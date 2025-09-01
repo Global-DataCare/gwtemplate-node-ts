@@ -1,6 +1,7 @@
 // src/utils/claims.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { v4 as uuidv4, validate as uuidValidate} from 'uuid';
 import { knownDomainsReversed } from "./domains.interface";
 import { findCanonicalClaimCase } from '../models/schema-definitions';
 
@@ -55,4 +56,74 @@ export function normalizeInteroperableClaims(
   }
   
   return normalizedClaims;
+}
+
+interface IncludedResource {
+  type: string;
+  id: string;
+  meta: {
+    claims: Record<string, any>;
+  };
+}
+
+/**
+ * Extracts the resource types from a map of claims.
+ * @param claims A map of claims.
+ * @returns An array of unique resource types.
+ */
+export function extractResourceTypes(claims: Record<string, any>): string[] {
+  const resourceTypes: string[] = [];
+  for (const claimName in claims) {
+    if (claimName.startsWith("org.schema.")) {
+      const parts = claimName.split('.');
+      if (parts.length > 1) {
+        const resourceType = parts[1]; // e.g., "Organization"
+        if (!resourceTypes.includes(resourceType)) {
+          resourceTypes.push(resourceType);
+        }
+      }
+    }
+  }
+  return resourceTypes;
+}
+
+/**
+ * Creates an included resource from a given type and claims.
+ * @param type The resource type.
+ * @param claims The claims for the resource.
+ * @param environment string that can be undefined
+ * @returns An included resource object.
+ */
+export function createIncludedResource(
+  type: string,
+  claims: Record<string, any>,
+  environment?: string
+): IncludedResource {
+
+  let resourceId: string;
+  const identifierClaim = `org.schema.${type}.identifier`;
+  if (claims[identifierClaim]) {
+    const identifier = claims[identifierClaim];
+
+          if (environment !== "demo" ) {
+            if (uuidValidate(identifier)) {
+               resourceId = identifier;
+             } else {
+                throw new Error (`Invalid Identifier ${identifier}`)
+             }
+          } else {
+             resourceId = identifier;
+          }
+
+  } else {
+    resourceId = uuidv4(); // Generate a new UUID v4
+  }
+
+  return {
+    type: type,
+    id: resourceId, // Use the UUID v4 as the ID
+    meta: {
+      claims: claims
+    }
+  };
 }

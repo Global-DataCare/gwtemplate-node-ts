@@ -1,7 +1,6 @@
 // src/routes/tenant.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import {v4 as uuidv4} from 'uuid';
 import express, { Request, Response, NextFunction } from 'express';
 import { ICryptography } from '../security/interfaces/ICryptography';
 import { QueueAdapter, JobRequest } from '../adapters/queue';
@@ -9,16 +8,9 @@ import { QueueAdapterMem } from '../adapters/queue-mem';
 import { parseCdsRequest } from '../security/middleware/parseCdsRequest';
 import { createDecodeRequestMiddleware } from '../security/middleware/decodeRequest';
 import { DataInRequest } from '../utils/http-parser';
+import { Worker } from '../worker';
 
 // --- Dependency Injection Setup (Mock) ---
-const cryptoService: ICryptography = {} as any;
-const asyncResponseStore = new Map<string, {
-  status: 'PENDING' | 'COMPLETED' | 'FAILED';
-  result?: string;
-}>();
-const queueAdapter: QueueAdapter = new QueueAdapterMem(asyncResponseStore);
-// ---
-
 const router = express.Router();
 const decodeRequest = createDecodeRequestMiddleware(cryptoService);
 
@@ -87,3 +79,4 @@ router.post(cdsRoute, (req, res, next) => {
 });
 
 export default router;
+

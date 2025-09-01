@@ -4,17 +4,9 @@
 import { DatabaseAbstract } from '../storage/database.abstract';
 import { ResourceDocument } from '../models/resource-document';
 import { Bundle } from '../models/bundle';
+import { ManagerResult } from '../models/manager-result';
 
 const EMPLOYEE_SECTION = 'employees';
-
-/**
- * The format-agnostic result of a manager's processing operation.
- * The worker is responsible for formatting this into a final response Bundle.
- */
-export interface ManagerResult {
-  successEntries: { id: string; status: string; resource?: any }[];
-  errorEntries: { id: string; status: string; errorMessage: string; }[];
-}
 
 export class EmployeeManager {
   private db: DatabaseAbstract;

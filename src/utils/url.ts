@@ -1,90 +1,51 @@
-// src/adapters/queue-mem.ts
+// src/utils/url.ts
 
-import { QueueAdapter, JobRequest } from './queue';
-import { ManagerRegistry, ManagerResult } from '../managers/EmployeeManager'; // Re-using ManagerResult
-import { convertResourceDataToArrayOfDataEntries, convertPrimaryDocToBundleFHIR } from '../utils/bundle';
-import { Bundle, BundleEntry } from '../models/bundle';
+/* Copyright (c) Connecting Solution & Applications Ltd. */
+/* Apache License 2.0 */
+
 /**
- * Formats the raw result from a manager into a final, client-facing Bundle.
- * This is the "Response Formatting" stage of the architecture.
- * @param managerResult The simple `{ success, error }` object from the manager.
- * @param originalFormat The format requested by the client (e.g., 'fhir+json').
- * @returns A fully formed Bundle.
+ * Join the base_url and path without adding extra slashes.
+ * 
+ * @param base_url - The base URL.
+ * @param path - The path to be appended to the base URL.
+ * @returns The safely joined URL.
  */
-function formatResponseBundle(managerResult: ManagerResult, originalFormat: string): Bundle {
-  const responseEntries: BundleEntry[] = [];
-
-  for (const success of managerResult.successEntries) {
-    responseEntries.push({
-      resource: success.resource || { id: success.id },
-      response: { status: success.status }
-    });
-  }
-
-  for (const error of managerResult.errorEntries) {
-    responseEntries.push({
-      resource: { id: error.id, resourceType: 'OperationOutcome' },
-      response: {
-        status: error.status,
-        outcome: { issue: [{ details: { text: error.errorMessage } }] }
-      }
-    });
-  }
-
-  const primaryDoc = {
-    type: 'batch-response',
-    total: managerResult.successEntries.length,
-    data: responseEntries,
-  };
-
-  // FUTURE: If originalFormat is fhir+json, use convertPrimaryDocToBundleFHIR
-  // For now, we return the canonical bundle.
-  return primaryDoc;
-}
-
-
-async function processJob(managers: ManagerRegistry, request: JobRequest): Promise<Bundle> {
-  const { input, resourceType, action, tenantId, format } = request;
-  const jobName = `${resourceType}-${action}`;
-
-  // 1. Normalize input to a canonical bundle
-  const canonicalEntries = convertResourceDataToArrayOfDataEntries(input.body, '/', 'http://localhost:3000');
-  const canonicalBundle: Bundle = { type: input.body.type || 'batch', data: canonicalEntries };
-
-  // 2. Route to Manager to get the format-agnostic result
-  let managerResult: ManagerResult;
-  switch (jobName) {
-    case 'Employee-_batch':
-      managerResult = await managers.employeeManager.processBundle(tenantId!, canonicalBundle);
-      break;
-    // Add other cases here
-    default:
-      throw new Error(`Unknown job name: '${jobName}'`);
-  }
-
-  // 3. Format the result into the final, client-facing Bundle
-  return formatResponseBundle(managerResult, format || 'json');
-}
-
-// ... The rest of QueueAdapterMem, which calls processJob ...
-export class QueueAdapterMem implements QueueAdapter {
-  // ... constructor, addJob, etc. ...
-  private async processQueue(): Promise<void> {
-    if (this.queue.length > 0) {
-      const job = this.queue.shift();
-      if (job) {
-        const thid = job.request.input.id; // Assuming DIDComm message ID
-        try {
-          // The result is now the final, formatted bundle.
-          const finalBundle = await processJob(this.managers, job.request);
-          this.responseStore.set(thid, { status: 'COMPLETED', result: JSON.stringify(finalBundle) });
-  } catch (error) {
-          // This secondary catch is for unexpected errors in the processJob function itself
-          const errorBundle = { type: 'batch-response', total: 0, data: [/*..error entry..*/] }; // Simplified
-          this.responseStore.set(thid, { status: 'FAILED', result: JSON.stringify(errorBundle) });
-  }
-}
+export function safelyJoinUrl(base_url: string, path: string): string {
+    // Remove trailing slash from base_url if it exists
+    if (base_url.endsWith('/')) {
+        base_url = base_url.substring(0, base_url.length - 1);
     }
-  }
-  // ... startWorker ...
+    // Remove leading slash from path if it exists
+    if (path.startsWith('/')) {
+        path = path.substring(1);
+    }
+    return `${base_url}/${path}`;
+}
+
+/**
+ * Splits a given URL into its domain and path components.
+ *
+ * @param {string} urlString - The full URL string to be split.
+ * @returns {{ domain: string; path: string }} An object containing the `domain` and `path` of the URL.
+ * If the URL is not valid it returns empty domain and path.
+ *
+ * @example
+ * Returns { domain: 'www.example.com', path: '/some/path' }
+ * const result = splitUrl('https://www.example.com/some/path?query=string');
+ *
+ * @example
+ * Returns null for invalid URLs
+ * const result = splitUrl('invalid-url');
+ */
+export function splitUrl(urlString: string): { domain: string; path: string } | null {
+    const domain = "";
+    const path = "";
+    try {
+        const url = new URL(urlString);
+        const domain = url.hostname;
+        const path = url.pathname;
+    } catch (error) {
+        console.error("Invalid URL provided:", (error as any).message);
+    }
+    return { domain, path };
 }
