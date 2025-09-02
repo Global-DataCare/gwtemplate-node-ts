@@ -1,20 +1,14 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/OrganizationManager.ts
 
-import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { isValidTenantAlternateName } from '../utils/tenant';
 import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
 import { VaultRepository } from '../database/repositories/vault/vault.repository';
-import { TenantConfig } from '../models/tenant'; // Corrected import path
-import { config } from '../config'; // For API base URL
-
-interface IncludedResource {
-  type: string;
-  id: string;
-  meta: {
-    claims: Record<string, any>;
-  };
-}
+import { TenantConfig } from '../models/tenant';
+import { config } from '../config';
+import { IncludedResource } from '../models/jsonapi';
+import { determineResourceId } from '../utils/resource';
 
 export class OrganizationManager {
 
@@ -24,59 +18,45 @@ export class OrganizationManager {
     this.vaultRepository = vaultRepository;
   }
 
-  /**
-   * Registers a new organization by processing a job with interoperable claims.
-   * @param job The job containing registration data.
-   * @param environment The deployment environment (e.g., 'demo').
-   * @returns A JSON:API document with the results.
-   */
-  async register(job: any, environment?: string): Promise<any> {
+  public async register(job: any, environment?: string): Promise<any> {
+    // 1. --- Initial Validation ---
     const data = job.body.data;
-
     if (!Array.isArray(data) || data.length === 0) {
       throw new Error("Invalid data: 'data' must be an array with at least one entry.");
     }
-
     const entry = data[0];
     const claims = entry.meta.claims;
-
     if (claims["@type"] !== "template") {
         throw new Error("Invalid @type: Top-level @type must be 'template'.");
     }
 
     const alternateName = claims[ClaimsOrgSchemaorg.alternateName];
-    if (alternateName && !isValidTenantAlternateName(alternateName)) {
-        throw new Error(`Invalid alternateName: '${alternateName}'. Tenant alternateName cannot start or end with 'host'.`);
-    }
-    if (!alternateName) {
-        throw new Error("Missing required claim: org.schema.Organization.alternateName");
-    }
 
-    // --- Logic migrated from TenantManager ---
-    const newTenantConfig: TenantConfig = {
-      id: uuidv4(), // Generate a new internal ID for the config object
+    // 2. --- Handle alternateName and Tenant-Specific Logic ---
+    if (alternateName !== 'host') {
+        if (!alternateName) {
+            throw new Error("Missing required claim: org.schema.Organization.alternateName");
+        }
+        if (!isValidTenantAlternateName(alternateName)) {
+            throw new Error(`Invalid alternateName: '${alternateName}'. Tenant alternateName cannot start or end with 'host'.`);
+        }
+        
+        const newTenantConfig: TenantConfig = {
+          id: uuidv4(),
       alternateName: alternateName,
-      legalName: claims[ClaimsOrgSchemaorg.legalName],
-      identifier: claims[ClaimsOrgSchemaorg.taxID], // Assuming taxID is the primary identifier
-      url: `${config.apiBaseUrl}/${alternateName}`,
-      sector: claims[ClaimsServiceSchemaorg.category] || 'default',
-      jurisdiction: claims[ClaimsOrgSchemaorg.addressCountry],
-      didDocument: {
-        '@context': 'https://www.w3.org/ns/did/v1',
-        id: `did:web:${alternateName}`, // Simplified DID generation
-        service: [], // Service endpoints can be added later
-      },
-      meta: {
-        lastUpdated: new Date().toISOString()
-      }
-    };
+          legalName: claims[ClaimsOrgSchemaorg.legalName],
+          identifier: claims[ClaimsOrgSchemaorg.taxID],
+          url: `${config.apiBaseUrl}/${alternateName}`,
+          sector: claims[ClaimsServiceSchemaorg.category] || 'default',
+          jurisdiction: claims[ClaimsOrgSchemaorg.addressCountry],
+          didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: `did:web:${alternateName}`, service: [] },
+          meta: { lastUpdated: new Date().toISOString() }
+        };
+        await this.vaultRepository.createNewVault({ id: alternateName, custodian: newTenantConfig.id });
+        await this.vaultRepository.put('host', [newTenantConfig], 'tenants');
+    }
 
-    await this.vaultRepository.createNewVault({ id: alternateName, custodian: newTenantConfig.id });
-    await this.vaultRepository.put('host', [newTenantConfig], 'tenants');
-    // --- End of migrated logic ---
-
-    // ... (rest of the resource extraction logic remains the same)
-    
+    // 3. --- Process Claims into Resources (ALWAYS RUNS) ---
     const resourceTypes: string[] = [];
     for (const claimName in claims) {
       if (claimName.startsWith("org.schema.")) {
@@ -93,7 +73,6 @@ export class OrganizationManager {
     const includedResources: IncludedResource[] = [];
     for (const type of resourceTypes) {
       const resourceClaims: Record<string, any> = { "@type": type };
-      let resourceId: string; // Ensure resourceId is always a string
       for (const claimName in claims) {
         if (claimName.startsWith(`org.schema.${type}.`)) {
           resourceClaims[claimName] = claims[claimName];
@@ -101,21 +80,16 @@ export class OrganizationManager {
       }
       
       const identifierClaim = claims[`org.schema.${type}.identifier`];
-      const uuidPart = identifierClaim?.split('urn:uuid:')[1]?.split(',')[0];
-
-      if (identifierClaim && environment !== 'demo' && uuidPart && uuidValidate(uuidPart)) {
-        resourceId = uuidPart;
-      } else {
-        resourceId = uuidv4();
-      }
+      const resourceId = determineResourceId(identifierClaim, environment);
 
       includedResources.push({
         type: type,
-        id: resourceId, // Now this is guaranteed to be a string
+        id: resourceId,
         meta: { claims: resourceClaims },
       });
     }
 
+    // 4. --- Construct and Return JSON:API Response (ALWAYS RUNS) ---
     const templateId = uuidv4();
     const relationships: Record<string, any> = {};
     includedResources.forEach(res => {
@@ -139,4 +113,3 @@ export class OrganizationManager {
     };
   }
 }
-
