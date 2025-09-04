@@ -1,10 +1,9 @@
 // src/managers/EmployeeManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { DatabaseAbstract } from '../storage/database.abstract';
-import { ResourceDocument } from '../models/resource-document';
 import { Bundle } from '../models/bundle';
 import { ManagerResult } from '../models/manager-result';
+import { IncludedResource } from '../models/jsonapi';
 
 const EMPLOYEE_SECTION = 'employees';
 
@@ -40,7 +39,7 @@ export class EmployeeManager {
         const claims = meta.claims;
 
         if (request.method === 'PUT' || request.method === 'POST') {
-          const doc: ResourceDocument = { id: employeeId, vaultId: tenantId, meta: { lastUpdated: new Date().toISOString(), claims: claims }, resource: resource };
+          const doc: any = { id: employeeId, vaultId: tenantId, meta: { lastUpdated: new Date().toISOString(), claims: claims }, resource: resource };
           await this.db.put(tenantId, [doc], EMPLOYEE_SECTION);
           result.successEntries.push({ id: employeeId, status: '201 Created', resource: { id: employeeId, resourceType: 'Practitioner' } });
         } else if (request.method === 'DELETE') {

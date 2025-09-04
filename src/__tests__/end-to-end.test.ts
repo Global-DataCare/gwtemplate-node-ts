@@ -1,7 +1,6 @@
 // src/__tests__/end-to-end.test.ts
 import express from 'express';
 import supertest from 'supertest';
-import { DatabaseMem } from '../storage/database.mem';
 import { QueueAdapterMem } from '../adapters/queue-mem';
 import { TenantMemManager } from '../managers/TenantMemManager';
 import { EmployeeManager } from '../managers/EmployeeManager';
@@ -12,6 +11,7 @@ import { createApiRouter } from '../routes/api';
 import { createDiscoveryRouter } from '../routes/discovery';
 import { getOrg1EmployeeBatch } from './org1.data'; // Ensure this data is updated
 import { v4 as uuidv4 } from 'uuid';
+import { ManagerRegistry } from '../managers/registry';
 
 // Helper function to wait for async jobs
 const waitForJob = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

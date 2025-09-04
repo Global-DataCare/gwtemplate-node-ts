@@ -33,6 +33,7 @@ export enum ClaimsPersonSchemaorg {
 
 export enum ClaimsServiceSchemaorg {
     category = "org.schema.Service.category",
+    identifier = "org.schema.Service.identifier",
     serviceType = "org.schema.Service.serviceType",
     termsOfService = "org.schema.Service.termsOfService",
 }

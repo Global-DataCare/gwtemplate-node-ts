@@ -19,7 +19,7 @@ describe('createHostClaimsFromEnv', () => {
             [HostEnvVars.ADMIN_EMAIL]: testHostData.member.admin1.email,
             [HostEnvVars.ADMIN_ROLE]: testHostData.member.admin1.hasOccupation,
             [HostEnvVars.ADMIN_UID]: testHostData.member.admin1.uuid,
-            [HostEnvVars.TERMS_URL]: testHostData.providerTermsOfService,
+            [HostEnvVars.TERMS_URL]: testHostData.provider.service.termsOfService,
             // Add other required vars that might not be in testHostData
             [HostEnvVars.ID_TYPE]: 'TAX',
             [HostEnvVars.DB_TYPE]: 'MEMORY',

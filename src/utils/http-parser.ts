@@ -1,23 +1,8 @@
-// src/utils/http-parser.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// File: src/utils/http-parser.ts
 
 import { URL } from 'url';
-
-export interface DataInRequest {
-  fullUrl?: string;
-  httpMethod?: string;
-  input?: any;
-  contentType?: string;
-  tenantId?: string;
-  jurisdiction?: string;
-  apiVersion?: string;
-  sectorType?: string;
-  section?: string;      // Corresponds to <sectionTypeOrCompartmentCodingSystem>
-  format?: string;       // Corresponds to <formatTypeOrCompartmentCodingValue>
-  resourceType?: string;
-  action?: string;       // The action without the '_' prefix
-  language?: string;
-}
+import { DataInRequest } from '../models/request'; // Import from the new central model file
 
 // --- Helper Functions ---
 

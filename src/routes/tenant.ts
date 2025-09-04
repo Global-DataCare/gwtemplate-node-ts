@@ -2,12 +2,12 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express, { Request, Response, NextFunction } from 'express';
-import { ICryptography } from '../security/interfaces/ICryptography';
-import { QueueAdapter, JobRequest } from '../adapters/queue';
+import { QueueAdapter } from '../adapters/queue';
 import { QueueAdapterMem } from '../adapters/queue-mem';
 import { parseCdsRequest } from '../security/middleware/parseCdsRequest';
+import { ICryptography } from '../security/interfaces/ICryptography';
 import { createDecodeRequestMiddleware } from '../security/middleware/decodeRequest';
-import { DataInRequest } from '../utils/http-parser';
+import { DataInRequest, JobRequest } from '../models/request';
 import { Worker } from '../worker';
 
 // --- Dependency Injection Setup (Mock) ---

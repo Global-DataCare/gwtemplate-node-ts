@@ -2,11 +2,12 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { TenantMemManager } from './TenantMemManager';
-import { EmployeeManager, ManagerResult } from './EmployeeManager';
+import { EmployeeManager } from './EmployeeManager';
 import { CustomerManager } from './CustomerManager';
 import { GroupManager } from './GroupManager';
 import { ListManager } from './ListManager';
 import { Bundle } from '../models/bundle';
+import { ManagerResult } from '../models/manager-result';
 
 /**
  * Defines the contract for all managers that process bundles.

@@ -4,25 +4,45 @@
 import { OrganizationManager } from '../../../managers/OrganizationManager';
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 import {
+    testHostClaimsOkWithService,
     testHostData,
     testTenant1Data,
-    testTenant1ClaimsOk,
-    testInvalidAlternateNameClaims,
     testTemplateId,
     testTemplateVersion,
     tesInvalidUuid,
-    testTenant1BaseValidClaims,
+    testTenant1ClaimsInvalidAlternateName,
+    testTenant1ClaimsOkWithService,
 } from '../../data/organization.data';
 import { isValidTenantAlternateName } from "../../../utils/tenant";
-import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg } from '../../../models/schemaorg';
+import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
 import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
-import { createHostClaimsFromEnv } from '../../../utils/host';
-import { HostEnvVars } from '../../../models/env';
+import { JobRequest } from '../../../models/request';
+import { ClaimsRecord } from '../../../models/resource-document';
+import { TenantConfig } from '../../../models/tenant';
+import { IKmsService } from '../../../security/interfaces/IKmsService';
+import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
 // Mock external dependencies
 jest.mock('uuid');
 jest.mock('../../../utils/tenant');
+
+// Create a mock KMS service for testing.
+const mockKmsService: jest.Mocked<IKmsService> = {
+    protectDocument: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> => {
+        // Simulate the KMS encrypting the content and moving it to the JWE property.
+        const secureDoc = { ...doc, jwe: { ciphertext: 'encrypted-content' } };
+        delete secureDoc.content;
+        return secureDoc;
+    }),
+    unprotectDocument: jest.fn(),
+    getDidDocument: jest.fn(),
+    getPublicJwks: jest.fn(),
+    getPublicVerificationKey: jest.fn(),
+    getPublicEncryptionKey: jest.fn(),
+    sign: jest.fn(),
+    verify: jest.fn(),
+};
 
 describe("OrganizationManager", () => {
     let organizationManager: OrganizationManager;
@@ -33,124 +53,145 @@ describe("OrganizationManager", () => {
     // --- TEST CASE OVERVIEW ---
     // --------------------------
     /*
-    * This test suite covers the following scenarios for the OrganizationManager:
+    * This test suite covers the synchronous, business-logic-only responsibilities of the OrganizationManager.
     *
     *  [1] HOST: Registers the 'host' organization with a valid, existing admin UUID.
     *  [2] TENANT: Generates a new UUID if the admin identifier is an invalid UUID (in normal mode).
     *  [3] DEMO: Allows using a non-UUID admin identifier in "demo" mode.
     *  [4] TENANT: Generates a new UUID for the admin if no identifier is provided.
-    *  [5] TENANT: Registers a tenant organization with a valid, existing admin UUID (Happy Path).
-    *  [6] TENANT: Rejects registration for a tenant with an invalid alternateName.
-    *
-    *  --- Planned for next cycle ---
+    *  [5] TENANT: Registers a tenant organization, encrypting the content before persistence (Happy Path).
+    *  [6] TENANT: Rejects registration for a tenant with an invalid alternateName format.
     *  [7] TENANT: Rejects registration if the alternateName (tenant-id) already exists.
     *  [8] TENANT: Rejects registration if the taxID + country combination already exists.
     *
     *  --- Future Scenarios (TODO) ---
-    *  [9] AUTH: Rejects registration based on caller's permissions.
+    *  [9 AUTH: Rejects registration based on caller's permissions.
     *  [10] BATCH: Processes the creation of multiple organizations in a single job.
-    *  [11 KEYS: Extracts admin's public keys from JWS/JWE to create their DID and add as 'controller' to the org's DID.
-    *  [12] GOVERNANCE: Tests for updating the organization's DID document based on defined policies (e.g., multi-controller approval).
+    *  [11] KEYS: Extracts admin's public keys from JWS/JWE to create their DID and add as 'controller' to the org's DID.
+    *  [12 GOVERNANCE: Tests for updating the organization's DID document based on defined policies (e.g., multi-controller approval).
     */
 
     beforeEach(() => {
         vaultRepository = new VaultMemRepository();
-        organizationManager = new OrganizationManager(vaultRepository);
+        // Inject both the repository and the mock KMS service.
+        organizationManager = new OrganizationManager(vaultRepository, mockKmsService);
         process.env = { ...originalEnv };
         
-        (uuidv4 as jest.Mock).mockImplementation(() => 'new-mocked-uuid-v4');
+        // Reset mocks before each test
+        jest.clearAllMocks();
+
+        (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
         (uuidValidate as jest.Mock).mockReturnValue(true);
         (isValidTenantAlternateName as jest.Mock).mockReturnValue(true);
     });
 
     afterEach(() => {
-        jest.clearAllMocks();
         process.env = originalEnv;
     });
 
-    /**
-     * Test case [1]: HOST - Registers the 'host' organization.
-     */
-    it("[1] should register the 'host' organization using claims from environment variables", async () => {
-        process.env[HostEnvVars.LEGAL_NAME] = testHostData.legalName;
-        process.env[HostEnvVars.JURISDICTION] = testHostData.addressCountry;
-        process.env[HostEnvVars.ID_TYPE] = 'TAX';
-        process.env[HostEnvVars.ID_VALUE] = testHostData.taxId;
-        process.env[HostEnvVars.ADMIN_EMAIL] = testHostData.member.admin1.email;
-        process.env[HostEnvVars.ADMIN_ROLE] = testHostData.member.admin1.hasOccupation;
-        process.env[HostEnvVars.ADMIN_UID] = testHostData.member.admin1.uuid;
-        process.env[HostEnvVars.TERMS_URL] = testHostData.providerTermsOfService;
-
-        const hostClaims = createHostClaimsFromEnv();
-        const job = { body: { data: [{ meta: { templateId: testTemplateId, claims: hostClaims } } ]} };
-
-        const result = await organizationManager.register(job);
-        
-        const personResource = result.included.find((r: any) => r.type === 'Person');
-        expect(personResource.id).toBe(testHostData.member.admin1.uuid);
-        expect(isValidTenantAlternateName).not.toHaveBeenCalled();
+    const createBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
+        tenantId: claims[ClaimsOrgSchemaorg.alternateName || 'host'], // TODO: is this secure?
+        jurisdiction: claims[ClaimsOrgSchemaorg.addressCountry],
+        resourceType: 'Organization',
+        section: 'org.schema',
+        action: '_batch',
+        input: {
+            type: 'https://didcomm.org/registration/1.0/register',
+            body: { data: [{ meta: { claims, templateId: testTemplateId, templateVersion: testTemplateVersion} }] }
+        },
+        httpMethod: 'POST',
+        fullUrl: '/default',
     });
 
-    /**
-     * Test case [2]: TENANT - Generates a new UUID if the admin identifier is an invalid UUID.
-     */
-    it('[2] should generate a new UUID if the admin identifier is an invalid UUID', async () => {
-        const invalidClaims = { ...testTenant1ClaimsOk, [ClaimsPersonSchemaorg.identifier]: tesInvalidUuid };
-        const job = { body: { data: [{ meta: { templateId: testTemplateId, claims: invalidClaims } }] } };
-        (uuidValidate as jest.Mock).mockReturnValue(false);
-
-        const result = await organizationManager.register(job);
-        
-        const personResource = result.included.find((r: any) => r.type === 'Person');
-        expect(personResource.id).toBe('new-mocked-uuid-v4');
-    });
-
-    /**
-     * Test case [3]: DEMO - Allows non-UUID identifiers.
-     */
-    it("[3] should accept a non-UUID admin identifier in 'demo' mode", async () => {
-        const demoClaims = { ...testTenant1ClaimsOk, [ClaimsPersonSchemaorg.identifier]: testTenant1Data.member.admin1.mockedUuid };
-        const job = { body: { data: [{ meta: { templateId: testTemplateId, claims: demoClaims } }] } };
-        (uuidValidate as jest.Mock).mockReturnValue(false);
-
-        const result = await organizationManager.register(job, 'demo');
-
-        const personResource = result.included.find((r: any) => r.type === 'Person');
-        expect(personResource.id).toBe(testTenant1Data.member.admin1.mockedUuid);
-        expect(uuidv4).not.toHaveBeenCalled();
-    });
-
-    /**
-     * Test case [4]: TENANT - Generates new UUID if admin identifier is missing.
-     */
-    it('[4] should generate a new UUID if the admin identifier is not provided', async () => {
-        const job = { body: { data: [{ meta: { templateId: testTemplateId, claims: testTenant1BaseValidClaims } }] } };
-        const result = await organizationManager.register(job);
-        const personResource = result.included.find((r: any) => r.type === 'Person');
-        expect(personResource.id).toBe('new-mocked-uuid-v4');
-    });
-
-    /**
-     * Test case [5]: TENANT - Registers a tenant organization (Happy Path).
-     */
-    it("[5] should register a valid tenant and store its configuration", async () => {
-        const job = { body: { data: [{ meta: { templateId: testTemplateId, claims: testTenant1ClaimsOk } }] } };
-        const createVaultSpy = jest.spyOn(vaultRepository, 'createNewVault');
+    it('[5] TENANT (Happy Path): should use the KMS to protect the document before persisting', async () => {
+        const job = createBaseJobForClaims(testTenant1ClaimsOkWithService);
+        const putSpy = jest.spyOn(vaultRepository, 'put');
 
         await organizationManager.register(job);
         
-        expect(createVaultSpy).toHaveBeenCalledWith(expect.objectContaining({ id: testTenant1Data.alternateName }));
+        // --- Security and Persistence Assertions ---
+        expect(mockKmsService.protectDocument).toHaveBeenCalledTimes(1);
+
+        // Verify the document passed to the KMS had plaintext content.
+        const docToProtect = mockKmsService.protectDocument.mock.calls[0][0];
+        expect(docToProtect.content).toBeDefined();
+        expect(docToProtect.content?.legalName).toBe(testTenant1Data.legalName);
+
+        // Verify that the document passed to the repository for storage is the secure one.
+        expect(putSpy).toHaveBeenCalledTimes(1);
+        const savedDoc = putSpy.mock.calls[0][1][0] as ConfidentialStorageDoc;
+        expect(savedDoc.content).toBeUndefined();
+        expect(savedDoc.jwe).toBeDefined();
     });
 
-    /**
-     * Test case [6]: TENANT - Rejects invalid alternateName.
-     */
-    it("[6] should reject registration if alternateName is invalid", async () => {
-        const job = { body: { data: [{ meta: { templateId: testTemplateId, claims: testInvalidAlternateNameClaims } }] } };
+    it("[1] HOST: should process a 'host' registration", async () => {
+        const job = createBaseJobForClaims(testHostClaimsOkWithService);
+        const result = await organizationManager.register(job);
+
+        expect(isValidTenantAlternateName).not.toHaveBeenCalled();
+        const entry = result.data[0];
+        expect(entry.response.status).toBe('201');
+        const person = entry.resource.contained.find((r: any) => r.type === 'Person');
+        expect(person.id).toBe(testHostData.member.admin1.uuid);
+    });
+
+    it("[3] DEMO: should use a non-UUID identifier directly in 'demo' mode", async () => {
+        const demoClaims = { ...testTenant1ClaimsOkWithService, [ClaimsPersonSchemaorg.identifier]: testTenant1Data.member.admin1.mockedUuid };
+        const job = createBaseJobForClaims(demoClaims);
+        (uuidValidate as jest.Mock).mockReturnValue(false);
+
+        const result = await organizationManager.register(job, 'demo');
+        const person = result.data[0].resource.contained.find((r: any) => r.type === 'Person');
+        expect(person.id).toBe(testTenant1Data.member.admin1.mockedUuid);
+        expect(uuidv4).not.toHaveBeenCalled();
+    });
+
+    it("[2] TENANT: should generate a new UUID for an invalid identifier", async () => {
+        const invalidClaims = { ...testTenant1ClaimsOkWithService, [ClaimsPersonSchemaorg.identifier]: tesInvalidUuid };
+        const job = createBaseJobForClaims(invalidClaims);
+        (uuidValidate as jest.Mock).mockReturnValue(false);
+
+        const result = await organizationManager.register(job);
+        const person = result.data[0].resource.contained.find((r: any) => r.type === 'Person');
+        expect(person.id).toBe('new-mocked-uuid-v4');
+    });
+
+    it("[4] TENANT: should generate a new UUID if identifier claim is missing", async () => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [ClaimsServiceSchemaorg.identifier]: _, ...noIdClaims } = testTenant1ClaimsOkWithService;
+        const job = createBaseJobForClaims(noIdClaims as ClaimsRecord);
+
+        const result = await organizationManager.register(job);
+        const person = result.data[0].resource.contained.find((r: any) => r.type === 'Person');
+        expect(person.id).toBe('new-mocked-uuid-v4');
+    });
+
+    it("[6] TENANT: should produce an error entry for an invalid alternateName format", async () => {
+        const job = createBaseJobForClaims(testTenant1ClaimsInvalidAlternateName);
         (isValidTenantAlternateName as jest.Mock).mockReturnValue(false);
-        const invalidName = testInvalidAlternateNameClaims[ClaimsOrgSchemaorg.alternateName];
-        const expectedErrorMessage = `Invalid alternateName: '${invalidName}'. Tenant alternateName cannot start or end with 'host'.`;
-        await expect(organizationManager.register(job)).rejects.toThrow(expectedErrorMessage);
+
+        const result = await organizationManager.register(job);
+        expect(result.data[0].response.status).toBe('400');
+        expect(result.data[0].response.body.message).toContain('Invalid alternateName');
+    });
+
+    it("[7] TENANT: should produce an error entry if alternateName already exists", async () => {
+        jest.spyOn(vaultRepository, 'vaultExists').mockResolvedValue(true);
+        const job = createBaseJobForClaims(testTenant1ClaimsOkWithService);
+
+        const result = await organizationManager.register(job);
+        expect(result.data[0].response.status).toBe('409');
+        expect(result.data[0].response.body.message).toContain('already exists');
+    });
+
+    it("[8] TENANT: should produce an error entry if taxID and country combination already exists", async () => {
+        const existingConfig: Partial<TenantConfig> = { identifier: testTenant1Data.taxId, jurisdiction: testTenant1Data.addressCountry };
+        jest.spyOn(vaultRepository, 'getContainersInSection').mockResolvedValue([existingConfig as TenantConfig]);
+        const job = createBaseJobForClaims(testTenant1ClaimsOkWithService);
+
+        const result = await organizationManager.register(job);
+        expect(result.data[0].response.status).toBe('409');
+        expect(result.data[0].response.body.message).toContain('already exists for taxId');
     });
 });
 

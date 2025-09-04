@@ -1,7 +1,5 @@
 // src/__tests__/org1-setup.test.ts
-import { ITenantManager, SchemaorgOrganizationParam } from '../managers/ITenantManager';
 import { TenantMemManager } from '../managers/TenantMemManager';
-import { DatabaseMem } from '../storage/database.mem';
 import { EmployeeManager } from '../managers/EmployeeManager';
 import { CustomerManager } from '../managers/CustomerManager';
 import { GroupManager } from '../managers/GroupManager';

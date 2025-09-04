@@ -1,8 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// File: src/security/interfaces/Cryptography.types.ts
 
-import { JobRequest } from "../../adapters/queue";
-
-// src/security/interfaces/Cryptography.types.ts
+import { JobRequest } from "../../models/request";
 
 export interface RecipientInfo {
   tenantId: string;
@@ -15,19 +14,20 @@ export interface SignerInfo {
   unprotectedHeader?: Record<string, any>;
 }
 
-export interface EncryptRequest {
+export interface ProtectRequest {
   stream: Uint8Array;
   recipients: RecipientInfo[];
-  protectedHeader?: Record<string, any>;
-  unprotectedHeader?: Record<string, any>;
+  protectedHeader?: Record<string, any>; // is it meta.jws.protected?
+  unprotectedHeader?: Record<string, any>; // is it meta.jws.unprotected?
   aad?: Uint8Array;// src/adapters/queue.ts
   input: Record<string, any>;
   meta?: {
-    jws?: { protected?: Record<string, any>; };
-    jwe?: { header?: Record<string, any>; };
+    jws?: { protected?: Record<string, any>; unprotected?: Record<string, any>;}; // protected and unprotected headers
+    jwe?: { header?: Record<string, any>; }; // public unencypted header from the JWE
     bearer?: { jwt: { header?: Record<string, any>; payload?: Record<string, any>; } }
   };
 }
+
 export interface QueueAdapter {
   addJob(jobName: string, request: JobRequest, priority?: number): Promise<void>;
 }

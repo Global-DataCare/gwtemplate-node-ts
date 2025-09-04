@@ -1,5 +1,3 @@
-# Architecture Patterns:
-
 This document is the formal specification for the architecture. It is the definitive guide and "prompt" for all development.
 
 ## 1. The Asynchronous API Flow (The Golden Rule)
@@ -84,3 +82,78 @@ Once the core asynchronous API is stable, the next architectural layer is the im
     1.  The `Worker` processes a job and gets a final `Bundle` response.
     2.  In addition to storing the result in the temporary `ResponseStore`, the `Worker` passes the `Bundle` to a future `MessagingManager`.
     3.  The `MessagingManager` analyzes the `Bundle` to determine the sender and recipients and writes the message to the appropriate `inbox` and `sent` sections in the corresponding vaults.
+
+---
+
+## 9. Resource Identification and Normalization
+
+This section defines the canonical process for handling resource identifiers within the system, ensuring a clear distinction between internal database IDs and public business identifiers.
+
+### 9.1. Core Principles
+
+- **Internal ID (`id`):** Every resource object (Organization, Person, etc.) in a response payload MUST have a top-level `id` field. This `id` MUST be a pure, non-prefixed UUID (e.g., `"a1b2c3d4-..."`). It is used for database indexing, foreign key relationships, and unambiguous internal referencing.
+
+- **Public Identifier (`identifier` claim):** This is the identifier provided in the incoming claims (e.g., from a registration form).
+    - Its primary format is a URN, typically `urn:uuid:<value>`.
+    - It represents the "source of truth" for the resource's identity at the time of the request.
+
+- **Business Identifiers (`taxID`, etc.):** These are critical public identifiers used for business-level validation and lookup (e.g., ensuring an organization with a specific `taxID` and `country` is unique). They are preserved as-is but are NEVER used as the internal resource `id`.
+
+### 9.2. The Normalization Flow
+
+To ensure data consistency, the following flow is mandatory when processing resources from claims:
+
+1.  **Determine the Internal `id`:** The internal `id` (the pure UUID) is derived from the `org.schema.<Type>.identifier` claim using the `determineResourceId` utility. This utility is responsible for:
+    - Extracting the UUID from a valid `urn:uuid:<value>` string.
+    - Generating a new UUID if the claim is missing or invalid.
+    - Accepting non-UUID identifiers in `demo` mode.
+
+2.  **Normalize the `identifier` Claim:** Once the internal `id` (the pure UUID) is determined, the original `org.schema.<Type>.identifier` claim within the resource's `meta.claims` object **MUST BE OVERWRITTEN**.
+
+3.  **Create the Canonical URN:** The new value for the `identifier` claim is created by passing the determined internal `id` to the `createUrnFromUuid` utility.
+
+**Example:**
+
+- **Incoming Claim:** `org.schema.Person.identifier: "urn:uuid:a1b2c3d4-..."`
+- **Processing Result:**
+    - `Person.id`: `"a1b2c3d4-..."` (derived by `determineResourceId`)
+    - `Person.meta.claims['org.schema.Person.identifier'`: `"urn:uuid:a1b2c3d4-..."` (re-created and normalized by `createUrnFromUuid`)
+
+---
+
+## 10. Secure Persistence Flow
+
+This pattern describes the mandatory sequence of operations a manager must follow to persist a sensitive document securely in a vault, ensuring separation of concerns between business logic, security, and storage.
+
+### 10.1. Actors
+
+-   **Manager** (e.g., `OrganizationManager`): Knows the business logic. Responsible for creating the business data (the `content`) and its searchable indexes (`indexed`).
+-   **IKmsService** (Key Management Service): Knows how to secure data for a tenant. Manages key access and orchestrates encryption.
+-   **VaultRepository**: Knows how to write data to the underlying storage. It is "dumb" regarding cryptography.
+
+### 10.2. Sequence
+
+1.  **Manager: Construct Plaintext Document**
+    - The manager creates a complete `ConfidentialStorageDoc` object.
+    - It populates the `indexed` array with the necessary searchable attributes.
+    - It populates the `content` property with the full, sensitive business object (e.g., `TenantConfig`). The `jwe` property is left empty.
+
+2.  **Manager: Request Protection from KMS**
+    - The manager calls `await this.kmsService.protectDocument(docToProtect, tenantId)`.
+    - It passes the entire plaintext document and the ID of the tenant who will own the data.
+
+3.  **KMS: Perform Encryption**
+    - The `IKmsService` implementation receives the document.
+    - It takes the `doc.content` object and serializes it (e.g., `JSON.stringify`).
+    - It calls its internal, low-level crypto engine (`ICryptography.encrypt`) to turn the serialized `plaintext` into a `JWEData` object.
+    - It creates a new "secure" document by copying the original, setting the `jwe` property with the result, and **deleting the `content` property**.
+    - It returns this new secure document to the manager.
+
+4.  **Manager: Persist Secure Document**
+    - The manager receives the secure document from the KMS.
+    - It calls `await this.vaultRepository.put('vault', [secureDoc], 'section')`, passing the secure document to the storage layer.
+
+### 3. Result
+
+The data is stored securely at rest. The `content` only ever exists in memory within the KMS's secure boundary during the encryption process, and the repository only ever sees the encrypted `jwe` object.
+

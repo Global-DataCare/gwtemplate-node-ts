@@ -1,6 +1,7 @@
 // src/adapters/queue-mem.ts
-import { QueueAdapter, JobRequest } from './queue';
+import { QueueAdapter } from './queue';
 import { Worker } from '../worker';
+import { JobRequest } from '../models/request';
 /**
  * An in-memory implementation of the QueueAdapter.
  * It follows the Adapter pattern: its only job is to manage a queue of jobs in memory.
