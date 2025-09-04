@@ -4,14 +4,14 @@
 import { OrganizationManager } from '../../../managers/OrganizationManager';
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 import {
-    testHostClaimsOkWithService,
     testHostData,
     testTenant1Data,
     testTemplateId,
     testTemplateVersion,
     tesInvalidUuid,
-    testTenant1ClaimsInvalidAlternateName,
-    testTenant1ClaimsOkWithService,
+    testClaimsTenant1AlternateNameInvalidPrefix,
+    testClaimsTenant1Registration,
+    testClaimsHostInitialization,
 } from '../../data/organization.data';
 import { isValidTenantAlternateName } from "../../../utils/tenant";
 import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
@@ -43,6 +43,21 @@ const mockKmsService: jest.Mocked<IKmsService> = {
     sign: jest.fn(),
     verify: jest.fn(),
 };
+
+const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
+    tenantId: claims[ClaimsOrgSchemaorg.alternateName || 'host'], // TODO: is this secure?
+    jurisdiction: claims[ClaimsOrgSchemaorg.addressCountry],
+    resourceType: 'Organization',
+    section: 'org.schema',
+    action: '_batch',
+    input: {
+        type: 'https://didcomm.org/registration/1.0/register',
+        body: { data: [{ meta: { claims, templateId: testTemplateId, templateVersion: testTemplateVersion} }] }
+    },
+    httpMethod: 'POST',
+    fullUrl: '/default',
+});
+
 
 describe("OrganizationManager", () => {
     let organizationManager: OrganizationManager;
@@ -89,22 +104,8 @@ describe("OrganizationManager", () => {
         process.env = originalEnv;
     });
 
-    const createBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
-        tenantId: claims[ClaimsOrgSchemaorg.alternateName || 'host'], // TODO: is this secure?
-        jurisdiction: claims[ClaimsOrgSchemaorg.addressCountry],
-        resourceType: 'Organization',
-        section: 'org.schema',
-        action: '_batch',
-        input: {
-            type: 'https://didcomm.org/registration/1.0/register',
-            body: { data: [{ meta: { claims, templateId: testTemplateId, templateVersion: testTemplateVersion} }] }
-        },
-        httpMethod: 'POST',
-        fullUrl: '/default',
-    });
-
     it('[5] TENANT (Happy Path): should use the KMS to protect the document before persisting', async () => {
-        const job = createBaseJobForClaims(testTenant1ClaimsOkWithService);
+        const job = testBaseJobForClaims(testClaimsTenant1Registration);
         const putSpy = jest.spyOn(vaultRepository, 'put');
 
         await organizationManager.register(job);
@@ -124,8 +125,8 @@ describe("OrganizationManager", () => {
         expect(savedDoc.jwe).toBeDefined();
     });
 
-    it("[1] HOST: should process a 'host' registration", async () => {
-        const job = createBaseJobForClaims(testHostClaimsOkWithService);
+    it("[1] HOST: should process thes 'host' initialization", async () => {
+        const job = testBaseJobForClaims(testClaimsHostInitialization);
         const result = await organizationManager.register(job);
 
         expect(isValidTenantAlternateName).not.toHaveBeenCalled();
@@ -136,8 +137,8 @@ describe("OrganizationManager", () => {
     });
 
     it("[3] DEMO: should use a non-UUID identifier directly in 'demo' mode", async () => {
-        const demoClaims = { ...testTenant1ClaimsOkWithService, [ClaimsPersonSchemaorg.identifier]: testTenant1Data.member.admin1.mockedUuid };
-        const job = createBaseJobForClaims(demoClaims);
+        const demoClaims = { ...testClaimsTenant1Registration, [ClaimsPersonSchemaorg.identifier]: testTenant1Data.member.admin1.mockedUuid };
+        const job = testBaseJobForClaims(demoClaims);
         (uuidValidate as jest.Mock).mockReturnValue(false);
 
         const result = await organizationManager.register(job, 'demo');
@@ -147,8 +148,8 @@ describe("OrganizationManager", () => {
     });
 
     it("[2] TENANT: should generate a new UUID for an invalid identifier", async () => {
-        const invalidClaims = { ...testTenant1ClaimsOkWithService, [ClaimsPersonSchemaorg.identifier]: tesInvalidUuid };
-        const job = createBaseJobForClaims(invalidClaims);
+        const invalidClaims = { ...testClaimsTenant1Registration, [ClaimsPersonSchemaorg.identifier]: tesInvalidUuid };
+        const job = testBaseJobForClaims(invalidClaims);
         (uuidValidate as jest.Mock).mockReturnValue(false);
 
         const result = await organizationManager.register(job);
@@ -158,8 +159,9 @@ describe("OrganizationManager", () => {
 
     it("[4] TENANT: should generate a new UUID if identifier claim is missing", async () => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { [ClaimsServiceSchemaorg.identifier]: _, ...noIdClaims } = testTenant1ClaimsOkWithService;
-        const job = createBaseJobForClaims(noIdClaims as ClaimsRecord);
+        const { [ClaimsPersonSchemaorg.identifier]: _, ...noIdClaims } = testClaimsTenant1Registration;
+        const job = testBaseJobForClaims(noIdClaims as ClaimsRecord);
+        (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
 
         const result = await organizationManager.register(job);
         const person = result.data[0].resource.contained.find((r: any) => r.type === 'Person');
@@ -167,31 +169,31 @@ describe("OrganizationManager", () => {
     });
 
     it("[6] TENANT: should produce an error entry for an invalid alternateName format", async () => {
-        const job = createBaseJobForClaims(testTenant1ClaimsInvalidAlternateName);
+        const job = testBaseJobForClaims(testClaimsTenant1AlternateNameInvalidPrefix);
         (isValidTenantAlternateName as jest.Mock).mockReturnValue(false);
 
         const result = await organizationManager.register(job);
         expect(result.data[0].response.status).toBe('400');
-        expect(result.data[0].response.body.message).toContain('Invalid alternateName');
+        expect(result.data[0].response.outcome.issue[0].details.text).toContain('Invalid alternateName');
     });
 
     it("[7] TENANT: should produce an error entry if alternateName already exists", async () => {
         jest.spyOn(vaultRepository, 'vaultExists').mockResolvedValue(true);
-        const job = createBaseJobForClaims(testTenant1ClaimsOkWithService);
+        const job = testBaseJobForClaims(testClaimsTenant1Registration);
 
         const result = await organizationManager.register(job);
         expect(result.data[0].response.status).toBe('409');
-        expect(result.data[0].response.body.message).toContain('already exists');
+        expect(result.data[0].response.outcome.issue[0].details.text).toContain('already exists');
     });
 
     it("[8] TENANT: should produce an error entry if taxID and country combination already exists", async () => {
         const existingConfig: Partial<TenantConfig> = { identifier: testTenant1Data.taxId, jurisdiction: testTenant1Data.addressCountry };
         jest.spyOn(vaultRepository, 'getContainersInSection').mockResolvedValue([existingConfig as TenantConfig]);
-        const job = createBaseJobForClaims(testTenant1ClaimsOkWithService);
+        const job = testBaseJobForClaims(testClaimsTenant1Registration);
 
         const result = await organizationManager.register(job);
         expect(result.data[0].response.status).toBe('409');
-        expect(result.data[0].response.body.message).toContain('already exists for taxId');
+        expect(result.data[0].response.outcome.issue[0].details.text).toContain("already exists");
     });
 });
 

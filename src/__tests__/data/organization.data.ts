@@ -145,7 +145,7 @@ const baseClaims: Omit<ClaimsRecord, "org.schema.Organization.legalName"> = {
 };
 
 /** A valid and complete set of claims for registering the HOST organization. */
-export const testHostClaimsOk: ClaimsRecord = {
+export const testClaimsHostOrganization: ClaimsRecord = {
     ...baseClaims,
     [ClaimsOrgSchemaorg.legalName]: testHostData.legalName,
     [ClaimsOrgSchemaorg.identifier]: testHostData.identifier,
@@ -154,18 +154,25 @@ export const testHostClaimsOk: ClaimsRecord = {
 };
 
 /**
- * Valid claims for the 'host' organization, including a service definition.
+ * Valid claims for the 'host' organization,
+ * including the admin registering the organization and the software provider
  */
-export const testHostClaimsOkWithService = {
-    ...testHostClaimsOk,
-    [ClaimsServiceSchemaorg.identifier]: `urn:uuid:${uuidv4()}`,
-    [ClaimsServiceSchemaorg.category]: 'Anti-Fraud',
+export const testClaimsHostInitialization = {
+    ...testClaimsHostOrganization,
+    [ClaimsPersonSchemaorg.identifier]: testHostData.member.admin1.identifier,
+    [ClaimsPersonSchemaorg.hasOccupation]: testHostData.member.admin1.hasOccupation,
+    [ClaimsPersonSchemaorg.email]: testHostData.member.admin1.email,
+    [ClaimsServiceSchemaorg.category]: testHostData.provider.service.category,
+    [ClaimsServiceSchemaorg.identifier]: testHostData.provider.service.identifier,
+    [ClaimsServiceSchemaorg.serviceType]: testHostData.provider.service.serviceType,
+    [ClaimsServiceSchemaorg.termsOfService]: testHostData.provider.service.termsOfService,
 };
+
 
 /**
  * Well-formed claims for a tenant registration.
  */
-export const testTenant1ClaimsOk = {
+export const testClaimsTenant1Organization = {
     ...baseClaims,
     [ClaimsOrgSchemaorg.legalName]: testTenant1Data.legalName,
     [ClaimsOrgSchemaorg.identifier]: testTenant1Data.identifier,
@@ -177,19 +184,22 @@ export const testTenant1ClaimsOk = {
 /**
  * Valid claims for a tenant, including a service definition.
  */
-export const testTenant1ClaimsOkWithService = {
-    ...testTenant1ClaimsOk,
+export const testClaimsTenant1Registration = {
+    ...testClaimsTenant1Organization,
+    [ClaimsPersonSchemaorg.identifier]: testTenant1Data.member.admin1.identifier,
+    [ClaimsPersonSchemaorg.hasOccupation]: testTenant1Data.member.admin1.hasOccupation,
+    [ClaimsPersonSchemaorg.email]: testTenant1Data.member.admin1.email,
+    [ClaimsServiceSchemaorg.category]: testTenant1Data.provider.service.category,
     [ClaimsServiceSchemaorg.identifier]: testTenant1Data.provider.service.identifier,
     [ClaimsServiceSchemaorg.termsOfService]: testTenant1Data.provider.service.termsOfService,
-    [ClaimsServiceSchemaorg.category]: testTenant1Data.provider.service.category,
-    [ClaimsServiceSchemaorg.serviceType]: testTenant1Data.provider.service.serviceType,
+    [ClaimsServiceSchemaorg.serviceType]: testTenant1Data.provider.service.serviceType, // purpose
 };
 
 /**
- * Claims for a tenant with an invalid alternateName format.
+ * Claims for a tenant with an invalid alternateName ('host' is not allowed as prefix or suffix for tenants)
  */
-export const testTenant1ClaimsInvalidAlternateName = {
-    ...testTenant1ClaimsOkWithService,
-    [ClaimsOrgSchemaorg.alternateName]: 'Invalid-Tenant@Name',
+export const testClaimsTenant1AlternateNameInvalidPrefix = {
+    ...testClaimsTenant1Registration,
+    [ClaimsOrgSchemaorg.alternateName]: 'hosting-tenant-1',
 };
 

@@ -1,19 +1,16 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/OrganizationManager.ts
 
-import { v4 as uuidv4 } from 'uuid';
-import { isValidTenantAlternateName } from '../utils/tenant';
-import { ClaimsOrgSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
-import { TenantConfig } from '../models/tenant';
 import { config } from '../config';
+import { TenantConfig } from '../models/tenant';
 import { IncludedResource } from '../models/jsonapi';
-import { determineResourceId } from '../utils/resource';
-import { ICryptography } from '../security/interfaces/ICryptography';
 import { ClaimsRecord } from '../models/resource-document';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { JweObject } from '../security/interfaces/Cryptography.types';
+import { ClaimsOrgSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
 import { IKmsService } from '../security/interfaces/IKmsService';
+import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { determineResourceId } from '../utils/resource';
+import { isValidTenantAlternateName } from '../utils/tenant';
 
 /**
  * Manages the business logic for organization registration.
@@ -37,7 +34,7 @@ export class OrganizationManager {
    * @returns A HybridPayload object with a data array of processed entries.
    */
   async register(job: any, environment?: string): Promise<{ data: any[] }> {
-    const jobEntries = job?.body?.data || job?.body?.entry || [];
+    const jobEntries = job?.input?.body?.data || job?.input?.body?.entry || [];
     const responseEntries: any[] = [];
 
     for (const entry of jobEntries) {
@@ -48,19 +45,19 @@ export class OrganizationManager {
         }
 
         try {
-    const alternateName = claims[ClaimsOrgSchemaorg.alternateName];
+            const alternateName = claims[ClaimsOrgSchemaorg.alternateName];
 
             // --- Pre-flight validations ---
             if (alternateName && alternateName !== 'host') {
-        if (!isValidTenantAlternateName(alternateName)) {
+                if (!isValidTenantAlternateName(alternateName)) {
                     throw new Error(`Invalid alternateName format: '${alternateName}'`);
-        }
+                }
                 if (await this.vaultRepository.vaultExists(alternateName)) {
                     throw new Error(`Conflict: alternateName '${alternateName}' already exists`);
                 }
                 const tenants = await this.vaultRepository.getContainersInSection<TenantConfig>('host', 'tenants');
                 if (tenants.some(t => t.identifier === claims[ClaimsOrgSchemaorg.taxID] && t.jurisdiction === claims[ClaimsOrgSchemaorg.addressCountry])) {
-                    throw new Error(`Conflict: taxID '${claims[ClaimsOrgSchemaorg.taxID]}' already exists in country '${claims[ClaimsOrgSchemaorg.addressCountry]}'`);
+                    throw new Error(`Conflict: already exists the taxID '${claims[ClaimsOrgSchemaorg.taxID]}' issued by '${claims[ClaimsOrgSchemaorg.addressCountry]}' jurisdiction`);
                 }
             }
         
@@ -79,7 +76,7 @@ export class OrganizationManager {
                 resource: {
                     ...organization,
                     contained: [person, service]
-      },
+                },
                 response: { status: '201' }
             });
 
@@ -167,13 +164,13 @@ export class OrganizationManager {
         }
 
         if (claimFound) {
-            const identifierClaim = claims[`org.schema.${type}.identifier`];
+            const identifierClaim = resourceClaims[`org.schema.${type}.identifier`];
             const resourceId = determineResourceId(identifierClaim, environment);
             resources[type.toLowerCase()] = {
                 id: resourceId,
                 type: type,
                 meta: { claims: resourceClaims },
-    };
+            };
         }
     }
     if (!resources.organization || !resources.person || !resources.service) {
@@ -182,5 +179,6 @@ export class OrganizationManager {
     return resources as { organization: IncludedResource, person: IncludedResource, service: IncludedResource };
   }
 }
+
 
 
