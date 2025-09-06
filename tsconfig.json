@@ -1,14 +1,21 @@
 {
-    "compilerOptions": {
-      "target": "ES2020",
-      "module": "CommonJS",
-      "esModuleInterop": true,
-      "moduleResolution": "node",
-      "outDir": "./dist",
-      "strict": true,
-      "resolveJsonModule": true,
-      "skipLibCheck": true
-    },
-    "include": ["src", "security", "src/__tests__"]
-  }
-  
+  "compilerOptions": {
+    "target": "es2016",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "baseUrl": "./src",
+    "outDir": "./build",
+    "rootDir": "./src",
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "typeRoots": ["./src/types", "./node_modules/@types"]
+  },
+  "include": ["./src/**/*.tsx", "./src/**/*.ts"],
+  "exclude": ["./build", "node_modules", "**/__tests__/*", "**/tests/*", "**/test/*", "*.test.ts"]
+}

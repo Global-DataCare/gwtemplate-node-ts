@@ -39,6 +39,57 @@ export interface RecipientDataJWE {
 }
 
 /**
+ * Represents the protected (integrity-protected) header of a JWE.
+ * These parameters are combined with the AAD (Additional Authenticated Data)
+ * to ensure they are not tampered with.
+ *
+ * JWE defines two algorithms:
+ * - 'alg': The algorithm for key encryption (wrapping the CEK). In our case, a PQC KEM like Kyber.
+ *          This is defined per-recipient, not in the main protected header.
+ * - 'enc': The algorithm for content encryption (e.g., 'A256GCM').
+ */
+export interface ProtectedHeadersJWE {
+    /** Algorithm for Content Encryption Key (CEK) wrapping (e.g., Kyber KEM). Defined per-recipient. */
+    alg?: string;
+    /** Content Type of the payload. */
+    cty?: string;
+    /** Encryption Algorithm for the content (e.g., 'A256GCM'). */
+    enc?: string;
+    /** Key ID of the recipient's public key. */
+    kid?: string;
+    /** Sender's public key identifier. */
+    skid?: string;
+    /** Type of the JWE (e.g., 'didcomm-envelope-enc'). */
+    typ?: string;
+    /** Compression algorithm ('DEF' for DEFLATE). */
+    zip?: string;
+}
+
+/**
+ * Represents the unprotected header of a JWE.
+ * These parameters are not integrity-protected.
+ */
+export interface UnprotectedHeadersJWE {
+    /** JWK Set URL, a URL pointing to a set of keys. */
+    jku?: string;
+}
+
+/**
+ * Represents the data specific to a single recipient of a JWE.
+ */
+export interface RecipientDataJWE {
+    /** The Content Encryption Key (CEK), encrypted for this specific recipient. Base64URL encoded. */
+    encrypted_key?: string;
+    /** Unprotected header parameters specific to this recipient. */
+    header: {
+        /** Key Encryption Algorithm used for this recipient (e.g., 'kyber-768-r3'). */
+        alg: string;
+        /** Key ID of the recipient's public key (thumbprint of the JWK). */
+        kid: string;
+    };
+}
+
+/**
  * Represents a JWE object before encryption.
  * It contains the plaintext data and the configuration for encryption.
  */
@@ -59,22 +110,20 @@ export interface UnencryptedJWE {
 }
 
 /**
- * Represents a complete, encrypted JWE object, ready for serialization.
- * This structure aligns with the JWE JSON Serialization format.
+ * Represents a JWE (JSON Web Encryption) in the General JSON Serialization format.
+ * This structure supports multiple recipients.
  */
-export interface JWEData {
-    /** BASE64URL(UTF8(JWE Protected Header)) */
+export interface JweObject {
+    /** Base64URL encoded, integrity-protected header. */
     protected: string;
-    /** JWE Shared Unprotected Header */
+    /** Unprotected header (not integrity-protected). */
     unprotected?: UnprotectedHeadersJWE;
-    /** Array of recipients */
+    /** Array of recipient-specific data. */
     recipients: RecipientDataJWE[];
-    /** BASE64URL(JWE Initialization Vector) */
+    /** Initialization Vector, Base64URL encoded. */
     iv: string;
-    /** BASE64URL(JWE Ciphertext) */
+    /** The encrypted plaintext, Base64URL encoded. */
     ciphertext: string;
-    /** BASE64URL(JWE Authentication Tag) */
+    /** The authentication tag, Base64URL encoded. */
     tag: string;
-    /** BASE64URL(JWE AAD) */
-    aad?: string;
 }

@@ -28,7 +28,10 @@ jest.mock('uuid');
 jest.mock('../../../utils/tenant');
 
 // Create a mock KMS service for testing.
+// Create a complete mock KMS service for testing to satisfy the IKmsService interface.
 const mockKmsService: jest.Mocked<IKmsService> = {
+    decodeRequest: jest.fn(),
+    encodeResponse: jest.fn(),
     protectDocument: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> => {
         // Simulate the KMS encrypting the content and moving it to the JWE property.
         const secureDoc = { ...doc, jwe: { ciphertext: 'encrypted-content' } };

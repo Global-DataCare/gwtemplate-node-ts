@@ -32,7 +32,7 @@ export interface QueueAdapter {
   addJob(jobName: string, request: JobRequest, priority?: number): Promise<void>;
 }
 
-export interface JweObject {
+export interface JWEData {
   protected?: string;
   unprotected?: Record<string, any>;
   recipients: Array<{

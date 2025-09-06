@@ -1,30 +1,36 @@
+// src/models/jws.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
-// File: src/models/jws.ts
 
 /**
- * Represents the core components of a JWS (JSON Web Signature) structure,
- * based on RFC 7515. This is the standard for signed data.
+ * Represents the header parameters of a JSON Web Signature (JWS).
  */
+export interface JwsHeader {
+    /** Algorithm used to secure the JWS. Must not be "none". */
+    alg: string;
+    /** Key ID that indicates which key was used for the JWS signature. */
+    kid: string;
+    /** Content type, usually "didcomm-signed+json". */
+    cty?: string;
+    /** Type of the message, usually "jwt". */
+    typ?: string;
+}
 
 /**
- * Represents a single signature within a JWS JSON Serialization object.
+ * Represents a signature entry in a JWS using the General JSON Serialization format.
  */
 export interface JwsSignature {
-    /** BASE64URL(UTF8(JWS Protected Header)) */
+    /** The Base64URL encoded protected (signed) header. */
     protected: string;
-    /** JWS Unprotected Header */
-    unprotected?: Record<string, any>;
-    /** BASE64URL(JWS Signature) */
+    /** The Base64URL encoded signature. */
     signature: string;
 }
 
 /**
- * Represents a complete JWS object in JSON Serialization format.
- * This format is preferred as it supports multiple signatures.
- * @see https://datatracker.ietf.org/doc/html/rfc7515#section-7.2
+ * Represents a JWS (JSON Web Signature) in the General JSON Serialization format.
+ * This structure supports multiple signatures.
  */
 export interface JwsObject {
-    /** The BASE64URL(JWS Payload). */
+    /** The Base64URL encoded payload. */
     payload: string;
     /** An array of one or more signatures. */
     signatures: JwsSignature[];

@@ -1,13 +1,15 @@
 // src/routes/api.ts
+// src/routes/api.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { QueueAdapter, JobRequest } from '../adapters/queue';
+import { QueueAdapter } from '../adapters/queue';
 import { TenantMemManager } from '../managers/TenantMemManager';
 import { TenantConfig } from '../managers/ITenantManager';
-import { convertUrlEncodedDataToJson } from '../utils/http-parser';
+import { createDidServiceId } from '../utils/did';
 import { createJobName } from '../utils/naming';
+import { JobRequest } from '../models/request';
 
 /**
  * Validates an incoming request against the dynamic service configuration in a tenant's DID Document.
@@ -17,42 +19,27 @@ import { createJobName } from '../utils/naming';
  * @returns True if the request is valid according to a service rule, false otherwise.
  */
 function isRequestValid(tenantConfig: TenantConfig, params: any): boolean {
-  const { jurisdiction, sector, section, format, resourceType, action } = params;
+  const { sector, section, format, resourceType, action } = params;
 
   if (!tenantConfig.didDocument?.service) {
     return false; // No services defined, no access.
   }
 
-  // Iterate through each service rule defined for the tenant.
-  for (const service of tenantConfig.didDocument.service) {
-    const idParts = service.id.split('_');
-    if (idParts.length < 4 || idParts[idParts.length - 1] !== 'path') {
-      continue; // Skip malformed or irrelevant service IDs.
-    }
+  // Construct the expected service ID from the request parameters.
+  const expectedServiceId = createDidServiceId({ version: 'v1', sector, section, format });
 
-    // Extract parts from the service ID template. Example: v1_healthcare_employee_org.hl7.fhir.r4_path
-    const [_, tplSector, tplSection, tplFormat] = idParts;
+  // Find a service rule in the tenant's DID document that matches the expected ID.
+  const matchingService = tenantConfig.didDocument.service.find(s => s.id === expectedServiceId);
 
-    // 1. Validate the base path (sector, section/alias, format)
-    const sectorMatch = tplSector === sector;
-    const formatMatch = tplFormat === format;
-    
-    // The section can match directly or via a category alias.
-    const sectionMatch = (tplSection === section) || 
-                         (service.categoryAlias?.split(',').includes(section) ?? false);
-    
-    if (sectorMatch && formatMatch && sectionMatch) {
-      // 2. If the base path matches, validate the resource and action
-      const resourceAllowed = service.serviceEndpoint.split(',').includes(resourceType);
-      const actionAllowed = service.actions.includes(action);
-
-      if (resourceAllowed && actionAllowed) {
-        return true; // Found a valid rule that permits this request.
-      }
-    }
+  if (!matchingService) {
+    return false; // No service rule found for this path.
   }
 
-  return false; // No rule matched the request.
+  // Check if the requested resource and action are permitted by the matched rule.
+  const resourceAllowed = matchingService.serviceEndpoint.split(',').includes(resourceType);
+  const actionAllowed = matchingService.actions.includes(action);
+
+  return resourceAllowed && actionAllowed;
 }
 
 /**
@@ -64,7 +51,7 @@ export function createApiRouter(queueAdapter: QueueAdapter, tenantManager: Tenan
   router.post('/:tenantId/cds-:jurisdiction/v1/:sector/:section/:format/:resourceType/:action', async (req, res) => {
     // --- STANDARD ASYNC JOB FLOW ---
     const { tenantId, resourceType, action } = req.params;
-    
+
     // --- 1. TENANT & POLICY VALIDATION ---
     const tenantConfig = tenantManager.getConfigByAlternateName(tenantId);
     if (!tenantConfig) {
@@ -75,7 +62,7 @@ export function createApiRouter(queueAdapter: QueueAdapter, tenantManager: Tenan
       // This is a critical security check. If no rule in the tenant's config matches the request, deny it.
       return res.status(404).json({ error: `The requested endpoint is not configured for this tenant.` });
     }
-    
+
     // FUTURE: Add JWS/JWE decoding and authorization logic here.
 
     // 2. Job Request Creation
@@ -88,7 +75,7 @@ export function createApiRouter(queueAdapter: QueueAdapter, tenantManager: Tenan
       ...req.params,
       // The input is the decoded DIDComm message
       input: {
-        id: messageId,
+        thid: messageId,
         type: 'didcomm-message-type', // This would be the DIDComm protocol type
         body: req.body,
       },
