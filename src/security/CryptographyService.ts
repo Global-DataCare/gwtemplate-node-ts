@@ -1,14 +1,16 @@
 // src/security/CryptographyService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+// Use `import * as pako` to ensure compatibility with CommonJS/ESM module resolution.
+// This resolves a stubborn TypeScript error (`esModuleInterop`) during testing.
+import * as pako from 'pako';
+import { randomBytes } from 'crypto';
+import { ml_kem768 } from '@noble/post-quantum/ml-kem';
 import { ICryptography, EncryptionOptions } from './interfaces/ICryptography';
 import { AesManager } from './AesManager';
 import { Convert } from '../utils/convert';
-import { JweObject, ProtectedHeadersJWE, RecipientDataJWE } from '../models/jwe';
 import { JWK } from '../models/jwk';
-import { ml_kem768 } from '@noble/post-quantum/ml-kem';
-import { randomBytes } from 'crypto';
-import pako from 'pako';
+import { JweObject, ProtectedHeadersJWE, RecipientDataJWE } from '../models/jwe';
 
 /**
  * Provides high-level cryptographic functions implementing the ICryptography interface.

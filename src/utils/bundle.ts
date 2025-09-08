@@ -95,3 +95,63 @@ export const convertPrimaryDocToBundleFHIR = (primaryDocument: any, bundleType: 
 
   return bundle;
 };
+
+// --- Bundle & ManagerResult Creation/Mutation Utilities ---
+
+import { Bundle, BundleEntry } from '@/models/bundle';
+import { ManagerResult } from '@/models/manager-result';
+
+/**
+ * Appends a new entry to a ManagerResult object, preserving order.
+ * This is a pure function; it returns a new ManagerResult object.
+ * @param result The existing ManagerResult.
+ * @param newEntry The success or error entry to add.
+ * @returns A new ManagerResult with the added entry.
+ */
+export function addEntryToResult(result: ManagerResult, newEntry: BundleEntry): ManagerResult {
+  return {
+    entries: [...result.entries, newEntry],
+  };
+}
+
+/**
+ * Creates a final response Bundle from the aggregated results of a manager.
+ * This is used by the Worker after the Manager has successfully processed all entries.
+ * @param managerResult The result object from the business logic manager.
+ * @returns A final response Bundle.
+ */
+export function createSuccessBundle(managerResult: ManagerResult): Bundle {
+  return {
+    type: 'batch-response',
+    data: managerResult.entries, // Simply use the ordered list of entries
+  };
+}
+
+/**
+ * Creates a response Bundle containing a single, fatal error entry.
+ * This is used by the Worker when a catastrophic error occurs before the
+ * manager can even process the job.
+ * @param errorMessage The high-level error message to report.
+ * @returns A response Bundle containing a single error entry.
+ */
+export function createErrorBundle(errorMessage: string): Bundle {
+  const errorEntry: BundleEntry = {
+    resource: {}, // Empty resource for a fatal error
+    response: {
+      status: '500',
+      outcome: {
+        issue: [{
+          severity: 'error',
+          code: 'exception',
+          details: { text: errorMessage },
+        }]
+      }
+    }
+  };
+
+  return {
+    type: 'batch-response',
+    data: [errorEntry]
+  };
+}
+

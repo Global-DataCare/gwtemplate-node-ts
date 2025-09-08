@@ -2,7 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { Request, Response, NextFunction } from 'express';
-import { extractHttpRequestDataAsJson, DataInRequest } from '../../utils/http-parser';
+import { extractHttpRequestDataAsJson } from '../../utils/http-parser';
+import { DataInRequest } from '../../models/request';
 
 // Extend the Express Request type to include our custom property
 declare global {
@@ -47,3 +48,4 @@ export const parseCdsRequest = (req: Request, res: Response, next: NextFunction)
     });
   }
 };
+

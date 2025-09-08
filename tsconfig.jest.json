@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Override 'module' for ts-jest compatibility with modern ESM syntax in tests.
+    "module": "ESNext",
+    // This flag must be explicitly set here. Overriding "module" appears to
+    // affect how TypeScript handles module interoperability, making this necessary.
+    "esModuleInterop": true,
+    // Add test-specific types that shouldn't be in the global scope for the main app.
+    "types": ["jest", "node"],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.test.ts", "src/**/*.spec.ts"]
+}

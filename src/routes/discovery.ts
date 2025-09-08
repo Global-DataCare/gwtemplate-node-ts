@@ -16,9 +16,9 @@ export function createDiscoveryRouter(tenantManager: TenantMemManager): express.
 
   // Endpoint to serve the tenant's full DID Document.
   // Example: GET /org1/.well-known/did.json
-  router.get('/:tenantId/.well-known/did.json', (req, res) => {
+  router.get('/:tenantId/.well-known/did.json', async (req, res) => {
     const { tenantId } = req.params;
-    const tenantConfig = tenantManager.getConfigByAlternateName(tenantId);
+    const tenantConfig = await tenantManager.getConfigByAlternateName(tenantId);
 
     if (!tenantConfig || !tenantConfig.didDocument) {
       return res.status(404).json({ error: `DID Document for tenant '${tenantId}' not found.` });
@@ -31,9 +31,9 @@ export function createDiscoveryRouter(tenantManager: TenantMemManager): express.
   // Endpoint to serve the tenant's JSON Web Key Set (JWKS).
   // This is crucial for clients to verify signatures.
   // Example: GET /org1/.well-known/jwks.json
-  router.get('/:tenantId/.well-known/jwks.json', (req, res) => {
+  router.get('/:tenantId/.well-known/jwks.json', async (req, res) => {
     const { tenantId } = req.params;
-    const tenantConfig = tenantManager.getConfigByAlternateName(tenantId);
+    const tenantConfig = await tenantManager.getConfigByAlternateName(tenantId);
 
     // The DID Document is the source of truth for cryptographic keys.
     // We extract them from the 'verificationMethod' array.
@@ -52,3 +52,4 @@ export function createDiscoveryRouter(tenantManager: TenantMemManager): express.
 
   return router;
 }
+

@@ -2,6 +2,8 @@
 import { QueueAdapter } from './queue';
 import { Worker } from '../worker';
 import { JobRequest } from '../models/request';
+import { IAsyncResponseStore, StoredJob } from './async-response-store.mem';
+
 /**
  * An in-memory implementation of the QueueAdapter.
  * It follows the Adapter pattern: its only job is to manage a queue of jobs in memory.
@@ -13,10 +15,10 @@ import { JobRequest } from '../models/request';
  */
 export class QueueAdapterMem implements QueueAdapter {
   private queue: { name: string; request: JobRequest; priority: number }[] = [];
-  private responseStore: Map<string, { status: string; result?: string; }>;
+  private responseStore: IAsyncResponseStore;
   private worker: Worker;
 
-  constructor(responseStore: Map<string, any>, worker: Worker) {
+  constructor(responseStore: IAsyncResponseStore, worker: Worker) {
     this.responseStore = responseStore;
     this.worker = worker;
     this.startWorker();
@@ -38,16 +40,22 @@ export class QueueAdapterMem implements QueueAdapter {
     if (this.queue.length > 0) {
       const job = this.queue.shift();
       if (job) {
-        const thid = job.request.input.id;
+        const thid = job.request.input.thid; // Correctly get thid from the decoded input
+        if (!thid) {
+          console.error(`Job ${job.name} is missing a 'thid'. Skipping.`);
+          return;
+        }
         try {
           // Delegate the entire processing logic to the injected worker.
           const finalBundle = await this.worker.process(job.name, job.request);
-          this.responseStore.set(thid, { status: 'COMPLETED', result: JSON.stringify(finalBundle) });
+          const finalResult: StoredJob = { status: 'COMPLETED', result: JSON.stringify(finalBundle) };
+          this.responseStore.set(thid, finalResult);
         } catch (error) {
           // This catch is for catastrophic errors where the worker itself fails.
           const errorMessage = `Catastrophic failure in worker while processing job ${job.name}: ${(error as Error).message}`;
           console.error(errorMessage);
-          this.responseStore.set(thid, { status: 'FAILED', result: JSON.stringify({ error: errorMessage }) });
+          const finalResult: StoredJob = { status: 'FAILED', result: JSON.stringify({ error: errorMessage }) };
+          this.responseStore.set(thid, finalResult);
         }
       }
     }
@@ -61,3 +69,4 @@ export class QueueAdapterMem implements QueueAdapter {
     setInterval(() => { this.processQueue(); }, 50);
   }
 }
+

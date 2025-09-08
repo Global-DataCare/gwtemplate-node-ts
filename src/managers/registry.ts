@@ -8,6 +8,7 @@ import { GroupManager } from './GroupManager';
 import { ListManager } from './ListManager';
 import { Bundle } from '../models/bundle';
 import { ManagerResult } from '../models/manager-result';
+import { OrganizationManager } from './OrganizationManager';
 
 /**
  * Defines the contract for all managers that process bundles.
@@ -21,10 +22,13 @@ export interface IBundleProcessor {
  * This is used for dependency injection into the worker.
  */
 export interface ManagerRegistry {
+  organizationManager: OrganizationManager;
   tenantManager: TenantMemManager;
-  employeeManager: EmployeeManager;
-  customerManager: CustomerManager;
-  groupManager: GroupManager;
-  listManager: ListManager;
-  // Add other managers here as they are created.
+  // Mark managers that are not fully implemented yet as optional.
+  // This allows us to build the application with only the finished components.
+  employeeManager?: EmployeeManager;
+  customerManager?: CustomerManager;
+  groupManager?: GroupManager;
+  listManager?: ListManager;
 }
+

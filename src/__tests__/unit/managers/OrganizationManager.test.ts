@@ -1,6 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/OrganizationManager.test.ts
 
+import { jest } from '@jest/globals';
 import { OrganizationManager } from '../../../managers/OrganizationManager';
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 import {
@@ -25,7 +26,7 @@ import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
 // Mock external dependencies
 jest.mock('uuid');
-jest.mock('../../../utils/tenant');
+jest.mock('@/utils/tenant');
 
 // Create a mock KMS service for testing.
 // Create a complete mock KMS service for testing to satisfy the IKmsService interface.
@@ -38,7 +39,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
         delete secureDoc.content;
         return secureDoc;
     }),
-    unprotectDocument: jest.fn(),
+    unprotectDocument: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string) => Promise.resolve(doc.content as any)),
     getDidDocument: jest.fn(),
     getPublicJwks: jest.fn(),
     getPublicVerificationKey: jest.fn(),

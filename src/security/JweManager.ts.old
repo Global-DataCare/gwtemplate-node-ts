@@ -4,13 +4,11 @@
 /* Apache License 2.0 */
 
 // import sjcl from 'sjclplus';
+import { AES_GCM_JWA_ENC } from '@/models/aes';
+import { RecipientDataJWE, ProtectedHeadersJWE, UnprotectedHeadersJWE } from '@/models/jwe';
 import pako from 'pako';
+import { JWEData } from './interfaces/Cryptography.types';
 // import { createRandomBytesAsBitArray } from '../crypto/security.manager';
-import { AES_GCM_JWA_ENC } from '../aes/aes.model';
-import { AESManager } from '../aes/aes.manager';
-import { generateRandomBytesBase64UrlEncoded } from '../security/security.manager';
-import { stringToUint8Array, bytesArrayToString, objectToRawBase64UrlSafe } from './convert';
-import { JWEData, RecipientDataJWE, ProtectedHeadersJWE, UnprotectedHeadersJWE, StandardJWE } from './jwe.interface';
 
 export const EncAlgoritmAES256GCM = 'aes-256-gcm';
 
@@ -209,7 +207,7 @@ export async function decryptDataJWE(cekBase64Url: string, jweData: JWEData): Pr
  *  BASE64URL(JWE Ciphertext) || '.' ||
  *  BASE64URL(JWE Authentication Tag).
  */
-export function compactDataJWE(jweData: StandardJWE | undefined): string {
+export function compactDataJWE(jweData: any | undefined): string {
     if (!jweData || !jweData.recipients || !jweData.recipients.length || jweData.recipients.length<1
         || !jweData.protected || !jweData.iv || !jweData.ciphertext || !jweData.tag ) {
         return ""

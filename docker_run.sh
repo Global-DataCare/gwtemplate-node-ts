@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker run -p 8080:8080 gateway-service-nodejs
+docker run -p 8080:8080 gwtemplate-node-ts

@@ -1,9 +1,12 @@
 {
   "compilerOptions": {
-    "target": "es2016",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "baseUrl": "./src",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
     "outDir": "./build",
     "rootDir": "./src",
     "allowSyntheticDefaultImports": true,
@@ -16,6 +19,6 @@
     "strict": true,
     "typeRoots": ["./src/types", "./node_modules/@types"]
   },
-  "include": ["./src/**/*.tsx", "./src/**/*.ts"],
-  "exclude": ["./build", "node_modules", "**/__tests__/*", "**/tests/*", "**/test/*", "*.test.ts"]
+  "include": ["./src/**/*.tsx", "./src/**/*.ts", "src/security/JweManager.ts.old"],
+  "exclude": ["./build", "node_modules", "*.test.ts", "**/*.spec.ts"]
 }

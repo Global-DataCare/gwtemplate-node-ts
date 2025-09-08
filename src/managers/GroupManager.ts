@@ -2,8 +2,9 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4 } from 'uuid';
-import { DatabaseAbstract } from '../storage/database.abstract';
+import { VaultRepository } from '../database/repositories/vault/vault.repository';
 import { normalizeInteroperableClaims } from '../utils/claims';
+import { RecordBase } from '../models/resource-document';
 
 export interface GroupInput {
   vaultId: string; // The vault where this group definition will be stored
@@ -15,10 +16,10 @@ export interface GroupInput {
 }
 
 export class GroupManager {
-  private db: DatabaseAbstract;
+  private vaultRepository: VaultRepository;
 
-  constructor(dbAdapter: DatabaseAbstract) {
-    this.db = dbAdapter;
+  constructor(vaultRepository: VaultRepository) {
+    this.vaultRepository = vaultRepository;
   }
 
   async set(input: GroupInput): Promise<any> {
@@ -28,7 +29,7 @@ export class GroupManager {
       input.payload,
     );
 
-    const groupDocument = {
+    const groupDocument: RecordBase & { claims: any; '@context': string; '@type': string } = {
       id: groupId,
       vaultId: input.vaultId,
       '@context': input.payload['@context'],
@@ -39,7 +40,7 @@ export class GroupManager {
       }
     };
 
-    await this.db.put(input.vaultId, [groupDocument], 'groups');
+    await this.vaultRepository.put(input.vaultId, [groupDocument], 'groups');
 
     return groupDocument;
   }

@@ -1,6 +1,7 @@
 // src/__tests__/unit/security/AesManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { jest } from '@jest/globals';
 import { randomBytes } from 'crypto'; // Use Node.js native crypto module
 import { ProtectedDataAES } from '../../../models/aes';
 import { AesManager } from '../../../security/AesManager';

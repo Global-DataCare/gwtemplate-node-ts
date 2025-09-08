@@ -2,15 +2,20 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express, { Request, Response, NextFunction } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { QueueAdapter } from '../adapters/queue';
-import { QueueAdapterMem } from '../adapters/queue-mem';
+import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 import { parseCdsRequest } from '../security/middleware/parseCdsRequest';
 import { ICryptography } from '../security/interfaces/ICryptography';
 import { createDecodeRequestMiddleware } from '../security/middleware/decodeRequest';
 import { DataInRequest, JobRequest } from '../models/request';
 import { Worker } from '../worker';
 
-// --- Dependency Injection Setup (Mock) ---
+export function createTenantRouter(
+  cryptoService: ICryptography,
+  queueAdapter: QueueAdapter,
+  asyncResponseStore: IAsyncResponseStore
+): express.Router {
 const router = express.Router();
 const decodeRequest = createDecodeRequestMiddleware(cryptoService);
 
@@ -35,7 +40,7 @@ const startAsyncJob = (req: Request, res: Response) => {
 
   const jobName = createJobName(cdsRequest);
   queueAdapter.addJob(jobName, jobRequest);
-  asyncResponseStore.set(decodedRequest.thid, { status: 'PENDING' });
+    asyncResponseStore.set(decodedRequest.thid, { status: 'PENDING' });
 
   res.status(202).send();
 };
@@ -44,21 +49,21 @@ const pollForJobResult = (req: Request, res: Response) => {
   const { thid } = req.body;
   if (!thid) return res.status(400).json({ error: 'Bad Request', message: 'Missing "thid" for polling.' });
   
-  const job = asyncResponseStore.get(thid);
-  if (!job) return res.status(404).json({ error: 'Thread ID not found or expired.' });
-  if (job.status === 'PENDING') return res.status(202).send();
+    const job = asyncResponseStore.get(thid);
+    if (!job) return res.status(404).json({ error: 'Thread ID not found or expired.' });
+    if (job.status === 'PENDING') return res.status(202).send();
   
-  if (job.status === 'COMPLETED' && job.result) {
-    const acceptHeader = req.headers.accept;
-    if (acceptHeader === 'application/jwt') {
-      res.contentType('application/jwt').send(job.result);
+    if (job.status === 'COMPLETED' && job.result) {
+      const acceptHeader = req.headers.accept;
+      if (acceptHeader === 'application/jwt') {
+        res.contentType('application/jwt').send(job.result);
+      } else {
+        res.contentType('application/x-www-form-urlencoded').send(`response=${job.result}`);
+      }
+      asyncResponseStore.delete(thid);
     } else {
-      res.contentType('application/x-www-form-urlencoded').send(`response=${job.result}`);
+      res.status(500).json({ error: 'Job failed to process.' });
     }
-    asyncResponseStore.delete(thid);
-  } else {
-    res.status(500).json({ error: 'Job failed to process.' });
-  }
 };
 
 const cdsRoute = '/:tenantId/cds-:jurisdiction/v1/:sectorType/:section/:format/:resourceType/:action';
@@ -78,5 +83,6 @@ router.post(cdsRoute, (req, res, next) => {
   }
 });
 
-export default router;
+  return router;
+}
 

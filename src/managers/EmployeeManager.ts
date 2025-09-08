@@ -1,17 +1,19 @@
 // src/managers/EmployeeManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { Bundle } from '../models/bundle';
-import { ManagerResult } from '../models/manager-result';
-import { IncludedResource } from '../models/jsonapi';
+import { Bundle, BundleEntry } from '@/models/bundle';
+import { ManagerResult } from '@/models/manager-result';
+import { VaultRepository } from '@/database/repositories/vault/vault.repository';
+import { RecordBase } from '@/models/resource-document';
+import { addEntryToResult } from '@/utils/bundle';
 
 const EMPLOYEE_SECTION = 'employees';
 
 export class EmployeeManager {
-  private db: DatabaseAbstract;
+  private vaultRepository: VaultRepository;
 
-  constructor(dbAdapter: DatabaseAbstract) {
-    this.db = dbAdapter;
+  constructor(vaultRepository: VaultRepository) {
+    this.vaultRepository = vaultRepository;
   }
 
   /**
@@ -19,38 +21,43 @@ export class EmployeeManager {
    * It does NOT build the final response bundle.
    */
   public async processBundle(tenantId: string, bundle: Bundle): Promise<ManagerResult> {
-    const result: ManagerResult = {
-      successEntries: [],
-      errorEntries: [],
-    };
+    let result: ManagerResult = { entries: [] };
 
     for (const entry of bundle.data) {
-      const { request, resource, meta } = entry;
+      const { request, resource } = entry;
       const employeeId = resource?.id || 'unknown';
 
       try {
         if (!request || !resource?.id) {
           throw new Error('Bundle entry must have a request object and a resource with an id.');
         }
-        if (!meta?.claims) {
-          throw new Error(`Entry for resource ${employeeId} is missing the required 'meta.claims' object.`);
-        }
-
-        const claims = meta.claims;
 
         if (request.method === 'PUT' || request.method === 'POST') {
-          const doc: any = { id: employeeId, vaultId: tenantId, meta: { lastUpdated: new Date().toISOString(), claims: claims }, resource: resource };
-          await this.db.put(tenantId, [doc], EMPLOYEE_SECTION);
-          result.successEntries.push({ id: employeeId, status: '201 Created', resource: { id: employeeId, resourceType: 'Practitioner' } });
+          await this.vaultRepository.put(tenantId, [resource as RecordBase], EMPLOYEE_SECTION);
+          const successEntry: BundleEntry = {
+            resource: { id: employeeId, resourceType: 'Practitioner' },
+            response: { status: '201' }
+          };
+          result = addEntryToResult(result, successEntry);
         } else if (request.method === 'DELETE') {
-          await this.db.delete(tenantId, employeeId, EMPLOYEE_SECTION);
-          result.successEntries.push({ id: employeeId, status: '200 OK' });
+          await this.vaultRepository.delete(tenantId, employeeId, EMPLOYEE_SECTION);
+          const successEntry: BundleEntry = {
+            resource: { id: employeeId },
+            response: { status: '200' }
+          };
+          result = addEntryToResult(result, successEntry);
         }
       } catch (error: any) {
-        result.errorEntries.push({ id: employeeId, status: '400 Bad Request', errorMessage: error.message });
+        const errorEntry: BundleEntry = {
+          resource: { id: employeeId },
+          response: {
+            status: '400',
+            outcome: { issue: [{ details: { text: error.message } }] }
+          }
+        };
+        result = addEntryToResult(result, errorEntry);
       }
     }
     return result;
   }
 }
-

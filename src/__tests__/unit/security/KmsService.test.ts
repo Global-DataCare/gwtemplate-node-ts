@@ -1,6 +1,7 @@
 // src/__tests__/unit/security/KmsService.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { jest } from '@jest/globals';
 import { KmsService } from '../../../security/KmsService';
 import { ICryptography } from '../../../security/interfaces/ICryptography';
 import { JWK } from '../../../models/jwk';

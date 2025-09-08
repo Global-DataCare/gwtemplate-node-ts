@@ -31,13 +31,13 @@ export const getOrg1EmployeeBatch = (org1Urn: string) => {
         resource: resource,
         // The single source of truth for our business logic.
         meta: {
-        claims: {
+          claims: {
             '@context': 'org.schema.Person',
             '@type': 'Practitioner',
             identifier: `emp-${emp.id}`,
             ...emp
-        }
-      },
+          }
+        },
         request: {
           method: 'PUT',
           url: `Practitioner/${emp.id}`

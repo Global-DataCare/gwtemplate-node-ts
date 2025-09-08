@@ -1,22 +1,56 @@
-/*
- * Jest Configuration
- * For a detailed explanation, see: https://jestjs.io/docs/configuration
- */
-
 // jest.config.ts
 
-/** @type {import('ts-jest').JestConfigWithTsJest} */
-export default {
-  // By using `projects`, we can run different test configurations in a single Jest run.
-  // This is the recommended way to separate unit and integration tests.
-  projects: [
-    '<rootDir>/jest.config.unit.ts',
-    '<rootDir>/jest.config.integration.ts',
+import type { JestConfigWithTsJest } from 'ts-jest';
+
+const config: JestConfigWithTsJest = {
+  testEnvironment: 'node',
+  injectGlobals: true,   // make describe/it/expect/jest global
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+
+  // Treat TS as ESM inside Jest so imports work
+  extensionsToTreatAsEsm: ['.ts'],
+
+  roots: ['<rootDir>/src'],
+  testMatch: ['**/src/**/*.test.ts', '**/src/**/*.spec.ts'],
+  testPathIgnorePatterns: ['/node_modules/', '/src/__tests__/old/'], // Exclude old tests
+
+  // Important: we will transform .ts via ts-jest, and specific node_modules .js via babel-jest
+  transform: {
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        useESM: true,
+        tsconfig: 'tsconfig.jest.json'
+      }
+    ],
+    '^.+\\.(mjs|js)$': 'babel-jest'
+  },
+
+  
+  // By default, Jest ignores node_modules. This robust pattern uses a negative
+  // lookahead to tell Jest to NOT ignore the specified ESM modules.
+  transformIgnorePatterns: [
+    `[/\\\\]node_modules[/\\\\](?!(${
+      [
+        '@noble/ciphers',
+        '@noble/hashes',
+        '@noble/post-quantum',
+        '@noble/curves',
+      ].join('|')
+    }))`
   ],
 
-  // Global settings that apply to all projects can be defined here.
-  // For now, we keep the configuration decentralized in the project files.
-  
-  // We can also define a global coverage directory.
-  coverageDirectory: 'coverage',
+  // If you added this before to strip .js endings, remove it. It can break ESM resolution.
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@noble/post-quantum/ml-kem$': '<rootDir>/src/__tests__/mocks/noble-post-quantum.mock.ts'
+  },  
+
+  clearMocks: true,
+  testTimeout: 12000,
+  verbose: true
 };
+
+export default config;
+
+

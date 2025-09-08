@@ -2,12 +2,12 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import admin from 'firebase-admin';
-import { config, optionFirestore } from '../config';
+import { config } from '../config';
 
 let dbInstance: FirebaseFirestore.Firestore | null = null;
 
 export function getFirestoreDb() {
-  if (!dbInstance && process.env.DB_PROVIDER === optionFirestore) {
+  if (!dbInstance && config.dbProvider === 'firestore') {
     const { projectId, clientEmail, privateKey } = config.firebase;
 
     if (!projectId || !clientEmail || !privateKey) {
@@ -26,3 +26,4 @@ export function getFirestoreDb() {
   }
   return dbInstance;
 }
+
