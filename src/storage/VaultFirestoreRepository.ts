@@ -2,8 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { Firestore, FieldValue } from '@google-cloud/firestore';
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
-import { VaultConfig, RecordBase } from '../models/resource-document';
+import { VaultRepository } from '@/database/repositories/vault/vault.repository';
+import { VaultConfig, RecordBase } from '@/models/resource-document';
 
 /**
  * A Firestore-based implementation of the Vault Repository.

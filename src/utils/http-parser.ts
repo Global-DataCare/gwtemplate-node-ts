@@ -2,7 +2,7 @@
 // File: src/utils/http-parser.ts
 
 import { URL } from 'url';
-import { DataInRequest } from '../models/request'; // Import from the new central model file
+import { DataInRequest } from '@/models/request'; // Import from the new central model file
 
 // --- Helper Functions ---
 

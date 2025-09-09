@@ -2,11 +2,11 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { IKmsService } from './interfaces/IKmsService';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { DecodedDidcommMessage } from '../models/request';
-import { DidDocument } from '../models/did';
-import { JwsObject } from '../models/jws';
-import { PublicJWKey } from '../models/crypto';
+import { ConfidentialStorageDoc } from '@/models/confidential-storage';
+import { DecodedDidcommMessage } from '@/models/request';
+import { DidDocument } from '@/models/did';
+import { JwsObject } from '@/models/jws';
+import { PublicJWKey } from '@/models/crypto';
 import { ITenantManager } from '@/managers/ITenantManager';
 import { encode as base64urlEncode, decode as base64urlDecode } from 'js-base64';
 

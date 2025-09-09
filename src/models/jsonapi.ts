@@ -11,7 +11,7 @@ export interface IncludedResource extends RecordBase {
   // 'id' is inherited from RecordBase
   type: string;
   meta: {
-    claims: Record<string, any>;
+    claims: Record<string, any>; // The worker will create always claims (even if empty)
     [key: string]: any; // Make meta open
   };
   [key: string]: any; // Make the top-level resource open

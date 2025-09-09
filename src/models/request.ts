@@ -30,6 +30,8 @@ export interface DataInRequest {
  */
 export interface DecodedDidcommMessage {
   type: string; // Message Type URI (protocol identifier)
+  thid: string; // The Transaction ID for message correlation.
+  aud: string;  // The audience of the message.
   [key: string]: any;
   
   /** The main content of the message */
@@ -51,3 +53,4 @@ export interface JobRequest extends DataInRequest {
     bearer?: { jwt: { header?: Record<string, any>; payload?: Record<string, any>; } }
   };
 }
+

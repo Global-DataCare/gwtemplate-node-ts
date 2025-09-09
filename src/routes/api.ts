@@ -4,7 +4,7 @@
 
 import express from 'express';
 import { QueueAdapter } from '@/adapters/queue';
-import { TenantMemManager } from '@/managers/TenantMemManager';
+import { TenantCacheManager } from '@/managers/TenantMemManager';
 import { createDidServiceId } from '@/utils/did';
 import { createJobName } from '@/utils/naming';
 
@@ -53,7 +53,7 @@ function isRequestValid(tenantConfig: TenantConfig, params: any): boolean {
  */
 export function createApiRouter(
   queueAdapter: QueueAdapter,
-  tenantManager: TenantMemManager,
+  tenantManager: TenantCacheManager,
   kmsService: IKmsService,
   asyncResponseStore: IAsyncResponseStore
 ): express.Router {

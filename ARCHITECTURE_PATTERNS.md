@@ -6,32 +6,32 @@ This document is the formal specification for the architecture. It is the defini
 
 All asynchronous API endpoints that process sensitive data **MUST** follow this established architectural pattern to ensure security, scalability, and separation of concerns.
 
-1.  **API Controller:** The controller is lightweight. Its primary role is to extract the encrypted message from the request and call `IKmsService.decodeRequest()` on the incoming payload.
+1.  **API Controller:** The controller is lightweight. Its primary role is to extract the encrypted message from the request and call `IKmsService.decodeRequest()` on the incoming payload. This results in a `DecodedDidcommMessage`.
 
-2.  **Job Queuing:** After successfully decoding the message into a `DecodedDidcommMessage` (the "job"), the controller places this job into a queue and immediately returns a `202 Accepted` response. This response **MUST** include the `thid` from the decoded job for correlation.
+2.  **Job Queuing:** The controller creates a `JobRequest` (containing the `DecodedDidcommMessage`) and places this job into a queue. It immediately returns a `202 Accepted` response, including the `thid` from the decoded job for correlation.
 
 3.  **Worker:** A separate Worker process dequeues the job and calls the appropriate business-logic `Manager` (e.g., `OrganizationManager`) to execute it.
 
-4.  **Response Encoding:** Upon completion, the Worker receives a `ManagerResult`. It formats this result into a final response payload and **MUST** call `IKmsService.encodeResponse()` to encrypt this payload for the intended recipient(s).
+4.  **Response Payload Creation:** The Manager executes the business logic and constructs a complete, JARM-compliant `IPayloadResponse` object. This object contains the final `Bundle` of results.
+5.  **Response Encoding:** The Worker receives the `IPayloadResponse` from the manager and **MUST** call `IKmsService.encodeResponse()` to encrypt this payload for the intended recipient(s).
 
-5.  **Response Storage:** The Worker stores the final, encrypted response in a temporary key-value store (e.g., Redis, Firestore), using the `thid` as the key.
+6.  **Response Storage:** The Worker stores the final, encrypted response (the `secureEnvelope`) in a temporary key-value store (e.g., Redis, Firestore), using the `thid` as the key.
 
-6.  **Polling:** A separate polling endpoint is responsible for retrieving the stored, encrypted response when requested by the original client using the `thid`.
+7.  **Polling:** A separate polling endpoint is responsible for retrieving the stored, encrypted response when requested by the original client using the `thid`.
 
 This pattern ensures that no sensitive plaintext data is ever held in the API controller and that all business logic is executed in the background, decoupled from the initial client request.
 ## 2. The Original Asynchronous API Flow (Detailed View)
 
 This section provides a more detailed view of the flow described above.
-1.  **Request:** The client `POST`s a **DIDComm Message Envelope** containing a standardized data `Bundle`. The request is sent to a dynamic API endpoint.
-2.  **Security Middleware & Decoding:** The **API Router**'s first step is to pass the encrypted message to the `IKmsService`. The `decodeRequest` method handles all decryption, signature verification, and structural validation, returning a plaintext `DecodedDidcommMessage`.
-3.  **Validation & Queuing:** The **API Router** validates the request against the tenant's service policy. If valid, it creates a `JobRequest` containing the `DecodedDidcommMessage` and pushes it into the **Queue**.
-4.  **Immediate Response (`202 Accepted`):** The client immediately receives a `202 Accepted` response containing the `thid` from the decoded message.
-5.  **Background Processing:** The **Worker** picks up the job. It calls the appropriate **Manager**.
-6.  **Format-Agnostic Business Logic:** The **Manager** executes the business logic. It operates on a canonical, internal data model and returns a simple `ManagerResult` object (`{ successEntries, errorEntries }`).
-7.  **Response Formatting & Encoding:** The **Worker** receives the `ManagerResult`. It uses `bundle.ts` utilities to format the result into the final response `Bundle`. The worker then calls `IKmsService.encodeResponse`, passing the bundle and the recipient JWKs (which it is responsible for discovering).
-8.  **Response Storage:** This final, encrypted bundle is stored in the `ResponseStore`, keyed by the `thid`.
-9.  **Polling for Results:** The client `POST`s to the same API path with the `_search` action, providing the `thid` in the body. The API Router retrieves and returns the final encrypted `Bundle` from the `ResponseStore`.
-
+1.  **Request:** The client `POST`s a **DIDComm Message Envelope**.
+2.  **Security Middleware & Decoding:** The **API Router** passes the message to the `IKmsService` to get a plaintext `DecodedDidcommMessage`.
+3.  **Validation & Queuing:** The **API Router** creates a `JobRequest` and pushes it into the **Queue**.
+4.  **Immediate Response (`202 Accepted`):** The client immediately receives a `202 Accepted` response with the `thid`.
+5.  **Background Processing:** The **Worker** picks up the job and calls the appropriate **Manager**.
+6.  **Business Logic & Response Creation:** The **Manager** executes the business logic and builds the final `IPayloadResponse` object.
+7.  **Response Encoding:** The **Worker** receives the `IPayloadResponse` and passes it to `IKmsService.encodeResponse`.
+8.  **Response Storage:** This final, encrypted envelope is stored in the `ResponseStore`, keyed by the `thid`.
+9.  **Polling for Results:** The client polls for and receives the final encrypted `IPayloadResponse`.
 **Important Exception:** The `/.well-known` endpoints for public key and DID discovery are *synchronous*.
 
 ## 3. API Structure
@@ -41,21 +41,44 @@ This section provides a more detailed view of the flow described above.
 
 ## 4. The Manager Contract
 
-*   **Input:** A canonical `Bundle` with a `data` array.
-*   **Output:** A `Promise<ManagerResult>`.
-*   **Responsibility:** Pure, format-agnostic business logic. **MUST NOT** build response bundles.
+*   **Input:** A canonical `JobRequest` object, which contains the full context of the request, including the decoded DIDComm message (`job.input`).
+*   **Output:** A `Promise<IPayloadResponse>`. The `IPayloadResponse` object is a complete, JARM-compliant payload ready to be secured by the worker.
+*   **Responsibility:** Pure, format-agnostic business logic **AND** construction of the final response payload. The manager is responsible for building the entire `IPayloadResponse`, including the `thid`, JARM claims (`iss`, `aud`, `exp`), and the response `body` (which contains the final `Bundle`).
+
+### 4.1. Response Bundle Type
+
+The `type` field of the `Bundle` within the returned `IPayloadResponse.body` **MUST** be determined by the `action` of the original request. This logic is centralized in the `getBundleResponseTypeForAction` utility. The mapping follows a semantic principle:
+
+*   **Read/Query Operations (`_search`, `_history`):** Result in a `searchset` bundle.
+*   **Atomic Transactions (`_transaction`, `_seal`):** Result in a `transaction-response` bundle.
+*   **Independent Batch Operations (`_batch`, `_verify`):** Result in a `batch-response` bundle.
 
 ## 5. The `BundleEntry` Contract
 
 *   The `claims` for business logic **MUST** be located in `entry.meta.claims`.
 *   The `entry.resource` contains the original resource for auditing and reference.
 
+### 5.1. Entry `type` Naming Convention
+
+The `entry.type` field is the definitive identifier for the business operation or "form" being submitted. Its value **MUST** follow a standardized format inspired by established standards like openEHR's template naming.
+
+*   **Structure:** `<UseCase>-<Action>-form-v<Major>.<Minor>`
+*   **Examples:**
+    *   `Organization-registration-form-v1.0`
+    *   `Employee-update-form-v2.1`
+    *   `Credential-revocation-request-v1.0`
+
+**Rationale:**
+
+1.  **Unambiguous Identification:** This format clearly identifies the business process and the specific version of the data schema/rules being used.
+2.  **Versioning:** Including the version directly in the `type` allows managers to implement version-specific logic, ensuring backward compatibility as forms and processes evolve.
+3.  **Clarity over Redundancy:** This convention centralizes the operation's identity in a single field, avoiding the need for redundant fields like `meta.templateId` or `meta.templateVersion`.
+
 ## 6. The Worker's Responsibilities
 
 1.  **Normalize Input:** The first crucial step is to normalize any incoming `Bundle` into the canonical internal format. This means that if the original bundle follows the FHIR standard (using an `entry` array), it **MUST** be converted to the internal standard which uses a `data` array (inspired by JSON:API). This ensures managers always receive a consistent data structure.
 2.  **Route Jobs:** Call the correct manager based on the `JobRequest`.
-3.  **Format Output:** Take the `ManagerResult` and build the final, correctly formatted response `Bundle`.
-
+3.  **Secure and Store Output:** Take the complete `IPayloadResponse` from the manager and pass it to `IKmsService` for signing and/or encryption. The resulting secure envelope is then stored in the `ResponseStore`. The worker **DOES NOT** format the response payload; it only orchestrates its security and storage.
 ## 7. Universal Naming Convention
 
 To ensure traceability and consistency, the system uses a universal naming convention for asynchronous events, whether they are jobs in the queue or message threads. All naming logic is centralized in `src/utils/naming.ts`.
@@ -176,4 +199,3 @@ This pattern describes the mandatory sequence of operations a manager must follo
 ### 11.3. Result
 
 The data is stored securely at rest. The `content` only ever exists in memory within the KMS's secure boundary during the encryption process, and the repository only ever sees the encrypted `jwe` object.
-

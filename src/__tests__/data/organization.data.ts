@@ -1,7 +1,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__test__/data/organization.data.ts
 
-import { v4 as uuidv4 } from 'uuid';
 import { ClaimsRecord } from "../../models/resource-document";
 import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from "../../models/schemaorg";
 

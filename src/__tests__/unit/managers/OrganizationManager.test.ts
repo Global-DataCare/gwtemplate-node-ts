@@ -49,14 +49,22 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 };
 
 const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
-    tenantId: claims[ClaimsOrgSchemaorg.alternateName || 'host'], // TODO: is this secure?
+
+    tenantId: claims[ClaimsOrgSchemaorg.alternateName || 'host'],
     jurisdiction: claims[ClaimsOrgSchemaorg.addressCountry],
     resourceType: 'Organization',
     section: 'org.schema',
     action: '_batch',
     input: {
+        thid: 'test-thid-123',
+        aud: 'did:web:antifraud.example.com',
         type: 'https://didcomm.org/registration/1.0/register',
-        body: { data: [{ meta: { claims, templateId: testTemplateId, templateVersion: testTemplateVersion} }] }
+        body: {
+            data: [{
+                type: 'Organization-registration-form-v1.0',
+                meta: { claims }
+            }]
+        }
     },
     httpMethod: 'POST',
     fullUrl: '/default',
@@ -76,7 +84,7 @@ describe("OrganizationManager", () => {
     *
     *  [1] HOST: Registers the 'host' organization with a valid, existing admin UUID.
     *  [2] TENANT: Generates a new UUID if the admin identifier is an invalid UUID (in normal mode).
-    *  [3] DEMO: Allows using a non-UUID admin identifier in "demo" mode.
+    *  [3 DEMO: Allows using a non-UUID admin identifier in "demo" mode.
     *  [4] TENANT: Generates a new UUID for the admin if no identifier is provided.
     *  [5] TENANT: Registers a tenant organization, encrypting the content before persistence (Happy Path).
     *  [6] TENANT: Rejects registration for a tenant with an invalid alternateName format.
@@ -85,8 +93,8 @@ describe("OrganizationManager", () => {
     *
     *  --- Future Scenarios (TODO) ---
     *  [9 AUTH: Rejects registration based on caller's permissions.
-    *  [10] BATCH: Processes the creation of multiple organizations in a single job.
-    *  [11] KEYS: Extracts admin's public keys from JWS/JWE to create their DID and add as 'controller' to the org's DID.
+    *  [10 BATCH: Processes the creation of multiple organizations in a single job.
+    *  [11 KEYS: Extracts admin's public keys from JWS/JWE to create their DID and add as 'controller' to the org's DID.
     *  [12 GOVERNANCE: Tests for updating the organization's DID document based on defined policies (e.g., multi-controller approval).
     */
 
@@ -112,7 +120,7 @@ describe("OrganizationManager", () => {
         const job = testBaseJobForClaims(testClaimsTenant1Registration);
         const putSpy = jest.spyOn(vaultRepository, 'put');
 
-        await organizationManager.register(job);
+        await organizationManager.process(job);
         
         // --- Security and Persistence Assertions ---
         expect(mockKmsService.protectDocument).toHaveBeenCalledTimes(1);
@@ -129,14 +137,19 @@ describe("OrganizationManager", () => {
         expect(savedDoc.jwe).toBeDefined();
     });
 
-    it("[1] HOST: should process thes 'host' initialization", async () => {
+
+    it("[1] HOST: should process the 'host' initialization", async () => {
         const job = testBaseJobForClaims(testClaimsHostInitialization);
-        const result = await organizationManager.register(job);
+        const responsePayload = await organizationManager.process(job);
 
         expect(isValidTenantAlternateName).not.toHaveBeenCalled();
-        const entry = result.data[0];
+        const entry = responsePayload.body.data[0];
         expect(entry.response.status).toBe('201');
-        const person = entry.resource.contained.find((r: any) => r.type === 'Person');
+
+
+        // Type guard assertion
+        expect(entry.resource).toBeDefined();
+        const person = entry.resource!.contained.find((r: any) => r.type === 'Person');
         expect(person.id).toBe(testHostData.member.admin1.uuid);
     });
 
@@ -145,8 +158,11 @@ describe("OrganizationManager", () => {
         const job = testBaseJobForClaims(demoClaims);
         (uuidValidate as jest.Mock).mockReturnValue(false);
 
-        const result = await organizationManager.register(job, 'demo');
-        const person = result.data[0].resource.contained.find((r: any) => r.type === 'Person');
+        const responsePayload = await organizationManager.process(job, 'demo');
+
+        const entry = responsePayload.body.data[0];
+        expect(entry.resource).toBeDefined();
+        const person = entry.resource!.contained.find((r: any) => r.type === 'Person');
         expect(person.id).toBe(testTenant1Data.member.admin1.mockedUuid);
         expect(uuidv4).not.toHaveBeenCalled();
     });
@@ -156,8 +172,11 @@ describe("OrganizationManager", () => {
         const job = testBaseJobForClaims(invalidClaims);
         (uuidValidate as jest.Mock).mockReturnValue(false);
 
-        const result = await organizationManager.register(job);
-        const person = result.data[0].resource.contained.find((r: any) => r.type === 'Person');
+        const responsePayload = await organizationManager.process(job);
+
+        const entry = responsePayload.body.data[0];
+        expect(entry.resource).toBeDefined();
+        const person = entry.resource!.contained.find((r: any) => r.type === 'Person');
         expect(person.id).toBe('new-mocked-uuid-v4');
     });
 
@@ -167,8 +186,11 @@ describe("OrganizationManager", () => {
         const job = testBaseJobForClaims(noIdClaims as ClaimsRecord);
         (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
 
-        const result = await organizationManager.register(job);
-        const person = result.data[0].resource.contained.find((r: any) => r.type === 'Person');
+        const responsePayload = await organizationManager.process(job);
+
+        const entry = responsePayload.body.data[0];
+        expect(entry.resource).toBeDefined();
+        const person = entry.resource!.contained.find((r: any) => r.type === 'Person');
         expect(person.id).toBe('new-mocked-uuid-v4');
     });
 
@@ -176,28 +198,31 @@ describe("OrganizationManager", () => {
         const job = testBaseJobForClaims(testClaimsTenant1AlternateNameInvalidPrefix);
         (isValidTenantAlternateName as jest.Mock).mockReturnValue(false);
 
-        const result = await organizationManager.register(job);
-        expect(result.data[0].response.status).toBe('400');
-        expect(result.data[0].response.outcome.issue[0].details.text).toContain('Invalid alternateName');
+        const responsePayload = await organizationManager.process(job);
+        const errorEntry = responsePayload.body.data[0];
+        expect(errorEntry.response.status).toBe('400');
+        expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('Invalid alternateName');
     });
 
     it("[7] TENANT: should produce an error entry if alternateName already exists", async () => {
         jest.spyOn(vaultRepository, 'vaultExists').mockResolvedValue(true);
         const job = testBaseJobForClaims(testClaimsTenant1Registration);
 
-        const result = await organizationManager.register(job);
-        expect(result.data[0].response.status).toBe('409');
-        expect(result.data[0].response.outcome.issue[0].details.text).toContain('already exists');
+        const responsePayload = await organizationManager.process(job);
+        const errorEntry = responsePayload.body.data[0];
+        expect(errorEntry.response.status).toBe('409');
+        expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('already exists');
     });
 
     it("[8] TENANT: should produce an error entry if taxID and country combination already exists", async () => {
         const existingConfig: Partial<TenantConfig> = { identifier: testTenant1Data.taxId, jurisdiction: testTenant1Data.addressCountry };
+
         jest.spyOn(vaultRepository, 'getContainersInSection').mockResolvedValue([existingConfig as TenantConfig]);
         const job = testBaseJobForClaims(testClaimsTenant1Registration);
 
-        const result = await organizationManager.register(job);
-        expect(result.data[0].response.status).toBe('409');
-        expect(result.data[0].response.outcome.issue[0].details.text).toContain("already exists");
+        const responsePayload = await organizationManager.process(job);
+        const errorEntry = responsePayload.body.data[0];
+        expect(errorEntry.response.status).toBe('409');
+        expect(errorEntry.response.outcome.issue[0].diagnostics).toContain("already exists");
     });
 });
-

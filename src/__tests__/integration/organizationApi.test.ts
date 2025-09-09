@@ -6,7 +6,7 @@ import request from 'supertest';
 import { v4 as uuidv4 } from 'uuid';
 import { createApiRouter } from '@/routes/api';
 import { QueueAdapter } from '@/adapters/queue';
-import { TenantMemManager } from '@/managers/TenantMemManager';
+import { TenantCacheManager } from '@/managers/TenantMemManager';
 import { testClaimsTenant1Registration, testHostData } from '../data/organization.data';
 import { testThid1, testCompletedJob, testPendingJob, testEncryptedJwe1 } from '../data/async-response.data';
 import { TenantConfig } from '@/models/tenant';
@@ -29,7 +29,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.urlencoded({ extended: true }));
   
   const vaultRepository = new VaultMemRepository();
-  const tenantManager = new TenantMemManager(vaultRepository);
+  const tenantManager = new TenantCacheManager(vaultRepository);
   
   // Pass all required arguments, including the asyncResponseStore
   const apiRouter = createApiRouter(mockQueueAdapter, tenantManager, mockKmsService, asyncResponseStore);
@@ -66,6 +66,7 @@ describe('Organization Registration API', () => {
       jest.spyOn(tenantManager, 'getConfigByAlternateName').mockResolvedValue(hostConfig as TenantConfig);
 
       const decodedMessage: DecodedDidcommMessage = {
+        aud: `did:web:${testHostData.alternateName}`,
         thid: uuidv4(),
         type: 'https://didcomm.org/registration/1.0/register',
         body: { data: [{ meta: { claims: testClaimsTenant1Registration } }] }

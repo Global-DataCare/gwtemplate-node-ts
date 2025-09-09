@@ -3,7 +3,7 @@
 
 import { v4 as uuidv4, validate as uuidValidate} from 'uuid';
 import { knownDomainsReversed } from "./domains.interface";
-import { findCanonicalClaimCase } from '../models/schema-definitions';
+import { findCanonicalClaimCase } from '@/models/schema-definitions';
 
 /**
  * Normalizes a raw claims object from a client application.

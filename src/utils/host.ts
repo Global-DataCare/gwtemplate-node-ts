@@ -1,10 +1,12 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/utils/host.ts
 
+import { v4 as uuidv4} from 'uuid';
 import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from "../models/schemaorg";
 import { HostEnvVars } from "../models/env";
 import { JobRequest } from "../models/request";
 import { ClaimsRecord } from "../models/resource-document";
+import { getHostDid } from "./did";
 
 // Define which environment variables are strictly required to build the host claims.
 // We use the enum to ensure this list is always in sync with the model.
@@ -64,12 +66,11 @@ export function createHostClaimsFromEnv(): ClaimsRecord {
 }
 
 /**
- * Creates a complete JobRequest object for the HOST organization using environment variables.
+ * Creates a complete JobRequest object to initialize the HOST organization using environment variables.
  * This is used to bootstrap the system if the host has not been initialized.
- * It calls `createHostClaimsFromEnv` internally to build the claims.
- * @returns {JobRequest} The fully constructed job object for host registration.
+ * @returns {JobRequest} The fully constructed job object for host initialization.
  */
-export function createHostJobFromEnv(): JobRequest {
+export function initializeHostJobFromEnv(): JobRequest {
     const hostClaims = createHostClaimsFromEnv();
 
     // Construct the full JobRequest object, providing the necessary context.
@@ -83,6 +84,8 @@ export function createHostJobFromEnv(): JobRequest {
 
         // The core input, mimicking a decoded DIDComm message
         input: {
+            thid: uuidv4(),
+            aud: getHostDid(),            
             type: 'https://didcomm.org/registration/1.0/register',
             body: {
                 // Following the HybridPayload rule, the body contains a `data` array of `entry` objects.

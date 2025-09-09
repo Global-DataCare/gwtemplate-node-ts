@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
-import { TenantMemManager } from '../managers/TenantMemManager';
+import { TenantCacheManager } from '../managers/TenantMemManager';
 
 /**
  * Creates a router for handling synchronous, tenant-specific discovery endpoints 
@@ -11,7 +11,7 @@ import { TenantMemManager } from '../managers/TenantMemManager';
  * @param tenantManager A TenantManager instance to resolve tenant information.
  * @returns An Express router instance.
  */
-export function createDiscoveryRouter(tenantManager: TenantMemManager): express.Router {
+export function createDiscoveryRouter(tenantManager: TenantCacheManager): express.Router {
   const router = express.Router();
 
   // Endpoint to serve the tenant's full DID Document.

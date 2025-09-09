@@ -35,6 +35,7 @@ describe('KmsService', () => {
       // --- Arrange ---
       const testPayload: DecodedDidcommMessage = {
         thid: 'test-thread-id-123',
+        aud: 'did:web:antifraud.example.com', // Added required 'aud' property
         priority: 3,
         type: 'test-type',
         body: {

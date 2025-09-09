@@ -3,12 +3,12 @@
 
 import { EncryptionOptions, ICryptography } from './interfaces/ICryptography';
 import { IKmsService } from './interfaces/IKmsService';
-import { JWK } from '../models/jwk';
-import { JwsObject } from '../models/jws';
-import { PublicJWKey } from '../models/crypto';
-import { DecodedDidcommMessage } from '../models/request';
-import { DidDocument } from '../models/did';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { JWK } from '@/models/jwk';
+import { JwsObject } from '@/models/jws';
+import { PublicJWKey } from '@/models/crypto';
+import { DecodedDidcommMessage } from '@/models/request';
+import { DidDocument } from '@/models/did';
+import { ConfidentialStorageDoc } from '@/models/confidential-storage';
 
 /**
  * High-level service for Key Management and cryptographic operations.

@@ -1,9 +1,77 @@
 // src/utils/bundle.ts
+// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-/* Copyright (c) Connecting Solution & Applications Ltd. */
-/* Apache License 2.0 */
+import { Bundle, ErrorEntry } from '@/models/bundle';
+import { IssueLevel, IssueType } from '@/models/fhir/codes';
+import { safelyJoinUrl } from './url';
 
-import { safelyJoinUrl } from "./url";
+export const BundleType = {
+  BatchResponse: 'batch-response',
+  Searchset: 'searchset',
+  TransactionResponse: 'transaction-response',
+} as const;
+
+export type BundleType = typeof BundleType[keyof typeof BundleType];
+
+/**
+ * Maps a request action to the corresponding FHIR-like Bundle type for the response,
+ * based on the semantic nature of the operation.
+ * @param action The action from the JobRequest (e.g., '_batch', '_search').
+ * @returns The corresponding BundleType for the response.
+ */
+export function getBundleResponseTypeForAction(action?: string): BundleType {
+  switch (action) {
+    // Read/Query Operations -> searchset
+    case '_search':
+    case '_history':
+      return BundleType.Searchset;
+
+    // Atomic Transactional Operations -> transaction-response
+    case '_transaction':
+    case '_seal':
+      return BundleType.TransactionResponse;
+
+    // Independent Batch Operations -> batch-response
+    case '_batch':
+    case '_verify':
+    default:
+      // Default to batch-response as it's the most common multi-entry operation.
+      return BundleType.BatchResponse;
+  }
+}
+
+/**
+ * Creates a response Bundle containing a single, fatal error entry.
+ * This is used by the Worker when a catastrophic error occurs.
+ *
+ * @param errorMessage The high-level error message to report.
+ * @param action The action from the original request, used to set the bundle type.
+ * @param originalEntryType The 'type' from the original request entry, if available.
+ * @returns A response Bundle containing a single error entry.
+ */
+export function createErrorBundle(errorMessage: string, action?: string, originalEntryType?: string): Bundle {
+  const errorEntry: ErrorEntry = {
+    // Reflect the original type if known, otherwise use a generic error type.
+    type: originalEntryType || 'unknown-error-v1.0',
+    response: {
+      status: '500',
+      outcome: {
+        resourceType: 'OperationOutcome',
+        issue: [{
+          severity: IssueLevel.Error,
+          code: IssueType.Exception,
+          diagnostics: errorMessage,
+        }]
+      }
+    }
+  };
+
+  return {
+    type: getBundleResponseTypeForAction(action),
+    data: [errorEntry]
+  };
+}
+
 
 /**
 * Converts a resource (FHIR Bundle or single resource) or a JSON:API object
@@ -95,63 +163,3 @@ export const convertPrimaryDocToBundleFHIR = (primaryDocument: any, bundleType: 
 
   return bundle;
 };
-
-// --- Bundle & ManagerResult Creation/Mutation Utilities ---
-
-import { Bundle, BundleEntry } from '@/models/bundle';
-import { ManagerResult } from '@/models/manager-result';
-
-/**
- * Appends a new entry to a ManagerResult object, preserving order.
- * This is a pure function; it returns a new ManagerResult object.
- * @param result The existing ManagerResult.
- * @param newEntry The success or error entry to add.
- * @returns A new ManagerResult with the added entry.
- */
-export function addEntryToResult(result: ManagerResult, newEntry: BundleEntry): ManagerResult {
-  return {
-    entries: [...result.entries, newEntry],
-  };
-}
-
-/**
- * Creates a final response Bundle from the aggregated results of a manager.
- * This is used by the Worker after the Manager has successfully processed all entries.
- * @param managerResult The result object from the business logic manager.
- * @returns A final response Bundle.
- */
-export function createSuccessBundle(managerResult: ManagerResult): Bundle {
-  return {
-    type: 'batch-response',
-    data: managerResult.entries, // Simply use the ordered list of entries
-  };
-}
-
-/**
- * Creates a response Bundle containing a single, fatal error entry.
- * This is used by the Worker when a catastrophic error occurs before the
- * manager can even process the job.
- * @param errorMessage The high-level error message to report.
- * @returns A response Bundle containing a single error entry.
- */
-export function createErrorBundle(errorMessage: string): Bundle {
-  const errorEntry: BundleEntry = {
-    resource: {}, // Empty resource for a fatal error
-    response: {
-      status: '500',
-      outcome: {
-        issue: [{
-          severity: 'error',
-          code: 'exception',
-          details: { text: errorMessage },
-        }]
-      }
-    }
-  };
-
-  return {
-    type: 'batch-response',
-    data: [errorEntry]
-  };
-}
-

@@ -7,7 +7,7 @@ import { config } from './config';
 import { createApiRouter } from './routes/api';
 import { VaultRepository } from './database/repositories/vault/vault.repository';
 import { VaultMemRepository } from './database/repositories/vault/vault.mem.repository';
-import { TenantMemManager } from './managers/TenantMemManager';
+import { TenantCacheManager } from './managers/TenantMemManager';
 import { QueueAdapter } from './adapters/queue';
 import { QueueAdapterMem } from './adapters/queue-mem';
 import { DevKmsService } from './security/DevKmsService';
@@ -48,7 +48,7 @@ async function startServer() {
   }
   await vaultRepository.createNewVault({ id: 'host', name: 'Host Vault' });
 
-  const tenantManager = new TenantMemManager(vaultRepository);
+  const tenantManager = new TenantCacheManager(vaultRepository);
   const kmsService = new DevKmsService(tenantManager);
 
   const managerRegistry: ManagerRegistry = {

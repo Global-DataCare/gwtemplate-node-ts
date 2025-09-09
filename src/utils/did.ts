@@ -1,6 +1,43 @@
 // src/utils/did.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { config } from '../config';
+
+/**
+ * Extracts the percent-encoded hostname from the configured public API URL.
+ * @returns The hostname part (e.g., "localhost%3A3000" or "antifraud.example.com").
+ */
+function getEncodedHost(): string {
+  try {
+    const parsedUrl = new URL(config.apiBaseUrl);
+    const host = parsedUrl.host; // e.g., localhost:3000
+    // Per the did:web spec, a port number's colon MUST be percent-encoded.
+    return host.replace(':', '%3A');
+  } catch (e) {
+    return 'localhost';
+  }
+}
+
+/**
+ * Constructs the web DID for the root host service.
+ * @returns The host's DID string (e.g., "did:web:localhost%3A3000").
+ */
+export function getHostDid(): string {
+  const encodedHost = getEncodedHost();
+  return `did:web:${encodedHost}`;
+}
+
+/**
+ * Constructs the web DID for a specific tenant.
+ * @param tenantId The alternateName of the tenant.
+ * @returns The tenant's DID string (e.g., "did:web:localhost%3A3000:tenant1").
+ */
+export function getTenantDid(tenantId: string): string {
+  const encodedHost = getEncodedHost();
+  // Tenant-specific DIDs are created as sub-paths from the main host DID.
+  return `did:web:${encodedHost}:${tenantId}`;
+}
+
 /**
  * Defines the components of a DID Document Service ID for path-based validation.
  * This structure is used to programmatically build and parse service IDs.

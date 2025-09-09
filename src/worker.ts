@@ -1,17 +1,17 @@
 // src/worker.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { IJobProcessor, ManagerRegistry } from './managers/registry';
+import { createErrorBundle } from './utils/bundle';
+import { IPayloadResponse } from './models/response';
 import { JobRequest } from './models/request';
-import { ManagerRegistry } from './managers/registry';
-import { ManagerResult } from './models/manager-result';
-import { convertResourceDataToArrayOfDataEntries, createSuccessBundle, createErrorBundle } from './utils/bundle';
-import { Bundle } from './models/bundle';
 import { parseJobName } from './utils/naming';
+import { getHostDid } from './utils/did';
 
 /**
  * The Worker is the heart of the background processing logic.
- * It is a dedicated layer that acts as a Job Router and Response Formatter,
- * completely decoupling the Queue Adapter from the business logic.
+ * It is a dedicated layer that acts as a Job Router, completely
+ * decoupling the Queue Adapter from the business logic managers.
  */
 export class Worker {
   private managers: ManagerRegistry;
@@ -21,51 +21,61 @@ export class Worker {
   }
 
   /**
-   * The main processing function. It takes a job, analyzes its name, routes it, and formats the response.
+   * The main processing function. It takes a job, analyzes its name, and routes it to the correct manager.
    * @param jobName The unique name of the job.
-   * @param request The job payload.
+   * @param job The job payload.
+   * @returns The complete, JARM-compliant response payload, ready for encryption.
    */
-  public async process(jobName: string, request: JobRequest): Promise<Bundle> {
+  public async process(jobName: string, job: JobRequest): Promise<IPayloadResponse> {
     const jobInfo = parseJobName(jobName);
-    if (!jobInfo) {
-      throw new Error(`Invalid job name format: '${jobName}'`);
-    }
-
-    const { resourceType, action } = jobInfo;
-    const { input, tenantId } = request;
-
+    
     try {
-      if (!tenantId) {
+      if (!jobInfo) {
+        throw new Error(`Invalid job name format: '${jobName}'`);
+      }
+      if (!job.tenantId) {
         throw new Error('Job is missing required tenantId.');
       }
 
-      // 1. Normalize input to a canonical bundle
-      const canonicalEntries = convertResourceDataToArrayOfDataEntries(input.body, '/', 'http://localhost:3000');
-      const canonicalBundle: Bundle = { type: input.body.type || 'batch', data: canonicalEntries };
+      const { resourceType } = jobInfo;
+      let manager: IJobProcessor | undefined;
 
-      // 2. Route to the appropriate manager based on the parsed job name
-      let managerResult: ManagerResult; // Declare, but don't initialize
-      if (resourceType === 'Employee' && this.managers.employeeManager) {
-        managerResult = await this.managers.employeeManager.processBundle(tenantId, canonicalBundle);
-      } else if (resourceType === 'Customer' && this.managers.customerManager && (action === '_update' || action === '_batch')) {
-        managerResult = await this.managers.customerManager.processBundle(canonicalBundle, tenantId);
-      } else if (resourceType === 'Organization' && this.managers.organizationManager && action === '_batch') {
-        // The OrganizationManager expects the full JobRequest, not the canonicalBundle
-        const registrationResult = await this.managers.organizationManager.register(request);
-        // Adapt the result to the ManagerResult structure
-        managerResult = { entries: registrationResult.data };
-      } else {
-        throw new Error(`No manager configured for resourceType '${resourceType}' and action '${action}'`);
+      // 1. Route to the appropriate manager based on the parsed job name
+      switch (resourceType) {
+        case 'Organization':
+          manager = this.managers.organizationManager;
+          break;
+        case 'Employee':
+          manager = this.managers.employeeManager;
+          break;
+        case 'Customer':
+          manager = this.managers.customerManager;
+          break;
+        default:
+          throw new Error(`No manager configured for resourceType '${resourceType}'`);
       }
 
+      if (!manager) {
+        throw new Error(`Manager for '${resourceType}' is registered but not initialized.`);
+      }
 
-      // 3. Format the result into the final, client-facing Bundle
-      return createSuccessBundle(managerResult);
+      // 2. Delegate the entire job to the selected manager
+      // The manager is responsible for all business logic and for building the response payload.
+      return await manager.process(job);
 
-    } catch (error) {
-      console.error(`[Worker Job '${jobName}' failed for thid ${input.thid}`, error);
-      return createErrorBundle((error as Error).message);
+    } catch (error: any) {
+      console.error(`[Worker Job '${jobName}' failed for thid ${job.input?.thid}]`, error.message);
+      
+      // 3. In case of a catastrophic failure, create a fatal error response payload.
+      const errorBundle = createErrorBundle(error.message, jobInfo?.action, job.input?.body?.data?.[0]?.type);
+      
+      return {
+        thid: job.input?.thid || 'unknown-thid',
+        iss: getHostDid(),
+        aud: job.input?.aud || 'unknown-aud',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        body: errorBundle,
+      };
     }
   }
 }
-

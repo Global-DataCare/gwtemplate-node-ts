@@ -1,34 +1,32 @@
 // src/managers/registry.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { TenantMemManager } from './TenantMemManager';
-import { EmployeeManager } from './EmployeeManager';
-import { CustomerManager } from './CustomerManager';
-import { GroupManager } from './GroupManager';
-import { ListManager } from './ListManager';
-import { Bundle } from '../models/bundle';
-import { ManagerResult } from '../models/manager-result';
-import { OrganizationManager } from './OrganizationManager';
+import { TenantCacheManager } from './TenantMemManager';
+import { JobRequest } from '@/models/request';
+import { IPayloadResponse } from '@/models/response';
 
 /**
- * Defines the contract for all managers that process bundles.
+ * Defines the standard contract for any manager that processes a job.
  */
-export interface IBundleProcessor {
-  processBundle(tenantId: string, bundle: Bundle): Promise<ManagerResult>;
+export interface IJobProcessor {
+  /**
+   * The main processing method for a manager.
+   * @param job The complete, authenticated, and authorized job request.
+   * @returns A promise that resolves to the JARM-compliant response payload.
+   */
+  process(job: JobRequest): Promise<IPayloadResponse>;
 }
 
 /**
  * A centralized registry of all manager instances in the application.
  * This is used for dependency injection into the worker.
+ * Note: Not all managers may process jobs (e.g., TenantMemManager might be synchronous).
  */
 export interface ManagerRegistry {
-  organizationManager: OrganizationManager;
-  tenantManager: TenantMemManager;
-  // Mark managers that are not fully implemented yet as optional.
-  // This allows us to build the application with only the finished components.
-  employeeManager?: EmployeeManager;
-  customerManager?: CustomerManager;
-  groupManager?: GroupManager;
-  listManager?: ListManager;
+  organizationManager: IJobProcessor;
+  tenantManager: TenantCacheManager;
+  employeeManager?: IJobProcessor;
+  customerManager?: IJobProcessor;
+  // groupManager?: IJobProcessor;
+  // listManager?: IJobProcessor;
 }
-

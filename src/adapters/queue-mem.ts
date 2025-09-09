@@ -1,7 +1,7 @@
 // src/adapters/queue-mem.ts
 import { QueueAdapter } from './queue';
 import { Worker } from '../worker';
-import { JobRequest } from '../models/request';
+import { JobRequest } from '@/models/request';
 import { IAsyncResponseStore, StoredJob } from './async-response-store.mem';
 
 /**

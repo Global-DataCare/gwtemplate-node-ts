@@ -2,15 +2,21 @@
 // File: src/managers/OrganizationManager.ts
 
 import { config } from '../config';
-import { TenantConfig } from '../models/tenant';
-import { IncludedResource } from '../models/jsonapi';
-import { ClaimsRecord } from '../models/resource-document';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { ClaimsOrgSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
-import { IKmsService } from '../security/interfaces/IKmsService';
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
-import { determineResourceId } from '../utils/resource';
-import { isValidTenantAlternateName } from '../utils/tenant';
+import { determineResourceId } from '@/utils/resource';
+import { isValidTenantAlternateName } from '@/utils/tenant';
+import { getBundleResponseTypeForAction } from '@/utils/bundle';
+import { IKmsService } from '@/security/interfaces/IKmsService';
+import { TenantConfig } from '@/models/tenant';
+import { IncludedResource } from '@/models/jsonapi';
+import { ClaimsRecord } from '@/models/resource-document';
+import { ConfidentialStorageDoc } from '@/models/confidential-storage';
+import { ClaimsOrgSchemaorg, ClaimsServiceSchemaorg } from '@/models/schemaorg';
+import { VaultRepository } from '@/database/repositories/vault/vault.repository';
+import { Bundle, BundleEntry, ErrorEntry } from '@/models/bundle';
+import { IssueLevel, IssueType } from '@/models/fhir/codes';
+import { ManagerError } from '@/models/errors/manager-error';
+import { IPayloadResponse } from '@/models/response';
+import { JobRequest } from '@/models/request';
 
 /**
  * Manages the business logic for organization registration.
@@ -26,71 +32,149 @@ export class OrganizationManager {
     this.kmsService = kmsService;
   }
 
-
   /**
    * Processes a registration job, handling one or more organization entries.
    * @param job The job object containing the registration claims.
    * @param environment The deployment environment (e.g., 'demo').
-   * @returns A HybridPayload object with a data array of processed entries.
+   * @returns A IPayloadResponse object with the outcome of the registration process.
    */
-  async register(job: any, environment?: string): Promise<{ data: any[] }> {
-    const jobEntries = job?.input?.body?.data || job?.input?.body?.entry || [];
-    const responseEntries: any[] = [];
+  async process(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
+    const jobEntries = job?.input?.body?.data || [];
+    const responseEntries: (BundleEntry | ErrorEntry)[] = [];
 
     for (const entry of jobEntries) {
-        const claims = entry?.meta?.claims;
-        if (!claims) {
-            // Handle malformed entry
-            continue;
-        }
-
-        try {
-            const alternateName = claims[ClaimsOrgSchemaorg.alternateName];
-
-            // --- Pre-flight validations ---
-            if (alternateName && alternateName !== 'host') {
-                if (!isValidTenantAlternateName(alternateName)) {
-                    throw new Error(`Invalid alternateName format: '${alternateName}'`);
-                }
-                if (await this.vaultRepository.vaultExists(alternateName)) {
-                    throw new Error(`Conflict: alternateName '${alternateName}' already exists`);
-                }
-                const tenants = await this.vaultRepository.getContainersInSection<TenantConfig>('host', 'tenants');
-                if (tenants.some(t => t.identifier === claims[ClaimsOrgSchemaorg.taxID] && t.jurisdiction === claims[ClaimsOrgSchemaorg.addressCountry])) {
-                    throw new Error(`Conflict: already exists the taxID '${claims[ClaimsOrgSchemaorg.taxID]}' issued by '${claims[ClaimsOrgSchemaorg.addressCountry]}' jurisdiction`);
-                }
-            }
-        
-            // --- Resource Extraction ---
-            const { organization, person, service } = this.extractResources(claims, environment);
-
-            // --- Persistence (for tenants only) ---
-            if (alternateName && alternateName !== 'host') {
-                await this.persistTenantConfig(organization, alternateName, [person, service]);
-            }
-            // --- Build Success Entry ---
-            responseEntries.push({
-                id: organization.id,
-                type: 'Organization',
-                meta: { ...entry.meta }, // Preserve original meta
-                resource: {
-                    ...organization,
-                    contained: [person, service]
-                },
-                response: { status: '201' }
-            });
-
-        } catch (error: any) {
-            // --- Build Error Entry ---
-            const status = error.message.startsWith('Conflict') ? '409' : '400';
-            responseEntries.push({
-                meta: { ...entry.meta },
-                response: { status, outcome: { issue: [{ severity: 'error', details: { text: error.message } }] } }
-            });
-        }
+      const resultEntry = await this.processRegistrationEntry(entry, environment);
+      responseEntries.push(resultEntry);
     }
 
-    return { data: responseEntries };
+    const responseBundle: Bundle = {
+      type: getBundleResponseTypeForAction(job.action),
+      total: responseEntries.length,
+      data: responseEntries,
+    };
+
+    // TODO: The JARM claims (iss, aud, exp) should be dynamically determined.
+    // iss: From service configuration (our DID/URL).
+    // aud: From the original request's client_id or equivalent property in the job.
+    // exp: Current time + a configured TTL (e.g., 5 minutes).
+    return {
+      thid: job.input.thid,
+      iss: 'did:web:antifraud.example.com', // Placeholder
+      aud: job.input.aud,                  // Correctly accessed from job.input
+      exp: Math.floor(Date.now() / 1000) + 300, // Placeholder: expires in 5 minutes
+      body: responseBundle,
+    };
+  }
+  /**
+   * Processes a single organization registration entry.
+   * @param entry The individual entry from the job payload, which includes the 'type'.
+   * @param environment The deployment environment.
+   * @returns A BundleEntry representing the outcome (success or error).
+   */
+  private async processRegistrationEntry(entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
+    const claims = entry?.meta?.claims;
+    // As per our simplified design, we trust and reflect the type from the client.
+    // We provide a fallback if the type is missing from the request entry.
+    const entryType = entry.type || 'Organization-unknown';
+
+    // For now, we "accept anything" as requested.
+
+    if (!claims) {
+      const error = new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
+      return {
+        type: entryType,
+        response: {
+          status: error.status,
+          outcome: {
+            resourceType: 'OperationOutcome',
+            issue: [
+              {
+                severity: IssueLevel.Error,
+                code: error.code,
+                diagnostics: error.message,
+              },
+            ],
+          },
+        },
+      };
+    }
+
+    try {
+        const alternateName = claims[ClaimsOrgSchemaorg.alternateName];
+
+        // --- Pre-flight validations ---
+        if (alternateName && alternateName !== 'host') {
+            if (!isValidTenantAlternateName(alternateName)) {
+                throw new ManagerError(`Invalid alternateName format: '${alternateName}'`, IssueType.Value);
+            }
+            if (await this.vaultRepository.vaultExists(alternateName)) {
+                throw new ManagerError(`Conflict: alternateName '${alternateName}' already exists`, IssueType.Conflict);
+            }
+            const tenants = await this.vaultRepository.getContainersInSection<TenantConfig>('host', 'tenants');
+            if (tenants.some(t => t.identifier === claims[ClaimsOrgSchemaorg.taxID] && t.jurisdiction === claims[ClaimsOrgSchemaorg.addressCountry])) {
+                throw new ManagerError(`Conflict: already exists the taxID '${claims[ClaimsOrgSchemaorg.taxID]}' issued by '${claims[ClaimsOrgSchemaorg.addressCountry]}' jurisdiction`, IssueType.Duplicate);
+            }
+        }
+
+        // --- Resource Extraction ---
+        const { organization, person, service } = this.extractResources(claims, environment);
+
+        // --- Persistence (for tenants only) ---
+        if (alternateName && alternateName !== 'host') {
+            await this.persistTenantConfig(organization, alternateName, [person, service]);
+        }
+
+        // --- Build Success Entry ---
+        return {
+            type: entryType,
+            resource: {
+              resourceType: 'Organization',
+              id: organization.id,
+              meta: organization.meta,
+              contained: [person, service]
+            },
+            response: { status: '201' }
+        };
+
+    } catch (error: any) {
+      if (error instanceof ManagerError) {
+        return {
+          type: entryType,
+          meta: entry.meta,
+          response: {
+            status: error.status,
+            outcome: {
+              resourceType: 'OperationOutcome',
+              issue: [{
+                severity: IssueLevel.Error,
+                code: error.code,
+                diagnostics: error.message,
+              },
+            ]},
+          },
+        };
+      } else {
+        // Log the unexpected error for debugging purposes.
+        console.error('Unexpected error during registration processing:', error);
+
+        // Return a generic 500 error entry.
+        return {
+          type: entryType,
+          meta: entry.meta,
+          response: {
+            status: '500',
+            outcome: {
+              resourceType: 'OperationOutcome',
+              issue: [{
+                severity: IssueLevel.Error,
+                code: IssueType.Exception,
+                diagnostics: 'An unexpected internal server error occurred.',
+              }],
+            },
+          },
+        };
+      }
+    }
   }
 
     /**
@@ -104,7 +188,7 @@ export class OrganizationManager {
     private async persistTenantConfig(org: IncludedResource, altName: string, contained: IncludedResource[]) {
         const person = contained.find(r => r.type === 'Person')!;
         const service = contained.find(r => r.type === 'Service')!;
-        
+
         // 1. Manager: Construct the business object (the content).
         const tenantConfig: TenantConfig = {
             id: org.id,
@@ -174,11 +258,9 @@ export class OrganizationManager {
         }
     }
     if (!resources.organization || !resources.person || !resources.service) {
-        throw new Error('Incomplete claims: Organization, Person, and Service resources are required.');
+        throw new ManagerError('Incomplete claims: Organization, Person, and Service resources are required.', IssueType.Required);
     }
     return resources as { organization: IncludedResource, person: IncludedResource, service: IncludedResource };
   }
 }
-
-
 
