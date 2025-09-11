@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { Convert } from '@/utils/convert';
+import { Convert } from '../utils/convert';
 
 /**
  * Defines the public interface for AES-GCM encrypted data components,

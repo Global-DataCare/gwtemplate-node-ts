@@ -2,21 +2,22 @@
 // File: src/managers/OrganizationManager.ts
 
 import { config } from '../config';
-import { determineResourceId } from '@/utils/resource';
-import { isValidTenantAlternateName } from '@/utils/tenant';
-import { getBundleResponseTypeForAction } from '@/utils/bundle';
-import { IKmsService } from '@/security/interfaces/IKmsService';
-import { TenantConfig } from '@/models/tenant';
-import { IncludedResource } from '@/models/jsonapi';
-import { ClaimsRecord } from '@/models/resource-document';
-import { ConfidentialStorageDoc } from '@/models/confidential-storage';
-import { ClaimsOrgSchemaorg, ClaimsServiceSchemaorg } from '@/models/schemaorg';
-import { VaultRepository } from '@/database/repositories/vault/vault.repository';
-import { Bundle, BundleEntry, ErrorEntry } from '@/models/bundle';
-import { IssueLevel, IssueType } from '@/models/fhir/codes';
-import { ManagerError } from '@/models/errors/manager-error';
-import { IPayloadResponse } from '@/models/response';
-import { JobRequest } from '@/models/request';
+import { determineResourceId } from '../utils/resource';
+import { isValidTenantAlternateName } from '../utils/tenant';
+import { getBundleResponseTypeForAction } from '../utils/bundle';
+import { IKmsService } from '../security/interfaces/IKmsService';
+import { TenantConfig } from '../models/tenant';
+import { IncludedResource } from '../models/jsonapi';
+import { ClaimsRecord } from '../models/resource-document';
+import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { ClaimsOrgSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
+import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
+import { IssueLevel, IssueType } from '../models/fhir/codes';
+import { ManagerError } from '../models/errors/manager-error';
+import { IPayloadResponse } from '../models/response';
+import { JobRequest } from '../models/request';
+import { getHostDid, getTenantDid } from '../utils/did';
 
 /**
  * Manages the business logic for organization registration.
@@ -53,14 +54,18 @@ export class OrganizationManager {
       data: responseEntries,
     };
 
+    const issuerDid = (job.tenantId && job.tenantId !== 'host')
+      ? getTenantDid(job.tenantId)
+      : getHostDid();
+
     // TODO: The JARM claims (iss, aud, exp) should be dynamically determined.
     // iss: From service configuration (our DID/URL).
     // aud: From the original request's client_id or equivalent property in the job.
     // exp: Current time + a configured TTL (e.g., 5 minutes).
     return {
       thid: job.input.thid,
-      iss: 'did:web:antifraud.example.com', // Placeholder
-      aud: job.input.aud,                  // Correctly accessed from job.input
+      iss: issuerDid,
+      aud: job.input.iss,                  // The response is for the original requester
       exp: Math.floor(Date.now() / 1000) + 300, // Placeholder: expires in 5 minutes
       body: responseBundle,
     };

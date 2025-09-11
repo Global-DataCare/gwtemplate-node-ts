@@ -4,18 +4,18 @@
 import express from 'express';
 import request from 'supertest';
 import { v4 as uuidv4 } from 'uuid';
-import { createApiRouter } from '@/routes/api';
-import { QueueAdapter } from '@/adapters/queue';
-import { TenantCacheManager } from '@/managers/TenantMemManager';
+import { createApiRouter } from '../../routes/api';
+import { QueueAdapter } from '../../adapters/queue';
+import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { testClaimsTenant1Registration, testHostData } from '../data/organization.data';
 import { testThid1, testCompletedJob, testPendingJob, testEncryptedJwe1 } from '../data/async-response.data';
-import { TenantConfig } from '@/models/tenant';
-import { createDidServiceId } from '@/utils/did';
-import { DecodedDidcommMessage } from '@/models/request';
-import { DidDocument } from '@/models/did';
+import { TenantConfig } from '../../models/tenant';
+import { createDidServiceId } from '../../utils/did';
+import { DecodedDidcommMessage } from '../../models/request';
+import { DidDocument } from '../../models/did';
 import { mockKmsService } from '../mocks/kms.mock';
-import { VaultMemRepository } from '@/database/repositories/vault/vault.mem.repository';
-import { AsyncResponseStoreMem, IAsyncResponseStore } from '@/adapters/async-response-store.mem';
+import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
+import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async-response-store.mem';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -29,13 +29,13 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.urlencoded({ extended: true }));
   
   const vaultRepository = new VaultMemRepository();
-  const tenantManager = new TenantCacheManager(vaultRepository);
+  const tenantsCacheManager = new TenantsCacheManager(vaultRepository);
   
-  // Pass all required arguments, including the asyncResponseStore
-  const apiRouter = createApiRouter(mockQueueAdapter, tenantManager, mockKmsService, asyncResponseStore);
+  // Pass the 4 required arguments
+  const apiRouter = createApiRouter(mockQueueAdapter, tenantsCacheManager, mockKmsService, asyncResponseStore);
   app.use('/', apiRouter);
   
-  return { app, tenantManager };
+  return { app, tenantsCacheManager };
 };
 
 describe('Organization Registration API', () => {
@@ -48,7 +48,7 @@ describe('Organization Registration API', () => {
     it('should decode the request, queue a job, and return 202 Accepted', async () => {
       // --- Arrange ---
       const asyncResponseStore = new AsyncResponseStoreMem();
-      const { app, tenantManager } = setupApp(asyncResponseStore);
+      const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
       
       const hostConfig: Partial<TenantConfig> = {
           ...testHostData,
@@ -63,7 +63,7 @@ describe('Organization Registration API', () => {
             }]
           } as DidDocument,
         };
-      jest.spyOn(tenantManager, 'getConfigByAlternateName').mockResolvedValue(hostConfig as TenantConfig);
+      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(hostConfig as TenantConfig);
 
       const decodedMessage: DecodedDidcommMessage = {
         aud: `did:web:${testHostData.alternateName}`,
@@ -146,3 +146,4 @@ describe('Organization Registration API', () => {
     });
   });
 });
+

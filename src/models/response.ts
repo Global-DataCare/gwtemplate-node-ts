@@ -1,7 +1,7 @@
 // src/models/response.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { Bundle } from '@/models/bundle';
+import { Bundle } from '../models/bundle';
 
 /**
  * Defines the structure of the plaintext response payload that a manager MUST return.

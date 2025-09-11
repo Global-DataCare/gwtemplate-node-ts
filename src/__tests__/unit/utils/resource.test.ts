@@ -51,5 +51,13 @@ describe('determineResourceId', () => {
         const resourceId = determineResourceId(validIdentifier, 'demo');
         expect(resourceId).toBe(validUuid);
     });
+
+    it("should extract the UUID from a complex identifier string containing a comma", () => {
+        (uuidValidate as jest.Mock).mockReturnValue(true);
+        const complexIdentifier = `urn:uuid:${validUuid},did:web:some-controller`;
+        const resourceId = determineResourceId(complexIdentifier);
+        expect(resourceId).toBe(validUuid);
+        expect(uuidv4).not.toHaveBeenCalled();
+    });
 });
 

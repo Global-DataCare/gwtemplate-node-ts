@@ -1,11 +1,11 @@
 // src/__tests__/unit/utils/did.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { getHostDid, getTenantDid } from '@/utils/did';
-import { config } from '@/config';
+import { getHostDid, getTenantDid } from '../../../utils/did';
+import { config } from '../../../config';
 
 // Mock the entire config module to control its values during tests.
-jest.mock('@/config');
+jest.mock('../../../config');
 
 describe('DID Utilities', () => {
 

@@ -8,7 +8,7 @@ import { TenantConfig } from "../models/tenant";
  * acting as a fast in-memory cache to resolve public identifiers to their
  * internal database context.
  */
-export interface ITenantManager {
+export interface ITenantsManager {
   /**
    * Loads all tenant configurations from the primary database into the in-memory cache.
    * This should be called on application startup.

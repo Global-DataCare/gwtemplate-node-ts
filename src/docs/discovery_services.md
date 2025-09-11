@@ -1,0 +1,90 @@
+# Discovery Services and Self-Descriptions Architecture
+
+## 1. Overview
+
+This document outlines the architecture for the service's public discovery endpoints. These endpoints are critical for interoperability and automated client configuration, supporting multiple standards including **OIDC, SMART-on-FHIR, FHIR, and GAIA-X**.
+
+The service provides discovery documents for both the central host platform and for each individual tenant, allowing clients to understand the specific capabilities and configurations of the entity they are interacting with.
+
+## 2. Core Principle: Dynamic, Configuration-Driven Generation
+
+A fundamental principle of this architecture is that discovery documents are **not static files**. They are dynamically generated on-demand based on the `TenantConfig` object that is created during the organization registration process and modified via authorized updates.
+
+This ensures that the advertised capabilities of a tenant are always an exact reflection of their stored configuration. Any change, such as a tenant enabling a legacy FHIR flow, is instantly and automatically reflected in their public discovery documents.
+
+## 3. Caching Strategy
+
+To ensure high performance and reduce unnecessary load on the database, tenant configurations **must be cached in-memory** after their first retrieval.
+
+The cache for a specific tenant **must be invalidated** by the `OrganizationManager` whenever a successful update to that tenant's configuration occurs (e.g., changing their supported response modes). This cache-invalidation strategy guarantees that the discovery endpoints serve fresh, accurate data immediately following a configuration change.
+
+## 4. Endpoint Definitions
+
+### 4.1. Host-Level Endpoints
+
+These endpoints describe the capabilities of the central hosting platform, establishing its identity as a trusted issuer and service provider.
+
+*   `/.well-known/openid-configuration`: Describes the host's primary OIDC capabilities for client onboarding.
+*   `/.well-known/did.json`: (GAIA-X & W3C) The host's Decentralized Identifier (DID) Document, establishing its root identity.
+*   `/jwks.json`: (GAIA-X & W3C) The host's public JSON Web Key Set (JWKS) for verifying signatures issued by the host.
+
+### 4.2. Tenant-Level Endpoints
+
+These endpoints are unique for each tenant and are dynamically generated from their specific `TenantConfig`, establishing their sovereign identity within the ecosystem.
+
+*   `/{tenantId}/.well-known/openid-configuration`: (OIDC) The tenant's specific OIDC discovery document, which includes their authorized `response_modes_supported`.
+*   `/{tenantId}/.well-known/smart-configuration`: (SMART-on-FHIR) If the tenant has enabled FHIR capabilities, this document advertises their OAuth2 scopes and endpoints.
+*   `/{tenantId}/.well-known/did.json`: (GAIA-X & W3C) The tenant's unique DID Document, establishing them as a sovereign participant.
+*   `/{tenantId}/jwks.json`: (GAIA-X & W3C) The tenant's unique public JWKS for verifying signatures originating from the tenant.
+*   `/{tenantId}/metadata`: (FHIR) If applicable, this endpoint returns the tenant's FHIR `CapabilityStatement`.
+*   `/{tenantId}/self-description`: (GAIA-X) This endpoint serves the tenant's GAIA-X compliant Self-Description, issued by the host as a signed Verifiable Credential (VC).
+
+## 5. Connection to the Onboarding Process
+
+The data required to generate all of these discovery documents is created and configured during the organization registration and subsequent update processes. The claims submitted by a new tenant directly populate the `TenantConfig` that these endpoints use.
+
+The creation of the `Service` resource during onboarding, which is tied to the new `Organization`, serves as the auditable event that justifies the issuance of the tenant's initial Self-Description.
+
+For complete details on how a tenant's capabilities are defined during onboarding, see the [Organization Registration Process Documentation](./organization_registration.md).
+
+## 6. Health and Liveness Probes
+
+The public, unauthenticated nature of the discovery endpoints makes them ideal for use as service health and liveness probes. They serve a different but complementary purpose to the end-to-end transactional `ping` endpoint.
+
+### 6.1 Liveness Probes (Discovery Endpoints)
+
+Making a `GET` request to any discovery endpoint (e.g., `/.well-known/openid-configuration` or `/{tenantId}/metadata`) serves as a high-level "liveness" check.
+
+*   **What it Verifies:**
+    *   The web server is running and accessible.
+    *   The API's routing layer is functioning.
+    *   For a tenant-specific endpoint, it confirms the tenant exists and its basic configuration can be loaded.
+*   **Use Case:** Ideal for automated infrastructure health checks (e.g., Kubernetes, load balancers) to quickly determine if the service is "on the air". A `200 OK` response indicates the service is alive, while a `404 Not Found` correctly indicates a non-existent tenant.
+
+### 6.2 End-to-End Health Probes (Transactional Ping)
+
+The end-to-end system health check is performed by submitting a `_batch` operation to the dedicated `ping` endpoint. This is not a simplified check; it is a full, real transaction that tests every component of the core architectural pattern.
+
+*   **URL Structure:** `POST .../<tenant-id>/cds-<jurisdiction>/v1/<sector>/ping/<format>/<resourceType>/<_batch>`
+*   **Unique `thid` Requirement:** The client **must** generate a unique `thid` (e.g., a UUID) for every ping request. Using a static `thid` is an anti-pattern that would break transaction correlation and make the test unreliable.
+*   **Security:** The endpoint adheres to all standard security patterns (JWS/JWE, `alg:none` in Demo, Legacy Mode).
+*   **Use Case:** A successful ping, from initial `POST` to final polling and retrieval of the response, provides a definitive guarantee that the entire asynchronous transactional pipeline is healthy.
+
+## 7. The Ping Flow as an Architectural Blueprint
+
+The `ping` transaction is more than just a health check; it is the **reference implementation for the entire asynchronous architectural pattern**. Its flow defines the exact lifecycle that every secure, multi-step business transaction in this service MUST follow.
+
+Any new feature requiring asynchronous processing (e.g., "Product Registration") should treat the `PingManager` and its associated tests as a template to ensure perfect adherence to the established architecture.
+
+### 7.1 The Canonical Transaction Flow
+
+The sequence of operations tested by the `ping` and required for all asynchronous features is:
+
+1.  **`POST` Request:** The client sends the initial job request to the appropriate API endpoint.
+2.  **KMS Decode:** The API controller's first action is to pass the incoming secure payload to the `IKmsService` for decoding and validation.
+3.  **Queue:** The controller places the decoded job into the message queue and immediately returns a `202 Accepted` response with the unique `thid`.
+4.  **Worker:** A separate Worker process dequeues the job and passes it to the appropriate business logic `Manager` (e.g., `PingManager`, `OrganizationManager`).
+5.  **KMS Encode:** After the `Manager` completes its work, the Worker passes the resulting response payload to the `IKmsService` to be encrypted and signed for the recipient.
+6.  **Storage:** The Worker stores the final, secure response envelope in the temporary key-value store, using the `thid` as the unique key.
+7.  **Polling/Retrieval:** The original client uses the `thid` to make one or more `_search` requests to the appropriate endpoint, retrieving the stored response once it becomes available.
+

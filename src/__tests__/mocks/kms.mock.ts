@@ -2,8 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { jest } from '@jest/globals';
-import { IKmsService } from '@/security/interfaces/IKmsService';
-import { ConfidentialStorageDoc } from '@/models/confidential-storage';
+import { IKmsService } from '../../security/interfaces/IKmsService';
+import { ConfidentialStorageDoc } from '../../models/confidential-storage';
 
 /**
  * Creates a complete, correctly-typed mock of the IKmsService for use in tests.

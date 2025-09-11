@@ -2,8 +2,8 @@
 // File: src/__tests__/unit/managers/OrganizationManager.test.ts
 
 import { jest } from '@jest/globals';
-import { OrganizationManager } from '../../../managers/OrganizationManager';
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
+import { OrganizationManager } from '../../../managers/OrganizationManager';
 import {
     testHostData,
     testTenant1Data,
@@ -26,7 +26,7 @@ import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
 // Mock external dependencies
 jest.mock('uuid');
-jest.mock('@/utils/tenant');
+jest.mock('../../../utils/tenant');
 
 // Create a mock KMS service for testing.
 // Create a complete mock KMS service for testing to satisfy the IKmsService interface.
@@ -56,13 +56,18 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
     section: 'org.schema',
     action: '_batch',
     input: {
-        thid: 'test-thid-123',
         aud: 'did:web:antifraud.example.com',
-        type: 'https://didcomm.org/registration/1.0/register',
+        /** contains `json` or `fhir+json` */
+        response_type: "json",
+        thid: 'test-thid-123',
+        type: 'json',
         body: {
             data: [{
+                meta: { claims },
+                request: {
+                    method: "POST"
+                },
                 type: 'Organization-registration-form-v1.0',
-                meta: { claims }
             }]
         }
     },

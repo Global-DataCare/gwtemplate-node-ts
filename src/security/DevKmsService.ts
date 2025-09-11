@@ -2,12 +2,12 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { IKmsService } from './interfaces/IKmsService';
-import { ConfidentialStorageDoc } from '@/models/confidential-storage';
-import { DecodedDidcommMessage } from '@/models/request';
-import { DidDocument } from '@/models/did';
-import { JwsObject } from '@/models/jws';
-import { PublicJWKey } from '@/models/crypto';
-import { ITenantManager } from '@/managers/ITenantManager';
+import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { DecodedDidcommMessage } from '../models/request';
+import { DidDocument } from '../models/did';
+import { JwsObject } from '../models/jws';
+import { PublicJWKey } from '../models/crypto';
+import { ITenantsManager } from '../managers/ITenantsManager';
 import { encode as base64urlEncode, decode as base64urlDecode } from 'js-base64';
 
 /**
@@ -21,9 +21,9 @@ import { encode as base64urlEncode, decode as base64urlDecode } from 'js-base64'
  * WARNING: DO NOT USE IN PRODUCTION.
  */
 export class DevKmsService implements IKmsService {
-  private tenantManager: ITenantManager;
+  private tenantManager: ITenantsManager;
 
-  constructor(tenantManager: ITenantManager) {
+  constructor(tenantManager: ITenantsManager) {
     this.tenantManager = tenantManager;
   }
 

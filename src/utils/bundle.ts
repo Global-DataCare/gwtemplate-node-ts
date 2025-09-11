@@ -1,8 +1,8 @@
 // src/utils/bundle.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { Bundle, ErrorEntry } from '@/models/bundle';
-import { IssueLevel, IssueType } from '@/models/fhir/codes';
+import { Bundle, ErrorEntry } from '../models/bundle';
+import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { safelyJoinUrl } from './url';
 
 export const BundleType = {

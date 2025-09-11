@@ -1,7 +1,7 @@
 // src/__tests__/unit/adapters/async-response-store.mem.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { AsyncResponseStoreMem } from '@/adapters/async-response-store.mem';
+import { AsyncResponseStoreMem } from '../../../adapters/async-response-store.mem';
 import { testThid1, testPendingJob, testCompletedJob } from '../../data/async-response.data';
 
 describe('AsyncResponseStoreMem', () => {

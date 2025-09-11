@@ -14,4 +14,10 @@ describe('createUrnFromUuid', () => {
     it('should handle an empty string', () => {
         expect(createUrnFromUuid('')).toBe('urn:uuid:');
     });
+
+    it('should still format a non-UUID string correctly', () => {
+      const notUuid = 'this-is-not-a-uuid';
+      const expectedUrn = 'urn:uuid:this-is-not-a-uuid';
+      expect(createUrnFromUuid(notUuid)).toBe(expectedUrn);
+    });
 });

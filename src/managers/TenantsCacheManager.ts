@@ -1,17 +1,17 @@
 // src/managers/TenantManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { ITenantManager } from './ITenantManager';
-import { VaultRepository } from '@/database/repositories/vault/vault.repository';
+import { ITenantsManager } from './ITenantsManager';
+import { VaultRepository } from '../database/repositories/vault/vault.repository';
 import { config } from '../config';
-import { SchemaorgOrganizationParam } from '@/models/params';
-import { RecordBase } from '@/models/resource-document';
-import { TenantConfig } from '@/models/tenant';
+import { SchemaorgOrganizationParam } from '../models/params';
+import { RecordBase } from '../models/resource-document';
+import { TenantConfig } from '../models/tenant';
 
 /**
  * An in-memory cache implementation of the Tenant Manager.
  */
-export class TenantCacheManager implements ITenantManager {
+export class TenantsCacheManager implements ITenantsManager {
   private vaultRepository: VaultRepository;
   private tenantCacheByAlternateName = new Map<string, TenantConfig>();
 

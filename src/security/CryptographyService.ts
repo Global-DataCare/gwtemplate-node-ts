@@ -8,9 +8,9 @@ import { randomBytes } from 'crypto';
 import { ml_kem768 } from '@noble/post-quantum/ml-kem';
 import { ICryptography, EncryptionOptions } from './interfaces/ICryptography';
 import { AesManager } from './AesManager';
-import { Convert } from '@/utils/convert';
-import { JWK } from '@/models/jwk';
-import { JweObject, ProtectedHeadersJWE, RecipientDataJWE } from '@/models/jwe';
+import { Convert } from '../utils/convert';
+import { JWK } from '../models/jwk';
+import { JweObject, ProtectedHeadersJWE, RecipientDataJWE } from '../models/jwe';
 
 /**
  * Provides high-level cryptographic functions implementing the ICryptography interface.

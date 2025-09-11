@@ -20,47 +20,112 @@ The organization registration process allows administrators to register new orga
 
 ## 3. Data Structures
 
-### 3.1 Input (`requestPayload.body`)
+### 3.1 Input (Decoded Request Payload)
 
-The `body` of the incoming `DecodedDidcommMessage` is expected to be a `Bundle` containing one or more entries. The `type` of the entry identifies the form and version.
+The `input` for the job is the plaintext, decoded DIDComm message. It contains top-level properties that control the response format and mode, along with the `body` which is the `Bundle` of entries.
 
-**Example Entry:**
+**Example Decoded Payload:**
 ```json
 {
-  "type": "Organization-registration-form-v1.0",
-        "meta": {
-          "claims": {
-            "@claims": "org.schema",
-            "@type": "template",
-            "org.schema.Organization.legalName": "Example Corp",
-      "org.schema.Organization.alternateName": "example-corp",
-      "..." : "..."
-          }
-        }
-      }
+  "aud": "did:web:antifraud.example.com",
+  "iss": "did:web:client.example.com",
+  "response_type": "json",
+  "response_mode": "form_post.jwt",
+  "thid": "test-thid-123",
+  "type": "https://didcomm.org/registration/1.0/register",
+  "body": {
+    "type": "Organization-registration-form-v1.0",
+    "data": [{
+      "meta": { "claims": { "..." : "..." } }
+    }
+  }
+}
 ```
 
-### 3.2 Output (`responsePayload.body`)
+#### Flat Claims for Structured Data
 
-The `body` of the outgoing `IPayloadResponse` is a `Bundle` of type `batch-response`. For each successful registration, it contains a `BundleEntry` of type `Organization-registration-receipt-v1.0`.
+To represent structured `schema.org/PropertyValue` data within a simple key-value format, the system uses a FHIR-inspired flat claim pattern: `SYSTEM|VALUE`. For a property that accepts multiple values, the values are comma-separated.
+
+The `OrganizationManager` is responsible for parsing this flat format. For example, if it receives a claim like this:
+`"org.schema.Service.additionalProperty": "net.openid.connect.discovery.response_modes_supported|form_post.jwt,json"`
+
+It will parse it internally to validate its components against the structured `PropertyValue` model.
+
+#### Claim Processing and Validation Rules
+The `OrganizationManager` must enforce a specific set of rules when processing the `additionalProperty` claim for `net.openid.connect.discovery.response_modes_supported`. This ensures the resulting configuration is always valid, secure, and predictable.
+
+1.  **Default Behavior:** If the `additionalProperty` claim is not provided, it will be defaulted to `form_post.jwt`.
+2.  **Guaranteed Primary Mode:** The `form_post.jwt` mode is always required. If the claim is present but does not include `form_post.jwt`, it will be added. The final list of modes will also be sorted to ensure `form_post.jwt` is the first element.
+3.  **Sanitization:** Only modes from a known allowlist (e.g., `form_post.jwt`, `json`, `fhir+json`) will be accepted. Any unsupported modes included in the claim will be silently removed.
+
+**Examples:**
+*   **Input:** `(claim not provided)`
+    **Accepted Claim:** `"net.openid...|form_post.jwt"`
+*   **Input:** `"net.openid...|fhir+json"`
+    **Accepted Claim:** `"net.openid...|form_post.jwt,fhir+json"`
+*   **Input:** `"net.openid...|json,xml,form_post.jwt"`
+    **Accepted Claim:** `"net.openid...|form_post.jwt,json"`
+
+### 3.2 Response Control Properties
+
+*   `response_type` (Required): Determines the content format of the response bundle.
+    *   `"json"`: The bundle will be JSON:API compliant, using a `data` array for its entries.
+    *   `"fhir+json"`: The bundle will be FHIR compliant, using an `entry` array.
+*   `response_mode` (Required): Determines the response delivery mechanism.
+    *   `"form_post.jwt"`: (Default) The standard asynchronous flow. The service returns a `202 Accepted`, and the client polls for the final response JWT using the `thid` in an HTTP POST request, e.g. `http://localhost:3000/host/cds-<jurisdiction>/<sector>/registry/org.schema/Organization/_search` con parameter "thid=<uuid>"
+    *   `"jwt"`: The response JWT is returned directly in the body of the HTTP response.
+
+### 3.3 Output (`IPayloadResponse`)
+
+The entire response from the manager is a JARM-compliant `IPayloadResponse` object. The `body` of this object is a `Bundle`.
+
+**Example Full Success Response Payload:**
+```json
+{
+  "thid": "test-thid-123",
+  "body": {
+    "type": "batch-response",
+    "total": 1,
+    "data": [
+      {
+        /* BundleEntry content goes here, see below */
+      }
+    ]
+  }
+}
+```
+**Note on Response Formatting (`data` vs. `entry`):**
+*   The `total` field indicates the total number of entries processed, including both successes and errors.
+*   The array containing the results will be named **`data`** or **`entry`** based on the `response_type` property in the original request.
+*   **Legacy Mode Fallback:** In `LEGACY_MODE=true`, if `response_type` is omitted from the payload, the system will fall back to inspecting the HTTP `Accept` header (e.g., `application/fhir+json` will produce the `entry` field).
+
+### 3.4 Example Entries
 
 **Example Success Entry (`BundleEntry`):**
 ```json
 {
-  "type": "Organization-registration-receipt-v1.0",
-  "id": "receipt-uuid-...",
-        "resource": {
-          "resourceType": "Organization",
-    "id": "org-uuid-...",
-    "meta": { "claims": { "..." } },
-          "contained": [
-      { "type": "Person", "id": "person-uuid-...", "meta": { "claims": { "..." } } }
-          ]
-        },
-        "response": {
-          "status": "201"
-        }
-      }
+  "type": "Organization-registration-form-v1.0",
+  "resource": {
+    /* The principal resource */
+  "id": "urn:uuid:<organization-uuid>",
+    "meta": { "claims": { /* Processed claims for the principal resource */ } },
+    "resourceType": "Organization",
+
+    /* Additional resources included including processed claims */
+    "contained": [{
+      "id": "urn:uuid:<employee-uuid>",
+      "meta": { "claims": { "org.schema.Person.email": "<email>" } },
+      "type": "Person",
+     }, {
+      "id": "urn:uuid:<role-uuid>",
+      "meta": { "claims": { "org.schema.Occupation.occupationalCategory": "ISCO-08:<code>" } },
+      "type": "Occupation",
+    }
+  }],
+  "response": {
+    "status": "201"
+  }
+}
 ```
 
 **Example Error Entry (`ErrorEntry`):**
@@ -71,19 +136,19 @@ The `body` of the outgoing `IPayloadResponse` is a `Bundle` of type `batch-respo
     "status": "409",
     "outcome": {
       "resourceType": "OperationOutcome",
-      "issue": [
-        {
-          "severity": "error",
-          "code": "duplicate",
-          "diagnostics": "An organization with the same taxID already exists."
-        }
-      ]
+      "issue": [{
+        "severity": "error",
+        "code": "duplicate",
+        "diagnostics": "Conflict: already exists the taxID '<taxId>' issued by '<country_code>' jurisdiction"
+      }
     }
   }
 }
 ```
 
-## 4. AI Prompt Guide
+## 4. Architectural Patterns & Modes
+
+## 5. AI Prompt Guide
 When generating code, use the following guidelines:
 
 *   **Language:** TypeScript

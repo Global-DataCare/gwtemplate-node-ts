@@ -3,7 +3,64 @@
 
 import { v4 as uuidv4, validate as uuidValidate} from 'uuid';
 import { knownDomainsReversed } from "./domains.interface";
-import { findCanonicalClaimCase } from '@/models/schema-definitions';
+import { findCanonicalClaimCase } from '../models/schema-definitions';
+
+/**
+ * Defines the constant for the response modes property ID.
+ */
+const RESPONSE_MODES_PROPERTY_ID = 'net.openid.connect.discovery.response_modes_supported';
+
+/**
+ * Defines the allowlist of supported response modes.
+ */
+const SUPPORTED_RESPONSE_MODES = ['form_post.jwt', 'json', 'fhir+json'];
+
+/**
+ * Defines the default, required response mode.
+ */
+const DEFAULT_RESPONSE_MODE = 'form_post.jwt';
+
+/**
+ * Processes the flat claim string for `response_modes_supported` to enforce business rules.
+ *
+ * @param claim - The raw claim string from the request (e.g., "propertyId|value1,value2").
+ * @returns A canonical, validated claim string that adheres to system rules.
+ */
+export const processResponseModesClaim = (claim: string | undefined): string => {
+  // Rule: Handle malformed or missing claims by returning the default.
+  if (!claim || !claim.trim().includes('|')) {
+    return `${RESPONSE_MODES_PROPERTY_ID}|${DEFAULT_RESPONSE_MODE}`;
+  }
+
+  const parts = claim.trim().split('|');
+  const propertyId = parts[0].trim();
+  const claimValues = parts[1];
+
+  // Rule: Handle empty value lists by returning the default.
+  if (!claimValues) {
+    return `${RESPONSE_MODES_PROPERTY_ID}|${DEFAULT_RESPONSE_MODE}`;
+  }
+
+  // 1. Parse, trim whitespace from each mode, and remove any empty values.
+  let modes = claimValues.split(',').map(mode => mode.trim()).filter(Boolean);
+
+  // 2. Filter the list against the allowlist of supported modes.
+  modes = modes.filter(mode => SUPPORTED_RESPONSE_MODES.includes(mode));
+
+  // 3. Ensure the default mode is always present using a Set to handle duplicates.
+  const modeSet = new Set(modes);
+  modeSet.add(DEFAULT_RESPONSE_MODE);
+
+  // 4. Convert back to an array and sort based on the canonical order in SUPPORTED_RESPONSE_MODES.
+  const finalModes = Array.from(modeSet);
+  finalModes.sort((a, b) => {
+    return SUPPORTED_RESPONSE_MODES.indexOf(a) - SUPPORTED_RESPONSE_MODES.indexOf(b);
+  });
+
+  // 5. Re-assemble the final, canonical claim string.
+  return `${propertyId}|${finalModes.join(',')}`;
+};
+
 
 /**
  * Normalizes a raw claims object from a client application.

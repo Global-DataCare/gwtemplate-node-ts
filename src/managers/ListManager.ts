@@ -2,9 +2,9 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4 } from 'uuid';
-import { VaultRepository } from '@/database/repositories/vault/vault.repository';
-import { normalizeInteroperableClaims } from '@/utils/claims';
-import { RecordBase } from '@/models/resource-document';
+import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { normalizeInteroperableClaims } from '../utils/claims';
+import { RecordBase } from '../models/resource-document';
 
 export interface ListInput {
   vaultId: string; // The patient's vault where this List will be stored

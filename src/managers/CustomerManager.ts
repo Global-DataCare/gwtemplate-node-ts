@@ -1,15 +1,15 @@
 // src/managers/CustomerManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { VaultRepository } from '@/database/repositories/vault/vault.repository';
-import { RecordBase } from '@/models/resource-document';
-import { Bundle, BundleEntry, ErrorEntry } from '@/models/bundle';
-import { JobRequest } from '@/models/request';
-import { IPayloadResponse } from '@/models/response';
-import { ManagerError } from '@/models/errors/manager-error';
-import { IssueLevel, IssueType } from '@/models/fhir/codes';
-import { getHostDid } from '@/utils/did';
-import { getBundleResponseTypeForAction } from '@/utils/bundle';
+import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { RecordBase } from '../models/resource-document';
+import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
+import { JobRequest } from '../models/request';
+import { IPayloadResponse } from '../models/response';
+import { ManagerError } from '../models/errors/manager-error';
+import { IssueLevel, IssueType } from '../models/fhir/codes';
+import { getHostDid } from '../utils/did';
+import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { IJobProcessor } from './registry';
 
 const CUSTOMER_PROFILE_SECTION = 'profile';

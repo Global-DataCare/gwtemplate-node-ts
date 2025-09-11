@@ -4,14 +4,11 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
     "outDir": "./build",
     "rootDir": "./src",
     "allowSyntheticDefaultImports": true,
     "declaration": true,
-    "emitDeclarationOnly": true,
+    "emitDeclarationOnly": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
@@ -19,6 +16,6 @@
     "strict": true,
     "typeRoots": ["./src/types", "./node_modules/@types"]
   },
-  "include": ["./src/**/*.tsx", "./src/**/*.ts", "src/security/JweManager.ts.old"],
+  "include": ["./src/**/*.tsx", "./src/**/*.ts"],
   "exclude": ["./build", "node_modules", "*.test.ts", "**/*.spec.ts"]
 }

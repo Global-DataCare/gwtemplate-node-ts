@@ -3,15 +3,15 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
-import { QueueAdapter } from '@/adapters/queue';
-import { TenantCacheManager } from '@/managers/TenantMemManager';
-import { createDidServiceId } from '@/utils/did';
-import { createJobName } from '@/utils/naming';
+import { QueueAdapter } from '../adapters/queue';
+import { TenantsCacheManager } from '../managers/TenantsCacheManager';
+import { createDidServiceId } from '../utils/did';
+import { createJobName } from '../utils/naming';
 
-import { JobRequest } from '@/models/request';
-import { TenantConfig } from '@/models/tenant';
-import { IKmsService } from '@/security/interfaces/IKmsService';
-import { IAsyncResponseStore } from '@/adapters/async-response-store.mem';
+import { JobRequest } from '../models/request';
+import { TenantConfig } from '../models/tenant';
+import { IKmsService } from '../security/interfaces/IKmsService';
+import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 
 /**
  * Validates an incoming request against the dynamic service configuration in a tenant's DID Document.
@@ -53,7 +53,7 @@ function isRequestValid(tenantConfig: TenantConfig, params: any): boolean {
  */
 export function createApiRouter(
   queueAdapter: QueueAdapter,
-  tenantManager: TenantCacheManager,
+  tenantManager: TenantsCacheManager,
   kmsService: IKmsService,
   asyncResponseStore: IAsyncResponseStore
 ): express.Router {

@@ -1,9 +1,9 @@
 // src/managers/registry.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { TenantCacheManager } from './TenantMemManager';
-import { JobRequest } from '@/models/request';
-import { IPayloadResponse } from '@/models/response';
+import { TenantsCacheManager } from './TenantsCacheManager';
+import { JobRequest } from '../models/request';
+import { IPayloadResponse } from '../models/response';
 
 /**
  * Defines the standard contract for any manager that processes a job.
@@ -24,7 +24,7 @@ export interface IJobProcessor {
  */
 export interface ManagerRegistry {
   organizationManager: IJobProcessor;
-  tenantManager: TenantCacheManager;
+  tenantManager: TenantsCacheManager;
   employeeManager?: IJobProcessor;
   customerManager?: IJobProcessor;
   // groupManager?: IJobProcessor;

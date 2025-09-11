@@ -1,15 +1,15 @@
 // src/managers/EmployeeManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { getHostDid } from '@/utils/did';
-import { getBundleResponseTypeForAction } from '@/utils/bundle';
-import { Bundle, BundleEntry, ErrorEntry } from '@/models/bundle';
-import { VaultRepository } from '@/database/repositories/vault/vault.repository';
-import { RecordBase } from '@/models/resource-document';
-import { JobRequest } from '@/models/request';
-import { IPayloadResponse } from '@/models/response';
-import { ManagerError } from '@/models/errors/manager-error';
-import { IssueLevel, IssueType } from '@/models/fhir/codes';
+import { getHostDid } from '../utils/did';
+import { getBundleResponseTypeForAction } from '../utils/bundle';
+import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
+import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { RecordBase } from '../models/resource-document';
+import { JobRequest } from '../models/request';
+import { IPayloadResponse } from '../models/response';
+import { ManagerError } from '../models/errors/manager-error';
+import { IssueLevel, IssueType } from '../models/fhir/codes';
 
 const EMPLOYEE_SECTION = 'employees';
 
