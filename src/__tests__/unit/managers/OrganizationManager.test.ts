@@ -56,7 +56,7 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
     section: 'org.schema',
     action: '_batch',
     input: {
-        aud: 'did:web:antifraud.example.com',
+        aud: 'did:web:api.example.com',
         /** contains `json` or `fhir+json` */
         response_type: "json",
         thid: 'test-thid-123',

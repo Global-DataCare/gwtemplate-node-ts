@@ -5,7 +5,7 @@ import { config } from '../config';
 
 /**
  * Extracts the percent-encoded hostname from the configured public API URL.
- * @returns The hostname part (e.g., "localhost%3A3000" or "antifraud.example.com").
+ * @returns The hostname part (e.g., "localhost%3A3000" or "api.example.com").
  */
 function getEncodedHost(): string {
   try {

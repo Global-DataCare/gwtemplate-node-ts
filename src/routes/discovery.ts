@@ -3,53 +3,86 @@
 
 import express from 'express';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
+import { DiscoveryService } from '../services/DiscoveryService';
+import { TenantConfig } from '../models/tenant';
+
+// List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
+const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
 
 /**
- * Creates a router for handling synchronous, tenant-specific discovery endpoints 
- * like .well-known configurations.
- * 
- * @param tenantManager A TenantManager instance to resolve tenant information.
- * @returns An Express router instance.
+ * Creates the router for synchronous, public discovery endpoints.
+ * @param tenantsCacheManager The cache manager to resolve tenant configurations.
+ * @param discoveryService The service to generate discovery documents.
+ * @returns An Express router.
  */
-export function createDiscoveryRouter(tenantManager: TenantsCacheManager): express.Router {
+export function createDiscoveryRouter(
+  tenantsCacheManager: TenantsCacheManager,
+  discoveryService: DiscoveryService
+): express.Router {
   const router = express.Router();
 
-  // Endpoint to serve the tenant's full DID Document.
-  // Example: GET /org1/.well-known/did.json
-  router.get('/:tenantId/.well-known/did.json', async (req, res) => {
-    const { tenantId } = req.params;
-    const tenantConfig = await tenantManager.getConfigByAlternateName(tenantId);
-
-    if (!tenantConfig || !tenantConfig.didDocument) {
-      return res.status(404).json({ error: `DID Document for tenant '${tenantId}' not found.` });
+  // Middleware to resolve the tenant configuration and attach it to the request.
+  const resolveTenant = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // For the host-specific route /.well-known/did.json, tenantId is not in the path.
+    const tenantId = req.params.tenantId || 'host';
+    const tenantConfig = await tenantsCacheManager.getConfigByAlternateName(tenantId);
+    if (!tenantConfig) {
+      // Use text/plain for simple errors on public-facing endpoints.
+      return res.status(404).type('text').send('Not Found');
     }
+    // Attach the config to the response locals for subsequent handlers to use.
+    res.locals.tenantConfig = tenantConfig;
+    next();
+  };
 
-    // FUTURE: Add logic to selectively expose public vs. private parts of the DID document if necessary.
-    res.json(tenantConfig.didDocument);
+  // --- Core Endpoints ---
+
+  router.get('/:tenantId/.well-known/did.json', resolveTenant, async (req, res) => {
+    // The tenantId is already resolved by the middleware.
+    const didDocument = await discoveryService.getDidDocument(res.locals.tenantConfig.alternateName);
+    if (didDocument) {
+      res.json(didDocument);
+    } else {
+      res.status(404).type('text').send('Not Found');
+    }
+  });
+  
+  // Also support host DID without tenantId in path, e.g., /.well-known/did.json
+  router.get('/.well-known/did.json', resolveTenant, async (req, res) => {
+    const didDocument = await discoveryService.getDidDocument('host');
+    if (didDocument) {
+      res.json(didDocument);
+    } else {
+      res.status(404).type('text').send('Not Found');
+    }
   });
 
-  // Endpoint to serve the tenant's JSON Web Key Set (JWKS).
-  // This is crucial for clients to verify signatures.
-  // Example: GET /org1/.well-known/jwks.json
-  router.get('/:tenantId/.well-known/jwks.json', async (req, res) => {
-    const { tenantId } = req.params;
-    const tenantConfig = await tenantManager.getConfigByAlternateName(tenantId);
+  router.get('/:tenantId/.well-known/openid-configuration', resolveTenant, (req, res) => {
+    const config = discoveryService.getOpenIdConfiguration(res.locals.tenantConfig);
+    res.json(config);
+  });
 
-    // The DID Document is the source of truth for cryptographic keys.
-    // We extract them from the 'verificationMethod' array.
-    if (!tenantConfig || !tenantConfig.didDocument || !Array.isArray(tenantConfig.didDocument.verificationMethod)) {
-      return res.status(404).json({ error: `JWKS for tenant '${tenantId}' not found.` });
+  // --- FHIR-Specific Endpoints ---
+
+  // Middleware to check if the tenant's sector is FHIR-enabled.
+  const isFhirSector = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const tenantConfig: TenantConfig = res.locals.tenantConfig;
+    // The 'sector' property is assumed to exist on the tenant config for this check.
+    if (tenantConfig && FHIR_SECTORS.includes(tenantConfig.sector)) {
+      return next();
     }
+    res.status(404).type('text').send('Not Found');
+  };
 
-    // Filter for keys suitable for signing (e.g., assertionMethod) and convert them to JWK format.
-    // The `publicKeyJwk` property is assumed to be the JWK representation.
-    const keys = tenantConfig.didDocument.verificationMethod
-      .filter((vm: any) => vm.publicKeyJwk)
-      .map((vm: any) => vm.publicKeyJwk);
-
-    res.json({ keys: keys });
+  router.get('/:tenantId/.well-known/smart-configuration', resolveTenant, isFhirSector, (req, res) => {
+    const config = discoveryService.getSmartConfiguration(res.locals.tenantConfig);
+    res.json(config);
+  });
+  
+  router.get('/:tenantId/fhir/metadata', resolveTenant, isFhirSector, (req, res) => {
+    const statement = discoveryService.getCapabilityStatement(res.locals.tenantConfig);
+    res.json(statement);
   });
 
   return router;
 }
-

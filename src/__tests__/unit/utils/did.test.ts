@@ -25,13 +25,13 @@ describe('DID Utilities', () => {
 
   it('should create the correct host DID for a URL without a port', () => {
     // Arrange
-    mutableConfig.apiBaseUrl = 'https://antifraud.example.com';
+    mutableConfig.apiBaseUrl = 'https://api.example.com';
     
     // Act
     const did = getHostDid();
 
     // Assert
-    expect(did).toBe('did:web:antifraud.example.com');
+    expect(did).toBe('did:web:api.example.com');
   });
 
   it('should create the correct tenant DID, including the host DID', () => {

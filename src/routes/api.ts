@@ -7,7 +7,8 @@ import { QueueAdapter } from '../adapters/queue';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { createDidServiceId } from '../utils/did';
 import { createJobName } from '../utils/naming';
-
+import { createOperationOutcome } from '../utils/outcome';
+import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { JobRequest } from '../models/request';
 import { TenantConfig } from '../models/tenant';
 import { IKmsService } from '../security/interfaces/IKmsService';
@@ -47,13 +48,13 @@ function isRequestValid(tenantConfig: TenantConfig, params: any): boolean {
 /**
  * Creates the main, dynamic API router according to the patterns defined in ARCHITECTURE_PATTERNS.md.
  * @param queueAdapter The queue adapter for adding jobs.
- * @param tenantManager The tenant manager for validating tenant policies.
+ * @param tenantsCacheManager The tenant manager for validating tenant policies.
  * @param kmsService The KMS for decoding incoming requests.
  * @param asyncResponseStore The in-memory store for async job responses.
  */
 export function createApiRouter(
   queueAdapter: QueueAdapter,
-  tenantManager: TenantsCacheManager,
+  tenantsCacheManager: TenantsCacheManager,
   kmsService: IKmsService,
   asyncResponseStore: IAsyncResponseStore
 ): express.Router {
@@ -63,43 +64,43 @@ export function createApiRouter(
 
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
   router.post(`${cdsRoutePrefix}/_batch`, async (req, res) => {
-    const { tenantId, resourceType } = req.params;
-    const { request } = req.body; // Expect 'request' parameter from form-urlencoded body
+    // --- Opaque Acceptance Strategy ---
+    const { tenantId, section, resourceType } = req.params;
+    const { request } = req.body;
 
     if (!request) {
-      return res.status(400).json({ error: 'Bad Request: Missing "request" parameter in form body.' });
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing "request" parameter in form body.');
+      return res.status(400).json(outcome);
     }
 
-    const tenantConfig = await tenantManager.getConfigByAlternateName(tenantId);
-    if (!tenantConfig) {
-      return res.status(404).json({ error: `Tenant '${tenantId}' not found.` });
+    // --- Path and Security Validation (Pre-Queue) ---
+    if (section === 'registry' && tenantId !== 'host') {
+      return res.status(202).send(); // Silently accept and drop.
     }
-
-    if (!isRequestValid(tenantConfig, { ...req.params, action: '_batch' })) {
-      return res.status(404).json({ error: `The requested endpoint is not configured for this tenant.` });
+    
+    const tenantConfig = await tenantsCacheManager.getConfigByAlternateName(tenantId);
+    if (!tenantConfig || !isRequestValid(tenantConfig, { ...req.params, action: '_batch' })) {
+      return res.status(202).send();
     }
 
     try {
+      // --- Cryptographic Validation ---
       const decodedMessage = await kmsService.decodeRequest(request);
       if (!decodedMessage || !decodedMessage.thid) {
-        return res.status(400).json({ error: 'Bad Request: Missing or invalid "thid" in decoded message payload.' });
+        return res.status(202).send();
       }
 
+      // --- Enqueue Job ---
       const jobName = createJobName(tenantId, resourceType, '_batch');
       const jobRequest: JobRequest = { ...req.params, input: decodedMessage, meta: {} };
-
+      
       await queueAdapter.addJob(jobName, jobRequest);
       asyncResponseStore.set(decodedMessage.thid, { status: 'PENDING' });
-
-      res.status(202).json({
-        thid: decodedMessage.thid
-      });
+      
+      return res.status(202).json({ thid: decodedMessage.thid });
     } catch (error: any) {
-      console.error(`[API Router Error processing request: ${error.message}`);
-      if (error.message.includes('Failed to parse')) {
-        return res.status(400).json({ error: 'Bad Request: Malformed payload.' });
-      }
-      return res.status(500).json({ error: 'Internal server error.' });
+      console.error(`[API Router Critical Error]: ${error.message}`);
+      return res.status(202).send();
     }
   });
 
@@ -107,12 +108,14 @@ export function createApiRouter(
   router.post(`${cdsRoutePrefix}/_search`, async (req, res) => {
     const { thid } = req.body; // Expect 'thid' parameter from form-urlencoded body
     if (!thid) {
-      return res.status(400).json({ error: 'Bad Request', message: 'Missing "thid" parameter in form body.' });
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing "thid" parameter in form body.');
+      return res.status(400).json(outcome);
     }
 
     const job = asyncResponseStore.get(thid);
     if (!job) {
-      return res.status(404).json({ error: 'Thread ID not found or expired.' });
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound);
+      return res.status(404).json(outcome);
     }
     if (job.status === 'PENDING') {
       return res.status(202).json({ thid, status: 'PENDING' });
@@ -125,9 +128,11 @@ export function createApiRouter(
       asyncResponseStore.delete(thid);
     } else {
       // This could be 'FAILED' or an invalid completed state
-      res.status(500).json({ error: 'Job failed to process or result was invalid.' });
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'Job failed to process or result was invalid.');
+      res.status(500).json(outcome);
     }
   });
 
   return router;
 }
+

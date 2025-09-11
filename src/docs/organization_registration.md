@@ -27,7 +27,7 @@ The `input` for the job is the plaintext, decoded DIDComm message. It contains t
 **Example Decoded Payload:**
 ```json
 {
-  "aud": "did:web:antifraud.example.com",
+  "aud": "did:web:api.example.com",
   "iss": "did:web:client.example.com",
   "response_type": "json",
   "response_mode": "form_post.jwt",

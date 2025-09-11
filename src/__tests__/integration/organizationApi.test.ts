@@ -88,6 +88,31 @@ describe('Organization Registration API', () => {
       expect(response.body.thid).toBe(decodedMessage.thid);
       expect(asyncResponseStore.get(decodedMessage.thid)).toEqual(testPendingJob);
     });
+
+    it('should silently accept and drop a request for the registry from a non-host tenant', async () => {
+      // --- Arrange ---
+      const asyncResponseStore = new AsyncResponseStoreMem();
+      const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
+      
+      // Mock the existence of the tenant trying to access the registry
+      const mockTenantConfig: Partial<TenantConfig> = { alternateName: 'tenant1' };
+      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
+      
+      // The URL attempts to access the 'registry' section using a tenant ID
+      const registrationUrl = '/tenant1/cds-ES/v1/FinancialServices/registry/org-schema/Organization/_batch';
+
+      // --- Act ---
+      const response = await request(app)
+        .post(registrationUrl)
+        .set('Content-Type', 'application/x-www-form-urlencoded')
+        .send(`request=${testEncryptedJwe1}`);
+
+      // --- Assert ---
+      // The server MUST return 202 Accepted to hide the fact that the validation failed.
+      expect(response.status).toBe(202);
+      // It MUST NOT queue a job.
+      expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
+    });
   });
 
   describe('POST /host/.../_search (Job Polling)', () => {
