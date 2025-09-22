@@ -4,7 +4,7 @@ import { JobRequest } from '../models/request';
 import { IPayloadResponse } from '../models/response';
 import { Bundle, BundleEntry } from '../models/bundle';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
-import { getTenantDid, getHostDid } from '../utils/did';
+import { getTenantDidWebId, getHostDidWebId } from '../utils/did';
 
 /**
  * Manages the business logic for the 'ping' operation.
@@ -37,8 +37,8 @@ export class PingManager {
 
     // Determine the issuer's DID based on the tenantId from the job.
     const issuerDid = (job.tenantId && job.tenantId !== 'host')
-      ? getTenantDid(job.tenantId)
-      : getHostDid();
+      ? getTenantDidWebId(job.tenantId)
+      : getHostDidWebId();
 
     // Construct the final JARM-compliant response payload.
     return {

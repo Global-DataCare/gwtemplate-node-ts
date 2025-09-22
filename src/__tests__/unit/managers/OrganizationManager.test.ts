@@ -21,7 +21,7 @@ import { VaultMemRepository } from '../../../database/repositories/vault/vault.m
 import { JobRequest } from '../../../models/request';
 import { ClaimsRecord } from '../../../models/resource-document';
 import { TenantConfig } from '../../../models/tenant';
-import { IKmsService } from '../../../security/interfaces/IKmsService';
+import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
 // Mock external dependencies
@@ -29,23 +29,25 @@ jest.mock('uuid');
 jest.mock('../../../utils/tenant');
 
 // Create a mock KMS service for testing.
-// Create a complete mock KMS service for testing to satisfy the IKmsService interface.
 const mockKmsService: jest.Mocked<IKmsService> = {
-    decodeRequest: jest.fn(),
+    // Add missing methods to satisfy the interface
+    provisionKeys: jest.fn(),
+    decodeJobRequest: jest.fn(),
+    signWithManagedKey: jest.fn(),
+    signWithReconstructedKey: jest.fn(),
+
+    // Existing mocked methods
     encodeResponse: jest.fn(),
-    protectDocument: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> => {
+    protectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> => {
         // Simulate the KMS encrypting the content and moving it to the JWE property.
         const secureDoc = { ...doc, jwe: { ciphertext: 'encrypted-content' } };
         delete secureDoc.content;
         return secureDoc;
     }),
-    unprotectDocument: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string) => Promise.resolve(doc.content as any)),
-    getDidDocument: jest.fn(),
+    unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string) => Promise.resolve(doc.content as any)),
     getPublicJwks: jest.fn(),
     getPublicVerificationKey: jest.fn(),
     getPublicEncryptionKey: jest.fn(),
-    sign: jest.fn(),
-    verify: jest.fn(),
 };
 
 const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
@@ -74,7 +76,6 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
     httpMethod: 'POST',
     fullUrl: '/default',
 });
-
 
 describe("OrganizationManager", () => {
     let organizationManager: OrganizationManager;
@@ -128,10 +129,10 @@ describe("OrganizationManager", () => {
         await organizationManager.process(job);
         
         // --- Security and Persistence Assertions ---
-        expect(mockKmsService.protectDocument).toHaveBeenCalledTimes(1);
+        expect(mockKmsService.protectConfidentialData).toHaveBeenCalledTimes(1);
 
         // Verify the document passed to the KMS had plaintext content.
-        const docToProtect = mockKmsService.protectDocument.mock.calls[0][0];
+        const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
         expect(docToProtect.content).toBeDefined();
         expect(docToProtect.content?.legalName).toBe(testTenant1Data.legalName);
 

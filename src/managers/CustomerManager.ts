@@ -8,7 +8,7 @@ import { JobRequest } from '../models/request';
 import { IPayloadResponse } from '../models/response';
 import { ManagerError } from '../models/errors/manager-error';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { getHostDid } from '../utils/did';
+import { getHostDidWebId } from '../utils/did';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { IJobProcessor } from './registry';
 
@@ -69,7 +69,7 @@ export class CustomerManager implements IJobProcessor {
 
     return {
       thid: job.input.thid,
-      iss: getHostDid(),
+      iss: getHostDidWebId(),
       aud: job.input.aud,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: responseBundle,

@@ -37,5 +37,5 @@ export interface IPayloadResponse {
    * The main body of the response, containing the results of the operation
    * structured as a Bundle.
    */
-  body: Bundle;
+  body: any;
 }

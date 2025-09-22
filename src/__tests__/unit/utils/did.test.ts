@@ -1,7 +1,7 @@
 // src/__tests__/unit/utils/did.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { getHostDid, getTenantDid } from '../../../utils/did';
+import { getHostDidWebId, getTenantDidWebId } from '../../../utils/did';
 import { config } from '../../../config';
 
 // Mock the entire config module to control its values during tests.
@@ -17,7 +17,7 @@ describe('DID Utilities', () => {
     mutableConfig.apiBaseUrl = 'http://localhost:3000';
     
     // Act
-    const did = getHostDid();
+    const did = getHostDidWebId();
 
     // Assert
     expect(did).toBe('did:web:localhost%3A3000');
@@ -28,7 +28,7 @@ describe('DID Utilities', () => {
     mutableConfig.apiBaseUrl = 'https://api.example.com';
     
     // Act
-    const did = getHostDid();
+    const did = getHostDidWebId();
 
     // Assert
     expect(did).toBe('did:web:api.example.com');
@@ -40,7 +40,7 @@ describe('DID Utilities', () => {
     const tenantId = 'tenant-abc-123';
 
     // Act
-    const did = getTenantDid(tenantId);
+    const did = getTenantDidWebId(tenantId);
 
     // Assert
     expect(did).toBe('did:web:api.service.io:tenant-abc-123');
@@ -52,7 +52,7 @@ describe('DID Utilities', () => {
     const tenantId = 'another-tenant';
 
     // Act
-    const did = getTenantDid(tenantId);
+    const did = getTenantDidWebId(tenantId);
 
     // Assert
     expect(did).toBe('did:web:127.0.0.1%3A8080:another-tenant');

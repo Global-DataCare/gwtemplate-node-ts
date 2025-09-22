@@ -199,3 +199,24 @@ This pattern describes the mandatory sequence of operations a manager must follo
 ### 11.3. Result
 
 The data is stored securely at rest. The `content` only ever exists in memory within the KMS's secure boundary during the encryption process, and the repository only ever sees the encrypted `jwe` object.
+
+---
+
+## 12. Data Handling and Serialization
+
+To ensure interoperability and prevent subtle bugs during cryptographic operations, all modules **MUST** adhere to the following data handling principles when converting between strings and bytes (`Uint8Array`).
+
+### 12.1. Serialization (Going "Out")
+
+-   **Context:** Preparing data to be sent, signed, or encrypted. This includes creating JWT payloads, DIDComm message bodies, and any data that will be persisted.
+-   **Rule:** When converting a JavaScript object or string into a JOSE-compatible format, the data MUST be UTF-8 encoded and then Base64URL encoded without padding.
+-   **Workflow:** `Object` -> `JSON.stringify()` -> `stringToBytesUTF8()` -> `bytesToRawBase64UrlSafe()` -> `string (Base64URL)`
+-   **Rationale:** This ensures that all outgoing data is standards-compliant and unambiguously encoded as UTF-8, which is the expected format for JSON-based protocols like JOSE and DIDComm, before its final Base64URL representation.
+
+### 12.2. Deserialization (Coming "In")
+
+-   **Context:** Processing data that has just been received, decrypted, or decompressed. This includes handling JWT payloads and the output of libraries like `pako`.
+-   **Rule:** When converting a Base64URL string back into a JavaScript object, it must first be decoded from Base64URL to bytes. Then, a **permissive ASCII/binary decoder (`bytesToStringASCII`) MUST be used** to convert the bytes to a string for parsing.
+-   **Workflow:** `string (Base64URL)` -> `base64ToBytes()` -> `Uint8Array` -> `bytesToStringASCII()` -> `string` -> `JSON.parse()` -> `Object`
+-   **Rationale:** Cryptographic and compression libraries operate on raw binary streams. Their output is not guaranteed to be a strictly valid UTF-8 byte sequence. A permissive decoder is required to robustly handle this data and prevent parsing failures after Base64URL decoding.
+

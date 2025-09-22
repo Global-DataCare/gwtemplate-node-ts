@@ -11,11 +11,12 @@ import { testClaimsTenant1Registration, testHostData } from '../data/organizatio
 import { testThid1, testCompletedJob, testPendingJob, testEncryptedJwe1 } from '../data/async-response.data';
 import { TenantConfig } from '../../models/tenant';
 import { createDidServiceId } from '../../utils/did';
-import { DecodedDidcommMessage } from '../../models/request';
+import { DecodedDidcommMessage, JobRequest } from '../../models/request';
 import { DidDocument } from '../../models/did';
 import { mockKmsService } from '../mocks/kms.mock';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async-response-store.mem';
+import { IssueType } from '../../models/fhir/codes';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -27,6 +28,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   const app = express();
   // Use urlencoded parser for FAPI-compliant form parameter bodies
   app.use(express.urlencoded({ extended: true }));
+  app.use(express.json()); // Also add json parser for legacy tests
   
   const vaultRepository = new VaultMemRepository();
   const tenantsCacheManager = new TenantsCacheManager(vaultRepository);
@@ -39,7 +41,6 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
 };
 
 describe('Organization Registration API', () => {
-  
   afterEach(() => {
     jest.clearAllMocks();
   });
@@ -55,25 +56,35 @@ describe('Organization Registration API', () => {
           didDocument: {
             '@context': 'https://www.w3.org/ns/did/v1',
             id: `did:web:${testHostData.alternateName}`,
-            service: [{
-              id: createDidServiceId({ version: 'v1', sector: 'FinancialServices', section: 'registry', format: 'org.schema' }),
+          service: [
+            {
+              id: createDidServiceId({ version: 'v1', sector: 'test', section: 'registry', format: 'org.schema' }),
               type: 'RegistryService',
               serviceEndpoint: 'Organization',
               actions: ['_batch'],
-            }]
-          } as DidDocument,
-        };
+            },
+          ],
+        } as DidDocument,
+      };
       jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(hostConfig as TenantConfig);
 
-      const decodedMessage: DecodedDidcommMessage = {
-        aud: `did:web:${testHostData.alternateName}`,
-        thid: uuidv4(),
-        type: 'https://didcomm.org/registration/1.0/register',
-        body: { data: [{ meta: { claims: testClaimsTenant1Registration } }] }
+      // FIX: The mock must return a complete JobRequest object
+      const mockDecodedJob: JobRequest = {
+        tenantId: 'host', // The tenant context of the request
+        resourceType: 'Organization',
+        action: '_batch',
+        input: {
+          aud: `did:web:${testHostData.alternateName}`,
+          thid: uuidv4(),
+          type: 'https://didcomm.org/registration/1.0/register',
+          body: { data: [{ meta: { claims: testClaimsTenant1Registration } }] },
+        },
+        meta: {} // Add meta property
       };
-      mockKmsService.decodeRequest.mockResolvedValue(decodedMessage);
+      mockKmsService.decodeJobRequest.mockResolvedValue(mockDecodedJob);
       
-      const registrationUrl = '/host/cds-ES/v1/FinancialServices/registry/org.schema/Organization/_batch';
+      const registrationUrl = '/host/cds-ES/v1/test/registry/org.schema/Organization/_batch';
+      const expectedPollingUrl = '/host/cds-ES/v1/test/registry/org.schema/Organization/_batch-response';
 
       // --- Act ---
       const response = await request(app)
@@ -82,14 +93,14 @@ describe('Organization Registration API', () => {
         .send(`request=${testEncryptedJwe1}`);
 
       // --- Assert ---
-      expect(mockKmsService.decodeRequest).toHaveBeenCalledWith(testEncryptedJwe1);
+      expect(mockKmsService.decodeJobRequest).toHaveBeenCalledWith(testEncryptedJwe1);
       expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
       expect(response.status).toBe(202);
-      expect(response.body.thid).toBe(decodedMessage.thid);
-      expect(asyncResponseStore.get(decodedMessage.thid)).toEqual(testPendingJob);
+      expect(response.headers.location).toBe(expectedPollingUrl);
+      expect(response.body).toEqual({}); // Body should be empty
     });
 
-    it('should silently accept and drop a request for the registry from a non-host tenant', async () => {
+    it('should return 403 Forbidden if a non-host tenant tries to access the registry', async () => {
       // --- Arrange ---
       const asyncResponseStore = new AsyncResponseStoreMem();
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
@@ -99,7 +110,7 @@ describe('Organization Registration API', () => {
       jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
       
       // The URL attempts to access the 'registry' section using a tenant ID
-      const registrationUrl = '/tenant1/cds-ES/v1/FinancialServices/registry/org-schema/Organization/_batch';
+      const registrationUrl = '/tenant1/cds-ES/v1/test/registry/org.schema/Organization/_batch';
 
       // --- Act ---
       const response = await request(app)
@@ -108,15 +119,15 @@ describe('Organization Registration API', () => {
         .send(`request=${testEncryptedJwe1}`);
 
       // --- Assert ---
-      // The server MUST return 202 Accepted to hide the fact that the validation failed.
-      expect(response.status).toBe(202);
-      // It MUST NOT queue a job.
+      expect(response.status).toBe(403);
+      expect(response.body.resourceType).toBe('OperationOutcome');
+      expect(response.body.issue[0].code).toBe(IssueType.Forbidden);
       expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
     });
   });
 
-  describe('POST /host/.../_search (Job Polling)', () => {
-    const pollingUrl = '/host/cds-ES/v1/FinancialServices/registry/org.schema/Organization/_search';
+  describe('POST /host/.../_batch-response (Job Polling)', () => {
+    const pollingUrl = '/host/cds-ES/v1/test/registry/org.schema/Organization/_batch-response';
 
     it('should return 200 OK with the form-encoded JWE if the job is complete', async () => {
       // --- Arrange ---
@@ -168,6 +179,8 @@ describe('Organization Registration API', () => {
 
       // --- Assert ---
       expect(response.status).toBe(404);
+      expect(response.body.resourceType).toBe('OperationOutcome');
+      expect(response.body.issue[0].code).toBe(IssueType.NotFound);
     });
   });
 });

@@ -4,7 +4,7 @@
 import { jest } from '@jest/globals';
 import { randomBytes } from 'crypto'; // Use Node.js native crypto module
 import { ProtectedDataAES } from '../../../models/aes';
-import { AesManager } from '../../../security/AesManager';
+import { AesManager } from '../../../crypto/AesManager';
 
 describe('AesManager', () => {
   let aesManager: AesManager;

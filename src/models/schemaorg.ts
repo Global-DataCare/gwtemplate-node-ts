@@ -1,4 +1,5 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// File: src/models/schemaorg.ts
 
 /**
  * Defines the canonical claim names for the 'org.schema' context,

@@ -6,7 +6,7 @@ import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } fro
 import { HostEnvVars } from "../models/env";
 import { JobRequest } from "../models/request";
 import { ClaimsRecord } from "../models/resource-document";
-import { getHostDid } from "./did";
+import { getHostDidWebId } from "./did";
 
 // Define which environment variables are strictly required to build the host claims.
 // We use the enum to ensure this list is always in sync with the model.
@@ -85,7 +85,7 @@ export function initializeHostJobFromEnv(): JobRequest {
         // The core input, mimicking a decoded DIDComm message
         input: {
             thid: uuidv4(),
-            aud: getHostDid(),            
+            aud: getHostDidWebId(),            
             type: 'https://didcomm.org/registration/1.0/register',
             body: {
                 // Following the HybridPayload rule, the body contains a `data` array of `entry` objects.

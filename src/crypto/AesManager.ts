@@ -2,17 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { Convert } from '../utils/convert';
-
-/**
- * Defines the public interface for AES-GCM encrypted data components,
- * serialized as base64url strings, as required for JWE.
- */
-export interface ProtectedDataAES {
-  ciphertext: string;
-  iv: string;
-  tag: string;
-}
+import { Content } from '../utils/content';
+import { ProtectedDataAES } from '../models/aes';
 
 /**
  * Manages AES-GCM encryption and decryption using Node.js's native crypto module.
@@ -26,7 +17,7 @@ export class AesManager {
 
   /**
    * Encrypts a plaintext string and returns the components as base64url strings.
-   * @param plaintext The string to encrypt.
+   * @param plaintext The stringified data to encrypt (e.g. a stringified object or ASCII string from raw bytes)
    * @param cekBytes The 32-byte Content Encryption Key.
    * @param aad The Additional Authenticated Data string for integrity protection.
    * @returns A promise resolving to the JWE-compatible encrypted components.
@@ -37,7 +28,7 @@ export class AesManager {
     }
 
     const iv = randomBytes(this.IV_GENERATION_SIZE);
-    const aadBytes = Convert.stringToBytes(aad);
+    const aadBytes = Content.stringToBytesUTF8(aad);
 
     const cipher = createCipheriv(this.ALGORITHM, cekBytes, iv, {
       authTagLength: this.TAG_SIZE_BYTES
@@ -49,9 +40,9 @@ export class AesManager {
     const tag = cipher.getAuthTag();
 
     return {
-      ciphertext: Convert.bytesToBase64Url(ciphertext),
-      iv: Convert.bytesToBase64Url(iv),
-      tag: Convert.bytesToBase64Url(tag),
+      ciphertext: Content.bytesToRawBase64UrlSafe(ciphertext),
+      iv: Content.bytesToRawBase64UrlSafe(iv),
+      tag: Content.bytesToRawBase64UrlSafe(tag),
     };
   }
 
@@ -71,10 +62,10 @@ export class AesManager {
       throw new Error(`Invalid key length: a ${this.KEY_SIZE}-byte key is required.`);
     }
 
-    const ciphertextBytes = Convert.base64UrlToBytes(encryptedData.ciphertext);
-    const tagBytes = Convert.base64UrlToBytes(encryptedData.tag);
-    const ivBytes = Convert.base64UrlToBytes(encryptedData.iv);
-    const aadBytes = Convert.stringToBytes(aad);
+    const ciphertextBytes = Content.base64ToBytes(encryptedData.ciphertext);
+    const tagBytes = Content.base64ToBytes(encryptedData.tag);
+    const ivBytes = Content.base64ToBytes(encryptedData.iv);
+    const aadBytes = Content.stringToBytesUTF8(aad);
 
     const decipher = createDecipheriv(this.ALGORITHM, cekBytes, ivBytes, {
         authTagLength: this.TAG_SIZE_BYTES
@@ -85,6 +76,6 @@ export class AesManager {
 
     const decryptedBytes = Buffer.concat([decipher.update(ciphertextBytes), decipher.final()]);
 
-    return Convert.bytesToString(decryptedBytes);
+    return Content.bytesToStringUTF8(decryptedBytes);
   }
 }

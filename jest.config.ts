@@ -35,16 +35,14 @@ const config: JestConfigWithTsJest = {
         '@noble/ciphers',
         '@noble/hashes',
         '@noble/post-quantum',
+        '@noble/post-quantum/ml-dsa', // More specific path
+        '@noble/post-quantum/ml-kem',  // More specific path        
         '@noble/curves',
+        '@stablelib/utf8',
+        '@stablelib/base64',        
       ].join('|')
     }))`
-  ],
-
-  // If you added this before to strip .js endings, remove it. It can break ESM resolution.
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '^@noble/post-quantum/ml-kem$': '<rootDir>/src/__tests__/mocks/noble-post-quantum.mock.ts'
-  },  
+  ], 
 
   clearMocks: true,
   testTimeout: 12000,

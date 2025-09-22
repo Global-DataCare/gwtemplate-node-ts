@@ -1,7 +1,7 @@
 // src/managers/EmployeeManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { getHostDid } from '../utils/did';
+import { getHostDidWebId } from '../utils/did';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
 import { VaultRepository } from '../database/repositories/vault/vault.repository';
@@ -68,7 +68,7 @@ export class EmployeeManager {
 
     return {
       thid: job.input.thid,
-      iss: getHostDid(),
+      iss: getHostDidWebId(),
       aud: job.input.aud,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: responseBundle,

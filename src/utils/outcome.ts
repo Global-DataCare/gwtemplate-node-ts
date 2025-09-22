@@ -1,7 +1,7 @@
 // src/utils/outcome.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { OperationOutcome } from 'src/models/fhir/operation-outcome';
+import { OperationOutcome } from '../models/fhir/operation-outcome';
 import { IssueLevel, IssueTypeCode } from '../models/fhir/codes';
 
 /**

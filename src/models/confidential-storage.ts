@@ -52,3 +52,13 @@ export interface ConfidentialStorageDoc extends RecordBase {
         chunks?: number;
     };
 }
+
+/**
+ * Represents a document whose sensitive content has been decrypted and is held
+ * in memory. The `jwe` property is removed, and the `content` is guaranteed to exist.
+ * This type should ONLY be used for in-memory processing and NEVER for persistence.
+ * @template T The expected type of the decrypted `content`.
+ */
+export type UnprotectedStorageDoc<T> = Omit<ConfidentialStorageDoc, 'jwe' | 'content'> & {
+    content: T;
+};

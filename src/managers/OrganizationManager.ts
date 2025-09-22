@@ -5,7 +5,7 @@ import { config } from '../config';
 import { determineResourceId } from '../utils/resource';
 import { isValidTenantAlternateName } from '../utils/tenant';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
-import { IKmsService } from '../security/interfaces/IKmsService';
+import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { TenantConfig } from '../models/tenant';
 import { IncludedResource } from '../models/jsonapi';
 import { ClaimsRecord } from '../models/resource-document';
@@ -17,7 +17,7 @@ import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { ManagerError } from '../models/errors/manager-error';
 import { IPayloadResponse } from '../models/response';
 import { JobRequest } from '../models/request';
-import { getHostDid, getTenantDid } from '../utils/did';
+import { getHostDidWebId, getTenantDidWebId } from '../utils/did';
 
 /**
  * Manages the business logic for organization registration.
@@ -55,8 +55,8 @@ export class OrganizationManager {
     };
 
     const issuerDid = (job.tenantId && job.tenantId !== 'host')
-      ? getTenantDid(job.tenantId)
-      : getHostDid();
+      ? getTenantDidWebId(job.tenantId)
+      : getHostDidWebId();
 
     // TODO: The JARM claims (iss, aud, exp) should be dynamically determined.
     // iss: From service configuration (our DID/URL).
@@ -113,7 +113,7 @@ export class OrganizationManager {
                 throw new ManagerError(`Invalid alternateName format: '${alternateName}'`, IssueType.Value);
             }
             if (await this.vaultRepository.vaultExists(alternateName)) {
-                throw new ManagerError(`Conflict: alternateName '${alternateName}' already exists`, IssueType.Conflict);
+                throw new ManagerError(`Conflict: a vault for alternateName '${alternateName}' already exists`, IssueType.Conflict);
             }
             const tenants = await this.vaultRepository.getContainersInSection<TenantConfig>('host', 'tenants');
             if (tenants.some(t => t.identifier === claims[ClaimsOrgSchemaorg.taxID] && t.jurisdiction === claims[ClaimsOrgSchemaorg.addressCountry])) {
@@ -224,7 +224,7 @@ export class OrganizationManager {
 
         // 3. Manager: Request protection from the KMS.
         // The KMS is responsible for serialization, encryption, and removing the .content property.
-        const secureDoc = await this.kmsService.protectDocument(docToProtect, org.id);
+        const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, org.id);
 
         // 4. Manager: Persist the final secure document.
         await this.vaultRepository.createNewVault({ id: altName, custodian: secureDoc.id });

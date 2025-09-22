@@ -5,7 +5,7 @@ import express from 'express';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { DiscoveryService } from '../services/DiscoveryService';
 import { TenantConfig } from '../models/tenant';
-
+import { pingHandler } from './handlers/discovery/ping.handler';
 // List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
 
@@ -21,35 +21,34 @@ export function createDiscoveryRouter(
 ): express.Router {
   const router = express.Router();
 
-  // Middleware to resolve the tenant configuration and attach it to the request.
+  // Middleware to resolve the tenant configuration. If no tenantId is in the path,
+  // it defaults to 'host'. This allows routes like `/.well-known/ping` to be treated
+  // as an alias for `/host/.well-known/ping`.
   const resolveTenant = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    // For the host-specific route /.well-known/did.json, tenantId is not in the path.
     const tenantId = req.params.tenantId || 'host';
     const tenantConfig = await tenantsCacheManager.getConfigByAlternateName(tenantId);
     if (!tenantConfig) {
-      // Use text/plain for simple errors on public-facing endpoints.
       return res.status(404).type('text').send('Not Found');
     }
-    // Attach the config to the response locals for subsequent handlers to use.
+    // Attach the config and resolved tenantId for subsequent handlers.
     res.locals.tenantConfig = tenantConfig;
+    res.locals.tenantId = tenantId;
     next();
   };
 
-  // --- Core Endpoints ---
+  // --- Route Definitions ---
+  // Using "/:tenantId?/" makes the tenantId optional. The resolveTenant middleware handles the default case.
+  const wellKnownPrefix = '/:tenantId?/.well-known';
 
-  router.get('/:tenantId/.well-known/did.json', resolveTenant, async (req, res) => {
-    // The tenantId is already resolved by the middleware.
-    const didDocument = await discoveryService.getDidDocument(res.locals.tenantConfig.alternateName);
-    if (didDocument) {
-      res.json(didDocument);
-    } else {
-      res.status(404).type('text').send('Not Found');
-    }
-  });
-  
-  // Also support host DID without tenantId in path, e.g., /.well-known/did.json
-  router.get('/.well-known/did.json', resolveTenant, async (req, res) => {
-    const didDocument = await discoveryService.getDidDocument('host');
+  /**
+   * Provides a simple health check and content negotiation demonstration endpoint.
+   * It is available for the host and for any valid tenant.
+   * @see pingHandler for implementation details.
+   */
+  router.get(`${wellKnownPrefix}/ping`, resolveTenant, pingHandler);
+
+  router.get(`${wellKnownPrefix}/did.json`, resolveTenant, async (req, res) => {
+    const didDocument = await discoveryService.getDidDocument(res.locals.tenantId);
     if (didDocument) {
       res.json(didDocument);
     } else {
@@ -57,28 +56,26 @@ export function createDiscoveryRouter(
     }
   });
 
-  router.get('/:tenantId/.well-known/openid-configuration', resolveTenant, (req, res) => {
+  router.get(`${wellKnownPrefix}/openid-configuration`, resolveTenant, (req, res) => {
     const config = discoveryService.getOpenIdConfiguration(res.locals.tenantConfig);
     res.json(config);
   });
 
   // --- FHIR-Specific Endpoints ---
-
-  // Middleware to check if the tenant's sector is FHIR-enabled.
   const isFhirSector = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const tenantConfig: TenantConfig = res.locals.tenantConfig;
-    // The 'sector' property is assumed to exist on the tenant config for this check.
     if (tenantConfig && FHIR_SECTORS.includes(tenantConfig.sector)) {
       return next();
     }
     res.status(404).type('text').send('Not Found');
   };
 
-  router.get('/:tenantId/.well-known/smart-configuration', resolveTenant, isFhirSector, (req, res) => {
+  router.get(`${wellKnownPrefix}/smart-configuration`, resolveTenant, isFhirSector, (req, res) => {
     const config = discoveryService.getSmartConfiguration(res.locals.tenantConfig);
     res.json(config);
   });
   
+  // Note: The FHIR metadata endpoint has a different path structure.
   router.get('/:tenantId/fhir/metadata', resolveTenant, isFhirSector, (req, res) => {
     const statement = discoveryService.getCapabilityStatement(res.locals.tenantConfig);
     res.json(statement);
@@ -86,3 +83,4 @@ export function createDiscoveryRouter(
 
   return router;
 }
+

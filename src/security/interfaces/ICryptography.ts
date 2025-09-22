@@ -1,9 +1,9 @@
 // src/security/interfaces/ICryptography.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { JWEData, SignRequest } from './Cryptography.types';
+import { SignRequest, JWEData } from '../../crypto/interfaces/Cryptography.types';
 import { JWK } from '../../models/jwk';
-import { JwsObject } from '../../models/jws';
+import { JwsMultiSign } from '../../models/jws';
 /**
  * Defines options for JWE encryption.
  */
@@ -40,11 +40,11 @@ export interface ICryptography {
    */
   decrypt(encryptedMessage: string): Promise<string>;
 
-  sign(request: SignRequest): Promise<JwsObject>;
-  verify(jws: JwsObject): Promise<{ verified: boolean; payload: Uint8Array }>;
-  jwsToCompact(jws: JwsObject): string;
-  jwsToJson(jws: JwsObject): string;
-  parseJws(jwsString: string): JwsObject;
+  sign(request: SignRequest): Promise<JwsMultiSign>;
+  verify(jws: JwsMultiSign): Promise<{ verified: boolean; payload: Uint8Array }>;
+  jwsToCompact(jws: JwsMultiSign): string;
+  jwsToJson(jws: JwsMultiSign): string;
+  parseJws(jwsString: string): JwsMultiSign;
   jweToCompact(jwe: JWEData): string;
   jweToJson(jwe: JWEData): string;
   parseJwe(jweString: string): JWEData;

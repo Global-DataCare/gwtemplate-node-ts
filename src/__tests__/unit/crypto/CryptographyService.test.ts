@@ -1,0 +1,256 @@
+// src/__tests__/unit/crypto/CryptographyService.test.ts
+// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+
+// import { jest } from '@jest/globals';
+import { CryptographyService } from '../../../crypto/CryptographyService';
+import { AesManager } from '../../../crypto/AesManager';
+import { ml_kem768 } from '@noble/post-quantum/ml-kem';
+import { MlkemPrivateJwk, MlkemPublicJwk, MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
+import { Content } from '../../../utils/content';
+import { randomBytes } from 'crypto';
+import { JweObject, RecipientDataJWE } from '../../../models/jwe';
+import * as mlDsa from '@noble/post-quantum/ml-dsa';
+import { ProtectedDataAES } from '../../../models/aes';
+import { withKid } from '../../../crypto/jwk-thumbprint';
+
+jest.mock('@noble/post-quantum/ml-kem');
+jest.mock('@noble/post-quantum/ml-dsa');
+jest.mock('../../../crypto/jwk-thumbprint');
+
+const mockMlKem768 = ml_kem768 as jest.Mocked<typeof ml_kem768>;
+const mockMlDsa = mlDsa.ml_dsa65 as jest.Mocked<typeof mlDsa.ml_dsa65>;
+const mockWithKid = withKid as jest.Mocked<typeof withKid>;
+
+describe('CryptographyService', () => {
+  let cryptoService: CryptographyService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    cryptoService = new CryptographyService();
+  });
+
+  // --- Formatting & Parsing Utilities ---
+
+  describe('Formatting & Parsing Utilities', () => {
+    it('getRecipientKidsFromJwe should extract all kids from a JWE object', () => {
+      // Arrange
+      const mockJwe: JweObject = {
+        protected: 'protected-header-b64',
+        recipients: [
+          { header: { alg: 'ML-KEM-768', kid: 'recipient-kid-1' } },
+          { header: { alg: 'ML-KEM-768' } }, // Recipient without a kid
+          { header: { alg: 'ML-KEM-768', kid: 'recipient-kid-3' } },
+        ] as RecipientDataJWE[],
+        iv: 'iv-b64', ciphertext: 'ciphertext-b64', tag: 'tag-b64',
+      };
+      
+      // Act
+      const kids = cryptoService.getRecipientKidsFromJwe(mockJwe);
+
+      // Assert
+      expect(kids).toHaveLength(2);
+      expect(kids).toEqual(['recipient-kid-1', 'recipient-kid-3']);
+    });
+
+    it('parseCompactJwe should correctly parse a compact JWE string', () => {
+      // Arrange
+      const protectedHeader = { alg: 'ML-KEM-768', enc: 'A256GCM', kid: 'test-kid' };
+      const protectedB64 = Content.objectToRawBase64UrlSafe(protectedHeader);
+      const compactJwe = `${protectedB64}.encrypted_key.iv.ciphertext.tag`;
+      
+      // Act
+      const jweObject = cryptoService.parseCompactJwe(compactJwe);
+
+      // Assert
+      expect(jweObject.protected).toBe(protectedB64);
+      expect(jweObject.recipients[0].encrypted_key).toBe('encrypted_key');
+      expect(jweObject.recipients[0].header.kid).toBe('test-kid');
+      expect(jweObject.iv).toBe('iv');
+      expect(jweObject.ciphertext).toBe('ciphertext');
+      expect(jweObject.tag).toBe('tag');
+    });
+
+    it('jweToCompact should throw if JWE has multiple recipients', () => {
+      const jweObject: JweObject = {
+        protected: 'protected',
+        recipients: [
+          { header: { kid: '1', alg: 'some'} },
+          { header: {kid: '2', alg: 'some'} }
+        ],
+        iv: 'iv', ciphertext: 'ciphertext', tag: 'tag'
+      };
+      expect(() => cryptoService.jweToCompact(jweObject)).toThrow();
+    });
+
+    it('parseCompactJws should correctly parse a compact JWS string', () => {
+      const protectedHeader = { alg: 'ML-DSA-65', kid: 'signer-kid' };
+      const protectedB64 = Content.objectToRawBase64UrlSafe(protectedHeader);
+      const payload = { data: 'test' };
+      const payloadB64 = Content.objectToRawBase64UrlSafe(payload);
+      const compactJws = `${protectedB64}.${payloadB64}.signature`;
+
+      // Act
+      const jwsObject = cryptoService.parseCompactJws(compactJws);
+
+      // Assert
+      expect(jwsObject.protected).toEqual(protectedHeader);
+      expect(jwsObject.payload).toEqual(payload);
+      expect(jwsObject.signature).toBeInstanceOf(Uint8Array);
+    });
+
+  });
+
+  // --- High-Level Workflows ---
+
+  describe('encryptJwe', () => {
+    it('should orchestrate AES encryption and Kyber key encapsulation for multiple recipients', async () => {
+      // --- 1. Arrange ---
+      const payload = { message: 'secret data' };
+      const protectedHeader = { enc: 'A256GCM', kid: 'sender-kid' };
+      const senderKeyPair: MlkemPrivateJwk = {
+        kty: 'OKP', crv: 'ML-KEM-768', x: 'sender-pub-key', kid: 'sender-kid', dBytes: randomBytes(64)
+      };
+      const recipients: MlkemPublicJwk[] = [
+        { kty: 'OKP', crv: 'ML-KEM-768', kid: 'recipient-1', x: Content.bytesToRawBase64UrlSafe(randomBytes(1184)) },
+        { kty: 'OKP', crv: 'ML-KEM-768', kid: 'recipient-2', x: Content.bytesToRawBase64UrlSafe(randomBytes(1184)) },
+      ];
+
+      const mockEncryptedComponents: ProtectedDataAES = {
+        ciphertext: 'mock-ciphertext-base64url', iv: 'mock-iv-base64url', tag: 'mock-tag-base64url',
+      };
+      const aesEncryptSpy = jest.spyOn(AesManager.prototype, 'encrypt').mockResolvedValue(mockEncryptedComponents);
+
+      const mockEncapsulation = { encapsulatedBytes: randomBytes(1088), uncapsulatedBytes: randomBytes(32) };
+      // For this test, we can mock encapsulate to return the same value each time.
+      const encapsulateSpy = jest.spyOn(cryptoService, 'encapsulate').mockResolvedValue(mockEncapsulation);
+
+      // --- 2. Act ---
+      const jweObject = await cryptoService.encryptJwe(payload, protectedHeader, senderKeyPair, recipients);
+
+      // --- 3. Assert ---
+      expect(aesEncryptSpy).toHaveBeenCalledTimes(1);
+      expect(encapsulateSpy).toHaveBeenCalledTimes(2);
+      expect(encapsulateSpy).toHaveBeenCalledWith(expect.any(Uint8Array), senderKeyPair.dBytes, Content.base64ToBytes(recipients[0].x));
+      expect(encapsulateSpy).toHaveBeenCalledWith(expect.any(Uint8Array), senderKeyPair.dBytes, Content.base64ToBytes(recipients[1].x));
+
+      expect(jweObject.iv).toBe(mockEncryptedComponents.iv);
+      expect(jweObject.ciphertext).toBe(mockEncryptedComponents.ciphertext);
+      expect(jweObject.recipients).toHaveLength(2);
+      expect(jweObject.recipients[0].header.kid).toBe('recipient-1');
+      expect(jweObject.recipients[0].encrypted_key).toBe(Content.bytesToRawBase64UrlSafe(mockEncapsulation.encapsulatedBytes));
+    });
+  });
+
+  describe('decryptJwe', () => {
+    it('should find the correct recipient by KID and successfully decrypt the JWE', async () => {
+      // --- 1. Arrange ---
+      const recipient2PrivKey: MlkemPrivateJwk = {
+        kty: 'OKP', crv: 'ML-KEM-768', x: 'recipient2-pub-key-b64', kid: 'recipient-kid-2', dBytes: new Uint8Array([4, 5, 6]),
+      };
+      const mockJwe: JweObject = {
+        protected: 'protected-header-b64',
+        recipients: [
+          { header: { alg: 'ML-KEM-768', kid: 'recipient-kid-1' }, encrypted_key: 'encrypted-key-1-b64' },
+          { header: { alg: 'ML-KEM-768', kid: 'recipient-kid-2' }, encrypted_key: 'encrypted-key-2-b64' },
+        ],
+        iv: 'iv-b64', ciphertext: 'ciphertext-b64', tag: 'tag-b64',
+      };
+      const mockCek = new Uint8Array([7, 8, 9]);
+      const mockDecryptedPayloadString = JSON.stringify({ message: 'This is a secret' });
+      const mockDecryptedBytes = Content.stringToBytesUTF8(mockDecryptedPayloadString);
+      const mockProtectedHeader = { enc: 'A256GCM' };
+
+      const decapsulateSpy = jest.spyOn(cryptoService, 'decapsulate').mockResolvedValue(mockCek);
+      const decryptSpy = jest.spyOn(cryptoService, 'decrypt').mockResolvedValue(mockDecryptedPayloadString);
+      jest.spyOn(Content, 'base64UrlSafeToJSON').mockReturnValue(mockProtectedHeader);
+
+      // --- 2. Act ---
+      const { decryptedBytes, protectedHeader } = await cryptoService.decryptJwe(mockJwe, recipient2PrivKey);
+
+      // --- 3. Assert ---
+      expect(decapsulateSpy).toHaveBeenCalledTimes(1);
+      expect(decapsulateSpy).toHaveBeenCalledWith(Content.base64ToBytes('encrypted-key-2-b64'), recipient2PrivKey.dBytes);
+      expect(decryptSpy).toHaveBeenCalledTimes(1);
+      expect(decryptSpy).toHaveBeenCalledWith(
+        { ciphertext: mockJwe.ciphertext, iv: mockJwe.iv, tag: mockJwe.tag }, mockCek, mockJwe.protected
+      );
+      expect(decryptedBytes).toEqual(mockDecryptedBytes);
+      expect(protectedHeader).toEqual(mockProtectedHeader);
+    });
+  });
+
+  // --- Low-Level Primitives ---
+
+  describe('Low-Level Primitives', () => {
+    it('encapsulate should call noble ml_kem768.encapsulate', async () => {
+      // Arrange
+      const pubKey = randomBytes(1184);
+      const data = randomBytes(32);
+      // FIX: Explicitly create Uint8Array to match the strict mock type
+      const mockReturn = { 
+        sharedSecret: new Uint8Array(randomBytes(32)), 
+        cipherText: new Uint8Array(randomBytes(1088))
+      };
+      // FIX: Cast the mock to jest.Mock to allow use of mockResolvedValue
+      (mockMlKem768.encapsulate as jest.Mock).mockResolvedValue(mockReturn);
+      
+      // Act
+      await cryptoService.encapsulate(data, randomBytes(64), pubKey);
+      
+      // Assert
+      expect(mockMlKem768.encapsulate).toHaveBeenCalledWith(pubKey, data);
+    });
+
+    it('decapsulate should call noble ml_kem768.decapsulate', async () => {
+      const cipherText = randomBytes(1088);
+      const privKey = randomBytes(2400);
+      await cryptoService.decapsulate(cipherText, privKey);
+      expect(mockMlKem768.decapsulate).toHaveBeenCalledWith(cipherText, privKey);
+    });
+
+    it('signBytes should call noble ml_dsa65.sign', async () => {
+        const data = randomBytes(32);
+        const privKey = randomBytes(128);
+        await cryptoService.signBytes(data, privKey);
+        expect(mockMlDsa.sign).toHaveBeenCalledWith(data, privKey);
+      });
+  
+      it('verifyBytes should call noble ml_dsa65.verify', async () => {
+        const sig = randomBytes(64);
+        const data = randomBytes(32);
+        const pubKey: MldsaPublicJwk = { kty: 'AKP', alg: 'ML-DSA-65', pub: 'pub-key-b64' };
+        await cryptoService.verifyBytes(sig, data, pubKey);
+        expect(mockMlDsa.verify).toHaveBeenCalledWith(sig, data, Content.base64ToBytes(pubKey.pub));
+      });
+  });
+
+  // --- Key Generation ---
+
+  describe('Key Generation', () => {
+    beforeEach(() => {
+      // Mock the key generation functions from @noble and the withKid utility
+      // before each test in this block.
+      mockMlDsa.keygen.mockReturnValue({ secretKey: randomBytes(2592), publicKey: randomBytes(1312) });
+      mockMlKem768.keygen.mockReturnValue({ secretKey: randomBytes(2400), publicKey: randomBytes(1184) });
+      // Mock withKid to return the JWK with a predictable kid
+      (withKid as jest.Mock).mockImplementation(async (jwk: any) => ({ ...jwk, kid: 'mock-kid' }));
+    });
+
+    it('should generate a valid ML-DSA key pair', async () => {
+      const { publicJWKey, secretKeyBytes } = await cryptoService.generateKeyPairMlDsa();
+      expect(publicJWKey.kty).toBe('AKP');
+      expect(publicJWKey.alg).toBe('ML-DSA-65');
+      expect(publicJWKey.kid).toBe('mock-kid');
+      expect(secretKeyBytes).toBeInstanceOf(Uint8Array);
+    });
+
+    it('should generate a valid ML-KEM key pair', async () => {
+      const { publicJWKey, secretKeyBytes } = await cryptoService.generateKeyPairMlKem();
+      expect(publicJWKey.kty).toBe('OKP');
+      expect(publicJWKey.crv).toBe('ML-KEM-768');
+      expect(publicJWKey.kid).toBe('mock-kid');
+      expect(secretKeyBytes).toBeInstanceOf(Uint8Array);
+    });
+  });
+
+});

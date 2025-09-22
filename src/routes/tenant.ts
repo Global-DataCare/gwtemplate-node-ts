@@ -5,9 +5,9 @@ import express, { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { QueueAdapter } from '../adapters/queue';
 import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
-import { parseCdsRequest } from '../security/middleware/parseCdsRequest';
-import { ICryptography } from '../security/interfaces/ICryptography';
-import { createDecodeRequestMiddleware } from '../security/middleware/decodeRequest';
+import { parseCdsRequest } from '../crypto/middleware/parseCdsRequest';
+import { ICryptography } from '../crypto/interfaces/ICryptography';
+import { createDecodeRequestMiddleware } from '../crypto/middleware/decodeRequest';
 import { DataInRequest, JobRequest } from '../models/request';
 import { Worker } from '../worker';
 

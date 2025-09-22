@@ -1,0 +1,98 @@
+# API Endpoint Reference
+
+This document provides a canonical reference for the structure and available resources of the Gateway's asynchronous API.
+
+## 1. URL Structure
+
+All asynchronous API endpoints follow a consistent, versioned, and multi-tenant path structure:
+
+`/v1/:entityId/cds-:jurisdiction/:sector/:section/:format/:resourceType/:_action`
+
+-   **`:entityId`**: The identifier of the entity (`host` or a tenant's `alternateName`).
+-   **`:jurisdiction`**: The two-letter country code (e.g., `es`, `us`).
+-   **`:sector`**: The business domain (e.g., `health-care`, `finance`).
+-   **`:section`**: The API domain or compartment being accessed.
+-   **`:format`**: The data schema standard (e.g., `org.schema`, `org.hl7.fhir.r4`).
+-   **`:resourceType`**: The specific type of resource being targeted.
+-   **`:_action`**: The asynchronous operation to perform (e.g., `_batch`).
+
+## 2. API Sections and Resources
+
+The API is divided into logical `sections`. The resources available within each section depend on the `sector` of the tenant.
+
+---
+
+### 2.1. Section: `registry`
+
+-   **Purpose:** Platform administration, primarily for registering new tenants.
+-   **Access:** **`host` only.**
+-   **Supported Resources:**
+    -   `Organization`: Represents the tenant organization being registered.
+    -   `Bundle`: For submitting the `Organization` and related resources such the legal representative and the accepted terms of service (`Person`, `Service`) in a single transaction.
+
+---
+
+### 2.2. Section: `entity`
+
+-   **Purpose:** Management of a tenant's internal resources (staff, locations, etc.).
+-   **Access:** **Tenants only.**
+-   **Supported Resources:**
+    -   **FHIR Sectors (`health-care`, etc.):**
+        -   `Practitioner`
+        -   `PractitionerRole`
+        -   `Location`
+        -   `Organization` (for internal departments)
+        -   `Bundle` (for mixed operations)
+    -   **Non-FHIR Sectors (`finance`, etc.):**
+        -   `Employee`
+        -   `Role`
+        -   `Place`
+        -   `Organization`
+        -   `Bundle`
+
+---
+
+### 2.3. Section: `individual`
+
+-   **Purpose:** Interaction with data related to individuals (patients, customers).
+-   **Access:** **Tenants only.**
+-   **Supported Resources:**
+    -   **FHIR Sectors:**
+        -   `Person`
+        -   `Patient`
+        -   `RelatedPerson`
+        -   `Bundle`
+    -   **Non-FHIR Sectors:**
+        -   `Person`
+        -   `Customer`
+        -   `RelatedPerson`
+        -   `Bundle`
+
+---
+
+### 2.4. Section: `index` (Future Work)
+
+-   **Purpose:** Interaction with an individual's Unified Health Index.
+-   **Access:** Tenants in the `health-care` sector.
+-   **Supported Resources:**
+    -   `Bundle`: Used for `_batch` operations.
+    -   `summary`: A placeholder resource for `_search` operations to retrieve the index.
+
+---
+
+### 2.5. Section: `ping`
+
+-   **Purpose:** Diagnostic endpoint for connectivity testing.
+-   **Access:** All tenants.
+-   **Supported Resources:**
+    -   `resource`: A generic placeholder resource type.
+
+A request for a asynhcronous ping would target the following URL:
+
+`POST /v1/acme/cds-es/test/ping/standard/resource/_batch`
+
+## 3. Example Endpoint
+
+A request for a health-care tenant to create a new practitioner would target the following URL:
+
+`POST /v1/acme/cds-es/health-care/entity/org.hl7.fhir.r4/Practitioner/_batch`

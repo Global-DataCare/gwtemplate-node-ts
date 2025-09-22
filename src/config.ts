@@ -1,4 +1,5 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// File: src/config.ts
 
 /**
  * Centralized configuration module.
@@ -27,7 +28,39 @@ function parseCsvToArray(csv: string | undefined): string[] {
   return csv.split(',').map(item => item.trim());
 }
 
-const rawConfig = {
+/**
+ * Defines the structure of the server's global configuration object.
+ * This is read once at startup from environment variables.
+ */
+export interface IServerConfig {
+  nodeEnv: string;
+  port: number;
+  apiHostname: string;
+  apiBaseUrl: string;
+  sectorsAllowed: string[];
+  dbProvider: string;
+  queueProvider: string;
+  kekSecret?: string;
+  host: {
+    legalName?: string;
+    jurisdiction?: string;
+    idType?: string;
+    idValue?: string;
+    adminEmail?: string;
+    adminUid?: string;
+  };  
+  mongo: {
+    uri?: string;
+    dbName: string;
+  };
+  firebase: {
+    projectId?: string;
+    clientEmail?: string;
+    privateKey?: string;
+  };
+  googleClientId?: string;
+}
+const rawConfig: IServerConfig = {
     nodeEnv: process.env.NODE_ENV || 'development',
     port: parseInt(process.env.PORT || '3000', 10),
     apiHostname: process.env.API_HOSTNAME || 'localhost',
@@ -35,6 +68,15 @@ const rawConfig = {
     sectorsAllowed: parseCsvToArray(process.env.SECTORS_ALLOWED),
     dbProvider: process.env.DB_PROVIDER || 'mem',
     queueProvider: process.env.QUEUE_PROVIDER || 'mem',
+    kekSecret: process.env.KEK_SECRET,
+    host: {
+      legalName: process.env.ORG_HOST_LEGAL_NAME,
+      jurisdiction: process.env.ORG_HOST_JURISDICTION,
+      idType: process.env.ORG_HOST_ID_TYPE,
+      idValue: process.env.ORG_HOST_ID_VALUE,
+      adminEmail: process.env.ORG_HOST_ADMIN_EMAIL,
+      adminUid: process.env.ORG_HOST_ADMIN_UID,
+    },    
     mongo: {
         uri: process.env.MONGO_URI,
         dbName: process.env.MONGO_DB_NAME || 'default',

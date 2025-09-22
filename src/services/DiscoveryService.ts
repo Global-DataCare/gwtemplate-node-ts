@@ -4,7 +4,7 @@
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { TenantConfig } from '../models/tenant';
 import { DidDocument } from '../models/did';
-import { JwkSet } from 'src/models/jwk';
+import { JwkSet } from '../models/jwk';
 
 /**
  * Handles the synchronous logic for retrieving public discovery documents like

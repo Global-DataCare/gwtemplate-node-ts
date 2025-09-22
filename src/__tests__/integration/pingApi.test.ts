@@ -25,7 +25,10 @@ const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
 // Define a reusable setup function to create the app instance
 const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   const app = express();
+  // Add all body parsers needed for the tests
   app.use(express.urlencoded({ extended: true }));
+  app.use(express.json());
+  app.use(express.json({ type: "application/fhir+json" }));
 
   const vaultRepository = new VaultMemRepository();
   const tenantsCacheManager = new TenantsCacheManager(vaultRepository);
@@ -66,6 +69,7 @@ describe('Ping API Endpoint', () => {
       
       mockKmsService.decodeRequest.mockResolvedValue(decodedPingMessage);
       const pingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch';
+      const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
 
       // --- Act ---
       const response = await request(app)
@@ -75,7 +79,7 @@ describe('Ping API Endpoint', () => {
         
       // --- Assert ---
       expect(response.status).toBe(202);
-      expect(response.body.thid).toBe(decodedPingMessage.thid);
+      expect(response.headers.location).toBe(expectedPollingUrl);
       expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
       
       // Self-documenting assertion: extract arguments by name
@@ -109,6 +113,7 @@ describe('Ping API Endpoint', () => {
 
       mockKmsService.decodeRequest.mockResolvedValue(decodedTenantPingMessage);
       const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
+      const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
 
       // --- Act ---
       const response = await request(app)
@@ -118,7 +123,7 @@ describe('Ping API Endpoint', () => {
 
       // --- Assert ---
       expect(response.status).toBe(202);
-      expect(response.body.thid).toBe(decodedTenantPingMessage.thid);
+      expect(response.headers.location).toBe(expectedPollingUrl);
       expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
 
       // Self-documenting assertion: extract arguments by name
@@ -128,11 +133,70 @@ describe('Ping API Endpoint', () => {
     });
   });
 
-
-  describe('Router Security and Validation (Opaque Acceptance)', () => {
-    it('should return 202 but not queue a job if the tenantId does not exist', async () => {
+  describe('POST /:tenantId/.../_batch (Legacy JSON Ping)', () => {
+    it('should queue a job when sent as application/json', async () => {
       // --- Arrange ---
       const asyncResponseStore = new AsyncResponseStoreMem();
+      const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
+
+      const mockTenantConfig: Partial<TenantConfig> = {
+        alternateName: 'tenant1',
+        didDocument: {
+          '@context': 'https://www.w3.org/ns/did/v1',
+          id: 'did:web:api.example.com:tenant1',
+          service: [{
+            id: createDidServiceId({ version: 'v1', sector: 'test', section: 'ping', format: 'standard' }),
+            type: 'ApiService', serviceEndpoint: 'resource', actions: ['_batch'],
+          }]
+        } as DidDocument,
+      };
+      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
+
+      const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
+
+      // --- Act ---
+      const response = await request(app)
+        .post(pingUrl)
+        .set('Content-Type', 'application/json')
+        .send(decodedTenantPingMessage);
+      // --- Assert ---
+      expect(response.status).toBe(202);
+      expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
+      const [jobName, jobRequest] = mockQueueAdapter.addJob.mock.calls[0];
+      expect(jobRequest.input.thid).toBe(decodedTenantPingMessage.thid);
+    });
+
+    it('should use the `id` field as a fallback for `thid`', async () => {
+        // --- Arrange ---
+        const asyncResponseStore = new AsyncResponseStoreMem();
+      const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
+
+      const mockTenantConfig: Partial<TenantConfig> = { alternateName: 'tenant1', didDocument: { service: [{ id: createDidServiceId({ version: 'v1', sector: 'test', section: 'ping', format: 'standard' }), type: 'ApiService', serviceEndpoint: 'resource', actions: ['_batch'] }] } as any };
+      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
+
+      const { thid, ...messageWithId } = decodedTenantPingMessage;
+      (messageWithId as any).id = 'fallback-id-123';
+
+      const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
+
+        // --- Act ---
+        const response = await request(app)
+        .post(pingUrl)
+        .set('Content-Type', 'application/json')
+        .send(messageWithId);
+
+        // --- Assert ---
+      expect(response.status).toBe(202);
+      expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
+      const job = asyncResponseStore.get('fallback-id-123');
+      expect(job).toBeDefined();
+      });
+  });
+
+  describe('Router Security and Validation (Explicit Rejection)', () => {
+    it('should return 404 if the tenantId does not exist', async () => {
+        // --- Arrange ---
+        const asyncResponseStore = new AsyncResponseStoreMem();
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
       // Mock the tenant manager to find no tenant
@@ -140,21 +204,21 @@ describe('Ping API Endpoint', () => {
 
       const pingUrl = '/nonexistent-tenant/cds-xx/v1/test/ping/standard/resource/_batch';
 
-      // --- Act ---
-      const response = await request(app)
+        // --- Act ---
+        const response = await request(app)
         .post(pingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
+          .set('Content-Type', 'application/x-www-form-urlencoded')
         .send(`request=${testEncryptedJwePing}`);
-        
-      // --- Assert ---
-      expect(response.status).toBe(202);
-      expect(response.body).toEqual({}); // Body should be empty
+        // --- Assert ---
+      expect(response.status).toBe(404);
+      expect(response.body.resourceType).toBe('OperationOutcome');
+      expect(response.body.issue[0].code).toBe(IssueType.NotFound);
       expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
-    });
+      });
 
-    it('should return 202 but not queue a job if the service is not in the DID', async () => {
-      // --- Arrange ---
-      const asyncResponseStore = new AsyncResponseStoreMem();
+    it('should return 404 if the service is not in the DID', async () => {
+        // --- Arrange ---
+        const asyncResponseStore = new AsyncResponseStoreMem();
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
       // Mock a tenant that exists but has NO services configured in its DID document.
@@ -169,83 +233,118 @@ describe('Ping API Endpoint', () => {
       jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
 
       const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
-      
-      // --- Act ---
-      const response = await request(app)
+
+        // --- Act ---
+        const response = await request(app)
         .post(pingUrl)
         .set('Content-Type', 'application/x-www-form-urlencoded')
         .send(`request=${testEncryptedJwePing}`);
-        
-      // --- Assert ---
-      expect(response.status).toBe(202);
-      expect(response.body).toEqual({});
+        // --- Assert ---
+        expect(response.status).toBe(404);
+        expect(response.body.resourceType).toBe('OperationOutcome');
       expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
+      });
     });
 
-    // NOTE: The other security tests for resourceType, action, and sector are omitted
-    // because they follow the exact same pattern as the two tests above. The logic
-    // is centralized in `isRequestValid`, and testing all failure paths of that
-    // function is better suited for a unit test of `isRequestValid` itself.
-    // These integration tests sufficiently prove that the router correctly implements
-    // the opaque acceptance pattern when `isRequestValid` returns false.
+  describe('Job Polling (`/_batch-response`)', () => {
+    const pollingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch-response';
+    const thid = decodedPingMessage.thid;
+
+    describe('POST Polling (Default)', () => {
+      it('should return 200 OK with the result if the job is complete', async () => {
+        // --- Arrange ---
+        const asyncResponseStore = new AsyncResponseStoreMem();
+        asyncResponseStore.set(thid, testCompletedJob);
+        const { app } = setupApp(asyncResponseStore);
+
+        // --- Act ---
+        const response = await request(app)
+          .post(pollingUrl)
+          .set('Content-Type', 'application/x-www-form-urlencoded')
+          .send(`thid=${thid}`);
+
+        // --- Assert ---
+        expect(response.status).toBe(200);
+        expect(response.text).toBe(`response=${testCompletedJob.result}`);
+        expect(asyncResponseStore.get(thid)).toBeUndefined();
+      });
+
+      it('should return 202 Accepted if the job is still pending', async () => {
+        // --- Arrange ---
+        const asyncResponseStore = new AsyncResponseStoreMem();
+        asyncResponseStore.set(thid, testPendingJob);
+        const { app } = setupApp(asyncResponseStore);
+
+        // --- Act ---
+        const response = await request(app)
+          .post(pollingUrl)
+          .set('Content-Type', 'application/x-www-form-urlencoded')
+          .send(`thid=${thid}`);
+
+        // --- Assert ---
+        expect(response.status).toBe(202);
+        expect(response.body.status).toBe('PENDING');
+        expect(asyncResponseStore.get(thid)).toBeDefined();
+      });
+
+      it('should return 404 Not Found for an unknown thid', async () => {
+        // --- Arrange ---
+        const asyncResponseStore = new AsyncResponseStoreMem();
+        const { app } = setupApp(asyncResponseStore);
+
+        // --- Act ---
+        const response = await request(app)
+          .post(pollingUrl)
+          .set('Content-Type', 'application/x-www-form-urlencoded')
+          .send('thid=unknown-thid');
+
+        // --- Assert ---
+        expect(response.status).toBe(404);
+        expect(response.body.resourceType).toBe('OperationOutcome');
+        expect(response.body.issue[0].code).toBe(IssueType.NotFound);
+    });
   });
 
-  describe('POST /host/.../_search (Job Polling)', () => {
-    const pollingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_search';
-    const thid = decodedPingMessage.thid;
-    it('should return 200 OK with the result if the job is complete', async () => {
-      // --- Arrange ---
-      const asyncResponseStore = new AsyncResponseStoreMem();
-      asyncResponseStore.set(thid, testCompletedJob);
-      const { app } = setupApp(asyncResponseStore);
+    describe('GET Polling (FHIR Conformance)', () => {
+      it('should return 200 OK for a FHIR-sector tenant', async () => {
+        // --- Arrange ---
+        const asyncResponseStore = new AsyncResponseStoreMem();
+        asyncResponseStore.set(thid, testCompletedJob);
+        const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
-      // --- Act ---
-      const response = await request(app)
-        .post(pollingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`thid=${thid}`);
+        // Mock a tenant in a FHIR-enabled sector
+        const mockFhirTenant: Partial<TenantConfig> = { alternateName: 'fhir_tenant', sector: 'health-care' };
+        jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockFhirTenant as TenantConfig);
 
-      // --- Assert ---
-      expect(response.status).toBe(200);
-      expect(response.text).toBe(`response=${testCompletedJob.result}`);
-      // The store should delete the result after it's retrieved
-      expect(asyncResponseStore.get(thid)).toBeUndefined();
-    });
+        const fhirPollingUrl = `/fhir_tenant/cds-xx/v1/test/ping/standard/resource/_batch-response?thid=${thid}`;
 
-    it('should return 202 Accepted if the job is still pending', async () => {
-      // --- Arrange ---
-      const asyncResponseStore = new AsyncResponseStoreMem();
-      asyncResponseStore.set(thid, testPendingJob);
-      const { app } = setupApp(asyncResponseStore);
+        // --- Act ---
+        const response = await request(app).get(fhirPollingUrl);
 
-      // --- Act ---
-      const response = await request(app)
-        .post(pollingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`thid=${thid}`);
+        // --- Assert ---
+        expect(response.status).toBe(200);
+        expect(response.text).toBe(`response=${testCompletedJob.result}`);
+      });
 
-      // --- Assert ---
-      expect(response.status).toBe(202);
-      expect(response.body.status).toBe('PENDING');
-      // The store should NOT delete the result if it's still pending
-      expect(asyncResponseStore.get(thid)).toBeDefined();
-    });
+      it('should return 405 Method Not Allowed for a non-FHIR-sector tenant', async () => {
+        // --- Arrange ---
+        const asyncResponseStore = new AsyncResponseStoreMem();
+        const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
-    it('should return 404 Not Found for an unknown thid', async () => {
-      // --- Arrange ---
-      const asyncResponseStore = new AsyncResponseStoreMem();
-      const { app } = setupApp(asyncResponseStore);
+        // Mock a tenant in a non-FHIR sector
+        const mockNonFhirTenant: Partial<TenantConfig> = { alternateName: 'non_fhir_tenant', sector: 'finance' };
+        jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockNonFhirTenant as TenantConfig);
 
-      // --- Act ---
-      const response = await request(app)
-        .post(pollingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send('thid=unknown-thid');
+        const nonFhirPollingUrl = `/non_fhir_tenant/cds-xx/v1/test/ping/standard/resource/_batch-response?thid=${thid}`;
 
-      // --- Assert ---
-      expect(response.status).toBe(404);
-      expect(response.body.resourceType).toBe('OperationOutcome');
-      expect(response.body.issue[0].code).toBe(IssueType.NotFound);
+        // --- Act ---
+        const response = await request(app).get(nonFhirPollingUrl);
+
+        // --- Assert ---
+        expect(response.status).toBe(405);
+        expect(response.body.resourceType).toBe('OperationOutcome');
+        expect(response.body.issue[0].code).toBe(IssueType.NotSupported);
+      });
     });
   });
 });

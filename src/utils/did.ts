@@ -22,7 +22,7 @@ function getEncodedHost(): string {
  * Constructs the web DID for the root host service.
  * @returns The host's DID string (e.g., "did:web:localhost%3A3000").
  */
-export function getHostDid(): string {
+export function getHostDidWebId(): string {
   const encodedHost = getEncodedHost();
   return `did:web:${encodedHost}`;
 }
@@ -32,7 +32,7 @@ export function getHostDid(): string {
  * @param tenantId The alternateName of the tenant.
  * @returns The tenant's DID string (e.g., "did:web:localhost%3A3000:tenant1").
  */
-export function getTenantDid(tenantId: string): string {
+export function getTenantDidWebId(tenantId: string): string {
   const encodedHost = getEncodedHost();
   // Tenant-specific DIDs are created as sub-paths from the main host DID.
   return `did:web:${encodedHost}:${tenantId}`;
@@ -52,7 +52,7 @@ export interface DidServiceIdParts {
 /**
  * Creates a standardized DID Document Service ID for path-based routing and validation.
  * The format is: <version>_<sector>_<section>_<format>_path
- * Example: v1_FinancialServices_org.schema_Organization_path
+ * Example: v1_test_org.schema_Organization_path
  *
  * @param parts - An object containing the components of the service ID.
  * @returns A standardized string representing the service ID.

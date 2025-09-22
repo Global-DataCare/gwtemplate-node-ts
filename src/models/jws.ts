@@ -18,7 +18,7 @@ export interface JwsHeader {
 /**
  * Represents a signature entry in a JWS using the General JSON Serialization format.
  */
-export interface JwsSignature {
+export interface JwsDetachedSignParts {
     /** The Base64URL encoded protected (signed) header. */
     protected: string;
     /** The Base64URL encoded signature. */
@@ -29,9 +29,9 @@ export interface JwsSignature {
  * Represents a JWS (JSON Web Signature) in the General JSON Serialization format.
  * This structure supports multiple signatures.
  */
-export interface JwsObject {
+export interface JwsMultiSign {
     /** The Base64URL encoded payload. */
     payload: string;
     /** An array of one or more signatures. */
-    signatures: JwsSignature[];
+    signatures: JwsDetachedSignParts[];
 }

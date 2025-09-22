@@ -1,8 +1,7 @@
 // src/routes/api.ts
-
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import express from 'express';
+import * as express from 'express';
 import { QueueAdapter } from '../adapters/queue';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { createDidServiceId } from '../utils/did';
@@ -11,8 +10,11 @@ import { createOperationOutcome } from '../utils/outcome';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { JobRequest } from '../models/request';
 import { TenantConfig } from '../models/tenant';
-import { IKmsService } from '../security/interfaces/IKmsService';
+import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
+
+// As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
+const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
 
 /**
  * Validates an incoming request against the dynamic service configuration in a tenant's DID Document.
@@ -64,51 +66,67 @@ export function createApiRouter(
 
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
   router.post(`${cdsRoutePrefix}/_batch`, async (req, res) => {
-    // --- Opaque Acceptance Strategy ---
     const { tenantId, section, resourceType } = req.params;
-    const { request } = req.body;
+    const contentType = req.headers['content-type'] || '';
+    let jobRequest: JobRequest;
 
-    if (!request) {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing "request" parameter in form body.');
+    // --- 1. Payload Handling ---
+    if (contentType.startsWith('application/x-www-form-urlencoded')) {
+      if (!req.body.request) {
+        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, "Missing 'request' parameter in form-encoded body.");
+        return res.status(400).json(outcome);
+      }
+      try {
+        jobRequest = await kmsService.decodeJobRequest(req.body.request);
+      } catch (error: any) {
+        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Failed to decode secure request: ' + error.message);
+        return res.status(401).json(outcome);
+      }
+    } else if (contentType.startsWith('application/json') || contentType.startsWith('application/fhir+json')) {
+      // For legacy/developer flow, construct a JobRequest from the plaintext body.
+      // The `req.params` are merged to provide the full context to the manager.
+      jobRequest = { ...req.params, input: req.body, meta: {} };
+    } else {
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotSupported, `Unsupported Content-Type: ${contentType}`);
+      return res.status(415).json(outcome);
+    }
+
+    // --- 2. Transaction ID Validation ---
+    const thid = jobRequest.input?.thid || jobRequest.input?.id;
+    if (!thid) {
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Request body must contain a "thid" or "id" property.');
       return res.status(400).json(outcome);
     }
 
-    // --- Path and Security Validation (Pre-Queue) ---
+    // --- 3. Path and Role Validation ---
     if (section === 'registry' && tenantId !== 'host') {
-      return res.status(202).send(); // Silently accept and drop.
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Forbidden, 'The "registry" section is reserved for the "host" entity.');
+      return res.status(403).json(outcome);
     }
-    
     const tenantConfig = await tenantsCacheManager.getConfigByAlternateName(tenantId);
     if (!tenantConfig || !isRequestValid(tenantConfig, { ...req.params, action: '_batch' })) {
-      return res.status(202).send();
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'The requested tenant or endpoint path does not exist.');
+      return res.status(404).json(outcome);
     }
 
-    try {
-      // --- Cryptographic Validation ---
-      const decodedMessage = await kmsService.decodeRequest(request);
-      if (!decodedMessage || !decodedMessage.thid) {
-        return res.status(202).send();
-      }
+    // --- 4. Enqueue Job ---
+    const jobName = createJobName(tenantId, resourceType, '_batch');
+    await queueAdapter.addJob(jobName, jobRequest);
+    asyncResponseStore.set(thid, { status: 'PENDING' });
 
-      // --- Enqueue Job ---
-      const jobName = createJobName(tenantId, resourceType, '_batch');
-      const jobRequest: JobRequest = { ...req.params, input: decodedMessage, meta: {} };
-      
-      await queueAdapter.addJob(jobName, jobRequest);
-      asyncResponseStore.set(decodedMessage.thid, { status: 'PENDING' });
-      
-      return res.status(202).json({ thid: decodedMessage.thid });
-    } catch (error: any) {
-      console.error(`[API Router Critical Error]: ${error.message}`);
-      return res.status(202).send();
-    }
+    // --- 5. Success Response ---
+    const pollingUrl = req.originalUrl.replace('/_batch', '/_batch-response');
+    res.location(pollingUrl);
+    return res.status(202).send();
   });
 
   // --- 2. ASYNC JOB POLLING ENDPOINT ---
-  router.post(`${cdsRoutePrefix}/_search`, async (req, res) => {
-    const { thid } = req.body; // Expect 'thid' parameter from form-urlencoded body
+
+  const pollingHandler = async (req: express.Request, res: express.Response) => {
+    const thid = (req.method === 'POST' ? req.body.thid : req.query.thid) as string | undefined;
+
     if (!thid) {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing "thid" parameter in form body.');
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing or invalid "thid" parameter.');
       return res.status(400).json(outcome);
     }
 
@@ -122,17 +140,26 @@ export function createApiRouter(
     }
 
     if (job.status === 'COMPLETED' && job.result) {
-      // Per FAPI, the final response is form-urlencoded.
       res.set('Content-Type', 'application/x-www-form-urlencoded');
       res.status(200).send(`response=${job.result}`);
       asyncResponseStore.delete(thid);
     } else {
-      // This could be 'FAILED' or an invalid completed state
       const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'Job failed to process or result was invalid.');
       res.status(500).json(outcome);
     }
-  });
+  };
+
+  const isFhirSector = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const tenantConfig = await tenantsCacheManager.getConfigByAlternateName(req.params.tenantId);
+    if (tenantConfig && tenantConfig.alternateName !== 'host' && FHIR_SECTORS.includes(tenantConfig.sector)) {
+      return next();
+    }
+    const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotSupported, 'GET polling is not supported for this entity.');
+    return res.status(405).json(outcome);
+  };
+
+  router.post(`${cdsRoutePrefix}/_batch-response`, pollingHandler);
+  router.get(`${cdsRoutePrefix}/_batch-response`, isFhirSector, pollingHandler);
 
   return router;
 }
-

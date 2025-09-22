@@ -1,0 +1,44 @@
+# Gateway API Routing Specification
+
+This document details the routing architecture of the Gateway, including middleware, supported `Content-Type`s, and the logic for handling asynchronous transaction IDs.
+
+## 1. Middleware and Content-Type Handling
+
+The Express application in `server.ts` is configured with several body-parsing middlewares to support different integration patterns. The order is important.
+
+1.  **`express.urlencoded({ extended: false })`**
+    -   **Content-Type:** `application/x-www-form-urlencoded`
+    -   **Purpose:** This is the primary method for the **FAPI/JAR Secure Flow**. The entire secure payload (JWE/JWS) is sent as a single `request` parameter in the form body.
+
+2.  **`express.text({ type: 'text/plain' })`**
+    -   **Content-Type:** `text/plain`
+    -   **Purpose:** Provides a simpler transport alternative for the same secure JWE/JWS payload, where the envelope is the entire raw request body.
+
+3.  **`express.json()`**
+    -   **Content-Type:** `application/json`
+    -   **Purpose:** Primarily for the **Legacy/Developer Flow**. It allows sending a `DecodedDidcommMessage` or a FHIR `Bundle` as a plaintext JSON object. It is also used by polling endpoints that expect a `thid` in a JSON body.
+
+4.  **`express.json({ type: "application/fhir+json" })`**
+    -   **Content-Type:** `application/fhir+json`
+    -   **Purpose:** Explicitly supports the **FHIR Legacy Flow**, allowing native FHIR clients to send `Bundle` resources using the standard FHIR `Content-Type`.
+
+## 2. Transaction ID (`thid`) Handling
+
+To ensure interoperability between DIDComm and FHIR standards, the system uses a fallback mechanism to identify asynchronous transactions.
+
+-   **Primary Identifier:** The `thid` property within the request body (for plaintext flows) or the decoded DIDComm message (for secure flows).
+
+-   **Fallback Identifier (FHIR Conformance):** If the `thid` property is not present in a plaintext request (`json` or `fhir+json`), the system **MUST** look for the top-level `id` property of the incoming object (which corresponds to the `Bundle.id` in a FHIR context).
+
+## 3. Asynchronous Endpoint Pattern (`_action` / `_bundleType`)
+
+The `apiRouter` follows a standard "Early Validation with Explicit Rejection" pattern. This is conformant with FHIR and provides immediate, clear feedback to clients.
+-   **`POST /.../_batch` (Submission):**
+    -   The router validates the request path. If the path is invalid (e.g., tenant not found, route not in DID), it **MUST** reject with `404 Not Found`.
+    -   The router validates the security payload. If invalid, it **MUST** reject with `400 Bad Request` or `401 Unauthorized`.
+    -   If all validations pass, it queues the job and returns `202 Accepted` with a `Location` header.
+
+-   **`POST` & `GET /.../_batch-response` (Polling):**
+    -   The client uses the `thid` to poll the endpoint specified in the `Location` header.
+    -   The server returns `202` (Pending), `200` (Completed), or `404` (Unknown `thid`).
+
