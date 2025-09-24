@@ -3,23 +3,23 @@
 
 import express from 'express';
 import dotenv from 'dotenv';
+import { Worker } from './worker';
 import { config, IServerConfig } from './config';
 import { createApiRouter } from './routes/api';
-import { VaultRepository } from './database/repositories/vault/vault.repository';
-import { VaultMemRepository } from './database/repositories/vault/vault.mem.repository';
-import { TenantsCacheManager } from './managers/TenantsCacheManager';
+import { IKmsService } from './crypto/interfaces/IKmsService';
+import { CryptographyService } from './crypto/CryptographyService';
+import { KmsService } from './services/KmsService';
+import { DemoKmsService } from './services/DemoKmsService';
 import { QueueAdapter } from './adapters/queue';
 import { QueueAdapterMem } from './adapters/queue-mem';
-import { DevKmsService } from './services/DevKmsService';
-import { Worker } from './worker';
+import { AsyncResponseStoreMem } from './adapters/async-response-store.mem';
+import { VaultRepository } from './database/repositories/vault/vault.repository';
+import { VaultMemRepository } from './database/repositories/vault/vault.mem.repository';
 import { ManagerRegistry } from './managers/registry';
 import { OrganizationManager } from './managers/OrganizationManager';
-import { AsyncResponseStoreMem } from './adapters/async-response-store.mem';
+import { TenantsCacheManager } from './managers/TenantsCacheManager';
 import { JobRequest } from './models/request';
-import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg } from './models/schemaorg';
-import { CryptographyService } from './crypto/CryptographyService';
-import { IKmsService } from './crypto/interfaces/IKmsService';
-import { KmsService } from './services/KmsService';
+import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from './models/schemaorg';
 
 dotenv.config();
 
@@ -36,13 +36,23 @@ async function bootstrapHost(orgManager: OrganizationManager, bootConfig: IServe
   console.log('[GW-API] Bootstrapping host tenant...');
   
   // 1. Construct the claims record from the server configuration.
+  // Each claim key MUST be prefixed with its schema.org type for extraction.
   const hostClaims = {
+    // Organization Claims
     [ClaimsOrgSchemaorg.legalName]: bootConfig.host.legalName,
     [ClaimsOrgSchemaorg.addressCountry]: bootConfig.host.jurisdiction,
     [ClaimsOrgSchemaorg.taxID]: bootConfig.host.idValue,
     [ClaimsOrgSchemaorg.alternateName]: 'host',
+    [ClaimsOrgSchemaorg.identifier]: `urn:uuid:${bootConfig.host.idValue}`, // Required for resource ID
+
+    // Legal Representative
     [ClaimsPersonSchemaorg.email]: bootConfig.host.adminEmail,
     [ClaimsPersonSchemaorg.identifier]: bootConfig.host.adminUid,
+
+    // Software Manufacturer
+    [ClaimsServiceSchemaorg.category]:  bootConfig.sectorsAllowed,
+    [ClaimsServiceSchemaorg.identifier]: `did:web:antifraud.services`, // Sofware manufacturer to verify the software's signature
+    [ClaimsServiceSchemaorg.termsOfService]: 'did:web:antifraud.services:gateway:terms',
   };
 
   // 2. Build a complete JobRequest that mimics a real registration request.
@@ -65,11 +75,13 @@ async function bootstrapHost(orgManager: OrganizationManager, bootConfig: IServe
   };
 
   try {
-    // 3. Process the job directly, passing the correct environment from the config.
-    await orgManager.process(bootstrapJob, bootConfig.nodeEnv);
+    // 3. Process the job directly. For bootstrap, any error is fatal.
+    await orgManager.process(bootstrapJob, bootConfig.nodeEnv, true);
     console.log('[GW-API] Host tenant bootstrapped successfully.');
   } catch (error) {
     console.error('[GW-API] FATAL: Host tenant bootstrapping failed.', error);
+    // Re-throw to prevent the server from starting in a corrupt state.
+    throw error;
   }
 }
 
@@ -104,31 +116,41 @@ async function startServer() {
   // based on the environment.
   // - In 'production' or 'development', we use the real KmsService which performs
   //   actual cryptographic operations.
-  // - In 'demo' or other test environments, we use DevKmsService, which simulates
+  // - In 'demo' or other test environments, we use DemoKmsService, which simulates
   //   cryptography for easier testing and demonstration.
   console.log(`[GW-API] Environment set to: ${config.nodeEnv}`);
   const cryptographyService = new CryptographyService();
   let kmsService: IKmsService;
 
-  if (config.nodeEnv === 'development' || config.nodeEnv === 'production') {
+  if (config.nodeEnv === 'demo') {
+    console.log('[GW-API] Using DemoKmsService with simulated cryptography.');
+    kmsService = new DemoKmsService();
+  } else {
+    // For 'production', 'development', and 'test', we use the real KmsService.
     console.log('[GW-API] Using real KmsService with live cryptography.');
     kmsService = new KmsService(cryptographyService);
-  } else {
-    console.log('[GW-API] Using DevKmsService with simulated cryptography.');
-    kmsService = new DevKmsService(); // DevKmsService likely needs the tenantManager too
   }
   
+  // CRITICAL STEP: Initialize the KMS to provision host keys before any other service uses it.
+  await kmsService.init();
+
   // 2c. Initialize core services and managers.
-  // The TenantsCacheManager is created, but the host config is not yet loaded.
-  const tenantManager = new TenantsCacheManager(vaultRepository);
+  // The TenantsCacheManager requires the KmsService to decrypt tenant configurations.
+  const tenantManager = new TenantsCacheManager(vaultRepository, kmsService);
   const orgManager = new OrganizationManager(vaultRepository, kmsService);
 
   // 2d. Bootstrap the 'host' tenant. This is a critical step.
   // We use the OrganizationManager to process a self-registration job for the host.
+  
   // This creates the host's vault and persists its configuration, making it a real tenant.
   await bootstrapHost(orgManager, config);
 
-  // 2d. The remaining services can now be initialized.
+  // CRITICAL STEP: The tenant cache was created *before* the host was bootstrapped.
+  // We must now explicitly load the tenants to ensure the cache is populated with the
+  // newly created host configuration (tenant zero).
+  await tenantManager.loadTenants();
+
+  // 2e. The remaining services can now be initialized.
   const managerRegistry: ManagerRegistry = {
     organizationManager: orgManager,
     tenantManager: tenantManager,
@@ -151,13 +173,14 @@ async function startServer() {
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore);
   app.use('/', apiRouter);
 
-  // --- 4. START LISTENING ---
+  // --- 4. START LISTENING (ONLY AFTER BOOTSTRAP IS COMPLETE) ---
   const server = app.listen(config.port, () => {
-    console.log(`[GW-API] Development Server running on ${config.apiBaseUrl}`);
+    const serverType = config.nodeEnv.charAt(0).toUpperCase() + config.nodeEnv.slice(1);
+    console.log(`[GW-API] ${serverType} Server running on ${config.apiBaseUrl}`);
     console.log('[GW-API] --- System Initialized Successfully ---');
   });
 
-  return { app, server };
+  return { app, server, queueAdapter };
 }
 
 // Only start the server if this file is run directly

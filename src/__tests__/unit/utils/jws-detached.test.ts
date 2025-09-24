@@ -1,9 +1,9 @@
 
-import * as mlDsa from '@noble/post-quantum/ml-dsa';
 import { testMockRandom32Bytes } from '../../data/crypto.data';
-// Import JWT utilities needed for the local implementation
-import { MldsaPublicJwk, withKid } from '../../../crypto/jwk-thumbprint';
+import * as mlDsa from '@noble/post-quantum/ml-dsa';
+import { withKid } from '../../../crypto/jwk-thumbprint';
 import { Content } from '../../../utils/content';
+import { MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
 import { encodeHeader, encodePayload, encodeSignature, decodeHeader } from '../../../utils/jwt';
 
 // Define a type for the private key for clarity and type safety.
@@ -91,7 +91,7 @@ describe('Detached JWS Cryptography', () => {
 
   beforeAll(async () => {
     const seed = testMockRandom32Bytes;
-    const { publicKey: publicKeyBytes, privateKey: privateKeyBytes } = mlDsa.keyPair(seed);
+    const { publicKey: publicKeyBytes, secretKey: privateKeyBytes } = mlDsa.ml_dsa44.keygen(seed);
     const pub_b64 = Content.bytesToRawBase64UrlSafe(publicKeyBytes);
     const priv_b64 = Content.bytesToRawBase64UrlSafe(privateKeyBytes);
 
@@ -131,7 +131,7 @@ describe('Detached JWS Cryptography', () => {
     
     // Create a new, different key pair
     const seed2 = new Uint8Array(32).fill(1);
-    const { publicKey: otherPublicKeyBytes } = mlDsa.keyPair(seed2);
+    const { publicKey: otherPublicKeyBytes } = mlDsa.ml_dsa44.keygen(seed2);
     const other_pub_b64 = Content.bytesToRawBase64UrlSafe(otherPublicKeyBytes);
     const otherPublicKey = await withKid({ kty: 'AKP', alg: 'ML-DSA-65', pub: other_pub_b64 });
 

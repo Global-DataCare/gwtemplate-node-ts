@@ -30,6 +30,7 @@ jest.mock('../../../utils/tenant');
 
 // Create a mock KMS service for testing.
 const mockKmsService: jest.Mocked<IKmsService> = {
+    init: jest.fn(async () => {}),
     // Add missing methods to satisfy the interface
     provisionKeys: jest.fn(),
     decodeJobRequest: jest.fn(),

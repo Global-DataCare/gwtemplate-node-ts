@@ -55,11 +55,11 @@ export interface ICryptography {
   
   /**
    * Generates and protects (encapsulates) a symmetric shared key (32 bytes)
-   * @param dataBytes 
+   * @param cekSeedBytes 
    * @param secretKeyBytes 
    * @param recipientPublicKeyBytes 
    */
-  encapsulate(dataBytes: Uint8Array, secretKeyBytes: Uint8Array, recipientPublicKeyBytes: Uint8Array): Promise<{ encapsulatedBytes: Uint8Array; uncapsulatedBytes: Uint8Array; }>;
+  encapsulate(cekSeedBytes: Uint8Array, secretKeyBytes: Uint8Array, recipientPublicKeyBytes: Uint8Array): Promise<{ encapsulatedCekBytes: Uint8Array; derivedCekBytes: Uint8Array; }>
   
   /**
    * Returns the unprotected shared symmetric key
@@ -90,23 +90,28 @@ export interface ICryptography {
   // --- High-Level Workflows ---
 
   /**
-   * Encrypts a JSON payload into a JWE object.
-   * @param payload JSON Object to encrypt.
-   * @param protectedHeader JSON Header to protect.
-   * @param secretJWKey The private key of the sender.
-   * @param recipientsJWKeys Array of public keys for the recipients.
-   * @param createRecipientHeaders If true (default), creates a header for each recipient. If false,
-   *   omits the per-recipient header, making the output compatible with Compact Serialization if
-   *   there is only one recipient.
-   * @returns A promise resolving to the JWE Object.
+   * Encrypts a payload into a JWE Object, suitable for JSON General Serialization.
+   * This method keeps protected and per-recipient headers separate, making it ideal
+   * for multi-recipient scenarios or storing as a structured object (e.g., ConfidentialStorage).
+   * @param payload The JSON object to encrypt.
+   * @param protectedHeader The main protected header (JWE Protected Header). Used as AAD.
+   * @param secretJWKey The sender's private ML-KEM key.
+   * @param recipientsJWKeys An array of public ML-KEM keys for the recipients.
+   * @returns A Promise resolving to a JweObject.
    */
-  encryptJwe(
-    payload: object, 
-    protectedHeader: object, 
-    secretJWKey: MlkemPrivateJwk, 
-    recipientsJWKeys: MlkemPublicJwk[], 
-    createRecipientHeaders?: boolean
-  ): Promise<JweObject>;  
+  encryptJwe(payload: object, protectedHeader: object, secretJWKey: MlkemPrivateJwk, recipientsJWKeys: MlkemPublicJwk[]): Promise<JweObject>;
+
+  /**
+   * Encrypts a payload directly into a JWE Compact Serialization string.
+   * This method is optimized for single-recipient JWEs. It merges the protected and
+   * recipient headers *before* encryption to form the correct AAD for the compact format.
+   * @param payload The JSON object to encrypt or a nested JWS string (compact representation).
+   * @param protectedHeader The main protected header (e.g., specifying `enc`).
+   * @param secretJWKey The sender's private ML-KEM key.
+   * @param recipientJWKey The single recipient's public ML-KEM key.
+   * @returns A Promise resolving to the JWE as a compact string.
+   */
+  encryptJweToCompact(payload: object | string, protectedHeader: object, secretJWKey: MlkemPrivateJwk, recipientJWKey: MlkemPublicJwk): Promise<string>;
   
   /**
    * Decrypts a JWE (in Compact or JSON format) and returns the decrypted bytes and protected header.
@@ -162,14 +167,6 @@ export interface ICryptography {
    * @returns A JWS Object with JSON objects for the header and payload.
    */
   parseCompactJws(jwsString: string): DataCompactJWT;
-
-  /**
-   * Converts a JWE Object into Compact Serialization format.
-   * Throws an error if the JWE has more than one recipient or a shared unprotected header.
-   * @param jwe The JWE Object to convert.
-   * @returns The JWE in Compact Serialization format.
-   */  
-  jweToCompact(jwe: JweObject): string;
   
   /**
    * Parses a JWE in Compact Serialization format into a JWE Object.

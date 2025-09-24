@@ -2,16 +2,16 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import * as express from 'express';
-import { QueueAdapter } from '../adapters/queue';
+import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
-import { createDidServiceId } from '../utils/did';
+import { QueueAdapter } from '../adapters/queue';
+import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 import { createJobName } from '../utils/naming';
+import { createDidServiceId } from '../utils/did';
 import { createOperationOutcome } from '../utils/outcome';
-import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { JobRequest } from '../models/request';
 import { TenantConfig } from '../models/tenant';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
+import { IssueLevel, IssueType } from '../models/fhir/codes';
 
 // As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
@@ -30,18 +30,19 @@ function isRequestValid(tenantConfig: TenantConfig, params: any): boolean {
     return false; // No services defined, no access.
   }
 
-  // Construct the expected service ID from the request parameters.
+  // 1. Construct the expected service ID from the request parameters.
   const expectedServiceId = createDidServiceId({ version: 'v1', sector, section, format });
 
-  // Find a service rule in the tenant's DID document that matches the expected ID.
-  const matchingService = tenantConfig.didDocument.service.find((s: { id: string }) => s.id === expectedServiceId);
+  // 2. Find a service rule in the tenant's DID document that matches the expected ID.
+  const matchingService = tenantConfig.didDocument.service.find((s: any) => s.id === expectedServiceId);
 
   if (!matchingService) {
     return false; // No service rule found for this path.
   }
 
-  // Check if the requested resource and action are permitted by the matched rule.
-  const resourceAllowed = matchingService.serviceEndpoint.split(',').includes(resourceType);
+  // 3. Check if the requested resource and action are permitted by the matched rule.
+  // The serviceEndpoint in our config is a comma-separated list of resource types.
+  const resourceAllowed = (matchingService.serviceEndpoint as string).split(',').includes(resourceType);
   const actionAllowed = matchingService.actions.includes(action);
 
   return resourceAllowed && actionAllowed;
@@ -70,6 +71,8 @@ export function createApiRouter(
     const contentType = req.headers['content-type'] || '';
     let jobRequest: JobRequest;
 
+    console.log(`[API] Received POST on ${req.originalUrl} for tenant: ${tenantId}`);
+
     // --- 1. Payload Handling ---
     if (contentType.startsWith('application/x-www-form-urlencoded')) {
       if (!req.body.request) {
@@ -77,8 +80,16 @@ export function createApiRouter(
         return res.status(400).json(outcome);
       }
       try {
-        jobRequest = await kmsService.decodeJobRequest(req.body.request);
+        console.log('[API] Decoding secure JWE request...');
+        const decodedJob = await kmsService.decodeJobRequest(req.body.request);
+        // The decoded job contains the core payload. We must merge it with
+        // the path parameters to provide the full context to the worker.
+        jobRequest = { ...req.params, ...decodedJob };
+        console.log('[API] JWE decoded successfully.');
       } catch (error: any) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[API] Error during JWE decoding:', error);
+        }
         const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Failed to decode secure request: ' + error.message);
         return res.status(401).json(outcome);
       }
@@ -104,7 +115,13 @@ export function createApiRouter(
       return res.status(403).json(outcome);
     }
     const tenantConfig = await tenantsCacheManager.getConfigByAlternateName(tenantId);
+    
+    // The validation now uses the full tenant config and request params.
     if (!tenantConfig || !isRequestValid(tenantConfig, { ...req.params, action: '_batch' })) {
+      if (process.env.NODE_ENV !== 'production') {
+        const isValid = tenantConfig ? isRequestValid(tenantConfig, { ...req.params, action: '_batch' }) : false;
+        console.error(`[API] Path/Role validation failed for ${req.originalUrl}. Tenant found: ${!!tenantConfig}. Request valid: ${isValid}`);
+      }
       const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'The requested tenant or endpoint path does not exist.');
       return res.status(404).json(outcome);
     }

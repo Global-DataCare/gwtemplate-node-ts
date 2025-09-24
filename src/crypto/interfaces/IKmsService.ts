@@ -34,6 +34,12 @@ import { MldsaPublicJwk, MlkemPublicJwk } from './Cryptography.types';
  */
 export interface IKmsService {
 
+  /**
+   * Initializes the service, ensuring essential keys (like for the 'host') are provisioned.
+   * MUST be called before any other methods.
+   */
+  init(): Promise<void>;  
+
   // --- Key Lifecycle Management ---
 
   /**

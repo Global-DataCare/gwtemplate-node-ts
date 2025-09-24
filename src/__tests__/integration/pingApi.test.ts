@@ -15,7 +15,7 @@ import { testCompletedJob, testPendingJob } from '../data/async-response.data';
 import { createDidServiceId } from '../../utils/did';
 import { DidDocument } from '../../models/did';
 import { IssueType } from '../../models/fhir/codes';
-import { config } from '../../config';
+import { JobRequest } from '../../models/request';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -31,7 +31,10 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.json({ type: "application/fhir+json" }));
 
   const vaultRepository = new VaultMemRepository();
-  const tenantsCacheManager = new TenantsCacheManager(vaultRepository);
+  const tenantsCacheManager = new TenantsCacheManager(vaultRepository, mockKmsService);
+
+  // Initialize the mock KMS to simulate the server startup sequence
+  mockKmsService.init();
 
   // The API router only needs these 4 core dependencies.
   const apiRouter = createApiRouter(mockQueueAdapter, tenantsCacheManager, mockKmsService, asyncResponseStore);
@@ -67,7 +70,15 @@ describe('Ping API Endpoint', () => {
       };
       jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockHostConfig as TenantConfig);
       
-      mockKmsService.decodeRequest.mockResolvedValue(decodedPingMessage);
+      const mockDecodedJob: JobRequest = {
+        input: decodedPingMessage,
+        meta: {}, // Mock meta as needed
+        tenantId: 'host',
+        resourceType: 'resource',
+        action: '_batch'
+      };
+      mockKmsService.decodeJobRequest.mockResolvedValue(mockDecodedJob)
+
       const pingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch';
       const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
 
@@ -111,7 +122,14 @@ describe('Ping API Endpoint', () => {
       };
       jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
 
-      mockKmsService.decodeRequest.mockResolvedValue(decodedTenantPingMessage);
+      const mockDecodedJob: JobRequest = {
+        input: decodedTenantPingMessage,
+        meta: {}, // Mock meta as needed
+        tenantId: 'tenant1',
+        resourceType: 'resource',
+        action: '_batch'
+      };
+      mockKmsService.decodeJobRequest.mockResolvedValue(mockDecodedJob);
       const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
       const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
 
@@ -348,4 +366,3 @@ describe('Ping API Endpoint', () => {
     });
   });
 });
-

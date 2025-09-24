@@ -11,6 +11,7 @@ import { ConfidentialStorageDoc } from '../../models/confidential-storage';
  * preventing TypeScript errors and promoting test consistency.
  */
 export const mockKmsService: jest.Mocked<IKmsService> = {
+  init: jest.fn(async () => {}),
   provisionKeys: jest.fn(),
   getPublicJwks: jest.fn(),
   getPublicVerificationKey: jest.fn(),

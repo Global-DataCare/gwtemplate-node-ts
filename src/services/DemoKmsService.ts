@@ -1,4 +1,4 @@
-// src/services/DevKmsService.ts
+// src/services/DemoKmsService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
@@ -17,15 +17,22 @@ import { MldsaPublicJwk, MlkemPublicJwk } from '../crypto/interfaces/Cryptograph
  *
  * WARNING: DO NOT USE IN PRODUCTION.
  */
-export class DevKmsService implements IKmsService {
+export class DemoKmsService implements IKmsService {
   
   // No dependencies needed for the dev/demo version for now.
   constructor() {}
 
+  async init(): Promise<void> {
+    console.warn(`[DemoKmsService] Initializing host keys...`);
+    // In demo mode, provisioning is a no-op that just logs a message.
+    // We call it here to maintain interface consistency.
+    await this.provisionKeys('host');
+  }
+  
   // --- Key Lifecycle Management ---
 
   async provisionKeys(entityId: string): Promise<JwkSet> {
-    console.warn(`[DevKmsService] Simulating key provisioning for: ${entityId}`);
+    console.warn(`[DemoKmsService] Simulating key provisioning for: ${entityId}`);
     return this.getPublicJwks(entityId);
   }
 
@@ -44,7 +51,7 @@ export class DevKmsService implements IKmsService {
   // --- Inbound Request Processing ---
 
   async decodeJobRequest(message: string): Promise<JobRequest> {
-    console.warn(`[DevKmsService] Bypassing decryption for JWE. Assuming plaintext JWS.`);
+    console.warn(`[DemoKmsService] Bypassing decryption for JWE. Assuming plaintext JWS.`);
     try {
       const jwsPayload = JSON.parse(message).jws;
       const [protectedB64, payloadB64] = jwsPayload.split('.');
@@ -60,14 +67,14 @@ export class DevKmsService implements IKmsService {
         },
       } as JobRequest;
     } catch (e) {
-      throw new Error('Invalid JSON or JWS format provided to DevKmsService.decodeJobRequest');
+      throw new Error('Invalid JSON or JWS format provided to DemoKmsService.decodeJobRequest');
     }
   }
 
   // --- Signing Operations ---
 
   async signWithManagedKey(payload: Uint8Array, entityId: string): Promise<JwsMultiSign> {
-    console.warn(`[DevKmsService] Simulating signing for entity: ${entityId}`);
+    console.warn(`[DemoKmsService] Simulating signing for entity: ${entityId}`);
     const key = await this.getPublicVerificationKey(entityId);
     const protectedHeader = { alg: key?.alg, kid: key?.kid };
     const payloadB64 = Content.bytesToRawBase64UrlSafe(payload);
@@ -86,7 +93,7 @@ export class DevKmsService implements IKmsService {
     encryptedSeedPartB: Uint8Array,
     protectorEntityId: string
   ): Promise<JwsMultiSign> {
-    console.warn(`[DevKmsService] Simulating reconstructed key signing for protector: ${protectorEntityId}`);
+    console.warn(`[DemoKmsService] Simulating reconstructed key signing for protector: ${protectorEntityId}`);
     // In dev, we just sign it as if we had the key directly.
     return this.signWithManagedKey(payload, 'reconstructed-dev-key');
   }
@@ -94,7 +101,7 @@ export class DevKmsService implements IKmsService {
   // --- Outbound Encryption ---
 
   async encodeResponse(payload: any, recipientJwks: JWK[], senderId: string): Promise<string> {
-    console.warn(`[DevKmsService] Bypassing encryption for response from ${senderId}. Returning plaintext JWE.`);
+    console.warn(`[DemoKmsService] Bypassing encryption for response from ${senderId}. Returning plaintext JWE.`);
     const protectedHeader = { enc: 'none', skid: `dev-sender-kid-for-${senderId}` };
     // Create a fake JWE object with plaintext payload for easy debugging
     const fakeJwe = {
@@ -108,7 +115,7 @@ export class DevKmsService implements IKmsService {
   // --- At-Rest Data Protection ---
 
   async protectConfidentialData(doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> {
-    console.warn(`[DevKmsService] Simulating data protection for entity: ${entityId}`);
+    console.warn(`[DemoKmsService] Simulating data protection for entity: ${entityId}`);
     if (!doc.content) return doc;
     const { content, ...docWithoutContent } = doc;
     // Simulate moving the content to a 'jwe' property without real encryption
@@ -117,9 +124,9 @@ export class DevKmsService implements IKmsService {
   }
 
   async unprotectConfidentialData<T>(doc: ConfidentialStorageDoc, entityId: string): Promise<T> {
-    console.warn(`[DevKmsService] Simulating data un-protection for entity: ${entityId}`);
+    console.warn(`[DemoKmsService] Simulating data un-protection for entity: ${entityId}`);
     if (!doc.jwe || !(doc.jwe as any).content) {
-      throw new Error('DevKmsService: Cannot unprotect document with invalid simulated JWE.');
+      throw new Error('DemoKmsService: Cannot unprotect document with invalid simulated JWE.');
     }
     return (doc.jwe as any).content as T;
   }

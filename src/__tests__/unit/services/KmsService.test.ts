@@ -19,7 +19,7 @@ const mockCryptoService: jest.Mocked<ICryptography> = {
   getRecipientKidsFromJwe: jest.fn(),
   signDataJws: jest.fn(),
   parseCompactJws: jest.fn(),
-  jweToCompact: jest.fn(),
+  encryptJweToCompact: jest.fn(),
   encrypt: jest.fn(),
   decrypt: jest.fn(),
   encapsulate: jest.fn(),
@@ -67,17 +67,40 @@ describe('KmsService', () => {
     });
   });
 
+  describe('init', () => {
+    it('should provision keys for the "host" entity', async () => {
+      // We spy on the method in the same class we are testing
+      const provisionSpy = jest.spyOn(kmsService, 'provisionKeys');
+      
+      await kmsService.init();
+
+      expect(provisionSpy).toHaveBeenCalledWith('host');
+      expect(provisionSpy).toHaveBeenCalledTimes(1);
+
+      // Verify the host keys are actually available
+      const hostKeys = await kmsService.getPublicJwks('host');
+      expect(hostKeys).toBeDefined();
+      expect(hostKeys.keys).toHaveLength(2);
+
+      provisionSpy.mockRestore();
+    });
+  });
+
   describe('decodeJobRequest', () => {
     it('should correctly decode a JWE message', async () => {
       // Arrange
+      await kmsService.init(); // INITIALIZE THE SERVICE
       const message = 'compact-jwe-string';
       const mockKids = ['mock-kem-kid'];
       const mockDecryptedBytes = new Uint8Array([1, 2, 3]);
       const mockProtectedHeader = { enc: 'A256GCM' };
       const mockJws: DataCompactJWT = { protected: {}, payload: { thid: '123' }, signature: new Uint8Array() };
 
-      await kmsService.provisionKeys('tenant-123'); // Ensure the key is in the KMS
-
+      // The key is for a recipient, not the host. Provision it separately.
+      // Note: `init()` already provisions the 'host' key, which acts as the recipient key in this mock setup.
+      // We'll reset the mock to ensure we can track the call for 'tenant-123' specifically.
+      mockCryptoService.generateKeyPairMlKem.mockClear();
+      await kmsService.provisionKeys('tenant-123'); 
       mockCryptoService.getRecipientKidsFromJwe.mockReturnValue(mockKids);
       mockCryptoService.decryptJwe.mockResolvedValue({ decryptedBytes: mockDecryptedBytes, protectedHeader: mockProtectedHeader });
       mockCryptoService.parseCompactJws.mockReturnValue(mockJws);
@@ -115,24 +138,34 @@ describe('KmsService', () => {
   });
   
   describe('encodeResponse', () => {
-    it('should encrypt a response for a single recipient and return a compact JWE', async () => {
+    it('should use encryptJweToCompact for a single recipient', async () => {
       const payload = { message: 'response' };
       const senderId = 'host';
       const recipientJwks: JWK[] = [mockMlkemPublicKey as JWK];
-      // FIX: The mock object must contain a recipient to be logical for compact serialization.
-      const mockJweObject = { 
-        protected: 'p', 
-        recipients: [{ header: { alg: "some", kid: mockMlkemPublicKey.kid }, encrypted_key: 'e' }], 
-        iv: 'i', 
-        ciphertext: 'c', 
-        tag: 't' 
-      };
-      const mockCompactJwe = 'p.e.i.c.t';
+      const mockCompactJwe = 'compact.jwe.string';
 
       await kmsService.provisionKeys(senderId);
+      mockCryptoService.encryptJweToCompact.mockResolvedValue(mockCompactJwe);
 
+      const result = await kmsService.encodeResponse(payload, recipientJwks, senderId);
+
+      expect(mockCryptoService.encryptJweToCompact).toHaveBeenCalledWith(
+        payload,
+        expect.objectContaining({ skid: 'mock-kem-kid' }),
+        expect.any(Object),
+        recipientJwks[0]
+      );
+      expect(result).toBe(mockCompactJwe);
+    });
+
+    it('should use encryptJwe and JSON.stringify for multiple recipients', async () => {
+      const payload = { message: 'response' };
+      const senderId = 'host';
+      const recipientJwks: JWK[] = [mockMlkemPublicKey as JWK, { ...mockMlkemPublicKey, kid: 'rec2' }];
+      const mockJweObject = { protected: 'p', recipients: [], iv: 'i', ciphertext: 'c', tag: 't' };
+
+      await kmsService.provisionKeys(senderId);
       mockCryptoService.encryptJwe.mockResolvedValue(mockJweObject);
-      mockCryptoService.jweToCompact.mockReturnValue(mockCompactJwe);
 
       const result = await kmsService.encodeResponse(payload, recipientJwks, senderId);
 
@@ -142,13 +175,13 @@ describe('KmsService', () => {
         expect.any(Object),
         recipientJwks
       );
-      expect(mockCryptoService.jweToCompact).toHaveBeenCalledWith(mockJweObject);
-      expect(result).toBe(mockCompactJwe);
+      expect(result).toBe(JSON.stringify(mockJweObject));
     });
   });
 
   describe('Confidential Data Protection', () => {
     it('should protect and unprotect data', async () => {
+      await kmsService.init(); // INITIALIZE THE SERVICE
       const entityId = 'tenant-123';
       const docContent = { sensitive: 'data' };
       const doc: ConfidentialStorageDoc = {

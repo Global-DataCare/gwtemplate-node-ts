@@ -1,17 +1,17 @@
-// src/__tests__/unit/services/DevKmsService.test.ts
+// src/__tests__/unit/services/DemoKmsService.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { jest } from '@jest/globals';
-import { DevKmsService } from '../../../services/DevKmsService';
+import { DemoKmsService } from '../../../services/DemoKmsService';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { Content } from '../../../utils/content';
 import { JobRequest } from '../../../models/request';
 
-describe('DevKmsService', () => {
-    let devKmsService: DevKmsService;
+describe('DemoKmsService', () => {
+    let devKmsService: DemoKmsService;
 
     beforeEach(() => {
-        devKmsService = new DevKmsService();
+        devKmsService = new DemoKmsService();
         jest.clearAllMocks();
     });
 

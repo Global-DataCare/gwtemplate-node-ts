@@ -20,6 +20,49 @@ All asynchronous API endpoints that process sensitive data **MUST** follow this 
 7.  **Polling:** A separate polling endpoint is responsible for retrieving the stored, encrypted response when requested by the original client using the `thid`.
 
 This pattern ensures that no sensitive plaintext data is ever held in the API controller and that all business logic is executed in the background, decoupled from the initial client request.
+
+## 2. Key Hierarchy and Envelope Encryption
+
+The system employs a multi-level **envelope encryption** strategy to ensure robust security and cryptographic isolation for data at rest. This pattern ensures that a compromise of one layer does not automatically compromise the entire system.
+
+The hierarchy is as follows:
+
+### 2.1. Level 0: Key Encryption Key (KEK)
+
+-   **Role**: The single master key for the entire system. It is the root of trust.
+-   **Source**: The KEK is considered a "root secret" and is **never** stored in the application's database. It MUST be provided from a secure, external source, such as an environment variable (`KEK_SECRET`) or a dedicated secret manager (e.g., Google Secret Manager, AWS KMS, HashiCorp Vault).
+-   **Function**: Its sole purpose is to encrypt and decrypt the **Host DEK**. It never touches tenant data or configurations directly.
+
+### 2.2. Level 1: Host Data Encryption Key (DEK)
+
+-   **Identifier**: The `entityId` for the host is the literal string `'host'`.
+-   **Protection**: The Host DEK is encrypted at rest by the **KEK**. It is the only key protected by the KEK.
+-   **Function**: The Host DEK serves two critical functions:
+    1.  It encrypts the host's own internal data and configuration (e.g., its own `TenantConfig` document).
+    2.  It acts as a "key-wrapping" key to encrypt the DEKs of all other tenants.
+
+### 2.3. Level 2: Tenant Data Encryption Key (DEK)
+
+-   **Identifier**: The `entityId` for a tenant is its unique resource UUID (e.g., `c1c2c3d4-e5f6...`).
+-   **Protection**: Each Tenant DEK is encrypted at rest by the **Host DEK**.
+-   **Function**: A Tenant DEK is used to encrypt all of that specific tenant's data (e.g., employees, customers, etc.) within that tenant's dedicated vault.
+
+### 2.4. Data Protection Flow Diagram
+
+This flow ensures that to access a tenant's data, an attacker would need to compromise multiple, independent keys.
+
+2.  **Job Queuing:** The controller creates a `JobRequest` (containing the `DecodedDidcommMessage`) and places this job into a queue. It immediately returns a `202 Accepted` response, including the `thid` from the decoded job for correlation.
+
+3.  **Worker:** A separate Worker process dequeues the job and calls the appropriate business-logic `Manager` (e.g., `OrganizationManager`) to execute it.
+
+4.  **Response Payload Creation:** The Manager executes the business logic and constructs a complete, JARM-compliant `IPayloadResponse` object. This object contains the final `Bundle` of results.
+5.  **Response Encoding:** The Worker receives the `IPayloadResponse` from the manager and **MUST** call `IKmsService.encodeResponse()` to encrypt this payload for the intended recipient(s).
+
+6.  **Response Storage:** The Worker stores the final, encrypted response (the `secureEnvelope`) in a temporary key-value store (e.g., Redis, Firestore), using the `thid` as the key.
+
+7.  **Polling:** A separate polling endpoint is responsible for retrieving the stored, encrypted response when requested by the original client using the `thid`.
+
+This pattern ensures that no sensitive plaintext data is ever held in the API controller and that all business logic is executed in the background, decoupled from the initial client request.
 ## 2. The Original Asynchronous API Flow (Detailed View)
 
 This section provides a more detailed view of the flow described above.

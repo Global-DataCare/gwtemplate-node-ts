@@ -90,30 +90,47 @@ export class CryptographyService implements ICryptography {
   // --- High-Level Workflows ---
 
   async encryptJwe(payload: object, protectedHeader: object, secretJWKey: MlkemPrivateJwk, recipientsJWKeys: MlkemPublicJwk[]): Promise<JweObject> {
-    const cekBytes = randomBytes(32); // Content Encryption Key
+    // ARCHITECTURAL NOTE: This implementation is currently only suitable for a single recipient.
+    // A Key Encapsulation Mechanism (KEM) derives a *different* shared secret for each recipient's public key.
+    // A true multi-recipient JWE requires a single Content Encryption Key (CEK) that is then
+    // encrypted (wrapped) for each recipient. This code uses the KEM-derived shared secret as the CEK.
+    // This must be refactored to a key-wrapping approach to support multiple recipients correctly.
+    if (recipientsJWKeys.length !== 1) {
+      // Temporarily throw until the architecture is fixed for multi-recipient.
+      throw new Error("CryptographyService.encryptJwe currently only supports a single recipient.");
+    }
+    const recipient = recipientsJWKeys[0];
+    const publicKeyBytes = Content.base64ToBytes(recipient.x);
+
+    // Per RFC 9278, we generate a random seed for the KEM. The KEM then derives both the
+    // final Content Encryption Key (CEK) and the encapsulated key from this seed.
+
+    const cekSeedBytes = randomBytes(32);
+    const { 
+      derivedCekBytes,     // This is the actual Content Encryption Key
+      encapsulatedCekBytes // This is the encrypted key for the recipient
+    } = await this.encapsulate(cekSeedBytes, secretJWKey.dBytes, publicKeyBytes);
+
+    // 2. Now, use the *derived* CEK to encrypt the payload with AES.
     const protectedHeaderB64Url = Content.objectToRawBase64UrlSafe(protectedHeader);
     let payloadBytes = Content.objectToBytes(payload);
-
-    // Handle compression
     if ((protectedHeader as ProtectedHeadersJWE).zip === 'DEF') {
       payloadBytes = pako.deflate(payloadBytes);
     }
     const payloadString = Content.bytesToStringASCII(payloadBytes);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[CryptoService] Encrypting content with:', {
+        cek_b64: Content.bytesToRawBase64UrlSafe(derivedCekBytes),
+        aad: protectedHeaderB64Url,
+      });
+    }
+    const encrypted = await this.encrypt(payloadString, derivedCekBytes, protectedHeaderB64Url);
 
-    // AES encryption
-    const encrypted = await this.encrypt(payloadString, cekBytes, protectedHeaderB64Url);
-
-    // Encapsulate the CEK for each recipient
-    const recipientData: RecipientDataJWE[] = await Promise.all(
-      recipientsJWKeys.map(async (jwk) => {
-        const publicKeyBytes = Content.base64ToBytes(jwk.x);
-        const { encapsulatedBytes } = await this.encapsulate(cekBytes, secretJWKey.dBytes, publicKeyBytes);
-        return {
-          header: { alg: jwk.crv, kid: jwk.kid! },
-          encrypted_key: Content.bytesToRawBase64UrlSafe(encapsulatedBytes),
-        };
-      })
-    );
+    // 3. Assemble the JWE. The `encrypted_key` is the result of the KEM encapsulation.
+    const recipientData: RecipientDataJWE[] = [{
+      header: { alg: recipient.crv, kid: recipient.kid! },
+      encrypted_key: Content.bytesToRawBase64UrlSafe(encapsulatedCekBytes),
+    }];
 
     return {
       protected: protectedHeaderB64Url,
@@ -123,7 +140,45 @@ export class CryptographyService implements ICryptography {
       tag: encrypted.tag,
     };
   }
-  
+
+  async encryptJweToCompact(payload: object | string, protectedHeader: object, secretJWKey: MlkemPrivateJwk, recipientJWKey: MlkemPublicJwk): Promise<string> {
+    // 1. Construct the complete, final protected header by merging the main and recipient headers.
+    const recipientHeader = { alg: recipientJWKey.crv, kid: recipientJWKey.kid! };
+    const finalProtectedHeader = { ...protectedHeader, ...recipientHeader };
+    const protectedHeaderB64Url = Content.objectToRawBase64UrlSafe(finalProtectedHeader);
+
+    // 2. Perform KEM to derive the Content Encryption Key (CEK).
+    const publicKeyBytes = Content.base64ToBytes(recipientJWKey.x);
+    const cekSeedBytes = randomBytes(32);
+    const { derivedCekBytes, encapsulatedCekBytes } = await this.encapsulate(cekSeedBytes, secretJWKey.dBytes, publicKeyBytes);
+    const encapsulatedKeyB64Url = Content.bytesToRawBase64UrlSafe(encapsulatedCekBytes);
+
+    // 3. Encrypt the payload using the derived CEK and the *final* protected header as AAD.
+    const payloadBytes = typeof payload === 'string'
+      ? Content.stringToBytesUTF8(payload)
+      : Content.objectToBytes(payload);
+
+    if ((finalProtectedHeader as ProtectedHeadersJWE).zip === 'DEF') {
+      // Note: Compressing a compact JWS string is often inefficient, but supported.
+      const compressedPayload = pako.deflate(payloadBytes);
+      const payloadString = Content.bytesToStringASCII(compressedPayload);
+      const encrypted = await this.encrypt(payloadString, derivedCekBytes, protectedHeaderB64Url);
+      return `${protectedHeaderB64Url}.${encapsulatedKeyB64Url}.${encrypted.iv}.${encrypted.ciphertext}.${encrypted.tag}`;
+    }
+
+    const payloadString = Content.bytesToStringASCII(payloadBytes);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[CryptoService] Encrypting content for Compact serialization with:', {
+        cek_b64: Content.bytesToRawBase64UrlSafe(derivedCekBytes),
+        aad: protectedHeaderB64Url,
+      });
+    }
+    const encrypted = await this.encrypt(payloadString, derivedCekBytes, protectedHeaderB64Url);
+
+    // 4. Assemble the 5 parts of the compact JWE.
+    return `${protectedHeaderB64Url}.${encapsulatedKeyB64Url}.${encrypted.iv}.${encrypted.ciphertext}.${encrypted.tag}`;
+  }  
+
   async decryptJwe(
     jwe: JweObject | string,
     secretKeyJwk: MlkemPrivateJwk
@@ -141,6 +196,12 @@ export class CryptographyService implements ICryptography {
 
     // Decrypt the payload
     const encryptedData = { ciphertext: jweObject.ciphertext, iv: jweObject.iv, tag: jweObject.tag };
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[CryptoService] Decrypting content with:', {
+        cek_b64: Content.bytesToRawBase64UrlSafe(cekBytes),
+        aad: jweObject.protected,
+      });
+    }
     const decryptedPayloadString = await this.decrypt(encryptedData, cekBytes, jweObject.protected);
 
     // Handle decompression
@@ -177,11 +238,17 @@ export class CryptographyService implements ICryptography {
     
     const signatureBytes = await this.signBytes(signingInputBytes, secretKeyBytes, alg);
     
-    return {
+    const jwsParts: JwtCompactParts = {
         protected: protectedHeaderB64Url,
         payload: payloadB64Url,
         signature: Content.bytesToRawBase64UrlSafe(signatureBytes),
     };
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[CryptoService] JWS Parts Created:', jwsParts);
+    }
+
+    return jwsParts;
   }
 
   async verifyJws(jws: JwtCompactParts | string, publicJwk: PublicJwk): Promise<boolean> {
@@ -215,13 +282,16 @@ export class CryptographyService implements ICryptography {
   decrypt(encryptedData: ProtectedDataAES, cekBytes: Uint8Array, aad: string): Promise<string> {
     return this.aesManager.decrypt(encryptedData, cekBytes, aad);
   }
-
-  async encapsulate(dataBytes: Uint8Array, secretKeyBytes: Uint8Array, recipientPublicKeyBytes: Uint8Array): Promise<{ encapsulatedBytes: Uint8Array; uncapsulatedBytes: Uint8Array; }> {
-    // Note: ML-KEM's encapsulate does not use dataBytes or secretKeyBytes. It *generates* the shared secret (uncapsulatedBytes).
-    // The `dataBytes` parameter could be used as a seed, but for JWE, we typically use a random CEK.
-    // For consistency with JWE logic, we'll use noble's encapsulate to generate a new key.
-    const { sharedSecret, cipherText } = await mlKem.ml_kem768.encapsulate(recipientPublicKeyBytes, dataBytes);
-    return { uncapsulatedBytes: sharedSecret, encapsulatedBytes: cipherText };
+  
+  async encapsulate(cekSeedBytes: Uint8Array, secretKeyBytes: Uint8Array, recipientPublicKeyBytes: Uint8Array): Promise<{ encapsulatedCekBytes: Uint8Array; derivedCekBytes: Uint8Array; }> {
+    // According to RFC 9278 (JWE with ML-KEM), a seed is used for the KEM encapsulation.
+    // The KEM then derives a shared secret from this seed. It is this *derived* shared secret
+    // that is used to encrypt the content, NOT the original seed.
+    // The `encapsulate` function from the noble library handles this correctly by accepting the
+    // seed as the second argument. It returns both the encapsulated key (`cipherText`)
+    // and the derived shared secret, which we must use as the actual AES key.
+    const { sharedSecret, cipherText } = await mlKem.ml_kem768.encapsulate(recipientPublicKeyBytes, cekSeedBytes);
+    return { derivedCekBytes: sharedSecret, encapsulatedCekBytes: cipherText };
   }
   
   async decapsulate(encapsulatedBytes: Uint8Array, secretKeyBytes: Uint8Array): Promise<Uint8Array> {
@@ -274,55 +344,9 @@ export class CryptographyService implements ICryptography {
     const result: DataCompactJWT = {
       payload: Content.base64UrlSafeToJSON(parts.payload),
       protected: Content.base64UrlSafeToJSON(parts.protected),
-      signature: Content.base64ToBytes(parts.payload),
+      signature: Content.base64ToBytes(parts.signature),
     };
     return result;
-  }
-
-  /**
-   * Converts a JWE Object into Compact Serialization format.
-   * This is only possible if the JWE has exactly one recipient and no shared unprotected header.
-   *
-   * --- The "Merging" Logic Explained ---
-   * A Compact JWE has only one header, the 'protected' header. This header must contain
-   * all the necessary information for the recipient to decrypt the message. In the JWE JSON
-   * Serialization, this information is split:
-   * - Main `protected` header: Contains content encryption info (e.g., `enc`).
-   * - Recipient `header`: Contains key encryption info (e.g., `alg`, `kid`).
-   *
-   * This method performs a standard operation: it merges the recipient's header into the
-   * main protected header to create the single, complete header required for compact serialization.
-   *
-   * @param jwe The JWE Object to convert.
-   * @returns The JWE in Compact Serialization format.
-   */
-  jweToCompact(jwe: JweObject): string {
-    if (jwe.recipients.length !== 1) {
-      throw new Error("JWE cannot be converted to Compact Serialization: must have exactly one recipient.");
-    }
-    if (jwe.unprotected) {
-      throw new Error("JWE cannot be converted to Compact Serialization: must not have a shared unprotected header.");
-    }
-
-    const recipient = jwe.recipients[0];
-    if (!recipient.encrypted_key) {
-      throw new Error("Invalid JWE recipient: missing encrypted_key.");
-    }
-
-    // 1. Decode the main protected header from Base64URL to a JSON object.
-    const mainProtectedHeader = Content.base64UrlSafeToJSON(jwe.protected);
-
-    // 2. Get the recipient-specific header.
-    const recipientHeader = recipient.header || {};
-
-    // 3. Merge them. Properties in `recipientHeader` will overwrite those in `mainProtectedHeader` if there's a conflict.
-    const finalProtectedHeader = { ...mainProtectedHeader, ...recipientHeader };
-
-    // 4. Re-encode the newly created, complete header into Base64URL.
-    const finalProtectedHeaderB64Url = Content.objectToRawBase64UrlSafe(finalProtectedHeader);
-
-    // 5. Assemble the 5 parts of the compact JWE.
-    return `${finalProtectedHeaderB64Url}.${recipient.encrypted_key}.${jwe.iv}.${jwe.ciphertext}.${jwe.tag}`;
   }
 
   parseCompactJwe(jweString: string): JweObject {

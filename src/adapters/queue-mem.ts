@@ -17,6 +17,7 @@ export class QueueAdapterMem implements QueueAdapter {
   private queue: { name: string; request: JobRequest; priority: number }[] = [];
   private responseStore: IAsyncResponseStore;
   private worker: Worker;
+  private intervalId: NodeJS.Timeout | null = null;
 
   constructor(responseStore: IAsyncResponseStore, worker: Worker) {
     this.responseStore = responseStore;
@@ -66,7 +67,17 @@ export class QueueAdapterMem implements QueueAdapter {
    * In a real system, this would be a more robust consumer process.
    */
   private startWorker(): void {
-    setInterval(() => { this.processQueue(); }, 50);
+    this.intervalId = setInterval(() => { this.processQueue(); }, 50);
   }
+
+  /**
+   * Stops the worker's processing loop. Essential for graceful shutdowns in tests.
+   */
+  public stop(): void {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+  }  
 }
 

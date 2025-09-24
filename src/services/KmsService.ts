@@ -17,19 +17,27 @@ import { ProtectedDataAES } from '../models/aes';
  */
 
 /**
- * Internal type for storing the full key set for a managed entity.
- * This represents the data as it would be held *in memory* after being loaded and unwrapped from a secure vault.
- *
- * --- Key Hierarchy Explained ---
- * - **KEK (Key Encryption Key):** A master key, often derived from an environment secret (e.g., `KEK_SECRET`).
- *   It resides only on the host and its sole purpose is to encrypt/decrypt DEKs. It NEVER encrypts user data.
- * - **DEK (Data Encryption Key):** A unique symmetric key generated for each entity (e.g., a Tenant).
- *   Its purpose is to encrypt the entity's data at rest (e.g., `ConfidentialStorageDoc`).
- *   The DEK itself is ALWAYS stored encrypted with the KEK.
- *
- * This in-memory `KeyPairSet` holds the DEK in its decrypted form, ready for use.
+ * Implements the Key Management Service interface.
+ * This service is the high-level facade for all internal cryptographic operations,
+ * abstracting away the underlying cryptographic engine and key storage mechanism.
+ * 
+ * @architecture
+ * This in-memory implementation simulates the multi-level key hierarchy defined in 
+ * `ARCHITECTURE_PATTERNS.md` under "Key Hierarchy and Envelope Encryption".
+ * 
+ * - **KEK Simulation**: In a production system, a Key Encryption Key (KEK) would be fetched 
+ *   from a secure secret manager at startup. This KEK would then decrypt the Host DEK. 
+ *   This implementation simulates the state *after* this initial decryption has occurred.
+ * 
+ * - **In-Memory Key Storage**: The `_managedKeys` map holds all Data Encryption Keys (DEKs) 
+ *   and private keys in a decrypted, ready-to-use state for the lifecycle of the server. 
+ *   This is suitable for development and testing. A production implementation would replace 
+ *   this map with a secure adapter that performs just-in-time decryption of keys using 
+ *   the Host DEK or a session key.
+ * 
+ * The `entityId` (e.g., 'host', or a tenant's UUID) is the primary identifier for a key set.
  */
-type KeyPairSet = {
+type EntityKeysSet = {
   verificationKeyPair: {
     publicJWKey: MldsaPublicJwk & { kid: string; };
     secretKeyBytes: Uint8Array;
@@ -55,14 +63,34 @@ type KeyPairSet = {
 export class KmsService implements IKmsService {
   private crypto: ICryptography;
   /** In-memory key storage. Key: entityId, Value: KeyPairSet. */
-  private _managedKeys: Map<string, KeyPairSet>;
+  private _managedKeys: Map<string, EntityKeysSet>;
+  private isHostInitialized: boolean = false;
 
   constructor(cryptographyService: ICryptography) {
     this.crypto = cryptographyService;
     this._managedKeys = new Map();
   }
 
-  // --- Key Lifecycle Management ---
+  /**
+   * Initializes the KmsService by provisioning the essential keys for the 'host' entity.
+   * This method MUST be called before any other methods are used.
+   */
+  async init(): Promise<void> {
+    if (this.isHostInitialized) {
+      console.log('[KmsService] Host keys already initialized.');
+      return;
+    }
+    console.log('[KmsService] Initializing host keys...');
+    await this.provisionKeys('host');
+    this.isHostInitialized = true;
+    console.log('[KmsService] Host keys initialized successfully.');
+  }
+
+  private checkInitialized(): void {
+    if (!this.isHostInitialized) {
+      throw new Error('KmsService has not been initialized. Call init() before using.');
+    }
+  }
 
   // --- Key Lifecycle Management ---
 
@@ -86,7 +114,7 @@ export class KmsService implements IKmsService {
     // Use deterministic keys only in development and when explicitly requested.
     if (process.env.NODE_ENV === 'development' && process.env.DEV_SEED === 'true') {
       // Deterministic generation for development and testing.
-      // Use the modern `.subarray()` which is the safe replacement for the deprecated `.slice()` on Buffers.
+      // Use the modern `.subarr000 está ay()` which is the safe replacement for the deprecated `.slice()` on Buffers.
       dsaSeed = createHash('sha256').update(entityId + '-dsa').digest().subarray(0, 32);
       kemSeed = createHash('sha512').update(entityId + '-kem').digest().subarray(0, 64);
       dataEncryptionKey = createHash('sha256').update(entityId + '-dek').digest().subarray(0, 32);
@@ -96,8 +124,8 @@ export class KmsService implements IKmsService {
       kemSeed = randomBytes(64);
       dataEncryptionKey = randomBytes(32);
     }
-    const verificationKeyPair = await this.crypto.generateKeyPairMlDsa();
-    const encryptionKeyPair = await this.crypto.generateKeyPairMlKem();
+    const verificationKeyPair = await this.crypto.generateKeyPairMlDsa(dsaSeed);
+    const encryptionKeyPair = await this.crypto.generateKeyPairMlKem(kemSeed);
 
     // In a production vault, the `dataEncryptionKey` would be encrypted with the Host KEK here before storage.
     this._managedKeys.set(entityId, { 
@@ -106,9 +134,13 @@ export class KmsService implements IKmsService {
       dataEncryptionKey: dataEncryptionKey
     });
     
-    return {
+    const publicJwkSet = {
       keys: [verificationKeyPair.publicJWKey as JWK, encryptionKeyPair.publicJWKey as JWK]
     };
+
+    console.log(`[KmsService] Provisioned new JWKSet for entity: ${entityId}`, publicJwkSet);
+
+    return publicJwkSet;
   }
 
   /**
@@ -148,6 +180,7 @@ export class KmsService implements IKmsService {
    * @returns A `JobRequest` object containing the parsed payload and metadata.
    */
   async decodeJobRequest(message: string): Promise<JobRequest> {
+    this.checkInitialized();
     const recipientKids = this.crypto.getRecipientKidsFromJwe(message);
     if (recipientKids.length === 0) {
       throw new Error('JWE does not contain any recipient key identifiers (kid).');
@@ -166,7 +199,14 @@ export class KmsService implements IKmsService {
     }
 
     const { decryptedBytes, protectedHeader } = await this.crypto.decryptJwe(message, foundKey);
+    
+    // The decrypted payload is the compact JWS string directly.
     const jwsString = Content.bytesToStringUTF8(decryptedBytes);
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[KmsService] Decrypted JWE payload, got compact JWS:', jwsString);
+    }
+
     const dataJwt = this.crypto.parseCompactJws(jwsString);
 
     return {
@@ -215,6 +255,7 @@ export class KmsService implements IKmsService {
     encryptedSeedPartB: Uint8Array,
     protectorEntityId: string
   ): Promise<JwsMultiSign> {
+    this.checkInitialized();
     const protectorKeys = this._managedKeys.get(protectorEntityId);
     if (!protectorKeys) {
       throw new Error(`Protector entity's keys not found: ${protectorEntityId}`);
@@ -268,12 +309,15 @@ export class KmsService implements IKmsService {
     };
 
     const kemRecipientJwks = recipientJwks as MlkemPublicJwk[];
-    const jweObject = await this.crypto.encryptJwe(payload, protectedHeader, senderPrivKey, kemRecipientJwks);
     
-    if (kemRecipientJwks.length !== 1) {
-      return JSON.stringify(jweObject); 
+    // For a single recipient, we should use the compact serialization format.
+    if (kemRecipientJwks.length === 1) {
+      return this.crypto.encryptJweToCompact(payload, protectedHeader, senderPrivKey, kemRecipientJwks[0]);
     }
-    return this.crypto.jweToCompact(jweObject);
+    
+    // For multiple recipients, we use the general JSON serialization format.
+    const jweObject = await this.crypto.encryptJwe(payload, protectedHeader, senderPrivKey, kemRecipientJwks);
+    return JSON.stringify(jweObject);
   }
 
   // --- At-Rest Data Protection ---
@@ -287,6 +331,7 @@ export class KmsService implements IKmsService {
    * as the AAD to prevent cross-tenant decryption attacks.
    */
   async protectConfidentialData(doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> {
+    this.checkInitialized();
     if (!doc.content) {
       throw new Error('Document has no "content" to protect.');
     }
@@ -312,6 +357,7 @@ export class KmsService implements IKmsService {
    * @returns The decrypted content of the document.
    */
   async unprotectConfidentialData<T>(doc: ConfidentialStorageDoc, entityId: string): Promise<T> {
+    this.checkInitialized();
     if (!doc.jwe || typeof doc.jwe !== 'object') {
       throw new Error('Document has no valid "jwe" property to unprotect.');
     }

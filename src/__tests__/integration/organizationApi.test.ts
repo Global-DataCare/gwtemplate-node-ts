@@ -31,8 +31,11 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.json()); // Also add json parser for legacy tests
   
   const vaultRepository = new VaultMemRepository();
-  const tenantsCacheManager = new TenantsCacheManager(vaultRepository);
+  const tenantsCacheManager = new TenantsCacheManager(vaultRepository, mockKmsService);
   
+  // Initialize the mock KMS to simulate the server startup sequence
+  mockKmsService.init();
+
   // Pass the 4 required arguments
   const apiRouter = createApiRouter(mockQueueAdapter, tenantsCacheManager, mockKmsService, asyncResponseStore);
   app.use('/', apiRouter);

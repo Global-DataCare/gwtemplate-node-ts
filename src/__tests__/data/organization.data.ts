@@ -202,3 +202,22 @@ export const testClaimsTenant1AlternateNameInvalidPrefix = {
     [ClaimsOrgSchemaorg.alternateName]: 'hosting-tenant-1',
 };
 
+/**
+ * A full, well-formed input payload for a tenant registration,
+ * matching the structure expected by the API.
+ */
+export const testPayloadCreateTenant1 = {
+  thid: `thid-${testTenant1Data.uuid}`,
+  iss: 'did:web:test-issuer.com',
+  aud: 'did:web:host.example.com',
+  body: {
+    data: [
+      {
+        type: 'Organization-registration-form-v1.0',
+        meta: {
+          claims: testClaimsTenant1Registration,
+        },
+      },
+    ],
+  },
+};

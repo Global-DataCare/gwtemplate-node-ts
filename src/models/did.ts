@@ -4,13 +4,24 @@
 import { RecipientPublicKey } from "./crypto";
 
 /**
+ * Defines the components of a DID Document Service ID for path-based validation.
+ * This structure is used to programmatically build and parse service IDs.
+ */
+export interface DidServiceIdParts {
+  version: string;
+  sector: string;
+  section: string;
+  format: string;
+}
+
+/**
  * Represents a service endpoint in a DID Document.
  * @see https://www.w3.org/TR/did-core/#service-endpoints
  */
-export interface DidServiceEndpoint {
+export interface DidService {
     id: string;
     type: string;
-    serviceEndpoint: string;
+    serviceEndpoint: string | string [];
     [key: string]: any; // Allow for additional properties
 }
 
@@ -29,7 +40,7 @@ export interface DidDocument {
     /** Public keys used for encryption. */
     keyAgreement?: RecipientPublicKey[];
     /** Service endpoints for interacting with the DID subject. */
-    service?: DidServiceEndpoint[];
+    service?: DidService[];
     /** Other properties are allowed. */
     [key: string]: any;
 }
