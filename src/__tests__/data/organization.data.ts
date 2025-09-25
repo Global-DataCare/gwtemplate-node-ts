@@ -151,6 +151,7 @@ export const testClaimsHostOrganization: ClaimsRecord = {
     ...baseClaims,
     [ClaimsOrgSchemaorg.legalName]: testHostData.legalName,
     [ClaimsOrgSchemaorg.identifier]: testHostData.identifier,
+    [ClaimsOrgSchemaorg.alternateName]: testHostData.alternateName,     
     [ClaimsOrgSchemaorg.addressCountry]: testHostData.addressCountry,
     [ClaimsOrgSchemaorg.taxID]: testHostData.taxId,
 };
