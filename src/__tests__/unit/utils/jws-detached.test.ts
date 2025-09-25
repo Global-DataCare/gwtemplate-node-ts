@@ -1,5 +1,4 @@
-
-import { testMockRandom32Bytes } from '../../data/crypto.data';
+import { externalClientSignerJwk } from '../../data/external-client.data';
 import * as mlDsa from '@noble/post-quantum/ml-dsa';
 import { withKid } from '../../../crypto/jwk-thumbprint';
 import { Content } from '../../../utils/content';
@@ -20,7 +19,7 @@ async function signDetached(payload: object, privateKey: MldsaPrivateJwk): Promi
   const header = {
     alg: privateKey.alg,
     // The public key's kid should be in the private key object for convenience
-    kid: (privateKey as any).kid, 
+    kid: (privateKey as any).kid,
     typ: 'JWT'
   };
 
@@ -29,10 +28,10 @@ async function signDetached(payload: object, privateKey: MldsaPrivateJwk): Promi
 
   const signingInput = `${encodedHeader}.${encodedPayload}`;
   const signingInputBytes = Content.stringToBytesUTF8(signingInput);
-  
+
   const privateKeyBytes = Content.base64ToBytes(privateKey.priv);
 
-  const signatureBytes = await mlDsa.ml_dsa65.sign(signingInputBytes, privateKeyBytes);
+  const signatureBytes = await mlDsa.ml_dsa44.sign(signingInputBytes, privateKeyBytes);
   const encodedSignature = encodeSignature(signatureBytes);
 
   return `${encodedHeader}..${encodedSignature}`;
@@ -63,7 +62,7 @@ async function verifyDetached(detachedJws: string, payload: object, publicKey: M
   const signatureBytes = Content.base64ToBytes(encodedSignature);
   const publicKeyBytes = Content.base64ToBytes(publicKey.pub);
 
-  const isValid = await mlDsa.ml_dsa65.verify(signatureBytes, signingInputBytes, publicKeyBytes);
+  const isValid = await mlDsa.ml_dsa44.verify(signatureBytes, signingInputBytes, publicKeyBytes);
 
   if (!isValid) {
     throw new Error('Invalid signature');
@@ -90,17 +89,10 @@ describe('Detached JWS Cryptography', () => {
   };
 
   beforeAll(async () => {
-    const seed = testMockRandom32Bytes;
-    const { publicKey: publicKeyBytes, secretKey: privateKeyBytes } = mlDsa.ml_dsa44.keygen(seed);
-    const pub_b64 = Content.bytesToRawBase64UrlSafe(publicKeyBytes);
-    const priv_b64 = Content.bytesToRawBase64UrlSafe(privateKeyBytes);
-
-    const publicKeyWithoutKid: MldsaPublicJwk = { kty: 'AKP', alg: 'ML-DSA-65', pub: pub_b64 };
-    const publicKeyWithKid = await withKid(publicKeyWithoutKid);
-
+    // Use the pre-generated, deterministic external client key pair for reproducible tests.
     keyPair = {
-      privateKey: { ...publicKeyWithKid, priv: priv_b64 }, // Include all public params in private key
-      publicKey: publicKeyWithKid,
+      privateKey: externalClientSignerJwk as MldsaPrivateJwk,
+      publicKey: externalClientSignerJwk as MldsaPublicJwk & { kid: string; },
     };
   });
 
@@ -110,7 +102,7 @@ describe('Detached JWS Cryptography', () => {
     expect(parts.length).toBe(3);
     expect(parts[1]).toBe('');
     const header = decodeHeader(parts[0]);
-    expect(header.alg).toEqual('ML-DSA-65');
+    expect(header.alg).toEqual('ML-DSA-44');
     expect(header.kid).toEqual(keyPair.publicKey.kid);
   });
 
@@ -129,11 +121,20 @@ describe('Detached JWS Cryptography', () => {
   it('should throw an error if the public key does not match', async () => {
     const detachedJws = await signDetached(payload, keyPair.privateKey);
     
-    // Create a new, different key pair
-    const seed2 = new Uint8Array(32).fill(1);
+    // Create a new, different key pair to simulate a mismatch
+    const seed2 = new Uint8Array(32).fill(1); // Different seed
     const { publicKey: otherPublicKeyBytes } = mlDsa.ml_dsa44.keygen(seed2);
     const other_pub_b64 = Content.bytesToRawBase64UrlSafe(otherPublicKeyBytes);
-    const otherPublicKey = await withKid({ kty: 'AKP', alg: 'ML-DSA-65', pub: other_pub_b64 });
+    
+    // Create a new public key object. To ensure the test fails on the *signature* check
+    // and not a simple header mismatch, we'll give it the same `alg` and `kid` as the
+    // original key.
+    const otherPublicKey: MldsaPublicJwk & { kid: string } = {
+      kty: 'AKP',
+      alg: 'ML-DSA-44', // Match alg to pass initial check
+      pub: other_pub_b64,
+      kid: keyPair.publicKey.kid // Match kid to pass initial check
+    };
 
     await expect(verifyDetached(detachedJws, payload, otherPublicKey))
       .rejects.toThrow('Invalid signature');

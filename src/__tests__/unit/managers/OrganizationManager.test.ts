@@ -7,14 +7,13 @@ import { OrganizationManager } from '../../../managers/OrganizationManager';
 import {
     testHostData,
     testTenant1Data,
-    testTemplateId,
-    testTemplateVersion,
+    testTenant1VaultId,
     tesInvalidUuid,
     testClaimsTenant1AlternateNameInvalidPrefix,
     testClaimsTenant1Registration,
     testClaimsHostInitialization,
 } from '../../data/organization.data';
-import { isValidTenantAlternateName } from "../../../utils/tenant";
+import * as tenantUtils from "../../../utils/tenant";
 import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
 import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
@@ -23,24 +22,21 @@ import { ClaimsRecord } from '../../../models/resource-document';
 import { TenantConfig } from '../../../models/tenant';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { config as appConfig } from '../../../config';
+import { Sector } from '../../../models/sector';
 
 // Mock external dependencies
 jest.mock('uuid');
-jest.mock('../../../utils/tenant');
 
 // Create a mock KMS service for testing.
 const mockKmsService: jest.Mocked<IKmsService> = {
     init: jest.fn(async () => {}),
-    // Add missing methods to satisfy the interface
     provisionKeys: jest.fn(),
     decodeJobRequest: jest.fn(),
     signWithManagedKey: jest.fn(),
     signWithReconstructedKey: jest.fn(),
-
-    // Existing mocked methods
     encodeResponse: jest.fn(),
     protectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> => {
-        // Simulate the KMS encrypting the content and moving it to the JWE property.
         const secureDoc = { ...doc, jwe: { ciphertext: 'encrypted-content' } };
         delete secureDoc.content;
         return secureDoc;
@@ -52,24 +48,21 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 };
 
 const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
-
-    tenantId: claims[ClaimsOrgSchemaorg.alternateName || 'host'],
+    // Correctly derive tenantId from claims or default to 'host'
+    tenantId: claims[ClaimsOrgSchemaorg.alternateName] || 'host',
     jurisdiction: claims[ClaimsOrgSchemaorg.addressCountry],
     resourceType: 'Organization',
     section: 'org.schema',
     action: '_batch',
     input: {
         aud: 'did:web:api.example.com',
-        /** contains `json` or `fhir+json` */
         response_type: "json",
         thid: 'test-thid-123',
         type: 'json',
         body: {
             data: [{
                 meta: { claims },
-                request: {
-                    method: "POST"
-                },
+                request: { method: "POST" },
                 type: 'Organization-registration-form-v1.0',
             }]
         }
@@ -83,61 +76,41 @@ describe("OrganizationManager", () => {
     let vaultRepository: VaultRepository;
     const originalEnv = process.env;
 
-    // --------------------------
-    // --- TEST CASE OVERVIEW ---
-    // --------------------------
-    /*
-    * This test suite covers the synchronous, business-logic-only responsibilities of the OrganizationManager.
-    *
-    *  [1] HOST: Registers the 'host' organization with a valid, existing admin UUID.
-    *  [2] TENANT: Generates a new UUID if the admin identifier is an invalid UUID (in normal mode).
-    *  [3 DEMO: Allows using a non-UUID admin identifier in "demo" mode.
-    *  [4] TENANT: Generates a new UUID for the admin if no identifier is provided.
-    *  [5] TENANT: Registers a tenant organization, encrypting the content before persistence (Happy Path).
-    *  [6] TENANT: Rejects registration for a tenant with an invalid alternateName format.
-    *  [7] TENANT: Rejects registration if the alternateName (tenant-id) already exists.
-    *  [8] TENANT: Rejects registration if the taxID + country combination already exists.
-    *
-    *  --- Future Scenarios (TODO) ---
-    *  [9 AUTH: Rejects registration based on caller's permissions.
-    *  [10 BATCH: Processes the creation of multiple organizations in a single job.
-    *  [11 KEYS: Extracts admin's public keys from JWS/JWE to create their DID and add as 'controller' to the org's DID.
-    *  [12 GOVERNANCE: Tests for updating the organization's DID document based on defined policies (e.g., multi-controller approval).
-    */
+    beforeAll(() => {
+        // Mock the allowed sectors for all tests in this suite
+        appConfig.sectorsAllowed = [Sector.HEALTH_CARE, Sector.SYSTEM];
+    });
 
     beforeEach(() => {
         vaultRepository = new VaultMemRepository();
-        // Inject both the repository and the mock KMS service.
         organizationManager = new OrganizationManager(vaultRepository, mockKmsService);
         process.env = { ...originalEnv };
         
-        // Reset mocks before each test
         jest.clearAllMocks();
 
         (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
         (uuidValidate as jest.Mock).mockReturnValue(true);
-        (isValidTenantAlternateName as jest.Mock).mockReturnValue(true);
     });
 
     afterEach(() => {
         process.env = originalEnv;
     });
 
-    it('[5] TENANT (Happy Path): should use the KMS to protect the document before persisting', async () => {
+    it('[5 TENANT (Happy Path): should use the KMS to protect the document before persisting', async () => {
         const job = testBaseJobForClaims(testClaimsTenant1Registration);
         const putSpy = jest.spyOn(vaultRepository, 'put');
+        const createVaultSpy = jest.spyOn(vaultRepository, 'createNewVault');
 
         await organizationManager.process(job);
         
-        // --- Security and Persistence Assertions ---
+        expect(createVaultSpy).toHaveBeenCalledWith(expect.objectContaining({ id: testTenant1VaultId }));
+        expect(mockKmsService.provisionKeys).toHaveBeenCalledWith(testTenant1VaultId);
         expect(mockKmsService.protectConfidentialData).toHaveBeenCalledTimes(1);
 
-        // Verify the document passed to the KMS had plaintext content.
         const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
         expect(docToProtect.content).toBeDefined();
         expect(docToProtect.content?.legalName).toBe(testTenant1Data.legalName);
 
-        // Verify that the document passed to the repository for storage is the secure one.
         expect(putSpy).toHaveBeenCalledTimes(1);
         const savedDoc = putSpy.mock.calls[0][1][0] as ConfidentialStorageDoc;
         expect(savedDoc.content).toBeUndefined();
@@ -149,12 +122,9 @@ describe("OrganizationManager", () => {
         const job = testBaseJobForClaims(testClaimsHostInitialization);
         const responsePayload = await organizationManager.process(job);
 
-        expect(isValidTenantAlternateName).not.toHaveBeenCalled();
         const entry = responsePayload.body.data[0];
         expect(entry.response.status).toBe('201');
 
-
-        // Type guard assertion
         expect(entry.resource).toBeDefined();
         const person = entry.resource!.contained.find((r: any) => r.type === 'Person');
         expect(person.id).toBe(testHostData.member.admin1.uuid);
@@ -188,7 +158,6 @@ describe("OrganizationManager", () => {
     });
 
     it("[4] TENANT: should generate a new UUID if identifier claim is missing", async () => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { [ClaimsPersonSchemaorg.identifier]: _, ...noIdClaims } = testClaimsTenant1Registration;
         const job = testBaseJobForClaims(noIdClaims as ClaimsRecord);
         (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
@@ -202,34 +171,54 @@ describe("OrganizationManager", () => {
     });
 
     it("[6] TENANT: should produce an error entry for an invalid alternateName format", async () => {
+        // Temporarily spy on and mock the return value for this specific test
+        const isValidSpy = jest.spyOn(tenantUtils, 'isValidTenantAlternateName').mockReturnValue(false);
         const job = testBaseJobForClaims(testClaimsTenant1AlternateNameInvalidPrefix);
-        (isValidTenantAlternateName as jest.Mock).mockReturnValue(false);
 
         const responsePayload = await organizationManager.process(job);
         const errorEntry = responsePayload.body.data[0];
         expect(errorEntry.response.status).toBe('400');
         expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('Invalid alternateName');
+        
+        isValidSpy.mockRestore(); // Clean up the spy
     });
 
-    it("[7] TENANT: should produce an error entry if alternateName already exists", async () => {
-        jest.spyOn(vaultRepository, 'vaultExists').mockResolvedValue(true);
+    it("[7] TENANT: should produce an error entry if vaultId already exists", async () => {
+        const vaultExistsSpy = jest.spyOn(vaultRepository, 'vaultExists').mockResolvedValue(true);
         const job = testBaseJobForClaims(testClaimsTenant1Registration);
 
         const responsePayload = await organizationManager.process(job);
+
+        expect(vaultExistsSpy).toHaveBeenCalledWith(testTenant1VaultId);
         const errorEntry = responsePayload.body.data[0];
         expect(errorEntry.response.status).toBe('409');
-        expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('already exists');
+        expect(errorEntry.response.outcome.issue[0].diagnostics).toContain(`a vault for '${testTenant1VaultId}' already exists`);
     });
-
+    
     it("[8] TENANT: should produce an error entry if taxID and country combination already exists", async () => {
-        const existingConfig: Partial<TenantConfig> = { identifier: testTenant1Data.taxId, jurisdiction: testTenant1Data.addressCountry };
-
+        const existingConfig: Partial<TenantConfig> = { identifier: testTenant1Data.taxId, jurisdiction: testTenant1Data.addressCountry, sector: Sector.HEALTH_CARE };
         jest.spyOn(vaultRepository, 'getContainersInSection').mockResolvedValue([existingConfig as TenantConfig]);
         const job = testBaseJobForClaims(testClaimsTenant1Registration);
 
         const responsePayload = await organizationManager.process(job);
+
         const errorEntry = responsePayload.body.data[0];
         expect(errorEntry.response.status).toBe('409');
         expect(errorEntry.response.outcome.issue[0].diagnostics).toContain("already exists");
+    });
+
+    it('[9] TENANT: should produce an error entry if sector claim contains multiple values', async () => {
+        const claimsWithMultipleSectors = {
+            ...testClaimsTenant1Registration,
+            [ClaimsServiceSchemaorg.category]: 'health-care,insurance',
+        };
+        const job = testBaseJobForClaims(claimsWithMultipleSectors);
+        
+        const responsePayload = await organizationManager.process(job);
+        
+        const errorEntry = responsePayload.body.data[0];
+        expect(errorEntry.response.status).toBe('400');
+        expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('Multiple sectors (comma-separated) are not allowed');
+        expect(errorEntry.response.outcome.issue[0].code).toBe('value');
     });
 });

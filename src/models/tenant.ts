@@ -2,6 +2,7 @@
 // File: src/models/tenant.ts
 
 import { RecordBase } from "./resource-document";
+import { Sector } from "./sector";
 
 /**
  * Represents the full configuration for a single tenant.
@@ -33,7 +34,7 @@ export interface TenantConfig extends RecordBase {
   /**
    * Contextual information for database collections.
    */
-  sector: string;
+  sector: Sector;
   jurisdiction: string;
 
   /**

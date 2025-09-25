@@ -6,7 +6,7 @@ import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { VaultRepository } from '../database/repositories/vault/vault.repository';
 import { determineResourceId } from '../utils/resource';
 import { createOperationOutcome } from '../utils/outcome';
-import { isValidTenantAlternateName } from '../utils/tenant';
+import { getTenantVaultId, isValidTenantAlternateName } from '../utils/tenant';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getHostDidWebId, getTenantDidWebId } from '../utils/did';
 import { initializeHostServices, initializeTenantServices } from '../utils/services';
@@ -20,6 +20,8 @@ import { ManagerError } from '../models/errors/manager-error';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
 import { ClaimsOrgSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
+import { validateNewOrganizationClaims } from '../utils/claims-validator';
+import { Sector } from '../models/sector';
 
 /**
  * Manages the business logic for organization registration.
@@ -117,53 +119,53 @@ export class OrganizationManager {
     }
 
     try {
-        const alternateName = claims[ClaimsOrgSchemaorg.alternateName];
+        validateNewOrganizationClaims(claims);
+        const alternateName = claims[ClaimsOrgSchemaorg.alternateName] ;
 
-        // --- Pre-flight validations ---
         if (!alternateName) {
             throw new ManagerError(`Missing required claim: '${ClaimsOrgSchemaorg.alternateName}'`, IssueType.Required);
         }
+
+        let validatedSector: Sector | undefined;
+
         if (alternateName !== 'host') {
             if (!isValidTenantAlternateName(alternateName)) {
                 throw new ManagerError(`Invalid alternateName format: '${alternateName}'`, IssueType.Value);
             }
-            if (await this.vaultRepository.vaultExists(alternateName)) {
-                throw new ManagerError(`Conflict: a vault for alternateName '${alternateName}' already exists`, IssueType.Conflict);
-            }
-            // --- Sector Validation ---
+            
             const requestedSector = claims[ClaimsServiceSchemaorg.category];
             if (!requestedSector) {
                 throw new ManagerError(`Missing required claim for new tenant: '${ClaimsServiceSchemaorg.category}'`, IssueType.Required);
             }
-            if (requestedSector === 'system') {
+            if (requestedSector === Sector.SYSTEM) {
                 throw new ManagerError("The 'system' sector is a reserved keyword and cannot be used by tenants.", IssueType.Forbidden);
             }
-            if (!config.sectorsAllowed.includes(requestedSector)) {
+            if (!config.sectorsAllowed.includes(requestedSector as Sector)) {
                 throw new ManagerError(`The requested sector '${requestedSector}' is not supported by this gateway.`, IssueType.Value);
             }
-            // ---
+            validatedSector = requestedSector as Sector;
+            
+            const vaultId = getTenantVaultId(validatedSector, alternateName);
+            if (await this.vaultRepository.vaultExists(vaultId)) {
+                throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
+            }
+            
             const tenants = await this.vaultRepository.getContainersInSection<TenantConfig>('host', 'tenants');
             if (tenants.some(t => t.identifier === claims[ClaimsOrgSchemaorg.taxID] && t.jurisdiction === claims[ClaimsOrgSchemaorg.addressCountry])) {
                 throw new ManagerError(`Conflict: already exists the taxID '${claims[ClaimsOrgSchemaorg.taxID]}' issued by '${claims[ClaimsOrgSchemaorg.addressCountry]}' jurisdiction`, IssueType.Duplicate);
             }
         }
 
-        // --- Resource Extraction ---
         const { organization, person, service } = this.extractResources(claims, environment);
 
-        // --- Persistence & Key Provisioning ---
         if (alternateName === 'host') {
-            // This is the special bootstrap flow for the host itself.
-            // We ensure it only runs once by checking if the host vault already exists.
             if (!await this.vaultRepository.vaultExists('host')) {
                 await this.persistHostConfig(organization, [person, service]);
             }
         } else {
-            // This is the standard flow for a new tenant.
-            await this.persistTenantConfig(organization, alternateName, [person, service]);
+            await this.persistTenantConfig(organization, alternateName, [person, service], validatedSector!);
         }
 
-        // --- Build Success Entry ---
         return {
             type: entryType,
             resource: {
@@ -176,37 +178,8 @@ export class OrganizationManager {
         };
 
     } catch (error: any) {
-      if (error instanceof ManagerError) {
-        return {
-          type: entryType,
-          meta: entry.meta,
-          response: {
-            status: error.status,
-            outcome: createOperationOutcome(
-              IssueLevel.Error,
-              error.code,
-              error.message
-            ),
-          },
-        };
-      } else {
-        // Log the unexpected error for debugging purposes.
-        console.error('Unexpected error during registration processing:', error);
-
-        // Return a generic 500 error entry.
-        return {
-          type: entryType,
-          meta: entry.meta,
-          response: {
-            status: '500',
-            outcome: createOperationOutcome(
-              IssueLevel.Error,
-              IssueType.Exception,
-              'An unexpected internal server error occurred.'
-            ),
-          },
-        };
-      }
+      // Use the existing helper function to create the error outcome
+      return this.handleError(error, entryType, entry.meta);
     }
   }
 
@@ -272,7 +245,7 @@ export class OrganizationManager {
            * The 'system' sector is a reserved keyword for the host's bootstrap process.
            * It it not available for the API.
            */          
-          sector: 'system',
+          sector: Sector.SYSTEM,
           // sectorsAllowed will be read from the global config
           sectorsAllowed: config.sectorsAllowed,
           didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: `did:web:${config.apiHostname}`, service: [] },
@@ -297,14 +270,17 @@ export class OrganizationManager {
       await this.vaultRepository.put('host', [secureDoc], 'tenants');
   }
 
+// ... (imports y otros métodos)
+
   /**
    * Constructs a new tenant's TenantConfig and persists it in the host's vault.
    * This follows the 'Secure Persistence Flow' architectural pattern.
    * @param org The main Organization resource.
    * @param altName The alternateName for the tenant's vault.
    * @param contained An array of contained resources (Person, Service).
+   * @param sector The validated business sector for the new tenant.
    */
-  private async persistTenantConfig(org: IncludedResource, altName: string, contained: IncludedResource[]) {
+  private async persistTenantConfig(org: IncludedResource, altName: string, contained: IncludedResource[], sector: Sector) {
       const person = contained.find(r => r.type === 'Person')!;
       const service = contained.find(r => r.type === 'Service')!;
 
@@ -315,13 +291,17 @@ export class OrganizationManager {
           legalName: org.meta.claims[ClaimsOrgSchemaorg.legalName],
           jurisdiction: org.meta.claims[ClaimsOrgSchemaorg.addressCountry],
           url: `${config.apiBaseUrl}/${altName}`,
-          sector: service.meta.claims[ClaimsServiceSchemaorg.category] || 'default',
+          sector: sector, // Use the validated sector passed as a parameter
           didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: `did:web:${config.apiHostname}:${altName}`, service: [] },
           meta: { lastUpdated: new Date().toISOString() }
       };
 
       // 1a. Generate the complete service list for the new tenant.
       tenantConfig.didDocument.service = initializeTenantServices(tenantConfig);
+
+      // 1b. Provision the cryptographic keys for the new tenant.
+      const vaultId = getTenantVaultId(tenantConfig.sector, altName);
+      await this.kmsService.provisionKeys(vaultId);
 
       // 2. Manager: Construct the complete plaintext document for the KMS.
       const docToProtect: ConfidentialStorageDoc = {
@@ -341,9 +321,11 @@ export class OrganizationManager {
       // The 'host' is always the protector of a new tenant's configuration.
       const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, 'host');
 
-      await this.vaultRepository.createNewVault({ id: altName, custodian: secureDoc.id });
+      await this.vaultRepository.createNewVault({ id: vaultId, custodian: secureDoc.id });
       await this.vaultRepository.put('host', [secureDoc], 'tenants');
   }
+
+// ... (resto del archivo)
 
   /**
    * Extracts and builds the Organization, Person, and Service resources from a flat claims object.

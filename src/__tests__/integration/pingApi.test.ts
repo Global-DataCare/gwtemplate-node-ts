@@ -16,6 +16,7 @@ import { createDidServiceId } from '../../utils/did';
 import { DidDocument } from '../../models/did';
 import { IssueType } from '../../models/fhir/codes';
 import { JobRequest } from '../../models/request';
+import { Sector } from '../../models/sector';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -331,7 +332,7 @@ describe('Ping API Endpoint', () => {
         const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
         // Mock a tenant in a FHIR-enabled sector
-        const mockFhirTenant: Partial<TenantConfig> = { alternateName: 'fhir_tenant', sector: 'health-care' };
+        const mockFhirTenant: Partial<TenantConfig> = { alternateName: 'fhir_tenant', sector: Sector.HEALTH_CARE };
         jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockFhirTenant as TenantConfig);
 
         const fhirPollingUrl = `/fhir_tenant/cds-xx/v1/test/ping/standard/resource/_batch-response?thid=${thid}`;
@@ -350,7 +351,7 @@ describe('Ping API Endpoint', () => {
         const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
         // Mock a tenant in a non-FHIR sector
-        const mockNonFhirTenant: Partial<TenantConfig> = { alternateName: 'non_fhir_tenant', sector: 'finance' };
+        const mockNonFhirTenant: Partial<TenantConfig> = { alternateName: 'non_fhir_tenant', sector: 'test' as Sector};
         jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockNonFhirTenant as TenantConfig);
 
         const nonFhirPollingUrl = `/non_fhir_tenant/cds-xx/v1/test/ping/standard/resource/_batch-response?thid=${thid}`;

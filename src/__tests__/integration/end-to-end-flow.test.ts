@@ -54,7 +54,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
   let kmsService: IKmsService;
   let cryptoService: CryptographyService;
   let hostEncryptionKey: MlkemPublicJwk;
-  let testConfig: IServerConfig;
+  let testConfig: Partial<IServerConfig>; // The setup function returns a Partial config.
   
   // These will hold the keys in the format needed by the crypto functions (with byte arrays)
   let externalSigner: MldsaPrivateJwk;
@@ -140,7 +140,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
       hostEncryptionKey
     );
 
-    const jurisdiction = testConfig.host.jurisdiction!;
+    const jurisdiction = testConfig.host?.jurisdiction!;
     const registrationUrl = `/host/cds-${jurisdiction}/v1/test/registry/org.schema/Organization/_batch`;
 
     // --- ACT ---

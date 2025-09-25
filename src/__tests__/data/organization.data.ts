@@ -47,24 +47,27 @@ const testHostAdmin1HasOccupation = "ISCO-08:1120";
 // --- Tenant 1 Organization Details ---
 const testTenant1Uuid = "c1c2c3d4-e5f6-7890-1234-567890abcdef";
 const testTenant1Identifier = `urn:uuid:${testTenant1Uuid}`;
-const testTenant1LegalName = "Tenant One";
-const testTenant1AlternateName = "tenant1";
-const testTenant1AddressCountry = "FR";
-const testTenant1TaxId = "987654321";
+const testTenant1LegalName = "Acme Company";
+const testTenant1AlternateName = "acme";
+const testTenant1AddressCountry = "US";
+const testTenant1TaxId = "98-7654321"; // EIN or TAX ID
 
 // --- Tenant 1 - Service Provider Details ---
 const testTenant1ProviderUuid = "d1c2c3d4-e5f6-7890-1234-567890abcdef";
 const testTenant1ProviderIdentifier = `urn:uuid:${testTenant1ProviderUuid}`;
-const testTenant1ProviderCategory = "<sector>";
-const testTenant1ProviderTermsOfService = "https://tenant1.example.com/terms";
+const testTenant1ProviderCategory = "health-care"; // As requested, using 'health-care' as the sector.
+const testTenant1ProviderTermsOfService = "https://provider.example.com/terms";
 const testTenant1ProviderServiceTypePurpose = "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC";
 
 // --- Tenant 1 - Admin 1 Details ---
-const testTenant1Admin1MockedUuid = "tenant1-admin1-id";
+const testTenant1Admin1MockedUuid = "acme-admin1-id";
 const testTenant1Admin1Uuid = "b1b2c3d4-e5f6-7890-1234-567890abcdef";
 const testTenant1Admin1Identifier = `urn:uuid:${testTenant1Admin1Uuid}`;
-const testTenant1Admin1Email = "tenant1-admin1@example.com";
+const testTenant1Admin1Email = "admin@acme.example.com";
 const testTenant1Admin1HasOccupation = "ISCO-08:1120";
+
+/** The unique composite vault ID for Tenant 1, derived from its sector and alternate name. */
+export const testTenant1VaultId = `${testTenant1ProviderCategory}_${testTenant1AlternateName}`;
 
 
 // ===================================================================================

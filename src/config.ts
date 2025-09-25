@@ -1,6 +1,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/config.ts
 
+import { Sector } from "./models/sector";
+
 /**
  * Centralized configuration module.
  * Reads environment variables and provides them to the application.
@@ -21,11 +23,19 @@ function buildApiBaseUrl(): string {
   return `${protocol}://${hostname}:${port}`;
 }
 
-function parseCsvToArray(csv: string | undefined): string[] {
+function parseAndValidateSectors(csv: string | undefined): Sector[] {
   if (!csv) {
     return [];
   }
-  return csv.split(',').map(item => item.trim());
+  const allSectors = Object.values(Sector) as string[];
+  const requestedSectors = csv.split(',').map(item => item.trim());
+
+  for (const sector of requestedSectors) {
+    if (!allSectors.includes(sector)) {
+      throw new Error(`Configuration Error: Invalid sector '${sector}' found in SECTORS_ALLOWED. Allowed values are: ${allSectors.join(', ')}`);
+    }
+  }
+  return requestedSectors as Sector[];
 }
 
 /**
@@ -37,7 +47,7 @@ export interface IServerConfig {
   port: number;
   apiHostname: string;
   apiBaseUrl: string;
-  sectorsAllowed: string[];
+  sectorsAllowed: Sector[];
   dbProvider: string;
   queueProvider: string;
   kekSecret?: string;
@@ -65,7 +75,7 @@ const rawConfig: IServerConfig = {
     port: parseInt(process.env.PORT || '3000', 10),
     apiHostname: process.env.API_HOSTNAME || 'localhost',
     apiBaseUrl: buildApiBaseUrl(),
-    sectorsAllowed: parseCsvToArray(process.env.SECTORS_ALLOWED),
+    sectorsAllowed: parseAndValidateSectors(process.env.SECTORS_ALLOWED),
     dbProvider: process.env.DB_PROVIDER || 'mem',
     queueProvider: process.env.QUEUE_PROVIDER || 'mem',
     kekSecret: process.env.KEK_SECRET,
