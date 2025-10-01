@@ -26,16 +26,27 @@ export function createDiscoveryRouter(
   // as an alias for `/host/.well-known/ping`.
   const resolveTenant = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const tenantId = req.params.tenantId || 'host';
-    const tenantConfig = await tenantsCacheManager.getConfigByAlternateName(tenantId);
-    if (!tenantConfig) {
+    const vaultId = tenantsCacheManager.getVaultIdByAlternateName(tenantId);
+
+    if (!vaultId) {
+      console.warn(`[DiscoveryRouter] Tenant resolution failed: alternateName '${tenantId}' not found in cache.`);
       return res.status(404).type('text').send('Not Found');
     }
+
+    const tenantConfig = await tenantsCacheManager.getConfig(vaultId);
+    if (!tenantConfig) {
+      // This case is unlikely if getVaultIdByAlternateName returned a vaultId,
+      // but it's a safeguard against cache inconsistency.
+      console.warn(`[DiscoveryRouter] Tenant resolution failed: vaultId '${vaultId}' for alternateName '${tenantId}' found, but config was missing from cache.`);
+      return res.status(404).type('text').send('Not Found');
+    }
+    
     // Attach the config and resolved tenantId for subsequent handlers.
     res.locals.tenantConfig = tenantConfig;
     res.locals.tenantId = tenantId;
     next();
   };
-
+  
   // --- Route Definitions ---
   // Using "/:tenantId?/" makes the tenantId optional. The resolveTenant middleware handles the default case.
   const wellKnownPrefix = '/:tenantId?/.well-known';

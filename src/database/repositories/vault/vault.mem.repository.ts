@@ -12,8 +12,18 @@ import { InMemoryVault } from '../../../models/repository';
 export class VaultMemRepository implements VaultRepository {
   private vaults = new Map<string, InMemoryVault>();
 
+  /**
+   * Clears all vaults and sections from the in-memory store.
+   * This is useful for ensuring a clean state between test runs.
+   */
+  public clear(): void {
+    this.vaults.clear();
+  }  
+
   public async createNewVault(vaultConfig: VaultConfig): Promise<boolean> {
+    console.log(`[VaultMemRepository] Attempting to create new vault with id: '${vaultConfig.id}'`);
     if (this.vaults.has(vaultConfig.id)) {
+      console.error(`[VaultMemRepository] Vault creation failed, vault already exists: '${vaultConfig.id}'`);
       return false;
     }
     this.vaults.set(vaultConfig.id, {
@@ -71,22 +81,27 @@ export class VaultMemRepository implements VaultRepository {
   }
 
   public async put<T extends RecordBase>(vaultId: string, containers: T[], sectionId: string = 'default'): Promise<boolean> {
+    console.log(`[VaultMemRepository] Putting ${containers.length} container(s) into vault: '${vaultId}', section: '${sectionId}'`);
     const vault = this.vaults.get(vaultId);
     if (!vault) {
+      console.error(`[VaultMemRepository] Cannot put data, vault not found: '${vaultId}'`);
       return false;
     }
 
-    let section = vault.sections.get(sectionId);
-    if (!section) {
-      section = new Map<string, RecordBase>();
-      vault.sections.set(sectionId, section);
+    // Ensure the section exists before trying to add to it.
+    if (!vault.sections.has(sectionId)) {
+      vault.sections.set(sectionId, new Map<string, RecordBase>());
     }
+    
+    // Get a DIRECT REFERENCE to the section map.
+    const sectionMap = vault.sections.get(sectionId)!;
     
     for (const doc of containers) {
       if (!doc.id) {
         throw new Error('Document must have an id.');
-  }
-      section.set(doc.id, doc);
+      }
+      // Modify the original map directly through the reference.
+      sectionMap.set(doc.id, doc);
     }
     return true;
   }

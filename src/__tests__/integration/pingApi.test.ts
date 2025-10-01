@@ -58,7 +58,7 @@ describe('Ping API Endpoint', () => {
       // Mock the host config with a valid service endpoint for ping
       const mockHostConfig: Partial<TenantConfig> = {
         alternateName: 'host',
-        didDocument: {
+        didConfig: {
           '@context': 'https://www.w3.org/ns/did/v1',
           id: 'did:web:api.example.com',
           service: [{
@@ -110,7 +110,7 @@ describe('Ping API Endpoint', () => {
       // Mock the tenant's existence with a valid service endpoint for ping
       const mockTenantConfig: Partial<TenantConfig> = {
         alternateName: 'tenant1',
-        didDocument: {
+        didConfig: {
           '@context': 'https://www.w3.org/ns/did/v1',
           id: 'did:web:api.example.com:tenant1',
           service: [{
@@ -160,7 +160,7 @@ describe('Ping API Endpoint', () => {
 
       const mockTenantConfig: Partial<TenantConfig> = {
         alternateName: 'tenant1',
-        didDocument: {
+        didConfig: {
           '@context': 'https://www.w3.org/ns/did/v1',
           id: 'did:web:api.example.com:tenant1',
           service: [{
@@ -190,7 +190,7 @@ describe('Ping API Endpoint', () => {
         const asyncResponseStore = new AsyncResponseStoreMem();
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
-      const mockTenantConfig: Partial<TenantConfig> = { alternateName: 'tenant1', didDocument: { service: [{ id: createDidServiceId({ version: 'v1', sector: 'test', section: 'ping', format: 'standard' }), type: 'ApiService', serviceEndpoint: 'resource', actions: ['_batch'] }] } as any };
+      const mockTenantConfig: Partial<TenantConfig> = { alternateName: 'tenant1', didConfig: { service: [{ id: createDidServiceId({ version: 'v1', sector: 'test', section: 'ping', format: 'standard' }), type: 'ApiService', serviceEndpoint: 'resource', actions: ['_batch'] }] } as any };
       jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
 
       const { thid, ...messageWithId } = decodedTenantPingMessage;
@@ -243,7 +243,7 @@ describe('Ping API Endpoint', () => {
       // Mock a tenant that exists but has NO services configured in its DID document.
       const mockTenantConfig: Partial<TenantConfig> = {
         alternateName: 'tenant1',
-        didDocument: {
+        didConfig: {
           '@context': 'https://www.w3.org/ns/did/v1',
           id: 'did:web:api.example.com:tenant1',
           service: [] // Empty service list confirms no valid service endpoint

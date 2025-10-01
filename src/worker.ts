@@ -15,9 +15,11 @@ import { getHostDidWebId } from './utils/did';
  */
 export class Worker {
   private managers: ManagerRegistry;
+  private apiBaseUrl: string;
 
-  constructor(managers: ManagerRegistry) {
+  constructor(managers: ManagerRegistry, apiBaseUrl: string) {
     this.managers = managers;
+    this.apiBaseUrl = apiBaseUrl;
   }
 
   /**
@@ -43,7 +45,7 @@ export class Worker {
       // 1. Route to the appropriate manager based on the parsed job name
       switch (resourceType) {
         case 'Organization':
-          manager = this.managers.organizationManager;
+          manager = this.managers.hostingManager;
           break;
         case 'Practitioner': // Employee
           manager = this.managers.employeeManager;
@@ -65,13 +67,13 @@ export class Worker {
 
     } catch (error: any) {
       console.error(`[Worker Job '${jobName}' failed for thid ${job.input?.thid}]`, error.message);
-      
+            
       // 3. In case of a catastrophic failure, create a fatal error response payload.
       const errorBundle = createErrorBundle(error.message, jobInfo?.action, job.input?.body?.data?.[0]?.type);
       
       return {
         thid: job.input?.thid || 'unknown-thid',
-        iss: getHostDidWebId(),
+        iss: getHostDidWebId(this.apiBaseUrl),
         aud: job.input?.aud || 'unknown-aud',
         exp: Math.floor(Date.now() / 1000) + 300,
         body: errorBundle,

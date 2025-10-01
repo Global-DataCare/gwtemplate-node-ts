@@ -3,68 +3,91 @@
 
 import { OperationOutcome } from "./fhir/operation-outcome";
 
+// ===================================================================================
+// BUNDLE ENTRY COMPONENTS
+// ===================================================================================
+
 /**
- * Represents the metadata associated with a BundleEntry.
+ * Defines the `request` property for an entry in a request Bundle.
+ */
+export interface BundleRequest {
+  method: 'POST' | 'PUT' | 'DELETE' | 'GET';
+  url: string;
+}
+
+/**
+ * Defines the `response` property for an entry in a response Bundle.
+ */
+export interface BundleResponse {
+  status: string; // e.g., "201"
+  [key: string]: any;
+}
+
+/**
+ * Defines the `meta` property that can hold contextual information.
  */
 export interface BundleEntryMeta {
   claims?: Record<string, any>;
-  [key: string]: any; // Allow other flexible meta properties
 }
 
+// ===================================================================================
+// BUNDLE ENTRY TYPES
+// ===================================================================================
+
 /**
- * Represents a single, successfully processed entry within a Bundle.
+ * Represents a single entry in an INCOMING request Bundle.
  */
-export interface BundleEntry {
+export interface BundleEntryRequest {
   id?: string;
   type: string;
-  resource: Record<string, any>;
+  request: BundleRequest;
+  resource?: Record<string, any>;
   meta?: BundleEntryMeta;
-  request?: {
-    method: 'POST' | 'PUT' | 'DELETE' | 'GET';
-    url: string;
-  };
-  response: {
-    status: string; // e.g., "201" for Created
-    [key: string]: any;
-  };
 }
 
 /**
- * Represents a single entry for an error result within a Bundle.
- * It maintains context from the original request but replaces a successful
- * resource with a FHIR-compliant OperationOutcome in the response field.
+ * Represents a single successful entry in an OUTGOING response Bundle.
+ */
+export interface BundleEntryResponse {
+  id?: string;
+  type: string;
+  response: BundleResponse;
+  resource?: Record<string, any>;
+  meta?: BundleEntryMeta;
+}
+
+/**
+ * Represents a single error entry in an OUTGOING response Bundle.
  */
 export interface ErrorEntry {
-  /** The 'id' might not be available if the input was malformed. */
   id?: string;
-
-  /** The 'type' of the operation/form from the original request entry. */
   type: string;
-
-  /** The 'resource' from the original entry might be included for context, if available. */
-  resource?: Record<string, any>;
-
-  /** The 'meta' from the original entry, which may contain the claims. */
-  meta?: BundleEntryMeta;
-
-  /** The 'request' from the original entry, if available. */
-  request?: {
-    method: 'POST' | 'PUT' | 'DELETE' | 'GET';
-    url: string;
-  };
-
-  /** The response containing the status and a detailed FHIR OperationOutcome. */
+  meta?: BundleEntryMeta; // Preserves original context
   response: {
-    status: string; // The HTTP code (e.g., "200", "201, "400", "409").
+    status: string;
     outcome: OperationOutcome;
   };
 }
 
+/** A union type for backward compatibility where the distinction is not yet needed. */
+
+export type BundleEntry = BundleEntryRequest | BundleEntryResponse | ErrorEntry
+
+// ===================================================================================
+// BUNDLE DEFINITION
+// ===================================================================================
+
 /**
  * Represents the canonical Bundle structure.
+ * The generic type `T` allows us to specify whether the `data` array
+ * contains request entries or response entries, providing strong type safety.
+ *
+ * @example
+ * const requestBundle: Bundle<BundleEntryRequest> = { ... };
+ * const responseBundle: Bundle<BundleEntryResponse | ErrorEntry> = { ... };
  */
-export interface Bundle {
+export interface Bundle<T = BundleEntryRequest | BundleEntryResponse | ErrorEntry> {
   type: string;
   total?: number;
-  data: (BundleEntry | ErrorEntry)[];
+  data: T[];
 }

@@ -48,6 +48,11 @@ export class DemoKmsService implements IKmsService {
     return this.getFakeJwks(entityId).find(key => key.kty === 'OKP') as MlkemPublicJwk | undefined;
   }
 
+  async getHostPublicJwkSet(): Promise<JwkSet> {
+    // In demo mode, the host's keys are just another set of fake keys.
+    return this.getPublicJwks('host');
+  }  
+
   // --- Inbound Request Processing ---
 
   async decodeJobRequest(message: string): Promise<JobRequest> {

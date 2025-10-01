@@ -2,7 +2,57 @@
 
 This document is the formal specification for the architecture. It is the definitive guide and "prompt" for all development.
 
-## 1. Secure Asynchronous API Pattern
+## 1. Sovereign Identity with URNs & VCs
+
+A strategic decision has been made to evolve the system's identity model to align with the principles of Self-Sovereign Identity (SSI), interoperability, and the standards promoted by European initiatives such as **Gaia-X** and the **International Data Spaces (IDS) Association**.
+
+A based on `did:web` anchored to the provider's domain has limitations regarding data sovereignty and federation. In contrast, this model is based on three pillars: Semantic URNs, Verifiable Credentials (VCs), and a Blockchain (Hyperledger Fabric) as a trust layer.
+
+### 1.1. The Identity Model: Semantic URNs
+
+We implement semantic, persistent, and global **URNs (Uniform Resource Names)**. These URNs name entities based on verifiable, real-world attributes, not on internal identifiers.
+
+The URN structure is configurable and follows a pattern like the one below:
+
+`urn:<namespace>:<network>:<jurisdiction>:<version>:<sector>:entity:tax:<taxID>`
+
+-   **Example for an Organization:**
+    `urn:antifraud:test-network:es:v1:health-care:entity:tax:B0011223344`
+-   **Example for an Employee (hierarchical):**
+    `urn:antifraud:test-network:es:v1:health-care:entity:tax:B0011223344:employee:email:employee@example.com:role:isco-08:4110`
+
+This approach ensures that a participant's identity is sovereign and machine-readable. By not depending on a specific web domain, it aligns with the decentralized principles of Self-Sovereign Identity (SSI) and the best practices defined by W3C, Gaia-X, and IDS.
+
+### 1.2. Verifiable Credentials (VCs) as a Trust Container
+
+The URN acts as the `ID` of a Verifiable Credential (VC). A VC is a digital document cryptographically signed by a trusted issuer (`Trust Anchor`) that certifies the claims about a subject.
+
+-   **`issuer`:** A `Trust Anchor` (e.g., a government agency, an industry consortium) whose identity is registered on the trust layer.
+-   **`subject`:** The entity identified by its URN.
+-   **`claims`:** The data being certified in the `credentialSubject` property of the VC, using reverse-DNS based JSON flat properties (e.g., `org.schema.Organization.legalName = "ACME Hospital"`).
+
+This model allows any network participant to cryptographically verify the authenticity of an organization's or employee's data without blindly trusting our system.
+
+### 1.3. Blockchain (Hyperledger Fabric) as the Trust Layer
+
+The permissioned blockchain network (Hyperledger Fabric) serves as the "ledger of trust" for the ecosystem. Its function is **not** to store user data, but to govern the system:
+
+1.  **Registry of `Trust Anchors`:** It contains the registry of which entities are authorized to issue VCs.
+2.  **VC Schema Management:** It stores and versions the data schemas that VCs must follow.
+3.  **Revocation Lists:** It provides a secure and distributed mechanism to revoke credentials that are no longer valid.
+
+The Fabric channel names follow a nomenclature aligned with the URN, enabling data sovereignty and segregation by environment, jurisdiction, and sector (e.g., `test-network.es.v1.health-care`).
+
+### 1.4. Impact on System Components
+
+-   **`HostingManager`:** Responsible for creating the root URN for new organizations (`tenants`) that register on the network.
+-   **`EmployeeManager`:** Uses the organization's URN to construct the hierarchical URN for employees.
+-   **`TenantsCacheManager`:** Plays a crucial role. It does not cache the full "configuration" but acts as a fast ID resolver. It keeps an in-memory map from the internal tenantId (e.g., health-care.tenant-1) to the tenant's public URN. This optimizes performance by avoiding database queries to retrieve a tenant's sovereign identifier.
+-   **`getTenantUrn` function:** This helper function provides a clean interface for other managers to resolve a `tenantId` to its URN.
+
+This design positions us as a service provider compatible with future European data spaces, ensuring maximum trust, security, and interoperability for our customers.
+
+## 2. Secure Asynchronous API Pattern
 
 All asynchronous API endpoints that process sensitive data **MUST** follow this established architectural pattern to ensure security, scalability, and separation of concerns.
 
@@ -21,19 +71,19 @@ All asynchronous API endpoints that process sensitive data **MUST** follow this 
 
 This pattern ensures that no sensitive plaintext data is ever held in the API controller and that all business logic is executed in the background, decoupled from the initial client request.
 
-## 2. Key Hierarchy and Envelope Encryption
+## 3. Key Hierarchy and Envelope Encryption
 
 The system employs a multi-level **envelope encryption** strategy to ensure robust security and cryptographic isolation for data at rest. This pattern ensures that a compromise of one layer does not automatically compromise the entire system.
 
 The hierarchy is as follows:
 
-### 2.1. Level 0: Key Encryption Key (KEK)
+### 3.1. Level 0: Key Encryption Key (KEK)
 
 -   **Role**: The single master key for the entire system. It is the root of trust.
 -   **Source**: The KEK is considered a "root secret" and is **never** stored in the application's database. It MUST be provided from a secure, external source, such as an environment variable (`KEK_SECRET`) or a dedicated secret manager (e.g., Google Secret Manager, AWS KMS, HashiCorp Vault).
 -   **Function**: Its sole purpose is to encrypt and decrypt the **Host DEK**. It never touches tenant data or configurations directly.
 
-### 2.2. Level 1: Host Data Encryption Key (DEK)
+### 3.2. Level 1: Host Data Encryption Key (DEK)
 
 -   **Identifier**: The `entityId` for the host is the literal string `'host'`.
 -   **Protection**: The Host DEK is encrypted at rest by the **KEK**. It is the only key protected by the KEK.
@@ -41,29 +91,17 @@ The hierarchy is as follows:
     1.  It encrypts the host's own internal data and configuration (e.g., its own `TenantConfig` document).
     2.  It acts as a "key-wrapping" key to encrypt the DEKs of all other tenants.
 
-### 2.3. Level 2: Tenant Data Encryption Key (DEK)
+### 3.3. Level 2: Tenant Data Encryption Key (DEK)
 
 -   **Identifier**: The `entityId` for a tenant is its unique resource UUID (e.g., `c1c2c3d4-e5f6...`).
 -   **Protection**: Each Tenant DEK is encrypted at rest by the **Host DEK**.
 -   **Function**: A Tenant DEK is used to encrypt all of that specific tenant's data (e.g., employees, customers, etc.) within that tenant's dedicated vault.
 
-### 2.4. Data Protection Flow Diagram
+### 3.4. Data Protection Flow Diagram
 
 This flow ensures that to access a tenant's data, an attacker would need to compromise multiple, independent keys.
 
-2.  **Job Queuing:** The controller creates a `JobRequest` (containing the `DecodedDidcommMessage`) and places this job into a queue. It immediately returns a `202 Accepted` response, including the `thid` from the decoded job for correlation.
-
-3.  **Worker:** A separate Worker process dequeues the job and calls the appropriate business-logic `Manager` (e.g., `OrganizationManager`) to execute it.
-
-4.  **Response Payload Creation:** The Manager executes the business logic and constructs a complete, JARM-compliant `IPayloadResponse` object. This object contains the final `Bundle` of results.
-5.  **Response Encoding:** The Worker receives the `IPayloadResponse` from the manager and **MUST** call `IKmsService.encodeResponse()` to encrypt this payload for the intended recipient(s).
-
-6.  **Response Storage:** The Worker stores the final, encrypted response (the `secureEnvelope`) in a temporary key-value store (e.g., Redis, Firestore), using the `thid` as the key.
-
-7.  **Polling:** A separate polling endpoint is responsible for retrieving the stored, encrypted response when requested by the original client using the `thid`.
-
-This pattern ensures that no sensitive plaintext data is ever held in the API controller and that all business logic is executed in the background, decoupled from the initial client request.
-## 2. The Original Asynchronous API Flow (Detailed View)
+## 4. The Original Asynchronous API Flow (Detailed View)
 
 This section provides a more detailed view of the flow described above.
 1.  **Request:** The client `POST`s a **DIDComm Message Envelope**.
@@ -77,18 +115,18 @@ This section provides a more detailed view of the flow described above.
 9.  **Polling for Results:** The client polls for and receives the final encrypted `IPayloadResponse`.
 **Important Exception:** The `/.well-known` endpoints for public key and DID discovery are *synchronous*.
 
-## 3. API Structure
+## 5. API Structure
 
 *   **Asynchronous Operations:** `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/{section}/{format}/{resourceType}/{action}`
 *   **Synchronous Discovery:** `GET /{tenantId}/.well-known/{file}`
 
-## 4. The Manager Contract
+## 6. The Manager Contract
 
 *   **Input:** A canonical `JobRequest` object, which contains the full context of the request, including the decoded DIDComm message (`job.input`).
 *   **Output:** A `Promise<IPayloadResponse>`. The `IPayloadResponse` object is a complete, JARM-compliant payload ready to be secured by the worker.
 *   **Responsibility:** Pure, format-agnostic business logic **AND** construction of the final response payload. The manager is responsible for building the entire `IPayloadResponse`, including the `thid`, JARM claims (`iss`, `aud`, `exp`), and the response `body` (which contains the final `Bundle`).
 
-### 4.1. Response Bundle Type
+### 6.1. Response Bundle Type
 
 The `type` field of the `Bundle` within the returned `IPayloadResponse.body` **MUST** be determined by the `action` of the original request. This logic is centralized in the `getBundleResponseTypeForAction` utility. The mapping follows a semantic principle:
 
@@ -96,12 +134,12 @@ The `type` field of the `Bundle` within the returned `IPayloadResponse.body` **M
 *   **Atomic Transactions (`_transaction`, `_seal`):** Result in a `transaction-response` bundle.
 *   **Independent Batch Operations (`_batch`, `_verify`):** Result in a `batch-response` bundle.
 
-## 5. The `BundleEntry` Contract
+## 7. The `BundleEntry` Contract
 
 *   The `claims` for business logic **MUST** be located in `entry.meta.claims`.
 *   The `entry.resource` contains the original resource for auditing and reference.
 
-### 5.1. Entry `type` Naming Convention
+### 7.1. Entry `type` Naming Convention
 
 The `entry.type` field is the definitive identifier for the business operation or "form" being submitted. Its value **MUST** follow a standardized format inspired by established standards like openEHR's template naming.
 
@@ -117,16 +155,17 @@ The `entry.type` field is the definitive identifier for the business operation o
 2.  **Versioning:** Including the version directly in the `type` allows managers to implement version-specific logic, ensuring backward compatibility as forms and processes evolve.
 3.  **Clarity over Redundancy:** This convention centralizes the operation's identity in a single field, avoiding the need for redundant fields like `meta.templateId` or `meta.templateVersion`.
 
-## 6. The Worker's Responsibilities
+## 8. The Worker's Responsibilities
 
 1.  **Normalize Input:** The first crucial step is to normalize any incoming `Bundle` into the canonical internal format. This means that if the original bundle follows the FHIR standard (using an `entry` array), it **MUST** be converted to the internal standard which uses a `data` array (inspired by JSON:API). This ensures managers always receive a consistent data structure.
 2.  **Route Jobs:** Call the correct manager based on the `JobRequest`.
 3.  **Secure and Store Output:** Take the complete `IPayloadResponse` from the manager and pass it to `IKmsService` for signing and/or encryption. The resulting secure envelope is then stored in the `ResponseStore`. The worker **DOES NOT** format the response payload; it only orchestrates its security and storage.
-## 7. Universal Naming Convention
+
+## 9. Universal Naming Convention
 
 To ensure traceability and consistency, the system uses a universal naming convention for asynchronous events, whether they are jobs in the queue or message threads. All naming logic is centralized in `src/utils/naming.ts`.
 
-### 7.1. Job Names
+### 9.1. Job Names
 
 *   **Purpose:** To create a unique, sortable, and informative name for a job in the queue. This name facilitates routing, debugging, and prioritized processing.
 *   **Structure:** `<priority>-<timestamp>:<tenantId>:<resourceType>:<action>`
@@ -134,14 +173,14 @@ To ensure traceability and consistency, the system uses a universal naming conve
 *   **Example:** `5-1678886400000:host:Organization:batch`
 *   **Implementation:** The `ApiRouter` **MUST** use `createJobName()` to generate the name. The `Worker` **MUST** use `parseJobName()` to analyze the name and route the job.
 
-### 7.2. Messaging Section IDs
+### 9.2. Messaging Section IDs
 
 *   **Purpose:** To uniquely identify a conversation thread (e.g., an inbox or sent folder) within a messaging vault (like a `Group` or `List`).
 *   **Structure:** `<timestamp>_<parentId>_<destinationId>_<type>`
 *   **Example:** `1678886400000_group123_member456_inbox`
 *   **Implementation:** A future `MessagingManager` **MUST** use `createMessageSectionId()` to generate these identifiers.
 
-## 8. Data Storage Patterns
+## 10. Data Storage Patterns
 
 The entire data persistence layer is abstracted to ensure business logic remains agnostic to the underlying database technology (e.g., in-memory for testing, Firestore for production).
 
@@ -151,7 +190,8 @@ The entire data persistence layer is abstracted to ensure business logic remains
 *   **Implementation Injection:** The specific implementation of a repository (e.g., `VaultMemRepository` or `VaultFirestoreRepository`) is injected into the managers at runtime, allowing the application to switch between storage backends without changing any business logic.
 
 This pattern is fundamental to the system's testability and future-proofing. For detailed instructions on how to correctly implement tests that involve this dependency injection, see the **[Testing Patterns and Best Practices Guide (`src/docs/guides/testing-patterns.md`)(./docs/guides/testing-patterns.md)**.
-## 9. Phase 2: The Persistent Messaging Model (Inbox/Sent)
+
+## 11. Phase 2: The Persistent Messaging Model (Inbox/Sent)
 
 Once the core asynchronous API is stable, the next architectural layer is the implementation of a persistent, DIDComm-based messaging system. The temporary `ResponseStore` used for polling is **NOT** part of this system.
 
@@ -171,11 +211,11 @@ Once the core asynchronous API is stable, the next architectural layer is the im
 
 ---
 
-## 10. Resource Identification and Normalization
+## 12. Resource Identification and Normalization
 
 This section defines the canonical process for handling resource identifiers within the system, ensuring a clear distinction between internal database IDs and public business identifiers.
 
-### 10.1. Core Principles
+### 12.1. Core Principles
 
 - **Internal ID (`id`):** Every resource object (Organization, Person, etc.) in a response payload MUST have a top-level `id` field. This `id` MUST be a pure, non-prefixed UUID (e.g., `"a1b2c3d4-..."`). It is used for database indexing, foreign key relationships, and unambiguous internal referencing.
 
@@ -185,7 +225,7 @@ This section defines the canonical process for handling resource identifiers wit
 
 - **Business Identifiers (`taxID`, etc.):** These are critical public identifiers used for business-level validation and lookup (e.g., ensuring an organization with a specific `taxID` and `country` is unique). They are preserved as-is but are NEVER used as the internal resource `id`.
 
-### 10.2. The Normalization Flow
+### 12.2. The Normalization Flow
 
 To ensure data consistency, the following flow is mandatory when processing resources from claims:
 
@@ -207,17 +247,17 @@ To ensure data consistency, the following flow is mandatory when processing reso
 
 ---
 
-## 11. Secure Persistence Flow
+## 13. Secure Persistence Flow
 
 This pattern describes the mandatory sequence of operations a manager must follow to persist a sensitive document securely in a vault, ensuring separation of concerns between business logic, security, and storage.
 
-### 11.1. Actors
+### 13.1. Actors
 
 -   **Manager** (e.g., `OrganizationManager`): Knows the business logic. Responsible for creating the business data (the `content`) and its searchable indexes (`indexed`).
 -   **IKmsService** (Key Management Service): Knows how to secure data for a tenant. Manages key access and orchestrates encryption.
 -   **VaultRepository**: Knows how to write data to the underlying storage. It is "dumb" regarding cryptography.
 
-### 11.2. Sequence
+### 13.2. Sequence
 
 1.  **Manager: Construct Plaintext Document**
     - The manager creates a complete `ConfidentialStorageDoc` object.
@@ -239,27 +279,26 @@ This pattern describes the mandatory sequence of operations a manager must follo
     - The manager receives the secure document from the KMS.
     - It calls `await this.vaultRepository.put('vault', [secureDoc], 'section')`, passing the secure document to the storage layer.
 
-### 11.3. Result
+### 13.3. Result
 
 The data is stored securely at rest. The `content` only ever exists in memory within the KMS's secure boundary during the encryption process, and the repository only ever sees the encrypted `jwe` object.
 
 ---
 
-## 12. Data Handling and Serialization
+## 14. Data Handling and Serialization
 
 To ensure interoperability and prevent subtle bugs during cryptographic operations, all modules **MUST** adhere to the following data handling principles when converting between strings and bytes (`Uint8Array`).
 
-### 12.1. Serialization (Going "Out")
+### 14.1. Serialization (Going "Out")
 
 -   **Context:** Preparing data to be sent, signed, or encrypted. This includes creating JWT payloads, DIDComm message bodies, and any data that will be persisted.
 -   **Rule:** When converting a JavaScript object or string into a JOSE-compatible format, the data MUST be UTF-8 encoded and then Base64URL encoded without padding.
 -   **Workflow:** `Object` -> `JSON.stringify()` -> `stringToBytesUTF8()` -> `bytesToRawBase64UrlSafe()` -> `string (Base64URL)`
 -   **Rationale:** This ensures that all outgoing data is standards-compliant and unambiguously encoded as UTF-8, which is the expected format for JSON-based protocols like JOSE and DIDComm, before its final Base64URL representation.
 
-### 12.2. Deserialization (Coming "In")
+### 14.2. Deserialization (Coming "In")
 
 -   **Context:** Processing data that has just been received, decrypted, or decompressed. This includes handling JWT payloads and the output of libraries like `pako`.
 -   **Rule:** When converting a Base64URL string back into a JavaScript object, it must first be decoded from Base64URL to bytes. Then, a **permissive ASCII/binary decoder (`bytesToStringASCII`) MUST be used** to convert the bytes to a string for parsing.
 -   **Workflow:** `string (Base64URL)` -> `base64ToBytes()` -> `Uint8Array` -> `bytesToStringASCII()` -> `string` -> `JSON.parse()` -> `Object`
 -   **Rationale:** Cryptographic and compression libraries operate on raw binary streams. Their output is not guaranteed to be a strictly valid UTF-8 byte sequence. A permissive decoder is required to robustly handle this data and prevent parsing failures after Base64URL decoding.
-

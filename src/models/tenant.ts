@@ -1,8 +1,28 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/models/tenant.ts
 
+import { DidService } from "./did";
 import { RecordBase } from "./resource-document";
 import { Sector } from "./sector";
+
+export interface EntityUrnBaseParams {
+  namespace: string;
+  network: string;
+  jurisdiction: string;
+  version?: string;
+  sector: string;
+}
+
+export interface OrganizationUrnParams extends EntityUrnBaseParams {
+  idType: 'tax';
+  idValue: string;
+}
+
+export interface EmployeeUrnParams extends OrganizationUrnParams {
+  email: string;
+  role: string;
+}
+
 
 /**
  * Represents the full configuration for a single tenant.
@@ -27,15 +47,30 @@ export interface TenantConfig extends RecordBase {
   identifier: string;
 
   /**
-   * The public URL where the DID document can be resolved.
-   */
-  url: string;
-
-  /**
    * Contextual information for database collections.
    */
   sector: Sector;
   jurisdiction: string;
+
+  /**
+   * The public URL where the DID document can be resolved (for the sector and jurisdiction).
+   */
+  url: string;
+
+  /**
+   *  Type of entity: e.g. Hospital, Clinic, Employee...
+   */
+  additionalType?: string;
+
+  /**
+   * The configuration of services for the DID Document for the tenant, containing all public keys,
+   * service endpoints, and other essential metadata.
+   */
+  didConfig: {
+    '@context': string | string[];
+    id: string;
+    service: DidService[]
+  };    
 
   /**
    * The authoritative DID Document for the tenant, containing all public keys,
@@ -45,10 +80,5 @@ export interface TenantConfig extends RecordBase {
     '@context': string | string[];
     id: string;
     [key: string]: any;
-  };
-
-  /**
-   *  For URN generation
-   */
-  additionalType?: string;
+  };  
 }

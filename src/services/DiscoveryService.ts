@@ -1,38 +1,32 @@
 // src/services/DiscoveryService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { TenantConfig } from '../models/tenant';
 import { DidDocument } from '../models/did';
 import { JwkSet } from '../models/jwk';
 
 /**
- * Handles the synchronous logic for retrieving public discovery documents like
- * DID Documents and JWKS, as specified in SYSTEM_DESIGN.md.
+ * Handles the stateless, synchronous logic for generating public discovery documents
+ * like DID Documents and JWKS based on a provided tenant configuration.
  */
 export class DiscoveryService {
-  constructor(private tenantsCacheManager: TenantsCacheManager) {}
-
   /**
-   * Retrieves the DID Document for a given entity (tenant or host).
-   * @param tenantId The alternateName of the entity.
-   * @returns The DID Document or null if not found.
+   * Retrieves the static DID Document from a given tenant configuration.
+   * @param tenantConfig The fully resolved configuration of the tenant.
+   * @returns The DID Document.
    */
-  async getDidDocument(tenantId: string): Promise<DidDocument | null> {
-    const config = await this.tenantsCacheManager.getConfigByAlternateName(tenantId);
-    return config?.didDocument || null;
+  getDidDocument(tenantConfig: TenantConfig): DidDocument {
+    return tenantConfig.didDocument;
   }
 
   /**
    * Retrieves the JSON Web Key Set (JWKS) for a given entity.
-   * @param tenantId The alternateName of the entity.
-   * @returns The JWKS or null if not found.
+   * @param tenantConfig The fully resolved configuration of the tenant.
+   * @returns The JWKS.
    */
-  async getJwks(tenantId: string): Promise<JwkSet | null> {
-    const config = await this.tenantsCacheManager.getConfigByAlternateName(tenantId);
-    if (!config) return null;
-    
-    // In a real implementation, this would retrieve public keys from the KMS.
+  getJwks(tenantConfig: TenantConfig): JwkSet {
+    // In a real implementation, this would retrieve public keys from the KMS
+    // or reference them from the DID Document's verificationMethod.
     // For now, it returns a placeholder.
     return { keys: [] };
   }
@@ -45,8 +39,8 @@ export class DiscoveryService {
   getOpenIdConfiguration(config: TenantConfig): object {
     return {
       issuer: config.url,
-      jwks_uri: `${config.url}/.well-known/jwks.json`,
-      // Additional OIDC metadata would be populated here.
+      // The jwks_uri path needs to be updated to match the new routing structure
+      jwks_uri: `${config.url}/cds-${config.jurisdiction}/v1/${config.sector}/.well-known/jwks.json`,
     };
   }
 
@@ -69,8 +63,8 @@ export class DiscoveryService {
    */
   getCapabilityStatement(config: TenantConfig): object {
     return {
-      resourceType: "CapabilityStatement",
-      status: "active",
+      resourceType: 'CapabilityStatement',
+      status: 'active',
       // The full capability statement would be dynamically generated here.
     };
   }

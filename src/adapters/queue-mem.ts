@@ -25,6 +25,8 @@ export class QueueAdapterMem implements QueueAdapter {
     this.startWorker();
   }
 
+
+
   /**
    * Adds a job to the in-memory queue.
    */
@@ -78,6 +80,23 @@ export class QueueAdapterMem implements QueueAdapter {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+  }
+  
+  /**
+   * FOR TESTING ONLY: Returns a promise that resolves when the queue is empty.
+   * This is crucial for synchronous testing of asynchronous operations.
+   */
+  public async waitForEmptyQueue(): Promise<void> {
+    return new Promise(resolve => {
+      const checkQueue = () => {
+        if (this.queue.length === 0) {
+          resolve();
+        } else {
+          setTimeout(checkQueue, 50); // Check again after a short delay
+        }
+      };
+      checkQueue();
+    });
   }  
 }
 

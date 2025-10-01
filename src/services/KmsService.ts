@@ -166,6 +166,21 @@ export class KmsService implements IKmsService {
     return this._managedKeys.get(entityId)?.encryptionKeyPair.publicJWKey;
   }
 
+  async getHostPublicJwkSet(): Promise<JwkSet> {
+    this.checkInitialized();
+    const hostKeys = this._managedKeys.get('host');
+    if (!hostKeys) {
+      // This state should be impossible if init() was called successfully.
+      throw new Error('Host keys not found despite service being initialized.');
+    }
+    return {
+      keys: [
+        hostKeys.verificationKeyPair.publicJWKey as JWK,
+        hostKeys.encryptionKeyPair.publicJWKey as JWK,
+      ],
+    };
+  }  
+
   // --- Inbound Request Processing ---
 
   /**

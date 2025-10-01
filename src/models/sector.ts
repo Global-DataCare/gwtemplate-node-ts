@@ -10,4 +10,5 @@ export enum Sector {
   HEALTH_INSURANCE = 'health-insurance',
   EMERGENCY = 'emergency',
   SYSTEM = 'system', // Reserved for the host's internal operations.
+  TEST = "test",
 }

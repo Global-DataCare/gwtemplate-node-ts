@@ -63,6 +63,13 @@ export interface IKmsService {
   /** Retrieves only the public encryption key for an entity. */
   getPublicEncryptionKey(entityId: string): Promise<MlkemPublicJwk | undefined>;
 
+  /**
+   * A dedicated method to get the host's public keys as a standard JWKSet.
+   * This is crucial for bootstrap and discovery endpoints (e.g., jwks.json)
+   * and for end-to-end testing scenarios.
+   */
+  getHostPublicJwkSet(): Promise<JwkSet>;
+
   // --- Inbound Request Processing ---
 
   /**

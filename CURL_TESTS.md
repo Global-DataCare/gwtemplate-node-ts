@@ -1,0 +1,102 @@
+# Real-time API Test using `curl`
+
+This guide provides the steps to start the server in `demo` mode and use `curl` to simulate the API requests from the integration test. This allows for direct observation of the server's behavior and debug logs without the complexity of the Jest test runner.
+
+## Step 1: Run the Server in Demo Mode
+
+First, start the API server. The `dev` script uses `ts-node-dev` and loads the environment variables from the `.env` file, which should set `NODE_ENV=demo` and `PORT=3000`.
+
+In your project's root directory, open a terminal and run the following command. Leave this terminal running to monitor the server's log output.
+
+```bash
+npm run dev
+```
+
+You should see the server's startup logs, ending with a message similar to this:
+
+```
+[GW-API] demo Server running on http://localhost:3000
+[GW-API] --- System Initialized Successfully ---
+```
+
+---
+
+## Step 2: Execute API Commands
+
+Open a **new, separate terminal** to run the following `curl` commands.
+
+### Command 1: Create the 'acme' Organization
+
+This command simulates "Part 1" of the integration test. It sends the organization registration payload to the `host`'s registry endpoint.
+
+```bash
+curl --location --request POST 'http://localhost:3000/host/cds-ES/v1/test/registry/org.schema/Organization/_batch' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "thid": "thid-c1c2c3d4-e5f6-7890-1234-567890abcdef",
+  "iss": "did:web:test-issuer.com",
+  "aud": "did:web:host.example.com",
+  "body": {
+    "data": [
+      {
+        "type": "Organization-registration-form-v1.0",
+        "meta": {
+          "claims": {
+            "@context": "org.schema",
+            "@type": "template",
+            "org.schema.Organization.legalName": "Acme Company",
+            "org.schema.Organization.identifier": "urn:uuid:c1c2c3d4-e5f6-7890-1234-567890abcdef",
+            "org.schema.Organization.alternateName": "acme",
+            "org.schema.Organization.addressCountry": "US",
+            "org.schema.Organization.taxID": "98-7654321",
+            "org.schema.Person.identifier": "urn:uuid:b1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "org.schema.Person.hasOccupation": "ISCO-08:1120",
+            "org.schema.Person.email": "admin1@acme.example.com",
+            "org.schema.Service.category": "health-care",
+            "org.schema.Service.identifier": "urn:uuid:d1c2c3d4-e5f6-7890-1234-567890abcdef",
+            "org.schema.Service.termsOfService": "https://provider.example.com/terms",
+            "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC"
+          }
+        }
+      }
+    ]
+  }
+}'
+```
+
+**Expected Outcome:**
+-   **In the `curl` terminal:** You should receive a `202 Accepted` response, along with a `location` header pointing to the polling URL.
+-   **In the server terminal:** You should see our debug logs, specifically `[TenantsCacheManager] Caching tenant with vaultId: host` and `[TenantsCacheManager] Caching tenant with vaultId: health-care.acme`.
+
+### Command 2: Create an Employee for 'acme'
+
+If the first command is successful, run this command to simulate "Part 2" of the test.
+
+```bash
+curl --location --request POST 'http://localhost:3000/acme/cds-ES/v1/health-care/entity/org.schema/Employee/_batch' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "thid": "thid-employee-11b2c3d4-e5f6-7890-1234-567890abcdef",
+  "iss": "did:web:provider.com:acme:employee:email:admin1@acme.example.com",
+  "aud": "did:web:provider.com",
+  "body": {
+    "data": [
+      {
+        "type": "Employee-form-v1.0",
+        "verb": "POST",
+        "meta": {
+          "claims": {
+            "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
+            "org.schema.Person.hasOccupation": "ISCO-08:4226",
+            "org.schema.Person.email": "receptionist1@acme.example.com"
+          }
+        }
+      }
+    ]
+  }
+}'
+```
+
+**Expected Outcome:**
+-   **In the `curl` terminal:** A `202 Accepted` response.
+-   **In the server terminal:** You should see the crucial debug log: `[API] Attempting to validate request with vaultId: health-care.acme`.

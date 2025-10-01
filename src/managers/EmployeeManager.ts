@@ -1,62 +1,59 @@
 // src/managers/EmployeeManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { getHostDidWebId } from '../utils/did';
+import { v4 as uuidv4 } from 'uuid';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
-import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
+import { Bundle, BundleEntry, BundleEntryRequest, ErrorEntry } from '../models/bundle';
 import { VaultRepository } from '../database/repositories/vault/vault.repository';
-import { RecordBase } from '../models/resource-document';
+import { ClaimsRecord, RecordBase } from '../models/resource-document';
 import { JobRequest } from '../models/request';
 import { IPayloadResponse } from '../models/response';
 import { ManagerError } from '../models/errors/manager-error';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
+import { IKmsService } from '../crypto/interfaces/IKmsService';
+import { ClaimsPersonSchemaorg } from '../models/schemaorg';
+import { determineResourceId } from '../utils/resource';
+import { EmployeeConfig } from '../models/employee-config';
+import { initializeEmployeeServices } from '../utils/services';
+import { createOperationOutcome } from '../utils/outcome';
+import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { TenantsCacheManager } from './TenantsCacheManager';
 
 const EMPLOYEE_SECTION = 'employees';
 
 export class EmployeeManager {
   private vaultRepository: VaultRepository;
+  private kmsService: IKmsService;
+  private tenantsCacheManager: TenantsCacheManager;
 
-  constructor(vaultRepository: VaultRepository) {
+  constructor(
+    vaultRepository: VaultRepository,
+    kmsService: IKmsService,
+    tenantsCacheManager: TenantsCacheManager,
+  ) {
     this.vaultRepository = vaultRepository;
+    this.kmsService = kmsService;
+    this.tenantsCacheManager = tenantsCacheManager;
   }
 
-  /**
-   * Processes an employee data management job and returns a JARM-compliant response payload.
-   */
-  public async process(job: JobRequest): Promise<IPayloadResponse> {
+  public async process(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
     const entries = job.input?.body?.data ?? [];
 
+    // Fetch the tenant's URN once for the entire job.
+    const issuerUrn = this.tenantsCacheManager.getTenantUrn(job.tenantId!);
+    if (!issuerUrn) {
+      throw new ManagerError(`Tenant with ID '${job.tenantId}' not found.`, IssueType.NotFound);
+    }
+
     for (const entry of entries) {
       try {
-        const resultEntry = await this.processEntry(entry, job.tenantId!);
+        // Pass the fetched URN down to the entry processor.
+        const resultEntry = await this.processEntry(entry, job.tenantId!, issuerUrn, environment);
         responseEntries.push(resultEntry);
       } catch (error: any) {
-        const entryType = entry.type || 'Employee-form-unknown-v1.0';
-        if (error instanceof ManagerError) {
-          responseEntries.push({
-            type: entryType,
-            response: {
-              status: error.status,
-              outcome: {
-                resourceType: 'OperationOutcome',
-                issue: [{ severity: IssueLevel.Error, code: error.code, diagnostics: error.message }],
-              },
-            },
-          });
-        } else {
-          console.error(`Unexpected error processing employee entry: ${error.message}`);
-          responseEntries.push({
-            type: entryType,
-            response: {
-              status: '500',
-              outcome: {
-                resourceType: 'OperationOutcome',
-                issue: [{ severity: IssueLevel.Error, code: IssueType.Exception, diagnostics: 'An unexpected internal error occurred.' }],
-              },
-            },
-          });
-        }
+        const errorEntry = this.handleError(error, entry.type, (entry as BundleEntryRequest).meta);
+        responseEntries.push(errorEntry);
       }
     }
 
@@ -68,44 +65,155 @@ export class EmployeeManager {
 
     return {
       thid: job.input.thid,
-      iss: getHostDidWebId(),
+      iss: issuerUrn, // Use the tenant's URN as the issuer
       aud: job.input.aud,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: responseBundle,
     };
   }
 
-  private async processEntry(entry: any, tenantId: string): Promise<BundleEntry> {
-    const { request, resource, type } = entry;
+  private async processEntry(
+    entry: BundleEntry,
+    tenantId: string,
+    tenantUrn: string,
+    environment?: string,
+  ): Promise<BundleEntry> {
+    const requestEntry = entry as BundleEntryRequest;
+    const { request, meta, type } = requestEntry;
+    const claims = meta?.claims;
 
-    if (!request || !resource?.id) {
-      throw new ManagerError('Entry requires a request object and a resource with an id.', IssueType.Required);
+    if (!request || !claims) {
+      throw new ManagerError('Entry requires a request object and meta.claims.', IssueType.Required);
     }
 
-    if (!tenantId) {
-      throw new ManagerError('Tenant context is required to process employee data.', IssueType.Forbidden);
+    const identifierClaim = claims[ClaimsPersonSchemaorg.identifier];
+    if (!identifierClaim) {
+      throw new ManagerError('Missing identifier claim for operation on Employee.', IssueType.Required);
     }
-    
-    const employeeId = resource.id;
+    const employeeId = determineResourceId(identifierClaim, environment);
 
-    if (request.method === 'PUT' || request.method === 'POST') {
-      await this.vaultRepository.put(tenantId, [resource as RecordBase], EMPLOYEE_SECTION);
-      return {
-        type: `${type}-receipt`,
+    switch (request.method) {
+      case 'POST':
+        return this.createEmployee(tenantId, tenantUrn, employeeId, claims, type);
+      case 'DELETE':
+        return this.disableEmployee(tenantId, employeeId, type);
+      default:
+        throw new ManagerError(`Unsupported request method: '${request.method}'`, IssueType.NotSupported);
+    }
+  }
+
+  private async createEmployee(
+    tenantId: string,
+    tenantUrn: string,
+    employeeId: string,
+    claims: ClaimsRecord,
+    entryType: string,
+  ): Promise<BundleEntry> {
+    await this.kmsService.provisionKeys(employeeId);
+
+    const email = claims[ClaimsPersonSchemaorg.email];
+    if (!email || typeof email !== 'string') {
+      throw new ManagerError('Missing or invalid email claim.', IssueType.Required);
+    }
+
+    const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation];
+    if (!roleCode || typeof roleCode !== 'string') {
+      throw new ManagerError('Missing or invalid hasOccupation claim.', IssueType.Required);
+    }
+
+    // Construct the hierarchical URN using the parent tenant's URN.
+    const employeeUrn = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
+
+    const employeeConfig: EmployeeConfig = {
+      id: employeeId,
+      type: 'EmployeeConfig',
+      status: 'active',
+      email: email,
+      didDocument: {
+        '@context': 'https://www.w3.org/ns/did/v1',
+        id: employeeUrn, // The employee's full, semantic URN
+        service: [],
+      },
+      meta: { claims },
+    };
+    employeeConfig.didDocument.service = initializeEmployeeServices(employeeConfig);
+
+    const occupationDoc: RecordBase & { employeeId: string } = {
+      id: uuidv4(),
+      type: 'Occupation',
+      employeeId: employeeId,
+      meta: {
+        claims: {
+          [ClaimsPersonSchemaorg.hasOccupation]: roleCode,
+        },
+      },
+    };
+
+    const docToProtect: ConfidentialStorageDoc = {
+      id: employeeConfig.id,
+      sequence: 0,
+      content: employeeConfig,
+    };
+    // The tenantId (internal ID) is used for the security context.
+    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, tenantId);
+    await this.vaultRepository.put(tenantId, [secureDoc, occupationDoc], EMPLOYEE_SECTION);
+
+    return {
+      type: entryType,
+      resource: {
         id: employeeId,
-        resource: { id: employeeId, resourceType: 'Practitioner' }, // Assuming employee is a Practitioner
-        response: { status: '201' },
-      };
-    } else if (request.method === 'DELETE') {
-      await this.vaultRepository.delete(tenantId, employeeId, EMPLOYEE_SECTION);
+        type: 'Person',
+        meta: employeeConfig.meta,
+        contained: [occupationDoc],
+      },
+      response: { status: '201' },
+    };
+  }
+
+  private async disableEmployee(tenantId: string, employeeId: string, entryType: string): Promise<BundleEntry> {
+    const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(tenantId, employeeId, EMPLOYEE_SECTION);
+    if (!employeeDoc) {
+      throw new ManagerError(`Employee with ID '${employeeId}' not found.`, IssueType.NotFound);
+    }
+
+    const employee = await this.kmsService.unprotectConfidentialData<EmployeeConfig>(employeeDoc, tenantId);
+    employee.status = 'disabled';
+
+    const docToProtect: ConfidentialStorageDoc = { ...employeeDoc, content: employee };
+    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, tenantId);
+    await this.vaultRepository.put(tenantId, [secureDoc], EMPLOYEE_SECTION);
+
+    return {
+      type: entryType,
+      resource: { id: employeeId },
+      response: { status: '200' },
+    };
+  }
+
+  private handleError(error: any, entryType: string = 'unknown', meta?: any): ErrorEntry {
+    if (error instanceof ManagerError) {
       return {
-        type: `${type}-receipt`,
-        id: employeeId,
-        resource: { id: employeeId },
-        response: { status: '200' },
+        type: entryType,
+        meta: meta,
+        response: {
+          status: error.status,
+          outcome: createOperationOutcome(IssueLevel.Error, error.code, error.message),
+        },
+      };
+    } else {
+      console.error('Unexpected error during employee processing:', error);
+      return {
+        type: entryType,
+        meta: meta,
+        response: {
+          status: '500',
+          outcome: createOperationOutcome(
+            IssueLevel.Error,
+            IssueType.Exception,
+            'An unexpected internal server error occurred.',
+          ),
+        },
       };
     }
-    
-    throw new ManagerError(`Unsupported request method: '${request.method}'`, IssueType.NotSupported);
   }
 }

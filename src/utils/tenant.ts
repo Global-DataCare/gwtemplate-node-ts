@@ -19,17 +19,21 @@ export function getTenantVaultId(sector: string, alternateName: string): string 
 
 
 /**
- * Validates a tenant's alternateName to ensure it doesn't conflict with the "host" name.
+ * Validates a tenant's alternateName to ensure it doesn't conflict with reserved patterns.
  * @param alternateName The alternateName to validate.
  * @returns True if the alternateName is valid, false otherwise.
  */
 export function isValidTenantAlternateName(alternateName: string): boolean {
   if (!alternateName) {
-    return false; // Or throw an error, depending on your requirements
+    return false;
+  }
+  // Underscore is a reserved character for the vaultId separator.
+  if (alternateName.includes('_')) {
+    return false;
   }
   const lowerName = alternateName.toLowerCase();
   if (lowerName === "host" || lowerName.startsWith("host") || lowerName.endsWith("host")) {
-    return false; // Invalid name
+    return false;
   }
-  return true; // Valid name
+  return true;
 }

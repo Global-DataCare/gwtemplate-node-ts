@@ -24,6 +24,10 @@ export interface DataInRequest {
   language?: string;
 }
 
+export enum JobAction {
+  "_batch" = "_batch",
+}
+
 /**
  * Represents the plaintext of a decoded DIDComm message.
  * This is the core business-level "input" for a job.
@@ -37,7 +41,6 @@ export interface DecodedDidcommMessage {
   /** The main content of the message */
   body: any
 }
-
 /**
  * Represents the entire data package for a single job ready for processing.
  * It combines the HTTP request context with the decoded message and its security context.

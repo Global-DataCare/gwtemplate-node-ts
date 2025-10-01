@@ -23,7 +23,7 @@ export interface IJobProcessor {
  * Note: Not all managers may process jobs (e.g., TenantMemManager might be synchronous).
  */
 export interface ManagerRegistry {
-  organizationManager: IJobProcessor;
+  hostingManager: IJobProcessor;
   tenantManager: TenantsCacheManager;
   employeeManager?: IJobProcessor;
   customerManager?: IJobProcessor;

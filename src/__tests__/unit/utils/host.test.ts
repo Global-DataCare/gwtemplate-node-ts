@@ -2,7 +2,7 @@
 // File: src/__tests__/unit/utils/host.test.ts
 
 import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
-import { testHostData } from '../../data/organization.data';
+import { testHostData } from '../../data/end-to-end.data';
 import { HostEnvVars } from '../../../models/env';
 import { createHostClaimsFromEnv } from '../../../utils/host';
 
