@@ -50,8 +50,8 @@ export async function generateConsentForm(): Promise<Uint8Array> {
     // TODO:  "Consent data" header
     ['Authorized Organization', 'providerLegalName'],
     ['Authorized Service Name', 'providerServiceName'],
-    ['Authorized Service URL', 'proviserServiceUrl'],
-    ['Consent Terms URL', 'termsUrl'],
+    ['Authorized Service URL', 'providerServiceUrl'],
+    ['Consent Terms URL', 'providerTermsUrl'],
   ];
 
   for (const [label, name] of textFields) {

@@ -34,3 +34,25 @@ export function createEmployeeUrn(params: EmployeeUrnParams): string {
   const roleCode = role.includes(':') ? role.split(':')[1] : role;
   return `${orgUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
 }
+
+/**
+ * Extracts the tenant's base URN from a longer, hierarchical URN.
+ * The tenant URN is considered to be the part of the string up to and including the entity identifier.
+ * @param fullUrn The complete, hierarchical URN (e.g., for an employee or connection).
+ * @returns The base URN of the tenant, or the original string if the pattern is not found.
+ */
+export function getTenantUrnPrefix(fullUrn: string): string {
+  const parts = fullUrn.split(':');
+  const entityIndex = parts.indexOf('entity');
+
+  if (entityIndex === -1 || entityIndex + 2 >= parts.length) {
+    // If 'entity' isn't found or there aren't enough parts for a full entity identifier,
+    // we can't determine the prefix, so we might return the original URN or handle as an error.
+    // For now, let's assume it might be a base URN already.
+    return fullUrn;
+  }
+
+  // The prefix includes the entity identifier (3 parts: 'entity', type, value)
+  const tenantParts = parts.slice(0, entityIndex + 3);
+  return tenantParts.join(':');
+}

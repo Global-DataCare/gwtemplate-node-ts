@@ -12,7 +12,8 @@ import {
     testClaimsHostAdmin1,
     testClaimsEmployeeAdminTenant1
 } from "./employee.data";
-import { testHostBaseData, testTenant1BaseData } from "./organization.data";
+import { testBaseDataHost, testBaseDataTenant1, testTenant1Urn } from "./organization.data";
+import { testServiceTermsClaimsForHost, testServiceTermsClaimsForTenant1 } from "./service.data";
 
 
 // ===================================================================================
@@ -24,10 +25,14 @@ import { testHostBaseData, testTenant1BaseData } from "./organization.data";
  * It assembles the base data with its administrative member.
  */
 export const testHostData = {
-    ...testHostBaseData,
+    ...testBaseDataHost,
     member: {
         admin1: testHostAdmin1,
     },
+    service: {
+        db: {},
+        terms: testServiceTermsClaimsForHost
+    }    
 };
 
 /**
@@ -35,13 +40,18 @@ export const testHostData = {
  * It assembles the base data with all its relevant members.
  */
 export const testTenant1Data = {
-    ...testTenant1BaseData,
+    ...testBaseDataTenant1,
+    identifier: testTenant1Urn,
     member: {
         admin1: testTenant1Admin1,
         receptionist1: testTenant1Receptionist1,
         firefighter1: testTenant1Firefighter1,
         nurse1: testTenant1Nurse1,
     },
+    service: {
+        db: {},
+        terms: testServiceTermsClaimsForTenant1
+    }
 };
 
 
@@ -59,10 +69,12 @@ const baseClaims: Omit<ClaimsRecord, "org.schema.Organization.legalName"> = {
 export const testClaimsHostOrganization: ClaimsRecord = {
     ...baseClaims,
     [ClaimsOrgSchemaorg.legalName]: testHostData.legalName,
-    [ClaimsOrgSchemaorg.identifier]: testHostData.identifier,
+    [ClaimsOrgSchemaorg.identifierType]: testHostData.identifierType,
+    [ClaimsOrgSchemaorg.identifierValue]: testHostData.identifierValue,
+    // [ClaimsOrgSchemaorg.identifierValue]: testHostData.identifier,
     [ClaimsOrgSchemaorg.alternateName]: testHostData.alternateName,
     [ClaimsOrgSchemaorg.addressCountry]: testHostData.addressCountry,
-    [ClaimsOrgSchemaorg.taxID]: testHostData.taxId,
+    // [ClaimsOrgSchemaorg.taxID]: testHostData.taxId,
 };
 
 /**
@@ -71,7 +83,7 @@ export const testClaimsHostOrganization: ClaimsRecord = {
 export const testClaimsHostInitialization = {
     ...testClaimsHostOrganization,
     ...testClaimsHostAdmin1,
-    [ClaimsServiceSchemaorg.category]: testHostData.provider.service.category,
+    [ClaimsServiceSchemaorg.category]: testHostData.provider.service.sectorCategory,
     [ClaimsServiceSchemaorg.identifier]: testHostData.provider.service.identifier,
     [ClaimsServiceSchemaorg.serviceType]: testHostData.provider.service.serviceTypePurpose,
     [ClaimsServiceSchemaorg.termsOfService]: testHostData.provider.service.termsOfService,
@@ -83,12 +95,13 @@ export const testClaimsHostInitialization = {
  */
 export const testClaimsTenant1Organization = {
     ...baseClaims,
-    // [ClaimsOrgSchemaorg.url]: testTenant1Data.url,
+    [ClaimsOrgSchemaorg.url]: testTenant1Data.url,
     [ClaimsOrgSchemaorg.legalName]: testTenant1Data.legalName,
-    [ClaimsOrgSchemaorg.identifier]: testTenant1Data.identifier,
+    [ClaimsOrgSchemaorg.identifierType]: testTenant1Data.identifierType,
+    [ClaimsOrgSchemaorg.identifierValue]: testTenant1Data.identifierValue,
     [ClaimsOrgSchemaorg.alternateName]: testTenant1Data.alternateName,
     [ClaimsOrgSchemaorg.addressCountry]: testTenant1Data.addressCountry,
-    [ClaimsOrgSchemaorg.taxID]: testTenant1Data.taxId,
+    // [ClaimsOrgSchemaorg.taxID]: testTenant1Data.taxId,
 };
 
 /**
@@ -97,7 +110,7 @@ export const testClaimsTenant1Organization = {
 export const testClaimsTenant1Registration = {
     ...testClaimsTenant1Organization,
     ...testClaimsEmployeeAdminTenant1,
-    [ClaimsServiceSchemaorg.category]: testTenant1Data.provider.service.category,
+    [ClaimsServiceSchemaorg.category]: testTenant1Data.provider.service.sectorCategory,
     [ClaimsServiceSchemaorg.identifier]: testTenant1Data.provider.service.identifier,
     [ClaimsServiceSchemaorg.termsOfService]: testTenant1Data.provider.service.termsOfService,
     [ClaimsServiceSchemaorg.serviceType]: testTenant1Data.provider.service.serviceTypePurpose,

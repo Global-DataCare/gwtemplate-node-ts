@@ -21,6 +21,7 @@ import { DidService } from '../../models/did';
 import { createDidServiceId } from '../../utils/did';
 import { createOrganizationUrn } from '../../utils/urn';
 import { getTenantVaultId } from '../../utils/tenant';
+import { OrganizationUrnParams } from '../../models/tenant';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -84,14 +85,24 @@ describe('Employee Creation API', () => {
         '/_batch-response',
       );
 
+      const organizationUrnParams: OrganizationUrnParams = {
+        namespace: 'antifraud',
+        network: 'test-network',
+        jurisdiction: jurisdiction,
+        version: 'v1',
+        sector: sector,
+        idType: testTenant1Data.identifierType,
+        idValue: testTenant1Data.identifierValue,
+      }
+
       const tenantUrn = createOrganizationUrn({
         namespace: 'antifraud',
         network: 'test-network',
         jurisdiction: jurisdiction,
         version: 'v1',
         sector: sector,
-        idType: 'tax',
-        idValue: testTenant1Data.taxId,
+        idType: testTenant1Data.identifierType,
+        idValue: testTenant1Data.identifierValue,
       });
 
       // --- 3. Configure Mocks using the constants ---

@@ -14,7 +14,7 @@ export interface EntityUrnBaseParams {
 }
 
 export interface OrganizationUrnParams extends EntityUrnBaseParams {
-  idType: 'tax';
+  idType: string;
   idValue: string;
 }
 
@@ -30,6 +30,8 @@ export interface EmployeeUrnParams extends OrganizationUrnParams {
  */
 export interface TenantConfig extends RecordBase {
   // `id` is inherited from RecordBase
+  claims: {
+  }
   
   /**
    * Public-facing identifier, used in URLs. e.g., 'org1'
@@ -42,7 +44,7 @@ export interface TenantConfig extends RecordBase {
   legalName: string;
 
   /**
-   * The public identifier (e.g., 'taxID|B12345678').
+   * The public identifier (e.g., the URN).
    */
   identifier: string;
 

@@ -36,6 +36,34 @@ Before contributing code, it is **essential** to read and understand the core ar
 *   **[Organization Registration Process (`src/docs/organization_registration.md`)(src/docs/organization_registration.md)**: Details the specific process of registering new organizations (tenants) within the system.
 *   **[Testing Strategy (`src/__tests__/README.md`)(src/__tests__/README.md)**: Explains the testing approach and how to run tests.
 
+## Data Flow: From Flat Claims to Semantic URNs
+
+A core task in the system is the deterministic generation of a canonical, semantic URN for an entity (like an Organization or an Employee) from the raw data provided during registration.
+
+1.  **Input Data (Flat Claims):** The system receives all input data as a flat key-value map of `claims`. For identifiers and other nested structures, we use a flattened dot-notation convention.
+
+    *Example Input Claims:*
+    ```typescript
+    const claims = {
+      'org.schema.Organization.legalName': 'Acme Company',
+      'org.schema.Organization.identifier.type': 'TAX',
+      'org.schema.Organization.identifier.value': 'B12345678',
+      'org.schema.Organization.address.addressCountry': 'ES',
+      // ... other claims
+    };
+    ```
+
+2.  **Manager's Role:** The responsible `Manager` (e.g., `CustomerManager`) receives these claims. Its primary role is to validate them and orchestrate the process.
+
+3.  **URN Generation (Utility Function):** The `Manager` passes the entire `claims` object to a dedicated utility function (e.g., `createUrnFromClaims(claims)` located in `src/utils/urn.ts`).
+
+4.  **Utility's Logic:** The utility function is responsible for extracting the required keys from the `claims` object (`identifier.type`, `identifier.value`, `address.addressCountry`, etc.) and using them to construct the canonical URN string according to the architecture defined in `VC_ARCHITECTURE.md`.
+
+This approach ensures that:
+- The logic for URN creation is centralized and easily testable.
+- Managers remain lightweight and their dependencies are clear.
+- The `claims` object remains the unaltered source of truth for the operation.
+
 ## Core Development Principles
 
 To maintain a high-quality, secure, and maintainable codebase, all contributions **MUST** adhere to the following principles.
@@ -88,7 +116,7 @@ The project is configured to run unit and integration tests using Jest. The conf
 To run the complete test suite (both unit and integration tests):
 ```bash
 
-npm test
+npm run test
 ```
 
 ### Running Only Unit Tests
@@ -97,7 +125,7 @@ To run only the unit tests (files located in `src/__tests__/unit`):
 
 ```bash
 
-npm test -- src/__tests__/unit
+npm run test:unit
 ```
 
 ### Running Only Integration Tests
@@ -105,7 +133,7 @@ npm test -- src/__tests__/unit
 To run only the integration tests (files located in `src/__tests__/integration`):
 ```bash
 
-npm test -- src/__tests__/integration
+npm run test:integration
 ```
 
 ### Running a Specific Test File
@@ -113,5 +141,4 @@ npm test -- src/__tests__/integration
 To run a single test file, pass its path to the `npm test` command:
 
 ```bash
-npm test -- src/__tests__/unit/security/AesManager.test.ts
-```
+npm run test -- src/__tests__/unit/crypto/AesManager.test.ts

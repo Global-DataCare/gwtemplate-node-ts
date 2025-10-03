@@ -43,9 +43,9 @@ export function createHostClaimsFromEnv(): ClaimsRecord {
         [ClaimsOrgSchemaorg.legalName]: process.env[HostEnvVars.LEGAL_NAME],
         [ClaimsOrgSchemaorg.addressCountry]: process.env[HostEnvVars.JURISDICTION],
         // The taxID claim is constructed from two env vars, as per your spec
-        [ClaimsOrgSchemaorg.taxID]: `${process.env[HostEnvVars.ID_VALUE]}`,
+        // [ClaimsOrgSchemaorg.taxID]: `${process.env[HostEnvVars.ID_VALUE]}`,
         [ClaimsOrgSchemaorg.alternateName]: "host", // Hardcoded as per system design
-        [ClaimsOrgSchemaorg.duns]: process.env[HostEnvVars.DUNS], // Optional, will be undefined if not set
+        // [ClaimsOrgSchemaorg.duns]: process.env[HostEnvVars.DUNS], // Optional, will be undefined if not set
 
         // --- Person (Admin) Claims ---
         [ClaimsPersonSchemaorg.email]: process.env[HostEnvVars.ADMIN_EMAIL],

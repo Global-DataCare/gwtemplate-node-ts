@@ -181,12 +181,12 @@ export class HostingManager {
         if (
           tenants.some(
             t =>
-              t.identifier === claims[ClaimsOrgSchemaorg.taxID] &&
+              t.identifier === claims[ClaimsOrgSchemaorg.identifier] &&
               t.jurisdiction === claims[ClaimsOrgSchemaorg.addressCountry],
           )
         ) {
           throw new ManagerError(
-            `Conflict: already exists the taxID '${claims[ClaimsOrgSchemaorg.taxID]}' issued by '${claims[ClaimsOrgSchemaorg.addressCountry]}' jurisdiction`,
+            `Conflict: already exists the tenant '${claims[ClaimsOrgSchemaorg.identifier]}' issued by '${claims[ClaimsOrgSchemaorg.addressCountry]}' jurisdiction`,
             IssueType.Duplicate,
           );
         }
@@ -275,6 +275,7 @@ export class HostingManager {
     // 2. Construct the host's own TenantConfig object.
     const hostConfig: TenantConfig = {
       id: org.id,
+      claims: {},
       identifier: org.meta.claims[ClaimsOrgSchemaorg.identifier],
       alternateName: 'host',
       legalName: org.meta.claims[ClaimsOrgSchemaorg.legalName],
@@ -370,6 +371,7 @@ export class HostingManager {
 
     const tenantConfig: TenantConfig = {
       id: org.id,
+      claims: {},
       identifier: org.meta.claims[ClaimsOrgSchemaorg.identifier],
       alternateName: altName,
       legalName: org.meta.claims[ClaimsOrgSchemaorg.legalName],
@@ -404,7 +406,7 @@ export class HostingManager {
         {
           attributes: [
             { name: 'alternateName', value: altName, unique: true },
-            { name: 'taxId', value: org.meta.claims[ClaimsOrgSchemaorg.taxID] },
+            { name: 'taxId', value: org.meta.claims[ClaimsOrgSchemaorg.identifier] },
           ],
           hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
         },

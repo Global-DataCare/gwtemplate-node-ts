@@ -53,6 +53,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string) =>
     Promise.resolve(doc.content as any),
   ),
+  getHostPublicJwkSet: jest.fn(),  
   getPublicVerificationKey: jest.fn(),
   getPublicEncryptionKey: jest.fn(),
 };
@@ -249,7 +250,7 @@ describe('HostingManager', () => {
   });
   
   it("[8] TENANT: should produce an error entry if taxID and country combination already exists", async () => {
-    const existingConfig: Partial<TenantConfig> = { identifier: testTenant1Data.taxId, jurisdiction: testTenant1Data.addressCountry, sector: Sector.HEALTH_CARE };
+    const existingConfig: Partial<TenantConfig> = { identifier: testTenant1Data.identifier, jurisdiction: testTenant1Data.addressCountry, sector: Sector.HEALTH_CARE };
     jest.spyOn(vaultRepository, 'getContainersInSection').mockResolvedValue([existingConfig as TenantConfig]);
     const job = testBaseJobForClaims(testClaimsTenant1Registration);
 
