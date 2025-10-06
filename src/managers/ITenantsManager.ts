@@ -1,7 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/ITenantsManager.ts
 
-import { DidService } from "../models/did";
+import { DidDocument, DidService } from "../models/did";
 
 /**
  * Defines the contract for the Tenants Manager cache.
@@ -29,4 +29,6 @@ export interface ITenantsManager {
    * @returns An array of DidService configurations or undefined if not found.
    */
   getDidServiceConfig(vaultId: string): DidService[] | undefined;
+
+  getDidDocument(vaultId: string): DidDocument | undefined;
 }

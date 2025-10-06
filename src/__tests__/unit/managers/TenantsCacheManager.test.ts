@@ -4,7 +4,7 @@
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
-import { TenantConfig } from '../../../models/tenant';
+import { EntityConfig } from '../../../models/entity';
 import { getTenantVaultId } from '../../../utils/tenant';
 import { testTenant1Data } from '../../data/end-to-end.data';
 import { Sector } from '../../../models/sector';
@@ -28,7 +28,7 @@ describe('TenantsCacheManager', () => {
   const tenantUrn = `urn:antifraud:test-network:us:v1:health-care:entity:tax:${MOCK_TENANT_TAX_ID}`;
 
   // CORRECTED: Added all required fields for TenantConfig
-  const hostConfig: TenantConfig = {
+  const hostConfig: EntityConfig = {
     id: 'host-uuid',
     type: 'TenantConfig',
     alternateName: 'host',
@@ -43,8 +43,8 @@ describe('TenantsCacheManager', () => {
   };
 
   // CORRECTED: Added all required fields for TenantConfig
-  const acmeConfig: TenantConfig = {
-    id: testTenant1Data.uuid,
+  const acmeConfig: EntityConfig = {
+    id: testTenant1Data.id,
     type: 'TenantConfig',
     alternateName: testTenant1Data.alternateName,
     legalName: testTenant1Data.legalName,

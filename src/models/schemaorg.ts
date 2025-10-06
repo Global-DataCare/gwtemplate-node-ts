@@ -7,22 +7,33 @@ import { ParameterData } from "./params";
  * Defines the canonical claim names for the 'org.schema' context,
  * based on Schema.org vocabulary.
  */
-export enum ClaimsOrgSchemaorg {
-  addressCountry = "org.schema.Organization.address.addressCountry",
-  addressRegion = "org.schema.Organization.address.addressRegion",
-  addressLocality = "org.schema.Organization.address.addressLocality",
-  postalCode = "org.schema.Organization.address.postalCode",
-  streetAddress = "org.schema.Organization.address.streetAddress",
-  alternateName = "org.schema.Organization.alternateName",
-  duns = "org.schema.Organization.duns",
-  email = "org.schema.Organization.email",
-  identifier = "org.schema.Organization.identifier", // the URN (composed by the provider)
-  identifierType = "org.schema.Organization.identifier.additionalType", // retrieved from a form
-  identifierValue = "org.schema.Organization.identifier.value", // retrieved from a form
-  legalName = "org.schema.Organization.legalName",
-  // taxID = "org.schema.Organization.taxID",
-  telephone = "org.schema.Organization.telephone",
-  url = "org.schema.Organization.url",
+export enum ClaimsOrganizationSchemaorg {
+    /** ISO 3166-1 alpha-2 (two-letter country code). The jurisdiction could be the country or the region (county, province or state) */
+    addressCountry = "org.schema.Organization.address.addressCountry",
+    /** ISO 3166-2 code for administrative divisions. The jurisdiction could be the country or the region (county, province or state) */
+    addressRegion = "org.schema.Organization.address.addressRegion",
+    addressLocality = "org.schema.Organization.address.addressLocality",
+    postalCode = "org.schema.Organization.address.postalCode",
+    streetAddress = "org.schema.Organization.address.streetAddress",
+    /** `TAX` ID or `EI` (Employer ID): @see http://terminology.hl7.org/CodeSystem/v2-0203 */
+    identifierType = "org.schema.Organization.identifier.additionalType",
+    identifierValue = "org.schema.Organization.identifier.value",
+    /** Legal registered name */
+    legalName = "org.schema.Organization.legalName",
+    /** Commercial name */
+    name = "org.schema.Organization.name",
+    /** short url-friendly name (0-9,a-z) */
+    alternateName = "org.schema.Organization.alternateName",
+    /** External URL for the service */
+    url = "org.schema.Organization.url",
+    /** The identifier is a URN generated using the legal ID (TAX or EI) */
+    identifier = "org.schema.Organization.identifier",
+    /** DUNS (free) or LEI could be provided */
+    duns = "org.schema.Organization.duns",
+    /** Public contact email */
+    email = "org.schema.Organization.email",
+    /** Public contact phone */
+    telephone = "org.schema.Organization.telephone",
 }
 
 /** For Employees (and Employee Role, but no PII) and customers / related persons.

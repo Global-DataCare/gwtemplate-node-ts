@@ -1,7 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/utils/urn.ts
 
-import { OrganizationUrnParams, EmployeeUrnParams } from "../models/tenant";
+import { OrganizationUrnParams, EmployeeUrnParams } from "../models/entity";
 
 /**
  * Creates a canonical URN string from a given UUID.

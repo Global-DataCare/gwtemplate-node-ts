@@ -11,12 +11,12 @@ This document specifies the architecture for issuing and managing Verifiable Cre
 
 ## 2. The "Pointer Credential" Pattern
 
-We issue **Pointer Credentials**. The `credentialSubject` is minimal and contains only one property: the `id`, which is the entity's stable and globally unique **Semantic URN**.
+We issue **Pointer Credentials**. The `credentialSubject` is minimal and contains only one property: the `identifier`, which is the entity's stable and globally unique **Semantic URN**.
 
 Example: 
 ```json
 "credentialSubject": {
-  "id": "urn:antifraud:test-network:es:v1:health-care:entity:tax:B0011223344"
+  "identifier": "urn:antifraud:test-network:es:v1:health-care:entity:tax:B0011223344"
 }
 ```
 
@@ -166,9 +166,9 @@ The hierarchical identifier model allows for a variety of credential types, each
 
 ### 7.1. Relationship Credential
 
-This credential type is used to prove that a specific, identified person has a verifiable relationship (e.g., parent, guardian) to the subject of a connection.
+This credential type is used to prove that a specific, identified person has a verifiable relationship (e.g., parent, guardian) to the subject of a connection. It is base on the 
 
--   **`credentialSubject.id`**: The full URN of the relationship, e.g., `...:connection:uuid:<uuid>:related:ppn:es:A1234567B:role:relationship:PRN`.
+-   **`credentialSubject.identifier`**: The full URN of the relationship, e.g., `...:connection:uuid:<uuid>:related:ppnes:A1234567B:role:relationship:PRN`.
 -   **Content:** The `credentialSubject` can contain additional details about the relationship, such as the validity period.
 -   **Purpose:** Allows a parent or guardian to present a credential that proves their authority over the child's connection DID, enabling them to act on the child's behalf.
 
@@ -176,7 +176,7 @@ This credential type is used to prove that a specific, identified person has a v
 
 This credential grants a professional temporary, auditable access to the data associated with a connection.
 
--   **`credentialSubject.id`**: The full URN of the professional access role, e.g., `...:connection:uuid:<uuid>:employee:email:doc@hosp.com:role:isco-08:2211`.
+-   **`credentialSubject.identifier`**: The full URN of the professional access role, e.g., `...:connection:uuid:<uuid>:employee:email:doctor@acme.org:role:isco-08:2211`.
 -   **Content:** The `credentialSubject` typically includes a `scope` or `permissions` field detailing what actions are permitted (e.g., `read:medical_history`).
 -   **Purpose:** Replaces traditional access control lists with a portable, verifiable, and time-bound authorization token.
 

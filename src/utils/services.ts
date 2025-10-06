@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { EmployeeConfig } from '../models/employee-config';
-import { TenantConfig } from '../models/tenant';
+import { EntityConfig } from '../models/entity';
 import { Sector } from '../models/sector';
 import { DidService } from '../models/did';
 import { createDidServiceId } from './did';
@@ -31,7 +31,7 @@ const createDidEndpointConfig = (id: string, resources: string[], actions: strin
  * @param tenantConfig The configuration of the tenant, containing the `sector`.
  * @returns An array of `DidService` objects for the tenant's business logic endpoints.
  */
-function generateDefaultBusinessServices(tenantConfig: TenantConfig): DidService[] {
+function generateDefaultBusinessServices(tenantConfig: EntityConfig): DidService[] {
   const { sector } = tenantConfig;
   const services: DidService[] = [];
   const isFhir = FHIR_SECTORS.includes(sector);
@@ -67,7 +67,7 @@ function generateDefaultBusinessServices(tenantConfig: TenantConfig): DidService
  * @param customServices An optional array of custom service configurations for future extensibility.
  * @returns The complete array of DidService objects for the didDocument.
  */
-export function initializeTenantServices(tenantConfig: TenantConfig, customServices: DidService[] = []): DidService[] {
+export function initializeTenantServices(tenantConfig: EntityConfig, customServices: DidService[] = []): DidService[] {
   const { didConfig: didDocument } = tenantConfig;
   // Robustly parse the DID to get the base URL, preventing replace errors.
   const didIdentifier = didDocument.id.substring('did:web:'.length);
@@ -101,7 +101,7 @@ export function initializeTenantServices(tenantConfig: TenantConfig, customServi
  * @param hostConfig The configuration of the host tenant.
  * @returns The complete array of DidService objects for the host's didDocument.
  */
-export function initializeHostServices(hostConfig: TenantConfig): DidService[] {
+export function initializeHostServices(hostConfig: EntityConfig): DidService[] {
   const { didConfig: didDocument, sectorsAllowed } = hostConfig;
   const didIdentifier = didDocument.id.substring('did:web:'.length);
   const baseUrl = `https://${didIdentifier.replace(/:/g, '/')}`;

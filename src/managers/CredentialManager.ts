@@ -4,11 +4,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import { VaultRepository } from '../database/repositories/vault/vault.repository';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { TenantConfig } from '../models/tenant';
+import { EntityConfig } from '../models/entity';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { ManagerError } from '../models/errors/manager-error';
 import { IssueType } from '../models/fhir/codes';
-import { VerifiableCredential } from '../models/verifiable-credential';
+import { VerifiableCredentialV2 } from '../models/verifiable-credential';
 import { objectToBytes } from '../utils/object-convert';
 import { MldsaPublicJwk } from '../crypto/interfaces/Cryptography.types';
 import { getTenantVaultId } from '../utils/tenant';
@@ -40,7 +40,7 @@ export class CredentialManager {
    * @param resourceType The type of resource (e.g., 'Organization', 'EmployeeRole').
    * @returns A promise that resolves to the decrypted VerifiableCredential.
    */
-  public async search(tenant: TenantConfig, subjectUrn: string, resourceType: string): Promise<VerifiableCredential> {
+  public async search(tenant: EntityConfig, subjectUrn: string, resourceType: string): Promise<VerifiableCredentialV2> {
     const vaultId = getTenantVaultId(tenant.sector, tenant.alternateName);
     const collectionId = `credential.${resourceType}`;
     
@@ -60,7 +60,7 @@ export class CredentialManager {
       );
     }
 
-    const decryptedVc = await this.kmsService.unprotectConfidentialData<VerifiableCredential>(encryptedDoc, decryptionEntityId);
+    const decryptedVc = await this.kmsService.unprotectConfidentialData<VerifiableCredentialV2>(encryptedDoc, decryptionEntityId);
     return decryptedVc;
   }
 
@@ -69,13 +69,13 @@ export class CredentialManager {
    * @param vaultId The internal vault ID of the tenant (e.g., 'health-care_acme').
    * @returns A promise that resolves to the complete, signed VerifiableCredential object.
    */
-  public async issueOrganizationSelfDescription(vaultId: string): Promise<VerifiableCredential> {
+  public async issueOrganizationSelfDescription(vaultId: string): Promise<VerifiableCredentialV2> {
     // 1. Fetch and decrypt tenant data
     const encryptedDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(vaultId, 'tenants');
     if (!encryptedDoc) {
       throw new ManagerError(`Tenant with vaultId '${vaultId}' not found in repository.`, IssueType.NotFound);
     }
-    const tenantConfig = await this.kmsService.unprotectConfidentialData<TenantConfig>(encryptedDoc, 'host');
+    const tenantConfig = await this.kmsService.unprotectConfidentialData<EntityConfig>(encryptedDoc, 'host');
 
     // 2. Construct the Credential Subject from the tenant's public claims
     const credentialSubject: Record<string, any> = {
@@ -95,7 +95,7 @@ export class CredentialManager {
     const oneYearFromNow = new Date(now.getTime());
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
 
-    const unsignedVc: VerifiableCredential = {
+    const unsignedVc: VerifiableCredentialV2 = {
       '@context': [
         'https://www.w3.org/2018/credentials/v1',
         'https://schema.org/', // Add schema.org context for fields like 'legalName'
@@ -103,8 +103,8 @@ export class CredentialManager {
       id: `urn:uuid:${uuidv4()}`, // Unique ID for the credential itself
       type: ['VerifiableCredential', 'Organization'],
       issuer: this.hostDid,
-      issuanceDate: now.toISOString(),
-      expirationDate: oneYearFromNow.toISOString(),
+      validFrom: now.toISOString(),
+      validUntil: oneYearFromNow.toISOString(),
       credentialSubject: credentialSubject,
     };
 
@@ -119,7 +119,7 @@ export class CredentialManager {
     // The JWS is constructed in detached format (header..signature)
     const jws = `${signatureResult.signatures[0].protected}..${signatureResult.signatures[0].signature}`;
 
-    const signedVc: VerifiableCredential = {
+    const signedVc: VerifiableCredentialV2 = {
       ...unsignedVc,
       proof: {
         type: 'JsonWebSignature2020',

@@ -4,7 +4,7 @@
 import express from 'express';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { DiscoveryService } from '../services/DiscoveryService';
-import { TenantConfig } from '../models/tenant';
+import { EntityConfig } from '../models/entity';
 import { pingHandler } from './handlers/discovery/ping.handler';
 // List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
@@ -74,7 +74,7 @@ export function createDiscoveryRouter(
 
   // --- FHIR-Specific Endpoints ---
   const isFhirSector = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const tenantConfig: TenantConfig = res.locals.tenantConfig;
+    const tenantConfig: EntityConfig = res.locals.tenantConfig;
     if (tenantConfig && FHIR_SECTORS.includes(tenantConfig.sector)) {
       return next();
     }

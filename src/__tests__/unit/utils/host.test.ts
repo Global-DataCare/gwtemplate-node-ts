@@ -1,7 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/utils/host.test.ts
 
-import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
 import { testHostData } from '../../data/end-to-end.data';
 import { HostEnvVars } from '../../../models/env';
 import { createHostClaimsFromEnv } from '../../../utils/host';
@@ -35,10 +35,10 @@ describe('createHostClaimsFromEnv', () => {
 
         expect(claims).toBeDefined();
         
-        expect(claims[ClaimsOrgSchemaorg.legalName]).toBe(testHostData.legalName);
-        expect(claims[ClaimsOrgSchemaorg.addressCountry]).toBe(testHostData.addressCountry);
-        expect(claims[ClaimsOrgSchemaorg.taxID]).toBe(testHostData.taxId);
-        expect(claims[ClaimsOrgSchemaorg.alternateName]).toBe("host");
+        expect(claims[ClaimsOrganizationSchemaorg.legalName]).toBe(testHostData.legalName);
+        expect(claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe(testHostData.addressCountry);
+        expect(claims[ClaimsOrganizationSchemaorg.taxID]).toBe(testHostData.taxId);
+        expect(claims[ClaimsOrganizationSchemaorg.alternateName]).toBe("host");
 
         expect(claims[ClaimsPersonSchemaorg.email]).toBe(testHostData.member.admin1.email);
         expect(claims[ClaimsPersonSchemaorg.hasOccupation]).toBe(testHostData.member.admin1.hasOccupation);

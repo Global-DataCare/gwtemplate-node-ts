@@ -2,7 +2,7 @@
 // File: src/utils/host.ts
 
 import { v4 as uuidv4} from 'uuid';
-import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from "../models/schemaorg";
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from "../models/schemaorg";
 import { HostEnvVars } from "../models/env";
 import { JobRequest } from "../models/request";
 import { ClaimsRecord } from "../models/resource-document";
@@ -40,11 +40,11 @@ export function createHostClaimsFromEnv(): ClaimsRecord {
         "@type": "template",
 
         // --- Organization Claims ---
-        [ClaimsOrgSchemaorg.legalName]: process.env[HostEnvVars.LEGAL_NAME],
-        [ClaimsOrgSchemaorg.addressCountry]: process.env[HostEnvVars.JURISDICTION],
+        [ClaimsOrganizationSchemaorg.legalName]: process.env[HostEnvVars.LEGAL_NAME],
+        [ClaimsOrganizationSchemaorg.addressCountry]: process.env[HostEnvVars.JURISDICTION],
         // The taxID claim is constructed from two env vars, as per your spec
         // [ClaimsOrgSchemaorg.taxID]: `${process.env[HostEnvVars.ID_VALUE]}`,
-        [ClaimsOrgSchemaorg.alternateName]: "host", // Hardcoded as per system design
+        [ClaimsOrganizationSchemaorg.alternateName]: "host", // Hardcoded as per system design
         // [ClaimsOrgSchemaorg.duns]: process.env[HostEnvVars.DUNS], // Optional, will be undefined if not set
 
         // --- Person (Admin) Claims ---
@@ -58,8 +58,8 @@ export function createHostClaimsFromEnv(): ClaimsRecord {
     };
 
     // Clean up optional undefined values
-    if (!claims[ClaimsOrgSchemaorg.duns]) {
-        delete claims[ClaimsOrgSchemaorg.duns];
+    if (!claims[ClaimsOrganizationSchemaorg.duns]) {
+        delete claims[ClaimsOrganizationSchemaorg.duns];
     }
 
     return claims;

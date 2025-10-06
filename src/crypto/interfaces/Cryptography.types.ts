@@ -2,10 +2,26 @@
 // File: src/security/interfaces/Cryptography.types.ts
 
 /**
- * @see https://datatracker.ietf.org/doc/draft-ietf-jose-pqc-kem/
- * @see https://cose-wg.github.io/draft-ietf-cose-dilithium/draft-ietf-cose-dilithium.html
+ * JWK shapes and RFC 7638 thumbprints for ML-KEM and ML-DSA.
+ *
+ * References (normative)
+ * @see https://www.rfc-editor.org/rfc/rfc7638           // JWK Thumbprint
+ * @see https://www.rfc-editor.org/rfc/rfc7517           // JWK
+ * @see https://www.rfc-editor.org/rfc/rfc7515#appendix-C // base64url (no padding)
+ * @see https://www.rfc-editor.org/rfc/rfc8037           // OKP key type
+ * @see https://www.rfc-editor.org/rfc/rfc9278           // JWK Thumbprint URI
+ *
+ * Post-quantum mappings
+ * @see https://datatracker.ietf.org/doc/draft-ietf-jose-pqc-kem/                 // JOSE PQ KEM
+ * @see https://datatracker.ietf.org/doc/draft-ietf-cose-dilithium/               // ML-DSA for JOSE/COSE (datatracker)
+ * @see https://cose-wg.github.io/draft-ietf-cose-dilithium/draft-ietf-cose-dilithium.html // ML-DSA (GitHub pages)
+ *
+ * NIST algorithm specs
+ * @see https://csrc.nist.gov/pubs/fips/203/final // FIPS 203 ML-KEM (landing)
+ * @see https://nvlpubs.nist.gov/nistpubs/fips/nist.fips.203.pdf // FIPS 203 PDF
+ * @see https://csrc.nist.gov/pubs/fips/204/final // FIPS 204 ML-DSA (landing)
+ * @see https://nvlpubs.nist.gov/nistpubs/fips/nist.fips.204.pdf // FIPS 204 PDF
  */
-;
 
 export type CurveMlKem512 = "ML-KEM-512";
 export type CurveMlKem768 = "ML-KEM-768";

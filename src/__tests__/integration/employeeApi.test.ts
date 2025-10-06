@@ -21,7 +21,7 @@ import { DidService } from '../../models/did';
 import { createDidServiceId } from '../../utils/did';
 import { createOrganizationUrn } from '../../utils/urn';
 import { getTenantVaultId } from '../../utils/tenant';
-import { OrganizationUrnParams } from '../../models/tenant';
+import { OrganizationUrnParams } from '../../models/entity';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {

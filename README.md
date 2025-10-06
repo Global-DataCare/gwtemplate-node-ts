@@ -17,22 +17,39 @@ Following TDD helps to ensure that the code is well-tested, maintainable, and me
 
 This project's documentation is split into several key files. Start here to understand the architecture, development patterns, and testing strategies.
 
-1.  **[Setup and Configuration Guide (`SETUP_GUIDE.md`)](SETUP_GUIDE.md)**
-    This document explains how to configure the necessary environment variables for the service to run, especially for the initial `host` setup. **Start here.**
-2.  **[Architecture Patterns (`ARCHITECTURE_PATTERNS.md`)](ARCHITECTURE_PATTERNS.md)**
+### Core Architecture & Development
+
+1.  **[Architecture Patterns (`ARCHITECTURE_PATTERNS.md`)](ARCHITECTURE_PATTERNS.md)**
     This is the **most important document**. It is the single source of truth for the core architectural decisions, data flows, and API structure. It serves as a formal specification and a "prompt" for any AI-assisted development to ensure consistency. **Read this first.**
 
-3.  **[New Storage Architecture Plan (`NEW_STORAGE_ARCH.md`)](NEW_STORAGE_ARCH.md)**
-    This document outlines the plan to refactor the storage layer towards a unified Repository pattern. It details the future structure for database interactions, ensuring a clean separation of concerns.
-
-4.  **[Developer Guide (`DEVELOPER_GUIDE.md`)](DEVELOPER_GUIDE.md)**
+2.  **[Developer Guide (`DEVELOPER_GUIDE.md`)](DEVELOPER_GUIDE.md)**
     This guide provides practical instructions for developers, including setup, running the server, and examples of how to interact with the API using `curl`.
 
-5.  **[Organization Registration Process (`src/docs/organization_registration.md`)](src/docs/organization_registration.md)**
-    This document details the process for registering new organizations (tenants) within the system, covering data flow, component responsibilities, security considerations (FAPI, DIDComm), and data structures. It also serves as a prompt for developers and AI code generation related to the registration process.
+3.  **[Setup and Configuration Guide (`SETUP_GUIDE.md`)](SETUP_GUIDE.md)**
+    This document explains how to configure the necessary environment variables for the service to run, especially for the initial `host` setup.
 
-6.  **[Testing Strategy (`src/__tests__/README.md`)](src/__tests__/README.md)**
+4.  **[New Storage Architecture Plan (`NEW_STORAGE_ARCH.md`)](NEW_STORAGE_ARCH.md)**
+    This document outlines the plan to refactor the storage layer towards a unified Repository pattern. It details the future structure for database interactions, ensuring a clean separation of concerns.
+
+5.  **[Testing Strategy (`src/__tests__/README.md`)](src/__tests__/README.md)**
     This document explains the testing philosophy, the structure of the integration tests, and how to add new test cases.
+
+### Identity, Trust, and Fabric Integration
+
+This set of documents describes the end-to-end architecture for integrating with a Hyperledger Fabric blockchain as a trust layer, following Self-Sovereign Identity (SSI) principles.
+
+1.  **[Identity Bootstrapping Guide (`IDENTITY_BOOTSTRAP_GUIDE.md`)](IDENTITY_BOOTSTRAP_GUIDE.md)**
+    This is the main guide that describes the conceptual flow for onboarding organizations (`Org A`, `Host B`, `Tenant C`) into the federated trust network, from legal identity verification to blockchain credential issuance.
+
+2.  **[Trust and Assurance Level Policy (`TRUST_POLICY.md`)](TRUST_POLICY.md)**
+    This document defines the business rules and security policies for identity verification, including the different Levels of Assurance (LoA) and the secure protocols for escalating verification when initial evidence is insufficient.
+
+3.  **[Fabric Implementation Plan (`FABRIC_IMPLEMENTATION_PLAN.md`)](FABRIC_IMPLEMENTATION_PLAN.md)**
+    This document provides the detailed technical plan for developers. It specifies the new components, API endpoints, managers, and tests required to implement the Fabric onboarding flow described in the bootstrapping guide.
+
+4.  **[Organization Registration Process (`src/docs/organization_registration.md`)](src/docs/organization_registration.md)**
+    This document details the existing process for registering new tenants, which serves as the foundation for the Fabric integration.
+
 
 ## Quick Start
 

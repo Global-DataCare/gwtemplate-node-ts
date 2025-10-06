@@ -1,0 +1,61 @@
+// src/__tests__/data/fabric-enrollment.data.ts
+// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+
+import { ClaimsActionSchemaorg } from '../../models/claims-action';
+import { DidDocument } from '../../models/did';
+import { DecodedDidcommMessage } from '../../models/request';
+import { testTenant1Data, testClaimsTenant1Registration } from './end-to-end.data';
+import { testHostDidWebIdentifier, testTenant1DidWebExternalIdentifier, testTenant1DidWebHostedIdentifier } from './organization.data';
+
+// ACTORS
+export const testControllerT_Did = 'did:web:controller-t.example.com';
+export const testFabricNetwork_Urn = 'urn:antifraud:fabric:test-network';
+
+export const testTenantC_DidDocument: DidDocument = {
+  '@context': 'https://www.w3.org/ns/did/v1',
+  id: testTenant1DidWebHostedIdentifier, // DID of Tenant C
+  alsoKnownAs: [testTenant1DidWebExternalIdentifier],
+  verificationMethod: [ /* ... */ ],
+  assertionMethod: [
+    testControllerT_Did, // Grants permission to Controller T
+  ],
+  authentication: [ /* ... */ ],
+};
+
+// FLAT CLAIMS FOR THE ACTION
+export const testFabricEnrollmentClaims = {
+  // The Agent is Tenant C. We prefix all its claims with 'org.schema.Action.agent.'
+  ...Object.entries(testClaimsTenant1Registration).reduce((acc, [key, value]) => {
+    acc[`org.schema.Action.agent.${key.replace('org.schema.Organization.', '')}`] = value;
+    return acc;
+  }, {} as any),
+  [ClaimsActionSchemaorg.agentIdentifier]: testTenant1Data.identifier, // URN of Tenant C
+
+  // The Participant is Controller T
+  [ClaimsActionSchemaorg.participantIdentifier]: testControllerT_Did,
+
+  // The Provider is the Fabric Network
+  [ClaimsActionSchemaorg.providerIdentifier]: testFabricNetwork_Urn,
+  [ClaimsActionSchemaorg.providerName]: 'Antifraud Test Network',
+
+  // The Start Time of the action
+  [ClaimsActionSchemaorg.startTime]: new Date().toISOString(),
+};
+
+// JOB REQUEST PAYLOAD
+export const testFabricEnrollmentRequestBody = {
+  data: [{
+    type: 'Fabric-enrollment-request-v1.0',
+    meta: {
+      claims: testFabricEnrollmentClaims,
+    },
+  }],
+};
+
+export const testFabricEnrollmentJobInput: DecodedDidcommMessage = {
+  aud: testHostDidWebIdentifier, // <-- The reques is to the host's `registry` URL, but not to the tenant's `entity` URL
+  iss: testControllerT_Did, // The request is signed by the participant
+  thid: 'test-thid-fabric-enrollment',
+  type: 'api+json',
+  body: testFabricEnrollmentRequestBody,
+};

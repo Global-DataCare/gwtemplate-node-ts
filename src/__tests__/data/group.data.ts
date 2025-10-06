@@ -1,5 +1,6 @@
 /**
- * This template represents a homogeneous group, a collection of members who share a common type, such as employees in a department or members of a family.
+ * This template represents a homogeneous group, a collection of members who share
+ * a common type, such as employees in a department or members of a family.
  *
  * This template represents a group's core data model. The claims are a flattened
  * representation based on the FHIR Group resource's search parameters. It's

@@ -8,14 +8,16 @@ import { VaultRepository } from '../../../database/repositories/vault/vault.repo
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { CredentialManager } from '../../../managers/CredentialManager';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
-import { testTenant1Data } from '../../data/end-to-end.data';
+import { testClaimsTenant1Organization, testTenant1Data } from '../../data/end-to-end.data';
 import { getTenantVaultId } from '../../../utils/tenant';
-import { TenantConfig } from '../../../models/tenant';
+import { EntityConfig } from '../../../models/entity';
 import { JwsMultiSign } from '../../../models/jws';
 import { JWK } from '../../../models/jwk';
 import { Sector } from '../../../models/sector';
 import { MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import { testConfigTenant1 } from '../../data/organization.data';
+import { ClaimsOrganizationSchemaorg } from '../../../models/schemaorg';
 
 // Tell Jest what will be mocked
 jest.mock('uuid');
@@ -30,20 +32,15 @@ describe('CredentialManager', () => {
   const HOST_DID = 'did:web:test-host.com';
 
   // Create a valid mock TenantConfig based on available test data that satisfies the interface
-  const mockTenantConfig: TenantConfig = {
+  const mockTenantConfig: EntityConfig = {
+    ...testConfigTenant1 as unknown as EntityConfig,
     id: 'acme-corp-id',
-    claims: {},
-    alternateName: testTenant1Data.alternateName,
-    legalName: testTenant1Data.legalName,
-    identifier: testTenant1Data.identifier,
-    identifierType: testTenant1Data.identifierType,
-    identifierValue: testTenant1Data.identifierValue,
-    // taxId: testTenant1Data.taxId,
-    sector: testTenant1Data.provider.service.sectorCategory as Sector,
-    jurisdiction: testTenant1Data.addressCountry,
-    url: testTenant1Data.url,
+    claims: testClaimsTenant1Organization,
     didConfig: { '@context': '', id: '', service: [] },
     didDocument: { '@context': '', id: '' },
+    identifier: '',
+    jurisdiction: '',
+    sector: Sector.HEALTH_CARE,
   };
 
   beforeEach(() => {

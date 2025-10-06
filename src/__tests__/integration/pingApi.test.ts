@@ -9,7 +9,7 @@ import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { mockKmsService } from '../mocks/kms.mock';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async-response-store.mem';
-import { TenantConfig } from '../../models/tenant';
+import { EntityConfig } from '../../models/entity';
 import { decodedPingMessage, testEncryptedJwePing, decodedTenantPingMessage } from '../data/ping.data';
 import { testCompletedJob, testPendingJob } from '../data/async-response.data';
 import { createDidServiceId } from '../../utils/did';
@@ -56,7 +56,7 @@ describe('Ping API Endpoint', () => {
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
       // Mock the host config with a valid service endpoint for ping
-      const mockHostConfig: Partial<TenantConfig> = {
+      const mockHostConfig: Partial<EntityConfig> = {
         alternateName: 'host',
         didConfig: {
           '@context': 'https://www.w3.org/ns/did/v1',
@@ -69,7 +69,7 @@ describe('Ping API Endpoint', () => {
           }]
         } as DidDocument,
       };
-      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockHostConfig as TenantConfig);
+      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockHostConfig as EntityConfig);
       
       const mockDecodedJob: JobRequest = {
         input: decodedPingMessage,
@@ -108,7 +108,7 @@ describe('Ping API Endpoint', () => {
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
       // Mock the tenant's existence with a valid service endpoint for ping
-      const mockTenantConfig: Partial<TenantConfig> = {
+      const mockTenantConfig: Partial<EntityConfig> = {
         alternateName: 'tenant1',
         didConfig: {
           '@context': 'https://www.w3.org/ns/did/v1',
@@ -121,7 +121,7 @@ describe('Ping API Endpoint', () => {
           }]
         } as DidDocument,
       };
-      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
+      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as EntityConfig);
 
       const mockDecodedJob: JobRequest = {
         input: decodedTenantPingMessage,
@@ -158,7 +158,7 @@ describe('Ping API Endpoint', () => {
       const asyncResponseStore = new AsyncResponseStoreMem();
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
-      const mockTenantConfig: Partial<TenantConfig> = {
+      const mockTenantConfig: Partial<EntityConfig> = {
         alternateName: 'tenant1',
         didConfig: {
           '@context': 'https://www.w3.org/ns/did/v1',
@@ -169,7 +169,7 @@ describe('Ping API Endpoint', () => {
           }]
         } as DidDocument,
       };
-      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
+      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as EntityConfig);
 
       const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
 
@@ -190,8 +190,8 @@ describe('Ping API Endpoint', () => {
         const asyncResponseStore = new AsyncResponseStoreMem();
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
-      const mockTenantConfig: Partial<TenantConfig> = { alternateName: 'tenant1', didConfig: { service: [{ id: createDidServiceId({ version: 'v1', sector: 'test', section: 'ping', format: 'standard' }), type: 'ApiService', serviceEndpoint: 'resource', actions: ['_batch'] }] } as any };
-      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
+      const mockTenantConfig: Partial<EntityConfig> = { alternateName: 'tenant1', didConfig: { service: [{ id: createDidServiceId({ version: 'v1', sector: 'test', section: 'ping', format: 'standard' }), type: 'ApiService', serviceEndpoint: 'resource', actions: ['_batch'] }] } as any };
+      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as EntityConfig);
 
       const { thid, ...messageWithId } = decodedTenantPingMessage;
       (messageWithId as any).id = 'fallback-id-123';
@@ -241,7 +241,7 @@ describe('Ping API Endpoint', () => {
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
       // Mock a tenant that exists but has NO services configured in its DID document.
-      const mockTenantConfig: Partial<TenantConfig> = {
+      const mockTenantConfig: Partial<EntityConfig> = {
         alternateName: 'tenant1',
         didConfig: {
           '@context': 'https://www.w3.org/ns/did/v1',
@@ -249,7 +249,7 @@ describe('Ping API Endpoint', () => {
           service: [] // Empty service list confirms no valid service endpoint
         } as DidDocument,
       };
-      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as TenantConfig);
+      jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockTenantConfig as EntityConfig);
 
       const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
 
@@ -332,8 +332,8 @@ describe('Ping API Endpoint', () => {
         const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
         // Mock a tenant in a FHIR-enabled sector
-        const mockFhirTenant: Partial<TenantConfig> = { alternateName: 'fhir_tenant', sector: Sector.HEALTH_CARE };
-        jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockFhirTenant as TenantConfig);
+        const mockFhirTenant: Partial<EntityConfig> = { alternateName: 'fhir_tenant', sector: Sector.HEALTH_CARE };
+        jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockFhirTenant as EntityConfig);
 
         const fhirPollingUrl = `/fhir_tenant/cds-xx/v1/test/ping/standard/resource/_batch-response?thid=${thid}`;
 
@@ -351,8 +351,8 @@ describe('Ping API Endpoint', () => {
         const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
         // Mock a tenant in a non-FHIR sector
-        const mockNonFhirTenant: Partial<TenantConfig> = { alternateName: 'non_fhir_tenant', sector: 'test' as Sector};
-        jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockNonFhirTenant as TenantConfig);
+        const mockNonFhirTenant: Partial<EntityConfig> = { alternateName: 'non_fhir_tenant', sector: 'test' as Sector};
+        jest.spyOn(tenantsCacheManager, 'getConfigByAlternateName').mockResolvedValue(mockNonFhirTenant as EntityConfig);
 
         const nonFhirPollingUrl = `/non_fhir_tenant/cds-xx/v1/test/ping/standard/resource/_batch-response?thid=${thid}`;
 

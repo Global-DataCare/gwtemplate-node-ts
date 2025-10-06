@@ -4,10 +4,10 @@
 import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { ITenantsManager } from './ITenantsManager';
 import { VaultRepository } from '../database/repositories/vault/vault.repository';
-import { TenantConfig } from '../models/tenant';
+import { EntityConfig } from '../models/entity';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { getTenantVaultId } from '../utils/tenant';
-import { DidService } from '../models/did';
+import { DidDocument, DidService } from '../models/did';
 import { getEnvironment } from '../utils/environment';
 
 /**
@@ -19,7 +19,7 @@ import { getEnvironment } from '../utils/environment';
 export class TenantsCacheManager implements ITenantsManager {
   private vaultRepository: VaultRepository;
   private kmsService: IKmsService;
-  private tenantCacheByVaultId = new Map<string, TenantConfig>();
+  private tenantCacheByVaultId = new Map<string, EntityConfig>();
 
   constructor(vaultRepository: VaultRepository, kmsService: IKmsService) {
     this.vaultRepository = vaultRepository;
@@ -36,7 +36,7 @@ export class TenantsCacheManager implements ITenantsManager {
 
     for (const record of secureTenantRecords) {
       try {
-        const tenantConfig = await this.kmsService.unprotectConfidentialData<TenantConfig>(record, 'host');
+        const tenantConfig = await this.kmsService.unprotectConfidentialData<EntityConfig>(record, 'host');
         if (tenantConfig && tenantConfig.alternateName) {
           const vaultId =
             tenantConfig.alternateName === 'host'
@@ -59,6 +59,11 @@ export class TenantsCacheManager implements ITenantsManager {
   public getTenantUrn(vaultId: string): string | undefined {
     const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
     return tenantConfig?.didDocument.id;
+  }
+
+  public getDidDocument(vaultId: string): DidDocument | undefined {
+    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+    return tenantConfig?.didDocument;
   }
 
   public getDidServiceConfig(vaultId: string): DidService[] | undefined {

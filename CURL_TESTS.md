@@ -34,7 +34,7 @@ curl --location --request POST 'http://localhost:3000/host/cds-ES/v1/test/regist
 --header 'Content-Type: application/json' \
 --data-raw '{
   "thid": "thid-c1c2c3d4-e5f6-7890-1234-567890abcdef",
-  "iss": "did:web:test-issuer.com",
+  "iss": "admin1@acme.org",
   "aud": "did:web:host.example.com",
   "body": {
     "data": [
@@ -44,14 +44,14 @@ curl --location --request POST 'http://localhost:3000/host/cds-ES/v1/test/regist
           "claims": {
             "@context": "org.schema",
             "@type": "template",
-            "org.schema.Organization.legalName": "Acme Company",
-            "org.schema.Organization.identifier": "urn:uuid:c1c2c3d4-e5f6-7890-1234-567890abcdef",
+            "org.schema.Organization.legalName": "Acme Organization",
+            "org.schema.Organization.identifier.additionalType": "EI",
+            "org.schema.Organization.identifier.value": "98-7654321",
             "org.schema.Organization.alternateName": "acme",
-            "org.schema.Organization.addressCountry": "US",
-            "org.schema.Organization.taxID": "98-7654321",
+            "org.schema.Organization.address.addressCountry": "US",
             "org.schema.Person.identifier": "urn:uuid:b1b2c3d4-e5f6-7890-1234-567890abcdef",
             "org.schema.Person.hasOccupation": "ISCO-08:1120",
-            "org.schema.Person.email": "admin1@acme.example.com",
+            "org.schema.Person.email": "admin1@acme.org",
             "org.schema.Service.category": "health-care",
             "org.schema.Service.identifier": "urn:uuid:d1c2c3d4-e5f6-7890-1234-567890abcdef",
             "org.schema.Service.termsOfService": "https://provider.example.com/terms",
@@ -77,8 +77,8 @@ curl --location --request POST 'http://localhost:3000/acme/cds-ES/v1/health-care
 --header 'Content-Type: application/json' \
 --data-raw '{
   "thid": "thid-employee-11b2c3d4-e5f6-7890-1234-567890abcdef",
-  "iss": "did:web:provider.com:acme:employee:email:admin1@acme.example.com",
-  "aud": "did:web:provider.com",
+  "iss": "did:web:host.example.com:acme:employee:email:admin1@acme.org",
+  "aud": "did:web:host.example.com",
   "body": {
     "data": [
       {
@@ -88,7 +88,7 @@ curl --location --request POST 'http://localhost:3000/acme/cds-ES/v1/health-care
           "claims": {
             "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
             "org.schema.Person.hasOccupation": "ISCO-08:4226",
-            "org.schema.Person.email": "receptionist1@acme.example.com"
+            "org.schema.Person.email": "receptionist1@acme.org"
           }
         }
       }

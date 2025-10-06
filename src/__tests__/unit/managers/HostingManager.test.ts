@@ -12,12 +12,12 @@ import {
   testClaimsTenant1AlternateNameInvalidPrefix,
 } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
-import { ClaimsOrgSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
 import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { JobRequest } from '../../../models/request';
 import { ClaimsRecord } from '../../../models/resource-document';
-import { TenantConfig } from '../../../models/tenant';
+import { EntityConfig } from '../../../models/entity';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { IServerConfig } from '../../../config';
@@ -60,8 +60,8 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 
 const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
   // Correctly derive tenantId from claims or default to 'host'
-  tenantId: claims[ClaimsOrgSchemaorg.alternateName] || 'host',
-  jurisdiction: claims[ClaimsOrgSchemaorg.addressCountry],
+  tenantId: claims[ClaimsOrganizationSchemaorg.alternateName] || 'host',
+  jurisdiction: claims[ClaimsOrganizationSchemaorg.addressCountry],
   resourceType: 'Organization',
   section: 'org.schema',
   action: '_batch',
@@ -142,7 +142,7 @@ describe('HostingManager', () => {
     expect(responsePayload.body.data[0].response.status).toBe('201');
 
     const sector = testClaimsTenant1Registration[ClaimsServiceSchemaorg.category] as Sector;
-    const alternateName = testClaimsTenant1Registration[ClaimsOrgSchemaorg.alternateName];
+    const alternateName = testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.alternateName];
     const tenantVaultId = tenantUtils.getTenantVaultId(sector, alternateName);
 
     expect(createVaultSpy).toHaveBeenCalledWith(expect.objectContaining({ id: tenantVaultId }));
@@ -150,7 +150,7 @@ describe('HostingManager', () => {
     expect(mockKmsService.protectConfidentialData).toHaveBeenCalledTimes(1);
 
     const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
-    const tenantConfig = docToProtect.content as TenantConfig;
+    const tenantConfig = docToProtect.content as EntityConfig;
 
     expect(tenantConfig).toBeDefined();
     expect(tenantConfig.legalName).toBe(testTenant1Data.legalName);
@@ -240,7 +240,7 @@ describe('HostingManager', () => {
     const responsePayload = await hostingManager.process(job);
 
     const sector = testClaimsTenant1Registration[ClaimsServiceSchemaorg.category] as Sector;
-    const alternateName = testClaimsTenant1Registration[ClaimsOrgSchemaorg.alternateName];
+    const alternateName = testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.alternateName];
     const expectedVaultId = tenantUtils.getTenantVaultId(sector, alternateName);
 
     expect(vaultExistsSpy).toHaveBeenCalledWith(expectedVaultId);
@@ -250,8 +250,8 @@ describe('HostingManager', () => {
   });
   
   it("[8] TENANT: should produce an error entry if taxID and country combination already exists", async () => {
-    const existingConfig: Partial<TenantConfig> = { identifier: testTenant1Data.identifier, jurisdiction: testTenant1Data.addressCountry, sector: Sector.HEALTH_CARE };
-    jest.spyOn(vaultRepository, 'getContainersInSection').mockResolvedValue([existingConfig as TenantConfig]);
+    const existingConfig: Partial<EntityConfig> = { identifier: testTenant1Data.identifier, jurisdiction: testTenant1Data.addressCountry, sector: Sector.HEALTH_CARE };
+    jest.spyOn(vaultRepository, 'getContainersInSection').mockResolvedValue([existingConfig as EntityConfig]);
     const job = testBaseJobForClaims(testClaimsTenant1Registration);
 
     const responsePayload = await hostingManager.process(job);

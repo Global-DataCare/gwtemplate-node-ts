@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { initializeHostServices, initializeTenantServices } from '../../../utils/services';
-import { TenantConfig } from '../../../models/tenant';
+import { EntityConfig } from '../../../models/entity';
 import { Sector } from '../../../models/sector';
 import { config } from '../../../config';
 
@@ -11,7 +11,7 @@ const createTestTenantConfig = (
   sector: Sector,
   didId: string,
   sectorsAllowed: Sector[] = []
-): TenantConfig => {
+): EntityConfig => {
   return {
     id: 'urn:uuid:tenant-uuid',
     identifier: 'tenant-id',

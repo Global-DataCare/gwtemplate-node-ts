@@ -10,7 +10,7 @@ import { getTenantVaultId, isValidTenantAlternateName } from '../utils/tenant';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { initializeHostServices, initializeTenantServices } from '../utils/services';
 import { JobRequest } from '../models/request';
-import { TenantConfig } from '../models/tenant';
+import { EntityConfig } from '../models/entity';
 import { IPayloadResponse } from '../models/response';
 import { IncludedResource } from '../models/jsonapi';
 import { ClaimsRecord } from '../models/resource-document';
@@ -18,7 +18,7 @@ import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { ManagerError } from '../models/errors/manager-error';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
-import { ClaimsOrgSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
 import { validateNewOrganizationClaims } from '../utils/claims-validator';
 import { Sector } from '../models/sector';
 import { TenantsCacheManager } from './TenantsCacheManager';
@@ -138,10 +138,10 @@ export class HostingManager {
 
     try {
       validateNewOrganizationClaims(claims);
-      const alternateName = claims[ClaimsOrgSchemaorg.alternateName];
+      const alternateName = claims[ClaimsOrganizationSchemaorg.alternateName];
 
       if (!alternateName) {
-        throw new ManagerError(`Missing required claim: '${ClaimsOrgSchemaorg.alternateName}'`, IssueType.Required);
+        throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
       }
 
       let validatedSector: Sector | undefined;
@@ -177,16 +177,16 @@ export class HostingManager {
           throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
         }
 
-        const tenants = await this.vaultRepository.getContainersInSection<TenantConfig>('host', 'tenants');
+        const tenants = await this.vaultRepository.getContainersInSection<EntityConfig>('host', 'tenants');
         if (
           tenants.some(
             t =>
-              t.identifier === claims[ClaimsOrgSchemaorg.identifier] &&
-              t.jurisdiction === claims[ClaimsOrgSchemaorg.addressCountry],
+              t.identifier === claims[ClaimsOrganizationSchemaorg.identifier] &&
+              t.jurisdiction === claims[ClaimsOrganizationSchemaorg.addressCountry],
           )
         ) {
           throw new ManagerError(
-            `Conflict: already exists the tenant '${claims[ClaimsOrgSchemaorg.identifier]}' issued by '${claims[ClaimsOrgSchemaorg.addressCountry]}' jurisdiction`,
+            `Conflict: already exists the tenant '${claims[ClaimsOrganizationSchemaorg.identifier]}' issued by '${claims[ClaimsOrganizationSchemaorg.addressCountry]}' jurisdiction`,
             IssueType.Duplicate,
           );
         }
@@ -273,13 +273,13 @@ export class HostingManager {
     const publicKeys = await this.kmsService.getPublicJwks(vaultId);
 
     // 2. Construct the host's own TenantConfig object.
-    const hostConfig: TenantConfig = {
+    const hostConfig: EntityConfig = {
       id: org.id,
       claims: {},
-      identifier: org.meta.claims[ClaimsOrgSchemaorg.identifier],
+      identifier: org.meta.claims[ClaimsOrganizationSchemaorg.identifier],
       alternateName: 'host',
-      legalName: org.meta.claims[ClaimsOrgSchemaorg.legalName],
-      jurisdiction: org.meta.claims[ClaimsOrgSchemaorg.addressCountry],
+      legalName: org.meta.claims[ClaimsOrganizationSchemaorg.legalName],
+      jurisdiction: org.meta.claims[ClaimsOrganizationSchemaorg.addressCountry],
       url: `${this.config.apiBaseUrl}/host`,
       sector: Sector.SYSTEM,
       sectorsAllowed: this.config.sectorsAllowed,
@@ -347,7 +347,7 @@ export class HostingManager {
     const publicKeys = await this.kmsService.getPublicJwks(vaultId);
 
     // --- Determine the tenant's domain and URL with a fallback mechanism ---
-    const tenantUrlClaim = org.meta.claims[ClaimsOrgSchemaorg.url];
+    const tenantUrlClaim = org.meta.claims[ClaimsOrganizationSchemaorg.url];
     let tenantDomain: string;
     let tenantUrl: string;
 
@@ -369,13 +369,13 @@ export class HostingManager {
       ? `did:web:${tenantDomain}:${altName}`
       : `did:web:${tenantDomain}`;
 
-    const tenantConfig: TenantConfig = {
+    const tenantConfig: EntityConfig = {
       id: org.id,
       claims: {},
-      identifier: org.meta.claims[ClaimsOrgSchemaorg.identifier],
+      identifier: org.meta.claims[ClaimsOrganizationSchemaorg.identifier],
       alternateName: altName,
-      legalName: org.meta.claims[ClaimsOrgSchemaorg.legalName],
-      jurisdiction: org.meta.claims[ClaimsOrgSchemaorg.addressCountry],
+      legalName: org.meta.claims[ClaimsOrganizationSchemaorg.legalName],
+      jurisdiction: org.meta.claims[ClaimsOrganizationSchemaorg.addressCountry],
       url: tenantUrl,
       sector: sector,
       didConfig: {
@@ -406,7 +406,7 @@ export class HostingManager {
         {
           attributes: [
             { name: 'alternateName', value: altName, unique: true },
-            { name: 'taxId', value: org.meta.claims[ClaimsOrgSchemaorg.identifier] },
+            { name: 'taxId', value: org.meta.claims[ClaimsOrganizationSchemaorg.identifier] },
           ],
           hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
         },

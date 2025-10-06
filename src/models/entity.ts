@@ -3,7 +3,6 @@
 
 import { DidService } from "./did";
 import { RecordBase } from "./resource-document";
-import { Sector } from "./sector";
 
 export interface EntityUrnBaseParams {
   namespace: string;
@@ -23,56 +22,24 @@ export interface EmployeeUrnParams extends OrganizationUrnParams {
   role: string;
 }
 
-
 /**
  * Represents the full configuration for a single tenant.
  * This object is stored in the 'host' vault and can be cached.
  */
-export interface TenantConfig extends RecordBase {
+export interface EntityConfig extends RecordBase {
   // `id` is inherited from RecordBase
-  claims: {
-  }
-  
-  /**
-   * Public-facing identifier, used in URLs. e.g., 'org1'
-   */
-  alternateName: string;
+  type: string;
 
-  /**
-   * Official, registered name.
-   */
-  legalName: string;
-
-  /**
-   * The public identifier (e.g., the URN).
-   */
-  identifier: string;
-
-  /**
-   * Contextual information for database collections.
-   */
-  sector: Sector;
-  jurisdiction: string;
-
-  /**
-   * The public URL where the DID document can be resolved (for the sector and jurisdiction).
-   */
-  url: string;
-
-  /**
-   *  Type of entity: e.g. Hospital, Clinic, Employee...
-   */
-  additionalType?: string;
+  /** Claims from form data and URN as `identifier` */
+  claims: object, // reverse-DNS claims from schema.org or fhir.hl7.org
 
   /**
    * The configuration of services for the DID Document for the tenant, containing all public keys,
    * service endpoints, and other essential metadata.
    */
   didConfig: {
-    '@context': string | string[];
-    id: string;
     service: DidService[]
-  };    
+  };
 
   /**
    * The authoritative DID Document for the tenant, containing all public keys,
@@ -82,5 +49,8 @@ export interface TenantConfig extends RecordBase {
     '@context': string | string[];
     id: string;
     [key: string]: any;
-  };  
+  };
+
+  /** The current status of the employee's account. */
+  status: 'active' | 'disabled';  
 }

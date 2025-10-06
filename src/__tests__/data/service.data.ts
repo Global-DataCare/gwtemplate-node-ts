@@ -1,18 +1,18 @@
 import { ClaimsServiceSchemaorg } from "../../models/schemaorg";
-import { testBaseDataHost, testBaseDataTenant1 } from "./organization.data";
+import { testConfigDataHost, testConfigTenant1 } from "./organization.data";
 
 // Terms of service accepted for running the software service
 export const testServiceTermsClaimsForHost = {
-    [ClaimsServiceSchemaorg.category]: testBaseDataHost.provider.service.sectorCategory, // sector type
-    [ClaimsServiceSchemaorg.identifier]: testBaseDataHost.provider.service.identifier,
-    [ClaimsServiceSchemaorg.termsOfService]: testBaseDataHost.provider.service.termsOfService,
-    [ClaimsServiceSchemaorg.serviceType]: testBaseDataHost.provider.service.serviceTypePurpose,
+    [ClaimsServiceSchemaorg.category]: testConfigDataHost.provider.service.sectorCategory, // sector type
+    [ClaimsServiceSchemaorg.identifier]: testConfigDataHost.provider.service.identifier,
+    [ClaimsServiceSchemaorg.termsOfService]: testConfigDataHost.provider.service.termsOfService,
+    [ClaimsServiceSchemaorg.serviceType]: testConfigDataHost.provider.service.serviceTypePurpose,
 }
 
 // Terms of service accepted by the tenant's registrant (the `admin` or tenant's `controller`)
 export const testServiceTermsClaimsForTenant1 = {
-    [ClaimsServiceSchemaorg.category]: testBaseDataTenant1.provider.service.sectorCategory, // sector type
-    [ClaimsServiceSchemaorg.identifier]: testBaseDataTenant1.provider.service.identifier,
-    [ClaimsServiceSchemaorg.termsOfService]: testBaseDataTenant1.provider.service.termsOfService,
-    [ClaimsServiceSchemaorg.serviceType]: testBaseDataTenant1.provider.service.serviceTypePurpose,
+    [ClaimsServiceSchemaorg.category]: testConfigTenant1.provider.service.sectorCategory, // sector type
+    [ClaimsServiceSchemaorg.identifier]: testConfigTenant1.provider.service.identifier,
+    [ClaimsServiceSchemaorg.termsOfService]: testConfigTenant1.provider.service.termsOfService,
+    [ClaimsServiceSchemaorg.serviceType]: testConfigTenant1.provider.service.serviceTypePurpose,
 }

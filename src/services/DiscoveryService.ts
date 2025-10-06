@@ -1,7 +1,7 @@
 // src/services/DiscoveryService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { TenantConfig } from '../models/tenant';
+import { EntityConfig } from '../models/entity';
 import { DidDocument } from '../models/did';
 import { JwkSet } from '../models/jwk';
 
@@ -15,7 +15,7 @@ export class DiscoveryService {
    * @param tenantConfig The fully resolved configuration of the tenant.
    * @returns The DID Document.
    */
-  getDidDocument(tenantConfig: TenantConfig): DidDocument {
+  getDidDocument(tenantConfig: EntityConfig): DidDocument {
     return tenantConfig.didDocument;
   }
 
@@ -24,7 +24,7 @@ export class DiscoveryService {
    * @param tenantConfig The fully resolved configuration of the tenant.
    * @returns The JWKS.
    */
-  getJwks(tenantConfig: TenantConfig): JwkSet {
+  getJwks(tenantConfig: EntityConfig): JwkSet {
     // In a real implementation, this would retrieve public keys from the KMS
     // or reference them from the DID Document's verificationMethod.
     // For now, it returns a placeholder.
@@ -36,7 +36,7 @@ export class DiscoveryService {
    * @param config The configuration of the tenant.
    * @returns A partial OIDC configuration object.
    */
-  getOpenIdConfiguration(config: TenantConfig): object {
+  getOpenIdConfiguration(config: EntityConfig): object {
     return {
       issuer: config.url,
       // The jwks_uri path needs to be updated to match the new routing structure
@@ -49,7 +49,7 @@ export class DiscoveryService {
    * @param config The configuration of the tenant.
    * @returns A partial SMART configuration object.
    */
-  getSmartConfiguration(config: TenantConfig): object {
+  getSmartConfiguration(config: EntityConfig): object {
     return {
       issuer: config.url,
       // Additional SMART on FHIR metadata would be populated here.
@@ -61,7 +61,7 @@ export class DiscoveryService {
    * @param config The configuration of the tenant.
    * @returns A partial CapabilityStatement object.
    */
-  getCapabilityStatement(config: TenantConfig): object {
+  getCapabilityStatement(config: EntityConfig): object {
     return {
       resourceType: 'CapabilityStatement',
       status: 'active',

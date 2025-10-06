@@ -2,7 +2,7 @@
 // File: src/__test__/data/organization.data.ts
 
 import { ClaimsRecord } from "../../models/resource-document";
-import { ClaimsOrgSchemaorg, ClaimsServiceSchemaorg } from "../../models/schemaorg";
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from "../../models/schemaorg";
 import {
     testHostAdmin1,
     testTenant1Admin1,
@@ -12,7 +12,7 @@ import {
     testClaimsHostAdmin1,
     testClaimsEmployeeAdminTenant1
 } from "./employee.data";
-import { testBaseDataHost, testBaseDataTenant1, testTenant1Urn } from "./organization.data";
+import { testConfigDataHost, testConfigTenant1, testTenant1UrnIdentifier } from "./organization.data";
 import { testServiceTermsClaimsForHost, testServiceTermsClaimsForTenant1 } from "./service.data";
 
 
@@ -25,14 +25,10 @@ import { testServiceTermsClaimsForHost, testServiceTermsClaimsForTenant1 } from 
  * It assembles the base data with its administrative member.
  */
 export const testHostData = {
-    ...testBaseDataHost,
+    ...testConfigDataHost,
     member: {
         admin1: testHostAdmin1,
     },
-    service: {
-        db: {},
-        terms: testServiceTermsClaimsForHost
-    }    
 };
 
 /**
@@ -40,18 +36,14 @@ export const testHostData = {
  * It assembles the base data with all its relevant members.
  */
 export const testTenant1Data = {
-    ...testBaseDataTenant1,
-    identifier: testTenant1Urn,
+    ...testConfigTenant1,
+    identifier: testTenant1UrnIdentifier,
     member: {
         admin1: testTenant1Admin1,
         receptionist1: testTenant1Receptionist1,
         firefighter1: testTenant1Firefighter1,
         nurse1: testTenant1Nurse1,
     },
-    service: {
-        db: {},
-        terms: testServiceTermsClaimsForTenant1
-    }
 };
 
 
@@ -68,13 +60,11 @@ const baseClaims: Omit<ClaimsRecord, "org.schema.Organization.legalName"> = {
 /** A valid and complete set of claims for registering the HOST organization. */
 export const testClaimsHostOrganization: ClaimsRecord = {
     ...baseClaims,
-    [ClaimsOrgSchemaorg.legalName]: testHostData.legalName,
-    [ClaimsOrgSchemaorg.identifierType]: testHostData.identifierType,
-    [ClaimsOrgSchemaorg.identifierValue]: testHostData.identifierValue,
-    // [ClaimsOrgSchemaorg.identifierValue]: testHostData.identifier,
-    [ClaimsOrgSchemaorg.alternateName]: testHostData.alternateName,
-    [ClaimsOrgSchemaorg.addressCountry]: testHostData.addressCountry,
-    // [ClaimsOrgSchemaorg.taxID]: testHostData.taxId,
+    [ClaimsOrganizationSchemaorg.legalName]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.legalName],
+    [ClaimsOrganizationSchemaorg.identifierType]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.identifierType],
+    [ClaimsOrganizationSchemaorg.identifierValue]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.identifierValue],
+    [ClaimsOrganizationSchemaorg.alternateName]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.alternateName],
+    [ClaimsOrganizationSchemaorg.addressCountry]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.addressCountry],
 };
 
 /**
@@ -83,25 +73,24 @@ export const testClaimsHostOrganization: ClaimsRecord = {
 export const testClaimsHostInitialization = {
     ...testClaimsHostOrganization,
     ...testClaimsHostAdmin1,
-    [ClaimsServiceSchemaorg.category]: testHostData.provider.service.sectorCategory,
-    [ClaimsServiceSchemaorg.identifier]: testHostData.provider.service.identifier,
-    [ClaimsServiceSchemaorg.serviceType]: testHostData.provider.service.serviceTypePurpose,
-    [ClaimsServiceSchemaorg.termsOfService]: testHostData.provider.service.termsOfService,
+    [ClaimsServiceSchemaorg.category]: testConfigDataHost.provider.service.sectorCategory,
+    [ClaimsServiceSchemaorg.identifier]: testConfigDataHost.provider.service.identifier,
+    [ClaimsServiceSchemaorg.serviceType]: testConfigDataHost.provider.service.serviceType,
+    [ClaimsServiceSchemaorg.termsOfService]: testConfigDataHost.provider.service.termsOfService,
 };
 
 
 /**
  * Well-formed claims for a tenant organization registration.
  */
-export const testClaimsTenant1Organization = {
+export const testClaimsTenant1Organization: object = {
     ...baseClaims,
-    [ClaimsOrgSchemaorg.url]: testTenant1Data.url,
-    [ClaimsOrgSchemaorg.legalName]: testTenant1Data.legalName,
-    [ClaimsOrgSchemaorg.identifierType]: testTenant1Data.identifierType,
-    [ClaimsOrgSchemaorg.identifierValue]: testTenant1Data.identifierValue,
-    [ClaimsOrgSchemaorg.alternateName]: testTenant1Data.alternateName,
-    [ClaimsOrgSchemaorg.addressCountry]: testTenant1Data.addressCountry,
-    // [ClaimsOrgSchemaorg.taxID]: testTenant1Data.taxId,
+    [ClaimsOrganizationSchemaorg.url]: testConfigTenant1.url,
+    [ClaimsOrganizationSchemaorg.legalName]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.legalName],
+    [ClaimsOrganizationSchemaorg.identifierType]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.identifierType],
+    [ClaimsOrganizationSchemaorg.identifierValue]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.identifierValue],
+    [ClaimsOrganizationSchemaorg.alternateName]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.alternateName],
+    [ClaimsOrganizationSchemaorg.addressCountry]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.addressCountry],
 };
 
 /**
@@ -110,17 +99,17 @@ export const testClaimsTenant1Organization = {
 export const testClaimsTenant1Registration = {
     ...testClaimsTenant1Organization,
     ...testClaimsEmployeeAdminTenant1,
-    [ClaimsServiceSchemaorg.category]: testTenant1Data.provider.service.sectorCategory,
-    [ClaimsServiceSchemaorg.identifier]: testTenant1Data.provider.service.identifier,
-    [ClaimsServiceSchemaorg.termsOfService]: testTenant1Data.provider.service.termsOfService,
-    [ClaimsServiceSchemaorg.serviceType]: testTenant1Data.provider.service.serviceTypePurpose,
+    [ClaimsServiceSchemaorg.category]: testConfigTenant1.provider.service.sectorCategory,
+    [ClaimsServiceSchemaorg.identifier]: testConfigTenant1.provider.service.identifier,
+    [ClaimsServiceSchemaorg.termsOfService]: testConfigTenant1.provider.service.termsOfService,
+    [ClaimsServiceSchemaorg.serviceType]: testConfigTenant1.provider.service.serviceTypePurpose,
 };
 
 /**
  * A full, well-formed input payload for a tenant registration, matching the structure expected by the API.
  */
 export const testPayloadCreateTenant1 = {
-  thid: `thid-${testTenant1Data.uuid}`,
+  thid: `thid-${testTenant1Data.id}`,
   iss: 'did:web:test-issuer.com',
   aud: 'did:web:host.example.com',
   body: {
@@ -140,5 +129,5 @@ export const testPayloadCreateTenant1 = {
  */
 export const testClaimsTenant1AlternateNameInvalidPrefix = {
     ...testClaimsTenant1Registration,
-    [ClaimsOrgSchemaorg.alternateName]: 'hosting-tenant-1',
+    [ClaimsOrganizationSchemaorg.alternateName]: 'hosting-tenant-1',
 };
