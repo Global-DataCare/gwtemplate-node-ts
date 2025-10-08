@@ -1,5 +1,11 @@
 # Architecture Patterns
 
+> ### Golden Rule: The `id` is the Canonical URN, the `iss` is a Resolvable `did:web`
+>
+> The system makes a clear distinction between an entity's canonical, persistent identifier (the URN, stored in `didDocument.id`) and the identifier used for cryptographic operations (the `iss` claim in a JWS, which is a resolvable `did:web`). This provides both semantic stability and efficient key discovery.
+>
+> The URN is constructed from stable, verifiable attributes (jurisdiction, sector, legal ID), while the `did:web` is tied to a domain and provides a mechanism for key rotation and service discovery.
+
 This document is the formal specification for the architecture. It is the definitive guide and "prompt" for all development.
 
 ## 1. Sovereign Identity with URNs & VCs

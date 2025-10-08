@@ -18,7 +18,7 @@ describe('PingManager', () => {
       // --- URL Path Parameters ---
       tenantId: 'host',
       jurisdiction: 'xx',
-      sectorType: 'test',
+      sector: 'test',
       section: 'ping',
       format: 'standard',
       resourceType: 'resource',

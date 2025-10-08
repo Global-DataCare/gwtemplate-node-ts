@@ -66,7 +66,7 @@ const pollForJobResult = (req: Request, res: Response) => {
     }
 };
 
-const cdsRoute = '/:tenantId/cds-:jurisdiction/v1/:sectorType/:section/:format/:resourceType/:action';
+const cdsRoute = '/:tenantId/cds-:jurisdiction/v1/:sector/:section/:format/:resourceType/:action';
 
 router.post(cdsRoute, (req, res, next) => {
   // We need a mock http-parser on the request for the test to pass, as the real one isn't fully wired yet.

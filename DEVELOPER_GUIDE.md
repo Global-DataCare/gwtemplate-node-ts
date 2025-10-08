@@ -90,6 +90,23 @@ The purpose of every part of a test's "Arrange" section should be immediately cl
 ### 3. Testing Principles
 
 All tests must follow the patterns and principles defined in our detailed **[Testing Patterns and Best Practices Guide (`src/docs/guides/testing-patterns.md`)](./docs/guides/testing-patterns.md)**. This is non-negotiable for ensuring a stable and maintainable codebase.
+
+### 4. Code Style and Conventions
+
+#### CommonJS Module Imports
+
+To ensure compatibility with the project's TypeScript configuration (`esModuleInterop: false`), all imports from CommonJS modules (such as `express`, `supertest`, `dotenv`) **MUST** use the `import * as ... from '...'` syntax.
+
+**Correct:**
+```typescript
+import * as express from 'express';
+```
+
+**Incorrect:**
+```typescript
+import express from 'express';
+```
+
 ## API Interaction Examples
 
 All write operations are asynchronous. You will receive a `202 Accepted` response with a `thid` (Transaction ID). You must then poll the `_search` endpoint with this `thid` to get the result.

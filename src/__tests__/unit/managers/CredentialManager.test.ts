@@ -17,7 +17,6 @@ import { Sector } from '../../../models/sector';
 import { MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { testConfigTenant1 } from '../../data/organization.data';
-import { ClaimsOrganizationSchemaorg } from '../../../models/schemaorg';
 
 // Tell Jest what will be mocked
 jest.mock('uuid');
@@ -36,7 +35,7 @@ describe('CredentialManager', () => {
     ...testConfigTenant1 as unknown as EntityConfig,
     id: 'acme-corp-id',
     claims: testClaimsTenant1Organization,
-    didConfig: { '@context': '', id: '', service: [] },
+    didConfig: { service: [] },
     didDocument: { '@context': '', id: '' },
     identifier: '',
     jurisdiction: '',
@@ -70,18 +69,18 @@ describe('CredentialManager', () => {
       };
 
       const mockSignatureResult: JwsMultiSign = {
-        payload: 'base64.payload',
+        payload: 'base64payload',
         signatures: [{
-          protected: 'base64.protectedHeader',
-          signature: 'base64.signature',
+          protected: 'base64protectedHeader',
+          signature: 'base64signature',
         }],
       };
       
       const mockPublicKey: JWK = {
         kid: 'key-1',
         kty: 'AKP', // Correct key type for ML-DSA
-        alg: 'ML-DSA-65',
-        pub: 'base64.publicKey',
+        alg: 'ML-DSA-44',
+        pub: 'base64publicKey',
       };
 
       mockVaultRepository.get.mockResolvedValue(mockEncryptedTenantDoc);

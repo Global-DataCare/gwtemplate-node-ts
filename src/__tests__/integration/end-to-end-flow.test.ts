@@ -32,8 +32,8 @@ jest.mock('../../config', () => ({
 }));
 
 import express from 'express';
-import { Server } from 'http';
 import request from 'supertest';
+import { Server } from 'http';
 import { startServer } from '../../server';
 import { CryptographyService } from '../../crypto/CryptographyService';
 import { MldsaPrivateJwk, MlkemPrivateJwk, MlkemPublicJwk } from '../../crypto/interfaces/Cryptography.types';
@@ -45,6 +45,7 @@ import { externalClientSignerJwk, externalClientEncrypterJwk } from '../data/ext
 import { testClaimsTenant1Receptionist1 } from '../data/employee.data';
 import { IKmsService } from '../../crypto/interfaces/IKmsService';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
+import { testTenant1AlternateName } from '../data/organization.data';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -154,13 +155,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
   });
 
   it('Part 2: should accept a JWE/JWS to create an employee for the "acme" organization', async () => {
-    // HACK: Force a tenant cache reload before this test.
-    // This ensures that the 'acme' tenant created in Part 1 is available in the cache.
-    // This addresses a race condition in the test environment where the cache is not
-    // reliably updated after the new tenant is persisted.
-    await tenantManager.loadTenants();
-
-    const issuerDid = `did:web:provider.com:${testTenant1Data.alternateName}:employee:email:${testTenant1Data.member.admin1.email}`;
+    const issuerDid = `did:web:provider.com:${testTenant1AlternateName}:employee:email:${testTenant1Data.member.admin1.email}`;
     const targetDid = 'did:web:provider.com';
 
     const employeeCreationPayload = {
@@ -211,5 +206,13 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     expect(response.status).toBe(202);
     expect(response.headers.location).toBeDefined();
     expect(addJobSpy).toHaveBeenCalledTimes(1);
+
+    // This is the critical fix: wait for the async job to complete
+    // before allowing the test suite to proceed to Part 2.
+    if (queueAdapter instanceof QueueAdapterMem) {
+      await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
+    } else {
+      await delay(200); // Fallback for other queue types
+    }
   });
 });

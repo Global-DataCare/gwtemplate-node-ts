@@ -13,7 +13,7 @@ export interface DataInRequest {
   tenantId?: string;
   jurisdiction?: string;
   apiVersion?: string;
-  sectorType?: string;
+  sector?: string;
   /** Corresponds to <sectionTypeOrCompartmentCodingSystem> */
   section?: string;
   /** Corresponds to <formatTypeOrCompartmentCodingValue> */

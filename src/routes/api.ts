@@ -102,6 +102,9 @@ export function createApiRouter(
     }
     
     // Construct the vaultId directly from URL parameters.
+    if (tenantId !== 'host' && process.env.NODE_ENV !== 'production') {
+      console.log(`[DEBUG] createApiRouter attempting to build vaultId with: sector='${sector}', tenantId='${tenantId}'`);
+    }
     const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
     
     console.log(`[API] Attempting validation for vaultId: '${vaultId}'.`);

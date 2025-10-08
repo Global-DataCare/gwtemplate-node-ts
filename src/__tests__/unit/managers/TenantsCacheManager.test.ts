@@ -6,9 +6,12 @@ import { VaultRepository } from '../../../database/repositories/vault/vault.repo
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { EntityConfig } from '../../../models/entity';
 import { getTenantVaultId } from '../../../utils/tenant';
-import { testTenant1Data } from '../../data/end-to-end.data';
 import { Sector } from '../../../models/sector';
 import { DidService } from '../../../models/did';
+import { ClaimsRecord } from '../../../models/resource-document';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
+import { testConfigDataHost, testConfigTenant1 } from '../../data/organization.data';
+import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
 
 // Mock the entire module. We are not using the actual implementation.
 jest.mock('../../../database/repositories/vault/vault.repository');
@@ -19,45 +22,34 @@ describe('TenantsCacheManager', () => {
   let mockKmsService: jest.Mocked<IKmsService>;
 
   // --- Test Data ---
-  const MOCK_HOST_TAX_ID = 'A12345678';
-  const MOCK_TENANT_TAX_ID = testTenant1Data.taxId;
-
   const mockServices: DidService[] = [{ id: 'service-1', type: 'TestService', serviceEndpoint: 'https://test.com' }];
 
-  const hostUrn = `urn:antifraud:test-network:us:v1:system:entity:tax:${MOCK_HOST_TAX_ID}`;
-  const tenantUrn = `urn:antifraud:test-network:us:v1:health-care:entity:tax:${MOCK_TENANT_TAX_ID}`;
-
-  // CORRECTED: Added all required fields for TenantConfig
+  // Create valid, model-compliant EntityConfig objects for testing, using fixtures.
+  const hostUrn = (testClaimsHostInitialization as ClaimsRecord)[ClaimsOrganizationSchemaorg.identifier];
   const hostConfig: EntityConfig = {
-    id: 'host-uuid',
-    type: 'TenantConfig',
-    alternateName: 'host',
-    legalName: 'System Host',
-    identifier: MOCK_HOST_TAX_ID,
-    sector: Sector.SYSTEM,
-    jurisdiction: 'us',
-    url: 'https://host.system.com',
-    didConfig: { '@context': '', id: hostUrn, service: [] },
-    didDocument: { '@context': '', id: hostUrn },
+    id: testConfigDataHost.id,
+    type: 'Organization',
+    status: 'active',
+    claims: testClaimsHostInitialization,
+    didConfig: { service: [] },
+    didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: hostUrn },
     meta: { lastUpdated: '' },
   };
 
-  // CORRECTED: Added all required fields for TenantConfig
+  const tenantUrn = (testClaimsTenant1Registration as ClaimsRecord)[ClaimsOrganizationSchemaorg.identifier];
   const acmeConfig: EntityConfig = {
-    id: testTenant1Data.id,
-    type: 'TenantConfig',
-    alternateName: testTenant1Data.alternateName,
-    legalName: testTenant1Data.legalName,
-    identifier: MOCK_TENANT_TAX_ID,
-    sector: Sector.HEALTH_CARE,
-    jurisdiction: 'us',
-    url: testTenant1Data.url,
-    didConfig: { '@context': '', id: tenantUrn, service: mockServices },
-    didDocument: { '@context': '', id: tenantUrn },
+    id: testConfigTenant1.id, // The UUID comes from the base config object
+    type: 'Organization',
+    status: 'active',
+    claims: testClaimsTenant1Registration, // Use the fully assembled claims object
+    didConfig: { service: mockServices },
+    didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: tenantUrn },
     meta: { lastUpdated: '' },
   };
 
-  const acmeVaultId = getTenantVaultId(acmeConfig.sector, acmeConfig.alternateName);
+  const acmeSector = (acmeConfig.claims as ClaimsRecord)[ClaimsServiceSchemaorg.category] as Sector;
+  const acmeAlternateName = (acmeConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.alternateName];
+  const acmeVaultId = getTenantVaultId(acmeSector, acmeAlternateName);
 
   beforeEach(() => {
     mockVaultRepository = {
@@ -76,10 +68,10 @@ describe('TenantsCacheManager', () => {
   });
 
   describe('loadTenants', () => {
-    it('should load tenant data and make it available via specific getters', async () => {
+    it('should load all valid tenant data and make it available via getters', async () => {
       // Arrange
-      const mockHostRecord = { id: 'host-record' };
-      const mockAcmeRecord = { id: 'acme-record' };
+      const mockHostRecord = { id: 'host-record', content: hostConfig };
+      const mockAcmeRecord = { id: 'acme-record', content: acmeConfig };
       mockVaultRepository.getContainersInSection.mockResolvedValue([mockAcmeRecord, mockHostRecord]);
       mockKmsService.unprotectConfidentialData
         .mockResolvedValueOnce(acmeConfig)
@@ -89,35 +81,93 @@ describe('TenantsCacheManager', () => {
       await tenantsCacheManager.loadTenants();
 
       // Assert
-      expect(tenantsCacheManager.getTenantUrn(acmeVaultId)).toBe(tenantUrn);
+      expect(tenantsCacheManager.getTenantDid(acmeVaultId)).toBe(tenantUrn);
       expect(tenantsCacheManager.getDidServiceConfig(acmeVaultId)).toEqual(mockServices);
-      expect(tenantsCacheManager.getTenantUrn('host')).toBe(hostUrn);
+      expect(tenantsCacheManager.getTenantDid('host')).toBe(hostUrn);
     });
+
+    it('should skip corrupted records and continue loading others', async () => {
+        // Arrange
+        const mockHostRecord = { id: 'host-record', content: hostConfig };
+        const mockAcmeRecord = { id: 'acme-record', content: acmeConfig };
+        const mockCorruptedRecord = { id: 'corrupted-record' };
+  
+        mockVaultRepository.getContainersInSection.mockResolvedValue([mockAcmeRecord, mockCorruptedRecord, mockHostRecord]);
+        
+        mockKmsService.unprotectConfidentialData
+          .mockResolvedValueOnce(acmeConfig)
+          .mockRejectedValueOnce(new Error('Decryption failed')) // Simulate a corrupted record
+          .mockResolvedValueOnce(hostConfig);
+  
+        // Act
+        await tenantsCacheManager.loadTenants();
+  
+        // Assert
+        // Verify that the valid records are still in the cache
+        expect(tenantsCacheManager.getTenantDid(acmeVaultId)).toBe(tenantUrn);
+        expect(tenantsCacheManager.getTenantDid('host')).toBe(hostUrn);
+        // Verify that the KMS was called for all records
+        expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledTimes(3);
+      });
   });
 
-  describe('getTenantUrn', () => {
-    it('should return the URN for an existing tenant', () => {
-      (tenantsCacheManager as any).tenantCacheByVaultId.set(acmeVaultId, acmeConfig);
-      const result = tenantsCacheManager.getTenantUrn(acmeVaultId);
+  describe('getTenantDid', () => {
+    beforeEach(() => {
+        (tenantsCacheManager as any).tenantCacheByVaultId.set(acmeVaultId, acmeConfig);
+        (tenantsCacheManager as any).tenantCacheByVaultId.set('host', hostConfig);
+    });
+
+    it('should return the DID for an existing tenant', () => {
+      const result = tenantsCacheManager.getTenantDid(acmeVaultId);
       expect(result).toBe(tenantUrn);
     });
 
+    it('should return the DID for the host', () => {
+        const result = tenantsCacheManager.getTenantDid('host');
+        expect(result).toBe(hostUrn);
+    });
+
     it('should return undefined for a non-existent tenant', () => {
-      const result = tenantsCacheManager.getTenantUrn('non-existent-id');
+      const result = tenantsCacheManager.getTenantDid('non-existent-id');
       expect(result).toBeUndefined();
     });
   });
 
   describe('getDidServiceConfig', () => {
+    beforeEach(() => {
+        (tenantsCacheManager as any).tenantCacheByVaultId.set(acmeVaultId, acmeConfig);
+        (tenantsCacheManager as any).tenantCacheByVaultId.set('host', hostConfig);
+    });
+
     it('should return the service configuration for an existing tenant', () => {
-      (tenantsCacheManager as any).tenantCacheByVaultId.set(acmeVaultId, acmeConfig);
       const result = tenantsCacheManager.getDidServiceConfig(acmeVaultId);
       expect(result).toEqual(mockServices);
+    });
+
+    it('should return the service configuration for the host', () => {
+        const result = tenantsCacheManager.getDidServiceConfig('host');
+        expect(result).toEqual([]); // The mock host has no services
     });
 
     it('should return undefined for a non-existent tenant', () => {
       const result = tenantsCacheManager.getDidServiceConfig('non-existent-id');
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe('getTenantSector', () => {
+    it('should correctly extract the sector from a cached tenant', () => {
+        (tenantsCacheManager as any).tenantCacheByVaultId.set(acmeVaultId, acmeConfig);
+        const sector = tenantsCacheManager.getTenantSector(acmeVaultId);
+        expect(sector).toBe(acmeSector);
+    });
+  });
+
+  describe('getTenantJurisdiction', () => {
+    it('should correctly extract the jurisdiction from a cached tenant', () => {
+        (tenantsCacheManager as any).tenantCacheByVaultId.set(acmeVaultId, acmeConfig);
+        const jurisdiction = tenantsCacheManager.getTenantJurisdiction(acmeVaultId);
+        expect(jurisdiction).toBe((acmeConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.addressCountry]);
     });
   });
 });

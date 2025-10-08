@@ -1,117 +1,101 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
-// File: src/__test__/data/organization.data.ts
+// File: src/__test__/data/end-to-end.data.ts
 
-import { ClaimsRecord } from "../../models/resource-document";
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from "../../models/schemaorg";
+import { ClaimsRecord } from '../../models/resource-document';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../models/schemaorg';
 import {
-    testHostAdmin1,
-    testTenant1Admin1,
-    testTenant1Receptionist1,
-    testTenant1Firefighter1,
-    testTenant1Nurse1,
-    testClaimsHostAdmin1,
-    testClaimsEmployeeAdminTenant1
-} from "./employee.data";
-import { testConfigDataHost, testConfigTenant1, testTenant1UrnIdentifier } from "./organization.data";
-import { testServiceTermsClaimsForHost, testServiceTermsClaimsForTenant1 } from "./service.data";
-
+  testHostAdmin1,
+  testTenant1Admin1,
+  testTenant1Receptionist1,
+  testTenant1Firefighter1,
+  testTenant1Nurse1,
+  testClaimsHostAdmin1,
+  testClaimsEmployeeAdminTenant1,
+} from './employee.data';
+import {
+  testConfigDataHost,
+  testConfigTenant1,
+  testTenant1AddressCountry,
+  testTenant1AlternateName,
+  testTenant1ExternalUrl,
+  testTenant1IdType,
+  testTenant1IdValue,
+  testTenant1LegalName,
+  testTenant1ServiceProviderCategory,
+  testTenant1UrnIdentifier,
+} from './organization.data';
 
 // ===================================================================================
 // GROUPED & EXPORTED TEST DATA OBJECTS
 // ===================================================================================
 
-/**
- * A comprehensive, structured object containing all data for the HOST organization.
- * It assembles the base data with its administrative member.
- */
 export const testHostData = {
-    ...testConfigDataHost,
-    member: {
-        admin1: testHostAdmin1,
-    },
+  ...testConfigDataHost,
+  member: {
+    admin1: testHostAdmin1,
+  },
 };
 
-/**
- * A comprehensive, structured object containing all data for TENANT 1.
- * It assembles the base data with all its relevant members.
- */
 export const testTenant1Data = {
-    ...testConfigTenant1,
-    identifier: testTenant1UrnIdentifier,
-    member: {
-        admin1: testTenant1Admin1,
-        receptionist1: testTenant1Receptionist1,
-        firefighter1: testTenant1Firefighter1,
-        nurse1: testTenant1Nurse1,
-    },
+  ...testConfigTenant1,
+  identifier: testTenant1UrnIdentifier,
+  member: {
+    admin1: testTenant1Admin1,
+    receptionist1: testTenant1Receptionist1,
+    firefighter1: testTenant1Firefighter1,
+    nurse1: testTenant1Nurse1,
+  },
 };
-
 
 // ===================================================================================
 // PRE-BUILT CLAIM SETS FOR TESTS
 // ===================================================================================
 
-/** The base set of claims, shared across different claim objects. */
-const baseClaims: Omit<ClaimsRecord, "org.schema.Organization.legalName"> = {
-    "@context": "org.schema",
-    "@type": "template",
-};
-
-/** A valid and complete set of claims for registering the HOST organization. */
-export const testClaimsHostOrganization: ClaimsRecord = {
-    ...baseClaims,
-    [ClaimsOrganizationSchemaorg.legalName]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.legalName],
-    [ClaimsOrganizationSchemaorg.identifierType]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.identifierType],
-    [ClaimsOrganizationSchemaorg.identifierValue]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.identifierValue],
-    [ClaimsOrganizationSchemaorg.alternateName]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.alternateName],
-    [ClaimsOrganizationSchemaorg.addressCountry]: testConfigDataHost.claims[ClaimsOrganizationSchemaorg.addressCountry],
+/**
+ * Valid claims for the 'host' organization's initial setup.
+ */
+export const testClaimsHostInitialization: ClaimsRecord = {
+  ...(testConfigDataHost.claims as ClaimsRecord),
+  ...testClaimsHostAdmin1,
+  [ClaimsServiceSchemaorg.category]: 'system',
+  [ClaimsServiceSchemaorg.identifier]: (testConfigDataHost.provider as any).service.identifier,
+  [ClaimsServiceSchemaorg.serviceType]: (testConfigDataHost.provider as any).service.serviceType,
+  [ClaimsServiceSchemaorg.termsOfService]: (testConfigDataHost.provider as any).service.termsOfService,
 };
 
 /**
- * Valid claims for the 'host' organization's initial setup, including its admin and provider service.
+ * A complete and valid set of claims for registering a new tenant ('acme').
+ * This is the canonical, flat claims object that the HostingManager expects to receive.
+ * It is built from granular constants to ensure correctness.
  */
-export const testClaimsHostInitialization = {
-    ...testClaimsHostOrganization,
-    ...testClaimsHostAdmin1,
-    [ClaimsServiceSchemaorg.category]: testConfigDataHost.provider.service.sectorCategory,
-    [ClaimsServiceSchemaorg.identifier]: testConfigDataHost.provider.service.identifier,
-    [ClaimsServiceSchemaorg.serviceType]: testConfigDataHost.provider.service.serviceType,
-    [ClaimsServiceSchemaorg.termsOfService]: testConfigDataHost.provider.service.termsOfService,
-};
+export const testClaimsTenant1Registration: ClaimsRecord = {
+  // --- Organization Claims ---
+  [ClaimsOrganizationSchemaorg.legalName]: testTenant1LegalName,
+  [ClaimsOrganizationSchemaorg.addressCountry]: testTenant1AddressCountry,
+  [ClaimsOrganizationSchemaorg.identifier]: testTenant1UrnIdentifier,
+  [ClaimsOrganizationSchemaorg.identifierType]: testTenant1IdType,
+  [ClaimsOrganizationSchemaorg.identifierValue]: testTenant1IdValue,
+  [ClaimsOrganizationSchemaorg.url]: testTenant1ExternalUrl,
+  [ClaimsOrganizationSchemaorg.alternateName]: testTenant1AlternateName,
 
+  // --- Person (Admin) Claims ---
+  ...testClaimsEmployeeAdminTenant1,
 
-/**
- * Well-formed claims for a tenant organization registration.
- */
-export const testClaimsTenant1Organization: object = {
-    ...baseClaims,
-    [ClaimsOrganizationSchemaorg.url]: testConfigTenant1.url,
-    [ClaimsOrganizationSchemaorg.legalName]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.legalName],
-    [ClaimsOrganizationSchemaorg.identifierType]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.identifierType],
-    [ClaimsOrganizationSchemaorg.identifierValue]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.identifierValue],
-    [ClaimsOrganizationSchemaorg.alternateName]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.alternateName],
-    [ClaimsOrganizationSchemaorg.addressCountry]: testConfigTenant1.claims[ClaimsOrganizationSchemaorg.addressCountry],
-};
-
-/**
- * Valid claims for a new tenant registration, including its admin and provider service.
- */
-export const testClaimsTenant1Registration = {
-    ...testClaimsTenant1Organization,
-    ...testClaimsEmployeeAdminTenant1,
-    [ClaimsServiceSchemaorg.category]: testConfigTenant1.provider.service.sectorCategory,
-    [ClaimsServiceSchemaorg.identifier]: testConfigTenant1.provider.service.identifier,
-    [ClaimsServiceSchemaorg.termsOfService]: testConfigTenant1.provider.service.termsOfService,
-    [ClaimsServiceSchemaorg.serviceType]: testConfigTenant1.provider.service.serviceTypePurpose,
+  // --- Service Claims ---
+  [ClaimsServiceSchemaorg.category]: testTenant1ServiceProviderCategory,
+  [ClaimsServiceSchemaorg.identifier]: (testConfigTenant1.provider as any).service.identifier,
+  [ClaimsServiceSchemaorg.termsOfService]: (testConfigTenant1.provider as any).service.termsOfService,
+  [ClaimsServiceSchemaorg.serviceType]: (testConfigTenant1.provider as any).service.serviceTypePurpose,
 };
 
 /**
  * A full, well-formed input payload for a tenant registration, matching the structure expected by the API.
  */
 export const testPayloadCreateTenant1 = {
-  thid: `thid-${testTenant1Data.id}`,
+  thid: `thid-${testConfigTenant1.id}`,
   iss: 'did:web:test-issuer.com',
   aud: 'did:web:host.example.com',
+  type: 'api+json',
   body: {
     data: [
       {
@@ -128,6 +112,6 @@ export const testPayloadCreateTenant1 = {
  * Claims for a tenant with an invalid alternateName ('host' is not allowed as prefix or suffix for tenants)
  */
 export const testClaimsTenant1AlternateNameInvalidPrefix = {
-    ...testClaimsTenant1Registration,
-    [ClaimsOrganizationSchemaorg.alternateName]: 'hosting-tenant-1',
+  ...testClaimsTenant1Registration,
+  [ClaimsOrganizationSchemaorg.alternateName]: 'hosting-tenant-1',
 };

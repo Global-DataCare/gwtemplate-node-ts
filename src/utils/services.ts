@@ -2,7 +2,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { EmployeeConfig } from '../models/employee-config';
-import { EntityConfig } from '../models/entity';
 import { Sector } from '../models/sector';
 import { DidService } from '../models/did';
 import { createDidServiceId } from './did';
@@ -20,33 +19,23 @@ const createDidEndpointConfig = (id: string, resources: string[], actions: strin
 
 /**
  * Generates the default set of BUSINESS LOGIC service endpoints for a new tenant.
- * This is the central function to modify when adding new default resource endpoints to the system.
+ * This function is now decoupled from the EntityConfig object.
  *
- * The logic is as follows:
- * 1. A base set of resources for entity management (Employee, Role, etc.) is ALWAYS included for ALL tenants.
- * 2. The system then checks the tenant's `sector`.
- * 3. If the sector has sector-specific resources (e.g., 'health-care' for FHIR), those resources are ADDED to the base list.
- *    The base resources are NOT replaced.
- *
- * @param tenantConfig The configuration of the tenant, containing the `sector`.
+ * @param sector The specific sector of the tenant.
  * @returns An array of `DidService` objects for the tenant's business logic endpoints.
  */
-function generateDefaultBusinessServices(tenantConfig: EntityConfig): DidService[] {
-  const { sector } = tenantConfig;
+function generateDefaultBusinessServices(sector: Sector): DidService[] {
   const services: DidService[] = [];
   const isFhir = FHIR_SECTORS.includes(sector);
 
-  // 1. Define the base resources available to ALL tenants.
   const entityResources = ['Employee', 'Role', 'Place', 'Organization', 'Bundle'];
   const individualResources = ['Customer', 'RelatedPerson', 'Bundle'];
 
-  // 2. If the tenant is in a FHIR-enabled sector, ADD sector-specific resources.
   if (isFhir) {
     entityResources.push('Practitioner', 'PractitionerRole', 'Location');
     individualResources.push('Patient');
   }
 
-  // 3. Create the service endpoints with the final resource lists.
   services.push(createDidEndpointConfig(
     createDidServiceId({ version: 'v1', sector, section: 'entity', format: 'org.schema' }),
     entityResources
@@ -63,32 +52,30 @@ function generateDefaultBusinessServices(tenantConfig: EntityConfig): DidService
 /**
  * Initializes the complete service list for a Tenant by combining discovery,
  * default business services, and any custom-provided services.
- * @param tenantConfig The configuration of the new tenant.
+ * @param didId The primary DID identifier for the tenant.
+ * @param sector The tenant's business sector.
  * @param customServices An optional array of custom service configurations for future extensibility.
  * @returns The complete array of DidService objects for the didDocument.
  */
-export function initializeTenantServices(tenantConfig: EntityConfig, customServices: DidService[] = []): DidService[] {
-  const { didConfig: didDocument } = tenantConfig;
-  // Robustly parse the DID to get the base URL, preventing replace errors.
-  const didIdentifier = didDocument.id.substring('did:web:'.length);
+export function initializeTenantServices(didId: string, sector: Sector, customServices: DidService[] = []): DidService[] {
+  const didIdentifier = didId.substring('did:web:'.length);
   const baseUrl = `https://${didIdentifier.replace(/:/g, '/')}`;
 
   const discoveryServices: DidService[] = [
     {
-      id: `${didDocument.id}#did-document`,
+      id: `${didId}#did-document`,
       type: 'LinkedDomains',
       serviceEndpoint: `${baseUrl}/.well-known/did.json`,
     },
     {
-      id: `${didDocument.id}#jwks`,
+      id: `${didId}#jwks`,
       type: 'JsonWebKeyService2020',
       serviceEndpoint: `${baseUrl}/jwks.json`,
     },
   ];
 
-  const defaultBusinessServices = generateDefaultBusinessServices(tenantConfig);
+  const defaultBusinessServices = generateDefaultBusinessServices(sector);
 
-  // Combine all services, ensuring no duplicates by ID.
   const allServices = [...discoveryServices, ...defaultBusinessServices, ...customServices];
   const serviceMap = new Map(allServices.map(s => [s.id, s]));
   
@@ -96,33 +83,30 @@ export function initializeTenantServices(tenantConfig: EntityConfig, customServi
 }
 
 /**
- * Generates the specific service list for the Host, which only includes
- * discovery and registry endpoints.
- * @param hostConfig The configuration of the host tenant.
+ * Generates the specific service list for the Host.
+ * @param didId The primary DID identifier for the host.
+ * @param sectorsAllowed The list of sectors the host is allowed to manage.
  * @returns The complete array of DidService objects for the host's didDocument.
  */
-export function initializeHostServices(hostConfig: EntityConfig): DidService[] {
-  const { didConfig: didDocument, sectorsAllowed } = hostConfig;
-  const didIdentifier = didDocument.id.substring('did:web:'.length);
+export function initializeHostServices(didId: string, sectorsAllowed: Sector[]): DidService[] {
+  const didIdentifier = didId.substring('did:web:'.length);
   const baseUrl = `https://${didIdentifier.replace(/:/g, '/')}`;
 
   const services: DidService[] = [
     {
-      id: `${didDocument.id}#did-document`,
+      id: `${didId}#did-document`,
       type: 'LinkedDomains',
       serviceEndpoint: `${baseUrl}/.well-known/did.json`,
     },
     {
-      id: `${didDocument.id}#jwks`,
+      id: `${didId}#jwks`,
       type: 'JsonWebKeyService2020',
       serviceEndpoint: `${baseUrl}/jwks.json`,
     },
   ];
 
-  // The host must have a registry service for EACH sector it is allowed to manage.
-  // Use a Set to automatically handle duplicates (e.g., if 'test' is already in sectorsAllowed).
   const uniqueSectors = new Set([...(sectorsAllowed || []), Sector.TEST]);
-  for (const sector of uniqueSectors) {
+  for (const sector of Array.from(uniqueSectors)) {
     services.push(createDidEndpointConfig(
       createDidServiceId({ version: 'v1', sector, section: 'registry', format: 'org.schema' }),
       ['Organization']
@@ -133,7 +117,6 @@ export function initializeHostServices(hostConfig: EntityConfig): DidService[] {
 
 /**
  * Initializes the complete service list for a new Employee.
- * An employee's DID is simpler and primarily points to discovery endpoints.
  * @param employeeConfig The configuration object for the new employee.
  * @returns The array of DidService objects for the employee's didDocument.
  */
@@ -152,8 +135,6 @@ export function initializeEmployeeServices(employeeConfig: EmployeeConfig): DidS
       type: 'JsonWebKeyService2020',
       serviceEndpoint: `${baseUrl}/jwks.json`,
     },
-    // Future services for an employee could be added here,
-    // e.g., credential presentation endpoints.
   ];
 
   return services;

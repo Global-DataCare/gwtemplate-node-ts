@@ -12,8 +12,7 @@ import { VerifiableCredentialV2 } from '../models/verifiable-credential';
 import { objectToBytes } from '../utils/object-convert';
 import { MldsaPublicJwk } from '../crypto/interfaces/Cryptography.types';
 import { getTenantVaultId } from '../utils/tenant';
-import { TenantsCacheManager } from './TenantsCacheManager';
-import { determineResourceId } from '../utils/resource';
+import { TenantsCacheManager } from './TenantsCacheManager';import { determineResourceId } from '../utils/resource';
 
 /**
  * Manages the business logic for creating and verifying Verifiable Credentials.

@@ -1,5 +1,5 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
-// File: src/models/tenant.ts
+// File: src/models/entity.ts
 
 import { DidService } from "./did";
 import { RecordBase } from "./resource-document";

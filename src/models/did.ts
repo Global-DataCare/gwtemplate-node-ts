@@ -1,6 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/models/did.ts
 
+import { PublicJwk } from "../crypto/interfaces/Cryptography.types";
 import { RecipientPublicKey } from "./crypto";
 
 /**
@@ -35,12 +36,24 @@ export interface DidDocument {
     '@context': string | string[];
     /** The DID URI itself. */
     id: string;
-    /** Public keys used for verifying digital signatures. */
-    verificationMethod?: RecipientPublicKey[];
-    /** Public keys used for encryption. */
-    keyAgreement?: RecipientPublicKey[];
-    /** Service endpoints for interacting with the DID subject. */
+    /** Public keys used for verifying digital signatures */
+    verificationMethod?: VerificationMethod[];
+    /** Keys/controllers authorized to make claims */
+    assertionMethod?: VerificationMethod[];
+    /** Keys used for authentication */
+    authentication?: VerificationMethod[]; 
+    /** Keys used to receive encrypted data */
+    keyAgreement?: VerificationMethod[];
+    /** Service endpoints for interacting with the entity */    
     service?: DidService[];
     /** Other properties are allowed. */
     [key: string]: any;
+}
+
+// En src/models/did.ts (o donde esté RecipientPublicKey/VerificationMethod)
+export interface VerificationMethod extends RecipientPublicKey {
+  id: string; // e.g., did:web:example.com#key-1
+  type: string; // e.g., JsonWebKey2020
+  controller: string; // e.g., did:web:example.com
+  publicKeyJwk: PublicJwk;
 }

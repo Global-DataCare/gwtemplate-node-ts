@@ -1,7 +1,5 @@
 # Guide: Identity Bootstrapping and Trust Model
 
-# Guide: Identity Bootstrapping and Trust Model
-
 > **Related Documents:**
 > *   **[Trust and Assurance Level Policy (`TRUST_POLICY.md`)](TRUST_POLICY.md)**: Defines the business rules for identity verification.
 > *   **[Fabric Implementation Plan (`FABRIC_IMPLEMENTATION_PLAN.md`)](FABRIC_IMPLEMENTATION_PLAN.md)**: Provides the detailed technical plan for implementing this flow.
@@ -12,27 +10,58 @@ This document provides a comprehensive guide to the identity bootstrapping proce
 
 The primary goal of this architecture is to create a robust, auditable, and cryptographically secure link between an organization's **legal identity** and its **digital operational identities**. The system is designed to be "post-quantum forward" at the application layer while integrating with the existing Public Key Infrastructure (PKI) requirements of Hyperledger Fabric.
 
-## 2. The Actors
+## 2. The Golden Rules of Identity
+
+To understand the architecture, it is essential to first understand the three "Golden Rules" that govern how entities are identified within the system.
+
+### Rule 1: `EntityConfig` is Generic
+The `EntityConfig` object is a generic container for any entity, be it the Root `Org A`, a `Host B`, or a `Tenant C`. Its structure is consistent, but its content is specific to the entity it represents.
+
+### Rule 2: The URN is the Canonical `id` for Sector-Specific Entities
+For any entity that operates within a specific business sector, such as a **Tenant**, its primary, canonical identifier is a semantic URN. This URN **MUST** be placed in the `didDocument.id` field.
+
+*   **Example for a Tenant:**
+    *   `didDocument.id`: `urn:antifraud:test-network:es:v1:health-care:entity:TAX:B123...`
+
+### Rule 3: `did:web` is the Secondary Alias (`alsoKnownAs`)
+For these same entities, any service endpoints addressable via a web domain are considered secondary aliases. These **MUST** be placed in the `didDocument.alsoKnownAs` array. This provides immense flexibility, allowing a single canonical identity to be reachable via multiple contexts.
+
+*   **Example for a Tenant:**
+    *   `didDocument.alsoKnownAs`:
+        *   `'did:web:host.example.com:acme'` (The hosted endpoint on the infrastructure provider).
+        *   `'did:web:acme-hospital.org'` (The tenant's own corporate domain).
+
+The same principle applies to employees, who may have multiple email addresses under a single canonical identity.
+
+### The Exception: The `Host`
+The `Host` itself is the only exception to Rule 2. As the multi-sector root of its own infrastructure, its primary identifier **MUST** be its `did:web`.
+
+*   **Example for the Host:**
+    *   `didDocument.id`: `did:web:host.example.com`
+
+These rules provide a clear, robust, and universal pattern for identity management across the entire system.
+
+## 3. The Actors
 
 To understand the flow, we define three distinct human controller roles:
 *   **Controller R:** The administrator of `Org A` (the network's **R**oot).
 *   **Controller S:** The administrator of `Host B` (the **S**ervice Host).
 *   **Controller T:** The administrator of `Tenant C` (the **T**enant).
 
-## 3. Core Architectural Principles
+## 4. Core Architectural Principles
 
 The architecture reconciles three identity layers:
-1.  **Legal Identity Layer:** The foundational trust, established via an official X.509 certificate held by a controller.
-2.  **Application Identity Layer:** The modern identity layer for APIs, using `did:web`, Post-Quantum Cryptography (PQC), and Verifiable Credentials (VCs).
-3.  **Network Identity Layer:** The identity for Hyperledger Fabric participation, based on a project-specific X.509 PKI governed by `Org A`.
+4.1.  **Legal Identity Layer:** The foundational trust, established via an official X.509 certificate held by a controller.
+4.2.  **Application Identity Layer:** The modern identity layer for APIs, using `did:web`, Post-Quantum Cryptography (PQC), and Verifiable Credentials (VCs).
+4.3.  **Network Identity Layer:** The identity for Hyperledger Fabric participation, based on a project-specific X.509 PKI governed by `Org A`.
 
 The **on-chain Identity Smart Contract** serves as the immutable ledger that formally binds these layers together.
 
-## 4. Solving the Bootstrapping Paradox: Seeding the PKI Hierarchy
+## 5. Solving the Bootstrapping Paradox: Seeding the PKI Hierarchy
 
 This process, performed by **Controller R**, is a prerequisite for starting the network. It involves creating a self-signed **X.509 Root CA certificate** off-chain and using it as a "seed" to initialize the Fabric Root CA. The Root CA then issues a certificate to an **Intermediate CA (ICA)**, which will handle all day-to-day certificate issuance. Once the ICA is running, the Fabric network can be started and the Identity Smart Contract can be deployed.
 
-## 5. Phase 1: The Trust Root Bootstrapping Ceremony (Org A)
+## 6. Phase 1: The Trust Root Bootstrapping Ceremony (Org A)
 
 This phase, orchestrated by **Controller R**, records `Org A`'s identity onto the now-running ledger.
 
@@ -57,7 +86,7 @@ sequenceDiagram
 
 The on-chain `genesisProofSignature` represents a powerful cryptographic statement: **"I, as the controller of the PQC private key whose thumbprint I am registering, attest that this document is the origin of my identity."**
 
-## 6. Phase 2: Participant Onboarding (Host B)
+## 7. Phase 2: Participant Onboarding (Host B)
 
 This process describes how `Host B`, managed by **Controller S**, joins the network. `Org A` acts as the governor and broker for network access.
 
@@ -88,7 +117,7 @@ sequenceDiagram
     GatewayA->>-GatewayB: 6. Issues and sends the "Identity Linkage VC"
 ```
 
-## 7. Phase 3: Tenant Onboarding - From Verification to Activation
+## 8. Phase 3: Tenant Onboarding - From Verification to Activation
 
 The onboarding of a tenant is a multi-phase process that separates cryptographic **Identity Verification** from real-world **Business Authorization**. This ensures that having a valid legal identity (e.g., `LoA 4`) is a prerequisite, but not an automatic grant of access to the network.
 
@@ -149,17 +178,17 @@ sequenceDiagram
     *   The flow then concludes with the **Re-encryption Ceremony** as described in the `FABRIC_IMPLEMENTATION_PLAN.md`, where `Controller T` uses this secret to provision the `Tenant C` service.
 
 
-## 8. Phase 4: Operational Identity & Dynamic Control
+## 9. Phase 4: Operational Identity & Dynamic Control
 
 Once onboarded, an organization can issue credentials. This operational layer is designed to be flexible, especially regarding key rotation.
 
-### Step 8.1: The Role of the Pointer VC
+### Step 9.1: The Role of the Pointer VC
 
 A Pointer VC is a specific type of Verifiable Credential that links a subject's **persistent, semantic identifier** to their **cryptographic controller (DID)**. This is not achieved by placing the controller's DID inside the `credentialSubject`. Instead, the link is established through the credential's **proof**. This model provides a clear separation of concerns:
 -   **The `credentialSubject` describes "who or what" the entity is.**
 -   **The `proof` describes "who controls" the credential about that entity.**
 
-### Step 8.2: Anatomy of an Operational VC (The Pointer VC Pattern)
+### Step 9.2: Anatomy of an Operational VC (The Pointer VC Pattern)
 
 All operational VCs (for tenants, employees, etc.) follow a precise structure to prevent identifier ambiguity.
 
@@ -172,16 +201,16 @@ All operational VCs (for tenants, employees, etc.) follow a precise structure to
     *   **`issuer`**: The DID of the issuing organization.
     *   **`proof.verificationMethod`**: Combines the **issuer's DID** and a specific key identifier (e.g., `did:web:hostb.example.com#key-1`). It attests to the binding between the `credentialSubject.identifier` and the cryptographic key material.
 
-### Step 8.3: The "Fact-in-Time" Credential vs. The "Live" DID
+### Step 9.3: The "Fact-in-Time" Credential vs. The "Live" DID
 
 *   **Verifiable Credential (VC):** A VC is a static assertion, a "fact frozen in time". It certifies the link between a subject's semantic URN and their DID at a specific moment.
 *   **DID Document:** A DID Document is a **live representation** of the entity's cryptographic keys, which can and should be rotated.
 
-### Step 8.4: The Verifiable Presentation (VP): Proof of Live Control
+### Step 9.4: The Verifiable Presentation (VP): Proof of Live Control
 
 When an entity needs to prove their identity, they create a Verifiable Presentation (VP), which is a digital envelope containing the original VC. The entity then **signs the entire VP envelope** using their **current, active private key**.
 
-### Step 8.5: The 3-Step Verification Flow
+### Step 9.5: The 3-Step Verification Flow
 
 A verifier performs these checks:
 1.  **Verify Live Control (VP Signature):** Verifies the signature on the outer VP envelope using the subject's **current public key** from their live DID document. *This proves the sender is the live controller of the DID.*
@@ -190,7 +219,7 @@ A verifier performs these checks:
 
 This two-level verification securely bridges the static credential with the dynamic state of the subject's keys.
 
-## 9. The Complete Audit Trail
+## 10. The Complete Audit Trail
 
 The architecture is designed for full end-to-end auditability:
 1.  **On-Chain Anchor:** Query the smart contract for the participant's key thumbprints and `genesisProofSignature`.

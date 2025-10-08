@@ -14,6 +14,8 @@ export interface IServerConfig {
   apiHostname: string;
   hostExternalDomain: string;
   apiBaseUrl: string;
+  namespace: string;
+  network: string;
   sectorsAllowed: Sector[];
   dbProvider: string;
   queueProvider: string;

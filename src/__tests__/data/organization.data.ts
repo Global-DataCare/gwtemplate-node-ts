@@ -61,7 +61,7 @@ export const testTenant1AddressCountry = "US";
 export const testTenant1IdType = "EI"; // EI or TAX
 export const testTenant1IdValue = "98-7654321";
 export const testTenant1AlternateName = "acme";
-export const testTenant1Domain = "acme.org";
+const testTenant1Uuid = "c1c2c3d4-e5f6-7890-1234-567890abcdef";
 
 // --- Tenant 1 - Service Provider Details ---
 // const testTenant1ServiceProviderUuid = "d1c2c3d4-e5f6-7890-1234-567890abcdef";
@@ -77,10 +77,12 @@ const testTenant1ServiceProviderPurposeType = "http://terminology.hl7.org/CodeSy
 export const testTenant1UrnIdentifier = 
   `urn:${URN_NAMESPACE}:${URN_NETWORK}:${testTenant1AddressCountry}:${URN_VERSION}:${testTenant1ServiceProviderCategory}:entity:${testTenant1IdType}:${testTenant1IdValue}`;
 
+/** Tenant's 1 external domain */
+export const testTenant1Domain = "acme.org";
+export const testTenant1ExternalUrl = `https://${testTenant1Domain}`
+export const testTenant1DidWebExternalIdentifier = `did:web:${testTenant1Domain}`;
 /** Hosted did:web = did:web:host.example.com:acme:us:v1:health-care */
 export const testTenant1DidWebHostedIdentifier = `did:web:${testHostDomain}:${testTenant1AlternateName}:${testTenant1AddressCountry}:v1:${testTenant1ServiceProviderCategory}`;
-export const testTenant1DidWebExternalIdentifier = `did:web:${testTenant1Domain}`;
-const testTenant1Uuid = "c1c2c3d4-e5f6-7890-1234-567890abcdef";
 
 // --- Tenant 1 - Admin 1 Details ---
 const testTenant1Admin1MockedUuid = "acme-admin1-id";
@@ -96,7 +98,8 @@ export const testTenant1Admin1HasOccupation = "ISCO-08:1120";
 // and "included" objects (services) such as provider and database resources.
 export const testConfigDataHost: EntityConfig = {
   id: testHostUuid,
-  status: `active`,
+  meta: { lastUpdated: '' },
+  status: 'active',
   type: "org.schema.Organization", // type of claims
   claims: {
     [ClaimsOrganizationSchemaorg.legalName]: testHostLegalName,
@@ -110,11 +113,11 @@ export const testConfigDataHost: EntityConfig = {
 
   /** --- DEPRECATED --- */
   // identifier: "urn:uuid:d1d2d3d4-e5f6-7890-1234-567890abcdef",
-  alternateName: testHostAlternateName,
+  /* alternateName: testHostAlternateName,
   addressCountry: testHostAddressCountry,
   identifierType: testHostIdType,
   identifierValue: testHostIdValue,
-  legalName: testHostLegalName,
+  legalName: testHostLegalName, */
   // taxId: testTenant1TaxId,  
   /** --- --- --- --- */
 
@@ -145,7 +148,8 @@ export const testConfigDataHost: EntityConfig = {
 // ===================================================================================
 export const testConfigTenant1: EntityConfig = {
   id: testTenant1Uuid,
-  status: `active`,
+  meta: { lastUpdated: '' },
+  status: 'active',
   type: "org.schema.Organization", // type of claims
   claims: {
     [ClaimsOrganizationSchemaorg.legalName]: testTenant1LegalName,
@@ -159,13 +163,14 @@ export const testConfigTenant1: EntityConfig = {
   
   /** --- DEPRECATED --- */
   // identifier: "urn:uuid:c1c2c3d4-e5f6-7890-1234-567890abcdef",
-  addressCountry: testTenant1AddressCountry,
+  /* addressCountry: testTenant1AddressCountry,
   identifierType: testTenant1IdType,
   identifierValue: testTenant1IdValue,
   // taxId: "98-7654321",
   legalName: testTenant1LegalName,
   alternateName: testTenant1AlternateName,
   url: "https://acme.example.com", //external URL, not provided by the host in this case
+  */
   /** --- --- */
   
   didConfig: {

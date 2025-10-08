@@ -6,7 +6,7 @@ import { createErrorBundle } from './utils/bundle';
 import { IPayloadResponse } from './models/response';
 import { JobRequest } from './models/request';
 import { parseJobName } from './utils/naming';
-import { getHostDidWebId } from './utils/did';
+import { composeHostDidWebId } from './utils/did';
 
 /**
  * The Worker is the heart of the background processing logic.
@@ -47,7 +47,8 @@ export class Worker {
         case 'Organization':
           manager = this.managers.hostingManager;
           break;
-        case 'Practitioner': // Employee
+        case 'Practitioner':
+        case 'Employee':
           manager = this.managers.employeeManager;
           break;
         case 'Customer':
@@ -73,7 +74,7 @@ export class Worker {
       
       return {
         thid: job.input?.thid || 'unknown-thid',
-        iss: getHostDidWebId(this.apiBaseUrl),
+        iss: composeHostDidWebId(this.apiBaseUrl),
         aud: job.input?.aud || 'unknown-aud',
         exp: Math.floor(Date.now() / 1000) + 300,
         body: errorBundle,

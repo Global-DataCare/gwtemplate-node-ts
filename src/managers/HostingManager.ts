@@ -22,7 +22,9 @@ import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/s
 import { validateNewOrganizationClaims } from '../utils/claims-validator';
 import { Sector } from '../models/sector';
 import { TenantsCacheManager } from './TenantsCacheManager';
-import { DidDocumentBuilder } from '../services/DidDocumentBuilder';
+import { createHostedDidWeb, populateDidDocumentFromJwks, composeHostDidWebId, getPrimaryDidWeb } from '../utils/did';
+import { DidDocument } from '../models/did';
+import { createOrganizationUrn } from '../utils/urn';
 
 /**
  * Manages the business logic for HOSTING, including new tenant registration.
@@ -40,7 +42,6 @@ export class HostingManager {
   private kmsService: IKmsService;
   private tenantsCacheManager: TenantsCacheManager;
   private config: IServerConfig;
-  private didDocumentBuilder: DidDocumentBuilder;
 
   constructor(
     vaultRepository: VaultRepository,
@@ -52,7 +53,6 @@ export class HostingManager {
     this.kmsService = kmsService;
     this.tenantsCacheManager = tenantsCacheManager;
     this.config = config;
-    this.didDocumentBuilder = new DidDocumentBuilder();
   }
 
   /**
@@ -84,10 +84,8 @@ export class HostingManager {
         responseEntries.push(resultEntry);
       } catch (error) {
         if (isBootstrap) {
-          // During bootstrap, any error is fatal and should halt the server startup.
           throw error;
         }
-        // For regular API calls, create a standard error entry in the response bundle.
         const errorEntry = this.handleError(error, entry.type, entry.meta);
         responseEntries.push(errorEntry);
       }
@@ -99,13 +97,9 @@ export class HostingManager {
       data: responseEntries,
     };
 
-    // This part is now tricky because getTenantDidWebId and getHostDidWebId were deleted.
-    // For now, we will construct a simplified issuer DID.
-    // TODO: Refactor DID utilities to be injectable or receive config.
-    const issuerDid =
-      job.tenantId && job.tenantId !== 'host'
-        ? `did:web:${this.config.apiHostname}:${job.tenantId}`
-        : `did:web:${this.config.apiHostname}`;
+    // --- CORRECTED ISSUER LOGIC ---
+    // The issuer for a registration response is always the Host.
+    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
 
     return {
       thid: job.input.thid,
@@ -172,6 +166,9 @@ export class HostingManager {
         }
         validatedSector = requestedSector as Sector;
 
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[DEBUG] HostingManager.processRegistrationEntry attempting to build vaultId with: validatedSector='${validatedSector}', alternateName='${alternateName}'`);
+        }
         const vaultId = getTenantVaultId(validatedSector, alternateName);
         if (await this.vaultRepository.vaultExists(vaultId)) {
           throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
@@ -268,72 +265,66 @@ export class HostingManager {
   private async persistHostConfig(org: IncludedResource, contained: IncludedResource[]) {
     console.log(`[HostingManager] ENTERING persistHostConfig.`);    
     const vaultId = 'host';
-    // 1. Provision the keys for the 'host' entity first.
     await this.kmsService.provisionKeys(vaultId);
     const publicKeys = await this.kmsService.getPublicJwks(vaultId);
 
-    // 2. Construct the host's own TenantConfig object.
     const hostConfig: EntityConfig = {
+      type: org.type,
+      status: 'active',
       id: org.id,
-      claims: {},
-      identifier: org.meta.claims[ClaimsOrganizationSchemaorg.identifier],
+      claims: org.meta.claims,
+      // Deprecated fields, kept for potential compatibility, but logic should use claims.
+      identifier: org.meta.claims[ClaimsOrganizationSchemaorg.identifier] as string,
       alternateName: 'host',
-      legalName: org.meta.claims[ClaimsOrganizationSchemaorg.legalName],
-      jurisdiction: org.meta.claims[ClaimsOrganizationSchemaorg.addressCountry],
+      legalName: org.meta.claims[ClaimsOrganizationSchemaorg.legalName] as string,
+      jurisdiction: org.meta.claims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       url: `${this.config.apiBaseUrl}/host`,
       sector: Sector.SYSTEM,
       sectorsAllowed: this.config.sectorsAllowed,
       didConfig: {
-        '@context': 'https://www.w3.org/ns/did/v1',
-        id: `did:web:${this.config.apiHostname}`,
         service: [],
       },
-      didDocument: {} as any, // Placeholder, will be generated next
+      didDocument: {} as any, 
       meta: { lastUpdated: new Date().toISOString() },
     };
 
-    // 2a. Generate the service configuration templates.
-    hostConfig.didConfig.service = initializeHostServices(hostConfig);
+    // Use the correct, restored function to define the host's DID
+    const didId = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
 
-    // 2b. Generate the static, public DID Document.
-    hostConfig.didDocument = this.didDocumentBuilder.build({
-      didId: hostConfig.didConfig.id,
-      baseUrl: `${this.config.apiBaseUrl}/host/cds-${hostConfig.jurisdiction}/v1`,
-      publicKeysJwk: publicKeys,
-      configServices: hostConfig.didConfig.service,
-    });
+    hostConfig.didConfig.service = initializeHostServices(didId, hostConfig.sectorsAllowed);
 
-    // 3. Construct the document to be protected.
+    // Unify the logic: Build the host's DID document using the same robust utility as tenants.
+    const skeletonDidDoc: DidDocument = {
+      '@context': 'https://www.w3.org/ns/did/v1',
+      id: didId,
+      alsoKnownAs: [], // The host has no other aliases in this context
+    };
+    hostConfig.didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
+
     const docToProtect: ConfidentialStorageDoc = {
       id: org.id,
       sequence: 0,
       content: hostConfig,
     };
 
-    // 4. Request protection from the KMS, using its own 'host' keys.
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
 
-    // 5. Create the host's own vault and persist its configuration inside it.
     await this.vaultRepository.createNewVault({ id: vaultId, custodian: secureDoc.id });
     await this.vaultRepository.put(vaultId, [secureDoc], 'tenants');
 
-    // DEPRECATED NOTE: Cache reloading for the host is handled by the main server startup sequence
-    // in server.ts AFTER this bootstrap process completes.
-
-    // NEW NOTE: Force a cache reload to ensure the host tenant is immediately available.
     console.log(`[HostingManager] Host config persisted. Forcing cache reload NOW.`);
     await this.tenantsCacheManager.loadTenants();
   }
 
   /**
-   * Constructs a new tenant's TenantConfig and persists it in the host's vault.
-   * This follows the 'Secure Persistence Flow' architectural pattern.
-   * @param org The main Organization resource.
+   * Constructs a new tenant's EntityConfig and persists it in the host's vault.
+   * This method is the core of the tenant creation logic and follows the "Golden Rules of Identity".
+   *
+   * @param org The main Organization resource extracted from the claims.
    * @param altName The alternateName for the tenant's vault.
    * @param contained An array of contained resources (Person, Service).
    * @param sector The validated business sector for the new tenant.
    */
-
   private async persistTenantConfig(
     org: IncludedResource,
     altName: string,
@@ -342,63 +333,65 @@ export class HostingManager {
   ) {
     const vaultId = getTenantVaultId(sector, altName);
     console.log(`[HostingManager] Persisting new tenant config with vaultId: '${vaultId}'`);
-    // 1. Provision the cryptographic keys for the new tenant.
+    
     await this.kmsService.provisionKeys(vaultId);
     const publicKeys = await this.kmsService.getPublicJwks(vaultId);
 
-    // --- Determine the tenant's domain and URL with a fallback mechanism ---
-    const tenantUrlClaim = org.meta.claims[ClaimsOrganizationSchemaorg.url];
-    let tenantDomain: string;
-    let tenantUrl: string;
-
-    if (tenantUrlClaim && typeof tenantUrlClaim === 'string' && tenantUrlClaim.startsWith('https://')) {
-      try {
-        const parsedUrl = new URL(tenantUrlClaim);
-        tenantDomain = parsedUrl.hostname;
-        tenantUrl = tenantUrlClaim;
-      } catch (e) {
-        tenantDomain = this.config.hostExternalDomain;
-        tenantUrl = `${this.config.apiBaseUrl}/${altName}`;
-      }
-    } else {
-      tenantDomain = this.config.hostExternalDomain;
-      tenantUrl = `${this.config.apiBaseUrl}/${altName}`;
-    }
-
-    const tenantDidId = tenantDomain.includes(this.config.apiHostname)
-      ? `did:web:${tenantDomain}:${altName}`
-      : `did:web:${tenantDomain}`;
-
-    const tenantConfig: EntityConfig = {
-      id: org.id,
-      claims: {},
-      identifier: org.meta.claims[ClaimsOrganizationSchemaorg.identifier],
-      alternateName: altName,
-      legalName: org.meta.claims[ClaimsOrganizationSchemaorg.legalName],
-      jurisdiction: org.meta.claims[ClaimsOrganizationSchemaorg.addressCountry],
-      url: tenantUrl,
+    // 1. Construct the canonical URN for the tenant using the existing utility.
+    const tenantUrn = createOrganizationUrn({
+      namespace: this.config.namespace,
+      network: this.config.network,
+      jurisdiction: org.meta.claims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       sector: sector,
-      didConfig: {
-        '@context': 'https://www.w3.org/ns/did/v1',
-        id: tenantDidId,
-        service: [],
+      idType: org.meta.claims[ClaimsOrganizationSchemaorg.identifierType] as string,
+      idValue: org.meta.claims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+    });
+
+    // 2. Construct the hosted and external did:web identifiers.
+    const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const jurisdiction = org.meta.claims[ClaimsOrganizationSchemaorg.addressCountry] as string;
+    const context = {
+      jurisdiction: jurisdiction,
+      version: 'v1', // TODO: Source this from a centralized configuration constant
+      sector: sector,
+    };
+    const hostedDid = createHostedDidWeb(hostDid, altName, context);
+    const publicTenantUrl = org.meta.claims[ClaimsOrganizationSchemaorg.url] as string | undefined;
+    const externalDid = publicTenantUrl && publicTenantUrl.startsWith('https://') 
+      ? `did:web:${new URL(publicTenantUrl).hostname}` 
+      : undefined;
+
+    // 3. Build the DID Document skeleton according to the "Golden Rules of Identity".
+    const skeletonDidDoc: DidDocument = {
+      '@context': 'https://www.w3.org/ns/did/v1',
+      id: tenantUrn,
+      alsoKnownAs: [hostedDid, ...(externalDid ? [externalDid] : [])],
+    };
+
+    // 4. Generate the service configuration templates.
+    const services = initializeTenantServices(tenantUrn, sector);
+
+    // 5. Populate the full DID document by multiplexing the keys and adding services.
+    const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
+    didDocument.service = services;
+
+    // 6. Construct the final EntityConfig for the tenant.
+    const tenantConfig: EntityConfig = {
+      type: org.type,
+      status: 'active',
+      id: org.id,
+      claims: {
+        ...org.meta.claims,
+        [ClaimsOrganizationSchemaorg.identifier]: tenantUrn,
       },
-      didDocument: {} as any, // Placeholder, will be generated next
+      didConfig: {
+        service: services, // Store the services in the config for internal use
+      },
+      didDocument: didDocument,
       meta: { lastUpdated: new Date().toISOString() },
     };
 
-    // 1a. Generate the service configuration templates.
-    tenantConfig.didConfig.service = initializeTenantServices(tenantConfig);
-
-    // 1b. Generate the static, public DID Document.
-    tenantConfig.didDocument = this.didDocumentBuilder.build({
-      didId: tenantConfig.didConfig.id,
-      baseUrl: `${this.config.apiBaseUrl}/${altName}/cds-${tenantConfig.jurisdiction}/v1`,
-      publicKeysJwk: publicKeys,
-      configServices: tenantConfig.didConfig.service,
-    });
-
-    // 2. Manager: Construct the complete plaintext document for the KMS.
+    // 7. Construct the document to be protected by the KMS.
     const docToProtect: ConfidentialStorageDoc = {
       id: org.id,
       sequence: 0,
@@ -406,7 +399,7 @@ export class HostingManager {
         {
           attributes: [
             { name: 'alternateName', value: altName, unique: true },
-            { name: 'taxId', value: org.meta.claims[ClaimsOrganizationSchemaorg.identifier] },
+            { name: 'taxId', value: org.meta.claims[ClaimsOrganizationSchemaorg.identifierValue] as string },
           ],
           hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
         },
@@ -414,17 +407,15 @@ export class HostingManager {
       content: tenantConfig,
     };
 
-    // The KMS is responsible for serialization, encryption, and removing the .content property.
-    // The 'host' is always the protector of a new tenant's configuration.
+    // 8. Encrypt and persist the new tenant's configuration.
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, 'host');
-
     await this.vaultRepository.createNewVault({ id: vaultId, custodian: secureDoc.id });
     await this.vaultRepository.put('host', [secureDoc], 'tenants');
 
-    // As per the architecture warning, force a cache reload to ensure the new tenant
-    // is immediately available to the API without a server restart.
+    // 9. Force a cache reload to make the new tenant immediately available.
     await this.tenantsCacheManager.loadTenants();
   }
+
 
   /**
    * Extracts and builds the Organization, Person, and Service resources from a flat claims object.
@@ -466,3 +457,4 @@ export class HostingManager {
     return resources as { organization: IncludedResource; person: IncludedResource; service: IncludedResource };
   }
 }
+

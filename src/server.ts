@@ -1,8 +1,8 @@
 // src/server.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import express from 'express';
-import dotenv from 'dotenv';
+import express = require('express');
+import dotenv = require('dotenv');
 import { Worker } from './worker';
 import { IServerConfig } from './config';
 import { Sector } from './models/sector';
@@ -18,6 +18,7 @@ import { ManagerRegistry } from './managers/registry';
 import { HostingManager } from './managers/HostingManager';
 import { TenantsCacheManager } from './managers/TenantsCacheManager';
 import { EmployeeManager } from './managers/EmployeeManager';
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from './models/schemaorg';
 
 // ===================================================================================
 // CONFIGURATION LOGIC - INTERNAL TO SERVER.TS
@@ -64,6 +65,8 @@ function getConfig(): IServerConfig {
       apiHostname: process.env.API_HOSTNAME || 'localhost',
       hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || process.env.API_HOSTNAME || 'localhost',
       apiBaseUrl: buildApiBaseUrl(port),
+      namespace: process.env.URN_NAMESPACE || 'antifraud',
+      network: process.env.URN_NETWORK || 'test-network',
       sectorsAllowed: parseAndValidateSectors(process.env.SECTORS_ALLOWED),
       dbProvider: process.env.DB_PROVIDER || 'mem',
       queueProvider: process.env.QUEUE_PROVIDER || 'mem',
@@ -102,16 +105,18 @@ function getConfig(): IServerConfig {
 async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServerConfig) {
   console.log('[GW-API] Bootstrapping host tenant...');
   const hostClaims = {
-    'org.schema.Organization.legalName': bootConfig.host.legalName,
-    'org.schema.Organization.addressCountry': bootConfig.host.jurisdiction,
-    'org.schema.Organization.taxID': bootConfig.host.idValue,
-    'org.schema.Organization.alternateName': 'host',
-    'org.schema.Organization.identifier': `urn:uuid:${bootConfig.host.idValue}`,
-    'org.schema.Person.email': bootConfig.host.adminEmail,
-    'org.schema.Person.identifier': `urn:uuid:${bootConfig.host.adminUid}`,
-    'org.schema.Person.hasOccupation': bootConfig.host.adminRole,
-    'org.schema.Service.category': 'system', 
-    'org.schema.Service.identifier': `urn:uuid:${bootConfig.host.idValue}-service`,
+    // [ClaimsOrganizationSchemaorg.identifier] is generated when persisting the host (tenant zero)
+    [ClaimsOrganizationSchemaorg.identifierType]: bootConfig.host.idType,
+    [ClaimsOrganizationSchemaorg.identifierValue]: bootConfig.host.idValue,
+    [ClaimsOrganizationSchemaorg.addressCountry]: bootConfig.host.jurisdiction,
+    [ClaimsOrganizationSchemaorg.legalName]: bootConfig.host.legalName,
+    [ClaimsOrganizationSchemaorg.alternateName]: 'host',
+    [ClaimsPersonSchemaorg.email]: bootConfig.host.adminEmail,
+    [ClaimsPersonSchemaorg.identifier]: `urn:uuid:${bootConfig.host.adminUid}`,
+    [ClaimsPersonSchemaorg.hasOccupation]: bootConfig.host.adminRole,
+    // TODO: Review accepted software manufacturer terms
+    [ClaimsServiceSchemaorg.category]: 'system', 
+    [ClaimsServiceSchemaorg.identifier]: `urn:uuid:${bootConfig.host.idValue}-service`,
   };
 
   try {

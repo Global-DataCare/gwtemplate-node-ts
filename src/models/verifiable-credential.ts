@@ -18,7 +18,7 @@ import { EvidenceObjectDLT } from "./oidc4ida.evidence.model"
 	created?:               string // ISO 8601 original timestamp of the signature, it is not the same as credential.issued (tx timestamp) (in Aries go framework use *util.TimeWithTrailingZeroMsec instead of time.Time)
 	jws?:                   string // The detached JWS signature string "<base64url(protectedheader)>..<base64url(signature)>"
 	proofPurpose?:          string // assertionMethod, authentication, keyAgreement, contractAgreement, capabilityInvocation, capabilityDelegation
-	type?:                  string // "JsonWebSignature2020", "BbsBlsSignature2020", "BbsBlsSignatureProof2020"
+	type:                  string // "JsonWebSignature2020", "BbsBlsSignature2020", "BbsBlsSignatureProof2020"
 	verificationMethod?:    string // The DID URL of the public key, e.g., "did:web:host.example.com#keyIdThumbprintBase64urlEncoded"
 }
 

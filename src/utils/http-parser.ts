@@ -43,7 +43,7 @@ export function convertPlainMessageToJson(message: any, contentType: string): an
 
 /**
  * Extracts and structures HTTP request data based on the defined CDS path structure.
- * URL Structure: /:tenantId/cds-:jurisdiction/v1/:sectorType/:section/:format/:resourceType/:action
+ * URL Structure: /:tenantId/cds-:jurisdiction/v1/:sector/:section/:format/:resourceType/:action
  */
 export function extractHttpRequestDataAsJson(
   url: string,
@@ -76,7 +76,7 @@ export function extractHttpRequestDataAsJson(
     tenantId: pathParts[cdsIndex - 1],
     jurisdiction: pathParts[cdsIndex].substring(4), // Remove 'cds-'
     apiVersion: pathParts[cdsIndex + 1],
-    sectorType: pathParts[cdsIndex + 2],
+    sector: pathParts[cdsIndex + 2],
     section: pathParts[cdsIndex + 3],
     format: pathParts[cdsIndex + 4],
     resourceType: pathParts[cdsIndex + 5],

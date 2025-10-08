@@ -27,7 +27,7 @@ export type PublicJWKey = MlkemPublicJwk | MldsaPublicJwk | ClassicPublicJwk;
  * @see https://w3c-ccg.github.io/ld-cryptosuite-registry/
  */
 export interface RecipientPublicKey {
-    type: "JsonWebKey2020";
+    type: string; // "JsonWebKey2020";
     controller?: string; // DID of the key controller
     publicKeyJwk: PublicJWKey;
     nbf?: number; // Not Before timestamp

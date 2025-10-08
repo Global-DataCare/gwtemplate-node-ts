@@ -1,9 +1,9 @@
 // src/__tests__/unit/services/DidDocumentBuilder.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { DidDocumentBuilder, BuildDidDocumentParams } from '../../../services/DidDocumentBuilder';
 import { JwkSet } from '../../../models/jwk';
 import { DidService } from '../../../models/did';
+import { DidDocumentBuilder, BuildDidDocumentParams } from '../../../services/DidDocumentBuilder';
 
 describe('DidDocumentBuilder', () => {
   it('should correctly build and multiplex a DID Document', () => {

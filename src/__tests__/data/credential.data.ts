@@ -2,8 +2,11 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { VerifiableCredentialV2 } from "../../models/verifiable-credential";
-import { testTenant1Data } from "./end-to-end.data";
-import { testHostDidWebIdentifier, testRootOrgDidWeb } from "./organization.data";
+import {
+  testTenant1UrnIdentifier,
+  testHostDidWebIdentifier,
+  testRootOrgDidWeb
+} from "./organization.data";
 
 // ===================================================================================
 // MOCK VERIFIABLE CREDENTIALS
@@ -58,7 +61,7 @@ export const testTenant1Vc: VerifiableCredentialV2 = {
   validFrom: testIssuanceDateByHost,
   validUntil: testExpirationDateByHost,
   credentialSubject: {
-    identifier: testTenant1Data.identifier, // The stable URN of the tenant
+    identifier: testTenant1UrnIdentifier, // The stable URN of the tenant
   },
   proof: [{
     type: 'JsonWebSignature2020',

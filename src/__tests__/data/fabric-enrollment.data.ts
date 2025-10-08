@@ -1,6 +1,7 @@
 // src/__tests__/data/fabric-enrollment.data.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { MldsaPublicJwk } from '../../crypto/interfaces/Cryptography.types';
 import { ClaimsActionSchemaorg } from '../../models/claims-action';
 import { DidDocument } from '../../models/did';
 import { DecodedDidcommMessage } from '../../models/request';
@@ -17,7 +18,18 @@ export const testTenantC_DidDocument: DidDocument = {
   alsoKnownAs: [testTenant1DidWebExternalIdentifier],
   verificationMethod: [ /* ... */ ],
   assertionMethod: [
-    testControllerT_Did, // Grants permission to Controller T
+    // This entry is the key to the authorization logic. It grants Controller T
+    // permission to make assertions on behalf of Tenant C.
+    {
+      id: `${testControllerT_Did}#key-1`,
+      type: 'JsonWebKey2020',
+      controller: testControllerT_Did,
+      publicKeyJwk:  {
+        kty: 'AKP',
+        alg: 'ML-DSA-44',
+        pub: 'placeholder-public-key-for-controller-t', // Using 'pub' for ML-DSA signature key
+      } as MldsaPublicJwk,
+    },
   ],
   authentication: [ /* ... */ ],
 };

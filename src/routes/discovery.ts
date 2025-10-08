@@ -26,7 +26,7 @@ export function createDiscoveryRouter(
   // as an alias for `/host/.well-known/ping`.
   const resolveTenant = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const tenantId = req.params.tenantId || 'host';
-    const vaultId = tenantsCacheManager.getVaultIdByAlternateName(tenantId);
+    const vaultId = tenantsCacheManagergetVaultIdByAlternateName.(tenantId);
 
     if (!vaultId) {
       console.warn(`[DiscoveryRouter] Tenant resolution failed: alternateName '${tenantId}' not found in cache.`);

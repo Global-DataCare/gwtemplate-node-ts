@@ -31,4 +31,5 @@ export const mockKmsService: jest.Mocked<IKmsService> = {
     }
     return doc.content as any;
   }),
+  getHostPublicJwkSet: jest.fn(async () => ({ keys: [] })),
 };

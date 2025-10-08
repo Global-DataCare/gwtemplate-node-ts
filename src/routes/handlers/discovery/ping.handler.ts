@@ -6,7 +6,7 @@ import { createOperationOutcome } from '../../../utils/outcome';
 import { compactJWT } from '../../../utils/jwt';
 import { convertPrimaryDocToFhirBundle } from '../../../utils/jsonapi';
 import { IPayloadResponse } from '../../../models/response';
-import { getHostDidWebId, getTenantDidWebId } from '../../../utils/did';
+import { composeHostDidWebId, getTenantDidWebId } from '../../../utils/did';
 import { IssueLevel, IssueType } from '../../../models/fhir/codes';
 
 /**
@@ -45,7 +45,7 @@ export const pingHandler = async (req: Request, res: Response) => {
             // For FAPI/JARM-compliant clients, we demonstrate the full secure response format.
             // The canonical bundle is wrapped in the JARM `IPayloadResponse` envelope
             // (with iss, aud, etc.), and then compacted into an unsigned JWS.
-            const issuerDid = tenantId === 'host' ? getHostDidWebId() : getTenantDidWebId(tenantId);
+            const issuerDid = tenantId === 'host' ? composeHostDidWebId() : getTenantDidWebId(tenantId);
             const responsePayload: IPayloadResponse = {
                 thid: `ping-${Date.now()}`,
                 iss: issuerDid,

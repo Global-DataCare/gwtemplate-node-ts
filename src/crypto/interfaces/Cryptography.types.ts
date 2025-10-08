@@ -60,7 +60,6 @@ export interface MldsaPrivateJwk extends MldsaPublicJwk{
     privBytes: Uint8Array;
 };
 
-
 export interface RecipientInfo {
   tenantId: string;
   header?: Record<string, any>;

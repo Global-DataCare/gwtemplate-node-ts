@@ -22,7 +22,7 @@ import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { IServerConfig } from '../../../config';
 import { Sector } from '../../../models/sector';
-import { testInvalidUuid } from '../../data/organization.data';
+import { testInvalidUuid, testTenant1AddressCountry, testTenant1LegalName } from '../../data/organization.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { JwkSet } from '../../../models/jwk';
 
@@ -59,9 +59,8 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 };
 
 const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
-  // Correctly derive tenantId from claims or default to 'host'
-  tenantId: claims[ClaimsOrganizationSchemaorg.alternateName] || 'host',
-  jurisdiction: claims[ClaimsOrganizationSchemaorg.addressCountry],
+  tenantId: (claims as any)[ClaimsOrganizationSchemaorg.alternateName] || 'host',
+  jurisdiction: (claims as any)[ClaimsOrganizationSchemaorg.addressCountry],
   resourceType: 'Organization',
   section: 'org.schema',
   action: '_batch',
@@ -93,16 +92,16 @@ describe('HostingManager', () => {
 
   beforeEach(() => {
     vaultRepository = new VaultMemRepository();
-    // We need a mocked instance of TenantsCacheManager for the HostingManager's constructor
     mockTenantsCacheManager = new TenantsCacheManager(vaultRepository, mockKmsService) as jest.Mocked<TenantsCacheManager>;
 
-    // Create a default mock config for most tests
     mockConfig = {
       nodeEnv: 'test',
       port: 3000,
       apiHostname: 'testhost',
       hostExternalDomain: 'testhost.com',
       apiBaseUrl: 'http://testhost:3000',
+      namespace: 'test-namespace', // Added missing property
+      network: 'test-network',     // Added missing property
       sectorsAllowed: [Sector.HEALTH_CARE, Sector.SYSTEM, Sector.HEALTH_INSURANCE],
       dbProvider: 'mem',
       queueProvider: 'mem',
@@ -121,7 +120,6 @@ describe('HostingManager', () => {
 
     jest.clearAllMocks();
     
-    // Reset mocks that were configured in the top-level scope
     mockKmsService.provisionKeys.mockResolvedValue(mockPublicKeys);
     mockKmsService.getPublicJwks.mockResolvedValue(mockPublicKeys);
 
@@ -133,7 +131,26 @@ describe('HostingManager', () => {
     process.env = originalEnv;
   });
 
+  it("[1 HOST: should process the 'host' initialization", async () => {
+    const job = testBaseJobForClaims(testClaimsHostInitialization);
+    const responsePayload = await hostingManager.process(job);
+
+    const entry = responsePayload.body.data[0];
+    expect(entry.response.status).toBe('201');
+
+    expect(entry.resource).toBeDefined();
+    const person = entry.resource!.contained.find((r: any) => r.type === 'Person');
+    expect(person.id).toBe(testHostData.member.admin1.uuid);
+  });
+
   it('[5 TENANT (Happy Path): should create full tenant config and protect it', async () => {
+    // PRE-CONDITION: Ensure host vault exists before creating a tenant.
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    // Clear mocks after bootstrap to isolate this test's assertions.
+    jest.clearAllMocks(); 
+    mockKmsService.provisionKeys.mockResolvedValue(mockPublicKeys);
+    mockKmsService.getPublicJwks.mockResolvedValue(mockPublicKeys);
+
     const job = testBaseJobForClaims(testClaimsTenant1Registration);
     const putSpy = jest.spyOn(vaultRepository, 'put');
     const createVaultSpy = jest.spyOn(vaultRepository, 'createNewVault');
@@ -147,14 +164,14 @@ describe('HostingManager', () => {
 
     expect(createVaultSpy).toHaveBeenCalledWith(expect.objectContaining({ id: tenantVaultId }));
     expect(mockKmsService.provisionKeys).toHaveBeenCalledWith(tenantVaultId);
+    // This should now be 1, because we cleared the mocks after bootstrapping the host.
     expect(mockKmsService.protectConfidentialData).toHaveBeenCalledTimes(1);
 
     const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
     const tenantConfig = docToProtect.content as EntityConfig;
 
     expect(tenantConfig).toBeDefined();
-    expect(tenantConfig.legalName).toBe(testTenant1Data.legalName);
-    // Check that both didConfig and didDocument were created
+    expect((tenantConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.legalName]).toBe(testTenant1LegalName);
     expect(tenantConfig.didConfig.service.length).toBeGreaterThan(0);
     expect(tenantConfig.didDocument.verificationMethod).toHaveLength(mockPublicKeys.keys.length);
     expect(tenantConfig.didDocument.service).toBeDefined();
@@ -165,19 +182,7 @@ describe('HostingManager', () => {
     expect(savedDoc.jwe).toBeDefined();
   });
 
-  it("[1] HOST: should process the 'host' initialization", async () => {
-    const job = testBaseJobForClaims(testClaimsHostInitialization);
-    const responsePayload = await hostingManager.process(job);
-
-    const entry = responsePayload.body.data[0];
-    expect(entry.response.status).toBe('201');
-
-    expect(entry.resource).toBeDefined();
-    const person = entry.resource!.contained.find((r: any) => r.type === 'Person');
-    expect(person.id).toBe(testHostData.member.admin1.uuid);
-  });
-
-  it("[3] DEMO: should use a non-UUID identifier directly in 'demo' mode", async () => {
+  it("[3 DEMO: should use a non-UUID identifier directly in 'demo' mode", async () => {
     const demoClaims = { ...testClaimsTenant1Registration, [ClaimsPersonSchemaorg.identifier]: testTenant1Data.member.admin1.mockedUuid };
     const job = testBaseJobForClaims(demoClaims);
     (uuidValidate as jest.Mock).mockReturnValue(false);
@@ -221,7 +226,6 @@ describe('HostingManager', () => {
   });
 
   it("[6] TENANT: should produce an error entry for an invalid alternateName format", async () => {
-    // Temporarily spy on and mock the return value for this specific test
     const isValidSpy = jest.spyOn(tenantUtils, 'isValidTenantAlternateName').mockReturnValue(false);
     const job = testBaseJobForClaims(testClaimsTenant1AlternateNameInvalidPrefix);
 
@@ -230,7 +234,7 @@ describe('HostingManager', () => {
     expect(errorEntry.response.status).toBe('400');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('Invalid alternateName');
     
-    isValidSpy.mockRestore(); // Clean up the spy
+    isValidSpy.mockRestore();
   });
 
   it("[7] TENANT: should produce an error entry if vaultId already exists", async () => {
@@ -249,13 +253,24 @@ describe('HostingManager', () => {
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain(`a vault for '${expectedVaultId}' already exists`);
   });
   
-  it("[8] TENANT: should produce an error entry if taxID and country combination already exists", async () => {
-    const existingConfig: Partial<EntityConfig> = { identifier: testTenant1Data.identifier, jurisdiction: testTenant1Data.addressCountry, sector: Sector.HEALTH_CARE };
+  it("[8 TENANT: should produce an error entry if identifier and country combination already exists", async () => {
+    // PRE-CONDITION: Ensure host vault exists
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    
+    // Arrange: Simulate an existing tenant config in the repository.
+    const existingConfig: Partial<EntityConfig> = {
+      // These are the two properties the manager checks for duplicates
+      identifier: (testClaimsTenant1Registration as ClaimsRecord)[ClaimsOrganizationSchemaorg.identifier],
+      jurisdiction: (testClaimsTenant1Registration as ClaimsRecord)[ClaimsOrganizationSchemaorg.addressCountry],
+    };
     jest.spyOn(vaultRepository, 'getContainersInSection').mockResolvedValue([existingConfig as EntityConfig]);
+    
     const job = testBaseJobForClaims(testClaimsTenant1Registration);
 
+    // Act
     const responsePayload = await hostingManager.process(job);
 
+    // Assert
     const errorEntry = responsePayload.body.data[0];
     expect(errorEntry.response.status).toBe('409');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('already exists');

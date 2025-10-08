@@ -4,7 +4,9 @@ import { JobRequest } from '../models/request';
 import { IPayloadResponse } from '../models/response';
 import { Bundle, BundleEntry } from '../models/bundle';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
-import { getTenantDidWebId, getHostDidWebId } from '../utils/did';
+import { TenantsCacheManager } from './TenantsCacheManager';
+import { ManagerError } from '../models/errors/manager-error';
+import { IssueType } from '../models/fhir/codes';
 
 /**
  * Manages the business logic for the 'ping' operation.
@@ -12,6 +14,11 @@ import { getTenantDidWebId, getHostDidWebId } from '../utils/did';
  * serving as a reference implementation and end-to-end diagnostic tool.
  */
 export class PingManager {
+  private tenantsCacheManager: TenantsCacheManager;
+
+  constructor(tenantsCacheManager: TenantsCacheManager) {
+    this.tenantsCacheManager = tenantsCacheManager;
+  }
 
   /**
    * Processes a ping job by echoing the input entries back in the response.
@@ -35,10 +42,14 @@ export class PingManager {
       data: responseEntries,
     };
 
-    // Determine the issuer's DID based on the tenantId from the job.
-    const issuerDid = (job.tenantId && job.tenantId !== 'host')
-      ? getTenantDidWebId(job.tenantId)
-      : getHostDidWebId();
+    // Determine the issuer's DID from the cache based on the tenantId from the job.
+    const vaultId = job.tenantId || 'host';
+    const issuerDid = this.tenantsCacheManager.getTenantDid(vaultId);
+
+    if (!issuerDid) {
+      // This should theoretically never happen if the routing validation is working correctly.
+      throw new ManagerError(`Could not determine issuer DID for vaultId: ${vaultId}`, IssueType.NotFound);
+    }
 
     // Construct the final JARM-compliant response payload.
     return {
