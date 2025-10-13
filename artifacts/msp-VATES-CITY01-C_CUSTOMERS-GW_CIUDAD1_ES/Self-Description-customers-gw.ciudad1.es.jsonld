@@ -1,0 +1,21 @@
+{
+  "@context": [
+    "https://w3id.org/gaia-x/contexts/self-description.jsonld"
+  ],
+  "@id": "did:web:customers-gw.ciudad1.es",
+  "@type": "gx:Participant",
+  "gx:legalName": "Ayuntamiento Ciudad 1",
+  "gx:jurisdiction": "ES",
+  "gx:legalRegistrationNumber": "VATES-CITY01-C",
+  "schema:taxID": "CITY01-C",
+  "gx:headquarterAddress": {
+    "gx:country": "ES",
+    "gx:city": "Ciudad 1",
+    "gx:street": "Plaza Mayor 1",
+    "gx:postalCode": "11001"
+  },
+  "gx:sector": [
+    "Public Services"
+  ],
+  "gx:gxfsRole": "gx:DataConsumer"
+}

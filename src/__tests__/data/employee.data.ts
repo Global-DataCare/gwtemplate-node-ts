@@ -1,6 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/data/employee.data.ts
 import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
+import { testTenant1Domain, testTenant1UrnIdentifier } from './organization.data';
 
 /**
 *  IMPORTANT!
@@ -30,13 +31,9 @@ export const testTenant1Admin1 = {
 };
 
 // --- Tenant 1 - Receptionist 1 Details ---
-export const testTenant1Receptionist1 = {
-    mockedUuid: "acme-receptionist1-id",
-    uuid: "11b2c3d4-e5f6-7890-1234-567890abcdef",
-    identifier: "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-    email: "receptionist1@acme.example.com",
-    hasOccupation: "ISCO-08:4226",
-};
+export const testTenant1Receptionist1Email = `receptionist1@${testTenant1Domain}`;
+export const testTenant1Receptionist1HasOccupation = "ISCO-08:4226";
+export const testTenant1Receptionist1Urn = `${testTenant1UrnIdentifier}:employee:email:${testTenant1Receptionist1Email}:role:${testTenant1Receptionist1HasOccupation}`
 
 // --- Tenant 1 - Firefighter 1 Details ---
 export const testTenant1Firefighter1 = {
@@ -73,9 +70,9 @@ export const testClaimsEmployeeAdminTenant1 = {
 };
 
 export const testClaimsTenant1Receptionist1 = {
-    [ClaimsPersonSchemaorg.identifier]: testTenant1Receptionist1.identifier,
-    [ClaimsPersonSchemaorg.hasOccupation]: testTenant1Receptionist1.hasOccupation,
-    [ClaimsPersonSchemaorg.email]: testTenant1Receptionist1.email,
+    [ClaimsPersonSchemaorg.identifier]: testTenant1Receptionist1Urn,
+    [ClaimsPersonSchemaorg.hasOccupation]: testTenant1Receptionist1HasOccupation,
+    [ClaimsPersonSchemaorg.email]: testTenant1Receptionist1Email,
 };
 
 export const testClaimsTenant1Firefighter1 = {

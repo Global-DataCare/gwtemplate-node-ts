@@ -1,0 +1,5 @@
+NodeOUs:
+                Enable: true
+                ClientOUIdentifier:
+                    OrganizationalUnitIdentifier: client
+                    Certificate: cacerts/ica-cert.pem

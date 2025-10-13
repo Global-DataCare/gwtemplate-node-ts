@@ -35,7 +35,7 @@ export function encodeHexToMultibase58btc(hexStr: string): string {
 // multibase base58btc ➜ hex (sin guiones)
 export function decodeMultibase58btcToHex(b58str: string): string {
   const bytes = decodeMultibase58btc(b58str);
-  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 // multibase base58btc ➜ UUID (formateado con guiones)

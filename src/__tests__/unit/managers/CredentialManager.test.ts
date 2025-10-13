@@ -1,123 +1,242 @@
-// src/__tests__/unit/managers/CredentialManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// File: src/__tests__/unit/managers/CredentialManager.test.ts
 
 import { jest } from '@jest/globals';
 import { v4 as uuidv4 } from 'uuid';
-import { mock, MockProxy } from 'jest-mock-extended';
 import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { CredentialManager } from '../../../managers/CredentialManager';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
-import { testClaimsTenant1Organization, testTenant1Data } from '../../data/end-to-end.data';
-import { getTenantVaultId } from '../../../utils/tenant';
-import { EntityConfig } from '../../../models/entity';
-import { JwsMultiSign } from '../../../models/jws';
-import { JWK } from '../../../models/jwk';
-import { Sector } from '../../../models/sector';
-import { MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
+import { testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
-import { testConfigTenant1 } from '../../data/organization.data';
+import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
+import { IServerConfig } from '../../../config';
+import { testClaimsTenant1Receptionist1, testTenant1Receptionist1Email, testTenant1Receptionist1Urn } from '../../data/employee.data';
+import { MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
+import { ProofEBSIv2, VerifiableCredentialV2 } from '../../../models/verifiable-credential';
+import { ManagerError } from '../../../models/errors/manager-error';
+import { JwsMultiSign } from '../../../models/jws';
+import { testTenant1UrnIdentifier, testTenant1VaultId } from '../../data/organization.data';
+import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
+import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
-// Tell Jest what will be mocked
+// Mock external dependencies
 jest.mock('uuid');
 
-// Mock dependencies using jest-mock-extended
-const mockVaultRepository: MockProxy<VaultRepository> = mock<VaultRepository>();
-const mockKmsService: MockProxy<IKmsService> = mock<IKmsService>();
-const mockTenantsCacheManager: MockProxy<TenantsCacheManager> = mock<TenantsCacheManager>();
+const mockSignResult: JwsMultiSign = {
+  payload: 'base64payload',
+  signatures: [{ protected: 'base64protectedHeader', signature: 'base64signature' }],
+};
+
+const mockHostPublicKey: MldsaPublicJwk = {
+  kid: 'host-key-1', kty: 'AKP', alg: 'ML-DSA-44', pub: '...',
+};
+
+const mockTenantPublicKey: MldsaPublicJwk = {
+  kid: 'tenant-key-1', kty: 'AKP', alg: 'ML-DSA-44', pub: '...',
+};
+
+// Create a mock KMS service for testing, mirroring the pattern in other manager tests.
+const mockKmsService: jest.Mocked<IKmsService> = {
+  init: jest.fn<IKmsService['init']>(),
+  provisionKeys: jest.fn<IKmsService['provisionKeys']>(),
+  getPublicJwks: jest.fn<IKmsService['getPublicJwks']>(),
+  decodeJobRequest: jest.fn<IKmsService['decodeJobRequest']>(),
+  signWithManagedKey: jest.fn<IKmsService['signWithManagedKey']>().mockResolvedValue(mockSignResult),
+  signWithReconstructedKey: jest.fn<IKmsService['signWithReconstructedKey']>(),
+  encodeResponse: jest.fn<IKmsService['encodeResponse']>(),
+  protectConfidentialData: jest.fn<IKmsService['protectConfidentialData']>(async (doc) => ({ ...doc, sequence: 0, jwe: {} })),
+  unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string) =>
+    Promise.resolve(doc.content as any),
+  ),
+  getHostPublicJwkSet: jest.fn<IKmsService['getHostPublicJwkSet']>(),
+  getPublicVerificationKey: jest.fn<IKmsService['getPublicVerificationKey']>().mockImplementation(async (entityId: string) => {
+    if (entityId === 'host' || entityId.startsWith('did:web:')) {
+      return mockHostPublicKey;
+    }
+    return mockTenantPublicKey;
+  }),
+  getPublicEncryptionKey: jest.fn<IKmsService['getPublicEncryptionKey']>(),
+  getHmacBase64Url: jest.fn<IKmsService['getHmacBase64Url']>(),
+  protectAttributesNameAndValue: jest.fn<IKmsService['protectAttributesNameAndValue']>(),
+};
 
 describe('CredentialManager', () => {
   let credentialManager: CredentialManager;
-  const HOST_DID = 'did:web:test-host.com';
+  let vaultRepository: VaultRepository;
+  let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
+  let mockConfig: IServerConfig;
 
-  // Create a valid mock TenantConfig based on available test data that satisfies the interface
-  const mockTenantConfig: EntityConfig = {
-    ...testConfigTenant1 as unknown as EntityConfig,
-    id: 'acme-corp-id',
-    claims: testClaimsTenant1Organization,
-    didConfig: { service: [] },
-    didDocument: { '@context': '', id: '' },
-    identifier: '',
-    jurisdiction: '',
-    sector: Sector.HEALTH_CARE,
-  };
+  const TENANT_ID = 'acme';
+  const HOST_DID = 'did:web:test-host.com';
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockVaultRepository.get.mockReset();
-    mockKmsService.unprotectConfidentialData.mockReset();
-    mockKmsService.signWithManagedKey.mockReset();
-    mockKmsService.getPublicVerificationKey.mockReset();
+    (uuidv4 as jest.Mock).mockReturnValue('mocked-credential-uuid');
+
+    vaultRepository = new VaultMemRepository();
+    mockTenantsCacheManager = new TenantsCacheManager(vaultRepository, mockKmsService) as jest.Mocked<TenantsCacheManager>;
+
+    mockConfig = { hostExternalDomain: 'test-host.com' } as IServerConfig;
 
     credentialManager = new CredentialManager(
-      mockVaultRepository,
+      vaultRepository,
       mockKmsService,
-      HOST_DID
+      mockTenantsCacheManager,
+      mockConfig,
     );
   });
 
   describe('issueOrganizationSelfDescription', () => {
-    it('should issue a valid, signed VC with a structured identifier and expiration date', async () => {
+    it('should issue a valid VC signed by the HOST', async () => {
       // --- ARRANGE ---
-      const vaultId = getTenantVaultId(mockTenantConfig.sector, mockTenantConfig.alternateName);
-      (uuidv4 as jest.Mock).mockReturnValue('mocked-credential-uuid');
-
-      const mockEncryptedTenantDoc: ConfidentialStorageDoc = {
-        id: mockTenantConfig.id,
-        sequence: 0,
-        jwe: { ciphertext: 'encrypted-data-string' },
-      };
-
-      const mockSignatureResult: JwsMultiSign = {
-        payload: 'base64payload',
-        signatures: [{
-          protected: 'base64protectedHeader',
-          signature: 'base64signature',
-        }],
-      };
-      
-      const mockPublicKey: JWK = {
-        kid: 'key-1',
-        kty: 'AKP', // Correct key type for ML-DSA
-        alg: 'ML-DSA-44',
-        pub: 'base64publicKey',
-      };
-
-      mockVaultRepository.get.mockResolvedValue(mockEncryptedTenantDoc);
-      mockKmsService.unprotectConfidentialData.mockResolvedValue(mockTenantConfig);
-      mockKmsService.signWithManagedKey.mockResolvedValue(mockSignatureResult);
-      mockKmsService.getPublicVerificationKey.mockResolvedValue(mockPublicKey as MldsaPublicJwk);
+      const evidence = { type: 'DigitalSignature', verifier: HOST_DID };
 
       // --- ACT ---
-      const vc = await credentialManager.issueOrganizationSelfDescription(vaultId);
+      const vc = await credentialManager.issueOrganizationSelfDescription(
+        testTenant1UrnIdentifier,
+        testClaimsTenant1Registration,
+        evidence,
+      );
 
       // --- ASSERT ---
-      expect(vc).toBeDefined();
-      expect(vc['@context']).toContain('https://www.w3.org/2018/credentials/v1');
-      expect(vc.type).toEqual(['VerifiableCredential', 'Organization']);
       expect(vc.issuer).toBe(HOST_DID);
+      const subject = vc.credentialSubject as any;
+      expect(subject.identifier).toBe(testTenant1UrnIdentifier);
+      expect(subject['org.schema.Organization.legalName']).toBe(testClaimsTenant1Registration['org.schema.Organization.legalName']);
+      expect(vc.evidence?.[0]).toEqual(evidence);
 
-      const { proof } = vc;
-      expect(proof).toBeDefined();
-      expect(proof?.type).toBe('JsonWebSignature2020');
-      expect(proof?.verificationMethod).toBe(`${HOST_DID}#${mockPublicKey.kid}`);
-      
-      const expectedJws = `${mockSignatureResult.signatures[0].protected}..${mockSignatureResult.signatures[0].signature}`;
-      expect(proof?.jws).toBe(expectedJws);
+      expect(vc.proof).toBeDefined();
+      expect((vc.proof as Array<ProofEBSIv2>)[0].verificationMethod).toBe(`${HOST_DID}#${mockHostPublicKey.kid}`);
+      expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(expect.any(Uint8Array), 'host');
+    });
+  });
 
-      expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(
-        expect.any(Uint8Array),
-        'host'
+  describe('issueEmployeeCredential', () => {
+    it('should issue a valid VC signed by the TENANT', async () => {
+      // --- ARRANGE ---
+      const jobContext = { tenantId: TENANT_ID, tenantVaultId: testTenant1VaultId };
+      const evidence = { type: 'InternalHRProcess', verifier: testTenant1UrnIdentifier };
+
+      jest.spyOn(mockTenantsCacheManager, 'getTenantUrn').mockReturnValue(testTenant1UrnIdentifier);
+
+      // --- ACT ---
+      const vc = await credentialManager.issueEmployeeCredential(
+        jobContext,
+        testTenant1Receptionist1Urn,
+        testClaimsTenant1Receptionist1,
+        evidence,
       );
+
+      // --- ASSERT ---
+      expect(vc.issuer).toBe(testTenant1UrnIdentifier); // Issued by the Tenant
+      const subject = vc.credentialSubject as any;
+      expect(subject.identifier).toBe(testTenant1Receptionist1Urn);
+      expect(subject[ClaimsPersonSchemaorg.email]).toBe(testTenant1Receptionist1Email);
+      expect(vc.evidence?.[0]).toEqual(evidence);
+      
+      expect(vc.proof).toBeDefined();
+      expect((vc.proof as Array<ProofEBSIv2>)[0].verificationMethod).toBe(`${testTenant1UrnIdentifier}#${mockTenantPublicKey.kid}`);
+      expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(expect.any(Uint8Array), jobContext.tenantVaultId);
     });
 
-    it('should throw an error if the tenant is not found in the vault', async () => {
-        const vaultId = 'non-existent-tenant';
-        mockVaultRepository.get.mockResolvedValue(undefined);
+    it('should throw an error if the tenant URN cannot be resolved', async () => {
+      // --- ARRANGE ---
+      jest.spyOn(mockTenantsCacheManager, 'getTenantUrn').mockReturnValue(undefined);
+      const jobContext = { tenantId: 'unknown-tenant', tenantVaultId: 'unknown-vault' };
 
-        await expect(credentialManager.issueOrganizationSelfDescription(vaultId))
-            .rejects
-            .toThrow(`Tenant with vaultId '${vaultId}' not found in repository.`);
+      // --- ACT & ASSERT ---
+      await expect(
+        credentialManager.issueEmployeeCredential(jobContext, 'some-urn', {}, {})
+      ).rejects.toThrow(`Could not resolve URN for tenant 'unknown-tenant'.`);
+    });
+  });
+
+  describe('storeCredential', () => {
+    it('should call KMS to protect indexes and content before storing', async () => {
+      // --- ARRANGE ---
+      const vc = { id: 'urn:uuid:vc-id-12T3' } as VerifiableCredentialV2;
+      const collectionId = 'credentials';
+      const decryptionEntityId = 'some-entity';
+      const putSpy = jest.spyOn(vaultRepository, 'put');
+
+      await vaultRepository.createNewVault({ id: testTenant1VaultId, sequence: 0, meta: {} });
+      
+      // Simulate the KMS returning HMACed attributes
+      mockKmsService.protectAttributesNameAndValue.mockResolvedValue([
+        { name: 'identifier', value: 'hmac-protected-value', unique: true },
+      ]);
+
+      // --- ACT ---
+      await credentialManager.storeCredential(vc, testTenant1VaultId, collectionId, testTenant1Receptionist1Urn, decryptionEntityId);
+
+      // --- ASSERT ---
+      // Verify HMAC protection was called for the index
+      expect(mockKmsService.protectAttributesNameAndValue).toHaveBeenCalledWith(
+        [{ name: 'identifier', value: testTenant1Receptionist1Urn, unique: true, type: 'uri' }],
+        testTenant1VaultId
+      );
+
+      // Verify the document content was encrypted
+      const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
+      expect(docToProtect.content).toEqual(vc);
+      expect(docToProtect.indexed?.attributes[0].value).toBe('hmac-protected-value'); // Check that the HMACed value is used
+      
+      // Verify the final protected document was put in the vault
+      expect(putSpy).toHaveBeenCalledWith(
+        testTenant1VaultId,
+        [expect.objectContaining({ jwe: {} })],
+        collectionId
+      );
+    });
+  });
+
+  describe('searchCredential', () => {
+    it('should find by attribute, unprotect, and return the credential', async () => {
+      // --- ARRANGE ---
+      const collectionId = 'credentials';
+      const decryptionEntityId = TENANT_ID;
+      const vc: VerifiableCredentialV2 = { id: 'urn:uuid:vc-id-12T3', issuer: 'test' } as any;
+
+      const encryptedDoc: ConfidentialStorageDoc = {
+        id: vc.id as string,
+        sequence: 0,
+        jwe: { ciphertext: 'encrypted-vc' },
+        indexed: { attributes: [{ name: 'identifier', value: 'protected-urn', unique: true }] },
+      };
+
+      // Mock the repository and KMS responses
+      const querySpy = jest.spyOn(vaultRepository, 'query').mockResolvedValue([encryptedDoc]);
+      mockKmsService.unprotectConfidentialData.mockResolvedValue(vc);
+
+      // --- ACT ---
+      const result = await credentialManager.searchCredential(
+        testTenant1VaultId,
+        testTenant1Receptionist1Urn,
+        collectionId,
+        decryptionEntityId,
+      );
+
+      // --- ASSERT ---
+      const expectedQuery = {
+        sectionId: collectionId,
+        where: [{ attribute: 'identifier', equals: testTenant1Receptionist1Urn }],
+      };
+      expect(querySpy).toHaveBeenCalledWith(testTenant1VaultId, expectedQuery);
+      
+      expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledWith(encryptedDoc, decryptionEntityId);
+      expect(result).toEqual(vc);
+    });
+
+    it('should return null if no credential is found', async () => {
+      // --- ARRANGE ---
+      jest.spyOn(vaultRepository, 'query').mockResolvedValue([]);
+
+      // --- ACT ---
+      const result = await credentialManager.searchCredential('v', 'u', 'c', 'd');
+
+      // --- ASSERT ---
+      expect(result).toBeNull();
     });
   });
 });
+

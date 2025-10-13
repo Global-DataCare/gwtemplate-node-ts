@@ -1,0 +1,27 @@
+name: Employees Gateway - Ciudad 1
+                version: 1.0.0
+                client:
+                organization: VATES-CITY01-E_EMPLOYEES-GW_CIUDAD1_ES
+                credentialStore:
+                    path: ./artifacts/msp-VATES-CITY01-E_EMPLOYEES-GW_CIUDAD1_ES
+                    cryptoStore:
+                    path: ./artifacts/msp-VATES-CITY01-E_EMPLOYEES-GW_CIUDAD1_ES
+                organizations:
+                VATES-CITY01-E_EMPLOYEES-GW_CIUDAD1_ES:
+                    mspid: VATES-CITY01-E_EMPLOYEES-GW_CIUDAD1_ES
+                    cryptoPath: ./artifacts/msp-VATES-CITY01-E_EMPLOYEES-GW_CIUDAD1_ES
+                    certificateAuthorities:
+                    - ca.ica.connecthealth.info
+                peers:
+                peer0.anchor1.example.com:
+                    url: grpcs://peer0.anchor1.example.com:7051
+                    tlsCACerts:
+                    path: ./artifacts/msp-VATES-CITY01-E_EMPLOYEES-GW_CIUDAD1_ES/intermediatecerts/root-cert.pem
+                    grpcOptions:
+                    ssl-target-name-override: peer0.anchor1.example.com
+                certificateAuthorities:
+                ca.ica.connecthealth.info:
+                    url: https://ica.connecthealth.info:7054
+                    caName: ca.ica.connecthealth.info
+                    tlsCACerts:
+                    path: ./artifacts/msp-VATES-CITY01-E_EMPLOYEES-GW_CIUDAD1_ES/cacerts/ica-cert.pem

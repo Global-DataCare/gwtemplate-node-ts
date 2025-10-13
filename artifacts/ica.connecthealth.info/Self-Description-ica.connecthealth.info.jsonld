@@ -1,0 +1,21 @@
+{
+  "@context": [
+    "https://w3id.org/gaia-x/contexts/self-description.jsonld"
+  ],
+  "@id": "did:web:ica.connecthealth.info",
+  "@type": "gx:Participant",
+  "gx:legalName": "ConnectHealth",
+  "gx:jurisdiction": "ES",
+  "gx:legalRegistrationNumber": "VATES-G12345678",
+  "schema:taxID": "G12345678",
+  "gx:headquarterAddress": {
+    "gx:country": "ES",
+    "gx:city": "Barcelona",
+    "gx:street": "Carrer de Provença, 1",
+    "gx:postalCode": "08001"
+  },
+  "gx:sector": [
+    "Trust Infrastructure"
+  ],
+  "gx:gxfsRole": "gx:TrustAnchor"
+}

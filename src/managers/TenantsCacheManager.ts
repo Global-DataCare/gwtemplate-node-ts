@@ -10,7 +10,7 @@ import { getTenantVaultId } from '../utils/tenant';
 import { DidDocument, DidService } from '../models/did';
 import { getEnvironment } from '../utils/environment';
 import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
-import { Sector } from '../models/sector';
+import { Sector } from '../models/path';
 import { parseTenantUrn } from '../utils/urn';
 
 /**

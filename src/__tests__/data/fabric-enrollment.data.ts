@@ -6,7 +6,7 @@ import { ClaimsActionSchemaorg } from '../../models/claims-action';
 import { DidDocument } from '../../models/did';
 import { DecodedDidcommMessage } from '../../models/request';
 import { testTenant1Data, testClaimsTenant1Registration } from './end-to-end.data';
-import { testHostDidWebIdentifier, testTenant1DidWebExternalIdentifier, testTenant1DidWebHostedIdentifier } from './organization.data';
+import { testHostDidWeb, testTenant1DidWebExternal, testTenant1DidWebHosted } from './organization.data';
 
 // ACTORS
 export const testControllerT_Did = 'did:web:controller-t.example.com';
@@ -14,8 +14,8 @@ export const testFabricNetwork_Urn = 'urn:antifraud:fabric:test-network';
 
 export const testTenantC_DidDocument: DidDocument = {
   '@context': 'https://www.w3.org/ns/did/v1',
-  id: testTenant1DidWebHostedIdentifier, // DID of Tenant C
-  alsoKnownAs: [testTenant1DidWebExternalIdentifier],
+  id: testTenant1DidWebHosted, // DID of Tenant C
+  alsoKnownAs: [testTenant1DidWebExternal],
   verificationMethod: [ /* ... */ ],
   assertionMethod: [
     // This entry is the key to the authorization logic. It grants Controller T
@@ -65,7 +65,7 @@ export const testFabricEnrollmentRequestBody = {
 };
 
 export const testFabricEnrollmentJobInput: DecodedDidcommMessage = {
-  aud: testHostDidWebIdentifier, // <-- The reques is to the host's `registry` URL, but not to the tenant's `entity` URL
+  aud: testHostDidWeb, // <-- The reques is to the host's `registry` URL, but not to the tenant's `entity` URL
   iss: testControllerT_Did, // The request is signed by the participant
   thid: 'test-thid-fabric-enrollment',
   type: 'api+json',

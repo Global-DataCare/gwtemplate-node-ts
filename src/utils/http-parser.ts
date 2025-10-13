@@ -69,7 +69,7 @@ export function extractHttpRequestDataAsJson(
   }
 
   const requestData: DataInRequest = {
-    fullUrl: url,
+    requestUrl: url,
     httpMethod: httpMethod.toUpperCase(),
     input: input,
     contentType: contentType,

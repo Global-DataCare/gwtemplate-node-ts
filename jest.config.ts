@@ -20,7 +20,14 @@ const config: JestConfigWithTsJest = {
       'ts-jest',
       {
         useESM: true,
-        tsconfig: 'tsconfig.jest.json'
+        tsconfig: {
+          // Override tsconfig.json for Jest
+          module: 'ESNext',
+          moduleResolution: 'bundler',
+          // These are required for ESM support in ts-jest
+          allowSyntheticDefaultImports: true,
+          esModuleInterop: true,
+        }
       }
     ],
     '^.+\\.(mjs|js)$': 'babel-jest'
@@ -40,6 +47,9 @@ const config: JestConfigWithTsJest = {
         '@noble/curves',
         '@stablelib/utf8',
         '@stablelib/base64',        
+        'pkijs',
+        'asn1js',
+        '@peculiar/webcrypto'
       ].join('|')
     }))`
   ], 

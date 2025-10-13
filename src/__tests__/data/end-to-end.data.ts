@@ -6,7 +6,6 @@ import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../model
 import {
   testHostAdmin1,
   testTenant1Admin1,
-  testTenant1Receptionist1,
   testTenant1Firefighter1,
   testTenant1Nurse1,
   testClaimsHostAdmin1,
@@ -17,7 +16,7 @@ import {
   testConfigTenant1,
   testTenant1AddressCountry,
   testTenant1AlternateName,
-  testTenant1ExternalUrl,
+  testTenant1Domain,
   testTenant1IdType,
   testTenant1IdValue,
   testTenant1LegalName,
@@ -41,7 +40,7 @@ export const testTenant1Data = {
   identifier: testTenant1UrnIdentifier,
   member: {
     admin1: testTenant1Admin1,
-    receptionist1: testTenant1Receptionist1,
+    // receptionist1: testTenant1Receptionist1,
     firefighter1: testTenant1Firefighter1,
     nurse1: testTenant1Nurse1,
   },
@@ -75,7 +74,7 @@ export const testClaimsTenant1Registration: ClaimsRecord = {
   [ClaimsOrganizationSchemaorg.identifier]: testTenant1UrnIdentifier,
   [ClaimsOrganizationSchemaorg.identifierType]: testTenant1IdType,
   [ClaimsOrganizationSchemaorg.identifierValue]: testTenant1IdValue,
-  [ClaimsOrganizationSchemaorg.url]: testTenant1ExternalUrl,
+  [ClaimsOrganizationSchemaorg.url]: testTenant1Domain,
   [ClaimsOrganizationSchemaorg.alternateName]: testTenant1AlternateName,
 
   // --- Person (Admin) Claims ---

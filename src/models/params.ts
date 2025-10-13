@@ -16,31 +16,48 @@ export interface ClaimInteroperable {
     value: any;
 }
 
-export type ParameterType = 'number' | 'date' | 'string' | 'token' | 'reference' | 'composite' | 'quantity' | 'uri' | 'period';
 /**
- * Represents a base interface for all types of parameters.
+ * Represents a single, named piece of data within an entity's configuration,
+ * aligning with the structure of a Parameter in the FHIR Parameters resource.
+ *
+ * This structure is used to store secondary or multi-value attributes (like
+ * multiple emails or official identifiers) in their original, readable format.
+ * The entire collection of these attributes is considered private and is always
+ * stored within an encrypted parent configuration object.
+ *
+ * @see {@link https://hl7.org/fhir/parameters.html}
  */
-export interface ParameterBase extends ClaimInteroperable {
-    /**
-     * Key name of the parameter (e.g., '@type' for the resource type or 'vaccine-code').
-     */
-    name: string;
-    /**
-     * The value of the parameter. Can be either a string or a number.
-     * Derived interfaces may specify more precise types.
-     */
-    value: any;
-    /**
-     * Indicates if the parameter can exist only once in an array of parameters.
-     * If true, the parameter is unique. If false or omitted, the parameter can appear multiple times
-     * (e.g., several 'identifier' parameters).
-     */
-    unique?: boolean;
+export interface ParamAttribute extends ClaimInteroperable {
+  /**
+   * The name of the parameter, which often corresponds to a key in the
+   * 'indexed' attributes dictionary of the parent configuration.
+   *
+   * @example 'NNES' (for a Spanish DNI, unique=true)
+   * @example 'email' (unique=falsez)
+   */
+  name: string;
+
+  /**
+   * The original value of the parameter. Can be either a string or a number.
+   * This corresponds to a simplified `value[x]` (e.g., `valueString`) in a FHIR Parameter.
+   */
+  value: string | number | undefined;
+
+  /**
+   * A custom flag to indicate whether this attribute's value is expected to
+   * be unique across all entities of the same type. This is used for
+   * server-side validation logic and is not part of the FHIR standard.
+   * @default false
+   */
+  unique?: boolean;
 }
+
+export type ParameterType = 'number' | 'date' | 'string' | 'token' | 'reference' | 'composite' | 'quantity' | 'uri' | 'period';
+
 /**
  * Represents a common interface for all types of parameters.
  */
-export interface ParameterData extends ParameterBase {
+export interface ParameterData extends ParamAttribute {
     /**
      * Defines the type of parameter.
      */

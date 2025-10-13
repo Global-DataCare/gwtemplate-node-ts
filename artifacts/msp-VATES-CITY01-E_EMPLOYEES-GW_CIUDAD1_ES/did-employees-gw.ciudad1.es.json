@@ -1,0 +1,22 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:employees-gw.ciudad1.es",
+  "verificationMethod": [
+    {
+      "id": "did:web:employees-gw.ciudad1.es#QWVaZFNWYWFaR2VTQ21rVnBqSEVZeTBnZFVITmNpSjE1VnU5ZmdWUXQ5Yw",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:employees-gw.ciudad1.es",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "y7vk2pP2HBag2YoepKYS2mkPfY8Iaa-HbC6NPBpitgY",
+        "y": "nHDlvETeM_EJKWT1pBHVcuGWzoSM2DN3oLO6dVCu0FI",
+        "d": "_03Fzy8-BITkxehGaYAkrYh_6k2ZpN2fmpoIKMX6v5c",
+        "kid": "QWVaZFNWYWFaR2VTQ21rVnBqSEVZeTBnZFVITmNpSjE1VnU5ZmdWUXQ5Yw"
+      }
+    }
+  ],
+  "authentication": [
+    "did:web:employees-gw.ciudad1.es#QWVaZFNWYWFaR2VTQ21rVnBqSEVZeTBnZFVITmNpSjE1VnU5ZmdWUXQ5Yw"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:ica.connecthealth.info",
+  "verificationMethod": [
+    {
+      "id": "did:web:ica.connecthealth.info#SlBGSmNWVDM2cmFmdUxHNno3TzBXdVhNZHp2VWM3REhGY2hpVERSQ1U1cw",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:ica.connecthealth.info",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "dvB4uKKg3E9M9-VwBNiIYY2rVycQqkdNdsjt-hs0_e8",
+        "y": "2iuMb7CnDE5prNpIHitaDp0GuR9qy_tijGJu3_JYzRQ",
+        "d": "rbtUPWBUmZaYPWrFwltdHYT6G4BiW5kSFAdlY-gp214",
+        "kid": "SlBGSmNWVDM2cmFmdUxHNno3TzBXdVhNZHp2VWM3REhGY2hpVERSQ1U1cw"
+      }
+    }
+  ],
+  "authentication": [
+    "did:web:ica.connecthealth.info#SlBGSmNWVDM2cmFmdUxHNno3TzBXdVhNZHp2VWM3REhGY2hpVERSQ1U1cw"
+  ]
+}

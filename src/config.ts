@@ -1,7 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/config.ts
 
-import { Sector } from "./models/sector";
+import { Sector } from "./models/path";
 
 /**
  * Defines the shape of the application's configuration object.

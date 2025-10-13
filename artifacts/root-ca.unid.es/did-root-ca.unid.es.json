@@ -1,0 +1,22 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:root-ca.unid.es",
+  "verificationMethod": [
+    {
+      "id": "did:web:root-ca.unid.es#Z0lFMUNnNDNrdkFuTVEydVBGellNVFMxaWxJZlFlNTEtTU84djJ2bFdETQ",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:root-ca.unid.es",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "OXAHGba080r4rKArKtUik1SeaJYfgp0pTq9EGG5mALI",
+        "y": "uP1Q-rY4I1gK-NIJg0XVGy9Fc3YdpAffYdhEV6WOKfk",
+        "d": "jqXOaQXDf7xORGVt5AvOX05OY6SdVhqXDhVTSB9j4Jw",
+        "kid": "Z0lFMUNnNDNrdkFuTVEydVBGellNVFMxaWxJZlFlNTEtTU84djJ2bFdETQ"
+      }
+    }
+  ],
+  "authentication": [
+    "did:web:root-ca.unid.es#Z0lFMUNnNDNrdkFuTVEydVBGellNVFMxaWxJZlFlNTEtTU84djJ2bFdETQ"
+  ]
+}

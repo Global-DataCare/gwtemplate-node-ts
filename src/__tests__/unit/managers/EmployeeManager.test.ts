@@ -8,7 +8,6 @@ import { VaultRepository } from '../../../database/repositories/vault/vault.repo
 import { EmployeeManager } from '../../../managers/EmployeeManager';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
-import { EmployeeConfig } from '../../../models/employee-config';
 import { determineResourceId } from '../../../utils/resource';
 import { RecordBase, ClaimsRecord } from '../../../models/resource-document';
 import { JwkSet } from '../../../models/jwk';
@@ -16,6 +15,7 @@ import { testClaimsTenant1Receptionist1 } from '../../data/employee.data';
 import { JobRequest } from '../../../models/request';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import { EntityConfig } from '../../../models/entity';
 
 // Tell Jest what will be mocked
 jest.mock('uuid');
@@ -42,7 +42,7 @@ const testBaseJobForClaims = (claims: ClaimsRecord, tenantId: string): JobReques
     },
   },
   httpMethod: 'POST',
-  fullUrl: '/default',
+  requestUrl: '/default',
 });
 
 describe('EmployeeManager', () => {
@@ -91,7 +91,7 @@ describe('EmployeeManager', () => {
       expect(mockTenantsCacheManager.getTenantUrn).toHaveBeenCalledWith(TENANT_ID);
 
       const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
-      const employeeConfig = docToProtect.content as EmployeeConfig;
+      const employeeConfig = docToProtect.content as EntityConfig;
 
       const email = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email];
       const roleCode = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.hasOccupation];

@@ -35,10 +35,11 @@ export const testHostAddressCountry = "ES";
 export const testHostIdType = "TAX"; // TAX or EI (TODO: link)
 export const testHostIdValue = "B12345678";
 export const testHostLegalName = "Hosting Organization";
-
 export const testHostDomain = "host.example.com"
-export const testHostExternalUrl = `https://${testHostDomain}`
-export const testHostDidWebIdentifier = `did:web:${testHostDomain}`
+
+/** Rule: path ends with slash `/` */
+export const testHostUrlExternal = `https://${testHostDomain}/`
+export const testHostDidWeb = `did:web:${testHostDomain}`
 
 // Software Service for Host
 const testServiceManufacturerDidWebIdentifier = `urn:web:<manufacturer>`;
@@ -56,19 +57,26 @@ export const testHostAdmin1UrnIdentifier = `urn:${URN_NAMESPACE}:${URN_NETWORK}:
 // TENANT 1 ORGANIZATION DATA
 // ===================================================================================
 // --- Tenant 1 Organization Details ---
+const testTenant1Uuid = "c1c2c3d4-e5f6-7890-1234-567890abcdef";
 export const testTenant1LegalName = "Acme Company";
 export const testTenant1AddressCountry = "US";
 export const testTenant1IdType = "EI"; // EI or TAX
 export const testTenant1IdValue = "98-7654321";
 export const testTenant1AlternateName = "acme";
-const testTenant1Uuid = "c1c2c3d4-e5f6-7890-1234-567890abcdef";
+export const testTenant1Domain = "api.acme.org";
+
+/** Rule: path ends with slash `/` */
+export const testTenant1UrlExternal = `https://${testTenant1Domain}/`
 
 // --- Tenant 1 - Service Provider Details ---
 // const testTenant1ServiceProviderUuid = "d1c2c3d4-e5f6-7890-1234-567890abcdef";
-const testTenant1ServiceProviderDidWebIdentifier = testHostDidWebIdentifier;
+const testTenant1ServiceProviderDidWebIdentifier = testHostDidWeb;
 export const testTenant1ServiceProviderCategory = "health-care"; // Using 'health-care' as the sector.
 const testTenant1ServiceProviderTerms = "https://provider.example.com/terms";
 const testTenant1ServiceProviderPurposeType = "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC";
+
+/** Tenant's Vault ID: "<sector>_<tenant-alternate-name>"" */
+export const testTenant1VaultId = `${testTenant1ServiceProviderCategory}_${testTenant1AlternateName}`;
 
 /** The Tenant's identifier a static, canonical semantic URN.
  *  This is the ID that will be used in the 'credentialSubject.identifier' of its Pointer Credential.
@@ -77,12 +85,14 @@ const testTenant1ServiceProviderPurposeType = "http://terminology.hl7.org/CodeSy
 export const testTenant1UrnIdentifier = 
   `urn:${URN_NAMESPACE}:${URN_NETWORK}:${testTenant1AddressCountry}:${URN_VERSION}:${testTenant1ServiceProviderCategory}:entity:${testTenant1IdType}:${testTenant1IdValue}`;
 
-/** Tenant's 1 external domain */
-export const testTenant1Domain = "acme.org";
-export const testTenant1ExternalUrl = `https://${testTenant1Domain}`
-export const testTenant1DidWebExternalIdentifier = `did:web:${testTenant1Domain}`;
-/** Hosted did:web = did:web:host.example.com:acme:us:v1:health-care */
-export const testTenant1DidWebHostedIdentifier = `did:web:${testHostDomain}:${testTenant1AlternateName}:${testTenant1AddressCountry}:v1:${testTenant1ServiceProviderCategory}`;
+/** Rule: path ends with slash `/` */
+export const testTenant1UrlHosted =
+    `${testHostUrlExternal}${testTenant1AlternateName}/cds-${testTenant1AddressCountry}/v1/${testTenant1ServiceProviderCategory}/`;
+
+// TODO: middleware to translate from external to hosted did:web
+/** Hosted did:web = did:web:host.example.com:acme:cds-us:v1:health-care */
+export const testTenant1DidWebHosted = `did:web:${testHostDomain}:${testTenant1AlternateName}:${testTenant1AddressCountry}:v1:${testTenant1ServiceProviderCategory}`;
+export const testTenant1DidWebExternal = `did:web:${testTenant1Domain}`;
 
 // --- Tenant 1 - Admin 1 Details ---
 const testTenant1Admin1MockedUuid = "acme-admin1-id";
@@ -105,7 +115,7 @@ export const testConfigDataHost: EntityConfig = {
     [ClaimsOrganizationSchemaorg.legalName]: testHostLegalName,
     [ClaimsOrganizationSchemaorg.identifierType]: testHostIdType,
     [ClaimsOrganizationSchemaorg.identifierValue]: testHostIdValue,
-    [ClaimsOrganizationSchemaorg.identifier]: testHostDidWebIdentifier,
+    [ClaimsOrganizationSchemaorg.identifier]: testHostDidWeb,
     [ClaimsOrganizationSchemaorg.alternateName]: testHostAlternateName,
     [ClaimsOrganizationSchemaorg.addressCountry]: testHostAddressCountry,
     // [ClaimsOrgSchemaorg.taxID]: testHostData.taxId,    
@@ -155,7 +165,7 @@ export const testConfigTenant1: EntityConfig = {
     [ClaimsOrganizationSchemaorg.legalName]: testTenant1LegalName,
     [ClaimsOrganizationSchemaorg.identifierType]: testTenant1IdType,
     [ClaimsOrganizationSchemaorg.identifierValue]: testTenant1IdValue,
-    [ClaimsOrganizationSchemaorg.identifier]: testTenant1DidWebHostedIdentifier, // this is the fixed, static one. The external did:web can vary with the domain
+    [ClaimsOrganizationSchemaorg.identifier]: testTenant1DidWebHosted, // this is the fixed, static one. The external did:web can vary with the domain
     [ClaimsOrganizationSchemaorg.alternateName]: testTenant1AlternateName,
     [ClaimsOrganizationSchemaorg.addressCountry]: testTenant1AddressCountry,
     // [ClaimsOrgSchemaorg.taxID]: testHostData.taxId,    

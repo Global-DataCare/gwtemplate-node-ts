@@ -159,7 +159,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     const targetDid = 'did:web:provider.com';
 
     const employeeCreationPayload = {
-      thid: `thid-employee-${testTenant1Data.member.receptionist1.uuid}`,
+      thid: `thid-test-employee-receptionist1`,
       iss: issuerDid,
       aud: targetDid,
       body: {

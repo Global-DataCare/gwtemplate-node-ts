@@ -4,7 +4,8 @@
 
 import { JwkSet, JWK } from '../../models/jwk';
 import { JwsMultiSign } from '../../models/jws';
-import { ConfidentialStorageDoc } from '../../models/confidential-storage';
+import { ParameterData } from '../../models/params'; // extends ParamAttribute with `type` and others.
+import { ConfidentialStorageDoc, IndexedAttribute } from '../../models/confidential-storage';
 import { JobRequest } from '../../models/request';
 import { MldsaPublicJwk, MlkemPublicJwk } from './Cryptography.types';
 
@@ -47,7 +48,7 @@ export interface IKmsService {
    * @param entityId The entity's unique identifier (e.g., a tenant URN).
    * @returns The public parts of the generated keys (JWKSet).
    */
-  provisionKeys(entityId: string): Promise<JwkSet>;
+  provisionKeys(entityVaultId: string): Promise<JwkSet>;
 
   /**
    * Retrieves all public keys for an entity.
@@ -55,13 +56,13 @@ export interface IKmsService {
    * @param entityId The entity's unique identifier.
    * @returns The public keys in a JWKSet.
    */
-  getPublicJwks(entityId: string): Promise<JwkSet>;
+  getPublicJwks(entityVaultId: string): Promise<JwkSet>;
 
   /** Retrieves only the public signing key for an entity. */
-  getPublicVerificationKey(entityId: string): Promise<MldsaPublicJwk | undefined>;
+  getPublicVerificationKey(entityVaultId: string): Promise<MldsaPublicJwk | undefined>;
   
   /** Retrieves only the public encryption key for an entity. */
-  getPublicEncryptionKey(entityId: string): Promise<MlkemPublicJwk | undefined>;
+  getPublicEncryptionKey(entityVaultId: string): Promise<MlkemPublicJwk | undefined>;
 
   /**
    * A dedicated method to get the host's public keys as a standard JWKSet.
@@ -90,7 +91,7 @@ export interface IKmsService {
    * @param entityId The ID of the internal entity that is signing.
    * @returns The signed data as a JwsObject.
    */
-  signWithManagedKey(payload: Uint8Array, entityId: string): Promise<JwsMultiSign>;
+  signWithManagedKey(payload: Uint8Array, entityVaultId: string): Promise<JwsMultiSign>;
 
   /**
    * Signs a payload by reconstructing a key from its components (e.g., for an Employee's cloud key).
@@ -118,7 +119,7 @@ export interface IKmsService {
    * used to locate the private encryption key for including its `skid` (sender key id) in the protected header.
    * @returns The encrypted JWE as a compact string (for one recipient) or a JSON string (for multiple).
    */
-  encodeResponse(payload: any, recipientJwks: JWK[], senderId: string): Promise<string>;
+  encodeResponse(payload: any, recipientJwks: JWK[], senderVaultId: string): Promise<string>;
 
   // --- At-Rest Data Protection ---
 
@@ -128,7 +129,7 @@ export interface IKmsService {
    * @param entityId The ID of the entity whose key should be used.
    * @returns The protected document with `.content` replaced by a `.jwe` property.
    */
-  protectConfidentialData(doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc>;
+  protectConfidentialData(doc: ConfidentialStorageDoc, entityVaultId: string): Promise<ConfidentialStorageDoc>;
 
   /**
    * Decrypts a document from secure storage.
@@ -136,5 +137,25 @@ export interface IKmsService {
    * @param entityId The ID of the entity whose key was used.
    * @returns The decrypted content of the document.
    */
-  unprotectConfidentialData<T>(doc: ConfidentialStorageDoc, entityId: string): Promise<T>;
+  unprotectConfidentialData<T>(doc: ConfidentialStorageDoc, entityVaultId: string): Promise<T>;
+
+  /**
+   * Computes a keyed hash (HMAC) of a plaintext string using the specified entity's secret HMAC key.
+   * @param plaintext The string to hash.
+   * @param entityId The ID of the entity (e.g., a tenant's vault ID) whose HMAC key should be used.
+   * @returns The resulting HMAC as a Base64UrlSafe string.
+   */
+  getHmacBase64Url(plaintext: string, entityVaultId: string): Promise<string>;
+
+  /**
+   * Takes an array of plaintext attributes (with type information) and returns a new array where
+   * both the `name` and `value` properties of each attribute have been protected with HMAC.
+   * This is used to create the `indexed` array for a `ConfidentialStorageDoc`.
+   * The implementation MUST use domain separation based on the attribute `type` to prevent collisions.
+   *
+   * @param attributes The array of plaintext `ParameterData` objects.
+   * @param entityVaultId The security context for key selection.
+   * @returns A promise that resolves to the array of protected `IndexedAttribute` objects, ready for storage.
+   */
+  protectAttributesNameAndValue(attributes: ParameterData[], entityVaultId: string): Promise<IndexedAttribute[]>;
 }

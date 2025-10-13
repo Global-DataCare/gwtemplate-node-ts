@@ -5,7 +5,7 @@ import express = require('express');
 import dotenv = require('dotenv');
 import { Worker } from './worker';
 import { IServerConfig } from './config';
-import { Sector } from './models/sector';
+import { Sector } from './models/path';
 import { createApiRouter } from './routes/api';
 import { IKmsService } from './crypto/interfaces/IKmsService';
 import { CryptographyService } from './crypto/CryptographyService';

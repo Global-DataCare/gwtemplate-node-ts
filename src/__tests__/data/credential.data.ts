@@ -4,7 +4,7 @@
 import { VerifiableCredentialV2 } from "../../models/verifiable-credential";
 import {
   testTenant1UrnIdentifier,
-  testHostDidWebIdentifier,
+  testHostDidWeb,
   testRootOrgDidWeb
 } from "./organization.data";
 
@@ -13,16 +13,31 @@ import {
 // ===================================================================================
 
 const testCredentialVersionHashedId = 'z(multibase(multihash(SHA3-256(<URN>:timestamp:epoch:<value>))))';
-const MOCK_KEY_ID = 'base64-kid-thumbprint';
+const MOCK_KEY_ID = 'base64-JWKey-thumbprint';
 const MOCK_DETACHED_JWS = 'base64protectedHeader..base64signature';
 
-const testIssuanceDateByRootOrg = `2025-09-29T00:00:00Z`;
-const testExpirationDateByRootOrg = `2025-09-28T23:59:59Z`;
+const testIssuanceIsoDateByRootOrg = `2025-09-29T00:00:00Z`;
+const testExpirationIsoDateByRootOrg = `2025-09-28T23:59:59Z`;
 const testCredentialCreatorForHost = testRootOrgDidWeb
 
-const testIssuanceDateByHost = '2025-30-09T12:34:56Z'
-const testExpirationDateByHost = '2026-30-09T12:34:56.000Z'
-const testCredentialCreatorForTenant1 = testHostDidWebIdentifier
+const testIssuanceIsoDateByHost = '2025-30-09T12:34:56Z'
+const testExpirationIsoDateByHost = '2026-30-09T12:34:56.000Z'
+const testCredentialCreatorForTenant1 = testHostDidWeb
+
+export const testHostVcJwtPayload = {
+  vc: {
+    '@context': ['https://www.w3.org/2018/credentials/v1'],
+    credentialSubject: {
+      identifier: testHostDidWeb,
+    },    
+    id: testCredentialVersionHashedId,
+    issuer: testCredentialCreatorForHost,
+    type: ['VerifiableCredential', 'Organization'],
+  },
+  // Issuance and expiration dates
+  nbf: 0, // "Non-valid before" epoch timestamp (number) from the "validFrom" (but no ISO date string)
+  exp: 0, // "Expiration" epoch timestamp (number) from the "validUntil" (but no ISO date string)
+}
 
 /**
  * A mock Verifiable Credential for an Organization (Tenant).
@@ -30,20 +45,21 @@ const testCredentialCreatorForTenant1 = testHostDidWebIdentifier
  */
 export const testHostVc: VerifiableCredentialV2 = {
   '@context': ['https://www.w3.org/2018/credentials/v1'],
-  id: testCredentialVersionHashedId,
-  type: ['VerifiableCredential', 'Organization'],
-  issuer: testCredentialCreatorForHost,
-  // Issuance and expiration dates are usually set dynamically in tests
-  validFrom: testIssuanceDateByRootOrg,
-  validUntil: testExpirationDateByRootOrg,
   credentialSubject: {
-    identifier: testHostDidWebIdentifier,
+    identifier: testHostDidWeb,
   },
+  id: testCredentialVersionHashedId,
+  issuer: testCredentialCreatorForHost,
+  type: ['VerifiableCredential', 'Organization'],
+  // Issuance and expiration dates
+  validFrom: testIssuanceIsoDateByRootOrg,
+  validUntil: testExpirationIsoDateByRootOrg,
+  // proofs are removed when generating the signature
   proof: [{
     type: 'JsonWebSignature2020',
     proofPurpose: 'assertionMethod',
     verificationMethod: `${testCredentialCreatorForHost}#${MOCK_KEY_ID}`,
-    created: testIssuanceDateByRootOrg,
+    created: testIssuanceIsoDateByRootOrg,
     jws: MOCK_DETACHED_JWS,
   }],
 };
@@ -54,20 +70,19 @@ export const testHostVc: VerifiableCredentialV2 = {
  */
 export const testTenant1Vc: VerifiableCredentialV2 = {
   '@context': ['https://www.w3.org/2018/credentials/v1'],
-  id: testCredentialVersionHashedId,
-  type: ['VerifiableCredential', 'Organization'],
-  issuer: testCredentialCreatorForTenant1,
-  // Issuance and expiration dates are usually set dynamically in tests
-  validFrom: testIssuanceDateByHost,
-  validUntil: testExpirationDateByHost,
   credentialSubject: {
     identifier: testTenant1UrnIdentifier, // The stable URN of the tenant
   },
+  id: testCredentialVersionHashedId,
+  issuer: testCredentialCreatorForTenant1,
+  type: ['VerifiableCredential', 'Organization'],
+  validFrom: testIssuanceIsoDateByHost,
+  validUntil: testExpirationIsoDateByHost,
   proof: [{
     type: 'JsonWebSignature2020',
     proofPurpose: 'assertionMethod',
     verificationMethod: `${testCredentialCreatorForTenant1}#${MOCK_KEY_ID}`,
-    created: testIssuanceDateByHost,
+    created: testIssuanceIsoDateByHost,
     jws: MOCK_DETACHED_JWS,
   }],
 };

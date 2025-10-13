@@ -1,8 +1,8 @@
 // src/utils/services.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { EmployeeConfig } from '../models/employee-config';
-import { Sector } from '../models/sector';
+import { EntityConfig } from '../models/entity';
+import { Sector } from '../models/path';
 import { DidService } from '../models/did';
 import { createDidServiceId } from './did';
 
@@ -42,7 +42,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   ));
 
   services.push(createDidEndpointConfig(
-    createDidServiceId({ version: 'v1', sector, section: 'profile', format: 'org.schema' }),
+    createDidServiceId({ version: 'v1', sector, section: 'index', format: 'org.schema' }),
     individualResources
   ));
 
@@ -120,7 +120,7 @@ export function initializeHostServices(didId: string, sectorsAllowed: Sector[]):
  * @param employeeConfig The configuration object for the new employee.
  * @returns The array of DidService objects for the employee's didDocument.
  */
-export function initializeEmployeeServices(employeeConfig: EmployeeConfig): DidService[] {
+export function initializeEmployeeServices(employeeConfig: EntityConfig): DidService[] {
   const { didDocument } = employeeConfig;
   const baseUrl = didDocument.id.replace('did:web:', 'https://').replace(/:/g, '/');
 
@@ -138,4 +138,45 @@ export function initializeEmployeeServices(employeeConfig: EmployeeConfig): DidS
   ];
 
   return services;
+}
+
+/**
+ * Initializes the complete service list for a new Customer.
+ * @param customerConfig The configuration object for the new customer.
+ * @param sector The sector of the tenant under which the customer is being created.
+ * @returns The array of DidService objects for the customer's didDocument.
+ */
+export function initializeCustomerServices(customerConfig: EntityConfig, sector: Sector): DidService[] {
+  const { didDocument } = customerConfig;
+  const baseUrl = didDocument.id.replace('did:web:', 'https://').replace(/:/g, '/');
+
+  const coreServices: DidService[] = [
+    {
+      id: `${didDocument.id}#did-document`,
+      type: 'LinkedDomains',
+      serviceEndpoint: `${baseUrl}/.well-known/did.json`,
+    },
+    {
+      id: `${didDocument.id}#jwks`,
+      type: 'JsonWebKeyService2020',
+      serviceEndpoint: `${baseUrl}/jwks.json`,
+    },
+  ];
+
+  // Define business services for an individual/customer based on new requirements.
+  const isFhir = FHIR_SECTORS.includes(sector);
+  const individualResources = ['Customer', 'RelatedPerson', 'Bundle'];
+  if (isFhir) {
+    individualResources.push('Patient');
+  }
+
+  const format = isFhir ? 'org.hl7.fhir.api' : 'org.schema';
+  const section = 'index'; // Section is 'index' for customer sectorial data index.
+
+  const businessService = createDidEndpointConfig(
+    createDidServiceId({ version: 'v1', sector, section, format }),
+    individualResources
+  );
+
+  return [...coreServices, businessService];
 }

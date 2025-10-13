@@ -45,7 +45,10 @@ export enum ClaimsOrganizationSchemaorg {
  *   conventions and international contexts.
  */
 export enum ClaimsPersonSchemaorg {
+    /** Second surname or mother's maiden name */
     additionalName = "org.schema.Person.additionalName",
+    /** Short friendly name */
+    alternateName = "org.schema.Person.alternateName",
     birthDate = "org.schema.Person.birthDate",
     email = "org.schema.Person.email",
     familyName = "org.schema.Person.familyName",
@@ -55,6 +58,7 @@ export enum ClaimsPersonSchemaorg {
     identifier = "org.schema.Person.identifier", // the URN (composed by the provider)
     identifierType = "org.schema.Person.identifier.additionalType", // retrieved from a form
     identifierValue = "org.schema.Person.identifier.value", // retrieved from a form
+    /** ICAO transliteration of official given name (including middlenames), family name and addtional surname */
     name = "org.schema.Person.name",
     telephone = "org.schema.Person.telephone",
     worksFor = "org.schema.Person.worksFor",
@@ -74,6 +78,29 @@ export enum ClaimsServiceSchemaorg {
     identifier = "org.schema.Service.identifier",
     serviceType = "org.schema.Service.serviceType",
     termsOfService = "org.schema.Service.termsOfService",
+}
+
+
+/**
+ * Defines the flat claim structure for a schema.org/Action.
+ * This is used for requests where an entity (agent) performs an action,
+ * often with a human controller (participant) initiating it.
+ */
+export enum ClaimsActionSchemaorg {
+  // The primary agent performing the action (e.g., the Tenant Organization)
+  agentIdentifier = 'org.schema.Action.agent.identifier',
+  agentLegalName = 'org.schema.Action.agent.legalName',
+  // ... other flattened properties of the agent ...
+
+  // A co-agent participating in the action (e.g., the Human Controller T)
+  participantIdentifier = 'org.schema.Action.participant.identifier',
+
+  // The service provider or target of the action (e.g., the Fabric Network)
+  providerIdentifier = 'org.schema.Action.provider.identifier',
+  providerName = 'org.schema.Action.provider.name',
+
+  // The time the action was initiated
+  startTime = 'org.schema.Action.startTime',
 }
 
 export const ICAOReverseDns = 'int.icao';

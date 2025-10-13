@@ -16,12 +16,12 @@ import {
   AsyncResponseStoreMem,
   IAsyncResponseStore,
 } from '../../adapters/async-response-store.mem';
-import { testTenant1Data } from '../data/end-to-end.data';
 import { DidService } from '../../models/did';
 import { createDidServiceId } from '../../utils/did';
 import { createOrganizationUrn } from '../../utils/urn';
 import { getTenantVaultId } from '../../utils/tenant';
 import { OrganizationUrnParams } from '../../models/entity';
+import { testTenant1AlternateName, testTenant1IdType, testTenant1IdValue } from '../data/organization.data';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -68,7 +68,7 @@ describe('Employee Creation API', () => {
 
       // --- 1. Define constants for URL parameters and expected values ---
       // This makes the test self-documenting and easy to maintain.
-      const tenantId = testTenant1Data.alternateName; // "acme"
+      const tenantId = testTenant1AlternateName; // "acme"
       const jurisdiction = 'us';
       const sector = 'health-care';
       const section = 'entity';
@@ -91,19 +91,10 @@ describe('Employee Creation API', () => {
         jurisdiction: jurisdiction,
         version: 'v1',
         sector: sector,
-        idType: testTenant1Data.identifierType,
-        idValue: testTenant1Data.identifierValue,
+        idType: testTenant1IdType,
+        idValue: testTenant1IdValue,
       }
-
-      const tenantUrn = createOrganizationUrn({
-        namespace: 'antifraud',
-        network: 'test-network',
-        jurisdiction: jurisdiction,
-        version: 'v1',
-        sector: sector,
-        idType: testTenant1Data.identifierType,
-        idValue: testTenant1Data.identifierValue,
-      });
+      const tenantUrn = createOrganizationUrn(organizationUrnParams);
 
       // --- 3. Configure Mocks using the constants ---
       const mockTenantServices: DidService[] = [
@@ -135,7 +126,7 @@ describe('Employee Creation API', () => {
           },
         },
         httpMethod: 'POST',
-        fullUrl: registrationUrl, // Use the constructed URL
+        requestUrl: registrationUrl, // Use the constructed URL
       };
       mockKmsService.decodeJobRequest.mockResolvedValue(
         mockDecodedJob as JobRequest,

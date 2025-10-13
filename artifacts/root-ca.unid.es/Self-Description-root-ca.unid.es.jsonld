@@ -1,0 +1,21 @@
+{
+  "@context": [
+    "https://w3id.org/gaia-x/contexts/self-description.jsonld"
+  ],
+  "@id": "did:web:root-ca.unid.es",
+  "@type": "gx:Participant",
+  "gx:legalName": "Fundación UNID",
+  "gx:jurisdiction": "ES",
+  "gx:legalRegistrationNumber": "VATES-G12345678",
+  "schema:taxID": "G12345678",
+  "gx:headquarterAddress": {
+    "gx:country": "ES",
+    "gx:city": "Soria",
+    "gx:street": "Calle Condes de Gómara, 6",
+    "gx:postalCode": "42002"
+  },
+  "gx:sector": [
+    "Trust Infrastructure"
+  ],
+  "gx:gxfsRole": "gx:TrustAnchor"
+}

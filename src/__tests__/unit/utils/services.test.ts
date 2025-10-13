@@ -3,7 +3,7 @@
 
 import { initializeHostServices, initializeTenantServices } from '../../../utils/services';
 import { EntityConfig } from '../../../models/entity';
-import { Sector } from '../../../models/sector';
+import { Sector } from '../../../models/path';
 import { config } from '../../../config';
 
 // Helper factory function to create tenant configurations for tests, reducing repetition.

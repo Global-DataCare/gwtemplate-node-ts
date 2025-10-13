@@ -3,10 +3,11 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { ClaimsRecord } from '../../models/resource-document';
-import { JobAction, JobRequest } from '../../models/request';
+import { JobRequest } from '../../models/request';
 import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
 import { determineResourceId } from '../../utils/resource';
 import { BundleEntry } from '../../models/bundle';
+import { JobAction } from '../../models/path';
 
 /**
  * **SDK Helper Part 1: Entry Creation**
@@ -53,9 +54,9 @@ export const createEntryFromClaims = (
  * @param targetDid The DID of the target gateway/provider.
  * @returns A fully-formed JobRequest object.
  */
-export const createSdkJobRequest = (
+export const sdkCreateJobRequest = (
   entries: BundleEntry[],
-  issuerDid: string,
+  issuerDid: string, // TODO: backend middleware to translate external did:web to hosted did:web
   targetDid: string
 ): JobRequest => {
   // In a real implementation, the backend derives tenantId from the issuerDid.

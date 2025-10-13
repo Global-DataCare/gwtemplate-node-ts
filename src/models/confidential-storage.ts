@@ -36,8 +36,8 @@ export interface ConfidentialStorageDoc extends RecordBase {
     /** A number that MUST be incremented each time the document is updated. */
     sequence: number;
 
-    /** An array of objects that contain indexed attributes for blind queries. */
-    indexed?: IndexedData[];
+    /** Contains an array of indexed attributes protected with HMAC for blind queries. */
+    indexed?: IndexedData;
     
     /** The main, potentially encrypted, content of the document. */
     content?: Record<string, any>;

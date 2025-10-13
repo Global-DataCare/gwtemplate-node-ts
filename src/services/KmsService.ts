@@ -10,7 +10,9 @@ import { JobRequest } from '../models/request';
 import { MldsaPublicJwk, MlkemPrivateJwk, MlkemPublicJwk } from '../crypto/interfaces/Cryptography.types';
 import { Content } from '../utils/content';
 import { createHash, randomBytes } from 'crypto';
+import { computeHmacSha256Base64Url } from '../crypto/hmac';
 import { ProtectedDataAES } from '../models/aes';
+import { ParamAttribute } from '../models/params';
 
 /**
  * @file Implements the Key Management Service, the central facade for all internal cryptographic operations.
@@ -48,6 +50,8 @@ type EntityKeysSet = {
   };
   /** The entity's 32-byte Data Encryption Key (DEK), used for symmetric encryption of data at rest. */
   dataEncryptionKey: Uint8Array;
+  /** The entity's 32-byte HMAC key, used for creating keyed hashes of searchable attributes. */
+  hmacKey: Uint8Array;
 }
 
 /**
@@ -106,39 +110,43 @@ export class KmsService implements IKmsService {
    * @param entityId A unique identifier for the entity (e.g., 'host', 'tenant-urn-123').
    * @returns A JWKSet containing the public keys (signing and encryption).
    */
-  async provisionKeys(entityId: string): Promise<JwkSet> {
+  async provisionKeys(entityVaultId: string): Promise<JwkSet> {
     let dsaSeed: Uint8Array;
     let kemSeed: Uint8Array;
     let dataEncryptionKey: Uint8Array;
+    let hmacKey: Uint8Array;
 
     // Use deterministic keys only in development and when explicitly requested.
     if (process.env.NODE_ENV === 'development' && process.env.DEV_SEED === 'true') {
       // Deterministic generation for development and testing.
       // Use the modern `.subarr000 está ay()` which is the safe replacement for the deprecated `.slice()` on Buffers.
-      dsaSeed = createHash('sha256').update(entityId + '-dsa').digest().subarray(0, 32);
-      kemSeed = createHash('sha512').update(entityId + '-kem').digest().subarray(0, 64);
-      dataEncryptionKey = createHash('sha256').update(entityId + '-dek').digest().subarray(0, 32);
+      dsaSeed = createHash('sha256').update(entityVaultId + '-dsa').digest().subarray(0, 32);
+      kemSeed = createHash('sha512').update(entityVaultId + '-kem').digest().subarray(0, 64);
+      dataEncryptionKey = createHash('sha256').update(entityVaultId + '-dek').digest().subarray(0, 32);
+      hmacKey = createHash('sha256').update(entityVaultId + '-hmac').digest().subarray(0, 32);
     } else {
       // Secure random generation for production
       dsaSeed = randomBytes(32);
       kemSeed = randomBytes(64);
       dataEncryptionKey = randomBytes(32);
+      hmacKey = randomBytes(32);
     }
     const verificationKeyPair = await this.crypto.generateKeyPairMlDsa(dsaSeed);
     const encryptionKeyPair = await this.crypto.generateKeyPairMlKem(kemSeed);
 
     // In a production vault, the `dataEncryptionKey` would be encrypted with the Host KEK here before storage.
-    this._managedKeys.set(entityId, { 
+    this._managedKeys.set(entityVaultId, { 
       verificationKeyPair: { publicJWKey: verificationKeyPair.publicJWKey, secretKeyBytes: verificationKeyPair.secretKeyBytes },
       encryptionKeyPair: { publicJWKey: encryptionKeyPair.publicJWKey, secretKeyBytes: encryptionKeyPair.secretKeyBytes },
-      dataEncryptionKey: dataEncryptionKey
+      dataEncryptionKey: dataEncryptionKey,
+      hmacKey: hmacKey
     });
     
     const publicJwkSet = {
       keys: [verificationKeyPair.publicJWKey as JWK, encryptionKeyPair.publicJWKey as JWK]
     };
 
-    console.log(`[KmsService] Provisioned new JWKSet for entity: ${entityId}`, publicJwkSet);
+    console.log(`[KmsService] Provisioned new JWKSet for entity: ${entityVaultId}`, publicJwkSet);
 
     return publicJwkSet;
   }
@@ -148,22 +156,22 @@ export class KmsService implements IKmsService {
    * @param entityId The unique identifier for the entity.
    * @returns A JWKSet of the entity's public keys.
    */
-  async getPublicJwks(entityId: string): Promise<JwkSet> {
-    const keyPairSet = this._managedKeys.get(entityId);
+  async getPublicJwks(entityVaultId: string): Promise<JwkSet> {
+    const keyPairSet = this._managedKeys.get(entityVaultId);
     if (!keyPairSet) {
-      throw new Error(`Keys not found for entity: ${entityId}`);
+      throw new Error(`Keys not found for entity: ${entityVaultId}`);
     }
     return {
       keys: [keyPairSet.verificationKeyPair.publicJWKey as JWK, keyPairSet.encryptionKeyPair.publicJWKey as JWK]
     };
   }
 
-  async getPublicVerificationKey(entityId: string): Promise<MldsaPublicJwk | undefined> {
-    return this._managedKeys.get(entityId)?.verificationKeyPair.publicJWKey;
+  async getPublicVerificationKey(entityVaultId: string): Promise<MldsaPublicJwk | undefined> {
+    return this._managedKeys.get(entityVaultId)?.verificationKeyPair.publicJWKey;
   }
 
-  async getPublicEncryptionKey(entityId: string): Promise<MlkemPublicJwk | undefined> {
-    return this._managedKeys.get(entityId)?.encryptionKeyPair.publicJWKey;
+  async getPublicEncryptionKey(entityVaultId: string): Promise<MlkemPublicJwk | undefined> {
+    return this._managedKeys.get(entityVaultId)?.encryptionKeyPair.publicJWKey;
   }
 
   async getHostPublicJwkSet(): Promise<JwkSet> {
@@ -239,10 +247,10 @@ export class KmsService implements IKmsService {
    * @param entityId The identifier of the signing entity.
    * @returns A `JwsMultiSign` object containing the signature.
    */
-  async signWithManagedKey(payload: Uint8Array, entityId: string): Promise<JwsMultiSign> {
-    const keyPairSet = this._managedKeys.get(entityId);
+  async signWithManagedKey(payload: Uint8Array, entityVaultId: string): Promise<JwsMultiSign> {
+    const keyPairSet = this._managedKeys.get(entityVaultId);
     if (!keyPairSet) {
-      throw new Error(`Verification key not found for entity: ${entityId}`);
+      throw new Error(`Verification key not found for entity: ${entityVaultId}`);
     }
     const { publicJWKey, secretKeyBytes } = keyPairSet.verificationKeyPair;
     const protectedHeader = { alg: publicJWKey.alg, kid: publicJWKey.kid };
@@ -307,10 +315,10 @@ export class KmsService implements IKmsService {
    * used to include its `skid` (sender key id) in the protected header.
    * @returns The encrypted JWE as a compact string (for a single recipient) or a JSON string (for multiple).
    */
-  async encodeResponse(payload: any, recipientJwks: JWK[], senderId: string): Promise<string> {
-    const senderKeys = this._managedKeys.get(senderId);
+  async encodeResponse(payload: any, recipientJwks: JWK[], senderVaultId: string): Promise<string> {
+    const senderKeys = this._managedKeys.get(senderVaultId);
     if (!senderKeys) {
-      throw new Error(`Sender keys not found for entity: ${senderId}`);
+      throw new Error(`Sender keys not found for entity: ${senderVaultId}`);
     }
     const senderPrivKey: MlkemPrivateJwk = {
       ...senderKeys.encryptionKeyPair.publicJWKey,
@@ -345,19 +353,19 @@ export class KmsService implements IKmsService {
    * containing the JSON-stringified `ProtectedDataAES` object. The `entityId` is used
    * as the AAD to prevent cross-tenant decryption attacks.
    */
-  async protectConfidentialData(doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> {
+  async protectConfidentialData(doc: ConfidentialStorageDoc, entityVaultId: string): Promise<ConfidentialStorageDoc> {
     this.checkInitialized();
     if (!doc.content) {
       throw new Error('Document has no "content" to protect.');
     }
-    const protectorKeys = this._managedKeys.get(entityId);
+    const protectorKeys = this._managedKeys.get(entityVaultId);
     if (!protectorKeys) {
-      throw new Error(`Protector entity's keys not found: ${entityId}`);
+      throw new Error(`Protector entity's keys not found: ${entityVaultId}`);
     }
 
     const contentString = JSON.stringify(doc.content);
     // The AAD is crucial here to bind the ciphertext to the entity.
-    const encryptedData = await this.crypto.encrypt(contentString, protectorKeys.dataEncryptionKey, entityId);
+    const encryptedData = await this.crypto.encrypt(contentString, protectorKeys.dataEncryptionKey, entityVaultId);
     
     const { content, ...docWithoutContent } = doc;
     // FIX: The result of encryption is an object, it should be stringified for storage.
@@ -371,19 +379,60 @@ export class KmsService implements IKmsService {
    * to ensure the ciphertext was intended for this entity.
    * @returns The decrypted content of the document.
    */
-  async unprotectConfidentialData<T>(doc: ConfidentialStorageDoc, entityId: string): Promise<T> {
+  async unprotectConfidentialData<T>(doc: ConfidentialStorageDoc, entityVaultId: string): Promise<T> {
     this.checkInitialized();
     if (!doc.jwe || typeof doc.jwe !== 'object') {
       throw new Error('Document has no valid "jwe" property to unprotect.');
     }
-    const protectorKeys = this._managedKeys.get(entityId);
+    const protectorKeys = this._managedKeys.get(entityVaultId);
     if (!protectorKeys) {
-      throw new Error(`Protector entity's keys not found: ${entityId}`);
+      throw new Error(`Protector entity's keys not found: ${entityVaultId}`);
     }
 
     const encryptedDataObject = doc.jwe as ProtectedDataAES;
     // The AAD must match the one used during encryption.
-    const decryptedString = await this.crypto.decrypt(encryptedDataObject, protectorKeys.dataEncryptionKey, entityId);
+    const decryptedString = await this.crypto.decrypt(encryptedDataObject, protectorKeys.dataEncryptionKey, entityVaultId);
     return JSON.parse(decryptedString) as T;
+  }
+
+  /**
+   * Computes a keyed hash (HMAC) of a plaintext string using the specified entity's secret HMAC key.
+   * @param plaintext The string to hash.
+   * @param entityVaultId The vault ID of the entity (e.g., 'host', 'health-care_acme') whose HMAC key should be used.
+   * @returns The resulting HMAC as a Base64UrlSafe string.
+   */
+  async getHmacBase64Url(plaintext: string, entityVaultId: string): Promise<string> {
+    this.checkInitialized();
+    const keys = this._managedKeys.get(entityVaultId);
+    if (!keys) {
+      throw new Error(`Keys not found for entity: ${entityVaultId}`);
+    }
+    if (!keys.hmacKey) {
+      // This should not happen if provisionKeys is always used.
+      throw new Error(`HMAC key is missing for entity: ${entityVaultId}`);
+    }
+    return computeHmacSha256Base64Url(plaintext, keys.hmacKey);
+  }
+
+  /**
+   * Takes an array of plaintext attributes and returns a new array where
+   * both the `name` and `value` properties of each attribute have been protected with HMAC.
+   *
+   * @param attributes The array of plaintext `ParamAttribute` objects.
+   * @param entityVaultId The security context for key selection.
+   * @returns A promise that resolves to the array of protected `ParamAttribute` objects.
+   */
+  async protectAttributesNameAndValue(attributes: ParamAttribute[], entityVaultId: string): Promise<ParamAttribute[]> {
+    const protectedAttributes: ParamAttribute[] = [];
+    for (const attribute of attributes) {
+      const protectedName = await this.getHmacBase64Url(attribute.name, entityVaultId);
+      const protectedValue = await this.getHmacBase64Url(attribute.value, entityVaultId);
+      protectedAttributes.push({
+        name: protectedName,
+        value: protectedValue,
+        unique: attribute.unique,
+      });
+    }
+    return protectedAttributes;
   }
 }

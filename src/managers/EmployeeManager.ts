@@ -13,7 +13,7 @@ import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { ClaimsPersonSchemaorg } from '../models/schemaorg';
 import { determineResourceId } from '../utils/resource';
-import { EmployeeConfig } from '../models/employee-config';
+import { EntityConfig } from '../models/entity';
 import { initializeEmployeeServices } from '../utils/services';
 import { createOperationOutcome } from '../utils/outcome';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
@@ -124,19 +124,26 @@ export class EmployeeManager {
     // Construct the hierarchical URN using the parent tenant's URN.
     const employeeUrn = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
 
-    const employeeConfig: EmployeeConfig = {
+    const employeeConfig: EntityConfig = {
       id: employeeId,
       type: 'EmployeeConfig',
       status: 'active',
-      email: email,
+      claims,
       didDocument: {
         '@context': 'https://www.w3.org/ns/did/v1',
         id: employeeUrn, // The employee's full, semantic URN
         service: [],
       },
-      meta: { claims },
+      didConfig: { // didConfig property is required by EntityConfig
+        service: []
+      },
     };
+
+    // Initialize services using the newly created config
     employeeConfig.didDocument.service = initializeEmployeeServices(employeeConfig);
+    
+    // Also, update the didConfig with the same services.
+    employeeConfig.didConfig.service = employeeConfig.didDocument.service;
 
     const occupationDoc: RecordBase & { employeeId: string } = {
       id: uuidv4(),
@@ -163,7 +170,7 @@ export class EmployeeManager {
       resource: {
         id: employeeId,
         type: 'Person',
-        meta: employeeConfig.meta,
+        meta: { claims: claims },
         contained: [occupationDoc],
       },
       response: { status: '201' },
@@ -176,7 +183,7 @@ export class EmployeeManager {
       throw new ManagerError(`Employee with ID '${employeeId}' not found.`, IssueType.NotFound);
     }
 
-    const employee = await this.kmsService.unprotectConfidentialData<EmployeeConfig>(employeeDoc, tenantId);
+    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, tenantId);
     employee.status = 'disabled';
 
     const docToProtect: ConfidentialStorageDoc = { ...employeeDoc, content: employee };

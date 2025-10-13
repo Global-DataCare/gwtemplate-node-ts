@@ -21,7 +21,7 @@ import { EntityConfig } from '../../../models/entity';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { IServerConfig } from '../../../config';
-import { Sector } from '../../../models/sector';
+import { Sector } from '../../../models/path';
 import { testInvalidUuid, testTenant1AddressCountry, testTenant1LegalName } from '../../data/organization.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { JwkSet } from '../../../models/jwk';
@@ -80,7 +80,7 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
     },
   },
   httpMethod: 'POST',
-  fullUrl: '/default',
+  requestUrl: '/default',
 });
 
 describe('HostingManager', () => {

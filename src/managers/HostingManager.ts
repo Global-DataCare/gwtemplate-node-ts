@@ -20,7 +20,7 @@ import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
 import { validateNewOrganizationClaims } from '../utils/claims-validator';
-import { Sector } from '../models/sector';
+import { Sector } from '../models/path';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { createHostedDidWeb, populateDidDocumentFromJwks, composeHostDidWebId, getPrimaryDidWeb } from '../utils/did';
 import { DidDocument } from '../models/did';
@@ -395,15 +395,13 @@ export class HostingManager {
     const docToProtect: ConfidentialStorageDoc = {
       id: org.id,
       sequence: 0,
-      indexed: [
-        {
-          attributes: [
-            { name: 'alternateName', value: altName, unique: true },
-            { name: 'taxId', value: org.meta.claims[ClaimsOrganizationSchemaorg.identifierValue] as string },
-          ],
-          hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
-        },
-      ],
+      indexed: {
+        attributes: [
+          { name: 'alternateName', value: altName, unique: true },
+          { name: 'taxId', value: org.meta.claims[ClaimsOrganizationSchemaorg.identifierValue] as string },
+        ],
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
       content: tenantConfig,
     };
 

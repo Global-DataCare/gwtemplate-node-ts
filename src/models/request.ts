@@ -1,12 +1,20 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/models/request.ts
 
+export enum FormRequest {
+  'OrganizationTerms' = 'register-organization_form_org.schema_v1.0',
+  'IndividualTerms' = 'register-individual_form_org.schema_v1.0',
+  'EmployeeRole' = 'employee-role_form_org.schema_v1.0',
+  'PersonalIdentity' = 'personal-identity_form_org.schema_v1.0',
+  'EvidenceEmbedded' = 'evidence-embedded_form_net.openid_v1.0',
+}
+
 /**
  * Represents the structured data extracted from an HTTP request path and other properties.
  * This is the foundational context for any incoming job.
  */
 export interface DataInRequest {
-  fullUrl?: string;
+  requestUrl?: string;
   httpMethod?: string;
   input?: any;
   contentType?: string;
@@ -22,10 +30,6 @@ export interface DataInRequest {
   /** The action without the '_' prefix */
   action?: string;
   language?: string;
-}
-
-export enum JobAction {
-  "_batch" = "_batch",
 }
 
 /**
