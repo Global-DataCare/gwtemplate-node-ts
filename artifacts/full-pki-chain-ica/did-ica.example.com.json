@@ -3,20 +3,20 @@
   "id": "did:web:ica.example.com",
   "verificationMethod": [
     {
-      "id": "did:web:ica.example.com#cXlrQWVLSEUxTXkwX0NvNVBRNUdMQmZSclBGTDBjLV84LUNuOWZ1Rm1ZZw",
+      "id": "did:web:ica.example.com#UXIyQThlMHhwUlRmbV9yQW56azM4QmttREpUWEpMTUxLM1FvdjFtQ29Caw",
       "type": "JsonWebKey2020",
       "controller": "did:web:ica.example.com",
       "publicKeyJwk": {
         "kty": "EC",
         "crv": "P-256",
-        "x": "hn_VyqE3nLzdJ4eltn_NK93JRALHTSVEPMq1t29_E1g",
-        "y": "5ksEQmNtyGPdBrhwwH7bXx4w16R11EOYt3cPIdHzQDs",
-        "d": "74NK5nPX1GzuxnCo622arwVaRXfq1jKi_0TXgp5MgVU",
-        "kid": "cXlrQWVLSEUxTXkwX0NvNVBRNUdMQmZSclBGTDBjLV84LUNuOWZ1Rm1ZZw"
+        "x": "q81qsPj7a0ZlHqL6XpikNIxSSatrD9dUn4NgFzX9h6A",
+        "y": "MECEEE2ZBFcmfR_QUlcrQqnURUpDvDuWA2brt9LYDxc",
+        "d": "-g0YrHONMQX2gL0i3bOGnhRuxpmcRzQ30VfZ3vjzx6A",
+        "kid": "UXIyQThlMHhwUlRmbV9yQW56azM4QmttREpUWEpMTUxLM1FvdjFtQ29Caw"
       }
     }
   ],
   "authentication": [
-    "did:web:ica.example.com#cXlrQWVLSEUxTXkwX0NvNVBRNUdMQmZSclBGTDBjLV84LUNuOWZ1Rm1ZZw"
+    "did:web:ica.example.com#UXIyQThlMHhwUlRmbV9yQW56azM4QmttREpUWEpMTUxLM1FvdjFtQ29Caw"
   ]
 }

@@ -56,7 +56,22 @@ const config: JestConfigWithTsJest = {
 
   clearMocks: true,
   testTimeout: 12000,
-  verbose: true
+  verbose: true,
+
+  // Coverage configuration
+  collectCoverage: true,
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.test.ts',
+    '!src/**/*.spec.ts',
+    '!**/node_modules/**',
+    '!**/vendor/**',
+    '!**/src/__tests__/**',
+  ],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '\\.data\\.ts$',
+  ],
 };
 
 export default config;
