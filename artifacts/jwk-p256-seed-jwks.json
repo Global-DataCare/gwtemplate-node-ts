@@ -3,9 +3,9 @@
     {
       "kty": "EC",
       "crv": "P-256",
-      "x": "y0RtZco30VemXr5mnjxcQAtS784jBcPQVweajFlwV6A",
-      "y": "s2nirD4uUQpULaRTAg2HHrl0v68TL1moQ1R0T0j_KMU",
-      "kid": "TC11QVI2cVNTSmxnUHZsazdKNEhkOTN4OS1Dc1U5MWlPbFhUY0RIRDZtQQ"
+      "x": "u6r0m76uk0I62VvLsABpNtcNIMKvODKYPRG8NYz-aX8",
+      "y": "hgCPpev2RolMCbfiyWeE-e_pL_TVTeOy4qcKaSQNGzQ",
+      "kid": "S2NkTV9fd0RCbXducU5HQTRvTzk4cUFJcDdTei1jTTlLYWJKdm9CamJqTQ"
     }
   ]
 }

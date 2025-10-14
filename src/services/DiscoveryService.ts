@@ -4,64 +4,82 @@
 import { EntityConfig } from '../models/entity';
 import { DidDocument } from '../models/did';
 import { JwkSet } from '../models/jwk';
+import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 
 /**
  * Handles the stateless, synchronous logic for generating public discovery documents
  * like DID Documents and JWKS based on a provided tenant configuration.
  */
 export class DiscoveryService {
+  private tenantsCacheManager: TenantsCacheManager;
+
+  constructor(tenantsCacheManager: TenantsCacheManager) {
+    this.tenantsCacheManager = tenantsCacheManager;
+  }
+
   /**
-   * Retrieves the static DID Document from a given tenant configuration.
-   * @param tenantConfig The fully resolved configuration of the tenant.
-   * @returns The DID Document.
+   * Retrieves the static DID Document for a given tenant.
+   * @param vaultId The unique vault identifier of the tenant.
+   * @returns The DID Document, or undefined if not found.
    */
-  getDidDocument(tenantConfig: EntityConfig): DidDocument {
-    return tenantConfig.didDocument;
+  getDidDocument(vaultId: string): DidDocument | undefined {
+    return this.tenantsCacheManager.getDidDocument(vaultId);
   }
 
   /**
    * Retrieves the JSON Web Key Set (JWKS) for a given entity.
-   * @param tenantConfig The fully resolved configuration of the tenant.
+   * @param vaultId The unique vault identifier of the tenant.
    * @returns The JWKS.
    */
-  getJwks(tenantConfig: EntityConfig): JwkSet {
-    // In a real implementation, this would retrieve public keys from the KMS
-    // or reference them from the DID Document's verificationMethod.
-    // For now, it returns a placeholder.
+  getJwks(vaultId: string): JwkSet {
+    // This is a placeholder. A real implementation would fetch public keys 
+    // from the KMS, which would require injecting the IKmsService.
+    console.warn(`[DiscoveryService] getJwks is returning a placeholder for vaultId: ${vaultId}`);
     return { keys: [] };
   }
 
   /**
    * Generates a placeholder OpenID Connect configuration.
-   * @param config The configuration of the tenant.
-   * @returns A partial OIDC configuration object.
+   * @param vaultId The unique vault identifier of the tenant.
+   * @returns A partial OIDC configuration object, or undefined if not found.
    */
-  getOpenIdConfiguration(config: EntityConfig): object {
+  getOpenIdConfiguration(vaultId: string): object | undefined {
+    const didDoc = this.tenantsCacheManager.getDidDocument(vaultId);
+    const tenantUrl = this.tenantsCacheManager.getTenantDomainUrl(vaultId);
+
+    if (!didDoc || !tenantUrl) return undefined;
+    
+    // The jwks_uri path needs to be updated to match the new routing structure.
+    // This now correctly uses the tenant's primary DID as the base.
+    const jwks_uri = new URL('/.well-known/jwks.json', didDoc.id.replace('did:web:', 'https://')).toString();
+    
     return {
-      issuer: config.url,
-      // The jwks_uri path needs to be updated to match the new routing structure
-      jwks_uri: `${config.url}/cds-${config.jurisdiction}/v1/${config.sector}/.well-known/jwks.json`,
+      issuer: tenantUrl,
+      jwks_uri: jwks_uri,
     };
   }
 
   /**
    * Generates a placeholder SMART on FHIR configuration.
-   * @param config The configuration of the tenant.
-   * @returns A partial SMART configuration object.
+   * @param vaultId The unique vault identifier of the tenant.
+   * @returns A partial SMART configuration object, or undefined if not found.
    */
-  getSmartConfiguration(config: EntityConfig): object {
+  getSmartConfiguration(vaultId: string): object | undefined {
+    const tenantUrl = this.tenantsCacheManager.getTenantDomainUrl(vaultId);
+    if (!tenantUrl) return undefined;
+
     return {
-      issuer: config.url,
+      issuer: tenantUrl,
       // Additional SMART on FHIR metadata would be populated here.
     };
   }
 
   /**
    * Generates a placeholder FHIR Capability Statement.
-   * @param config The configuration of the tenant.
+   * @param vaultId The unique vault identifier of the tenant.
    * @returns A partial CapabilityStatement object.
    */
-  getCapabilityStatement(config: EntityConfig): object {
+  getCapabilityStatement(vaultId: string): object {
     return {
       resourceType: 'CapabilityStatement',
       status: 'active',

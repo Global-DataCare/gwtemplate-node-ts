@@ -11,6 +11,7 @@ import { DidDocument, DidService } from '../models/did';
 import { getEnvironment } from '../utils/environment';
 import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
 import { Sector } from '../models/path';
+import { getBaseUrlFromDidWeb } from '../utils/did';
 import { parseTenantUrn } from '../utils/urn';
 
 /**
@@ -79,7 +80,7 @@ export class TenantsCacheManager implements ITenantsManager {
     console.log(`[TenantsCacheManager] Successfully loaded ${this.tenantCacheByVaultId.size} tenants.`);
   }
 
-  public getTenantUrn(vaultId: string): string | undefined {
+  public getTenantIdentifierUrn(vaultId: string): string | undefined {
     const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
     return tenantConfig?.didDocument.id;
   }
@@ -134,5 +135,60 @@ export class TenantsCacheManager implements ITenantsManager {
     const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
     if (!tenantConfig) return undefined;
     return (tenantConfig.claims as any)[ClaimsOrganizationSchemaorg.addressCountry] as string;
+  }
+
+  /**
+   * Retrieves the canonical service URL for a tenant.
+   * It prioritizes the tenant's specified external domain (`url` claim) if it exists.
+   * If not, it constructs and returns the fallback hosted URL on the gateway.
+   * @param vaultId The unique vault identifier for the tenant.
+   * @param apiBaseUrl The base URL of the API, required for constructing fallback URLs.
+   * @returns The tenant's service URL, or undefined if the tenant is not found.
+   */
+  public getTenantDomainUrl(vaultId: string): string | undefined {
+    if (vaultId === 'host') {
+      const hostDidDoc = this.getDidDocument('host');
+      return hostDidDoc ? getBaseUrlFromDidWeb(hostDidDoc.id) : undefined;
+    }
+
+    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+    if (!tenantConfig) {
+      return undefined;
+    }
+    
+    // Prioritize the tenant's custom, external URL if it has been configured.
+    const externalUrl = (tenantConfig.claims as any)[ClaimsOrganizationSchemaorg.url];
+    if (externalUrl) {
+      // Ensure the URL has a scheme for consistency.
+      return externalUrl.startsWith('http') ? externalUrl : `https://${externalUrl}`;
+    }
+    // Otherwise, fall back to the hosted URL.
+    return this.constructHostedUrl(tenantConfig);
+  }
+
+  /**
+   * Constructs the full hosted URL for a tenant based on its configuration.
+   * It derives the host's base domain from the host's own DID document.
+   * Example: https://host.com/acme/cds-us/v1/health-care
+   */
+  private constructHostedUrl(config: EntityConfig): string | undefined {
+    const hostDidDoc = this.getDidDocument('host');
+    if (!hostDidDoc) {
+      console.error('[TenantsCacheManager] Cannot construct hosted URL: Host DID document not found in cache.');
+      return undefined;
+    }
+
+    // The host's DID is the source of truth for its domain. Use the new utility to decode it.
+    const baseUrl = getBaseUrlFromDidWeb(hostDidDoc.id);
+
+    const alternateName = (config.claims as any)[ClaimsOrganizationSchemaorg.alternateName];
+    const urn = config.didDocument?.id;
+    const parsedUrn = urn ? parseTenantUrn(urn) : null;
+
+    if (!alternateName || !parsedUrn?.jurisdiction || !parsedUrn?.version || !parsedUrn?.sector) {
+      return undefined;
+    }
+    
+    return `${baseUrl}/${alternateName}/cds-${parsedUrn.jurisdiction}/${parsedUrn.version}/${parsedUrn.sector}`;
   }
 }

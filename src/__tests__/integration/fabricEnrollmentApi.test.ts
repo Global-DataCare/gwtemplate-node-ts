@@ -127,7 +127,7 @@ describe('Fabric Enrollment API', () => {
       // Mock the decoded job, but from an UNAUTHORIZED controller
       const jobFromUnauthorizedController: DecodedDidcommMessage = {
         ...testFabricEnrollmentJobInput,
-        iss: 'did:web:unauthorized.controller.com',
+        iss: 'did:web:unauthorized.controller.com', // TODO: the controller is an employee so a URN is expected, or a did:web hosted for the email and role? (but URN is the identifier)
       };
       // Wrap it in a JobRequest for the mock
       const mockInvalidJobRequest: JobRequest = {

@@ -6,8 +6,16 @@ import { createOperationOutcome } from '../../../utils/outcome';
 import { compactJWT } from '../../../utils/jwt';
 import { convertPrimaryDocToFhirBundle } from '../../../utils/jsonapi';
 import { IPayloadResponse } from '../../../models/response';
-import { composeHostDidWebId, getTenantDidWebId } from '../../../utils/did';
 import { IssueLevel, IssueType } from '../../../models/fhir/codes';
+
+/**
+ * Encodes a hostname from a request's Host header for use in a did:web.
+ * Example: 'localhost:3000' -> 'localhost%3A3000'
+ */
+function getEncodedHostFromRequest(req: Request): string {
+  const host = req.get('host') || 'localhost';
+  return host.replace(':', '%3A');
+}
 
 /**
  * Handles requests to the ping endpoint (e.g., `/.well-known/ping`).
@@ -18,7 +26,7 @@ import { IssueLevel, IssueType } from '../../../models/fhir/codes';
  * The structure of the response varies based on the client's `Accept` header,
  * showcasing the different data formats the API supports.
  */
-export const pingHandler = async (req: Request, res: Response) => {
+export const pingHandler = () => async (req: Request, res: Response) => {
     const tenantId = res.locals.tenantId as string;
 
     // 1. Create the canonical response body (the Bundle). This is the base data structure.
@@ -43,9 +51,8 @@ export const pingHandler = async (req: Request, res: Response) => {
 
         case 'application/x-www-form-urlencoded':
             // For FAPI/JARM-compliant clients, we demonstrate the full secure response format.
-            // The canonical bundle is wrapped in the JARM `IPayloadResponse` envelope
-            // (with iss, aud, etc.), and then compacted into an unsigned JWS.
-            const issuerDid = tenantId === 'host' ? composeHostDidWebId() : getTenantDidWebId(tenantId);
+            // The issuer MUST be derived from the Host header to match the client's expectation.
+            const issuerDid = `did:web:${getEncodedHostFromRequest(req)}`;
             const responsePayload: IPayloadResponse = {
                 thid: `ping-${Date.now()}`,
                 iss: issuerDid,

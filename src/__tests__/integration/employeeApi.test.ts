@@ -109,7 +109,7 @@ describe('Employee Creation API', () => {
         .spyOn(tenantsCacheManager, 'getDidServiceConfig')
         .mockReturnValue(mockTenantServices);
 
-      jest.spyOn(tenantsCacheManager, 'getTenantUrn').mockReturnValue(tenantUrn);
+      jest.spyOn(tenantsCacheManager, 'getTenantIdentifierUrn').mockReturnValue(tenantUrn);
 
       const thid = uuidv4();
       // CORRECTED: The mock for the decoded job should represent the raw data from the KMS.

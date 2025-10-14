@@ -21,7 +21,7 @@ export interface ITenantsManager {
    * @param vaultId The internal vaultId of the tenant (e.g., 'health-care.tenant-1').
    * @returns The URN string or undefined if not found.
    */
-  getTenantUrn(vaultId: string): string | undefined;
+  getTenantIdentifierUrn(vaultId: string): string | undefined;
 
   /**
    * Retrieves a tenant's service configurations from the cache by its internal vaultId.

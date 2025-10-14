@@ -3,20 +3,20 @@
   "id": "did:web:root-ca.example.com",
   "verificationMethod": [
     {
-      "id": "did:web:root-ca.example.com#RW80RHVmNDNjTWwzcENHR0E5ckZOTlp5Y3l6UF8tNlU2SHRSYXBYWDlkQQ",
+      "id": "did:web:root-ca.example.com#RWZEMzVaS0M4eHplMGdpMFMwMDQycVVKMVRLVVpmanFuT0I3MkUtNWhLMA",
       "type": "JsonWebKey2020",
       "controller": "did:web:root-ca.example.com",
       "publicKeyJwk": {
         "kty": "EC",
         "crv": "P-256",
-        "x": "ydK9MYxWW2bh3Qdvs_zAM7PFDLbCNscR7t6SG7B_Qa0",
-        "y": "0iF7_BZCpl9o-tp8FtJjXegDhLvycF46_PxWLLUI-wE",
-        "d": "pGWjq3UVtLzyVjmjVbMsoa1mojnlUuPaMBq8twmoBoA",
-        "kid": "RW80RHVmNDNjTWwzcENHR0E5ckZOTlp5Y3l6UF8tNlU2SHRSYXBYWDlkQQ"
+        "x": "2TKUdJPlI0UKgraZj_uxLp8fWyLyyV1WwbgC1q8NCxE",
+        "y": "2qfRlvjsJwZn_Q5uj4sMAFVN0XqxyIikmBoeqeW2-bo",
+        "d": "5FiP_7EoxzKie1YGc1O2stsvd7nfML8dWTPv8v3XHT0",
+        "kid": "RWZEMzVaS0M4eHplMGdpMFMwMDQycVVKMVRLVVpmanFuT0I3MkUtNWhLMA"
       }
     }
   ],
   "authentication": [
-    "did:web:root-ca.example.com#RW80RHVmNDNjTWwzcENHR0E5ckZOTlp5Y3l6UF8tNlU2SHRSYXBYWDlkQQ"
+    "did:web:root-ca.example.com#RWZEMzVaS0M4eHplMGdpMFMwMDQycVVKMVRLVVpmanFuT0I3MkUtNWhLMA"
   ]
 }

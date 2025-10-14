@@ -51,7 +51,7 @@ const testServiceManufacturerPurposeType = "http://terminology.hl7.org/CodeSyste
 const testHostAdmin1Uuid = "a1b2c3d4-e5f6-7890-1234-567890abcdef";
 export const testHostAdmin1Email = `admin1@${testHostDomain}`;
 export const testHostAdmin1HasOccupation = `${codeSystemISCO08}:1120`; // 2 segments (<system>:<code>)
-export const testHostAdmin1UrnIdentifier = `urn:${URN_NAMESPACE}:${URN_NETWORK}:${testHostAddressCountry}:v1:${testServiceManufacturerCategory}:entity:${testHostIdType}:${testHostIdValue}:employee:email:${testHostAdmin1Email}:role:${testHostAdmin1HasOccupation}`;
+export const testHostAdmin1IdentifierUrn = `urn:${URN_NAMESPACE}:${URN_NETWORK}:${testHostAddressCountry}:v1:${testServiceManufacturerCategory}:entity:${testHostIdType}:${testHostIdValue}:employee:email:${testHostAdmin1Email}:role:${testHostAdmin1HasOccupation}`;
 
 // ===================================================================================
 // TENANT 1 ORGANIZATION DATA
@@ -82,7 +82,7 @@ export const testTenant1VaultId = `${testTenant1ServiceProviderCategory}_${testT
  *  This is the ID that will be used in the 'credentialSubject.identifier' of its Pointer Credential.
  *  For example: `urn:antifraud:test-network:ES:v1:health-care:entity:EI:98-7654321`
  */
-export const testTenant1UrnIdentifier = 
+export const testTenant1IdentifierUrn = 
   `urn:${URN_NAMESPACE}:${URN_NETWORK}:${testTenant1AddressCountry}:${URN_VERSION}:${testTenant1ServiceProviderCategory}:entity:${testTenant1IdType}:${testTenant1IdValue}`;
 
 /** Rule: path ends with slash `/` */

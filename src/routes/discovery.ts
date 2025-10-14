@@ -22,80 +22,90 @@ export function createDiscoveryRouter(
 ): express.Router {
   const router = express.Router();
 
-  // Middleware to resolve the tenant configuration based on path parameters.
+  // Middleware to resolve the tenant vaultId based on path parameters and verify existence.
   const resolveTenant = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const { sector, tenantId } = req.params;
+    const { tenantId, jurisdiction, version, sector } = req.params;
 
-    // The 'host' is a special case that doesn't have a sector in its path.
-    if (tenantId === 'host' || !tenantId) {
-      const hostConfig = await tenantsCacheManager.getConfig('host');
-      if (!hostConfig) {
+    // The 'host' is a special case that doesn't use the structured CDS path.
+    if (req.path.startsWith('/host')) {
+      res.locals.vaultId = 'host';
+      // Quick check to ensure host is loaded before proceeding.
+      if (!tenantsCacheManager.getDidDocument('host')) {
         return res.status(503).type('text').send('Service Unavailable: Host configuration not loaded.');
       }
-      res.locals.tenantConfig = hostConfig;
-      res.locals.tenantId = 'host';
-      res.locals.vaultId = 'host';
       return next();
     }
 
-    // For all standard tenants, sector is required to construct the vaultId.
-    if (!sector) {
-      return res.status(400).type('text').send('Bad Request: The {sector} parameter is required in the URL.');
+    // For all standard tenants, all parts of the CDS path are required.
+    if (!tenantId || !jurisdiction || !version || !sector) {
+      return res.status(400).type('text').send('Bad Request: A valid CDS path is required.');
     }
 
     const vaultId = getTenantVaultId(sector, tenantId);
-    const tenantConfig = await tenantsCacheManager.getConfig(vaultId);
+    
+    // Use the public getDidDocument method to check for the tenant's existence.
+    // This avoids exposing the entire internal EntityConfig in the middleware.
+    const didDocument = tenantsCacheManager.getDidDocument(vaultId);
 
-    if (!tenantConfig) {
+    if (!didDocument) {
       console.warn(`[DiscoveryRouter] Tenant not found for vaultId '${vaultId}' constructed from path.`);
       return res.status(404).type('text').send('Not Found');
     }
     
-    res.locals.tenantConfig = tenantConfig;
-    res.locals.tenantId = tenantId; // The alternateName
-    res.locals.vaultId = vaultId; // The full vaultId
+    res.locals.vaultId = vaultId; // Pass the resolved vaultId to the next handler.
     next();
   };
   
   // --- Route Definitions ---
   // Define separate, unambiguous route structures for host and tenants.
   const hostWellKnownPrefix = '/host/.well-known';
-  const tenantWellKnownPrefix = '/:jurisdiction/:version/:sector/:tenantId/.well-known';
+  // This new route aligns with the hosted DID web specification for tenants.
+  const tenantWellKnownPrefix = '/:tenantId/cds-:jurisdiction/:version/:sector/.well-known';
 
-  router.get([`${hostWellKnownPrefix}/ping`, `${tenantWellKnownPrefix}/ping`], resolveTenant, pingHandler);
+  router.get([`${hostWellKnownPrefix}/ping`, `${tenantWellKnownPrefix}/ping`], resolveTenant, pingHandler());
 
   router.get([`${hostWellKnownPrefix}/did.json`, `${tenantWellKnownPrefix}/did.json`], resolveTenant, async (req, res) => {
-    const didDocument = await discoveryService.getDidDocument(res.locals.vaultId);
-    if (didDocument) {
-      res.json(didDocument);
+    // The final handler's responsibility is to fetch the specific document it needs.
+    const didDocument = tenantsCacheManager.getDidDocument(res.locals.vaultId);
+    // The existence check was already done in resolveTenant, so we can be confident it exists.
+    res.json(didDocument);
+  });
+
+  router.get([`${hostWellKnownPrefix}/openid-configuration`, `${tenantWellKnownPrefix}/openid-configuration`], resolveTenant, (req, res) => {
+    const config = discoveryService.getOpenIdConfiguration(res.locals.vaultId);
+    if (config) {
+      res.json(config);
     } else {
       res.status(404).type('text').send('Not Found');
     }
   });
 
-  router.get([`${hostWellKnownPrefix}/openid-configuration`, `${tenantWellKnownPrefix}/openid-configuration`], resolveTenant, (req, res) => {
-    const config = discoveryService.getOpenIdConfiguration(res.locals.tenantConfig);
-    res.json(config);
-  });
-
   // --- FHIR-Specific Endpoints ---
   const isFhirSector = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const tenantConfig: EntityConfig = res.locals.tenantConfig;
-    if (tenantConfig && FHIR_SECTORS.includes(tenantConfig.sector)) {
+    const sector = tenantsCacheManager.getTenantSector(res.locals.vaultId);
+    if (sector && FHIR_SECTORS.includes(sector)) {
       return next();
     }
     res.status(404).type('text').send('Not Found');
   };
 
   router.get([`${hostWellKnownPrefix}/smart-configuration`, `${tenantWellKnownPrefix}/smart-configuration`], resolveTenant, isFhirSector, (req, res) => {
-    const config = discoveryService.getSmartConfiguration(res.locals.tenantConfig);
-    res.json(config);
+    const config = discoveryService.getSmartConfiguration(res.locals.vaultId);
+    if (config) {
+      res.json(config);
+    } else {
+      res.status(404).type('text').send('Not Found');
+    }
   });
   
   // Note: The FHIR metadata endpoint uses the full structured path.
-  router.get('/:jurisdiction/:version/:sector/:tenantId/fhir/metadata', resolveTenant, isFhirSector, (req, res) => {
-    const statement = discoveryService.getCapabilityStatement(res.locals.tenantConfig);
-    res.json(statement);
+  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/fhir/metadata', resolveTenant, isFhirSector, (req, res) => {
+    const statement = discoveryService.getCapabilityStatement(res.locals.vaultId);
+    if (statement) {
+      res.json(statement);
+    } else {
+      res.status(404).type('text').send('Not Found');
+    }
   });
   return router;
 }

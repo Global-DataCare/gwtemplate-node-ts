@@ -9,8 +9,8 @@ import { testTenant1Data, testClaimsTenant1Registration } from './end-to-end.dat
 import { testHostDidWeb, testTenant1DidWebExternal, testTenant1DidWebHosted } from './organization.data';
 
 // ACTORS
-export const testControllerT_Did = 'did:web:controller-t.example.com';
-export const testFabricNetwork_Urn = 'urn:antifraud:fabric:test-network';
+export const testEmployeeUrnControllerT = 'did:web:controller-t.example.com';
+export const testFabricInitialNetworkUrn = 'urn:antifraud:fabric:test-network';
 
 export const testTenantC_DidDocument: DidDocument = {
   '@context': 'https://www.w3.org/ns/did/v1',
@@ -21,9 +21,9 @@ export const testTenantC_DidDocument: DidDocument = {
     // This entry is the key to the authorization logic. It grants Controller T
     // permission to make assertions on behalf of Tenant C.
     {
-      id: `${testControllerT_Did}#key-1`,
+      id: `${testEmployeeUrnControllerT}#key-1`,
       type: 'JsonWebKey2020',
-      controller: testControllerT_Did,
+      controller: testEmployeeUrnControllerT,
       publicKeyJwk:  {
         kty: 'AKP',
         alg: 'ML-DSA-44',
@@ -44,10 +44,10 @@ export const testFabricEnrollmentClaims = {
   [ClaimsActionSchemaorg.agentIdentifier]: testTenant1Data.identifier, // URN of Tenant C
 
   // The Participant is Controller T
-  [ClaimsActionSchemaorg.participantIdentifier]: testControllerT_Did,
+  [ClaimsActionSchemaorg.participantIdentifier]: testEmployeeUrnControllerT,
 
   // The Provider is the Fabric Network
-  [ClaimsActionSchemaorg.providerIdentifier]: testFabricNetwork_Urn,
+  [ClaimsActionSchemaorg.providerIdentifier]: testFabricInitialNetworkUrn,
   [ClaimsActionSchemaorg.providerName]: 'Antifraud Test Network',
 
   // The Start Time of the action
@@ -66,7 +66,7 @@ export const testFabricEnrollmentRequestBody = {
 
 export const testFabricEnrollmentJobInput: DecodedDidcommMessage = {
   aud: testHostDidWeb, // <-- The reques is to the host's `registry` URL, but not to the tenant's `entity` URL
-  iss: testControllerT_Did, // The request is signed by the participant
+  iss: testEmployeeUrnControllerT, // The request is signed by the participant
   thid: 'test-thid-fabric-enrollment',
   type: 'api+json',
   body: testFabricEnrollmentRequestBody,

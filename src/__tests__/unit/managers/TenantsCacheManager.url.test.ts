@@ -1,0 +1,88 @@
+// src/__tests__/unit/managers/TenantsCacheManager.url.test.ts
+// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+
+import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
+import { DemoKmsService } from '../../../services/DemoKmsService';
+import { testConfigTenant1, testTenant1IdentifierUrn, testHostDidWeb } from '../../data/organization.data';
+import { ClaimsOrganizationSchemaorg } from '../../../models/schemaorg';
+import { EntityConfig } from '../../../models/entity';
+
+describe('TenantsCacheManager - getTenantDomainUrl', () => {
+  let tenantsCacheManager: TenantsCacheManager;
+
+  const hostConfig: EntityConfig = {
+    id: 'host-id',
+    status: 'active',
+    claims: { [ClaimsOrganizationSchemaorg.alternateName]: 'host' },
+    didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: testHostDidWeb },
+  } as any;
+
+  const tenantConfigWithUrl: EntityConfig = {
+    ...testConfigTenant1,
+    didDocument: { ...testConfigTenant1.didDocument, id: testTenant1IdentifierUrn },
+    claims: {
+      ...testConfigTenant1.claims,
+      [ClaimsOrganizationSchemaorg.url]: 'acme.example.com',
+    }
+  } as any;
+
+  const tenantConfigWithoutUrl: EntityConfig = { 
+    ...testConfigTenant1,
+    didDocument: { ...testConfigTenant1.didDocument, id: testTenant1IdentifierUrn },
+  } as any;
+  delete (tenantConfigWithoutUrl.claims as any)[ClaimsOrganizationSchemaorg.url];
+
+  beforeEach(() => {
+    tenantsCacheManager = new TenantsCacheManager(new VaultMemRepository(), new DemoKmsService());
+
+    // Spy on getDidDocument and mock its implementation
+    jest.spyOn(tenantsCacheManager, 'getDidDocument').mockImplementation((vaultId: string) => {
+      if (vaultId === 'host') return hostConfig.didDocument;
+      if (vaultId === 'health-care_acme_with_url') return tenantConfigWithUrl.didDocument;
+      if (vaultId === 'health-care_acme_no_url') return tenantConfigWithoutUrl.didDocument;
+      return undefined;
+    });
+
+    // Manually set up the internal cache for the tests.
+    (tenantsCacheManager as any).tenantCacheByVaultId.set('host', hostConfig);
+    (tenantsCacheManager as any).tenantCacheByVaultId.set('health-care_acme_with_url', tenantConfigWithUrl);
+    (tenantsCacheManager as any).tenantCacheByVaultId.set('health-care_acme_no_url', tenantConfigWithoutUrl);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should return the external domain URL with https if the claim exists', () => {
+    // ACT
+    const url = tenantsCacheManager.getTenantDomainUrl('health-care_acme_with_url');
+    // ASSERT
+    expect(url).toBe('https://acme.example.com');
+  });
+
+  it('should construct the correct hosted URL if the external domain claim is missing', () => {
+    // ACT
+    const url = tenantsCacheManager.getTenantDomainUrl('health-care_acme_no_url');
+    // ASSERT
+    const hostDomain = testHostDidWeb.replace('did:web:', '');
+    const urnParts = testTenant1IdentifierUrn.split(':');
+    const expectedUrl = `https://${hostDomain}/acme/cds-${urnParts[3]}/${urnParts[4]}/${urnParts[5]}`;
+    expect(url).toBe(expectedUrl);
+  });
+  
+  it('should return the host URL for the host vaultId', () => {
+    // ACT
+    const url = tenantsCacheManager.getTenantDomainUrl('host');
+    // ASSERT
+    const hostDomain = testHostDidWeb.replace('did:web:', '');
+    expect(url).toBe(`https://${hostDomain}`);
+  });
+
+  it('should return undefined for a non-existent vaultId', () => {
+    // ACT
+    const url = tenantsCacheManager.getTenantDomainUrl('non-existent-vault');
+    // ASSERT
+    expect(url).toBeUndefined();
+  });
+});

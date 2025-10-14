@@ -41,7 +41,7 @@ export class EmployeeManager {
     const entries = job.input?.body?.data ?? [];
 
     // Fetch the tenant's URN once for the entire job.
-    const issuerUrn = this.tenantsCacheManager.getTenantUrn(job.tenantId!);
+    const issuerUrn = this.tenantsCacheManager.getTenantIdentifierUrn(job.tenantId!);
     if (!issuerUrn) {
       throw new ManagerError(`Tenant with ID '${job.tenantId}' not found.`, IssueType.NotFound);
     }

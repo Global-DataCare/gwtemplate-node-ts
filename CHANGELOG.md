@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [20251014-1710]
+
+### Added
+- **TDD-Driven URL Utilities**:
+  - Created a new unit-tested `getBaseUrlFromDidWeb` utility in `did.ts` to correctly parse `did:web` identifiers, including those with percent-encoded ports (e.g., `localhost%3A3000`).
+  - Implemented a new, fully unit-tested `getTenantDomainUrl` method in `TenantsCacheManager` using a TDD approach. This method provides the canonical service URL for a tenant, prioritizing their external domain and falling back to the gateway's hosted URL.
+
+### Changed
+- **Major Architectural Refactoring of Discovery Service**:
+  - The system now correctly derives a tenant's hosted URL from the host's own `did:web` identifier, making the `TenantsCacheManager` self-reliant and architecturally sound.
+  - The `discovery.ts` router and its `resolveTenant` middleware were completely refactored to remove dependencies on internal configuration objects, improving encapsulation and security. The router now correctly handles the `/:tenantId/cds.../.well-known/did.json` path.
+- **`TenantsCacheManager` Naming**: Renamed `getTenantUrn` to the more descriptive `getTenantIdentifierUrn` across the entire codebase for clarity.
+
+### Fixed
+- **Critical Security Fix in Ping Handler**:
+  - Refactored the `ping.handler.ts` to derive the JWT `iss` (issuer) claim from the request's `Host` header.
+  - This corrects a major architectural flaw and ensures that the identity in a discovery response matches the domain the client is interacting with, adhering to `did:web` security principles.
+- **Test Suite Failures**:
+  - Correctly implemented the updated `IKmsService` interface in `DemoKmsService`, `KmsService`, and `kms.mock.ts`.
+  - Added the `type` property to the `IndexedAttribute` model to preserve data semantics during HMAC protection.
+  - Fixed dependency injection in `PingManager.test.ts`.
+  - Replaced the obsolete `DidDocumentBuilder.test.ts` with `did-document.test.ts` and created a new, correct integration test for the Well-Known API endpoint (`wellKnownApi.test.ts`).
+
+
+
 ### Added
 - **Batch Processing & Identifier Generation in `CustomerManager`**:
   - Re-architected `CustomerManager` to correctly process `_batch` requests by handling each entry as a discrete customer creation.
@@ -17,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added a new `uuidToBytes` utility to correctly convert UUID strings into 16-byte arrays for encoding.
 
 ### Fixed
-- **`uuid` Library Mocking**: Corrected the Jest mock for the `uuid` library in `CustomerManager.test.ts` to include the `validate` function, resolving a persistent `TypeError: (0 , uuid_1.validate) is not a function` runtime error during tests.
+- **`uuid` Library Mocking**: Corrected the Jest mock for the `uuid` library in `CustomerManager.test.ts` to include the `validate` function.
 - **Corrected `vc.id` Generation**:
   - Refactored the `vc-id` utility to correctly implement the "Versioned Credential ID" pattern: `z(multibase(multihash(SHA3-256(<URN>:timestamp:epoch:<value>))))`.
   - Removed all problematic `multiformats` dependencies and replaced them with a self-contained `base-x` implementation to resolve persistent module resolution failures.

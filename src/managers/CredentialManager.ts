@@ -72,7 +72,7 @@ export class CredentialManager {
     validatedClaims: ClaimsRecord,
     evidence: any,
   ): Promise<VerifiableCredentialV2> {
-    const issuerUrn = this.tenantsCacheManager.getTenantUrn(jobContext.tenantId);
+    const issuerUrn = this.tenantsCacheManager.getTenantIdentifierUrn(jobContext.tenantId);
     if (!issuerUrn) {
       throw new ManagerError(`Could not resolve URN for tenant '${jobContext.tenantId}'.`, IssueType.NotFound);
     }

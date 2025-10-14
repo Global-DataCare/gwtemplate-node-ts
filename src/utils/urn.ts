@@ -53,7 +53,7 @@ export function createEmployeeUrn(params: EmployeeUrnParams): string {
  * @param fullUrn The complete, hierarchical URN (e.g., for an employee or connection).
  * @returns The base URN of the tenant, or the original string if the pattern is not found.
  */
-export function getTenantUrnPrefix(fullUrn: string): string {
+export function getTenantIdentifierUrnPrefix(fullUrn: string): string {
   const parts = fullUrn.split(':');
   const entityIndex = parts.indexOf('entity');
 

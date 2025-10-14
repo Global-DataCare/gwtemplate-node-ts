@@ -51,7 +51,7 @@ export class CustomerManager {
     const entries = job.input?.body?.data ?? [];
     const tenantVaultId = job.tenantId!;
 
-    const issuerUrn = this.tenantsCacheManager.getTenantUrn(tenantVaultId);
+    const issuerUrn = this.tenantsCacheManager.getTenantIdentifierUrn(tenantVaultId);
     if (!issuerUrn) {
       throw new ManagerError(`Tenant with ID '${tenantVaultId}' not found.`, IssueType.NotFound);
     }

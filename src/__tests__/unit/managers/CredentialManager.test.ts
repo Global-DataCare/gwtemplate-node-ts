@@ -15,7 +15,7 @@ import { MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
 import { ProofEBSIv2, VerifiableCredentialV2 } from '../../../models/verifiable-credential';
 import { ManagerError } from '../../../models/errors/manager-error';
 import { JwsMultiSign } from '../../../models/jws';
-import { testTenant1UrnIdentifier, testTenant1VaultId } from '../../data/organization.data';
+import { testTenant1IdentifierUrn, testTenant1VaultId } from '../../data/organization.data';
 import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
@@ -93,7 +93,7 @@ describe('CredentialManager', () => {
 
       // --- ACT ---
       const vc = await credentialManager.issueOrganizationSelfDescription(
-        testTenant1UrnIdentifier,
+        testTenant1IdentifierUrn,
         testClaimsTenant1Registration,
         evidence,
       );
@@ -101,7 +101,7 @@ describe('CredentialManager', () => {
       // --- ASSERT ---
       expect(vc.issuer).toBe(HOST_DID);
       const subject = vc.credentialSubject as any;
-      expect(subject.identifier).toBe(testTenant1UrnIdentifier);
+      expect(subject.identifier).toBe(testTenant1IdentifierUrn);
       expect(subject['org.schema.Organization.legalName']).toBe(testClaimsTenant1Registration['org.schema.Organization.legalName']);
       expect(vc.evidence?.[0]).toEqual(evidence);
 
@@ -115,9 +115,9 @@ describe('CredentialManager', () => {
     it('should issue a valid VC signed by the TENANT', async () => {
       // --- ARRANGE ---
       const jobContext = { tenantId: TENANT_ID, tenantVaultId: testTenant1VaultId };
-      const evidence = { type: 'InternalHRProcess', verifier: testTenant1UrnIdentifier };
+      const evidence = { type: 'InternalHRProcess', verifier: testTenant1IdentifierUrn };
 
-      jest.spyOn(mockTenantsCacheManager, 'getTenantUrn').mockReturnValue(testTenant1UrnIdentifier);
+      jest.spyOn(mockTenantsCacheManager, 'getTenantIdentifierUrn').mockReturnValue(testTenant1IdentifierUrn);
 
       // --- ACT ---
       const vc = await credentialManager.issueEmployeeCredential(
@@ -128,20 +128,20 @@ describe('CredentialManager', () => {
       );
 
       // --- ASSERT ---
-      expect(vc.issuer).toBe(testTenant1UrnIdentifier); // Issued by the Tenant
+      expect(vc.issuer).toBe(testTenant1IdentifierUrn); // Issued by the Tenant
       const subject = vc.credentialSubject as any;
       expect(subject.identifier).toBe(testTenant1Receptionist1Urn);
       expect(subject[ClaimsPersonSchemaorg.email]).toBe(testTenant1Receptionist1Email);
       expect(vc.evidence?.[0]).toEqual(evidence);
       
       expect(vc.proof).toBeDefined();
-      expect((vc.proof as Array<ProofEBSIv2>)[0].verificationMethod).toBe(`${testTenant1UrnIdentifier}#${mockTenantPublicKey.kid}`);
+      expect((vc.proof as Array<ProofEBSIv2>)[0].verificationMethod).toBe(`${testTenant1IdentifierUrn}#${mockTenantPublicKey.kid}`);
       expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(expect.any(Uint8Array), jobContext.tenantVaultId);
     });
 
     it('should throw an error if the tenant URN cannot be resolved', async () => {
       // --- ARRANGE ---
-      jest.spyOn(mockTenantsCacheManager, 'getTenantUrn').mockReturnValue(undefined);
+      jest.spyOn(mockTenantsCacheManager, 'getTenantIdentifierUrn').mockReturnValue(undefined);
       const jobContext = { tenantId: 'unknown-tenant', tenantVaultId: 'unknown-vault' };
 
       // --- ACT & ASSERT ---

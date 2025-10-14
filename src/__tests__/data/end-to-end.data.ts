@@ -15,13 +15,14 @@ import {
   testConfigDataHost,
   testConfigTenant1,
   testTenant1AddressCountry,
+  testTenant1Admin1Email,
   testTenant1AlternateName,
   testTenant1Domain,
   testTenant1IdType,
   testTenant1IdValue,
   testTenant1LegalName,
   testTenant1ServiceProviderCategory,
-  testTenant1UrnIdentifier,
+  testTenant1IdentifierUrn,
 } from './organization.data';
 
 // ===================================================================================
@@ -37,7 +38,7 @@ export const testHostData = {
 
 export const testTenant1Data = {
   ...testConfigTenant1,
-  identifier: testTenant1UrnIdentifier,
+  identifier: testTenant1IdentifierUrn,
   member: {
     admin1: testTenant1Admin1,
     // receptionist1: testTenant1Receptionist1,
@@ -71,7 +72,7 @@ export const testClaimsTenant1Registration: ClaimsRecord = {
   // --- Organization Claims ---
   [ClaimsOrganizationSchemaorg.legalName]: testTenant1LegalName,
   [ClaimsOrganizationSchemaorg.addressCountry]: testTenant1AddressCountry,
-  [ClaimsOrganizationSchemaorg.identifier]: testTenant1UrnIdentifier,
+  [ClaimsOrganizationSchemaorg.identifier]: testTenant1IdentifierUrn,
   [ClaimsOrganizationSchemaorg.identifierType]: testTenant1IdType,
   [ClaimsOrganizationSchemaorg.identifierValue]: testTenant1IdValue,
   [ClaimsOrganizationSchemaorg.url]: testTenant1Domain,
@@ -88,11 +89,14 @@ export const testClaimsTenant1Registration: ClaimsRecord = {
 };
 
 /**
- * A full, well-formed input payload for a tenant registration, matching the structure expected by the API.
+ *  A full, well-formed input payload for a tenant registration, matching the structure expected by the API.
+ *  Note the legal representative is not registered so it is using as issuer the email address:
+ *  - a `bearer` token will be provider;
+ *  - the `evidence` of the email in the `bearer`can be included in the verifiable credential for the legal representative.
  */
 export const testPayloadCreateTenant1 = {
   thid: `thid-${testConfigTenant1.id}`,
-  iss: 'did:web:test-issuer.com',
+  iss: `urn:email:${testTenant1Admin1Email}`,
   aud: 'did:web:host.example.com',
   type: 'api+json',
   body: {

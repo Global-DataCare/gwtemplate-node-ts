@@ -149,3 +149,18 @@ export const createDidServiceId = (params: { version: string; sector: string; se
   const sanitizedFormat = params.format.toLowerCase().replace(/\./g, '-');
   return `${version}_${sector}_${section}_${sanitizedFormat}`;
 };
+
+/**
+ * Converts a did:web identifier into a full HTTPS or HTTP base URL.
+ * It correctly decodes percent-encoded ports for local development.
+ * @param did The did:web string (e.g., 'did:web:example.com' or 'did:web:localhost%3A3000').
+ * @returns The full base URL (e.g., 'https://example.com' or 'http://localhost:3000').
+ */
+export function getBaseUrlFromDidWeb(did: string): string {
+  const domainPart = did.replace(/^did:web:/, '').split(':')[0];
+  const decodedDomain = decodeURIComponent(domainPart);
+  
+  const protocol = decodedDomain.startsWith('localhost') ? 'http' : 'https';
+  
+  return `${protocol}://${decodedDomain}`;
+}

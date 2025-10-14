@@ -3,7 +3,7 @@
 
 import { DidDocument } from '../../../models/did';
 import { JwkSet } from '../../../models/jwk';
-import { createHostedDidWeb, getPrimaryDidWeb, findSigningMethod, populateDidDocumentFromJwks } from '../../../utils/did';
+import { createHostedDidWeb, getPrimaryDidWeb, findSigningMethod, populateDidDocumentFromJwks, getBaseUrlFromDidWeb } from '../../../utils/did';
 
 // --- Test Data ---
 const HOST_DID = 'did:web:host.com';
@@ -84,6 +84,28 @@ describe('DID Utility Functions (Deterministic)', () => {
 
       const externalVm = result.verificationMethod?.find(vm => vm.controller === EXTERNAL_DID);
       expect(externalVm?.id).toBe(`${EXTERNAL_DID}#sig-ml`);
+    });
+  });
+
+  describe('getBaseUrlFromDidWeb', () => {
+    it('should return an HTTPS url for a standard domain', () => {
+      const result = getBaseUrlFromDidWeb('did:web:example.com');
+      expect(result).toBe('https://example.com');
+    });
+
+    it('should return an HTTP url for localhost', () => {
+      const result = getBaseUrlFromDidWeb('did:web:localhost');
+      expect(result).toBe('http://localhost');
+    });
+
+    it('should correctly decode a percent-encoded port for localhost', () => {
+      const result = getBaseUrlFromDidWeb('did:web:localhost%3A3000');
+      expect(result).toBe('http://localhost:3000');
+    });
+
+    it('should ignore path components of the did:web', () => {
+      const result = getBaseUrlFromDidWeb('did:web:example.com:some:other:path');
+      expect(result).toBe('https://example.com');
     });
   });
 });

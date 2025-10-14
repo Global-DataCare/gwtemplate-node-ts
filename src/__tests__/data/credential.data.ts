@@ -3,7 +3,7 @@
 
 import { VerifiableCredentialV2 } from "../../models/verifiable-credential";
 import {
-  testTenant1UrnIdentifier,
+  testTenant1IdentifierUrn,
   testHostDidWeb,
   testRootOrgDidWeb
 } from "./organization.data";
@@ -71,7 +71,7 @@ export const testHostVc: VerifiableCredentialV2 = {
 export const testTenant1Vc: VerifiableCredentialV2 = {
   '@context': ['https://www.w3.org/2018/credentials/v1'],
   credentialSubject: {
-    identifier: testTenant1UrnIdentifier, // The stable URN of the tenant
+    identifier: testTenant1IdentifierUrn, // The stable URN of the tenant
   },
   id: testCredentialVersionHashedId,
   issuer: testCredentialCreatorForTenant1,

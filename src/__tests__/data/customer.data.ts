@@ -2,7 +2,7 @@
 // File: src/__tests__/data/customer.data.ts
 
 import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
-import { testTenant1DidWebExternal, testTenant1UrnIdentifier } from './organization.data';
+import { testTenant1DidWebExternal, testTenant1IdentifierUrn } from './organization.data';
 
 // ===================================================================================
 // DATA DEFINITIONS
@@ -30,7 +30,7 @@ export const testCustomer1Data = {
 };
 
 // The URN is the authoritative identifier provided in the claims.
-export const testCustomer1Urn = `${testTenant1UrnIdentifier}:individual:multibase:${testCustomer1MultibaseId}`;
+export const testCustomer1Urn = `${testTenant1IdentifierUrn}:individual:multibase:${testCustomer1MultibaseId}`;
 export const testCustomer1DidWeb = `${testTenant1DidWebExternal}:individual:multibase:${testCustomer1MultibaseId}`;
 
 // ===================================================================================

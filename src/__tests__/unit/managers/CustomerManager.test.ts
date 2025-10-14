@@ -13,7 +13,7 @@ import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
 import { CredentialManager } from '../../../managers/CredentialManager';
 import { EntityConfig } from '../../../models/entity';
-import { testTenant1UrnIdentifier } from '../../data/organization.data';
+import { testTenant1IdentifierUrn } from '../../data/organization.data';
 import { testCustomer1Uuid } from '../../data/customer.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import {
@@ -35,7 +35,7 @@ describe('CustomerManager', () => {
   let mockTenantsCacheManager: MockProxy<TenantsCacheManager>;
   let mockCredentialManager: MockProxy<CredentialManager>;
 
-  const TENANT_URN = testTenant1UrnIdentifier;
+  const TENANT_URN = testTenant1IdentifierUrn;
 
   beforeEach(() => {
     mockVaultRepository = mock<VaultRepository>();
@@ -65,7 +65,7 @@ describe('CustomerManager', () => {
     it('HU 2 (Professional Onboarding): should aggregate a batch and create a single customer', async () => {
       // ARRANGE
       const job = testCreateCustomerJobRequestProfessionalOnboarding;
-      mockTenantsCacheManager.getTenantUrn.mockReturnValue(TENANT_URN);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
 
       // ACT
       const response = await customerManager.process(job);
@@ -122,7 +122,7 @@ describe('CustomerManager', () => {
       
       (job.input.body!.data[0].meta!.claims as any)['org.schema.Service.category'] = 'health-care';
       
-      mockTenantsCacheManager.getTenantUrn.mockReturnValue(TENANT_URN);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
 
       // ACT
       const response = await customerManager.process(job);
@@ -149,7 +149,7 @@ describe('CustomerManager', () => {
         // ARRANGE
         const job = { ...testCreateCustomerJobRequestProfessionalOnboarding };
         (job.input.body!.data[1].meta!.claims as any)[ClaimsPersonSchemaorg.identifier] = 'urn:uuid:different-uuid';
-        mockTenantsCacheManager.getTenantUrn.mockReturnValue(TENANT_URN);
+        mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
 
         // ACT
         const response = await customerManager.process(job);

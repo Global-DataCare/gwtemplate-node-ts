@@ -79,7 +79,7 @@ describe('EmployeeManager', () => {
       const job = testBaseJobForClaims(testClaimsTenant1Receptionist1, TENANT_ID);
       mockKmsService.provisionKeys.mockResolvedValue(mockJwkSet);
       mockVaultRepository.put.mockResolvedValue(true);
-      mockTenantsCacheManager.getTenantUrn.mockReturnValue(TENANT_URN);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
 
       // ACT
       const response = await employeeManager.process(job);
@@ -88,7 +88,7 @@ describe('EmployeeManager', () => {
       const expectedEmployeeId = determineResourceId(testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.identifier]);
       expect(mockKmsService.provisionKeys).toHaveBeenCalledWith(expectedEmployeeId);
 
-      expect(mockTenantsCacheManager.getTenantUrn).toHaveBeenCalledWith(TENANT_ID);
+      expect(mockTenantsCacheManager.getTenantIdentifierUrn).toHaveBeenCalledWith(TENANT_ID);
 
       const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
       const employeeConfig = docToProtect.content as EntityConfig;

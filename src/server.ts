@@ -7,6 +7,8 @@ import { Worker } from './worker';
 import { IServerConfig } from './config';
 import { Sector } from './models/path';
 import { createApiRouter } from './routes/api';
+import { createDiscoveryRouter } from './routes/discovery';
+import { DiscoveryService } from './services/DiscoveryService';
 import { IKmsService } from './crypto/interfaces/IKmsService';
 import { CryptographyService } from './crypto/CryptographyService';
 import { KmsService } from './services/KmsService';
@@ -152,6 +154,7 @@ async function startServer() {
   const tenantManager = new TenantsCacheManager(vaultRepository, kmsService);
   const hostingManager = new HostingManager(vaultRepository, kmsService, tenantManager, config);
   const employeeManager = new EmployeeManager(vaultRepository, kmsService, tenantManager);
+  const discoveryService = new DiscoveryService(tenantManager);
 
   if (!(await vaultRepository.vaultExists('host'))) {
     await bootstrapHost(hostingManager, config);
@@ -166,7 +169,9 @@ async function startServer() {
   const asyncResponseStore = new AsyncResponseStoreMem();
   const queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
 
+  const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService);
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore);
+  app.use('/', discoveryRouter);
   app.use('/', apiRouter);
 
   const server = app.listen(config.port, () => {
