@@ -4,9 +4,9 @@
 import express from 'express';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { DiscoveryService } from '../services/DiscoveryService';
-import { EntityConfig } from '../models/entity';
 import { getTenantVaultId } from '../utils/tenant';
 import { pingHandler } from './handlers/discovery/ping.handler';
+
 // List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
 

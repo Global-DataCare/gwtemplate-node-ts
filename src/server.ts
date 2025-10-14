@@ -68,7 +68,6 @@ function getConfig(): IServerConfig {
       hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || process.env.API_HOSTNAME || 'localhost',
       apiBaseUrl: buildApiBaseUrl(port),
       namespace: process.env.URN_NAMESPACE || 'antifraud',
-      network: process.env.URN_NETWORK || 'test-network',
       sectorsAllowed: parseAndValidateSectors(process.env.SECTORS_ALLOWED),
       dbProvider: process.env.DB_PROVIDER || 'mem',
       queueProvider: process.env.QUEUE_PROVIDER || 'mem',

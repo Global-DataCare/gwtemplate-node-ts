@@ -80,7 +80,7 @@ export const testTenant1VaultId = `${testTenant1ServiceProviderCategory}_${testT
 
 /** The Tenant's identifier a static, canonical semantic URN.
  *  This is the ID that will be used in the 'credentialSubject.identifier' of its Pointer Credential.
- *  For example: `urn:antifraud:test-network:ES:v1:health-care:entity:EI:98-7654321`
+ *  For example: `urn:antifraud:test-network:cds-ES:v1:health-care:entity:EI:98-7654321`
  */
 export const testTenant1IdentifierUrn = 
   `urn:${URN_NAMESPACE}:${URN_NETWORK}:${testTenant1AddressCountry}:${URN_VERSION}:${testTenant1ServiceProviderCategory}:entity:${testTenant1IdType}:${testTenant1IdValue}`;

@@ -103,7 +103,6 @@ describe('HostingManager', () => {
       hostExternalDomain: 'testhost.com',
       apiBaseUrl: 'http://testhost:3000',
       namespace: 'test-namespace', // Added missing property
-      network: 'test-network',     // Added missing property
       sectorsAllowed: [Sector.HEALTH_CARE, Sector.SYSTEM, Sector.HEALTH_INSURANCE],
       dbProvider: 'mem',
       queueProvider: 'mem',

@@ -24,7 +24,7 @@ const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
  * @returns True if the request is valid, false otherwise.
  */
 function isRequestValid(services: DidService[] | undefined, params: any): boolean {
-  console.log(`[isRequestValid]: params=${params}`);
+  console.log(`[isRequestValid]: params=${JSON.stringify(params)}`);
   const { sector, section, format, resourceType, action } = params;
 
   if (!services) {
@@ -32,9 +32,11 @@ function isRequestValid(services: DidService[] | undefined, params: any): boolea
   }
   console.log(`[isRequestValid]: sector=${sector}, section=${section}, format=${format}`);
   const expectedServiceId = createDidServiceId({ version: 'v1', sector, section, format });
+  console.log(`[isRequestValid]: expectedServiceId=${expectedServiceId}`);
   const matchingService = services.find(s => s.id === expectedServiceId);
 
   if (!matchingService) {
+    console.log(`[isRequestValid]: No matching service found. Available services: ${services.map(s => s.id).join(', ')}`);
     return false;
   }
 
@@ -74,11 +76,15 @@ export function createApiRouter(
         return res.status(400).json(outcome);
       }
       try {
+        // The KMS is responsible for verifying the cryptographic signature of the JWS.
+        // If the signature is invalid, it WILL throw an exception, which is caught below.
+        // A successfully returned jobRequest implies a cryptographically valid signature.
         const decodedJob = await kmsService.decodeJobRequest(req.body.request);
         jobRequest = { ...req.params, ...decodedJob };
       } catch (error: any) {
-        console.error('[API] Error during JWE decoding:', error);
-        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Failed to decode secure request: ' + error.message);
+        console.error('[API] Error during JWS decoding/verification:', error);
+        // A failure here is an authentication problem (bad signature, tampered message).
+        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Failed to verify secure request: ' + error.message);
         return res.status(401).json(outcome);
       }
     } else if (contentType.startsWith('application/json') || contentType.startsWith('application/fhir+json')) {
@@ -124,10 +130,9 @@ export function createApiRouter(
     }
 
     // --- 4. Enqueue Job ---
-    // The canonical vaultId MUST be attached to the job for the worker.
-    jobRequest.tenantId = vaultId;
-    
-    const jobName = createJobName(tenantId, resourceType, '_batch');
+    // The jobRequest already contains the tenantId (alternateName) from the path parameters.
+    // The worker is responsible for constructing the final vaultId when it processes the job.
+    const jobName = createJobName(vaultId, resourceType, '_batch');
     await queueAdapter.addJob(jobName, jobRequest);
     asyncResponseStore.set(thid, { status: 'PENDING' });
 

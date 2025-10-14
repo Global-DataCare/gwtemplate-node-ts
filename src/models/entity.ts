@@ -7,7 +7,7 @@ import { RecordBase } from "./resource-document";
 
 export interface EntityUrnBaseParams {
   namespace: string;
-  network: string;
+  network: 'test-network';
   jurisdiction: string;
   version?: string;
   sector: string;

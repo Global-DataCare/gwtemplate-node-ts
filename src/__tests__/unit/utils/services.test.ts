@@ -59,7 +59,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServices(tenantConfig.didDocument.id, tenantConfig.provider.service.sectorCategory as Sector);
 
       // ASSERT
-      expect(services).toHaveLength(4); // 2 discovery + 2 business
+      expect(services).toHaveLength(5); // 2 discovery + 2 business + 1 network
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -80,7 +80,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServices(tenantConfig.didDocument.id, tenantConfig.provider.service.sectorCategory as Sector);
       
       // ASSERT
-      expect(services).toHaveLength(4);
+      expect(services).toHaveLength(5);
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();

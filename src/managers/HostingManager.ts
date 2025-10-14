@@ -340,7 +340,7 @@ export class HostingManager {
     // 1. Construct the canonical URN for the tenant using the existing utility.
     const tenantUrn = createOrganizationUrn({
       namespace: this.config.namespace,
-      network: this.config.network,
+      network: 'test-network', // New tenants are always enrolled in the 'test-network' first.
       jurisdiction: org.meta.claims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       sector: sector,
       idType: org.meta.claims[ClaimsOrganizationSchemaorg.identifierType] as string,

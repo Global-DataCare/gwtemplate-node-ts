@@ -1,4 +1,4 @@
-// src/__tests__/data/fabric-enrollment.data.ts
+// src/__tests__/data/network-enrollment.data.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { MldsaPublicJwk } from '../../crypto/interfaces/Cryptography.types';
@@ -10,7 +10,12 @@ import { testHostDidWeb, testTenant1DidWebExternal, testTenant1DidWebHosted } fr
 
 // ACTORS
 export const testEmployeeUrnControllerT = 'did:web:controller-t.example.com';
-export const testFabricInitialNetworkUrn = 'urn:antifraud:fabric:test-network';
+/**
+ * A rich, semantic URN identifying the target network, including jurisdiction and sector.
+ * This is the level of detail required for the Host to correctly proxy the request.
+ * Format: urn:<namespace>:<network-id>:cds-<jurisdiction>:<version>:<sector>
+ */
+export const testInitialNetworkUrn = 'urn:antifraud:test-network:cds-us:v1:health-care';
 
 export const testTenantC_DidDocument: DidDocument = {
   '@context': 'https://www.w3.org/ns/did/v1',
@@ -35,7 +40,7 @@ export const testTenantC_DidDocument: DidDocument = {
 };
 
 // FLAT CLAIMS FOR THE ACTION
-export const testFabricEnrollmentClaims = {
+export const testNetworkEnrollmentClaims = {
   // The Agent is Tenant C. We prefix all its claims with 'org.schema.Action.agent.'
   ...Object.entries(testClaimsTenant1Registration).reduce((acc, [key, value]) => {
     acc[`org.schema.Action.agent.${key.replace('org.schema.Organization.', '')}`] = value;
@@ -46,8 +51,8 @@ export const testFabricEnrollmentClaims = {
   // The Participant is Controller T
   [ClaimsActionSchemaorg.participantIdentifier]: testEmployeeUrnControllerT,
 
-  // The Provider is the Fabric Network
-  [ClaimsActionSchemaorg.providerIdentifier]: testFabricInitialNetworkUrn,
+  // The Provider is the Network
+  [ClaimsActionSchemaorg.providerIdentifier]: testInitialNetworkUrn,
   [ClaimsActionSchemaorg.providerName]: 'Antifraud Test Network',
 
   // The Start Time of the action
@@ -55,19 +60,19 @@ export const testFabricEnrollmentClaims = {
 };
 
 // JOB REQUEST PAYLOAD
-export const testFabricEnrollmentRequestBody = {
+export const testNetworkEnrollmentRequestBody = {
   data: [{
-    type: 'Fabric-enrollment-request-v1.0',
+    type: 'Network-enrollment-request-v1.0',
     meta: {
-      claims: testFabricEnrollmentClaims,
+      claims: testNetworkEnrollmentClaims,
     },
   }],
 };
 
-export const testFabricEnrollmentJobInput: DecodedDidcommMessage = {
-  aud: testHostDidWeb, // <-- The reques is to the host's `registry` URL, but not to the tenant's `entity` URL
-  iss: testEmployeeUrnControllerT, // The request is signed by the participant
-  thid: 'test-thid-fabric-enrollment',
+export const testInitialNetworkJobInput: DecodedDidcommMessage = {
+  aud: testHostDidWeb, 
+  iss: testEmployeeUrnControllerT, 
+  thid: 'test-thid-network-enrollment',
   type: 'api+json',
-  body: testFabricEnrollmentRequestBody,
+  body: testNetworkEnrollmentRequestBody,
 };

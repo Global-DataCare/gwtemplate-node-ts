@@ -76,7 +76,18 @@ export function initializeTenantServices(didId: string, sector: Sector, customSe
 
   const defaultBusinessServices = generateDefaultBusinessServices(sector);
 
-  const allServices = [...discoveryServices, ...defaultBusinessServices, ...customServices];
+  const defaultNetworkServices: DidService[] = [
+    createDidEndpointConfig(
+      createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema' }),
+      ['Action'],
+      ['_batch']
+    ),
+  ];
+  // Rename the type for clarity
+  defaultNetworkServices[0].type = 'NetworkEnrollmentService';
+
+
+  const allServices = [...discoveryServices, ...defaultBusinessServices, ...defaultNetworkServices, ...customServices];
   const serviceMap = new Map(allServices.map(s => [s.id, s]));
   
   return Array.from(serviceMap.values());

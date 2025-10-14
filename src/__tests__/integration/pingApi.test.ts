@@ -86,8 +86,11 @@ describe('Ping API Endpoint', () => {
       expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
       
       const [jobName, jobRequest] = mockQueueAdapter.addJob.mock.calls[0];
-      expect(jobName).toContain('host:resource');
+      // The jobName should be created with the vaultId, which for the host is 'host'.
+      expect(jobName).toContain('host:resource:_batch');
+      // The jobRequest's tenantId should be the alternateName from the path.
       expect(jobRequest.tenantId).toBe('host');
+      expect(jobRequest.sector).toBe('test');
     });
   });
 
@@ -124,8 +127,12 @@ describe('Ping API Endpoint', () => {
       expect(response.headers.location).toBe(expectedPollingUrl);
       expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
 
-      const [jobName, jobRequest] = mockQueueAdapter.addJob.mock.calls[0];
-      expect(jobRequest.tenantId).toBe('test_acme'); // The router resolves the vaultId
+      const [jobName, jobRequest] = (mockQueueAdapter.addJob as jest.Mock).mock.calls[0];
+      // The jobName is now created with the vaultId to ensure uniqueness.
+      expect(jobName).toContain('test_acme:resource:_batch');
+      // The jobRequest itself should retain the original path parameters for the worker.
+      expect(jobRequest.tenantId).toBe('acme');
+      expect(jobRequest.sector).toBe('test');
     });
   });
 

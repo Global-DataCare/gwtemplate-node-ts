@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2025-10-15-0126]
+
+### SECURITY
+
+-   **Formalized the Inbound Request Security Model:** A clear, two-phase security model has been implemented and documented, strictly separating **Authentication** from **Authorization**.
+    -   **Phase 1 (Authentication):** The API Controller (`api.ts`) is now solely responsible for authenticating requests. It uses a `try...catch` block to call the `KmsService`. If signature verification fails, the KMS throws an error, and the API immediately returns a **`401 Unauthorized`**.
+    -   **Phase 2 (Authorization):** Business-level authorization (e.g., checking if a signer is a permitted "controller" via `assertionMethod` for a specific action like Fabric onboarding) is now the responsibility of the asynchronous **Worker** and its respective **Manager**. The API controller no longer handles this logic.
+-   Added a critical security integration test (`should return 401 Unauthorized...`) to ensure the API correctly handles cryptographic signature failures from the KMS.
+
+### CHANGED
+
+-   **Improved Job Name Uniqueness:** The `createJobName` function now uses the unique `vaultId` (e.g., "health-care_acme") to generate the job name, preventing potential collisions between tenants with the same `alternateName` in different sectors.
+-   **Clarified Naming Convention:** Refactored `createJobName` and `parseJobName` in `src/utils/naming.ts` to use the parameter `jobContextId` instead of the ambiguous `tenantId`, and updated documentation to clarify that this ID must be the `vaultId`.
+-   **Refined Test Suite Logic:** Integration tests for API endpoints (`employeeApi.test.ts`, `networkEnrollmentApi.test.ts`) have been simplified to follow the DRY principle. They now focus on verifying their specific endpoint integration, while the detailed mechanics of job creation are exhaustively tested in `pingApi.test.ts`.
+
+### FIXED
+
+-   **Fixed the `tenantId` in the `JobRequest` to preserve the original path parameter:** A critical bug was fixed in the API controller where the `jobRequest.tenantId` (which should be the tenant's `alternateName` from the URL) was being incorrectly overwritten with the internal `vaultId`. The `JobRequest` now correctly preserves the raw path parameters for the worker to process.
+-   **Corrected Job Name Creation:** Fixed a bug in `createJobName` that was incorrectly stripping the leading underscore from actions (e.g., `_batch` became `batch`).
+-   **Repaired All Integration Tests:** Aligned `pingApi.test.ts`, `employeeApi.test.ts`, and the original `networkEnrollmentApi.test.ts` with the corrected architecture, ensuring the entire test suite passes.
+
+### Added
+
+-   **Enhanced Architectural Documentation:** Updated `ARCHITECTURE-OVERVIEW.md` and `DEVELOPER_GUIDE.md` to reflect the new security model, the separation of AuthN/AuthZ, and the correct data flow from the API controller to the worker.
+
 ## [20251014-1710]
 
 ### Added

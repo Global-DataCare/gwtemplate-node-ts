@@ -3,33 +3,31 @@
 
 /**
  * Creates a unique and informative name for a job to be placed in the queue.
- * The name follows the structure: <priority>-<timestamp>:<tenantId>:<resourceType>:<action>
+ * The name follows the structure: <priority>-<timestamp>:<jobContextId>:<resourceType>:<action>
  * 
  * Job Priority is based on a Triage scale, similar to the Manchester Triage System (MTS),
  * where 1 is the highest priority and 5 is the lowest. If not specified, priority defaults to 5.
  * 
- * @param tenantId The ID of the tenant context.
+ * @param jobContextId A unique identifier for the job's context. In the API layer, this **MUST** be the tenant's `vaultId` (e.g., 'health-care_acme') to ensure job name uniqueness across sectors.
  * @param resourceType The type of the resource being processed.
  * @param action The action being performed (e.g., '_batch', '_update').
  * @param priority The priority of the job, from 1 (highest) to 5 (lowest).
  * @returns A unique, priority-sorted job name string.
  */
-export function createJobName(tenantId: string, resourceType: string, action: string, priority: 1 | 2 | 3 | 4 | 5 = 5): string {
+export function createJobName(jobContextId: string, resourceType: string, action: string, priority: 1 | 2 | 3 | 4 | 5 = 5): string {
   const timestamp = Date.now();
-  // Remove the leading underscore from the action for a cleaner name.
-  const cleanAction = action.startsWith('_') ? action.substring(1) : action;
-  return `${priority}-${timestamp}:${tenantId}:${resourceType}:${cleanAction}`;
+  return `${priority}-${timestamp}:${jobContextId}:${resourceType}:${action}`;
 }
 
 /**
  * Parses a job name to extract its constituent parts.
  * 
  * @param jobName The unique job name.
- * @returns An object containing the parts of the name, or null if the name is invalid.
+ * @returns An object containing the parts of the name, or null if the name is invalid. The `jobContextId` will correspond to the `vaultId` passed during creation.
  */
-export function parseJobName(jobName: string): { priority: number, timestamp: number, tenantId: string, resourceType: string, action: string } | null {
-  const [priorityTime, tenantId, resourceType, action] = jobName.split(':');
-  if (!priorityTime || !tenantId || !resourceType || !action) {
+export function parseJobName(jobName: string): { priority: number, timestamp: number, jobContextId: string, resourceType: string, action: string } | null {
+  const [priorityTime, jobContextId, resourceType, action] = jobName.split(':');
+  if (!priorityTime || !jobContextId || !resourceType || !action) {
     return null;
   }
   const [priority, timestamp] = priorityTime.split('-').map(Number);
@@ -41,9 +39,9 @@ export function parseJobName(jobName: string): { priority: number, timestamp: nu
   return {
     priority,
     timestamp,
-    tenantId,
+    jobContextId,
     resourceType,
-    action: `_${action}` // Re-add the underscore for consistency with API actions
+    action: action // The action already includes the underscore
   };
 }
 
