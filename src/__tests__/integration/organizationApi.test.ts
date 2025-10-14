@@ -11,6 +11,7 @@ import {
   testClaimsTenant1Registration,
   testHostData,
 } from '../data/end-to-end.data';
+import { testHostAlternateName } from '../data/organization.data';
 import {
   testThid1,
   testCompletedJob,
@@ -111,7 +112,7 @@ describe('Organization Registration API', () => {
         resourceType: resourceType,
         action: action,
         input: {
-          aud: `did:web:${testHostData.alternateName}`,
+          aud: `did:web:${testHostAlternateName}`,
           thid: thid,
           type: 'https://didcomm.org/registration/1.0/register',
           body: { data: [{ meta: { claims: testClaimsTenant1Registration } }] },

@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { CustomerManager } from '../../../managers/CustomerManager';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
-import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
+import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
 import { JobRequest } from '../../../models/request';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
@@ -62,39 +62,37 @@ describe('CustomerManager', () => {
 
   describe('Customer Onboarding', () => {
     
-    it('HU 2 (Professional Onboarding): should process a complete batch and create a single customer', async () => {
+    it('HU 2 (Professional Onboarding): should aggregate a batch and create a single customer', async () => {
       // ARRANGE
       const job = testCreateCustomerJobRequestProfessionalOnboarding;
-      // Follow the established synchronous mock pattern from EmployeeManager.test.ts
       mockTenantsCacheManager.getTenantUrn.mockReturnValue(TENANT_URN);
 
       // ACT
       const response = await customerManager.process(job);
 
       // ASSERT
-      // 1. Verify that the customer was persisted once
+      // 1. Verify persistence
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
       const savedDoc = mockKmsService.protectConfidentialData.mock.calls[0][0];
       const customerConfig = savedDoc.content as EntityConfig;
       expect(customerConfig.id).toBe(testCustomer1Uuid);
+      expect((customerConfig.claims as any)[ClaimsPersonSchemaorg.identifierValue]).toBe((testIndividualOnboardingBatchEntries[1].meta.claims as any)[ClaimsPersonSchemaorg.identifierValue]);
 
-      // 2. Verify that claims from all entries were aggregated using a type guard
+      // 2. Verify response structure
       const responseEntry = response.body.data[0];
       if (!('resource' in responseEntry)) {
-        fail('Expected a BundleEntry with a resource, but received an ErrorEntry.');
+        fail('Expected a BundleEntry, got an ErrorEntry.');
       }
-      const finalClaims = responseEntry.resource!.meta!.claims!;
-      expect(finalClaims[ClaimsPersonSchemaorg.identifierValue]).toBe(
-        (testIndividualOnboardingBatchEntries[1].meta.claims as any)[ClaimsPersonSchemaorg.identifierValue],
-      );
-      expect(finalClaims[ClaimsPersonSchemaorg.email]).toBe(
-        (testIndividualOnboardingBatchEntries[0].meta.claims as any)[ClaimsPersonSchemaorg.email],
-      );
-
-      // 3. Verify the response structure
-      expect(response.body.data).toHaveLength(1);
       expect(responseEntry.response.status).toBe('201');
       expect(responseEntry.resource?.id).toBe(testCustomer1Uuid);
+
+      // 3. Verify aggregated claims in the response
+      const personClaims = responseEntry.resource!.meta!.claims!;
+      const serviceClaims = responseEntry.resource!.contained![0]!.meta!.claims!;
+      
+      expect(personClaims[ClaimsPersonSchemaorg.email]).toBe((testIndividualOnboardingBatchEntries[0].meta.claims as any)[ClaimsPersonSchemaorg.email]);
+      expect(personClaims[ClaimsPersonSchemaorg.identifierValue]).toBe((testIndividualOnboardingBatchEntries[1].meta.claims as any)[ClaimsPersonSchemaorg.identifierValue]);
+      expect(serviceClaims[ClaimsServiceSchemaorg.termsOfService]).toBe((testIndividualOnboardingBatchEntries[0].meta.claims as any)[ClaimsServiceSchemaorg.termsOfService]);
     });
 
     it('HU 1 (Self-Onboarding): should generate an identifier if none is provided', async () => {

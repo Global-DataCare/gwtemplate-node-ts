@@ -62,7 +62,7 @@ describe('Fabric Enrollment API', () => {
       const action = '_batch';
 
       const enrollmentUrl = `/${tenantId}/cds-${jurisdiction}/v1/${sector}/${section}/${format}/${resourceType}/${action}`;
-      const expectedPollingUrl = `${enrollmentUrl.replace('/_batch', '/_batch-response')}?thid=${testFabricEnrollmentJobInput.thid}`;
+      const expectedPollingUrl = `${enrollmentUrl.replace('/_batch', '/_batch-response')}`;
 
       // Mock the service configuration for the tenant to allow this action
       const mockTenantServices: DidService[] = [

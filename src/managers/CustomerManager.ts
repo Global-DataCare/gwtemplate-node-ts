@@ -1,6 +1,7 @@
 // src/managers/CustomerManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { v4 as uuidv4} from 'uuid';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { Bundle, BundleEntry, BundleEntryRequest, ErrorEntry } from '../models/bundle';
 import { VaultRepository } from '../database/repositories/vault/vault.repository';
@@ -48,26 +49,19 @@ export class CustomerManager {
   public async process(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
     const entries = job.input?.body?.data ?? [];
-    const tenantVaultId = job.tenantId!; // In this context, job.tenantId is the vaultId.
+    const tenantVaultId = job.tenantId!;
 
-    const issuerUrn = await this.tenantsCacheManager.getTenantUrn(tenantVaultId);
+    const issuerUrn = this.tenantsCacheManager.getTenantUrn(tenantVaultId);
     if (!issuerUrn) {
-      // This is a catastrophic failure for the whole batch, as we don't know who the issuer is.
       throw new ManagerError(`Tenant with ID '${tenantVaultId}' not found.`, IssueType.NotFound);
     }
 
-    // Process each entry individually to support true batch operations.
-    for (const entry of entries) {
-      try {
-        // Assuming all entries in this batch are for creation, based on the job type.
-        // A more complex manager might inspect entry.request.method.
-        const resultEntry = await this._processSingleCreation(entry, tenantVaultId, issuerUrn, environment);
-        responseEntries.push(resultEntry);
-      } catch (error: any) {
-        // If a single entry fails, create an error entry for it and continue with the next.
-        const errorEntry = this.handleError(error, entry.type, entry.meta);
-        responseEntries.push(errorEntry);
-      }
+    try {
+      const resultEntry = await this.processCreationBatch(entries, tenantVaultId, issuerUrn, environment);
+      responseEntries.push(resultEntry);
+    } catch (error: any) {
+      const errorEntry = this.handleError(error, 'Customer-creation-batch-v1.0', job.input.body);
+      responseEntries.push(errorEntry);
     }
 
     const responseBundle: Bundle = {
@@ -85,39 +79,29 @@ export class CustomerManager {
     };
   }
 
-  private async _processSingleCreation(
-    entry: BundleEntryRequest,
+  private async processCreationBatch(
+    entries: BundleEntryRequest[],
     tenantVaultId: string,
     tenantUrn: string,
     environment?: string,
   ): Promise<BundleEntry> {
-    const originalClaims = entry.meta?.claims;
-    if (!originalClaims) {
-      throw new ManagerError('Missing meta.claims in batch entry.', IssueType.Required);
-    }
+    
+    const aggregatedClaims = this._aggregateBatchClaims(entries);
+    const { person, service } = this._extractResources(aggregatedClaims, environment);
+    const internalId = person.id;
+    const publicUuidUrn = person.meta.claims[ClaimsPersonSchemaorg.identifier] as string;
 
-    // 1. Extract resources from claims, following the HostingManager pattern.
-    const { person, service } = this._extractResources(originalClaims, environment);
-
-    const publicIdentifierClaim = person.meta.claims[ClaimsPersonSchemaorg.identifier] as string;
-    const internalId = person.id; // Already determined by _extractResources
-
-    // 2. Prepare data for indexing (excluding sensitive PII like birthDate).
-    const parametersToIndex = this._buildIndexParameters(person.meta.claims);
+    const parametersToIndex = this._buildIndexParameters(aggregatedClaims);
     const indexedAttributes = await this.kmsService.protectAttributesNameAndValue(parametersToIndex, tenantVaultId);
 
-    // 3. Construct the final, canonical identifiers and EntityConfig.
     const multibaseId = encodeMultibase58btc(uuidToBytes(internalId));
     const customerUrn = `${tenantUrn}:individual:multibase:${multibaseId}`;
     
-    // Ensure the final claims reflect the canonical URN.
-    person.meta.claims[ClaimsPersonSchemaorg.identifier] = customerUrn;
-
     const customerConfig: EntityConfig = {
       id: internalId,
       type: 'CustomerConfig',
       status: 'active',
-      claims: person.meta.claims, // Store all person-related claims.
+      claims: aggregatedClaims,
       didDocument: {
         '@context': 'https://www.w3.org/ns/did/v1',
         id: customerUrn,
@@ -131,7 +115,6 @@ export class CustomerManager {
     customerConfig.didDocument.service = initializeCustomerServices(customerConfig, sector);
     customerConfig.didConfig.service = customerConfig.didDocument.service;
 
-    // 4. Construct and persist the secure document.
     const docToStore: ConfidentialStorageDoc = {
       id: internalId,
       sequence: 0,
@@ -140,12 +123,13 @@ export class CustomerManager {
     };
     const protectedDoc = await this.kmsService.protectConfidentialData(docToStore, tenantVaultId);
     await this.vaultRepository.put(tenantVaultId, [protectedDoc], CUSTOMER_SECTION);
+    
+    person.meta.claims[ClaimsPersonSchemaorg.identifier] = publicUuidUrn;
 
-    // 5. Build the structured API response.
     return {
       type: 'Customer',
       resource: {
-        ...person, // Includes id, type, and meta.claims
+        ...person,
         resourceType: 'Person',
         contained: [
           { ...service, resourceType: 'Service' }
@@ -155,17 +139,37 @@ export class CustomerManager {
     };
   }
 
-  /**
-   * Builds a list of parameters for indexing from the person claims.
-   */
+  private _aggregateBatchClaims(entries: BundleEntryRequest[]): ClaimsRecord {
+    const aggregatedClaims: ClaimsRecord = {};
+    let anchorIdentifier: string | undefined;
+
+    for (const entry of entries) {
+      const claims = entry.meta?.claims;
+      if (!claims) continue;
+      const currentIdentifier = claims[ClaimsPersonSchemaorg.identifier] as string | undefined;
+      if (currentIdentifier) {
+        if (!anchorIdentifier) {
+          anchorIdentifier = currentIdentifier;
+        } else if (anchorIdentifier !== currentIdentifier) {
+          throw new ManagerError(`Identifier inconsistency in batch: expected '${anchorIdentifier}', but found '${currentIdentifier}'.`, IssueType.Value);
+        }
+      }
+      Object.assign(aggregatedClaims, claims);
+    }
+    if (!anchorIdentifier) {
+      aggregatedClaims[ClaimsPersonSchemaorg.identifier] = `urn:uuid:${uuidv4()}`;
+    }
+    return aggregatedClaims;
+  }
+
   private _buildIndexParameters(claims: ClaimsRecord): ParameterData[] {
     const parameters: ParameterData[] = [];
     for (const [key, value] of Object.entries(claims)) {
-      if (key !== ClaimsPersonSchemaorg.birthDate) { // Exclude sensitive PII
+      if (key !== ClaimsPersonSchemaorg.birthDate) {
         if (typeof value === 'object' && value !== null && 'additionalType' in value && 'value' in value) {
           const val = value as any;
           parameters.push({ name: val.additionalType, value: val.value, unique: true, type: 'token' });
-        } else {
+        } else if (key.startsWith('org.schema.')) {
           parameters.push({ name: key, value: value as string, type: 'string' });
         }
       }

@@ -56,6 +56,8 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   getHostPublicJwkSet: jest.fn(),  
   getPublicVerificationKey: jest.fn(),
   getPublicEncryptionKey: jest.fn(),
+  getHmacBase64Url: jest.fn(),
+  protectAttributesNameAndValue: jest.fn(),
 };
 
 const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
@@ -173,7 +175,7 @@ describe('HostingManager', () => {
     expect(tenantConfig).toBeDefined();
     expect((tenantConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.legalName]).toBe(testTenant1LegalName);
     expect(tenantConfig.didConfig.service.length).toBeGreaterThan(0);
-    expect(tenantConfig.didDocument.verificationMethod).toHaveLength(mockPublicKeys.keys.length);
+    expect(tenantConfig.didDocument.verificationMethod).toHaveLength(1);
     expect(tenantConfig.didDocument.service).toBeDefined();
 
     expect(putSpy).toHaveBeenCalledTimes(1);

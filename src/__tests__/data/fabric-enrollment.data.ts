@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { MldsaPublicJwk } from '../../crypto/interfaces/Cryptography.types';
-import { ClaimsActionSchemaorg } from '../../models/claims-action';
+import { ClaimsActionSchemaorg } from '../../models/schemaorg';
 import { DidDocument } from '../../models/did';
 import { DecodedDidcommMessage } from '../../models/request';
 import { testTenant1Data, testClaimsTenant1Registration } from './end-to-end.data';

@@ -1,16 +1,24 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/models/confidential-storage.ts
 
-import { RecordBase } from "./resource-document";
+import { RecordBase } from './resource-document';
+import { ParameterType } from './params';
 
 /**
  * Defines the structure of an attribute to be indexed for blind, searchable queries.
  * @see https://identity.foundation/confidential-storage/#indexed-attributes
  */
 export interface IndexedAttribute {
-    name: string;
-    value: string;
-    unique?: boolean;
+  name: string;
+  value: string;
+  unique?: boolean;
+  /**
+   * The original data type of the `value` before it was converted to a string
+   * for HMAC protection. This is essential for performing type-aware queries
+   * (e.g., numerical range queries) on the indexed data.
+   * If not present, the type is assumed to be 'string'.
+   */
+  type?: ParameterType | string;
 }
 
 /**

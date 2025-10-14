@@ -1,4 +1,4 @@
-// utils/pki-utils.ts
+import { createGaiaXLegalParticipantCredential } from './credential-generators';// utils/pki-utils.ts
 
 // Author: Fernando Latorre López
 // License: Apache License 2.0 (see LICENSE)
@@ -20,21 +20,21 @@ import { Crypto } from '@peculiar/webcrypto';
 const crypto = new Crypto();
 pkijs.setEngine('nodeEngine', crypto, crypto.subtle);
 
-export type EntityConfig = {
+export type AuthorityConfig = {
+    seed: string | Uint8Array | undefined; // bytes, hex string or empty for being automatically generated
     legalRegistrationNumber: string;
     domain: string;
     subjectCN: string;
-    org: string;
-    jurisdiction: string;
-    location: { city: string; street: string; postalCode: string };
-    seed: string; // hex string or empty for being automatically generated
+    officialName: string;
+    countryCode: string;
+    location: { city: string; street?: string; postalCode?: string };
     certFile?: string;  // automatically generated
     jwksFile?: string;  // automatically generated
     didFile?: string;   // automatically generated
     sdFile?: string;    // automatically generated
 };
 
-export function generateMSPID(entity: EntityConfig): string {
+export function generateMSPID(entity: AuthorityConfig): string {
   return `${entity.legalRegistrationNumber}_${entity.domain}`.replace(/\./g, '_').toUpperCase();
 }
 
@@ -44,13 +44,11 @@ export function resolveOutputDir(...segments: string[]) {
   return dir;
 }
 
-export async function saveJwkDidAndSD(
-  entity: EntityConfig,
+export async function saveJwkDidAndCredential(
+  entity: AuthorityConfig,
   pubJwk: any,
   kid: string,
-  outputDir: string,
-  role: "TrustAnchor" | "DataConsumer" = "DataConsumer",
-  sector: string[] = ["Public Services"]
+  outputDir: string
 ) {
   const didID = `did:web:${entity.domain}`;
   const jwks = { keys: [{ ...pubJwk, kid }] };
@@ -65,29 +63,25 @@ export async function saveJwkDidAndSD(
     }],
     authentication: [`${didID}#${kid}`]
   };
-  const sd = {
-    "@context": ["https://w3id.org/gaia-x/contexts/self-description.jsonld"],
-    "@id": didID,
-    "@type": "gx:Participant",
-    "gx:legalName": entity.org,
-    "gx:jurisdiction": entity.jurisdiction,
-    "gx:legalRegistrationNumber": entity.legalRegistrationNumber,
-    "schema:taxID": entity.legalRegistrationNumber.slice(6),
-    "gx:headquarterAddress": {
-      "gx:country": entity.jurisdiction,
-      "gx:city": entity.location.city,
-      "gx:street": entity.location.street,
-      "gx:postalCode": entity.location.postalCode
-    },
-    "gx:sector": sector,
-    "gx:gxfsRole": `gx:${role}`
-  };
+  
+  const termsAndConditionsHash = Buffer.from(sha256(Buffer.from('dummy terms content for test', 'utf8'))).toString('hex');
+
+  const credential = createGaiaXLegalParticipantCredential({
+    webDomain: `https://${entity.domain}`,
+    officialName: entity.officialName,
+    did: didID,
+    issuerDid: didID, // Self-issued
+    vatId: entity.legalRegistrationNumber,
+    countryCode: entity.countryCode,
+    termsAndConditionsUrl: `https://${entity.domain}/terms`,
+    termsAndConditionsHashHex: termsAndConditionsHash,
+  });
 
   fs.mkdirSync(outputDir, { recursive: true });
 
   fs.writeFileSync(path.join(outputDir, `jwks-${entity.domain}.json`), JSON.stringify(jwks, null, 2));
   fs.writeFileSync(path.join(outputDir, `did-${entity.domain}.json`), JSON.stringify(did, null, 2));
-  fs.writeFileSync(path.join(outputDir, `Self-Description-${entity.domain}.jsonld`), JSON.stringify(sd, null, 2));
+  fs.writeFileSync(path.join(outputDir, `LegalParticipantCredential-${entity.domain}.jsonld`), JSON.stringify(credential, null, 2));
 }
 
 export function bufferToPem(buf: Buffer, label: string): string {
@@ -101,7 +95,7 @@ export function bigintToBytes(bn: bigint): Uint8Array {
   return Uint8Array.from(Buffer.from(hex, 'hex'));
 }
 
-export async function deriveKeyPair(seedHex?: string): Promise<{
+export async function deriveKeyPair(seedInput?: string | Uint8Array): Promise<{
   pub: Uint8Array;
   jwk: {
     kty: string;
@@ -113,9 +107,14 @@ export async function deriveKeyPair(seedHex?: string): Promise<{
   seed: string;
   kid: string;
 }> {
-  const seedBuf = seedHex?.trim()
-    ? Buffer.from(seedHex.replace(/^0x/, ''), 'hex').subarray(0, 32)
-    : randomBytes(32);
+  let seedBuf: Buffer;
+  if (seedInput instanceof Uint8Array) {
+    seedBuf = Buffer.from(seedInput.subarray(0, 32));
+  } else if (seedInput?.trim()) {
+    seedBuf = Buffer.from(seedInput.replace(/^0x/, ''), 'hex').subarray(0, 32);
+  } else {
+    seedBuf = Buffer.from(randomBytes(32));
+  }
 
   const seed = Buffer.from(seedBuf).toString('hex');
   const privateKey = sha256(seedBuf);

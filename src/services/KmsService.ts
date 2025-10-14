@@ -3,7 +3,7 @@
 
 import { JWK, JwkSet } from '../models/jwk';
 import { JwsMultiSign } from '../models/jws';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { ConfidentialStorageDoc, IndexedAttribute } from '../models/confidential-storage';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { ICryptography } from '../crypto/interfaces/ICryptography';
 import { JobRequest } from '../models/request';
@@ -12,7 +12,7 @@ import { Content } from '../utils/content';
 import { createHash, randomBytes } from 'crypto';
 import { computeHmacSha256Base64Url } from '../crypto/hmac';
 import { ProtectedDataAES } from '../models/aes';
-import { ParamAttribute } from '../models/params';
+import { ParamAttribute, ParameterData } from '../models/params';
 
 /**
  * @file Implements the Key Management Service, the central facade for all internal cryptographic operations.
@@ -415,23 +415,41 @@ export class KmsService implements IKmsService {
   }
 
   /**
-   * Takes an array of plaintext attributes and returns a new array where
+   * Takes an array of plaintext attributes (with type information) and returns a new array where
    * both the `name` and `value` properties of each attribute have been protected with HMAC.
+   * This is used to create the `indexed` array for a `ConfidentialStorageDoc`.
+   * The implementation MUST use domain separation based on the attribute `type` to prevent collisions.
    *
-   * @param attributes The array of plaintext `ParamAttribute` objects.
+   * @param attributes The array of plaintext `ParameterData` objects.
    * @param entityVaultId The security context for key selection.
-   * @returns A promise that resolves to the array of protected `ParamAttribute` objects.
+   * @returns A promise that resolves to the array of protected `IndexedAttribute` objects, ready for storage.
    */
-  async protectAttributesNameAndValue(attributes: ParamAttribute[], entityVaultId: string): Promise<ParamAttribute[]> {
-    const protectedAttributes: ParamAttribute[] = [];
+  async protectAttributesNameAndValue(attributes: ParameterData[], entityVaultId: string): Promise<IndexedAttribute[]> {
+    const protectedAttributes: IndexedAttribute[] = [];
     for (const attribute of attributes) {
+      if (attribute.value === undefined) {
+        // Do not index undefined values. Log a warning.
+        console.warn(`[KmsService] Skipping HMAC protection for attribute "${attribute.name}" because its value is undefined.`);
+        continue;
+      }
+      // Coerce number to string for canonical representation before HMAC.
+      const valueAsString = String(attribute.value);
+
       const protectedName = await this.getHmacBase64Url(attribute.name, entityVaultId);
-      const protectedValue = await this.getHmacBase64Url(attribute.value, entityVaultId);
-      protectedAttributes.push({
+      const protectedValue = await this.getHmacBase64Url(valueAsString, entityVaultId);
+      
+      const indexedAttr: IndexedAttribute = {
         name: protectedName,
         value: protectedValue,
         unique: attribute.unique,
-      });
+      };
+
+      // Only add the 'type' if it's not the default 'string'
+      if (attribute.type && attribute.type !== 'string') {
+        indexedAttr.type = attribute.type;
+      }
+
+      protectedAttributes.push(indexedAttr);
     }
     return protectedAttributes;
   }

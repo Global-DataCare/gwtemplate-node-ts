@@ -5,12 +5,12 @@ import path from 'path';
 import * as pkijs from 'pkijs';
 import { Crypto } from '@peculiar/webcrypto';
 import {
-  EntityConfig,
+  AuthorityConfig,
   deriveKeyPair,
   createCertificate,
   bufferToPem,
   saveJwkDidAndSD,
-} from '../src/utils/pki-utils';
+} from '../src/utils/pki';
 
 // Initialize WebCrypto
 const crypto = new Crypto();
@@ -36,7 +36,7 @@ const ORG_STREET = getEnv('ORG_STREET');
 const ORG_POSTAL_CODE = getEnv('ORG_POSTAL_CODE');
 
 // Define entity configurations using environment variables
-const rootCAConfig: EntityConfig = {
+const rootCAConfig: AuthorityConfig = {
   legalRegistrationNumber: getEnv('ROOT_CA_LEGAL_NUMBER'),
   domain: `root-ca.${BASE_DOMAIN}`,
   subjectCN: `root-ca.${BASE_DOMAIN}`,
@@ -46,7 +46,7 @@ const rootCAConfig: EntityConfig = {
   seed: ROOT_CA_SEED,
 };
 
-const icaConfig: EntityConfig = {
+const icaConfig: AuthorityConfig = {
   legalRegistrationNumber: getEnv('ICA_LEGAL_NUMBER'),
   domain: `ica.${BASE_DOMAIN}`,
   subjectCN: `ica.${BASE_DOMAIN}`,
@@ -56,7 +56,7 @@ const icaConfig: EntityConfig = {
   seed: ICA_SEED,
 };
 
-const hostConfig: EntityConfig = {
+const hostConfig: AuthorityConfig = {
     legalRegistrationNumber: getEnv('HOST_LEGAL_NUMBER'),
     domain: getEnv('HOST_DOMAIN'),
     subjectCN: getEnv('HOST_DOMAIN'),
@@ -74,7 +74,7 @@ function resolveOutputDir(...segments: string[]) {
   }
 
 async function generateEntityArtifacts(
-    config: EntityConfig,
+    config: AuthorityConfig,
     outputDir: string,
     role: "TrustAnchor" | "DataConsumer" | "ServiceProvider",
     sector: string[]

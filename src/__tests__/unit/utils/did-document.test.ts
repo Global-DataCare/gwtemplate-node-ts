@@ -2,6 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { createDefaultDidDocument } from '../../../utils/did-document';
+import { DidService } from '../../../models/did';
 
 describe('createDefaultDidDocument', () => {
 
@@ -23,12 +24,12 @@ describe('createDefaultDidDocument', () => {
     expect(didDoc.service).toHaveLength(3);
     
     // Check discovery service endpoint
-    const discoveryService = didDoc.service?.find(s => s.id === '#did-document');
+    const discoveryService = didDoc.service?.find((s: DidService) => s.id === '#did-document');
     expect(discoveryService).toBeDefined();
     expect(discoveryService?.serviceEndpoint).toBe('https://example.com/.well-known/did.json');
     
     // Check registry service ID
-    const registryService = didDoc.service?.find(s => s.type === 'GatewayRegistryService');
+    const registryService = didDoc.service?.find((s: DidService) => s.type === 'GatewayRegistryService');
     expect(registryService).toBeDefined();
     expect(registryService?.id).toBe('v1_system_registry_org-schema');
   });
@@ -49,12 +50,12 @@ describe('createDefaultDidDocument', () => {
     expect(didDoc.service).toHaveLength(3);
 
     // Check discovery service endpoint
-    const discoveryService = didDoc.service?.find(s => s.id === '#did-document');
+    const discoveryService = didDoc.service?.find((s: DidService) => s.id === '#did-document');
     expect(discoveryService).toBeDefined();
     expect(discoveryService?.serviceEndpoint).toBe('https://example.com/acme-corp/.well-known/did.json');
 
     // Check registry service ID
-    const registryService = didDoc.service?.find(s => s.type === 'GatewayRegistryService');
+    const registryService = didDoc.service?.find((s: DidService) => s.type === 'GatewayRegistryService');
     expect(registryService).toBeDefined();
     expect(registryService?.id).toBe('v1_health-care_registry_org-schema');
   });

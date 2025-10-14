@@ -1,10 +1,13 @@
-import fs from 'fs';
+import { writeFileSync } from 'fs';
 import { randomBytes } from '@noble/hashes/utils.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { p256 } from '@noble/curves/nist.js';
 import { Crypto } from '@peculiar/webcrypto';
 import * as pkijs from 'pkijs';
 import * as asn1js from 'asn1js';
+import { TEST_PARTICIPANT } from '../data/participant';
+
+const FILE_PREFIX = 'x509-self-signed';
 
 const webcrypto = new Crypto();
 pkijs.setEngine('nodeEngine', webcrypto, webcrypto.subtle);
@@ -61,8 +64,8 @@ const rawPublicKey = new Uint8Array(publicKeyBytes); // <-- reenvuelve para que 
   cert.version = 2;
   cert.serialNumber = new asn1js.Integer({ value: 1 });
   cert.issuer.typesAndValues.push(new pkijs.AttributeTypeAndValue({
-    type: '2.5.4.3',
-    value: new asn1js.PrintableString({ value: 'Example Root CA' })
+    type: '2.5.4.3', // Common Name
+    value: new asn1js.PrintableString({ value: `${TEST_PARTICIPANT.COMMON_NAME} Root CA` })
   }));
   cert.subject.typesAndValues = cert.issuer.typesAndValues;
   cert.notBefore.value = new Date();
@@ -82,6 +85,6 @@ const rawPublicKey = new Uint8Array(publicKeyBytes); // <-- reenvuelve para que 
   // Step 4: Export as PEM
   const certRaw = cert.toSchema(true).toBER(false);
   const certPem = bufferToPem(Buffer.from(certRaw), 'CERTIFICATE');
-  fs.writeFileSync('certificate-pkijs.pem', certPem);
-  console.log('✅ certificate-pkijs.pem written successfully.');
+  writeFileSync(`artifacts/${FILE_PREFIX}-certificate.pem`, certPem);
+  console.log(`✅ artifacts/${FILE_PREFIX}-certificate.pem written successfully.`);
 });

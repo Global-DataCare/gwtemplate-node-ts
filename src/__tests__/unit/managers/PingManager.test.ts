@@ -1,17 +1,27 @@
 // File: src/__tests__/unit/managers/PingManager.test.ts
 
 import { PingManager } from '../../../managers/PingManager';
+import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { JobRequest } from '../../../models/request';
 import { getBundleResponseTypeForAction } from '../../../utils/bundle';
 
 describe('PingManager', () => {
   let pingManager: PingManager;
+  let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
 
   beforeEach(() => {
-    pingManager = new PingManager();
+    // Mock the TenantsCacheManager and its dependencies
+    mockTenantsCacheManager = {
+      getTenantDid: jest.fn(),
+    } as any;
+
+    pingManager = new PingManager(mockTenantsCacheManager);
   });
 
   it('should process a ping job and echo the original entry with a success response', async () => {
+    // Arrange: Set up the mock to return a DID for the 'host' tenant
+    mockTenantsCacheManager.getTenantDid.mockReturnValue('did:web:host.example.com');
+
     // Arrange: Create a mock job request simulating the path:
     // /host/cds-xx/v1/test/ping/standard/resource/_batch
     const mockJob: JobRequest = {

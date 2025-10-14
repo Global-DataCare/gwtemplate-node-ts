@@ -6,11 +6,11 @@ import path from 'path';
 import * as pkijs from 'pkijs';
 import { Crypto } from '@peculiar/webcrypto';
 import {
-  EntityConfig,
+  AuthorityConfig,
   deriveKeyPair,
   createCertificate,
   bufferToPem,
-} from '../../utils/pki-utils';
+} from '../../utils/pki';
 
 // Increase timeout for this test suite as key generation can be slow
 jest.setTimeout(30000); 
@@ -31,24 +31,24 @@ const ICA_SEED = getEnv('ICA_SEED');
 const BASE_DOMAIN = getEnv('BASE_DOMAIN');
 // ... (load other env vars)
 
-const rootCAConfig: EntityConfig = {
+const rootCAConfig: AuthorityConfig = {
   // ... (config loaded from env)
   legalRegistrationNumber: getEnv('ROOT_CA_LEGAL_NUMBER'),
   domain: `root-ca.${BASE_DOMAIN}`,
   subjectCN: `root-ca.${BASE_DOMAIN}`,
-  org: getEnv('ROOT_CA_ORG_NAME'),
-  jurisdiction: getEnv('ORG_JURISDICTION'),
+  officialName: getEnv('ROOT_CA_ORG_NAME'),
+  countryCode: getEnv('ORG_JURISDICTION'),
   location: { city: getEnv('ORG_CITY'), street: getEnv('ORG_STREET'), postalCode: getEnv('ORG_POSTAL_CODE') },
   seed: ROOT_CA_SEED,
 };
 
-const icaConfig: EntityConfig = {
+const icaConfig: AuthorityConfig = {
   // ... (config loaded from env)
   legalRegistrationNumber: getEnv('ICA_LEGAL_NUMBER'),
   domain: `ica.${BASE_DOMAIN}`,
   subjectCN: `ica.${BASE_DOMAIN}`,
-  org: getEnv('ICA_ORG_NAME'),
-  jurisdiction: getEnv('ORG_JURISDICTION'),
+  officialName: getEnv('ICA_ORG_NAME'),
+  countryCode: getEnv('ORG_JURISDICTION'),
   location: { city: getEnv('ORG_CITY'), street: getEnv('ORG_STREET'), postalCode: getEnv('ORG_POSTAL_CODE') },
   seed: ICA_SEED,
 };

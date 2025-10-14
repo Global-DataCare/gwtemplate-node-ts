@@ -1,13 +1,14 @@
 // src/services/DemoKmsService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { ConfidentialStorageDoc, IndexedAttribute } from '../models/confidential-storage';
 import { JobRequest } from '../models/request';
 import { JwsMultiSign } from '../models/jws';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { JwkSet, JWK } from '../models/jwk';
 import { Content } from '../utils/content';
 import { MldsaPublicJwk, MlkemPublicJwk } from '../crypto/interfaces/Cryptography.types';
+import { ParameterData } from '../models/params';
 
 /**
  * A development-only implementation of the Key Management Service that correctly
@@ -135,6 +136,37 @@ export class DemoKmsService implements IKmsService {
     }
     return (doc.jwe as any).content as T;
   }
+
+  async getHmacBase64Url(plaintext: string, entityId: string): Promise<string> {
+    console.warn(`[DemoKmsService] Simulating HMAC for entity: ${entityId}`);
+    return `hmac-of-${plaintext}`;
+  }
+
+  async protectAttributesNameAndValue(attributes: ParameterData[], entityId: string): Promise<IndexedAttribute[]> {
+    console.warn(`[DemoKmsService] Simulating attribute protection for entity: ${entityId}`);
+    const protectedAttributes: IndexedAttribute[] = [];
+    for (const attribute of attributes) {
+      if (attribute.value === undefined) {
+        continue;
+      }
+      const valueAsString = String(attribute.value);
+      
+      const indexedAttr: IndexedAttribute = {
+        name: `hmac-of-${attribute.name}`,
+        value: `hmac-of-${valueAsString}`,
+        unique: attribute.unique,
+      };
+
+      // Only add the 'type' if it's not the default 'string'
+      if (attribute.type && attribute.type !== 'string') {
+        indexedAttr.type = attribute.type;
+      }
+      
+      protectedAttributes.push(indexedAttr);
+    }
+    return protectedAttributes;
+  }
+
 
   /**
    * Creates a consistent, fake JSON Web Key Set (JWKS) based on the entity's ID.
