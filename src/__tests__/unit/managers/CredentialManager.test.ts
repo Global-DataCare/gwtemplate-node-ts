@@ -13,9 +13,8 @@ import { IServerConfig } from '../../../config';
 import { testClaimsTenant1Receptionist1, testTenant1Receptionist1Email, testTenant1Receptionist1Urn } from '../../data/employee.data';
 import { MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
 import { ProofEBSIv2, VerifiableCredentialV2 } from '../../../models/verifiable-credential';
-import { ManagerError } from '../../../models/errors/manager-error';
 import { JwsMultiSign } from '../../../models/jws';
-import { testTenant1IdentifierUrn, testTenant1VaultId } from '../../data/organization.data';
+import { testHostDidWeb, testHostDomain, testTenant1IdentifierUrn, testTenant1VaultId } from '../../data/organization.data';
 import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
@@ -82,7 +81,7 @@ describe('CredentialManager', () => {
       vaultRepository,
       mockKmsService,
       mockTenantsCacheManager,
-      mockConfig,
+      testHostDomain,
     );
   });
 
@@ -99,14 +98,14 @@ describe('CredentialManager', () => {
       );
 
       // --- ASSERT ---
-      expect(vc.issuer).toBe(HOST_DID);
+      expect(vc.issuer).toBe(testHostDidWeb);
       const subject = vc.credentialSubject as any;
       expect(subject.identifier).toBe(testTenant1IdentifierUrn);
       expect(subject['org.schema.Organization.legalName']).toBe(testClaimsTenant1Registration['org.schema.Organization.legalName']);
       expect(vc.evidence?.[0]).toEqual(evidence);
 
       expect(vc.proof).toBeDefined();
-      expect((vc.proof as Array<ProofEBSIv2>)[0].verificationMethod).toBe(`${HOST_DID}#${mockHostPublicKey.kid}`);
+      expect((vc.proof as Array<ProofEBSIv2>)[0].verificationMethod).toBe(`${testHostDidWeb}#${mockHostPublicKey.kid}`);
       expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(expect.any(Uint8Array), 'host');
     });
   });

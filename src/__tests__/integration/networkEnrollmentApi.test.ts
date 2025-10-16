@@ -11,13 +11,9 @@ import { mockKmsService } from '../mocks/kms.mock';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { IAsyncResponseStore, AsyncResponseStoreMem } from '../../adapters/async-response-store.mem';
 import { testEncryptedJwe1 } from '../data/async-response.data';
-import { HostingManager } from '../../managers/HostingManager';
-import { testClaimsTenant1Registration } from '../data/end-to-end.data';
 import { testTenant1AddressCountry, testTenant1AlternateName, testTenant1ServiceProviderCategory } from '../data/organization.data';
 import { testInitialNetworkJobInput, testTenantC_DidDocument } from '../data/network-enrollment.data';
-import { Sector } from '../../models/path';
 import { getTenantVaultId } from '../../utils/tenant';
-
 import { DidService } from '../../models/did';
 import { createDidServiceId } from '../../utils/did';
 

@@ -107,7 +107,7 @@ export const testCreateCustomerJobRequestProfessionalOnboarding: JobRequest = {
     section: `${Section.individual}`, // "individual"
     format: `${Format.Schema}`, // "org.schema"
     resourceType: `${Resource.Person}`, // "Person"
-    action: `${JobAction._batch}`, // "_batch"
+    action: `${JobAction._create}`, // "_create"
     input: {
         aud: testTenant1DidWebExternal, // 'did:web:api.acme.org',
         thid: 'thid-customer-prof-onboarding',

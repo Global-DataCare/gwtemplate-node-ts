@@ -245,7 +245,7 @@ export class CryptographyService implements ICryptography {
     };
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[CryptoService] JWS Parts Created:', jwsParts);
+      // console.log('[CryptoService] JWS Parts Created:', jwsParts);
     }
 
     return jwsParts;

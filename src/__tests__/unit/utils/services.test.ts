@@ -51,7 +51,7 @@ describe('Service Initialization Utilities', () => {
 
   describe('initializeTenantServices', () => {
     
-    it('should create default entity and profile services for a non-FHIR tenant', () => {
+    it('should create default entity and individual services for a non-FHIR tenant', () => {
       // ARRANGE
       const tenantConfig = createTestTenantConfig(Sector.TEST, `did:web:${mockConfig.hostExternalDomain}:acme`);
 
@@ -59,17 +59,17 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServices(tenantConfig.didDocument.id, tenantConfig.provider.service.sectorCategory as Sector);
 
       // ASSERT
-      expect(services).toHaveLength(5); // 2 discovery + 2 business + 1 network
+      expect(services).toHaveLength(6); // 2 discovery + 2 business + 2 network
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
       expect(entityService!.serviceEndpoint).toContain('Employee');
       expect(entityService!.serviceEndpoint).not.toContain('Practitioner');
 
-      const profileService = services.find((s: DidService) => s.id.includes('index'));
-      expect(profileService).toBeDefined();
-      expect(profileService!.serviceEndpoint).toContain('Customer');
-      expect(profileService!.serviceEndpoint).not.toContain('Patient');
+      const individualService = services.find((s: DidService) => s.id.includes('individual'));
+      expect(individualService).toBeDefined();
+      expect(individualService!.serviceEndpoint).toContain('Person');
+      expect(individualService!.serviceEndpoint).not.toContain('Patient');
     });
 
     it('should ADD FHIR resources for a FHIR-enabled tenant', () => {
@@ -80,17 +80,17 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServices(tenantConfig.didDocument.id, tenantConfig.provider.service.sectorCategory as Sector);
       
       // ASSERT
-      expect(services).toHaveLength(5);
+      expect(services).toHaveLength(6);
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
       expect(entityService!.serviceEndpoint).toContain('Employee');
       expect(entityService!.serviceEndpoint).toContain('Practitioner');
 
-      const profileService = services.find((s: DidService) => s.id.includes('index'));
-      expect(profileService).toBeDefined();
-      expect(profileService!.serviceEndpoint).toContain('Customer');
-      expect(profileService!.serviceEndpoint).toContain('Patient');
+      const individualService = services.find((s: DidService) => s.id.includes('individual'));
+      expect(individualService).toBeDefined();
+      expect(individualService!.serviceEndpoint).toContain('Person');
+      expect(individualService!.serviceEndpoint).toContain('Patient');
     });
 
     it('should include standard discovery endpoints', () => {

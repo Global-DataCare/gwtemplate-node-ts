@@ -46,6 +46,7 @@ export enum Resource {
 
 export enum JobAction {
   "_batch" = "_batch",
+  "_create" = "_create",
 }
 
 export enum knownDomainsReversedEnum {

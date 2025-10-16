@@ -1,8 +1,8 @@
 // src/server.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import express = require('express');
-import dotenv = require('dotenv');
+import * as express from 'express';
+import * as dotenv from 'dotenv';
 import { Worker } from './worker';
 import { IServerConfig } from './config';
 import { Sector } from './models/path';
@@ -21,6 +21,13 @@ import { HostingManager } from './managers/HostingManager';
 import { TenantsCacheManager } from './managers/TenantsCacheManager';
 import { EmployeeManager } from './managers/EmployeeManager';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from './models/schemaorg';
+import { CustomerManager } from './managers/CustomerManager';
+import { CredentialManager } from './managers/CredentialManager';
+import { CompositionManager } from './managers/CompositionManager';
+import { BlockchainAdapterMem } from './adapters/BlockchainAdapterMem';
+import { createNetworkRouter } from './routes/network';
+import { IBlockchainAdapter } from './adapters/IBlockchainAdapter';
+import { CommunicationManager } from './managers/CommunicationManager';
 
 // ===================================================================================
 // CONFIGURATION LOGIC - INTERNAL TO SERVER.TS
@@ -137,9 +144,9 @@ async function startServer() {
   const config = getConfig();
 
   console.log('[GW-API] Initializing...');
-  const app = express();
-  app.use(express.urlencoded({ extended: true }));
-  app.use(express.json());
+  const app = express.default();
+  app.use(express.default.urlencoded({ extended: true }));
+  app.use(express.default.json());
 
   const vaultRepository = new VaultMemRepository();
 
@@ -153,6 +160,30 @@ async function startServer() {
   const tenantManager = new TenantsCacheManager(vaultRepository, kmsService);
   const hostingManager = new HostingManager(vaultRepository, kmsService, tenantManager, config);
   const employeeManager = new EmployeeManager(vaultRepository, kmsService, tenantManager);
+  
+  const credentialManager = new CredentialManager(
+    vaultRepository,
+    kmsService,
+    tenantManager,
+    config.hostExternalDomain,
+  );
+
+  // For now, we'll use the in-memory adapter. This can be swapped with a real
+  // Fabric adapter based on config settings in the future.
+  const blockchainAdapter: IBlockchainAdapter = new BlockchainAdapterMem();
+
+  const customerManager = new CustomerManager(
+    vaultRepository,
+    kmsService,
+    tenantManager,
+    credentialManager,
+    blockchainAdapter,
+    config.namespace // Pass the configured network name (e.g., 'antifraud')
+  );
+
+  const compositionManager = new CompositionManager();
+  const communicationManager = new CommunicationManager();
+
   const discoveryService = new DiscoveryService(tenantManager);
 
   if (!(await vaultRepository.vaultExists('host'))) {
@@ -162,7 +193,10 @@ async function startServer() {
   const managerRegistry: ManagerRegistry = { 
     hostingManager, 
     tenantManager,
-    employeeManager 
+    employeeManager,
+    customerManager,
+    compositionManager,
+    communicationManager,
   };
   const worker = new Worker(managerRegistry, config.apiBaseUrl);
   const asyncResponseStore = new AsyncResponseStoreMem();
@@ -170,15 +204,17 @@ async function startServer() {
 
   const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService);
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore);
+  const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   app.use('/', discoveryRouter);
   app.use('/', apiRouter);
+  app.use('/', networkRouter);
 
   const server = app.listen(config.port, () => {
     console.log(`[GW-API ${config.nodeEnv} Server running on ${config.apiBaseUrl}`);
     console.log('[GW-API] --- System Initialized Successfully ---');
   });
 
-  return { app, server, queueAdapter, tenantManager, kmsService };
+  return { app, server, queueAdapter, tenantManager, kmsService, blockchainAdapter };
 }
 
 if (require.main === module) {

@@ -15,7 +15,7 @@ describe('initializeTenantServices', () => {
     const services: DidService[] = initializeTenantServices(tenantDid, tenantSector);
 
     // --- Assert ---
-    const enrollmentService = services.find(s => s.id.includes('_test-network_'));
+    const enrollmentService = services.find(s => s.type === 'NetworkEnrollmentService');
     
     expect(enrollmentService).toBeDefined();
     expect(enrollmentService?.type).toBe('NetworkEnrollmentService');

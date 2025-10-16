@@ -27,6 +27,8 @@ export interface ManagerRegistry {
   tenantManager: TenantsCacheManager;
   employeeManager?: IJobProcessor;
   customerManager?: IJobProcessor;
+  compositionManager?: IJobProcessor;
+  communicationManager?: IJobProcessor;
   // groupManager?: IJobProcessor;
   // listManager?: IJobProcessor;
 }

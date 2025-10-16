@@ -10,7 +10,7 @@ import { IPayloadResponse } from '../models/response';
 import { ManagerError } from '../models/errors/manager-error';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
+import { ClaimsPersonSchemaorg } from '../models/schemaorg';
 import { EntityConfig } from '../models/entity';
 import { initializeCustomerServices } from '../utils/services'; 
 import { createOperationOutcome } from '../utils/outcome';
@@ -19,12 +19,19 @@ import { ParameterData } from '../models/params'; // extends ParamAttribute with
 import { CredentialManager } from './CredentialManager';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { parseTenantUrn } from '../utils/urn';
+import { getTenantVaultId } from '../utils/tenant';
 import { Sector } from '../models/path';
 import { determineResourceId } from '../utils/resource';
 import { uuidToBytes } from '../utils/uuid';
 import { encodeMultibase58btc } from '../utils/multibase58';
+import { getJurisdictionGroup } from '../utils/jurisdiction';
+import { normalizePhoneNumber } from '../utils/phone-number';
+import { parseIdentifierType } from '../utils/identifier-parser';
+import { generateUrnHash } from '../utils/urn-hash';
+import { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { IncludedResource } from '../models/jsonapi';
 import { ClaimsRecord } from '../models/resource-document';
+
 
 const CUSTOMER_SECTION = 'customers';
 
@@ -33,35 +40,56 @@ export class CustomerManager {
   private kmsService: IKmsService;
   private tenantsCacheManager: TenantsCacheManager;
   private credentialManager: CredentialManager;
+  private blockchainAdapter: IBlockchainAdapter;
+  private network: string;
 
   constructor(
     vaultRepository: VaultRepository,
     kmsService: IKmsService,
     tenantsCacheManager: TenantsCacheManager,
     credentialManager: CredentialManager,
+    blockchainAdapter: IBlockchainAdapter,
+    network: string
   ) {
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
     this.tenantsCacheManager = tenantsCacheManager;
     this.credentialManager = credentialManager;
+    this.blockchainAdapter = blockchainAdapter;
+    this.network = network;
   }
 
   public async process(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
+    // console.log('[CustomerManager] Processing job:', JSON.stringify(job, null, 2));
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
     const entries = job.input?.body?.data ?? [];
-    const tenantVaultId = job.tenantId!;
+    
+    // The Manager is responsible for constructing the vaultId from the job's context
+    const tenantVaultId = getTenantVaultId(job.sector!, job.tenantId!);
 
     const issuerUrn = this.tenantsCacheManager.getTenantIdentifierUrn(tenantVaultId);
     if (!issuerUrn) {
-      throw new ManagerError(`Tenant with ID '${tenantVaultId}' not found.`, IssueType.NotFound);
+      throw new ManagerError(`Tenant with vaultId '${tenantVaultId}' could not be resolved.`, IssueType.NotFound);
     }
+    
+    switch(job.action) {
+      case '_create':
+        try {
+          const resultEntry = await this.processCreationBatch(entries, tenantVaultId, issuerUrn, environment);
+          responseEntries.push(resultEntry);
+        } catch (error: any) {
+          const errorEntry = this.handleError(error, 'Customer-creation-batch-v1.0', job.input.body);
+          responseEntries.push(errorEntry);
+        }
+        break;
+      
+      case '_discovery':
+        const discoveryResults = await this.processDiscoveryBatch(entries, job.sector!, job.resourceType!);
+        responseEntries.push(...discoveryResults);
+        break;
 
-    try {
-      const resultEntry = await this.processCreationBatch(entries, tenantVaultId, issuerUrn, environment);
-      responseEntries.push(resultEntry);
-    } catch (error: any) {
-      const errorEntry = this.handleError(error, 'Customer-creation-batch-v1.0', job.input.body);
-      responseEntries.push(errorEntry);
+      default:
+        throw new ManagerError(`Unsupported action '${job.action}' for CustomerManager.`, IssueType.NotSupported);
     }
 
     const responseBundle: Bundle = {
@@ -138,6 +166,97 @@ export class CustomerManager {
       response: { status: '201' },
     };
   }
+
+  private async processDiscoveryBatch(
+    entries: BundleEntryRequest[],
+    sector: string,
+    resourceType: string,
+  ): Promise<(BundleEntry | ErrorEntry)[]> {
+    const tasksByTarget = new Map<string, { hash: string; originalEntry: BundleEntryRequest }[]>();
+    const finalResults: (BundleEntry | ErrorEntry)[] = [];
+    const entryMap = new Map(entries.map(e => [e.meta?.claims, e]));
+
+    // 1. Prepare all discovery tasks and group them by target (channel + chaincode)
+    for (const entry of entries) {
+      const claims = entry.meta?.claims;
+      const prepResult = this.prepareUrnAndJurisdiction(claims as any);
+
+      if (!prepResult.urn) {
+        finalResults.push({
+          type: entry.type,
+          meta: entry.meta,
+          response: {
+            status: '400',
+            outcome: createOperationOutcome(IssueLevel.Error, IssueType.Invalid, 'Unsupported discovery claim type'),
+          },
+        });
+        continue;
+      }
+
+      const hash = generateUrnHash(prepResult.urn);
+      const channel = `${sector}-${prepResult.jurisdictionGroup}`;
+      const chaincode = `discovery-${resourceType.toLowerCase()}`;
+      const targetKey = `${channel}:${chaincode}`;
+
+      if (!tasksByTarget.has(targetKey)) {
+        tasksByTarget.set(targetKey, []);
+      }
+      tasksByTarget.get(targetKey)!.push({ hash, originalEntry: entry });
+    }
+
+    // 2. Execute batch queries for each target group
+    for (const [targetKey, tasks] of tasksByTarget.entries()) {
+      const [channel, chaincode] = targetKey.split(':');
+      const hashesToQuery = tasks.map(t => t.hash);
+
+      const foundDids = await this.blockchainAdapter.discoverDidsByHashes(hashesToQuery, channel, chaincode);
+
+      foundDids.forEach((did, index) => {
+        const originalTask = tasks[index];
+        finalResults.push({
+          type: originalTask.originalEntry.type,
+          meta: originalTask.originalEntry.meta,
+          response: did
+            ? { status: '200', location: did }
+            : { status: '404', outcome: createOperationOutcome(IssueLevel.Information, IssueType.NotFound, 'Identifier not found on the network') },
+        });
+      });
+    }
+    
+    // Re-sort results to match the original input order, because Promise.all does not guarantee order
+    const sortedResults = [...finalResults].sort((a, b) => {
+        const claimsA = JSON.stringify(a.meta?.claims);
+        const claimsB = JSON.stringify(b.meta?.claims);
+        return Array.from(entryMap.keys()).findIndex(k => JSON.stringify(k) === claimsA) - Array.from(entryMap.keys()).findIndex(k => JSON.stringify(k) === claimsB);
+    });
+
+    return sortedResults;
+  }
+
+  private prepareUrnAndJurisdiction(claims: ClaimsRecord): { urn?: string; jurisdictionGroup: 'eu' | 'global' } {
+    let urn: string | undefined;
+    let jurisdictionGroup: 'eu' | 'global' = 'global';
+
+    const identifierType = claims[ClaimsPersonSchemaorg.identifierType] as string;
+    const identifierValue = claims[ClaimsPersonSchemaorg.identifierValue] as string;
+    const telephone = claims[ClaimsPersonSchemaorg.telephone] as string;
+
+    if (identifierType && identifierValue) {
+      const parsedId = parseIdentifierType(identifierType);
+      if (parsedId.countryCode) {
+        jurisdictionGroup = getJurisdictionGroup(parsedId.countryCode);
+      }
+      urn = `urn:${this.network}:${jurisdictionGroup}:identifier:${identifierType}:${identifierValue}`;
+    } else if (telephone) {
+      const normalizedPhone = normalizePhoneNumber(telephone);
+      jurisdictionGroup = 'global';
+      urn = `urn:${this.network}:${jurisdictionGroup}:mobile:E164:${normalizedPhone}`;
+    }
+
+    return { urn, jurisdictionGroup };
+  }
+
+
 
   private _aggregateBatchClaims(entries: BundleEntryRequest[]): ClaimsRecord {
     const aggregatedClaims: ClaimsRecord = {};

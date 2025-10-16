@@ -16,11 +16,13 @@ import { EntityConfig } from '../../../models/entity';
 import { testTenant1IdentifierUrn } from '../../data/organization.data';
 import { testCustomer1Uuid } from '../../data/customer.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import { IBlockchainAdapter } from '../../../adapters/IBlockchainAdapter';
 import {
   testCreateCustomerJobRequestProfessionalOnboarding,
   testIndividualOnboardingBatchEntries,
 } from '../../data/customer-onboarding.data';
-import { BundleEntry, ErrorEntry } from '../../../models/bundle';
+import { BundleEntry, BundleEntryResponse, ErrorEntry } from '../../../models/bundle';
+
 
 // Mock the uuidv4 function to return a predictable value for tests
 jest.mock('uuid', () => ({
@@ -28,12 +30,24 @@ jest.mock('uuid', () => ({
   validate: jest.fn(() => true), // Mock the validate function
 }));
 
+// Mock the jurisdiction mapping utility
+jest.mock('../../../utils/jurisdiction', () => ({
+    getJurisdictionGroup: (countryCode: string) => {
+      if (['ES', 'FR', 'DE'].includes(countryCode.toUpperCase())) {
+        return 'eu';
+      }
+      return 'global';
+    },
+  }));
+  
 describe('CustomerManager', () => {
   let customerManager: CustomerManager;
   let mockVaultRepository: MockProxy<VaultRepository>;
   let mockKmsService: MockProxy<IKmsService>;
   let mockTenantsCacheManager: MockProxy<TenantsCacheManager>;
   let mockCredentialManager: MockProxy<CredentialManager>;
+  let mockBlockchainAdapter: MockProxy<IBlockchainAdapter>;
+
 
   const TENANT_URN = testTenant1IdentifierUrn;
 
@@ -42,12 +56,15 @@ describe('CustomerManager', () => {
     mockKmsService = mock<IKmsService>();
     mockTenantsCacheManager = mock<TenantsCacheManager>();
     mockCredentialManager = mock<CredentialManager>();
+    mockBlockchainAdapter = mock<IBlockchainAdapter>();
 
     customerManager = new CustomerManager(
       mockVaultRepository,
       mockKmsService,
       mockTenantsCacheManager,
       mockCredentialManager,
+      mockBlockchainAdapter, // Add the new dependency
+      'test-network'         // Add the network name
     );
     jest.clearAllMocks();
 
@@ -159,6 +176,83 @@ describe('CustomerManager', () => {
         const errorEntry = response.body.data[0] as ErrorEntry;
         expect(errorEntry.response.status).toBe('400');
         expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('Identifier inconsistency in batch');
+    });
+  });
+
+  describe('Customer Discovery', () => {
+    it('should batch queries and call the adapter once per channel', async () => {
+      // ARRANGE
+      const job: JobRequest = {
+        sector: 'health-care',
+        tenantId: 'acme',
+        action: '_discovery',
+        resourceType: 'Person',
+        input: {
+          thid: 'thid-test-batch',
+          iss: 'iss-test',
+          aud: 'aud-test',
+          type: 'api+json',
+          body: {
+            data: [
+              // EU-based identifier
+              {
+                type: 'Person-discover-v1.0',
+                meta: { claims: { [ClaimsPersonSchemaorg.identifierType]: 'NNES', [ClaimsPersonSchemaorg.identifierValue]: '12345678Z' } }
+              },
+              // Global identifier
+              {
+                type: 'Person-discover-v1.0',
+                meta: { claims: { [ClaimsPersonSchemaorg.telephone]: '+15551234567' } }
+              },
+              // Another EU-based identifier to test grouping
+              {
+                type: 'Person-discover-v1.0',
+                meta: { claims: { [ClaimsPersonSchemaorg.identifierType]: 'PPNFR', [ClaimsPersonSchemaorg.identifierValue]: '987654321' } }
+              },
+            ]
+          }
+        }
+      };
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
+      // Mock the batch response
+      mockBlockchainAdapter.discoverDidsByHashes.mockImplementation(async (hashes, channel) => {
+        if (channel === 'health-care-eu') {
+            return ['did:web:nnes-did', undefined]; // NNES found, PPN not found
+        }
+        if (channel === 'health-care-global') {
+            return ['did:web:phone-did'];
+        }
+        return [];
+      });
+
+      // ACT
+      const response = await customerManager.process(job);
+
+      // ASSERT
+      // 1. Verify adapter was called exactly once for each channel
+      expect(mockBlockchainAdapter.discoverDidsByHashes).toHaveBeenCalledTimes(2);
+
+      // 2. Verify the EU channel call
+      expect(mockBlockchainAdapter.discoverDidsByHashes).toHaveBeenCalledWith(
+        [expect.any(String), expect.any(String)], // An array of 2 hashes
+        'health-care-eu',
+        'discovery-person'
+      );
+
+      // 3. Verify the Global channel call
+      expect(mockBlockchainAdapter.discoverDidsByHashes).toHaveBeenCalledWith(
+        [expect.any(String)], // An array of 1 hash
+        'health-care-global',
+        'discovery-person'
+      );
+      
+      // 4. Verify the final response structure and order
+      expect(response.body.data.length).toBe(3);
+      expect((response.body.data[0] as BundleEntryResponse).response?.status).toBe('200');
+      expect((response.body.data[0] as BundleEntryResponse).response.location).toBe('did:web:nnes-did');
+      expect((response.body.data[1] as BundleEntryResponse).response.status).toBe('200');
+      expect((response.body.data[1] as BundleEntryResponse).response.location).toBe('did:web:phone-did');
+      expect((response.body.data[2] as ErrorEntry).response.status).toBe('404');
     });
   });
 });

@@ -12,7 +12,7 @@ const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
 /**
  * (Internal) Creates a standardized DID Service Endpoint configuration object.
  */
-const createDidEndpointConfig = (id: string, resources: string[], actions: string[] = ['_batch']): DidService => {
+const createDidEndpointConfig = (id: string, resources: string[], actions: string[] = ['_create', '_batch']): DidService => {
   const serviceEndpoint = resources.join(',');
   return { id, type: 'ApiService', serviceEndpoint, actions };
 };
@@ -28,12 +28,13 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   const services: DidService[] = [];
   const isFhir = FHIR_SECTORS.includes(sector);
 
-  const entityResources = ['Employee', 'Role', 'Place', 'Organization', 'Bundle'];
-  const individualResources = ['Customer', 'RelatedPerson', 'Bundle'];
+  const entityResources = ['Employee', 'EmployeeRole', 'Place', 'Organization', 'Bundle'];
+  // Define the full list of individual-related resources for our roadmap.
+  const individualResources = ['Person', 'Composition', 'Communication', 'Subscription', 'RelatedPerson', 'Bundle'];
 
   if (isFhir) {
     entityResources.push('Practitioner', 'PractitionerRole', 'Location');
-    individualResources.push('Patient');
+    individualResources.push('Patient', 'Appointment'); // Add Appointment for FHIR context
   }
 
   services.push(createDidEndpointConfig(
@@ -41,8 +42,9 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     entityResources
   ));
 
+  // This single service definition now enables all planned individual-related endpoints.
   services.push(createDidEndpointConfig(
-    createDidServiceId({ version: 'v1', sector, section: 'index', format: 'org.schema' }),
+    createDidServiceId({ version: 'v1', sector, section: 'individual', format: 'org.schema' }),
     individualResources
   ));
 
@@ -76,15 +78,28 @@ export function initializeTenantServices(didId: string, sector: Sector, customSe
 
   const defaultBusinessServices = generateDefaultBusinessServices(sector);
 
+  // NOTE: In a real implementation, these network services would likely be added to a tenant's
+  // DID Document *after* they have successfully enrolled, not by default.
+  // They are included here by default to simplify the end-to-end testing flow.
   const defaultNetworkServices: DidService[] = [
-    createDidEndpointConfig(
-      createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema' }),
-      ['Action'],
-      ['_batch']
-    ),
+    {
+      ...(createDidEndpointConfig(
+        createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema' }),
+        ['Action'],
+        ['_batch']
+      )),
+      type: 'NetworkEnrollmentService'
+    },
+    {
+      ...(createDidEndpointConfig(
+        createDidServiceId({ version: 'v1', sector, section: 'discovery-network', format: 'org.schema' }),
+        ['Person'],
+        ['_discovery']
+      )),
+      type: 'PersonDiscoveryService'
+    },
   ];
-  // Rename the type for clarity
-  defaultNetworkServices[0].type = 'NetworkEnrollmentService';
+
 
 
   const allServices = [...discoveryServices, ...defaultBusinessServices, ...defaultNetworkServices, ...customServices];
@@ -176,7 +191,7 @@ export function initializeCustomerServices(customerConfig: EntityConfig, sector:
 
   // Define business services for an individual/customer based on new requirements.
   const isFhir = FHIR_SECTORS.includes(sector);
-  const individualResources = ['Customer', 'RelatedPerson', 'Bundle'];
+  const individualResources = ['Customer', 'RelatedPerson', 'Bundle', 'Person'];
   if (isFhir) {
     individualResources.push('Patient');
   }

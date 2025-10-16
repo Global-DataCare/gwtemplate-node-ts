@@ -1,7 +1,7 @@
 // src/routes/discovery.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import express from 'express';
+import * as express from 'express';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { DiscoveryService } from '../services/DiscoveryService';
 import { getTenantVaultId } from '../utils/tenant';
@@ -20,7 +20,7 @@ export function createDiscoveryRouter(
   tenantsCacheManager: TenantsCacheManager,
   discoveryService: DiscoveryService
 ): express.Router {
-  const router = express.Router();
+  const router = express.default.Router();
 
   // Middleware to resolve the tenant vaultId based on path parameters and verify existence.
   const resolveTenant = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -109,4 +109,3 @@ export function createDiscoveryRouter(
   });
   return router;
 }
-

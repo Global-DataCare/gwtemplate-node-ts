@@ -52,7 +52,14 @@ export class Worker {
           manager = this.managers.employeeManager;
           break;
         case 'Customer':
+        case 'Person':
           manager = this.managers.customerManager;
+          break;
+        case 'Composition':
+          manager = this.managers.compositionManager;
+          break;
+        case 'Communication':
+          manager = this.managers.communicationManager;
           break;
         default:
           throw new Error(`No manager configured for resourceType '${resourceType}'`);

@@ -2,6 +2,57 @@
 
 All notable changes to this project will be documented in this file.
 
+## [UNRELEASED]
+
+### Added
+
+-   **New Person Discovery Feature:** Implemented a new asynchronous `_discovery` action to find a Person's `did:web` using private identifiers.
+    -   The new endpoint is `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/test-network/org.schema/Person/_discovery`.
+    -   The backend handles URN construction, hashing, and dynamic routing to the appropriate blockchain channel (`<sector>-eu` or `<sector>-global`) and smart contract (`discovery-person`) based on "convention over configuration".
+    -   Introduced `NetworkActionsController` and a dedicated `networkRouter` to manage this new API section.
+    -   Added new utility modules to support the discovery logic: `identifier-parser.ts`, `jurisdiction.ts`, and `phone-number.ts`.
+
+### Changed
+
+-   **Refactored `CustomerManager`:** The manager now handles the new `_discovery` action alongside the existing `_batch` action.
+    -   The discovery logic is optimized to group multiple identifier hashes (e.g., from `NNES` and `telephone` for the same person) and query the blockchain in a single, efficient batch call per channel target.
+    -   The smart contract is expected to implement a "first match wins" optimization for these batch queries.
+-   **Updated `IBlockchainAdapter`:** The interface was changed from `discoverDidByHash` to the batch-aware `discoverDidsByHashes` to support the performance optimization.
+-   **Updated Service Definitions (`services.ts`):**
+
+### Fixed
+
+-   **Corrected Onboarding Tests:** Fixed all failing unit tests for `CustomerManager` by aligning the test data's job action with the manager's expectation.
+-   **Resolved `tsc` Compilation Errors**
+
+### Internal
+
+-   **Unit Tests:** Added a comprehensive suite of unit tests for the new batch discovery logic in `CustomerManager.test.ts`.
+-   **End-to-End Test:** Added a new test case (`Part 8`) to the main integration test suite (`end-to-end-flow.test.ts`). This test verifies the full, asynchronous submit-and-poll flow for the `_discovery` endpoint using a real, encrypted JWE payload.
+-   **Documentation:** Created a new, detailed architecture document for the discovery feature at `docs/03-IDENTITY-AND-TRUST/03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md`, which includes a Mermaid sequence diagram illustrating the entire flow, and ``.
+-   **Code Cleanup:** Removed the obsolete `CustomerDiscoveryManager` and its test file, as its logic was consolidated into `CustomerManager`. Disabled verbose cryptographic logs to improve test readability.
+
+## [Unreleased]
+
+### Added
+- **End-to-End Test for Person Onboarding**: A comprehensive E2E test (`Part 3`) now verifies the entire asynchronous flow for creating a `Person` resource, including job submission (`202 Accepted`), secure polling with `POST` (`200 OK`), and final response validation (`201 Created`).
+- **TDD Roadmap for Future Features**: Added tests (`Part 4` for `Composition` and `Part 5` for `Communication`) in the E2E flow. These tests act as an executable specification and clear roadmap for the next development steps.
+- **`CustomerManager` Integration**: Fully integrated the `CustomerManager` into the server initialization, connecting it to the `Worker` via the `ManagerRegistry`.
+
+### Changed
+- **Corrected Tenant Service Configuration**: Updated `utils/services.ts` to correctly define the service endpoint for the `individual` section (previously `index`), enabling the `Person`, `Composition`, `Communication`, and `Subscription` resource types.
+- **Refactored `CredentialManager` Dependencies**: The `CredentialManager` constructor now correctly receives only the `hostExternalDomain` string instead of the entire `IServerConfig` object, adhering to dependency injection best practices.
+- **Standardized Manager Logic**: Refactored `CustomerManager` to correctly derive the `vaultId` from the `job.sector` and `job.tenantId` properties, following the established architectural pattern where managers (not the router) are responsible for this logic.
+
+### Fixed
+- **Critical Bug in Job Context**: Fixed a critical bug where `CustomerManager` was incorrectly interpreting `job.tenantId` as the `vaultId`, leading to "Tenant not found" errors. The manager now correctly reconstructs the `vaultId`..
+- **Module Interoperability Issues**: Standardized the import and usage of CommonJS modules like `express` across the application (`server.ts`, `discovery.ts`) to use the `import * as name` and `name.default()` pattern, resolving persistent compilation and runtime errors.
+- **E2E Test Polling Logic**: Corrected the E2E test to use the secure `POST` method with the `thid` in the `body` for polling, aligning with the server's implementation.
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 

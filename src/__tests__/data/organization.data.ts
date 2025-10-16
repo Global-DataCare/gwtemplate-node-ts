@@ -59,9 +59,9 @@ export const testHostAdmin1IdentifierUrn = `urn:${URN_NAMESPACE}:${URN_NETWORK}:
 // --- Tenant 1 Organization Details ---
 const testTenant1Uuid = "c1c2c3d4-e5f6-7890-1234-567890abcdef";
 export const testTenant1LegalName = "Acme Company";
-export const testTenant1AddressCountry = "US";
-export const testTenant1IdType = "EI"; // EI or TAX
-export const testTenant1IdValue = "98-7654321";
+export const testTenant1AddressCountry = "ES";
+export const testTenant1IdType = "TAX"; // EI or TAX
+export const testTenant1IdValue = "A0011233";
 export const testTenant1AlternateName = "acme";
 export const testTenant1Domain = "api.acme.org";
 
@@ -100,6 +100,20 @@ const testTenant1Admin1Uuid = "b1b2c3d4-e5f6-7890-1234-567890abcdef";
 export const testTenant1Admin1Identifier = `urn:uuid:${testTenant1Admin1Uuid}`;
 export const testTenant1Admin1Email = `admin@${testTenant1Domain}`;
 export const testTenant1Admin1HasOccupation = "ISCO-08:1120";
+
+
+
+// ===================================================================================
+// TENANT 2 ORGANIZATION DATA
+// ===================================================================================
+// --- Tenant 2 Organization Details ---
+const testTenant2Uuid = "c2c2c3d4-e5f6-7890-2234-567890abcdef";
+export const testTenant2LegalName = "Tenant D";
+export const testTenant2AddressCountry = "US";
+export const testTenant2IdType = "EI"; // EI or TAX
+export const testTenant2IdValue = "98-7654322";
+export const testTenant2AlternateName = "tenant-d";
+export const testTenant2Domain = "api-d.example.com";
 
 // ===================================================================================
 // HOST CONFIG DATA

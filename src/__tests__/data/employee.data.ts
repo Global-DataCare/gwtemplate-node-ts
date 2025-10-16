@@ -1,7 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/data/employee.data.ts
 import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
-import { testTenant1Domain, testTenant1IdentifierUrn } from './organization.data';
+import { testTenant1DidWebExternal, testTenant1Domain, testTenant1IdentifierUrn } from './organization.data';
 
 /**
 *  IMPORTANT!
@@ -33,7 +33,10 @@ export const testTenant1Admin1 = {
 // --- Tenant 1 - Receptionist 1 Details ---
 export const testTenant1Receptionist1Email = `receptionist1@${testTenant1Domain}`;
 export const testTenant1Receptionist1HasOccupation = "ISCO-08:4226";
+
+/** e.g.: "urn:antifraud:test-network:US:v1:health-care:entity:EI:98-7654321:employee:email:receptionist1@api.acme.org:role:ISCO-08:4226" */
 export const testTenant1Receptionist1Urn = `${testTenant1IdentifierUrn}:employee:email:${testTenant1Receptionist1Email}:role:${testTenant1Receptionist1HasOccupation}`
+export const testTenant1Receptionist1DidExternal = `${testTenant1DidWebExternal}:employee:email:${testTenant1Receptionist1Email}:role:${testTenant1Receptionist1HasOccupation}`
 
 // --- Tenant 1 - Firefighter 1 Details ---
 export const testTenant1Firefighter1 = {

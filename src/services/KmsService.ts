@@ -146,7 +146,7 @@ export class KmsService implements IKmsService {
       keys: [verificationKeyPair.publicJWKey as JWK, encryptionKeyPair.publicJWKey as JWK]
     };
 
-    console.log(`[KmsService] Provisioned new JWKSet for entity: ${entityVaultId}`, publicJwkSet);
+    //     // console.log(`[KmsService] Provisioned new JWKSet for entity: ${entityVaultId}`, publicJwkSet);
 
     return publicJwkSet;
   }
@@ -227,7 +227,7 @@ export class KmsService implements IKmsService {
     const jwsString = Content.bytesToStringUTF8(decryptedBytes);
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[KmsService] Decrypted JWE payload, got compact JWS:', jwsString);
+      // console.log('[KmsService] Decrypted JWE payload, got compact JWS:', jwsString);
     }
 
     const dataJwt = this.crypto.parseCompactJws(jwsString);

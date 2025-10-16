@@ -6,7 +6,6 @@ import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { VerifiableCredentialV2, ProofEBSIv2 } from '../models/verifiable-credential';
 import { ManagerError } from '../models/errors/manager-error';
 import { objectToBytes } from '../utils/object-convert';
-import { IServerConfig } from '../config';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { IssueType } from '../models/fhir/codes';
@@ -26,20 +25,18 @@ export class CredentialManager {
   private vaultRepository: VaultRepository;
   private kmsService: IKmsService;
   private tenantsCacheManager: TenantsCacheManager;
-  private config: IServerConfig;
   private hostDid: string;
 
   constructor(
     vaultRepository: VaultRepository,
     kmsService: IKmsService,
     tenantsCacheManager: TenantsCacheManager,
-    config: IServerConfig,
+    hostExternalDomain: string,
   ) {
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
     this.tenantsCacheManager = tenantsCacheManager;
-    this.config = config;
-    this.hostDid = `did:web:${config.hostExternalDomain}`;
+    this.hostDid = `did:web:${hostExternalDomain}`;
   }
 
   /**
@@ -209,5 +206,3 @@ export class CredentialManager {
     return { ...unsignedVc, proof: [proof] };
   }
 }
-
-
