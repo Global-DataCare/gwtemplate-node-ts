@@ -67,7 +67,8 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
     // ASSERT
     const hostDomain = testHostDidWeb.replace('did:web:', '');
     const urnParts = testTenant1IdentifierUrn.split(':');
-    const expectedUrl = `https://${hostDomain}/acme/cds-${urnParts[3]}/${urnParts[4]}/${urnParts[5]}`;
+    // The jurisdiction (urnParts[3]) must be lower-cased to match the canonical URL format.
+    const expectedUrl = `https://${hostDomain}/acme/cds-${urnParts[3].toLowerCase()}/${urnParts[4]}/${urnParts[5]}`;
     expect(url).toBe(expectedUrl);
   });
   

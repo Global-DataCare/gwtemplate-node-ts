@@ -16,7 +16,7 @@ function bigintToBytes(bn: bigint, length: number): Uint8Array {
 test('Generate JWK from noble P-256 seed and export JWKS, DID and Legal Participant Credential', async () => {
   const seed = randomBytes(32);
   const seedHex = Buffer.from(seed).toString('hex');
-  console.log('🔐 Seed (hex):', seedHex);
+  // console.log('🔐 Seed (hex):', seedHex);
 
   const privateScalarBytes = sha256(seed);
   const pub = p256.getPublicKey(privateScalarBytes, false);
@@ -40,7 +40,7 @@ test('Generate JWK from noble P-256 seed and export JWKS, DID and Legal Particip
   const kid = Buffer.from(thumbprint).toString('base64url');
   const publicJwk = { ...publicJwkNoKid, kid };
 
-  console.log('🆔 kid (base64url):', kid);
+  // console.log('🆔 kid (base64url):', kid);
 
   // Save public key JWK
   const jwks = { keys: [publicJwk] };
@@ -75,5 +75,5 @@ test('Generate JWK from noble P-256 seed and export JWKS, DID and Legal Particip
   });
 
   writeFileSync(`artifacts/${FILE_PREFIX}-credential-${TEST_PARTICIPANT.COMMON_NAME}.jsonld`, JSON.stringify(credential, null, 2));
-  console.log('✅ JWK, JWKS, DID and Legal Participant Credential generated successfully.');
+  // console.log('✅ JWK, JWKS, DID and Legal Participant Credential generated successfully.');
 });

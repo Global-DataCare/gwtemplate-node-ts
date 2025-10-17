@@ -1,6 +1,9 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/models/request.ts
 
+import { ProtectedHeadersJWE } from "./jwe";
+import { JwsHeader } from "./jws";
+
 export enum FormRequest {
   'OrganizationTerms' = 'register-organization_form_org.schema_v1.0',
   'IndividualTerms' = 'register-individual_form_org.schema_v1.0',
@@ -36,7 +39,7 @@ export interface DataInRequest {
  * Represents the plaintext of a decoded DIDComm message.
  * This is the core business-level "input" for a job.
  */
-export interface DecodedDidcommMessage {
+export interface  DecodedDidcommMessage {
   type: string; // Message Type URI (protocol identifier)
   thid: string; // The Transaction ID for message correlation.
   aud: string;  // The audience of the message.
@@ -55,9 +58,9 @@ export interface JobRequest extends DataInRequest {
 
   /** Metadata enriched by the security middleware from the cryptographic envelope (JWS/JWE). */
   meta?: {
-    jws?: { protected?: Record<string, any>; };
-    jwe?: { header?: Record<string, any>; };
-    bearer?: { jwt: { header?: Record<string, any>; payload?: Record<string, any>; } }
+    jws?: { protected?: JwsHeader };
+    jwe?: { header?: ProtectedHeadersJWE };
+    bearer?: { jwt: { header?: JwsHeader, payload?: Record<string, any>; } }
   };
 }
 

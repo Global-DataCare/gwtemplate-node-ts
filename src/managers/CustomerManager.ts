@@ -72,7 +72,9 @@ export class CustomerManager {
       throw new ManagerError(`Tenant with vaultId '${tenantVaultId}' could not be resolved.`, IssueType.NotFound);
     }
     
+    /**  A _batch in CustomerManager implies claim aggregation to create a single entity. */
     switch(job.action) {
+      case '_batch':
       case '_create':
         try {
           const resultEntry = await this.processCreationBatch(entries, tenantVaultId, issuerUrn, environment);
@@ -205,7 +207,7 @@ export class CustomerManager {
     }
 
     // 2. Execute batch queries for each target group
-    for (const [targetKey, tasks] of tasksByTarget.entries()) {
+    const discoveryPromises = Array.from(tasksByTarget.entries()).map(async ([targetKey, tasks]) => {
       const [channel, chaincode] = targetKey.split(':');
       const hashesToQuery = tasks.map(t => t.hash);
 
@@ -221,7 +223,9 @@ export class CustomerManager {
             : { status: '404', outcome: createOperationOutcome(IssueLevel.Information, IssueType.NotFound, 'Identifier not found on the network') },
         });
       });
-    }
+    });
+
+    await Promise.all(discoveryPromises);
     
     // Re-sort results to match the original input order, because Promise.all does not guarantee order
     const sortedResults = [...finalResults].sort((a, b) => {

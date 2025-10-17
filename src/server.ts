@@ -111,7 +111,7 @@ function getConfig(): IServerConfig {
  * Bootstraps the host tenant using a direct method, reading all values from config.
  */
 async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServerConfig) {
-  console.log('[GW-API] Bootstrapping host tenant...');
+  // console.log('[GW-API] Bootstrapping host tenant...');
   const hostClaims = {
     // [ClaimsOrganizationSchemaorg.identifier] is generated when persisting the host (tenant zero)
     [ClaimsOrganizationSchemaorg.identifierType]: bootConfig.host.idType,
@@ -129,7 +129,7 @@ async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServer
 
   try {
     await hostingManager.bootstrapHost(hostClaims);
-    console.log('[GW-API] Host tenant bootstrapped successfully.');
+    // console.log('[GW-API] Host tenant bootstrapped successfully.');
   } catch (error) {
     console.error('[GW-API] FATAL: Host tenant bootstrapping failed.', error);
     throw error;
@@ -143,7 +143,7 @@ async function startServer() {
   dotenv.config();
   const config = getConfig();
 
-  console.log('[GW-API] Initializing...');
+  // console.log('[GW-API] Initializing...');
   const app = express.default();
   app.use(express.default.urlencoded({ extended: true }));
   app.use(express.default.json());
@@ -182,7 +182,7 @@ async function startServer() {
   );
 
   const compositionManager = new CompositionManager();
-  const communicationManager = new CommunicationManager();
+  const communicationManager = new CommunicationManager({ tenantsCacheManager: tenantManager });
 
   const discoveryService = new DiscoveryService(tenantManager);
 
@@ -198,7 +198,7 @@ async function startServer() {
     compositionManager,
     communicationManager,
   };
-  const worker = new Worker(managerRegistry, config.apiBaseUrl);
+  const worker = new Worker(managerRegistry, config.apiBaseUrl, kmsService);
   const asyncResponseStore = new AsyncResponseStoreMem();
   const queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
 
@@ -210,8 +210,8 @@ async function startServer() {
   app.use('/', networkRouter);
 
   const server = app.listen(config.port, () => {
-    console.log(`[GW-API ${config.nodeEnv} Server running on ${config.apiBaseUrl}`);
-    console.log('[GW-API] --- System Initialized Successfully ---');
+    // console.log(`[GW-API ${config.nodeEnv} Server running on ${config.apiBaseUrl}`);
+    // console.log('[GW-API] --- System Initialized Successfully ---');
   });
 
   return { app, server, queueAdapter, tenantManager, kmsService, blockchainAdapter };

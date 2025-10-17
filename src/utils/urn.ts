@@ -3,6 +3,7 @@
 
 import { OrganizationUrnParams, EmployeeUrnParams } from "../models/entity";
 
+
 /**
  * Creates a canonical URN string from a given UUID.
  * @param uuid The UUID to format.
@@ -11,6 +12,7 @@ import { OrganizationUrnParams, EmployeeUrnParams } from "../models/entity";
 export function createUrnUuid(uuid: string): string {
     return `urn:uuid:${uuid}`;
 }
+
 
 /**
  * Creates the canonical URN for an organization based on its public, verifiable attributes.

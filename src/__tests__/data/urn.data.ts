@@ -5,6 +5,6 @@
  * Centralized constants for building semantic URNs in tests.
  * This ensures consistency and alignment with the architecture.
  */
-export const URN_NAMESPACE = 'antifraud';
+export const URN_NAMESPACE = 'unid';
 export const URN_NETWORK = 'test-network';
 export const URN_VERSION = 'v1';

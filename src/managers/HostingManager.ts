@@ -61,10 +61,10 @@ export class HostingManager {
    * @param hostClaims The claims data for the host organization.
    */
   public async bootstrapHost(hostClaims: ClaimsRecord): Promise<void> {
-    console.log('[HostingManager] Starting direct bootstrap process...');
+    // console.log('[HostingManager] Starting direct bootstrap process...');
     const { organization, person, service } = this.extractResources(hostClaims);
     await this.persistHostConfig(organization, [person, service]);
-    console.log('[HostingManager] Direct bootstrap process finished.');
+    // console.log('[HostingManager] Direct bootstrap process finished.');
   }
 
   /**
@@ -167,7 +167,7 @@ export class HostingManager {
         validatedSector = requestedSector as Sector;
 
         if (process.env.NODE_ENV !== 'production') {
-          console.log(`[DEBUG] HostingManager.processRegistrationEntry attempting to build vaultId with: validatedSector='${validatedSector}', alternateName='${alternateName}'`);
+          // console.log(`[DEBUG] HostingManager.processRegistrationEntry attempting to build vaultId with: validatedSector='${validatedSector}', alternateName='${alternateName}'`);
         }
         const vaultId = getTenantVaultId(validatedSector, alternateName);
         if (await this.vaultRepository.vaultExists(vaultId)) {
@@ -191,16 +191,16 @@ export class HostingManager {
 
       const { organization, person, service } = this.extractResources(claims, environment);
 
-      console.log(`[HostingManager] Processing entry for alternateName: '${alternateName}'`);
+      // console.log(`[HostingManager] Processing entry for alternateName: '${alternateName}'`);
       if (alternateName === 'host') {
-        console.log(`[HostingManager] 'host' entry detected. Checking if vault exists...`);
+        // console.log(`[HostingManager] 'host' entry detected. Checking if vault exists...`);
         const hostVaultExists = await this.vaultRepository.vaultExists('host');
-        console.log(`[HostingManager] Does 'host' vault exist? ${hostVaultExists}`);
+        // console.log(`[HostingManager] Does 'host' vault exist? ${hostVaultExists}`);
         if (!hostVaultExists) {
-          console.log(`[HostingManager] 'host' vault does not exist. Calling persistHostConfig.`);
+          // console.log(`[HostingManager] 'host' vault does not exist. Calling persistHostConfig.`);
           await this.persistHostConfig(organization, [person, service]);
         } else {
-          console.log(`[HostingManager] 'host' vault ALREADY EXISTS. Skipping persistHostConfig.`);
+          // console.log(`[HostingManager] 'host' vault ALREADY EXISTS. Skipping persistHostConfig.`);
         }
       } else {
         await this.persistTenantConfig(organization, alternateName, [person, service], validatedSector!);
@@ -263,7 +263,7 @@ export class HostingManager {
    * @param contained An array of the host's contained resources (Person, Service).
    */
   private async persistHostConfig(org: IncludedResource, contained: IncludedResource[]) {
-    console.log(`[HostingManager] ENTERING persistHostConfig.`);    
+    // console.log(`[HostingManager] ENTERING persistHostConfig.`);    
     const vaultId = 'host';
     await this.kmsService.provisionKeys(vaultId);
     const publicKeys = await this.kmsService.getPublicJwks(vaultId);
@@ -312,7 +312,7 @@ export class HostingManager {
     await this.vaultRepository.createNewVault({ id: vaultId, custodian: secureDoc.id });
     await this.vaultRepository.put(vaultId, [secureDoc], 'tenants');
 
-    console.log(`[HostingManager] Host config persisted. Forcing cache reload NOW.`);
+    // console.log(`[HostingManager] Host config persisted. Forcing cache reload NOW.`);
     await this.tenantsCacheManager.loadTenants();
   }
 
@@ -332,7 +332,7 @@ export class HostingManager {
     sector: Sector,
   ) {
     const vaultId = getTenantVaultId(sector, altName);
-    console.log(`[HostingManager] Persisting new tenant config with vaultId: '${vaultId}'`);
+    // console.log(`[HostingManager] Persisting new tenant config with vaultId: '${vaultId}'`);
     
     await this.kmsService.provisionKeys(vaultId);
     const publicKeys = await this.kmsService.getPublicJwks(vaultId);
@@ -361,11 +361,19 @@ export class HostingManager {
       ? `did:web:${new URL(publicTenantUrl).hostname}` 
       : undefined;
 
-    // 3. Build the DID Document skeleton according to the "Golden Rules of Identity".
+    // 3. Determine the primary DID and construct the DID Document skeleton.
+    const primaryDid = externalDid || hostedDid;
+    const alsoKnownAs = [tenantUrn];
+    if (externalDid && primaryDid === hostedDid) {
+      alsoKnownAs.push(externalDid);
+    } else if (hostedDid && primaryDid === externalDid) {
+      alsoKnownAs.push(hostedDid);
+    }
+
     const skeletonDidDoc: DidDocument = {
       '@context': 'https://www.w3.org/ns/did/v1',
-      id: tenantUrn,
-      alsoKnownAs: [hostedDid, ...(externalDid ? [externalDid] : [])],
+      id: primaryDid, // The primary identifier is the resolvable did:web
+      alsoKnownAs: alsoKnownAs, // Other identifiers, including the canonical URN
     };
 
     // 4. Generate the service configuration templates.

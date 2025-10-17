@@ -130,8 +130,8 @@ export async function deriveKeyPair(seedInput?: string | Uint8Array): Promise<{
   const thumb = await calculateJwkThumbprint(pubJwk, 'sha256');
   const kid = Buffer.from(thumb).toString('base64url');
 
-  console.log(`🔐 Generated seed: ${seed}`);
-  console.log(`🆔 Corresponding kid: ${kid}`);
+  // console.log(`🔐 Generated seed: ${seed}`);
+  // console.log(`🆔 Corresponding kid: ${kid}`);
 
   return { pub, jwk, seed, kid };
 }

@@ -20,8 +20,9 @@ import { EntityConfig } from '../../../models/entity';
 // Tell Jest what will be mocked
 jest.mock('uuid');
 
-const testBaseJobForClaims = (claims: ClaimsRecord, tenantId: string): JobRequest => ({
+const testBaseJobForClaims = (claims: ClaimsRecord, tenantId: string, sector: string): JobRequest => ({
   tenantId: tenantId,
+  sector: sector,
   jurisdiction: 'us',
   resourceType: 'Person',
   section: 'org.schema',
@@ -53,8 +54,10 @@ describe('EmployeeManager', () => {
 
   const mockJwkSet: JwkSet = { keys: [] };
   const MOCKED_OCCUPATION_UUID = 'mocked-occupation-uuid';
-  const TENANT_ID = 'health-care.tenant-1';
-  const TENANT_URN = 'urn:antifraud:soschain-test:us:v1:health-care:entity:tax:123456789';
+  const TENANT_ALTERNATE_NAME = 'tenant-1';
+  const TENANT_SECTOR = 'health-care';
+  const TENANT_VAULT_ID = `${TENANT_SECTOR}_${TENANT_ALTERNATE_NAME}`;
+  const TENANT_URN = `urn:antifraud:soschain-test:us:v1:${TENANT_SECTOR}:entity:tax:123456789`;
 
   beforeEach(() => {
     mockVaultRepository = mock<VaultRepository>();
@@ -76,7 +79,7 @@ describe('EmployeeManager', () => {
   describe('Employee Creation (POST)', () => {
     it('should create employee with a semantic URN and save protected documents', async () => {
       // ARRANGE
-      const job = testBaseJobForClaims(testClaimsTenant1Receptionist1, TENANT_ID);
+      const job = testBaseJobForClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       mockKmsService.provisionKeys.mockResolvedValue(mockJwkSet);
       mockVaultRepository.put.mockResolvedValue(true);
       mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
@@ -88,7 +91,7 @@ describe('EmployeeManager', () => {
       const expectedEmployeeId = determineResourceId(testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.identifier]);
       expect(mockKmsService.provisionKeys).toHaveBeenCalledWith(expectedEmployeeId);
 
-      expect(mockTenantsCacheManager.getTenantIdentifierUrn).toHaveBeenCalledWith(TENANT_ID);
+      expect(mockTenantsCacheManager.getTenantIdentifierUrn).toHaveBeenCalledWith(TENANT_VAULT_ID);
 
       const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
       const employeeConfig = docToProtect.content as EntityConfig;

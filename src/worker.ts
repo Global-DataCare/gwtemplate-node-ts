@@ -3,40 +3,41 @@
 
 import { IJobProcessor, ManagerRegistry } from './managers/registry';
 import { createErrorBundle } from './utils/bundle';
-import { IPayloadResponse } from './models/response';
 import { JobRequest } from './models/request';
 import { parseJobName } from './utils/naming';
 import { composeHostDidWebId } from './utils/did';
+import { IKmsService } from './crypto/interfaces/IKmsService';
+import { getTenantVaultId } from './utils/tenant';
 
 /**
  * The Worker is the heart of the background processing logic.
- * It is a dedicated layer that acts as a Job Router, completely
+ * It is a dedicated layer that acts as a Job Router and Response Encryptor,
  * decoupling the Queue Adapter from the business logic managers.
  */
 export class Worker {
   private managers: ManagerRegistry;
   private apiBaseUrl: string;
+  private kmsService: IKmsService;
 
-  constructor(managers: ManagerRegistry, apiBaseUrl: string) {
+  constructor(managers: ManagerRegistry, apiBaseUrl: string, kmsService: IKmsService) {
     this.managers = managers;
     this.apiBaseUrl = apiBaseUrl;
+    this.kmsService = kmsService;
   }
 
   /**
-   * The main processing function. It takes a job, analyzes its name, and routes it to the correct manager.
-   * @param jobName The unique name of the job.
-   * @param job The job payload.
-   * @returns The complete, JARM-compliant response payload, ready for encryption.
+   * Processes a job, gets the plaintext response from the appropriate manager,
+   * and then encrypts it before returning the final artifact.
+   * @returns The final, encrypted JWE response as a string.
    */
-  public async process(jobName: string, job: JobRequest): Promise<IPayloadResponse> {
+  public async process(jobName: string, job: JobRequest): Promise<string> {
     const jobInfo = parseJobName(jobName);
-    
     try {
       if (!jobInfo) {
         throw new Error(`Invalid job name format: '${jobName}'`);
       }
-      if (!job.tenantId) {
-        throw new Error('Job is missing required tenantId.');
+      if (!job.tenantId || !job.sector) {
+        throw new Error('Job is missing required tenantId or sector.');
       }
 
       const { resourceType } = jobInfo;
@@ -69,23 +70,40 @@ export class Worker {
         throw new Error(`Manager for '${resourceType}' is registered but not initialized.`);
       }
 
-      // 2. Delegate the entire job to the selected manager
-      // The manager is responsible for all business logic and for building the response payload.
-      return await manager.process(job);
+      // 2. Delegate to the manager to get the plaintext response.
+      const payloadResponse = await manager.process(job);
+      
+      // 3. Encrypt the final response for the original requester.
+      const recipientKey = job.meta?.jwe?.header?.jwk;
+      if (!recipientKey) {
+        throw new Error(`Cannot encode response: sender's public key (jwk) not found in original request JWE header.`);
+      }
 
+      // Determine the vaultId of the entity issuing the response.
+      const senderVaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector, job.tenantId);
+      
+      return this.kmsService.encodeResponse(payloadResponse, [recipientKey], senderVaultId);
+      
     } catch (error: any) {
       console.error(`[Worker Job '${jobName}' failed for thid ${job.input?.thid}]`, error.message);
-            
-      // 3. In case of a catastrophic failure, create a fatal error response payload.
-      const errorBundle = createErrorBundle(error.message, jobInfo?.action, job.input?.body?.data?.[0]?.type);
       
-      return {
+      const errorBundle = createErrorBundle(error.message, jobInfo?.action, job.input?.body?.data?.[0]?.type);
+      const errorResponse = {
         thid: job.input?.thid || 'unknown-thid',
         iss: composeHostDidWebId(this.apiBaseUrl),
-        aud: job.input?.aud || 'unknown-aud',
+        aud: job.input?.iss || 'unknown-aud',
         exp: Math.floor(Date.now() / 1000) + 300,
         body: errorBundle,
       };
+
+      // Also encrypt error responses.
+      const recipientKey = job.meta?.jwe?.header?.jwk;
+      if (!recipientKey) {
+        throw new Error(`Cannot encode error response: sender's public key not found.`);
+      }
+
+      // The issuer of a catastrophic error is always the host.
+      return this.kmsService.encodeResponse(errorResponse, [recipientKey], 'host');
     }
   }
 }

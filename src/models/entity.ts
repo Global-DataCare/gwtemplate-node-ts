@@ -23,6 +23,7 @@ export interface EmployeeUrnParams extends OrganizationUrnParams {
   role: string;
 }
 
+
 /**
  * Represents the fundamental data payload for any configurable entity.
  * It separates the core identity information from operational or cryptographic configurations.

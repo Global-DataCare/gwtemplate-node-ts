@@ -4,12 +4,11 @@
 import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { ITenantsManager } from './ITenantsManager';
 import { VaultRepository } from '../database/repositories/vault/vault.repository';
-import { EntityConfig } from '../models/entity';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { getTenantVaultId } from '../utils/tenant';
+import { getTenantVaultId, getIdentifierUrnFromClaims } from '../utils/tenant';
 import { DidDocument, DidService } from '../models/did';
 import { getEnvironment } from '../utils/environment';
-import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
 import { Sector } from '../models/path';
 import { getBaseUrlFromDidWeb } from '../utils/did';
 import { parseTenantUrn } from '../utils/urn';
@@ -23,7 +22,7 @@ import { parseTenantUrn } from '../utils/urn';
 export class TenantsCacheManager implements ITenantsManager {
   private vaultRepository: VaultRepository;
   private kmsService: IKmsService;
-  private tenantCacheByVaultId = new Map<string, EntityConfig>();
+  private tenantCacheByVaultId = new Map<string, any>();
 
   constructor(vaultRepository: VaultRepository, kmsService: IKmsService) {
     this.vaultRepository = vaultRepository;
@@ -31,7 +30,7 @@ export class TenantsCacheManager implements ITenantsManager {
   }
 
   public async loadTenants(): Promise<void> {
-    console.log('[TenantsCacheManager] Reloading all tenant configurations into memory...');
+    // console.log('[TenantsCacheManager] Reloading all tenant configurations into memory...');
 
     this.tenantCacheByVaultId.clear();
 
@@ -40,21 +39,18 @@ export class TenantsCacheManager implements ITenantsManager {
 
     for (const record of secureTenantRecords) {
       try {
-        const tenantConfig = await this.kmsService.unprotectConfidentialData<EntityConfig>(record, 'host');
+        const tenantConfig = await this.kmsService.unprotectConfidentialData<any>(record, 'host');
 
         if (tenantConfig) {
-          // The alternateName is a required configuration alias stored in the claims.
-          const alternateName = (tenantConfig.claims as any)[ClaimsOrganizationSchemaorg.alternateName];
+          const alternateName = tenantConfig.claims[ClaimsOrganizationSchemaorg.alternateName];
           let sector: string | undefined;
 
           if (alternateName) {
             if (alternateName === 'host') {
-              // The host is a special, sector-agnostic entity.
-              // The vaultId will be 'host', so the sector is not strictly needed for caching.
-              sector = 'governance'; // Assign a default for consistency.
+              sector = 'governance';
             } else {
-              // For all tenants, the URN in didDocument.id is the single source of truth for the sector.
-              const urn = tenantConfig.didDocument?.id;
+              // The sector must be parsed from the canonical identifier (URN) in the claims.
+              const urn = getIdentifierUrnFromClaims(tenantConfig.claims);
               const parsedUrn = urn ? parseTenantUrn(urn) : null;
               sector = parsedUrn?.sector;
             }
@@ -64,7 +60,7 @@ export class TenantsCacheManager implements ITenantsManager {
                 alternateName === 'host' ? 'host' : getTenantVaultId(sector, alternateName);
 
               if (getEnvironment() !== 'production') {
-                console.log(`[TenantsCacheManager] Caching tenant with vaultId: ${vaultId}`);
+                // console.log(`[TenantsCacheManager] Caching tenant with vaultId: ${vaultId}`);
               }
               this.tenantCacheByVaultId.set(vaultId, tenantConfig);
             } else {
@@ -77,12 +73,17 @@ export class TenantsCacheManager implements ITenantsManager {
       }
     }
 
-    console.log(`[TenantsCacheManager] Successfully loaded ${this.tenantCacheByVaultId.size} tenants.`);
+    // console.log(`[TenantsCacheManager] Successfully loaded ${this.tenantCacheByVaultId.size} tenants.`);
   }
 
+  /**
+   * Retrieves the canonical URN for a tenant from its cached claims.
+   * @param vaultId The unique vault identifier for the tenant.
+   * @returns The URN string, or `undefined` if not found.
+   */
   public getTenantIdentifierUrn(vaultId: string): string | undefined {
     const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
-    return tenantConfig?.didDocument.id;
+    return getIdentifierUrnFromClaims(tenantConfig?.claims);
   }
 
   public getDidDocument(vaultId: string): DidDocument | undefined {
@@ -91,19 +92,13 @@ export class TenantsCacheManager implements ITenantsManager {
   }
 
   public getDidServiceConfig(vaultId: string): DidService[] | undefined {
-    console.log(`[TenantsCacheManager] Attempting to get services for vaultId: '${vaultId}'`);
     const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
-    if (!tenantConfig) {
-      console.log(`[TenantsCacheManager] Cache MISS for vaultId: '${vaultId}'`);
-    } else {
-      console.log(`[TenantsCacheManager] Cache HIT for vaultId: '${vaultId}'`);
-    }
     return tenantConfig?.didConfig.service;
   }
 
   /**
    * Retrieves the cached DID identifier (`did:web:...`) for a given tenant.
-   * @param vaultId The unique vault identifier for the tenant (e.g., 'host', 'health-care_acme').
+   * @param vaultId The unique vault identifier for the tenant.
    * @returns The DID string, or `undefined` if the tenant is not found in the cache.
    */
   public getTenantDid(vaultId: string): string | undefined {
@@ -112,29 +107,27 @@ export class TenantsCacheManager implements ITenantsManager {
   }
 
   /**
-   * Retrieves the cached sector for a given tenant.
+   * Retrieves the cached sector for a given tenant by parsing its canonical URN.
    * @param vaultId The unique vault identifier for the tenant.
-   * @returns The sector, or `undefined` if the tenant is not found.
+   * @returns The sector, or `undefined` if the tenant is not found or the URN is malformed.
    */
   public getTenantSector(vaultId: string): Sector | undefined {
-    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
-    if (!tenantConfig) return undefined;
+    const urn = this.getTenantIdentifierUrn(vaultId);
+    if (!urn) return undefined;
     
-    // For tenants, the single source of truth for the sector is the URN.
-    const urn = tenantConfig.didDocument?.id;
-    const parsedUrn = urn ? parseTenantUrn(urn) : null;
+    const parsedUrn = parseTenantUrn(urn);
     return parsedUrn?.sector as Sector;
   }
 
   /**
-   * Retrieves the cached jurisdiction for a given tenant.
+   * Retrieves the cached jurisdiction for a given tenant from its claims.
    * @param vaultId The unique vault identifier for the tenant.
-   * @returns The jurisdiction string (e.g., 'us'), or `undefined` if not found.
+   * @returns The jurisdiction string (e.g., 'es'), or `undefined` if not found.
    */
   public getTenantJurisdiction(vaultId: string): string | undefined {
     const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
     if (!tenantConfig) return undefined;
-    return (tenantConfig.claims as any)[ClaimsOrganizationSchemaorg.addressCountry] as string;
+    return tenantConfig.claims[ClaimsOrganizationSchemaorg.addressCountry] as string;
   }
 
   /**
@@ -142,7 +135,6 @@ export class TenantsCacheManager implements ITenantsManager {
    * It prioritizes the tenant's specified external domain (`url` claim) if it exists.
    * If not, it constructs and returns the fallback hosted URL on the gateway.
    * @param vaultId The unique vault identifier for the tenant.
-   * @param apiBaseUrl The base URL of the API, required for constructing fallback URLs.
    * @returns The tenant's service URL, or undefined if the tenant is not found.
    */
   public getTenantDomainUrl(vaultId: string): string | undefined {
@@ -156,39 +148,36 @@ export class TenantsCacheManager implements ITenantsManager {
       return undefined;
     }
     
-    // Prioritize the tenant's custom, external URL if it has been configured.
-    const externalUrl = (tenantConfig.claims as any)[ClaimsOrganizationSchemaorg.url];
+    const externalUrl = tenantConfig.claims[ClaimsOrganizationSchemaorg.url];
     if (externalUrl) {
-      // Ensure the URL has a scheme for consistency.
       return externalUrl.startsWith('http') ? externalUrl : `https://${externalUrl}`;
     }
-    // Otherwise, fall back to the hosted URL.
     return this.constructHostedUrl(tenantConfig);
   }
 
   /**
    * Constructs the full hosted URL for a tenant based on its configuration.
-   * It derives the host's base domain from the host's own DID document.
-   * Example: https://host.com/acme/cds-us/v1/health-care
+   * @param config The full tenant configuration object from the cache.
    */
-  private constructHostedUrl(config: EntityConfig): string | undefined {
+  private constructHostedUrl(config: any): string | undefined {
     const hostDidDoc = this.getDidDocument('host');
     if (!hostDidDoc) {
       console.error('[TenantsCacheManager] Cannot construct hosted URL: Host DID document not found in cache.');
       return undefined;
     }
 
-    // The host's DID is the source of truth for its domain. Use the new utility to decode it.
     const baseUrl = getBaseUrlFromDidWeb(hostDidDoc.id);
 
-    const alternateName = (config.claims as any)[ClaimsOrganizationSchemaorg.alternateName];
-    const urn = config.didDocument?.id;
+    const alternateName = config.claims[ClaimsOrganizationSchemaorg.alternateName];
+    // The URN is the single source of truth for jurisdiction, version, and sector.
+    const urn = config.claims[ClaimsOrganizationSchemaorg.identifier];
     const parsedUrn = urn ? parseTenantUrn(urn) : null;
 
     if (!alternateName || !parsedUrn?.jurisdiction || !parsedUrn?.version || !parsedUrn?.sector) {
+      console.warn('[TenantsCacheManager] Cannot construct hosted URL: missing alternateName or could not parse URN.');
       return undefined;
     }
     
-    return `${baseUrl}/${alternateName}/cds-${parsedUrn.jurisdiction}/${parsedUrn.version}/${parsedUrn.sector}`;
+    return `${baseUrl}/${alternateName}/cds-${parsedUrn.jurisdiction.toLowerCase()}/${parsedUrn.version}/${parsedUrn.sector}`;
   }
 }

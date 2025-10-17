@@ -18,7 +18,7 @@ export class BlockchainAdapterMem implements IBlockchainAdapter {
    * Simulates querying the mock ledger for a batch of hashes.
    */
   public async discoverDidsByHashes(hashes: string[], channel: string, chaincode: string): Promise<(string | undefined)[]> {
-    console.log(`[BlockchainAdapterMem] Querying channel "${channel}" on chaincode "${chaincode}" for ${hashes.length} hashes.`);
+    // console.log(`[BlockchainAdapterMem] Querying channel "${channel}" on chaincode "${chaincode}" for ${hashes.length} hashes.`);
     
     const results = hashes.map(hash => this.ledger.get(hash));
     

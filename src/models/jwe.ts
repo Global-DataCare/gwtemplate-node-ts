@@ -1,6 +1,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/models/jwe.ts
 
+import { JWK } from "./jwk";
+
 /**
  * Represents the core components of a JWE (JSON Web Encryption) structure,
  * based on RFC 7516. This is the standard for encrypted data.
@@ -14,6 +16,7 @@ export interface ProtectedHeadersJWE {
     alg?: string; // CEK encryption algorithm
     enc?: string; // Content encryption algorithm (e.g., "A256GCM")
     cty?: string; // Content type
+    jwk?: JWK; // Senders JWK
     typ?: string; // Type, e.g., "didcomm-envelope-enc"
     kid?: string; // Recipient's key ID
     skid?: string; // Sender's key ID

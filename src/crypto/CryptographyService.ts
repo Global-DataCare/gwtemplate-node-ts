@@ -119,10 +119,12 @@ export class CryptographyService implements ICryptography {
     }
     const payloadString = Content.bytesToStringASCII(payloadBytes);
     if (process.env.NODE_ENV !== 'production') {
+      /*
       console.log('[CryptoService] Encrypting content with:', {
         cek_b64: Content.bytesToRawBase64UrlSafe(derivedCekBytes),
         aad: protectedHeaderB64Url,
       });
+      */
     }
     const encrypted = await this.encrypt(payloadString, derivedCekBytes, protectedHeaderB64Url);
 
@@ -168,10 +170,12 @@ export class CryptographyService implements ICryptography {
 
     const payloadString = Content.bytesToStringASCII(payloadBytes);
     if (process.env.NODE_ENV !== 'production') {
+      /*
       console.log('[CryptoService] Encrypting content for Compact serialization with:', {
         cek_b64: Content.bytesToRawBase64UrlSafe(derivedCekBytes),
         aad: protectedHeaderB64Url,
       });
+      */
     }
     const encrypted = await this.encrypt(payloadString, derivedCekBytes, protectedHeaderB64Url);
 
@@ -197,10 +201,12 @@ export class CryptographyService implements ICryptography {
     // Decrypt the payload
     const encryptedData = { ciphertext: jweObject.ciphertext, iv: jweObject.iv, tag: jweObject.tag };
     if (process.env.NODE_ENV !== 'production') {
+      /*
       console.log('[CryptoService] Decrypting content with:', {
         cek_b64: Content.bytesToRawBase64UrlSafe(cekBytes),
         aad: jweObject.protected,
       });
+      */
     }
     const decryptedPayloadString = await this.decrypt(encryptedData, cekBytes, jweObject.protected);
 

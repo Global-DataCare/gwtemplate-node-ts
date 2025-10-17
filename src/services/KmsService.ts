@@ -81,13 +81,13 @@ export class KmsService implements IKmsService {
    */
   async init(): Promise<void> {
     if (this.isHostInitialized) {
-      console.log('[KmsService] Host keys already initialized.');
+      // console.log('[KmsService] Host keys already initialized.');
       return;
     }
-    console.log('[KmsService] Initializing host keys...');
+    // console.log('[KmsService] Initializing host keys...');
     await this.provisionKeys('host');
     this.isHostInitialized = true;
-    console.log('[KmsService] Host keys initialized successfully.');
+    // console.log('[KmsService] Host keys initialized successfully.');
   }
 
   private checkInitialized(): void {
@@ -166,12 +166,34 @@ export class KmsService implements IKmsService {
     };
   }
 
-  async getPublicVerificationKey(entityVaultId: string): Promise<MldsaPublicJwk | undefined> {
-    return this._managedKeys.get(entityVaultId)?.verificationKeyPair.publicJWKey;
+  async getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<MldsaPublicJwk | undefined> {
+    const keySet = this._managedKeys.get(entityVaultId);
+    if (!keySet) return undefined;
+
+    // For now, we only support one key type, so we ignore the 'alg' parameter.
+    // In the future, this would filter a list of keys.
+    // Default to ML-DSA-44 if no alg is provided.
+    if (!alg || alg === 'ML-DSA-44') {
+      return keySet.verificationKeyPair.publicJWKey;
+    }
+    
+    // Placeholder for legacy ECDSA key lookup
+    return undefined;
   }
 
-  async getPublicEncryptionKey(entityVaultId: string): Promise<MlkemPublicJwk | undefined> {
-    return this._managedKeys.get(entityVaultId)?.encryptionKeyPair.publicJWKey;
+  async getPublicEncryptionKey(entityVaultId: string, crv?: string): Promise<MlkemPublicJwk | undefined> {
+    const keySet = this._managedKeys.get(entityVaultId);
+    if (!keySet) return undefined;
+
+    // For now, we only support one key type, so we ignore the 'crv' parameter.
+    // In the future, this would filter a list of keys.
+    // Default to ML-KEM-768 if no crv is provided.
+    if (!crv || crv === 'ML-KEM-768') {
+      return keySet.encryptionKeyPair.publicJWKey;
+    }
+    
+    // Placeholder for legacy P-256 key lookup
+    return undefined;
   }
 
   async getHostPublicJwkSet(): Promise<JwkSet> {

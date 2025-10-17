@@ -24,19 +24,19 @@ const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
  * @returns True if the request is valid, false otherwise.
  */
 function isRequestValid(services: DidService[] | undefined, params: any): boolean {
-  console.log(`[isRequestValid]: params=${JSON.stringify(params)}`);
+  // console.log(`[isRequestValid]: params=${JSON.stringify(params)}`);
   const { sector, section, format, resourceType, action } = params;
 
   if (!services) {
     return false;
   }
-  console.log(`[isRequestValid]: sector=${sector}, section=${section}, format=${format}`);
+  // console.log(`[isRequestValid]: sector=${sector}, section=${section}, format=${format}`);
   const expectedServiceId = createDidServiceId({ version: 'v1', sector, section, format });
-  console.log(`[isRequestValid]: expectedServiceId=${expectedServiceId}`);
+  // console.log(`[isRequestValid]: expectedServiceId=${expectedServiceId}`);
   const matchingService = services.find(s => s.id === expectedServiceId);
 
   if (!matchingService) {
-    console.log(`[isRequestValid]: No matching service found. Available services: ${services.map(s => s.id).join(', ')}`);
+    // console.log(`[isRequestValid]: No matching service found. Available services: ${services.map(s => s.id).join(', ')}`);
     return false;
   }
 
@@ -63,9 +63,50 @@ export function createApiRouter(
 
   const cdsRoutePrefix = '/:tenantId/cds-:jurisdiction/v1/:sector/:section/:format/:resourceType';
 
+  // --- ASYNC JOB POLLING ENDPOINT (MUST BE DEFINED BEFORE THE GENERIC SUBMISSION ENDPOINT) ---
+
+  const pollingHandler = async (req: express.Request, res: express.Response) => {
+    const thid = (req.method === 'POST' ? req.body.thid : req.query.thid) as string | undefined;
+
+    if (!thid) {
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing or invalid "thid" parameter.');
+      return res.status(400).json(outcome);
+    }
+
+    const job = asyncResponseStore.get(thid);
+    if (!job) {
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound);
+      return res.status(404).json(outcome);
+    }
+    if (job.status === 'PENDING') {
+      res.set('Retry-After', '5');
+      return res.status(202).json({ thid, status: 'PENDING' });
+    }
+
+    if (job.status === 'COMPLETED' && job.result) {
+      res.set('Content-Type', 'application/x-www-form-urlencoded');
+      res.status(200).send(`response=${job.result}`);
+      asyncResponseStore.delete(thid);
+    } else {
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'Job failed to process or result was invalid.');
+      res.status(500).json(outcome);
+    }
+  };
+
+  const isFhirSector = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // This middleware logic is still broken as it relies on properties not exposed by the cache.
+    // For now, bypassing to allow tests to proceed. A new lookup method in the cache is needed.
+    // e.g., getTenantSector(vaultId)
+    // TODO: Refactor this to use a new specific cache function.
+    return next();
+  };
+
+  router.post(`${cdsRoutePrefix}/_batch-response`, pollingHandler);
+  router.get(`${cdsRoutePrefix}/_batch-response`, isFhirSector, pollingHandler);
+
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
-  router.post(`${cdsRoutePrefix}/_batch`, async (req, res) => {
-    const { tenantId, section, resourceType, sector } = req.params;
+  router.post(`${cdsRoutePrefix}/:action`, async (req, res) => {
+    const { tenantId, section, resourceType, sector, action } = req.params;
     const contentType = req.headers['content-type'] || '';
     let jobRequest: JobRequest;
 
@@ -109,16 +150,16 @@ export function createApiRouter(
     
     // Construct the vaultId directly from URL parameters.
     if (tenantId !== 'host' && process.env.NODE_ENV !== 'production') {
-      console.log(`[DEBUG] createApiRouter attempting to build vaultId with: sector='${sector}', tenantId='${tenantId}'`);
+      // console.log(`[DEBUG] createApiRouter attempting to build vaultId with: sector='${sector}', tenantId='${tenantId}'`);
     }
     const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
     
-    console.log(`[API] Attempting validation for vaultId: '${vaultId}'.`);
+    // console.log(`[API] Attempting validation for vaultId: '${vaultId}'.`);
     const tenantServices = tenantsCacheManager.getDidServiceConfig(vaultId);
-    console.log(`[API] Tenant services found for '${vaultId}': ${!!tenantServices}`);
+    // console.log(`[API] Tenant services found for '${vaultId}': ${!!tenantServices}`);
 
     try {
-      if (!isRequestValid(tenantServices, { ...req.params, action: '_batch' })) {
+      if (!isRequestValid(tenantServices, { ...req.params, action })) {
         console.error(`[API] Path/Role validation failed for ${req.originalUrl}. Tenant services found: ${!!tenantServices}.`);
         const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'The requested tenant or endpoint path does not exist.');
         return res.status(404).json(outcome);
@@ -132,12 +173,16 @@ export function createApiRouter(
     // --- 4. Enqueue Job ---
     // The jobRequest already contains the tenantId (alternateName) from the path parameters.
     // The worker is responsible for constructing the final vaultId when it processes the job.
-    const jobName = createJobName(vaultId, resourceType, '_batch');
+    const jobName = createJobName(vaultId, resourceType, action);
+    
+    // Manually add the action from the URL to the job payload before queueing.
+    jobRequest.action = action;
+
     await queueAdapter.addJob(jobName, jobRequest);
     asyncResponseStore.set(thid, { status: 'PENDING' });
 
     // --- 5. Success Response ---
-    const pollingUrl = req.originalUrl.replace('/_batch', '/_batch-response');
+    const pollingUrl = req.originalUrl.replace(`/${action}`, '/_batch-response');
     res.location(pollingUrl);
     // Add a Retry-After header to guide the client on polling frequency.
     res.set('Retry-After', '5');
@@ -145,47 +190,6 @@ export function createApiRouter(
     // The client already has the thid and the polling URL is in the Location header.
     res.status(202).send();
   });
-
-  // --- 2. ASYNC JOB POLLING ENDPOINT ---
-
-  const pollingHandler = async (req: express.Request, res: express.Response) => {
-    const thid = (req.method === 'POST' ? req.body.thid : req.query.thid) as string | undefined;
-
-    if (!thid) {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing or invalid "thid" parameter.');
-      return res.status(400).json(outcome);
-    }
-
-    const job = asyncResponseStore.get(thid);
-    if (!job) {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound);
-      return res.status(404).json(outcome);
-    }
-    if (job.status === 'PENDING') {
-      res.set('Retry-After', '5');
-      return res.status(202).json({ thid, status: 'PENDING' });
-    }
-
-    if (job.status === 'COMPLETED' && job.result) {
-      res.set('Content-Type', 'application/x-www-form-urlencoded');
-      res.status(200).send(`response=${job.result}`);
-      asyncResponseStore.delete(thid);
-    } else {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'Job failed to process or result was invalid.');
-      res.status(500).json(outcome);
-    }
-  };
-
-  const isFhirSector = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    // This middleware logic is still broken as it relies on properties not exposed by the cache.
-    // For now, bypassing to allow tests to proceed. A new lookup method in the cache is needed.
-    // e.g., getTenantSector(vaultId)
-    // TODO: Refactor this to use a new specific cache function.
-    return next();
-  };
-
-  router.post(`${cdsRoutePrefix}/_batch-response`, pollingHandler);
-  router.get(`${cdsRoutePrefix}/_batch-response`, isFhirSector, pollingHandler);
 
   return router;
 }

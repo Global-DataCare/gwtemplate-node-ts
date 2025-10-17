@@ -37,6 +37,54 @@ The mapping is as follows:
 | `payload` (array) | `body.data` | JSON:API formatted array. |
 
 
+## Phase 2: Patient Response and Status Polling
+
+The initial notification is only the first half of the interaction. The process is not complete until the patient confirms, cancels, or reschedules the appointment. This creates a long-running, stateful job that the original EMR system needs to monitor.
+
+### High-Level Response Flow
+
+1.  **Patient Action**: The patient's app, after displaying the appointment, presents `Accept` and `Cancel` options.
+2.  **Response Message**: When the user taps an option, the app constructs a new `CommMsgExtended` message. This is **not** a FHIR resource, but a simple, structured response.
+    -   The `thid` of the response **must be the same** as the original notification's `thid` to correlate the conversation.
+    -   The `to` field is the DID of the EMR system (the `from` of the original message).
+    -   The `from` field is the DID of the individual.
+    -   The `body.data` contains a simple `AppointmentResponse` resource with the new status (`booked` for accepted, `cancelled` for declined).
+3.  **Gateway Ingestion**: The app sends this response message to the gateway.
+4.  **Worker Processing**: A worker processes the response. It identifies the original job using the `thid`, updates its status, and potentially notifies the EMR system via a webhook or makes the status available for polling.
+
+### Asynchronous Job State Management
+
+To allow the EMR to poll for the status of the appointment without breaking the end-to-end encryption of the payload, certain metadata fields on the stored job object (`ConfidentialDocument`) must be stored unencrypted.
+
+| Unencrypted Metadata Field | Purpose | Example Values |
+| :--- | :--- | :--- |
+| `thid` | Job Correlation ID | `urn:uuid:c26e2a2a-6531-4a1f-a185-8a014a6316f7` |
+| `status` | Current state of the appointment | `proposed`, `pending`, `booked`, `cancelled`, `noshow` |
+| `type` | Type of resource | `Appointment`, `Communication` |
+| `owner`| The DID of the owner of the document | `did:web:uhc-es.com:services:health-care:u:1234`|
+| `updated` | Timestamp of last status change | `2024-10-15T14:45:00Z` |
+
+The `status` field is derived from the official [FHIR AppointmentStatus ValueSet](http://hl7.org/fhir/ValueSet/appointmentstatus).
+
+### EMR Polling Endpoint
+
+The EMR can periodically query a new endpoint to get the latest status of the job.
+
+**Request:**
+`GET /status/{thid}`
+
+**Response (for a pending appointment):**
+```json
+{
+  "thid": "urn:uuid:c26e2a2a-6531-4a1f-a185-8a014a6316f7",
+  "status": "pending",
+  "type": "Appointment",
+  "updated": "2024-10-15T14:30:00Z"
+}
+```
+
+This mechanism allows the external system to track the progress of the appointment lifecycle without ever having access to the encrypted PII/PHI exchanged between the gateway and the individual.
+
 ## Detailed Architectural Steps & Payloads
 
 ### Step 1: EMR Constructs the FHIR `Communication` Resource

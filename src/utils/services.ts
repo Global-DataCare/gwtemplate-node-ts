@@ -92,7 +92,7 @@ export function initializeTenantServices(didId: string, sector: Sector, customSe
     },
     {
       ...(createDidEndpointConfig(
-        createDidServiceId({ version: 'v1', sector, section: 'discovery-network', format: 'org.schema' }),
+        createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema' }),
         ['Person'],
         ['_discovery']
       )),

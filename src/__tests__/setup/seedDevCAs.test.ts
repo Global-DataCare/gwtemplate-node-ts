@@ -61,19 +61,19 @@ function resolveOutputDir(...segments: string[]) {
 
 describe('Development CAs Seeding', () => {
   it('should generate all required crypto material for Root CA and Intermediate CA', async () => {
-    console.log('🔥 Starting generation of crypto material for development CAs...');
+    // console.log('🔥 Starting generation of crypto material for development CAs...');
 
     const rootDir = resolveOutputDir('fabric-ca-server-root');
     const icaDir = resolveOutputDir('fabric-ca-server-ica');
     
-    console.log('🧹 Cleaning up previous crypto material...');
+    // console.log('🧹 Cleaning up previous crypto material...');
     fs.rmSync(rootDir, { recursive: true, force: true });
     fs.rmSync(icaDir, { recursive: true, force: true });
     fs.mkdirSync(rootDir, { recursive: true });
     fs.mkdirSync(icaDir, { recursive: true });
 
     // --- Root CA ---
-    console.log('🌱 Generating Root CA...');
+    // console.log('🌱 Generating Root CA...');
     const rootKeyPair = await deriveKeyPair(rootCAConfig.seed);
     const rootPrivKey = await crypto.subtle.importKey('jwk', rootKeyPair.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign']);
     
@@ -90,10 +90,10 @@ describe('Development CAs Seeding', () => {
     fs.writeFileSync(path.join(rootDir, 'ca-cert.pem'), bufferToPem(rootCertBuffer, 'CERTIFICATE'));
     const rootPrivKeyPem = bufferToPem(Buffer.from(await crypto.subtle.exportKey('pkcs8', rootPrivKey)), 'PRIVATE KEY');
     fs.writeFileSync(path.join(rootDir, 'ca-key.pem'), rootPrivKeyPem);
-    console.log(`✅ Root CA material generated in ${rootDir}`);
+    // console.log(`✅ Root CA material generated in ${rootDir}`);
 
     // --- Intermediate CA ---
-    console.log('🌿 Generating Intermediate CA...');
+    // console.log('🌿 Generating Intermediate CA...');
     const icaKeyPair = await deriveKeyPair(icaConfig.seed);
     const icaPrivKey = await crypto.subtle.importKey('jwk', icaKeyPair.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign']);
 
@@ -112,7 +112,7 @@ describe('Development CAs Seeding', () => {
     fs.writeFileSync(path.join(icaDir, 'ca-key.pem'), icaPrivKeyPem);
     fs.writeFileSync(path.join(icaDir, 'ca-chain.pem'), bufferToPem(rootCertBuffer, 'CERTIFICATE'));
     
-    console.log(`✅ Intermediate CA material generated in ${icaDir}`);
-    console.log('\n🚀 Crypto material generated successfully. You can now start the CAs with \`docker-compose up -d\`.');
+    // console.log(`✅ Intermediate CA material generated in ${icaDir}`);
+    // console.log('\n🚀 Crypto material generated successfully. You can now start the CAs with \`docker-compose up -d\`.');
   });
 });

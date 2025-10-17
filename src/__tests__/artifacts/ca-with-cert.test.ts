@@ -86,5 +86,5 @@ const rawPublicKey = new Uint8Array(publicKeyBytes); // <-- reenvuelve para que 
   const certRaw = cert.toSchema(true).toBER(false);
   const certPem = bufferToPem(Buffer.from(certRaw), 'CERTIFICATE');
   writeFileSync(`artifacts/${FILE_PREFIX}-certificate.pem`, certPem);
-  console.log(`✅ artifacts/${FILE_PREFIX}-certificate.pem written successfully.`);
+  // console.log(`✅ artifacts/${FILE_PREFIX}-certificate.pem written successfully.`);
 });

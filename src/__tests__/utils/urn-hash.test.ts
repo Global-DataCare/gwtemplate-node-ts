@@ -5,22 +5,22 @@ import { testExamplesIndividualUrn } from '../data/identity.data';
 describe('generateUrnHash', () => {
   // This test's primary goal is to log the generated hashes for documentation.
   it('should generate deterministic, multibase-encoded hashes for all example URNs', () => {
-    console.log('--- URN Multibase Hash Generation ---');
+    // console.log('--- URN Multibase Hash Generation ---');
 
     for (const [key, urn] of Object.entries(testExamplesIndividualUrn)) {
       const hash = generateUrnHash(urn);
 
       // Log the input and output for documentation and verification
-      console.log(`URN (${key}): ${urn}`);
-      console.log(`Canonicalized: ${canonicalizeForTest(urn)}`);
-      console.log(`Multibase Hash: ${hash}\n`);
+      // console.log(`URN (${key}): ${urn}`);
+      // console.log(`Canonicalized: ${canonicalizeForTest(urn)}`);
+      // console.log(`Multibase Hash: ${hash}\n`);
 
       // Basic assertion to ensure the function is working
       expect(hash).toBeDefined();
       expect(hash.startsWith('z')).toBe(true);
     }
 
-    console.log('------------------------------------');
+    // console.log('------------------------------------');
   });
 
   it('should produce the same hash for URNs that only differ in schema-part casing', () => {

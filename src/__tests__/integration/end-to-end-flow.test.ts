@@ -241,7 +241,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     // The 'acme' tenant was created in 'ES' jurisdiction in Part 1. We must be consistent.
     const jurisdiction = 'es'; 
     // TODO: function for external url and did:web or hosted url and did:web is required instead of URN for the target audience
-    const targetDid = await tenantManager.getTenantIdentifierUrn('health-care_acme');
+    const targetDid = await tenantManager.getTenantDid('health-care_acme');
     const issuerDid = testTenant1Receptionist1DidExternal;
     const thid = `thid-e2e-person-onboarding-${Date.now()}`;
 
@@ -314,8 +314,8 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
 
     const compositionPayload = {
       thid: `thid-e2e-composition-${Date.now()}`,
-      iss: `did:web:acme.com:users:some-receptionist-id`,
-      aud: await tenantManager.getTenantIdentifierUrn('health-care_acme'),
+      iss: testTenant1Receptionist1DidExternal,
+      aud: await tenantManager.getTenantDid('health-care_acme'),
       body: {
         data: [
           {
@@ -360,8 +360,8 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
 
     const communicationPayload = {
       thid: appointmentThid,
-      iss: `did:web:acme.com:users:some-emr-system-id`,
-      aud: await tenantManager.getTenantIdentifierUrn('health-care_acme'),
+      iss: testTenant1Receptionist1DidExternal,
+      aud: await tenantManager.getTenantDid('health-care_acme'),
       body: {
         data: [
           {
@@ -411,7 +411,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
       pthid: '...original-appointment-thid...', // pthid links to the original message
       thid: `thid-e2e-response-${Date.now()}`,
       iss: `did:web:patient-app-instance-123`, // The patient's app instance DID
-      aud: await tenantManager.getTenantIdentifierUrn('health-care_acme'),
+      aud: await tenantManager.getTenantDid('health-care_acme'),
       body: {
         data: [{
           type: 'Communication-response-v1.0',
@@ -431,8 +431,8 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
 
     const subscriptionPayload = {
       thid: `thid-e2e-subscription-${Date.now()}`,
-      iss: `did:web:acme.com:users:some-emr-system-id`,
-      aud: await tenantManager.getTenantIdentifierUrn('health-care_acme'),
+      iss: testTenant1Receptionist1DidExternal,
+      aud: await tenantManager.getTenantDid('health-care_acme'),
       body: {
         data: [{
           type: 'Subscription-create-v1.0',
@@ -468,7 +468,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     const discoveryPayload = {
         thid: thid,
         iss: testTenant1Receptionist1DidExternal,
-        aud: await tenantManager.getTenantIdentifierUrn('health-care_acme'),
+        aud: await tenantManager.getTenantDid('health-care_acme'),
         body: {
             data: [{
                 type: 'Person-discover-v1.0',
@@ -490,7 +490,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     const jweProtectedHeader = { enc: 'A256GCM', cty: 'JWS', skid: externalEncrypter.kid };
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
-    const discoveryUrl = `/acme/cds-es/v1/health-care/network/org.schema/Person/_discovery`;
+    const discoveryUrl = `/acme/cds-es/v1/health-care/test-network/org.schema/Person/_discovery`;
     
     const postResponse = await request.default(app)
       .post(discoveryUrl)

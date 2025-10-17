@@ -58,11 +58,17 @@ export interface IKmsService {
    */
   getPublicJwks(entityVaultId: string): Promise<JwkSet>;
 
-  /** Retrieves only the public signing key for an entity. */
-  getPublicVerificationKey(entityVaultId: string): Promise<MldsaPublicJwk | undefined>;
+  /** 
+   * Retrieves the public signing key for an entity, optionally filtering by algorithm.
+   * If no algorithm is specified, it defaults to the preferred modern algorithm (e.g., ML-DSA-44).
+   */
+  getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<MldsaPublicJwk | undefined>;
   
-  /** Retrieves only the public encryption key for an entity. */
-  getPublicEncryptionKey(entityVaultId: string): Promise<MlkemPublicJwk | undefined>;
+  /** 
+   * Retrieves the public encryption key for an entity, optionally filtering by curve.
+   * If no curve is specified, it defaults to the preferred modern algorithm (e.g., ML-KEM-768).
+   */
+  getPublicEncryptionKey(entityVaultId: string, crv?: string): Promise<MlkemPublicJwk | undefined>;
 
   /**
    * A dedicated method to get the host's public keys as a standard JWKSet.

@@ -11,7 +11,7 @@ export class MockBlockchainManager {
 
   constructor(itemType: string) {
     this.itemType = itemType;
-    console.log(`[MockBlockchainManager] Initialized for item type: ${this.itemType}`);
+    // console.log(`[MockBlockchainManager] Initialized for item type: ${this.itemType}`);
   }
 
   /**
@@ -29,7 +29,7 @@ export class MockBlockchainManager {
     assetUUID: string,
     resourceObj: any,
   ): Promise<any> {
-    console.log(`[MockBlockchainManager] Simulating creation of ${this.itemType} with ID: ${assetUUID}`);
+    // console.log(`[MockBlockchainManager] Simulating creation of ${this.itemType} with ID: ${assetUUID}`);
     // In a real scenario, this would interact with a blockchain.
     // Here, we just return the object, perhaps wrapped in a "data" property
     // to mimic the primary document structure you showed.
@@ -41,7 +41,7 @@ export class MockBlockchainManager {
 
   // Add other mocked methods as needed (e.g., update, read, etc.)
   async read(mspId: string, assetId: string): Promise<any> {
-    console.log(`[MockBlockchainManager] Simulating read of ${this.itemType} with ID: ${assetId}`);
+    // console.log(`[MockBlockchainManager] Simulating read of ${this.itemType} with ID: ${assetId}`);
     // This would fetch from the blockchain. We'll return a dummy object.
     return Promise.resolve({ data: [{ id: assetId, mocked: true }] });
   }

@@ -18,6 +18,7 @@ import { initializeEmployeeServices } from '../utils/services';
 import { createOperationOutcome } from '../utils/outcome';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { TenantsCacheManager } from './TenantsCacheManager';
+import { getTenantVaultId } from '../utils/tenant';
 
 const EMPLOYEE_SECTION = 'employees';
 
@@ -40,8 +41,13 @@ export class EmployeeManager {
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
     const entries = job.input?.body?.data ?? [];
 
+    if (!job.tenantId || !job.sector) {
+      throw new ManagerError('Job is missing required tenantId or sector.', IssueType.Required);
+    }
+    const vaultId = getTenantVaultId(job.sector, job.tenantId);
+
     // Fetch the tenant's URN once for the entire job.
-    const issuerUrn = this.tenantsCacheManager.getTenantIdentifierUrn(job.tenantId!);
+    const issuerUrn = this.tenantsCacheManager.getTenantIdentifierUrn(vaultId);
     if (!issuerUrn) {
       throw new ManagerError(`Tenant with ID '${job.tenantId}' not found.`, IssueType.NotFound);
     }
@@ -49,7 +55,7 @@ export class EmployeeManager {
     for (const entry of entries) {
       try {
         // Pass the fetched URN down to the entry processor.
-        const resultEntry = await this.processEntry(entry, job.tenantId!, issuerUrn, environment);
+        const resultEntry = await this.processEntry(entry, vaultId, issuerUrn, environment);
         responseEntries.push(resultEntry);
       } catch (error: any) {
         const errorEntry = this.handleError(error, entry.type, (entry as BundleEntryRequest).meta);
@@ -74,7 +80,7 @@ export class EmployeeManager {
 
   private async processEntry(
     entry: BundleEntry,
-    tenantId: string,
+    vaultId: string,
     tenantUrn: string,
     environment?: string,
   ): Promise<BundleEntry> {
@@ -94,16 +100,16 @@ export class EmployeeManager {
 
     switch (request.method) {
       case 'POST':
-        return this.createEmployee(tenantId, tenantUrn, employeeId, claims, type);
+        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type);
       case 'DELETE':
-        return this.disableEmployee(tenantId, employeeId, type);
+        return this.disableEmployee(vaultId, employeeId, type);
       default:
         throw new ManagerError(`Unsupported request method: '${request.method}'`, IssueType.NotSupported);
     }
   }
 
   private async createEmployee(
-    tenantId: string,
+    vaultId: string,
     tenantUrn: string,
     employeeId: string,
     claims: ClaimsRecord,
@@ -161,9 +167,9 @@ export class EmployeeManager {
       sequence: 0,
       content: employeeConfig,
     };
-    // The tenantId (internal ID) is used for the security context.
-    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, tenantId);
-    await this.vaultRepository.put(tenantId, [secureDoc, occupationDoc], EMPLOYEE_SECTION);
+    // The tenant's vaultId is used for the security context.
+    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
+    await this.vaultRepository.put(vaultId, [secureDoc, occupationDoc], EMPLOYEE_SECTION);
 
     return {
       type: entryType,
@@ -177,18 +183,18 @@ export class EmployeeManager {
     };
   }
 
-  private async disableEmployee(tenantId: string, employeeId: string, entryType: string): Promise<BundleEntry> {
-    const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(tenantId, employeeId, EMPLOYEE_SECTION);
+  private async disableEmployee(vaultId: string, employeeId: string, entryType: string): Promise<BundleEntry> {
+    const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(vaultId, employeeId, EMPLOYEE_SECTION);
     if (!employeeDoc) {
       throw new ManagerError(`Employee with ID '${employeeId}' not found.`, IssueType.NotFound);
     }
 
-    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, tenantId);
+    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
     employee.status = 'disabled';
 
     const docToProtect: ConfidentialStorageDoc = { ...employeeDoc, content: employee };
-    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, tenantId);
-    await this.vaultRepository.put(tenantId, [secureDoc], EMPLOYEE_SECTION);
+    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
+    await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);
 
     return {
       type: entryType,

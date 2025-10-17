@@ -1,6 +1,8 @@
 // src/utils/tenant.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
+
   /**
  * Constructs the unique vault identifier for a tenant from its sector and alternate name.
  * This composite ID is used as the vault name in the repository and as the `entityId`
@@ -36,4 +38,16 @@ export function isValidTenantAlternateName(alternateName: string): boolean {
     return false;
   }
   return true;
+}
+
+/**
+ * Extracts the canonical identifier URN from a claims object.
+ * @param claims The claims object from an entity configuration.
+ * @returns The URN string, or undefined if not found.
+ */
+export function getIdentifierUrnFromClaims(claims: any): string | undefined {
+  if (!claims) {
+    return undefined;
+  }
+  return claims[ClaimsOrganizationSchemaorg.identifier] as string;
 }

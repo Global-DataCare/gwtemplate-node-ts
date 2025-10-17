@@ -70,7 +70,7 @@ describe('🔐 PKI Chain Test', () => {
         const derCert = bufferToPem(rootCert, 'CERTIFICATE').toString().replace(/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\\n/g, '');
         const certBytes = Buffer.from(derCert, 'base64');
         const hash = sha256(certBytes);
-        console.log(`📌 CA Root Fingerprint (SHA-256): ${bytesToHex(hash)}`);
+        // console.log(`📌 CA Root Fingerprint (SHA-256): ${bytesToHex(hash)}`);
     });
 
     test('Generate ICA', async () => {

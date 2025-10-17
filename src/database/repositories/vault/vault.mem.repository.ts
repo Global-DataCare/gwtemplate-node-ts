@@ -21,7 +21,7 @@ export class VaultMemRepository implements VaultRepository {
   }  
 
   public async createNewVault(vaultConfig: VaultConfig): Promise<boolean> {
-    console.log(`[VaultMemRepository] Attempting to create new vault with id: '${vaultConfig.id}'`);
+    // console.log(`[VaultMemRepository] Attempting to create new vault with id: '${vaultConfig.id}'`);
     if (this.vaults.has(vaultConfig.id)) {
       console.error(`[VaultMemRepository] Vault creation failed, vault already exists: '${vaultConfig.id}'`);
       return false;
@@ -81,7 +81,7 @@ export class VaultMemRepository implements VaultRepository {
   }
 
   public async put<T extends RecordBase>(vaultId: string, containers: T[], sectionId: string = 'default'): Promise<boolean> {
-    console.log(`[VaultMemRepository] Putting ${containers.length} container(s) into vault: '${vaultId}', section: '${sectionId}'`);
+    // console.log(`[VaultMemRepository] Putting ${containers.length} container(s) into vault: '${vaultId}', section: '${sectionId}'`);
     const vault = this.vaults.get(vaultId);
     if (!vault) {
       console.error(`[VaultMemRepository] Cannot put data, vault not found: '${vaultId}'`);

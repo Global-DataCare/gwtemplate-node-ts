@@ -7,7 +7,7 @@ function delay(ms: number): Promise<void> {
 
 class ChainCodeProcessor {
     static async process(data: any): Promise<void> {
-      console.log(`Invoking smart contract with data: ${JSON.stringify(data)}`);
+      // console.log(`Invoking smart contract with data: ${JSON.stringify(data)}`);
       // Use the Hyperledger Fabric SDK here
       await delay(MOCK_DELAY_MS);
     }

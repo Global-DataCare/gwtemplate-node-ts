@@ -207,7 +207,7 @@ describe('Network Enrollment API', () => {
         input: jobFromNonControllerEmployee,
         meta: {
           jws: {
-            protected: { kid: employeeKid }
+            protected: { alg: 'ES256K', kid: employeeKid }
           }
         },
       };

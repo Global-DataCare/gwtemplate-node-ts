@@ -52,7 +52,7 @@ export function initializeKekService(): void {
   // Security Best Practice: Redact the secret from the environment variables
   // after it has been loaded into its secure, in-memory wrapped form.
   process.env.KEK_SECRET = '<REDACTED_FOR_SECURITY>';
-  console.log('[KEK_SERVICE] Initialized successfully. Master secret has been wrapped and redacted.');
+  // console.log('[KEK_SERVICE] Initialized successfully. Master secret has been wrapped and redacted.');
 }
 
 /**

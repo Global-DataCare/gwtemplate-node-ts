@@ -80,7 +80,7 @@ export const testTenant1VaultId = `${testTenant1ServiceProviderCategory}_${testT
 
 /** The Tenant's identifier a static, canonical semantic URN.
  *  This is the ID that will be used in the 'credentialSubject.identifier' of its Pointer Credential.
- *  For example: `urn:antifraud:test-network:cds-ES:v1:health-care:entity:EI:98-7654321`
+ *  For example: `urn:unid:test-network:cds-ES:v1:health-care:entity:EI:98-7654321`
  */
 export const testTenant1IdentifierUrn = 
   `urn:${URN_NAMESPACE}:${URN_NETWORK}:${testTenant1AddressCountry}:${URN_VERSION}:${testTenant1ServiceProviderCategory}:entity:${testTenant1IdType}:${testTenant1IdValue}`;
@@ -179,7 +179,7 @@ export const testConfigTenant1: EntityConfig = {
     [ClaimsOrganizationSchemaorg.legalName]: testTenant1LegalName,
     [ClaimsOrganizationSchemaorg.identifierType]: testTenant1IdType,
     [ClaimsOrganizationSchemaorg.identifierValue]: testTenant1IdValue,
-    [ClaimsOrganizationSchemaorg.identifier]: testTenant1DidWebHosted, // this is the fixed, static one. The external did:web can vary with the domain
+    [ClaimsOrganizationSchemaorg.identifier]: testTenant1IdentifierUrn, // this is the fixed, static one. The external did:web can vary with the domain
     [ClaimsOrganizationSchemaorg.alternateName]: testTenant1AlternateName,
     [ClaimsOrganizationSchemaorg.addressCountry]: testTenant1AddressCountry,
     // [ClaimsOrgSchemaorg.taxID]: testHostData.taxId,    

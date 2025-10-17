@@ -61,7 +61,7 @@ export class VerifyPdf {
 
     const validAuthenticatedAttributes = verifier.verify(cert, sig, "binary");
     if (!validAuthenticatedAttributes) {
-      console.log("VerifyPdf: Wrong authenticated attributes");
+      // console.log("VerifyPdf: Wrong authenticated attributes");
      //  throw new Error("Wrong authenticated attributes");
     }
 
@@ -82,7 +82,7 @@ export class VerifyPdf {
     const validContentDigest = dataDigest.toString("binary") === attrDigest;
     if (validContentDigest) {
       const greenText = "\x1b[32m%s\x1b[0m";
-      console.log(greenText, "Signature is valid!!!");
+      // console.log(greenText, "Signature is valid!!!");
     } else {
       throw new Error("Wrong content digest");
     }
