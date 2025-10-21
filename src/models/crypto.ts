@@ -1,26 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/models/crypto.ts
 
-import { MldsaPublicJwk, MlkemPublicJwk } from "../crypto/interfaces/Cryptography.types";
-
-/**
- * Represents a public key for a classical (non-PQC) algorithm.
- * This is used for legacy compatibility, e.g., with existing X.509 infrastructure.
- */
-export type ClassicPublicJwk = {
-    kty: "OKP";
-    crv: "Ed25519"; // Or other classic curves
-    x: string;
-    use: "sig";
-    alg: "EdDSA";
-    kid?: string;
-};
-
-/**
- * Represents a public key in JWK format, suitable for public documents like DIDs.
- * This is a union of all supported public key types, both PQC and classic.
- */
-export type PublicJWKey = MlkemPublicJwk | MldsaPublicJwk | ClassicPublicJwk;
+import { PublicJwk } from "../crypto/interfaces/Cryptography.types";
 
 /**
  * Describes a public key and its controller, for use in JWE recipients or DID documents.
@@ -29,7 +10,7 @@ export type PublicJWKey = MlkemPublicJwk | MldsaPublicJwk | ClassicPublicJwk;
 export interface RecipientPublicKey {
     type: string; // "JsonWebKey2020";
     controller?: string; // DID of the key controller
-    publicKeyJwk: PublicJWKey;
+    publicKeyJwk: PublicJwk;
     nbf?: number; // Not Before timestamp
     exp?: number; // Expiration timestamp
 }

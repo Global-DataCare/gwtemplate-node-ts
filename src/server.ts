@@ -151,14 +151,27 @@ async function startServer() {
   const vaultRepository = new VaultMemRepository();
 
   const cryptographyService = new CryptographyService();
-  
-  const kmsService: IKmsService = config.nodeEnv === 'demo'
-    ? new DemoKmsService()
-    : new KmsService(cryptographyService);
+
+  // KmsService and TenantsCacheManager have a circular dependency.
+  // - KmsService needs TenantsCacheManager to resolve DIDs for key lookup.
+  // - TenantsCacheManager needs KmsService to decrypt tenant data from the vault.
+  // To break the cycle, we provide TenantsCacheManager with a function that resolves
+  // to the KmsService instance, which will be fully initialized later.
+  let kmsService: IKmsService;
+  const tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService);
+
+  kmsService =
+    config.nodeEnv === 'demo'
+      ? new DemoKmsService()
+      : new KmsService(cryptographyService, tenantManager);
   await kmsService.init();
 
-  const tenantManager = new TenantsCacheManager(vaultRepository, kmsService);
-  const hostingManager = new HostingManager(vaultRepository, kmsService, tenantManager, config);
+  const hostingManager = new HostingManager(
+    vaultRepository,
+    kmsService,
+    tenantManager,
+    config,
+  );
   const employeeManager = new EmployeeManager(vaultRepository, kmsService, tenantManager);
   
   const credentialManager = new CredentialManager(
@@ -203,7 +216,7 @@ async function startServer() {
   const queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
 
   const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService);
-  const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore);
+  const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   app.use('/', discoveryRouter);
   app.use('/', apiRouter);
@@ -214,7 +227,7 @@ async function startServer() {
     // console.log('[GW-API] --- System Initialized Successfully ---');
   });
 
-  return { app, server, queueAdapter, tenantManager, kmsService, blockchainAdapter };
+  return { app, server, queueAdapter, tenantManager, kmsService, blockchainAdapter, vaultRepository, cryptographyService };
 }
 
 if (require.main === module) {

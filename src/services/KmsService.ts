@@ -1,4 +1,4 @@
-// src/services/KmsService.ts
+import { VerificationMethod } from '../models/did';// src/services/KmsService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { JWK, JwkSet } from '../models/jwk';
@@ -12,7 +12,9 @@ import { Content } from '../utils/content';
 import { createHash, randomBytes } from 'crypto';
 import { computeHmacSha256Base64Url } from '../crypto/hmac';
 import { ProtectedDataAES } from '../models/aes';
-import { ParamAttribute, ParameterData } from '../models/params';
+import { ParameterData } from '../models/params';
+
+import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 
 /**
  * @file Implements the Key Management Service, the central facade for all internal cryptographic operations.
@@ -66,12 +68,17 @@ type EntityKeysSet = {
  */
 export class KmsService implements IKmsService {
   private crypto: ICryptography;
+  private tenantsCacheManager: TenantsCacheManager;
   /** In-memory key storage. Key: entityId, Value: KeyPairSet. */
   private _managedKeys: Map<string, EntityKeysSet>;
   private isHostInitialized: boolean = false;
 
-  constructor(cryptographyService: ICryptography) {
+  constructor(
+    cryptographyService: ICryptography,
+    tenantsCacheManager: TenantsCacheManager,
+    ) {
     this.crypto = cryptographyService;
+    this.tenantsCacheManager = tenantsCacheManager;
     this._managedKeys = new Map();
   }
 
@@ -253,11 +260,15 @@ export class KmsService implements IKmsService {
     }
 
     const dataJwt = this.crypto.parseCompactJws(jwsString);
-
-    return {
+    const jobRequest = {
       input: dataJwt.payload,
       meta: { jws: dataJwt, jwe: { header: protectedHeader } },
     } as JobRequest;
+
+    // If the sender's public key for encryption is embedded in the header (e.g., during bootstrapping),
+    // there's nothing more to do. If it's not, the orchestrator (e.g., api.ts) will be responsible
+    // for resolving the sender's DID and verifying the signature.
+    return jobRequest;
   }
 
   // --- Signing Operations ---

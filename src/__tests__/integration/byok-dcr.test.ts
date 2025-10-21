@@ -50,13 +50,20 @@ import { testIndividualOnboardingBatchEntries } from '../data/customer-onboardin
 import { IPayloadResponse } from '../../models/response';
 import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
 import { generateUrnHash } from '../../utils/urn-hash';
+import { createHash } from 'crypto';
 import { normalizePhoneNumber } from '../../utils/phone-number';
+import { VaultRepository } from '../../database/repositories/vault/vault.repository';
+import { IBlockchainAdapter } from '../../adapters/IBlockchainAdapter';
 import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
 
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-describe('End-to-End API Flow (with Real Cryptography)', () => {
+// endpoint (e.g., `.../_dcr`). 
+// For now, this test validates that a tenant admin can onboard by providing their own keys
+// during the initial registration, and that subsequent API calls using those keys are resolved correctly.
+
+describe('End-to-End API Flow (BYOK Onboarding)', () => {
   let app: express.Express;
   let server: Server;
   let queueAdapter: QueueAdapter;
@@ -68,7 +75,8 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
   let kmsService: IKmsService;
   let tenantManager: TenantsCacheManager;
   let createdPersonId: string; // Variable to store the ID of the created person
-  let blockchainAdapter: BlockchainAdapterMem;
+  let blockchainAdapter: IBlockchainAdapter;
+  let vaultRepository: VaultRepository;
 
 
   beforeAll(async () => {
@@ -79,7 +87,9 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     queueAdapter = serverInstance.queueAdapter;
     kmsService = serverInstance.kmsService!;
     tenantManager = serverInstance.tenantManager;
-    blockchainAdapter = serverInstance.blockchainAdapter as BlockchainAdapterMem;
+    blockchainAdapter = serverInstance.blockchainAdapter;
+    vaultRepository = serverInstance.vaultRepository;
+    cryptoService = serverInstance.cryptographyService;
 
 
     // Get the public key directly from the running server's KmsService.
@@ -89,23 +99,19 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     if (!hostEncryptionKey) {
       throw new Error('Test setup failed: Could not find host encryption key (OKP) in JWKSet.');
     }
-    
-    cryptoService = new CryptographyService();
+    await tenantManager.loadTenants();
 
-    externalSigner = {
-      alg: 'ML-DSA-44',
-      kid: externalClientSignerJwk.kid,
-      kty: 'AKP',
-      pub: externalClientSignerJwk.pub,
-      privBytes: Content.base64ToBytes(externalClientSignerJwk.priv),
-    };
-    externalEncrypter = {
-      crv: 'ML-KEM-768',
-      kid: externalClientEncrypterJwk.kid,
-      kty: 'OKP',
-      x: externalClientEncrypterJwk.x,
-      dBytes: Content.base64ToBytes(externalClientEncrypterJwk.d),
-    };
+    // Generate deterministic keys for the "external client" (the future tenant admin)
+    // This makes the test reproducible without relying on static key files.
+    const externalClientSeed = 'byok-test-client-seed';
+    const dsaSeed = createHash('sha256').update(externalClientSeed + '-dsa').digest().subarray(0, 32);
+    const kemSeed = createHash('sha512').update(externalClientSeed + '-kem').digest().subarray(0, 64);
+    
+    const signerKeyPair = await cryptoService.generateKeyPairMlDsa(dsaSeed);
+    const encrypterKeyPair = await cryptoService.generateKeyPairMlKem(kemSeed);
+
+    externalSigner = { ...signerKeyPair.publicJWKey, privBytes: signerKeyPair.secretKeyBytes };
+    externalEncrypter = { ...encrypterKeyPair.publicJWKey, dBytes: encrypterKeyPair.secretKeyBytes };
   });
 
   beforeEach(() => {
@@ -130,12 +136,23 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     });
   });
 
-  it('Part 1: should accept a valid JWE/JWS to create a new organization', async () => {
+  it('Part 1: should accept a BOOTSTRAPPING request with embedded JWKs', async () => {
+    // This part tests the "Bring-Your-Own-Key" (BYOK) scenario.
+    // During the very first "organization creation" request, the client's DID (`iss`)
+    // is not yet registered in the system. To establish trust, the client MUST
+    // embed their public keys (JWKs) directly into the JWS and JWE protected headers.
+    // The server will then associate these keys with the new admin employee being created.
     const orgCreationPayload = { ...testPayloadCreateTenant1 };
 
     const jwsProtectedHeader = {
       alg: externalSigner.alg,
       kid: externalSigner.kid,
+      jwk: { // Public part of the signer key
+        alg: externalSigner.alg,
+        kid: externalSigner.kid,
+        kty: externalSigner.kty,
+        pub: externalSigner.pub,
+      },
     };
     const jwsCompactParts = await cryptoService.signDataJws(
       orgCreationPayload,
@@ -148,6 +165,12 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
       enc: 'A256GCM',
       cty: 'JWS',
       skid: externalEncrypter.kid,
+      jwk: { // Public part of the encrypter key
+        crv: externalEncrypter.crv,
+        kid: externalEncrypter.kid,
+        kty: externalEncrypter.kty,
+        x: externalEncrypter.x,
+      },
     };
     const compactJwe = await cryptoService.encryptJweToCompact(
       compactJws,
@@ -171,9 +194,19 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     } else {
       await delay(200);
     }
+    
+    // CRITICAL: After the organization and its admin are created, we must reload the
+    // tenant cache to ensure the new DID documents and keys are available for the next tests.
+    await tenantManager.loadTenants();
   });
 
-  it('Part 2: should accept a JWE/JWS to create an employee for the "acme" organization', async () => {
+  it('Part 2: should accept a STANDARD request without embedded JWKs', async () => {
+    // This part tests the standard operational flow.
+    // After bootstrapping (Part 1), the client's admin employee is registered,
+    // and their keys are known to the server. The client's DID (`iss`) can now be
+    // resolved by the server to find the correct public keys for signature
+    // verification and response encryption. Therefore, the client NO LONGER
+    // needs to embed the full JWKs in every request, saving bandwidth.
     const issuerDid = `did:web:provider.com:${testTenant1AlternateName}:employee:email:${testTenant1Data.member.admin1.email}`;
     const targetDid = 'did:web:provider.com';
 
@@ -192,7 +225,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
       },
     };
 
-    const jwsProtectedHeader = {
+    const jwsProtectedHeader = { // NO jwk here
       alg: externalSigner.alg,
       kid: externalSigner.kid,
     };
@@ -203,7 +236,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     );
     const compactJws = `${jwsCompactParts.protected}.${jwsCompactParts.payload}.${jwsCompactParts.signature}`;
 
-    const jweProtectedHeader = {
+    const jweProtectedHeader = { // NO jwk here
       enc: 'A256GCM',
       cty: 'JWS',
       skid: externalEncrypter.kid,
@@ -233,6 +266,9 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     } else {
       await delay(200); // Fallback for other queue types
     }
+    // CRITICAL: Reload the cache again to pick up the newly created employee's keys,
+    // which were added to the tenant's DID document.
+    await tenantManager.loadTenants();
   });
 
   it('Part 3: should create a new customer (individual) and allow polling for the result', async () => {
@@ -255,11 +291,18 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     };
 
     // 2. ACT (Phase 1): Sign and encrypt the payload, then POST it
-    const jwsProtectedHeader = { alg: externalSigner.alg, kid: externalSigner.kid };
+    const jwsProtectedHeader = {
+      alg: externalSigner.alg,
+      kid: externalSigner.kid,
+    };
     const jwsCompactParts = await cryptoService.signDataJws(personCreationPayload, jwsProtectedHeader, externalSigner.privBytes);
     const compactJws = `${jwsCompactParts.protected}.${jwsCompactParts.payload}.${jwsCompactParts.signature}`;
 
-    const jweProtectedHeader = { enc: 'A256GCM', cty: 'JWS', skid: externalEncrypter.kid };
+    const jweProtectedHeader = {
+      enc: 'A256GCM',
+      cty: 'JWS',
+      skid: externalEncrypter.kid,
+    };
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
     const registrationUrl = `/${tenantId}/cds-${jurisdiction}/v1/health-care/individual/org.schema/Person/_batch`;
@@ -334,11 +377,18 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
       }
     };
     
-    const jwsProtectedHeader = { alg: externalSigner.alg, kid: externalSigner.kid };
+    const jwsProtectedHeader = {
+      alg: externalSigner.alg,
+      kid: externalSigner.kid,
+    };
     const jws = await cryptoService.signDataJws(compositionPayload, jwsProtectedHeader, externalSigner.privBytes);
     const compactJws = `${jws.protected}.${jws.payload}.${jws.signature}`;
 
-    const jweProtectedHeader = { enc: 'A256GCM', cty: 'JWS', skid: externalEncrypter.kid };
+    const jweProtectedHeader = {
+      enc: 'A256GCM',
+      cty: 'JWS',
+      skid: externalEncrypter.kid,
+    };
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
     const registrationUrl = `/acme/cds-es/v1/health-care/individual/org.schema/Composition/_batch`;
@@ -385,11 +435,18 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
       }
     };
     
-    const jwsProtectedHeader = { alg: externalSigner.alg, kid: externalSigner.kid };
+    const jwsProtectedHeader = {
+      alg: externalSigner.alg,
+      kid: externalSigner.kid,
+    };
     const jws = await cryptoService.signDataJws(communicationPayload, jwsProtectedHeader, externalSigner.privBytes);
     const compactJws = `${jws.protected}.${jws.payload}.${jws.signature}`;
 
-    const jweProtectedHeader = { enc: 'A256GCM', cty: 'JWS', skid: externalEncrypter.kid };
+    const jweProtectedHeader = {
+      enc: 'A256GCM',
+      cty: 'JWS',
+      skid: externalEncrypter.kid,
+    };
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
     const registrationUrl = `/acme/cds-es/v1/health-care/individual/org.schema/Communication/_batch`;
@@ -461,7 +518,7 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     // Manually replicate the URN generation logic from the manager to get the correct hash
     const expectedUrn = `urn:antifraud:eu:identifier:${discoveryClaimType}:${discoveryClaimValue}`;
     const expectedHash = generateUrnHash(expectedUrn);
-    blockchainAdapter.addMapping(expectedHash, targetDid);
+    (blockchainAdapter as BlockchainAdapterMem).addMapping(expectedHash, targetDid);
     
     // 2. ARRANGE: Construct the discovery request payload
     const thid = `thid-e2e-discovery-${Date.now()}`;
@@ -483,11 +540,18 @@ describe('End-to-End API Flow (with Real Cryptography)', () => {
     };
 
     // 3. ACT (Phase 1): Encrypt and POST the discovery job
-    const jwsProtectedHeader = { alg: externalSigner.alg, kid: externalSigner.kid };
+    const jwsProtectedHeader = {
+      alg: externalSigner.alg,
+      kid: externalSigner.kid,
+    };
     const jws = await cryptoService.signDataJws(discoveryPayload, jwsProtectedHeader, externalSigner.privBytes);
     const compactJws = `${jws.protected}.${jws.payload}.${jws.signature}`;
 
-    const jweProtectedHeader = { enc: 'A256GCM', cty: 'JWS', skid: externalEncrypter.kid };
+    const jweProtectedHeader = {
+      enc: 'A256GCM',
+      cty: 'JWS',
+      skid: externalEncrypter.kid,
+    };
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
     const discoveryUrl = `/acme/cds-es/v1/health-care/test-network/org.schema/Person/_discovery`;

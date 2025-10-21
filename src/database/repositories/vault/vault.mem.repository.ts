@@ -4,6 +4,7 @@
 import { VaultRepository } from './vault.repository';
 import { RecordBase, VaultConfig } from '../../../models/resource-document';
 import { InMemoryVault } from '../../../models/repository';
+import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
 /**
  * An in-memory implementation of the Vault Repository.
@@ -118,9 +119,30 @@ export class VaultMemRepository implements VaultRepository {
     return [];
   }
 
-  public async query(vaultId: string, query: any): Promise<any[]> {
-    console.warn("query is not implemented in VaultMemRepository");
-    return [];
+  public async query<T extends RecordBase>(vaultId: string, query: { sectionId: string, where: { attribute: string, equals: string }[] }): Promise<T[]> {
+    const section = this.vaults.get(vaultId)?.sections.get(query.sectionId);
+    if (!section) {
+      return [];
+    }
+
+    const allDocs = Array.from(section.values()) as ConfidentialStorageDoc[];
+    
+    // Filter the documents based on the where clauses
+    const filteredDocs = allDocs.filter(doc => {
+      if (!doc.indexed?.attributes) {
+        return false;
+      }
+      
+      // All 'where' conditions must be met (AND logic)
+      return query.where.every(condition => {
+        // Check if any attribute in the document matches the current condition
+        return doc.indexed!.attributes.some(attr => 
+          attr.name === condition.attribute && attr.value === condition.equals
+        );
+      });
+    });
+
+    return filteredDocs as unknown as T[];
   }
 
   public async delete(vaultId: string, containerId: string, sectionId?: string): Promise<boolean> {

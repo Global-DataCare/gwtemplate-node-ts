@@ -6,9 +6,9 @@ import { ITenantsManager } from './ITenantsManager';
 import { VaultRepository } from '../database/repositories/vault/vault.repository';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { getTenantVaultId, getIdentifierUrnFromClaims } from '../utils/tenant';
-import { DidDocument, DidService } from '../models/did';
+import { DidDocument, DidService, VerificationMethod } from '../models/did';
 import { getEnvironment } from '../utils/environment';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
+import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
 import { Sector } from '../models/path';
 import { getBaseUrlFromDidWeb } from '../utils/did';
 import { parseTenantUrn } from '../utils/urn';
@@ -21,12 +21,15 @@ import { parseTenantUrn } from '../utils/urn';
  */
 export class TenantsCacheManager implements ITenantsManager {
   private vaultRepository: VaultRepository;
-  private kmsService: IKmsService;
+  private kmsServiceResolver: () => IKmsService;
   private tenantCacheByVaultId = new Map<string, any>();
+  private get kmsService(): IKmsService {
+    return this.kmsServiceResolver();
+  }
 
-  constructor(vaultRepository: VaultRepository, kmsService: IKmsService) {
+  constructor(vaultRepository: VaultRepository, kmsServiceResolver: () => IKmsService) {
     this.vaultRepository = vaultRepository;
-    this.kmsService = kmsService;
+    this.kmsServiceResolver = kmsServiceResolver;
   }
 
   public async loadTenants(): Promise<void> {
@@ -74,6 +77,72 @@ export class TenantsCacheManager implements ITenantsManager {
     }
 
     // console.log(`[TenantsCacheManager] Successfully loaded ${this.tenantCacheByVaultId.size} tenants.`);
+  }
+
+  /**
+   * Retrieves the full, cached configuration for a tenant.
+   * @param vaultId The unique vault identifier for the tenant.
+   * @returns The tenant's configuration object, or `undefined` if not found.
+   */
+  public getTenant(vaultId: string): any | undefined {
+    return this.tenantCacheByVaultId.get(vaultId);
+  }
+
+  /**
+   * Finds a tenant in the cache by their full DID identifier.
+   * @param did The `did:web:...` identifier of the tenant.
+   * @returns The tenant's configuration object, or `undefined` if no tenant matches the DID.
+   */
+  public findTenantByDid(did: string): any | undefined {
+    for (const tenantConfig of this.tenantCacheByVaultId.values()) {
+      if (tenantConfig.didDocument?.id === did) {
+        return tenantConfig;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Finds a tenant in the cache where the tenant's DID is a prefix of the provided DID.
+   * This is used to resolve an employee or individual's DID back to their parent tenant
+   * when the DID is from an external domain.
+   * @param did The `did:web:...` identifier of the entity (e.g., an employee).
+   * @returns The tenant's configuration object, or `undefined` if no tenant matches.
+   */
+  public findTenantByDidPrefix(did: string): any | undefined {
+    // Find the tenant whose DID is the longest matching prefix of the given DID.
+    let bestMatch: any | undefined;
+    let longestPrefix = 0;
+
+    for (const tenantConfig of this.tenantCacheByVaultId.values()) {
+      const tenantDid = tenantConfig.didDocument?.id;
+      if (tenantDid && did.startsWith(tenantDid)) {
+        if (tenantDid.length > longestPrefix) {
+          longestPrefix = tenantDid.length;
+          bestMatch = tenantConfig;
+        }
+      }
+    }
+    return bestMatch;
+  }
+
+  /**
+   * Adds a new verification method (e.g., a public key) to a tenant's cached DID document.
+   * This is used when an employee is registered to make their keys discoverable via the tenant's DID.
+   * @param vaultId The vault ID of the tenant to modify.
+   * @param verificationMethod The verification method object to add.
+   */
+  public addVerificationMethodToTenant(vaultId: string, verificationMethod: VerificationMethod): void {
+    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+    if (tenantConfig) {
+      if (!tenantConfig.didDocument.verificationMethod) {
+        tenantConfig.didDocument.verificationMethod = [];
+      }
+      tenantConfig.didDocument.verificationMethod.push(verificationMethod);
+      this.tenantCacheByVaultId.set(vaultId, tenantConfig);
+    } else {
+      console.warn(`[TenantsCacheManager] Could not add verification method: Tenant with vaultId '${vaultId}' not found in cache.`);
+    }
   }
 
   /**

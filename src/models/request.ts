@@ -53,14 +53,48 @@ export interface  DecodedDidcommMessage {
  * It combines the HTTP request context with the decoded message and its security context.
  */
 export interface JobRequest extends DataInRequest {
+  contentType?: string;
+  requestUrl?: string;
+  httpMethod?: string;
+  tenantId?: string;
+  jurisdiction?: string;
+  apiVersion?: string;
+  sector?: string;
+  /** Corresponds to <sectionTypeOrCompartmentCodingSystem> */
+  section?: string;
+  /** Corresponds to <formatTypeOrCompartmentCodingValue> */
+  format?: string;
+  resourceType?: string;
+  /** The action without the '_' prefix */
+  action?: string;
+  language?: string;
+
   /** The decoded DIDComm message which constitutes the primary input for the job. */
   input: DecodedDidcommMessage;
 
   /** Metadata enriched by the security middleware from the cryptographic envelope (JWS/JWE). */
-  meta?: {
-    jws?: { protected?: JwsHeader };
-    jwe?: { header?: ProtectedHeadersJWE };
-    bearer?: { jwt: { header?: JwsHeader, payload?: Record<string, any>; } }
+  meta?: JobRequestMeta;
+}
+
+/**
+ * Defines the structure of the cryptographic metadata associated with a job request.
+ */
+export interface JobRequestMeta {
+  jws?: {
+    protected?: JwsHeader;
+    [key: string]: any; // Allow other properties
   };
+  jwe?: {
+    header?: ProtectedHeadersJWE;
+    [key:string]: any; // Allow other properties
+  };
+  bearer?: {
+    jwt: {
+      header?: JwsHeader;
+      payload?: Record<string, any>;
+    };
+    [key: string]: any; // Allow other properties
+  };
+  [key: string]: any; // Allow other properties
 }
 

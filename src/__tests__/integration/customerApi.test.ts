@@ -5,6 +5,7 @@ import express from 'express';
 import request from 'supertest';
 import { v4 as uuidv4 } from 'uuid';
 import { createApiRouter } from '../../routes/api';
+import { CryptographyService } from '../../crypto/CryptographyService';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { testEncryptedJwe1 } from '../data/async-response.data';
@@ -38,14 +39,17 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   const vaultRepository = new VaultMemRepository();
   const tenantsCacheManager = new TenantsCacheManager(
     vaultRepository,
-    mockKmsService,
+    () => mockKmsService,
   );
 
+  const cryptographyService = new CryptographyService();
   const apiRouter = createApiRouter(
     mockQueueAdapter,
     tenantsCacheManager,
     mockKmsService,
     asyncResponseStore,
+    vaultRepository,
+    cryptographyService
   );
   app.use('/', apiRouter);
 
@@ -115,6 +119,21 @@ describe('Person Onboarding API', () => {
           ...testCreateCustomerJobRequestProfessionalOnboarding.input,
           aud: tenantUrn,
           thid: thid,
+          iss: 'did:web:some-issuer',
+        },
+        meta: {
+          jws: {
+            protected: {
+              alg: 'ML-DSA-44',
+              kid: 'did:web:some-issuer#key-1',
+            },
+          },
+          jwe: {
+            header: {
+              skid: 'did:web:some-issuer#enc-key-1',
+              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+            }
+          },
         },
         httpMethod: 'POST',
         requestUrl: registrationUrl,

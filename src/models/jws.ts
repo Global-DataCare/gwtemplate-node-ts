@@ -1,6 +1,8 @@
 // src/models/jws.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { JWK } from './jwk';
+
 /**
  * Represents the header parameters of a JSON Web Signature (JWS).
  */
@@ -13,6 +15,8 @@ export interface JwsHeader {
     cty?: string;
     /** Type of the message, usually "jwt". */
     typ?: string;
+    /** The full public key, used in bootstrapping scenarios. */
+    jwk?: JWK;
 }
 
 /**

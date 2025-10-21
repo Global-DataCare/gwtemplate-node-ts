@@ -38,7 +38,8 @@ export type MldsaAlg = AlgMlDsa2 | AlgMlDsa3 | AlgMlDsa5;
 // Base JWKs used for RFC 7638 thumbprint calculation
 export type MlkemBaseJwk = { kty: "OKP"; crv: MlkemCurve; x: string };
 export type MldsaBaseJwk = { kty: "AKP"; alg: MldsaAlg; pub: string };
-export type BaseJwk = MlkemBaseJwk | MldsaBaseJwk;
+export type EcBaseJwk = { kty: "EC"; crv: string; x: string; y: string };
+export type BaseJwk = MlkemBaseJwk | MldsaBaseJwk | EcBaseJwk;
 
 export interface MlkemPublicJwk extends MlkemBaseJwk {
     kid?: string;     // filled from thumbprint
@@ -48,7 +49,24 @@ export interface MldsaPublicJwk extends MldsaBaseJwk {
     kid?: string;     // filled from thumbprint
 };
 
-export type PublicJwk = MlkemPublicJwk | MldsaPublicJwk;
+/**
+ * Represents a public key for classic cryptography algorithms like Elliptic Curve.
+ */
+export interface ClassicPublicJwk {
+    kty: "EC";
+    crv: string; // e.g., "P-256"
+    x: string;
+    y: string;
+    kid?: string;
+    alg?: string;
+    use?: string;
+};
+
+/**
+ * Represents a public key in JWK format, suitable for public documents like DIDs.
+ * This is a union of all supported public key types, both Post-Quantum and classic.
+ */
+export type PublicJwk = MlkemPublicJwk | MldsaPublicJwk | ClassicPublicJwk;
 
 export interface MlkemPrivateJwk extends MlkemPublicJwk{
     // Private material (extended seed) must never be published:

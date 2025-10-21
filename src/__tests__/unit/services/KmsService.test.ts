@@ -9,6 +9,8 @@ import { MldsaPublicJwk, MlkemPublicJwk } from '../../../crypto/interfaces/Crypt
 import { JWK } from '../../../models/jwk';
 import { DataCompactJWT } from '../../../models/jwt';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 
 // Mock the dependency
 const mockCryptoService: jest.Mocked<ICryptography> = {
@@ -32,6 +34,11 @@ const mockCryptoService: jest.Mocked<ICryptography> = {
   parseCompactJwe: jest.fn(),
 };
 
+const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
+  findTenantByDid: jest.fn(),
+} as any;
+
+
 describe('KmsService', () => {
   let kmsService: KmsService;
 
@@ -49,7 +56,7 @@ describe('KmsService', () => {
     mockCryptoService.generateKeyPairMlDsa.mockResolvedValue({ publicJWKey: mockMldsaPublicKey, secretKeyBytes: mockMldsaSecretKey });
     mockCryptoService.generateKeyPairMlKem.mockResolvedValue({ publicJWKey: mockMlkemPublicKey, secretKeyBytes: mockMlkemSecretKey });
 
-    kmsService = new KmsService(mockCryptoService);
+    kmsService = new KmsService(mockCryptoService, mockTenantsCacheManager);
   });
 
   describe('provisionKeys', () => {
@@ -87,21 +94,20 @@ describe('KmsService', () => {
   });
 
   describe('decodeJobRequest', () => {
-    it('should correctly decode a JWE message', async () => {
+    it('should decrypt a JWE and return the parsed JWS payload', async () => {
       // Arrange
-      await kmsService.init(); // INITIALIZE THE SERVICE
+      await kmsService.init(); 
       const message = 'compact-jwe-string';
-      const mockKids = ['mock-kem-kid'];
-      const mockDecryptedBytes = new Uint8Array([1, 2, 3]);
-      const mockProtectedHeader = { enc: 'A256GCM' };
-      const mockJws: DataCompactJWT = { protected: {}, payload: { thid: '123' }, signature: new Uint8Array() };
+      const mockHostKid = 'mock-kem-kid'; // KID of the host's encryption key
+      const mockDecryptedBytes = Content.stringToBytesUTF8('protected.payload.signature');
+      const mockProtectedHeader = { enc: 'A256GCM', skid: 'sender-key-id' }; // No JWK
+      const mockJws: DataCompactJWT = { 
+        protected: { alg: 'ML-DSA-44', kid: 'sender-key-id' }, 
+        payload: { thid: '123', iss: 'did:web:sender' }, 
+        signature: new Uint8Array() 
+      };
 
-      // The key is for a recipient, not the host. Provision it separately.
-      // Note: `init()` already provisions the 'host' key, which acts as the recipient key in this mock setup.
-      // We'll reset the mock to ensure we can track the call for 'tenant-123' specifically.
-      mockCryptoService.generateKeyPairMlKem.mockClear();
-      await kmsService.provisionKeys('tenant-123'); 
-      mockCryptoService.getRecipientKidsFromJwe.mockReturnValue(mockKids);
+      mockCryptoService.getRecipientKidsFromJwe.mockReturnValue([mockHostKid]);
       mockCryptoService.decryptJwe.mockResolvedValue({ decryptedBytes: mockDecryptedBytes, protectedHeader: mockProtectedHeader });
       mockCryptoService.parseCompactJws.mockReturnValue(mockJws);
 
@@ -110,10 +116,15 @@ describe('KmsService', () => {
 
       // Assert
       expect(mockCryptoService.getRecipientKidsFromJwe).toHaveBeenCalledWith(message);
-      expect(mockCryptoService.decryptJwe).toHaveBeenCalledWith(message, expect.any(Object));
+      // It should have found the managed 'host' key (with kid 'mock-kem-kid') to decrypt.
+      expect(mockCryptoService.decryptJwe).toHaveBeenCalledWith(message, expect.objectContaining({ kid: mockHostKid }));
       expect(mockCryptoService.parseCompactJws).toHaveBeenCalledWith(Content.bytesToStringUTF8(mockDecryptedBytes));
+      
+      // The service's job is ONLY to decrypt and parse.
       expect(jobRequest.input).toEqual(mockJws.payload);
       expect(jobRequest.meta?.jwe?.header).toEqual(mockProtectedHeader);
+      // It MUST NOT have resolved or added a JWK. This is the orchestrator's job.
+      expect(jobRequest.meta?.jwe?.header?.jwk).toBeUndefined();
     });
   });
 

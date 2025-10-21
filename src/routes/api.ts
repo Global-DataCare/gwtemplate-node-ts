@@ -12,7 +12,14 @@ import { createOperationOutcome } from '../utils/outcome';
 import { JobRequest } from '../models/request';
 import { DidService } from '../models/did';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { getTenantVaultId } from '../utils/tenant';
+import { Content } from '../utils/content';
+import { EntityConfig } from '../models/entity';
+import { JWK } from '../models/jwk';
+import { VerificationMethod } from '../models/did';
+
+import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { ICryptography } from '../crypto/interfaces/ICryptography';
+import { getTenantVaultIdFromIss, getTenantVaultId } from '../utils/tenant';
 
 // As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
@@ -57,7 +64,9 @@ export function createApiRouter(
   queueAdapter: QueueAdapter,
   tenantsCacheManager: TenantsCacheManager,
   kmsService: IKmsService,
-  asyncResponseStore: IAsyncResponseStore
+  asyncResponseStore: IAsyncResponseStore,
+  vaultRepository: VaultRepository,
+  cryptographyService: ICryptography,
 ): express.Router {
   const router = express.Router();
 
@@ -110,29 +119,121 @@ export function createApiRouter(
     const contentType = req.headers['content-type'] || '';
     let jobRequest: JobRequest;
 
-    // --- 1. Payload Handling ---
-    if (contentType.startsWith('application/x-www-form-urlencoded')) {
-      if (!req.body.request) {
-        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, "Missing 'request' parameter in form-encoded body.");
-        return res.status(400).json(outcome);
-      }
-      try {
-        // The KMS is responsible for verifying the cryptographic signature of the JWS.
-        // If the signature is invalid, it WILL throw an exception, which is caught below.
-        // A successfully returned jobRequest implies a cryptographically valid signature.
+    try {
+      // --- 1. Payload Handling & JobRequest Construction ---
+      if (contentType.startsWith('application/x-www-form-urlencoded')) {
+        // ENCRYPTED FLOW
+        if (!req.body.request) {
+          const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, "Missing 'request' parameter in form-encoded body.");
+          return res.status(400).json(outcome);
+        }
+        // The KMS decrypts the JWE using the HOST's key and returns the inner JWS, but does not verify it.
         const decodedJob = await kmsService.decodeJobRequest(req.body.request);
+
+        // --- Signature Verification & Sender Key Resolution (Orchestrator Logic) ---
+        // If the sender's public key is not embedded, we must resolve it and verify the signature now.
+        if (!decodedJob.meta?.jwe?.header?.jwk) {
+          const senderDid = decodedJob.input?.iss;
+          const senderKeyId = decodedJob.meta?.jws?.protected?.kid;
+          const jwsToVerify = decodedJob.meta?.jws;
+
+          if (!senderDid || !senderKeyId || !jwsToVerify) {
+            throw new Error("Secure request is missing 'iss', 'kid', or a valid JWS structure.");
+          }
+
+          // 1. Determine the tenant vault from the issuer's DID.
+          const vaultId = getTenantVaultIdFromIss(senderDid);
+          if (!vaultId) {
+            throw new Error(`Could not determine vaultId for issuer DID: ${senderDid}`);
+          }
+          
+          // 2. Protect query parameters using HMAC (Secure Query Pattern).
+          const protectedAttrName = await kmsService.getHmacBase64Url('kid', vaultId);
+          const protectedAttrValue = await kmsService.getHmacBase64Url(senderKeyId, vaultId);
+
+          // 3. Query the vault for the sender's encrypted document.
+          const queryResult = await vaultRepository.query(vaultId, {
+            sectionId: 'employees', // Employees are the primary actors who can sign.
+            where: [{ attribute: protectedAttrName, equals: protectedAttrValue }],
+          });
+
+          if (!queryResult || queryResult.length === 0) {
+            throw new Error(`Could not find an entity with key ID '${senderKeyId}' in vault '${vaultId}'.`);
+          }
+
+          // 4. Unprotect the document to get the sender's full config.
+          const employeeDoc = queryResult[0];
+          const employeeConfig = await kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
+
+          // 5. Find the specific public key that matches the key ID.
+          const verificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
+            (vm: VerificationMethod) => vm.id.endsWith(`#${senderKeyId}`)
+          );
+          const senderPublicKey = verificationMethod?.publicKeyJwk;
+          
+          if (!senderPublicKey) {
+            throw new Error(`Key ID '${senderKeyId}' not found in resolved DID document for '${senderDid}'.`);
+          }
+
+          // 6. Verify the JWS signature.
+          const isValid = await cryptographyService.verifyDetachedJws(
+            Content.stringToBytesUTF8(`${jwsToVerify.protected}.${jwsToVerify.payload}`),
+            jwsToVerify.signature,
+            senderPublicKey
+          );
+          if (!isValid) {
+            throw new Error('Invalid signature.');
+          }
+
+          // 7. Enrich the job request with the resolved & verified key for the worker.
+          // The worker needs this to encrypt the response.
+          if (decodedJob.meta?.jwe?.header) {
+            decodedJob.meta.jwe.header.jwk = senderPublicKey as JWK;
+          }
+        }
+        
         jobRequest = { ...req.params, ...decodedJob };
-      } catch (error: any) {
-        console.error('[API] Error during JWS decoding/verification:', error);
-        // A failure here is an authentication problem (bad signature, tampered message).
-        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Failed to verify secure request: ' + error.message);
-        return res.status(401).json(outcome);
+
+      } else if (contentType.startsWith('application/json') || contentType.startsWith('application/fhir+json')) {
+        // LEGACY / UNENCRYPTED FLOW
+        const authToken = req.headers.authorization;
+        // The 'ping' endpoint is a public health check and does not require authentication for legacy requests.
+        if (section !== 'ping' && (!authToken || !authToken.startsWith('Bearer '))) {
+          const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Missing or invalid Bearer token.');
+          return res.status(401).json(outcome);
+        }
+        // TODO: Implement actual token validation (e.g., call a verifier like GoogleTokenVerifier).
+        // For now, any Bearer token is accepted in non-production environments.
+        if (process.env.NODE_ENV === 'production') {
+            // In production, we would validate the token here.
+            // const isValid = await verifyToken(authToken.split(' ')[1]);
+            // if (!isValid) {
+            //   return res.status(401).json(createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Invalid Bearer token.'));
+            // }
+        }
+
+        jobRequest = { 
+          ...req.params, 
+          input: req.body, 
+          contentType: contentType, // <-- Ensure contentType is passed in legacy flow
+          meta: { 
+            bearer: { 
+              token: authToken,
+              // TODO: This structure should be populated by a real JWT verification function
+              // that decodes the token. For now, we use placeholders.
+              jwt: { header: {alg: "", kid: ""}, payload: {} } 
+            } 
+          }
+        };
+
+      } else {
+        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotSupported, `Unsupported Content-Type: ${contentType}`);
+        return res.status(415).json(outcome);
       }
-    } else if (contentType.startsWith('application/json') || contentType.startsWith('application/fhir+json')) {
-      jobRequest = { ...req.params, input: req.body, meta: {} };
-    } else {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotSupported, `Unsupported Content-Type: ${contentType}`);
-      return res.status(415).json(outcome);
+    } catch (error: any) {
+      console.error('[API] Error during request processing/decoding:', error);
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Failed to process secure request: ' + error.message);
+      return res.status(401).json(outcome);
     }
 
     // --- 2. Transaction ID Validation ---
@@ -148,46 +249,25 @@ export function createApiRouter(
       return res.status(403).json(outcome);
     }
     
-    // Construct the vaultId directly from URL parameters.
-    if (tenantId !== 'host' && process.env.NODE_ENV !== 'production') {
-      // console.log(`[DEBUG] createApiRouter attempting to build vaultId with: sector='${sector}', tenantId='${tenantId}'`);
-    }
     const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
-    
-    // console.log(`[API] Attempting validation for vaultId: '${vaultId}'.`);
     const tenantServices = tenantsCacheManager.getDidServiceConfig(vaultId);
-    // console.log(`[API] Tenant services found for '${vaultId}': ${!!tenantServices}`);
 
-    try {
-      if (!isRequestValid(tenantServices, { ...req.params, action })) {
-        console.error(`[API] Path/Role validation failed for ${req.originalUrl}. Tenant services found: ${!!tenantServices}.`);
-        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'The requested tenant or endpoint path does not exist.');
-        return res.status(404).json(outcome);
-      }
-    } catch (error) {
-      console.error(`[API] An unexpected error occurred during isRequestValid call for ${req.originalUrl}.`, error);
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'An unexpected error occurred during request validation.');
-      return res.status(500).json(outcome);
+    if (!isRequestValid(tenantServices, { ...req.params, action })) {
+      console.error(`[API] Path/Role validation failed for ${req.originalUrl}. Tenant services found: ${!!tenantServices}.`);
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'The requested tenant or endpoint path does not exist.');
+      return res.status(404).json(outcome);
     }
 
     // --- 4. Enqueue Job ---
-    // The jobRequest already contains the tenantId (alternateName) from the path parameters.
-    // The worker is responsible for constructing the final vaultId when it processes the job.
     const jobName = createJobName(vaultId, resourceType, action);
-    
-    // Manually add the action from the URL to the job payload before queueing.
-    jobRequest.action = action;
-
+    jobRequest.action = action; // Ensure action is part of the job request for the worker
     await queueAdapter.addJob(jobName, jobRequest);
     asyncResponseStore.set(thid, { status: 'PENDING' });
 
     // --- 5. Success Response ---
     const pollingUrl = req.originalUrl.replace(`/${action}`, '/_batch-response');
     res.location(pollingUrl);
-    // Add a Retry-After header to guide the client on polling frequency.
     res.set('Retry-After', '5');
-    // Per FHIR Async and general best practices, the 202 response should have an empty body.
-    // The client already has the thid and the polling URL is in the Location header.
     res.status(202).send();
   });
 

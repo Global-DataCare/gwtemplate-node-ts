@@ -73,15 +73,19 @@ export class Worker {
       // 2. Delegate to the manager to get the plaintext response.
       const payloadResponse = await manager.process(job);
       
-      // 3. Encrypt the final response for the original requester.
-      const recipientKey = job.meta?.jwe?.header?.jwk;
-      if (!recipientKey) {
-        throw new Error(`Cannot encode response: sender's public key (jwk) not found in original request JWE header.`);
+            // 3. Secure the final response for the original requester.
+      const senderVaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector, job.tenantId);
+
+      // For legacy, unencrypted requests, the response is also unencrypted.
+      if (job.contentType?.startsWith('application/json') || job.contentType?.startsWith('application/fhir+json')) {
+        return JSON.stringify(payloadResponse);
       }
 
-      // Determine the vaultId of the entity issuing the response.
-      const senderVaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector, job.tenantId);
-      
+      // For the standard secure flow, the response MUST be encrypted.
+      const recipientKey = job.meta?.jwe?.header?.jwk;
+      if (!recipientKey) {
+        throw new Error(`(Secure Flow) Cannot encode response: sender's public key (jwk) not found in original request JWE header.`);
+      }
       return this.kmsService.encodeResponse(payloadResponse, [recipientKey], senderVaultId);
       
     } catch (error: any) {
@@ -96,14 +100,15 @@ export class Worker {
         body: errorBundle,
       };
 
-      // Also encrypt error responses.
+      // Also attempt to encrypt error responses if a key is available.
       const recipientKey = job.meta?.jwe?.header?.jwk;
-      if (!recipientKey) {
-        throw new Error(`Cannot encode error response: sender's public key not found.`);
+      if (recipientKey) {
+        // The issuer of a catastrophic error is always the host.
+        return this.kmsService.encodeResponse(errorResponse, [recipientKey], 'host');
+      } else {
+        // If no key is available (legacy flow or pre-decryption error), return the plaintext error.
+        return JSON.stringify(errorResponse);
       }
-
-      // The issuer of a catastrophic error is always the host.
-      return this.kmsService.encodeResponse(errorResponse, [recipientKey], 'host');
     }
   }
 }

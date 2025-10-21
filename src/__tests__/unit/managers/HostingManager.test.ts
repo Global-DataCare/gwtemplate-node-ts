@@ -94,7 +94,7 @@ describe('HostingManager', () => {
 
   beforeEach(() => {
     vaultRepository = new VaultMemRepository();
-    mockTenantsCacheManager = new TenantsCacheManager(vaultRepository, mockKmsService) as jest.Mocked<TenantsCacheManager>;
+    mockTenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService) as jest.Mocked<TenantsCacheManager>;
 
     mockConfig = {
       nodeEnv: 'test',

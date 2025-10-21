@@ -1,4 +1,4 @@
-// src/__tests__/integration/employeeApi.test.ts
+import { CryptographyService } from '../../crypto/CryptographyService';// src/__tests__/integration/employeeApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
@@ -38,10 +38,11 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.json());
 
   const vaultRepository = new VaultMemRepository();
+  const cryptographyService = new CryptographyService();
   // We need a real TenantsCacheManager for routing, but we will mock its return values in tests.
   const tenantsCacheManager = new TenantsCacheManager(
     vaultRepository,
-    mockKmsService,
+    () => mockKmsService,
   );
 
   const apiRouter = createApiRouter(
@@ -49,6 +50,8 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
     tenantsCacheManager,
     mockKmsService,
     asyncResponseStore,
+    vaultRepository,
+    cryptographyService
   );
   app.use('/', apiRouter);
 
@@ -120,9 +123,24 @@ describe('Employee Creation API', () => {
         input: {
           aud: tenantUrn,
           thid: thid,
+          iss: 'did:web:some-issuer',
           type: 'Employee-creation-request-v1.0',
           body: {
             data: [{ meta: { claims: testClaimsTenant1Receptionist1 } }],
+          },
+        },
+        meta: {
+          jws: {
+            protected: {
+              alg: 'ML-DSA-44',
+              kid: 'did:web:some-issuer#key-1',
+            },
+          },
+          jwe: {
+            header: {
+              skid: 'did:web:some-issuer#enc-key-1',
+              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+            }
           },
         },
         httpMethod: 'POST',

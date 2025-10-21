@@ -2,7 +2,7 @@
 // Minimal utilities for ML-KEM (OKP) and ML-DSA (AKP)
 
 import { Content } from "../utils/content";
-import { BaseJwk, PublicJwk, MlkemCurve, MldsaAlg, MlkemPublicJwk, MldsaPublicJwk } from "./interfaces/Cryptography.types";
+import { BaseJwk, PublicJwk, MlkemCurve, MldsaAlg, MlkemPublicJwk, MldsaPublicJwk, EcBaseJwk } from "./interfaces/Cryptography.types";
 
 /**
  * Creates a canonical string from a simple, flat JSON object as required by
@@ -27,14 +27,25 @@ export async function computeJwkThumbprint(
     return Content.bytesToRawBase64UrlSafe(new Uint8Array(digest));
 }
 
-/** Extract Base JWK for thumbprint calculation */
+/** Extract Base JWK for thumbprint calculation per RFC 7638 */
 export function toBaseJwk(jwk: PublicJwk): BaseJwk {
     if (jwk.kty === "OKP") {
+        // For ML-KEM and other OKP keys (like Ed25519)
         const { crv, x } = jwk;
         return { kty: "OKP", crv, x };
-    } else {
+    } else if (jwk.kty === "AKP") {
+        // For ML-DSA
         const { alg, pub } = jwk;
         return { kty: "AKP", alg, pub };
+    } else if (jwk.kty === "EC") {
+        // For Elliptic Curve keys (legacy)
+        const { crv, x, y } = jwk;
+        const baseJwk: EcBaseJwk = { kty: "EC", crv, x, y };
+        return baseJwk;
+    } else {
+        // This will cause a compile-time error if any type in PublicJwk is not handled.
+        const exhaustiveCheck: never = jwk;
+        throw new Error(`Unsupported key type for JWK thumbprint: ${(exhaustiveCheck as any).kty}`);
     }
 }
 

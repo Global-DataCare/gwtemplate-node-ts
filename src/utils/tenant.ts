@@ -51,3 +51,30 @@ export function getIdentifierUrnFromClaims(claims: any): string | undefined {
   }
   return claims[ClaimsOrganizationSchemaorg.identifier] as string;
 }
+
+
+/**
+ * Parses a DID (`did:web`) of a hosted entity (Employee, Individual) to extract 
+ * the components needed to form the parent tenant's vault ID.
+ * Example: `did:web:provider.com:acme:cds-es:v1:health-care:employee:admin` -> `health-care_acme`
+ *
+ * @param iss The issuer DID string.
+ * @returns The composite vault ID string.
+ * @throws An error if the DID format is not a supported hosted DID format.
+ */
+export function getTenantVaultIdFromIss(iss: string): string {
+  const parts = iss.split(':');
+  // Minimum parts for a hosted DID: did:web:domain:tenant:cds-xx:v1:sector...
+  if (parts.length < 7 || parts[0] !== 'did' || parts[1] !== 'web') {
+    throw new Error(`Invalid or unsupported DID format for issuer: ${iss}`);
+  }
+  
+  const tenantId = parts[3];
+  const sector = parts[6];
+  
+  if (!sector || !tenantId) {
+    throw new Error(`Could not extract sector and tenantId from DID: ${iss}`);
+  }
+  
+  return getTenantVaultId(sector, tenantId);
+}

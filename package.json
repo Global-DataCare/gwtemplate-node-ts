@@ -19,7 +19,7 @@
     "format": "prettier --write 'src/**/*.{ts,js}'",
     "type-check": "tsc --noEmit",
     "type-check:watch": "npm run type-check -- --watch",
-    "test": "jest --coverage",
+    "test": "jest",
     "test:watch": "jest --watchAll",
     "test:unit": "jest --coverage src/__tests__/unit",
     "test:integration": "jest --coverage src/__tests__/integration",

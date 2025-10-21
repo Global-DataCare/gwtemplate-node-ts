@@ -142,12 +142,16 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
     return newDidDoc;
 }
 
-export const createDidServiceId = (params: { version: string; sector: string; section: string; format: string }) => {
+export const createDidServiceId = (params: { version: string; sector: string; section: string; format: string, resourceType?: string }) => {
   const version = params.version.toLowerCase();
   const sector = params.sector.toLowerCase();
   const section = params.section.toLowerCase();
   const sanitizedFormat = params.format.toLowerCase().replace(/\./g, '-');
-  return `${version}_${sector}_${section}_${sanitizedFormat}`;
+  let id = `${version}_${sector}_${section}_${sanitizedFormat}`;
+  if (params.resourceType) {
+    id += `_${params.resourceType.toLowerCase()}`;
+  }
+  return id;
 };
 
 /**

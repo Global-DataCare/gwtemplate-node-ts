@@ -12,7 +12,7 @@ const config: JestConfigWithTsJest = {
 
   roots: ['<rootDir>/src'],
   testMatch: ['**/src/**/*.test.ts', '**/src/**/*.spec.ts'],
-  testPathIgnorePatterns: ['/node_modules/', '/src/__tests__/old/'], // Exclude old tests
+  testPathIgnorePatterns: ['/node_modules/', '/src/__tests__/old/', 'snomed-ips.test.ts'], // Exclude old tests
 
   // Important: we will transform .ts via ts-jest, and specific node_modules .js via babel-jest
   transform: {

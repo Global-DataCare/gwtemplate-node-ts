@@ -8,7 +8,6 @@ import { VaultRepository } from '../../../database/repositories/vault/vault.repo
 import { EmployeeManager } from '../../../managers/EmployeeManager';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
-import { determineResourceId } from '../../../utils/resource';
 import { RecordBase, ClaimsRecord } from '../../../models/resource-document';
 import { JwkSet } from '../../../models/jwk';
 import { testClaimsTenant1Receptionist1 } from '../../data/employee.data';
@@ -16,6 +15,7 @@ import { JobRequest } from '../../../models/request';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { EntityConfig } from '../../../models/entity';
+import { normalizeCodeSystemAndValue } from '../../../utils/attributes';
 
 // Tell Jest what will be mocked
 jest.mock('uuid');
@@ -27,6 +27,10 @@ const testBaseJobForClaims = (claims: ClaimsRecord, tenantId: string, sector: st
   resourceType: 'Person',
   section: 'org.schema',
   action: '_batch',
+  meta: { // Add the meta object for the test to pass the guard
+    jws: { protected: { alg: 'ML-DSA-44', kid: 'test-kid', jwk: { kid: 'test-kid', kty: 'AKP', alg: 'ML-DSA-44', pub: '...' } } },
+    jwe: { header: { enc: 'A256GCM', skid: 'test-skid', jwk: { kid: 'test-skid', kty: 'OKP', crv: 'ML-KEM-768', x: '...' } } },
+  },
   input: {
     aud: 'did:web:api.example.com', // This can be anything for this test
     response_type: 'json',
@@ -74,13 +78,21 @@ describe('EmployeeManager', () => {
         return secureDoc;
       },
     );
+    
+    // Mock for the new secure indexing flow
+    mockKmsService.protectAttributesNameAndValue.mockImplementation(async (attributes) => {
+      return attributes.map(attr => ({
+        name: `hmac(${attr.name})`,
+        value: `hmac(${attr.value})`,
+        unique: attr.unique,
+      }));
+    });
   });
 
   describe('Employee Creation (POST)', () => {
-    it('should create employee with a semantic URN and save protected documents', async () => {
+    it('should create employee, index kids securely, and save protected documents', async () => {
       // ARRANGE
       const job = testBaseJobForClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
-      mockKmsService.provisionKeys.mockResolvedValue(mockJwkSet);
       mockVaultRepository.put.mockResolvedValue(true);
       mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
 
@@ -88,19 +100,34 @@ describe('EmployeeManager', () => {
       const response = await employeeManager.process(job);
 
       // ASSERT
-      const expectedEmployeeId = determineResourceId(testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.identifier]);
-      expect(mockKmsService.provisionKeys).toHaveBeenCalledWith(expectedEmployeeId);
-
       expect(mockTenantsCacheManager.getTenantIdentifierUrn).toHaveBeenCalledWith(TENANT_VAULT_ID);
 
+      // Verify that all expected attributes were sent to be protected for indexing
+      const signerKid = job.meta?.jws?.protected?.jwk?.kid;
+      const encrypterKid = job.meta?.jwe?.header?.jwk?.kid;
+      const email = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email];
+      const roleCode = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.hasOccupation];
+
+      expect(mockKmsService.protectAttributesNameAndValue).toHaveBeenCalledWith(
+        [
+          { name: 'email', value: email, unique: true, type: 'string'},
+          { name: 'role', value: normalizeCodeSystemAndValue(roleCode as string), unique: false, type: 'token'},
+          { name: 'kid', value: signerKid, unique: false, type: 'string'},
+          { name: 'kid', value: encrypterKid, unique: false, type: 'string'},
+        ],
+        TENANT_VAULT_ID
+      );
+      
       const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
       const employeeConfig = docToProtect.content as EntityConfig;
 
-      const email = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email];
-      const roleCode = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.hasOccupation];
       const expectedUrn = `${TENANT_URN}:employee:email:${email}:role:isco-08:${roleCode}`;
       expect(employeeConfig.didDocument.id).toBe(expectedUrn);
 
+      // Verify that the protected indexes from the mock were added to the document
+      expect(docToProtect.indexed?.attributes).toHaveLength(4);
+      expect(docToProtect.indexed?.attributes[0].name).toBe('hmac(email)');
+      
       const savedDocs = mockVaultRepository.put.mock.calls[0][1] as (RecordBase | ConfidentialStorageDoc)[];
       expect(savedDocs).toHaveLength(2);
       const secureEmployeeDoc = savedDocs.find(

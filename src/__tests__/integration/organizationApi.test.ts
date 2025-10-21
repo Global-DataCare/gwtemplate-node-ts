@@ -1,4 +1,4 @@
-// src/__tests__/integration/organizationApi.test.ts
+import { CryptographyService } from '../../crypto/CryptographyService';// src/__tests__/integration/organizationApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
@@ -45,20 +45,23 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.json()); // Also add json parser for legacy tests
 
   const vaultRepository = new VaultMemRepository();
+  const cryptographyService = new CryptographyService();
   const tenantsCacheManager = new TenantsCacheManager(
     vaultRepository,
-    mockKmsService,
+    () => mockKmsService,
   );
 
   // Initialize the mock KMS to simulate the server startup sequence
   mockKmsService.init();
 
-  // Pass the 4 required arguments
+  // Pass the 6 required arguments
   const apiRouter = createApiRouter(
     mockQueueAdapter,
     tenantsCacheManager,
     mockKmsService,
     asyncResponseStore,
+    vaultRepository,
+    cryptographyService
   );
   app.use('/', apiRouter);
 
@@ -116,8 +119,30 @@ describe('Organization Registration API', () => {
           thid: thid,
           type: 'https://didcomm.org/registration/1.0/register',
           body: { data: [{ meta: { claims: testClaimsTenant1Registration } }] },
+          iss: 'did:web:some-issuer',
         },
-        meta: {},
+        meta: {
+          jws: {
+            protected: {
+              alg: 'ML-DSA-44',
+              kid: 'did:web:some-issuer#key-1',
+            },
+          },
+          jwe: { // JWE header for response encryption
+            header: {
+              skid: 'did:web:some-issuer#enc-key-1',
+              jwk: { // Public key for the response
+                kty: 'OKP',
+                crv: 'ML-KEM-768',
+                kid: 'did:web:some-issuer#enc-key-1',
+                x: 'mock-public-encryption-key-x'
+              }
+            }
+          },
+          bearer: { // decoded Bearer token payload
+            jwt: { payload: { email: 'admin@host.com'} },
+          }
+        },
       };
       mockKmsService.decodeJobRequest.mockResolvedValue(
         mockDecodedJob as JobRequest,

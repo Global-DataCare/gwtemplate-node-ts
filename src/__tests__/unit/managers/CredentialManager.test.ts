@@ -73,7 +73,7 @@ describe('CredentialManager', () => {
     (uuidv4 as jest.Mock).mockReturnValue('mocked-credential-uuid');
 
     vaultRepository = new VaultMemRepository();
-    mockTenantsCacheManager = new TenantsCacheManager(vaultRepository, mockKmsService) as jest.Mocked<TenantsCacheManager>;
+    mockTenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService) as jest.Mocked<TenantsCacheManager>;
 
     mockConfig = { hostExternalDomain: 'test-host.com' } as IServerConfig;
 

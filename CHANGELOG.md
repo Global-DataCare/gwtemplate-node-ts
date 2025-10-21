@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Secure Key Resolution for Standard Crypto Flow: When a protected request arrives without an embedded `jwk` in the JWE and JWS protected header, KmsService now follows a secure query pattern:
+
+  It derives the tenant's vaultId from the issuer's (iss) DID (e.g., an employee or customer DID).
+  
+  It uses its internal HMAC capabilities to protect the query parameters (i.e., the key identifier `kid` as attribute name).
+  
+  It queries the VaultRepository using these protected parameters to find the corresponding encrypted document.
+  
+  It decrypts the employee/customer configuration document just-in-time to retrieve the public key required (jwk) to encrypt the future response.
+
 -   **New Person Discovery Feature:** Implemented a new asynchronous `_discovery` action to find a Person's `did:web` using private identifiers.
     -   The new endpoint is `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/test-network/org.schema/Person/_discovery`.
     -   The backend handles URN construction, hashing, and dynamic routing to the appropriate blockchain channel (`<sector>-eu` or `<sector>-global`) and smart contract (`discovery-person`) based on "convention over configuration".

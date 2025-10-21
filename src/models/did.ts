@@ -41,9 +41,9 @@ export interface DidDocument {
     /** Keys/controllers authorized to make claims */
     assertionMethod?: VerificationMethod[];
     /** Keys used for authentication */
-    authentication?: VerificationMethod[]; 
+    authentication?: (string | VerificationMethod)[]; 
     /** Keys used to receive encrypted data */
-    keyAgreement?: VerificationMethod[];
+    keyAgreement?: (string | VerificationMethod)[];
     /** Service endpoints for interacting with the entity */    
     service?: DidService[];
     /** Other properties are allowed. */

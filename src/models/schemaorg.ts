@@ -3,6 +3,13 @@
 
 import { ParameterData } from "./params";
 
+export enum ClaimsServiceSchemaorg {
+    category = "org.schema.Service.category",
+    identifier = "org.schema.Service.identifier",
+    serviceType = "org.schema.Service.serviceType",
+    termsOfService = "org.schema.Service.termsOfService",
+}
+
 /**
  * Defines the canonical claim names for the 'org.schema' context,
  * based on Schema.org vocabulary.
@@ -72,14 +79,6 @@ export enum ClaimsPersonSchemaorg {
     additionalType = 'org.schema.Person.additionaltype', // e.g.: 'Employee'
     */    
 }
-
-export enum ClaimsServiceSchemaorg {
-    category = "org.schema.Service.category",
-    identifier = "org.schema.Service.identifier",
-    serviceType = "org.schema.Service.serviceType",
-    termsOfService = "org.schema.Service.termsOfService",
-}
-
 
 /**
  * Defines the flat claim structure for a schema.org/Action.

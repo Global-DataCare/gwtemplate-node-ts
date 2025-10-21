@@ -4,6 +4,7 @@
 import express from 'express';
 import request from 'supertest';
 import { createApiRouter } from '../../routes/api';
+import { CryptographyService } from '../../crypto/CryptographyService';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { JobRequest, DecodedDidcommMessage } from '../../models/request';
@@ -28,7 +29,8 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.json());
 
   const vaultRepository = new VaultMemRepository();
-  const tenantsCacheManager = new TenantsCacheManager(vaultRepository, mockKmsService);
+  const cryptographyService = new CryptographyService();
+  const tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService);
   
   jest.spyOn(tenantsCacheManager, 'getDidServiceConfig');
   jest.spyOn(tenantsCacheManager, 'getDidDocument');
@@ -40,6 +42,8 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
     tenantsCacheManager,
     mockKmsService,
     asyncResponseStore,
+    vaultRepository,
+    cryptographyService
   );
   app.use('/', apiRouter);
 
@@ -78,8 +82,24 @@ describe('Network Enrollment API', () => {
       const mockJobRequest: JobRequest = {
         tenantId: '',
         resourceType, action,
-        input: testInitialNetworkJobInput,
-        meta: {},
+        input: {
+          ...testInitialNetworkJobInput,
+          iss: 'did:web:some-issuer'
+        },
+        meta: {
+          jws: {
+            protected: {
+              alg: 'ML-DSA-44',
+              kid: 'did:web:some-issuer#key-1',
+            },
+          },
+          jwe: {
+            header: {
+              skid: 'did:web:some-issuer#enc-key-1',
+              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+            }
+          },
+        },
       };
       mockKmsService.decodeJobRequest.mockResolvedValue(mockJobRequest);
       
@@ -207,8 +227,14 @@ describe('Network Enrollment API', () => {
         input: jobFromNonControllerEmployee,
         meta: {
           jws: {
-            protected: { alg: 'ES256K', kid: employeeKid }
-          }
+            protected: { alg: 'ML-DSA-44', kid: employeeKid }
+          },
+          jwe: {
+            header: {
+              skid: employeeKid, // Assuming sender uses same key for signing and encryption ID
+              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: employeeKid, x: 'mock-key' }
+            }
+          },
         },
       };
       // The KMS successfully verifies the signature (authentication is a success).

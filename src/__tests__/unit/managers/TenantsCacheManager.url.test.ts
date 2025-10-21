@@ -34,7 +34,8 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
   delete (tenantConfigWithoutUrl.claims as any)[ClaimsOrganizationSchemaorg.url];
 
   beforeEach(() => {
-    tenantsCacheManager = new TenantsCacheManager(new VaultMemRepository(), new DemoKmsService());
+    const demoKmsService = new DemoKmsService();
+    tenantsCacheManager = new TenantsCacheManager(new VaultMemRepository(), () => demoKmsService);
 
     // Spy on getDidDocument and mock its implementation
     jest.spyOn(tenantsCacheManager, 'getDidDocument').mockImplementation((vaultId: string) => {

@@ -80,25 +80,27 @@ export function initializeTenantServices(didId: string, sector: Sector, customSe
 
   // NOTE: In a real implementation, these network services would likely be added to a tenant's
   // DID Document *after* they have successfully enrolled, not by default.
-  // They are included here by default to simplify the end-to-end testing flow.
-  const defaultNetworkServices: DidService[] = [
-    {
-      ...(createDidEndpointConfig(
-        createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema' }),
-        ['Action'],
-        ['_batch']
-      )),
-      type: 'NetworkEnrollmentService'
-    },
-    {
-      ...(createDidEndpointConfig(
-        createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema' }),
-        ['Person'],
-        ['_discovery']
-      )),
-      type: 'PersonDiscoveryService'
-    },
-  ];
+      // They are included here by default to simplify the end-to-end testing flow.
+    const defaultNetworkServices: DidService[] = [
+        {
+            ...(createDidEndpointConfig(
+                // default network is 'test-network'. always as section
+                createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Action' }),
+                ['Action'],
+                ['_batch']
+            )),
+            type: 'NetworkEnrollmentService'
+        },
+        {
+            ...(createDidEndpointConfig(
+                // default network is 'test-network'. always as section
+                createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Person' }),
+                ['Person'],
+                ['_discovery']
+            )),
+            type: 'PersonDiscoveryService'
+        },
+    ];
 
 
 

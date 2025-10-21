@@ -1,4 +1,4 @@
-// src/__tests__/integration/pingApi.test.ts
+import { CryptographyService } from '../../crypto/CryptographyService';// src/__tests__/integration/pingApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
@@ -28,11 +28,12 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.json());
 
   const vaultRepository = new VaultMemRepository();
-  const tenantsCacheManager = new TenantsCacheManager(vaultRepository, mockKmsService);
+  const cryptographyService = new CryptographyService();
+  const tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService);
 
   mockKmsService.init();
 
-  const apiRouter = createApiRouter(mockQueueAdapter, tenantsCacheManager, mockKmsService, asyncResponseStore);
+  const apiRouter = createApiRouter(mockQueueAdapter, tenantsCacheManager, mockKmsService, asyncResponseStore, vaultRepository, cryptographyService);
   app.use('/', apiRouter);
 
   return { app, tenantsCacheManager };
@@ -61,7 +62,23 @@ describe('Ping API Endpoint', () => {
       
       const mockDecodedJob: JobRequest = {
         input: decodedPingMessage,
-        meta: {},
+        meta: {
+          jws: {
+            protected: {
+              alg: 'ML-DSA-44',
+              kid: 'did:web:some-issuer#key-1',
+            },
+          },
+          jwe: {
+            header: {
+              skid: 'did:web:some-issuer#enc-key-1',
+              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+            }
+          },
+          bearer: {
+            jwt: { payload: { email: 'ping@test.com' } },
+          }
+        },
         tenantId: 'host',
         resourceType: 'resource',
         action: '_batch',
@@ -104,7 +121,23 @@ describe('Ping API Endpoint', () => {
 
       const mockDecodedJob: JobRequest = {
         input: decodedTenantPingMessage,
-        meta: {},
+        meta: {
+          jws: {
+            protected: {
+              alg: 'ML-DSA-44',
+              kid: 'did:web:some-issuer#key-1',
+            },
+          },
+          jwe: {
+            header: {
+              skid: 'did:web:some-issuer#enc-key-1',
+              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+            }
+          },
+          bearer: {
+            jwt: { payload: { email: 'ping@test.com' } },
+          }
+        },
         tenantId: 'acme',
         resourceType: 'resource',
         action: '_batch',
@@ -168,6 +201,39 @@ describe('Ping API Endpoint', () => {
         expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
       });
     });
+
+  describe('POST /host/.../_batch (Legacy JSON Ping)', () => {
+    it('should accept a plain JSON request and queue a job with the correct contentType', async () => {
+      // --- Arrange ---
+      const asyncResponseStore = new AsyncResponseStoreMem();
+      const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
+  
+      // The router must still validate that the service endpoint exists
+      jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockReturnValue([pingServiceConfig]);
+  
+      const pingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch';
+      const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
+  
+      // --- Act ---
+      const response = await request(app)
+        .post(pingUrl)
+        .set('Content-Type', 'application/json')
+        .send(decodedPingMessage); // Send the raw JSON payload
+        
+      // --- Assert ---
+      expect(response.status).toBe(202);
+      expect(response.headers.location).toBe(expectedPollingUrl);
+      expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
+      
+      const [jobName, jobRequest] = (mockQueueAdapter.addJob as jest.Mock).mock.calls[0];
+      expect(jobName).toContain('host:resource:_batch');
+      expect(jobRequest.tenantId).toBe('host');
+      
+      // CRITICAL: Verify the contentType is set correctly for the worker
+      expect(jobRequest.contentType).toBe('application/json');
+      expect(jobRequest.input).toEqual(decodedPingMessage);
+    });
+  });
 
   describe('Job Polling (`/_batch-response`)', () => {
     const pollingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch-response';

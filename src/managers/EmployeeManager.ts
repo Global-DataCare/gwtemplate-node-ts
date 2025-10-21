@@ -2,11 +2,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4 } from 'uuid';
-import { getBundleResponseTypeForAction } from '../utils/bundle';
-import { Bundle, BundleEntry, BundleEntryRequest, ErrorEntry } from '../models/bundle';
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
-import { ClaimsRecord, RecordBase } from '../models/resource-document';
-import { JobRequest } from '../models/request';
 import { IPayloadResponse } from '../models/response';
 import { ManagerError } from '../models/errors/manager-error';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
@@ -19,6 +14,15 @@ import { createOperationOutcome } from '../utils/outcome';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { getTenantVaultId } from '../utils/tenant';
+import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { BundleEntry, ErrorEntry, BundleEntryRequest, Bundle } from '../models/bundle';
+import { ClaimsRecord, RecordBase } from '../models/resource-document';
+import { getBundleResponseTypeForAction } from '../utils/bundle';
+import { normalizeCodeSystemAndValue } from '../utils/attributes';
+import { ParameterData } from '../models/params';
+import { PublicJwk } from '../crypto/interfaces/Cryptography.types';
+import { DidDocument, VerificationMethod } from '../models/did';
+import { JobRequest, JobRequestMeta } from '../models/request';
 
 const EMPLOYEE_SECTION = 'employees';
 
@@ -52,10 +56,15 @@ export class EmployeeManager {
       throw new ManagerError(`Tenant with ID '${job.tenantId}' not found.`, IssueType.NotFound);
     }
 
+    if (!job.meta) {
+      // This should ideally never happen if the request passed through the security layer.
+      throw new ManagerError('Job is missing cryptographic metadata.', IssueType.Invalid);
+    }
+
     for (const entry of entries) {
       try {
-        // Pass the fetched URN down to the entry processor.
-        const resultEntry = await this.processEntry(entry, vaultId, issuerUrn, environment);
+        // Pass the fetched URN and the job metadata down to the entry processor.
+        const resultEntry = await this.processEntry(entry, vaultId, issuerUrn, job.meta, environment);
         responseEntries.push(resultEntry);
       } catch (error: any) {
         const errorEntry = this.handleError(error, entry.type, (entry as BundleEntryRequest).meta);
@@ -82,11 +91,12 @@ export class EmployeeManager {
     entry: BundleEntry,
     vaultId: string,
     tenantUrn: string,
+    meta: JobRequestMeta,
     environment?: string,
   ): Promise<BundleEntry> {
     const requestEntry = entry as BundleEntryRequest;
-    const { request, meta, type } = requestEntry;
-    const claims = meta?.claims;
+    const { request, meta: entryMeta, type } = requestEntry;
+    const claims = entryMeta?.claims;
 
     if (!request || !claims) {
       throw new ManagerError('Entry requires a request object and meta.claims.', IssueType.Required);
@@ -100,7 +110,7 @@ export class EmployeeManager {
 
     switch (request.method) {
       case 'POST':
-        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type);
+        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type, meta);
       case 'DELETE':
         return this.disableEmployee(vaultId, employeeId, type);
       default:
@@ -114,15 +124,28 @@ export class EmployeeManager {
     employeeId: string,
     claims: ClaimsRecord,
     entryType: string,
+    jobMeta: JobRequestMeta,
   ): Promise<BundleEntry> {
-    await this.kmsService.provisionKeys(employeeId);
+    // During bootstrapping (employee creation), the request MUST contain the public keys.
+    const signerJwk = jobMeta?.jws?.protected?.jwk;
+    const encrypterJwk = jobMeta?.jwe?.header?.jwk;
+
+    if (!signerJwk || !encrypterJwk) {
+      // TODO: This path should trigger the "managed key" flow in the future.
+      throw new ManagerError('Missing embedded JWKs in the JWS/JWE headers for employee creation.', IssueType.Required);
+    }
+
+    // Additional validation to ensure the keys have kids
+    if (!signerJwk.kid || !encrypterJwk.kid) {
+      throw new ManagerError('Embedded JWKs must have a "kid" property.', IssueType.Required);
+    }
 
     const email = claims[ClaimsPersonSchemaorg.email];
     if (!email || typeof email !== 'string') {
       throw new ManagerError('Missing or invalid email claim.', IssueType.Required);
     }
 
-    const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation];
+    const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation]; // e.g. ISCO-08:<code>
     if (!roleCode || typeof roleCode !== 'string') {
       throw new ManagerError('Missing or invalid hasOccupation claim.', IssueType.Required);
     }
@@ -130,16 +153,42 @@ export class EmployeeManager {
     // Construct the hierarchical URN using the parent tenant's URN.
     const employeeUrn = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
 
+    // Create verification methods from the provided JWKs
+    const verificationMethods: VerificationMethod[] = [
+      {
+        id: `${employeeUrn}#${signerJwk.kid}`,
+        type: 'JsonWebKey',
+        controller: employeeUrn,
+        publicKeyJwk: signerJwk as PublicJwk,
+      },
+      {
+        id: `${employeeUrn}#${encrypterJwk.kid}`,
+        type: 'JsonWebKey',
+        controller: employeeUrn,
+        publicKeyJwk: encrypterJwk as PublicJwk,
+      },
+    ];
+
+    const employeeDidDocument: DidDocument = {
+      '@context': 'https://www.w3.org/ns/did/v1',
+      id: employeeUrn,
+      verificationMethod: verificationMethods,
+      authentication: [verificationMethods[0].id],
+      keyAgreement: [verificationMethods[1].id],
+      service: [],
+    };
+    
+    // Also add these keys to the parent tenant's DID Document for resolution.
+    // This allows others to find the employee's keys by querying the tenant's DID.
+    this.tenantsCacheManager.addVerificationMethodToTenant(vaultId, verificationMethods[0]);
+    this.tenantsCacheManager.addVerificationMethodToTenant(vaultId, verificationMethods[1]);
+
     const employeeConfig: EntityConfig = {
       id: employeeId,
       type: 'EmployeeConfig',
       status: 'active',
       claims,
-      didDocument: {
-        '@context': 'https://www.w3.org/ns/did/v1',
-        id: employeeUrn, // The employee's full, semantic URN
-        service: [],
-      },
+      didDocument: employeeDidDocument,
       didConfig: { // didConfig property is required by EntityConfig
         service: []
       },
@@ -162,11 +211,23 @@ export class EmployeeManager {
       },
     };
 
+    const attributesToIndex: ParameterData[] = [
+      { name: 'email', value: email, unique: true, type: 'string'},
+      // The role code is normalized before HMAC to ensure consistent searching.
+      { name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token'},
+      { name: 'kid', value: signerJwk.kid, unique: false, type: 'string'},
+      { name: 'kid', value: encrypterJwk.kid, unique: false, type: 'string'},
+    ];
+    
+    const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(attributesToIndex, vaultId);
+
     const docToProtect: ConfidentialStorageDoc = {
       id: employeeConfig.id,
       sequence: 0,
       content: employeeConfig,
+      indexed: { attributes: protectedAttributes },
     };
+    
     // The tenant's vaultId is used for the security context.
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
     await this.vaultRepository.put(vaultId, [secureDoc, occupationDoc], EMPLOYEE_SECTION);

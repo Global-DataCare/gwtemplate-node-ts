@@ -60,7 +60,7 @@ describe('TenantsCacheManager', () => {
       unprotectConfidentialData: jest.fn(),
     } as any;
 
-    tenantsCacheManager = new TenantsCacheManager(mockVaultRepository, mockKmsService);
+    tenantsCacheManager = new TenantsCacheManager(mockVaultRepository, () => mockKmsService);
   });
 
   afterEach(() => {
