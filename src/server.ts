@@ -1,11 +1,12 @@
 // src/server.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import 'reflect-metadata';
 import * as express from 'express';
 import * as dotenv from 'dotenv';
 import { Worker } from './worker';
 import { IServerConfig } from './config';
-import { Sector } from './models/path';
+import { Sector } from './models/urlPath';
 import { createApiRouter } from './routes/api';
 import { createDiscoveryRouter } from './routes/discovery';
 import { DiscoveryService } from './services/DiscoveryService';
@@ -28,6 +29,7 @@ import { BlockchainAdapterMem } from './adapters/BlockchainAdapterMem';
 import { createNetworkRouter } from './routes/network';
 import { IBlockchainAdapter } from './adapters/IBlockchainAdapter';
 import { CommunicationManager } from './managers/CommunicationManager';
+import { createFhirRouter } from './routes/fhir';
 
 // ===================================================================================
 // CONFIGURATION LOGIC - INTERNAL TO SERVER.TS
@@ -136,17 +138,27 @@ async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServer
   }
 }
 
+interface StartServerOptions {
+  testMiddlewares?: express.RequestHandler[];
+}
+
 /**
  * Initializes and starts the Express server.
  */
-async function startServer() {
+async function startServer(options?: StartServerOptions) {
   dotenv.config();
   const config = getConfig();
 
   // console.log('[GW-API] Initializing...');
   const app = express.default();
   app.use(express.default.urlencoded({ extended: true }));
-  app.use(express.default.json());
+  app.use(express.default.json({ type: ['application/json', 'application/fhir+json'] }));
+
+  // Apply test middlewares before any routers
+  if (options?.testMiddlewares) {
+    options.testMiddlewares.forEach(mw => app.use(mw));
+  }
+
 
   const vaultRepository = new VaultMemRepository();
 
@@ -218,9 +230,11 @@ async function startServer() {
   const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService);
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
+  const fhirRouter = createFhirRouter(queueAdapter);
   app.use('/', discoveryRouter);
   app.use('/', apiRouter);
   app.use('/', networkRouter);
+  app.use('/', fhirRouter);
 
   const server = app.listen(config.port, () => {
     // console.log(`[GW-API ${config.nodeEnv} Server running on ${config.apiBaseUrl}`);

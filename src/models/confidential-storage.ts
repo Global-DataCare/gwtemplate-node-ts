@@ -1,6 +1,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/models/confidential-storage.ts
-
+// $HOME/GITS/gwtemplate-node-ts/src/models/confidential-storage.ts
 import { RecordBase } from './resource-document';
 import { ParameterType } from './params';
 

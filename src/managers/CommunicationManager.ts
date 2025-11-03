@@ -37,7 +37,7 @@ export class CommunicationManager implements IJobProcessor {
     const bundleEntries: (BundleEntryResponse | ErrorEntry)[] = [];
     const now = Math.floor(Date.now() / 1000);
 
-    const entries = job.input.body.data || [job.input.body];
+    const entries = job.content.body.data || [job.content.body];
 
     for (const entry of entries) {
       try {
@@ -52,7 +52,7 @@ export class CommunicationManager implements IJobProcessor {
         if (!serverDid) {
             throw new Error(`Could not determine server DID for tenant '${job.tenantId}'.`);
         }
-        const commMsg = this.convertFhirToCommMsg(job.input.thid, serverDid, fhirResource);
+        const commMsg = this.convertFhirToCommMsg(job.content.thid, serverDid, fhirResource);
         
         bundleEntries.push({
           response: { status: '200' },
@@ -100,7 +100,7 @@ export class CommunicationManager implements IJobProcessor {
       iss: serverDid,
       aud: aud,
       exp: now + 300, // 5 minutes expiration
-      thid: job.input.thid,
+      thid: job.content.thid,
       body: responseBundle,
     };
   }

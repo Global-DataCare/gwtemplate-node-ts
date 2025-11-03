@@ -43,7 +43,7 @@ export class EmployeeManager {
 
   public async process(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
-    const entries = job.input?.body?.data ?? [];
+    const entries = job.content?.body?.data ?? [];
 
     if (!job.tenantId || !job.sector) {
       throw new ManagerError('Job is missing required tenantId or sector.', IssueType.Required);
@@ -79,9 +79,9 @@ export class EmployeeManager {
     };
 
     return {
-      thid: job.input.thid,
+      thid: job.content.thid,
       iss: issuerUrn, // Use the tenant's URN as the issuer
-      aud: job.input.aud,
+      aud: job.content.aud,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: responseBundle,
     };

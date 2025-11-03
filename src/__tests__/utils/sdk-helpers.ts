@@ -7,7 +7,7 @@ import { JobRequest } from '../../models/request';
 import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
 import { determineResourceId } from '../../utils/resource';
 import { BundleEntry } from '../../models/bundle';
-import { JobAction } from '../../models/path';
+import { JobAction } from '../../models/urlPath';
 
 /**
  * **SDK Helper Part 1: Entry Creation**
@@ -66,7 +66,7 @@ export const sdkCreateJobRequest = (
   return {
     action: JobAction._batch,
     tenantId,
-    input: {
+    content: {
       thid: uuidv4(), // Use UUID for transaction IDs.
       iss: issuerDid,
       aud: targetDid,

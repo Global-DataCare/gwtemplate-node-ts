@@ -1,5 +1,5 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
-// File: src/models/sector.ts
+// File: src/models/urlPath.ts
 
 /**
  * Defines the standardized business sectors supported by the gateway.
@@ -47,6 +47,7 @@ export enum Resource {
 export enum JobAction {
   "_batch" = "_batch",
   "_create" = "_create",
+  "_discovery" = "_discovery"
 }
 
 export enum knownDomainsReversedEnum {

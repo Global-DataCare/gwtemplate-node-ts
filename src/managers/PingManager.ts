@@ -26,7 +26,7 @@ export class PingManager {
    * @returns A IPayloadResponse object with the echoed entries.
    */
   async process(job: JobRequest): Promise<IPayloadResponse> {
-    const jobEntries = job?.input?.body?.data || [];
+    const jobEntries = job?.content?.body?.data || [];
 
     // Create response entries by appending a success status to each original entry.
     const responseEntries: BundleEntry[] = jobEntries.map((entry: BundleEntry) => ({
@@ -53,9 +53,9 @@ export class PingManager {
 
     // Construct the final JARM-compliant response payload.
     return {
-      thid: job.input.thid,
+      thid: job.content.thid,
       iss: issuerDid,
-      aud: job.input.iss,   // The response is for the original requester
+      aud: job.content.iss,   // The response is for the original requester
       exp: Math.floor(Date.now() / 1000) + 300, // Expires in 5 minutes
       body: responseBundle,
     };

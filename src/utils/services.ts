@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { EntityConfig } from '../models/entity';
-import { Sector } from '../models/path';
+import { Sector } from '../models/urlPath';
 import { DidService } from '../models/did';
 import { createDidServiceId } from './did';
 
@@ -80,29 +80,27 @@ export function initializeTenantServices(didId: string, sector: Sector, customSe
 
   // NOTE: In a real implementation, these network services would likely be added to a tenant's
   // DID Document *after* they have successfully enrolled, not by default.
-      // They are included here by default to simplify the end-to-end testing flow.
-    const defaultNetworkServices: DidService[] = [
-        {
-            ...(createDidEndpointConfig(
-                // default network is 'test-network'. always as section
-                createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Action' }),
-                ['Action'],
-                ['_batch']
-            )),
-            type: 'NetworkEnrollmentService'
-        },
-        {
-            ...(createDidEndpointConfig(
-                // default network is 'test-network'. always as section
-                createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Person' }),
-                ['Person'],
-                ['_discovery']
-            )),
-            type: 'PersonDiscoveryService'
-        },
-    ];
-
-
+  // They are included here by default to simplify the end-to-end testing flow.
+  const defaultNetworkServices: DidService[] = [
+      {
+          ...(createDidEndpointConfig(
+              // default network is 'test-network'. always as section
+              createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Action' }),
+              ['Action'],
+              ['_batch']
+          )),
+          type: 'NetworkEnrollmentService'
+      },
+      {
+          ...(createDidEndpointConfig(
+              // default network is 'test-network'. always as section
+              createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Person' }),
+              ['Person'],
+              ['_discovery']
+          )),
+          type: 'PersonDiscoveryService'
+      },
+  ];
 
   const allServices = [...discoveryServices, ...defaultBusinessServices, ...defaultNetworkServices, ...customServices];
   const serviceMap = new Map(allServices.map(s => [s.id, s]));

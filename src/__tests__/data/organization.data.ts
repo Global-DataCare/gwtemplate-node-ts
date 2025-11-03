@@ -5,6 +5,7 @@ import { EntityConfig } from "../../models/entity";
 import { URN_NAMESPACE, URN_NETWORK, URN_VERSION } from "./urn.data";
 import { ClaimsOrganizationSchemaorg } from "../../models/schemaorg";
 import { testTenant1Vc } from "./credential.data";
+import { Sector } from "../../models/urlPath";
 
 /**
  * This file contains the foundational data for test organizations,
@@ -71,7 +72,7 @@ export const testTenant1UrlExternal = `https://${testTenant1Domain}/`
 // --- Tenant 1 - Service Provider Details ---
 // const testTenant1ServiceProviderUuid = "d1c2c3d4-e5f6-7890-1234-567890abcdef";
 const testTenant1ServiceProviderDidWebIdentifier = testHostDidWeb;
-export const testTenant1ServiceProviderCategory = "health-care"; // Using 'health-care' as the sector.
+export const testTenant1ServiceProviderCategory = Sector.HEALTH_CARE; // Using 'health-care' as the sector.
 const testTenant1ServiceProviderTerms = "https://provider.example.com/terms";
 const testTenant1ServiceProviderPurposeType = "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC";
 

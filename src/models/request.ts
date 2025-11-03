@@ -19,7 +19,7 @@ export enum FormRequest {
 export interface DataInRequest {
   requestUrl?: string;
   httpMethod?: string;
-  input?: any;
+  content?: any;
   contentType?: string;
   tenantId?: string;
   jurisdiction?: string;
@@ -51,6 +51,8 @@ export interface  DecodedDidcommMessage {
 /**
  * Represents the entire data package for a single job ready for processing.
  * It combines the HTTP request context with the decoded message and its security context.
+ * The hosted URL has this structure: `https://<host-domain>/:tenantId/cds-:jurisdiction/v1/:sector/:section/:format/:resourceType/:action`
+ * The external URL has this structure: `https://<organization-domain>/:section/:format/:resourceType/:action`
  */
 export interface JobRequest extends DataInRequest {
   contentType?: string;
@@ -70,7 +72,7 @@ export interface JobRequest extends DataInRequest {
   language?: string;
 
   /** The decoded DIDComm message which constitutes the primary input for the job. */
-  input: DecodedDidcommMessage;
+  content: DecodedDidcommMessage;
 
   /** Metadata enriched by the security middleware from the cryptographic envelope (JWS/JWE). */
   meta?: JobRequestMeta;

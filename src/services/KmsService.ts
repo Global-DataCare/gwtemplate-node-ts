@@ -261,7 +261,7 @@ export class KmsService implements IKmsService {
 
     const dataJwt = this.crypto.parseCompactJws(jwsString);
     const jobRequest = {
-      input: dataJwt.payload,
+      content: dataJwt.payload,
       meta: { jws: dataJwt, jwe: { header: protectedHeader } },
     } as JobRequest;
 

@@ -120,7 +120,7 @@ describe('Employee Creation API', () => {
       const mockDecodedJob: Omit<JobRequest, 'tenantId'> = {
         resourceType: resourceType,
         action: action,
-        input: {
+        content: {
           aud: tenantUrn,
           thid: thid,
           iss: 'did:web:some-issuer',

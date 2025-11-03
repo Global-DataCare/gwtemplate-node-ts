@@ -1,5 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/data/employee.data.ts
+import { JobRequest } from '../../models/request';
+import { ClaimsRecord } from '../../models/resource-document';
 import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
 import { testTenant1DidWebExternal, testTenant1Domain, testTenant1IdentifierUrn } from './organization.data';
 
@@ -89,3 +91,34 @@ export const testClaimsTenant1Nurse1 = {
     [ClaimsPersonSchemaorg.hasOccupation]: testTenant1Nurse1.hasOccupation,
     [ClaimsPersonSchemaorg.email]: testTenant1Nurse1.email,
 };
+
+
+export const testBaseJobForEmployeeClaims = (claims: ClaimsRecord, tenantId: string, sector: string): JobRequest => ({
+  tenantId: tenantId,
+  sector: sector,
+  jurisdiction: 'us',
+  resourceType: 'Person',
+  section: 'org.schema',
+  action: '_batch',
+  meta: { // Add the meta object for the test to pass the guard
+    jws: { protected: { alg: 'ML-DSA-44', kid: 'test-kid', jwk: { kid: 'test-kid', kty: 'AKP', alg: 'ML-DSA-44', pub: '...' } } },
+    jwe: { header: { enc: 'A256GCM', skid: 'test-skid', jwk: { kid: 'test-skid', kty: 'OKP', crv: 'ML-KEM-768', x: '...' } } },
+  },
+  content: {
+    aud: 'did:web:api.example.com', // This can be anything for this test
+    response_type: 'json',
+    thid: 'test-thid-456',
+    type: 'json',
+    body: {
+      data: [
+        {
+          meta: { claims },
+          request: { method: 'POST' },
+          type: 'Employee-form-v1.0',
+        },
+      ],
+    },
+  },
+  httpMethod: 'POST',
+  requestUrl: '/default',
+});

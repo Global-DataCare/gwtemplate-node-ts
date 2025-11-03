@@ -49,6 +49,7 @@ const config: JestConfigWithTsJest = {
         '@stablelib/base64',        
         'pkijs',
         'asn1js',
+        'uuid',
         '@peculiar/webcrypto'
       ].join('|')
     }))`

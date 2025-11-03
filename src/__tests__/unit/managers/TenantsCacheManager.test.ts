@@ -6,7 +6,7 @@ import { VaultRepository } from '../../../database/repositories/vault/vault.repo
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { EntityConfig } from '../../../models/entity';
 import { getTenantVaultId } from '../../../utils/tenant';
-import { Sector } from '../../../models/path';
+import { Sector } from '../../../models/urlPath';
 import { DidService } from '../../../models/did';
 import { ClaimsRecord } from '../../../models/resource-document';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';

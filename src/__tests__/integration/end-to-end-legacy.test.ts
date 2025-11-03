@@ -27,13 +27,44 @@ jest.mock('../../config', () => ({
   })),
 }));
 
+import 'reflect-metadata';
 import * as express from 'express';
 import * as request from 'supertest';
 import { Server } from 'http';
+import { container } from 'tsyringe';
 import { startServer } from '../../server';
 import { QueueAdapter } from '../../adapters/queue';
 import { QueueAdapterMem } from '../../adapters/queue-mem';
 import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
+import { IAuthorizationManager } from '../../managers/auth/IAuthorizationManager';
+import { testCommunicationAppointmentFhirR4 } from '../data/appointment.data';
+import { BundleEntry } from '../../models/bundle';
+import { IAccessTokenClaims } from '../../models/auth';
+
+// Mock implementation for the AuthorizationManager
+class MockAuthorizationManager implements IAuthorizationManager {
+  public consentStore: Map<string, boolean> = new Map();
+
+  // Helper to set up consent for a test
+  public setConsent(consentId: string, hasConsent: boolean): void {
+    this.consentStore.set(consentId, hasConsent);
+  }
+
+  // In the real implementation, this method would inspect the resource to find the consentId.
+  // For the mock, we pass the consentId directly for simplicity.
+  public async canAccess(
+    _claims: IAccessTokenClaims,
+    resource: BundleEntry,
+    _action: string,
+    consentId?: string,
+  ): Promise<boolean> {
+    if (!consentId) {
+      return false;
+    }
+    return this.consentStore.get(consentId) ?? false;
+  }
+}
+
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -42,10 +73,29 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
   let server: Server;
   let queueAdapter: QueueAdapter;
   let addJobSpy: jest.SpyInstance;
+  let authManager: MockAuthorizationManager;
 
   beforeAll(async () => {
-    // Start the server, which will use the mocked config.
-    const serverInstance = await startServer();
+    // Dependency injection setup for the mock Authorization Manager
+    authManager = new MockAuthorizationManager();
+    container.register<IAuthorizationManager>('AuthorizationManager', { useValue: authManager });
+
+    // Create a mock authentication middleware
+    const mockAuthMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (req.headers.authorization === 'Bearer mock-valid-token-for-fhir') {
+        (req as any).claims = {
+          iss: 'did:web:test-issuer.com',
+          sub: 'did:web:test-employee.com',
+          aud: 'did:web:this-gateway.com',
+          scope: 'fhir:Communication.create',
+          client_id: 'test-client',
+        } as IAccessTokenClaims;
+      }
+      next();
+    };
+
+    // Start the server, passing the mock middleware to be applied before any routes
+    const serverInstance = await startServer({ testMiddlewares: [mockAuthMiddleware] });
     app = serverInstance.app;
     server = serverInstance.server;
     queueAdapter = serverInstance.queueAdapter;
@@ -96,4 +146,105 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
       await delay(200);
     }
   });
+
+  describe('FHIR Communication Flow', () => {
+    const communicationUrl = '/v1/health-care/individual/org.hl7.fhir.r4/Communication';
+    const accessToken = 'Bearer mock-valid-token-for-fhir';
+
+    // To mock the canAccess method correctly, we need to bypass its complex parameters
+    // in the test and just control its return value based on the consentId.
+    let canAccessSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      // Spy on the real canAccess method of our *mocked* manager
+      canAccessSpy = jest.spyOn(authManager, 'canAccess');
+    });
+
+    afterEach(() => {
+      canAccessSpy.mockRestore();
+    });
+
+    it('should REJECT a FHIR Communication with 403 Forbidden if consent is NOT present', async () => {
+      // 1. ARRANGE
+      const consentId = 'urn:uuid:consent-not-granted';
+      const communicationPayload = {
+        ...testCommunicationAppointmentFhirR4,
+        partOf: [{ reference: consentId }],
+      };
+
+      // We configure the mock implementation to return false for this consentId.
+      authManager.setConsent(consentId, false);
+      // We also need to mock the spy's behavior for this specific test.
+      canAccessSpy.mockImplementation((_c, _r, _a, passedConsentId) =>
+        Promise.resolve(authManager.consentStore.get(passedConsentId) ?? false),
+      );
+
+      // 2. ACT
+      const response = await request
+        .default(app)
+        .post(communicationUrl)
+        .set('Content-Type', 'application/fhir+json')
+        .set('Authorization', accessToken)
+        .send(communicationPayload);
+
+      // 3. ASSERT
+      expect(response.status).toBe(403);
+      expect(response.body.resourceType).toBe('OperationOutcome');
+      expect(response.body.issue[0].code).toBe('forbidden');
+      // Verify that the auth manager was actually called with the correct consentId
+      expect(canAccessSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'create', consentId);
+    });
+
+    it('should REJECT a FHIR Communication with 400 Bad Request if partOf is missing', async () => {
+      // 1. ARRANGE
+      const communicationPayload = { ...testCommunicationAppointmentFhirR4 };
+      delete (communicationPayload as any).partOf;
+
+      // 2. ACT
+      const response = await request
+        .default(app)
+        .post(communicationUrl)
+        .set('Content-Type', 'application/fhir+json')
+        .set('Authorization', accessToken)
+        .send(communicationPayload);
+
+      // 3. ASSERT
+      expect(response.status).toBe(400);
+      expect(response.body.resourceType).toBe('OperationOutcome');
+      expect(response.body.issue[0].code).toBe('required');
+    });
+
+    it('should ACCEPT a FHIR Communication with 202 Accepted if consent IS present', async () => {
+      // 1. ARRANGE
+      const consentId = 'urn:uuid:consent-granted-for-comm';
+      const communicationPayload = {
+        ...testCommunicationAppointmentFhirR4,
+        partOf: [{ reference: consentId }],
+      };
+      authManager.setConsent(consentId, true);
+      canAccessSpy.mockImplementation((_c, _r, _a, passedConsentId) =>
+        Promise.resolve(authManager.consentStore.get(passedConsentId) ?? false),
+      );
+
+      // 2. ACT
+      const response = await request
+        .default(app)
+        .post(communicationUrl)
+        .set('Content-Type', 'application/fhir+json')
+        .set('Authorization', accessToken)
+        .send(communicationPayload);
+
+      // 3. ASSERT
+      expect(response.status).toBe(202);
+      expect(response.headers.location).toBeDefined();
+      expect(addJobSpy).toHaveBeenCalledTimes(1);
+      expect(canAccessSpy).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'create', consentId);
+
+      // Ensure the job is processed before the test finishes to avoid open handles.
+      if (queueAdapter instanceof QueueAdapterMem) {
+        await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
+      }
+    });
+  });
 });
+

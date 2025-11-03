@@ -31,7 +31,7 @@ export class NetworkActionsController {
       }
       
       const decodedJob = await this.kmsService.decodeJobRequest(req.body.request);
-      if (!decodedJob.input?.thid) {
+      if (!decodedJob.content?.thid) {
         throw new ManagerError('Request payload is missing required "thid".', IssueType.Required);
       }
 
@@ -42,7 +42,7 @@ export class NetworkActionsController {
       await this.queueAdapter.addJob(jobName, job);
       
       const pollingUrl = req.originalUrl;
-      res.location(pollingUrl).status(202).json({ thid: decodedJob.input.thid });
+      res.location(pollingUrl).status(202).json({ thid: decodedJob.content.thid });
     } catch (error) {
       next(error);
     }

@@ -9,7 +9,7 @@ import { getTenantVaultId, getIdentifierUrnFromClaims } from '../utils/tenant';
 import { DidDocument, DidService, VerificationMethod } from '../models/did';
 import { getEnvironment } from '../utils/environment';
 import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
-import { Sector } from '../models/path';
+import { Sector } from '../models/urlPath';
 import { getBaseUrlFromDidWeb } from '../utils/did';
 import { parseTenantUrn } from '../utils/urn';
 

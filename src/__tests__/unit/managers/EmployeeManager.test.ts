@@ -10,7 +10,7 @@ import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
 import { RecordBase, ClaimsRecord } from '../../../models/resource-document';
 import { JwkSet } from '../../../models/jwk';
-import { testClaimsTenant1Receptionist1 } from '../../data/employee.data';
+import { testBaseJobForEmployeeClaims as testBaseJobForEmployeeClaims, testClaimsTenant1Receptionist1 } from '../../data/employee.data';
 import { JobRequest } from '../../../models/request';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
@@ -19,36 +19,6 @@ import { normalizeCodeSystemAndValue } from '../../../utils/attributes';
 
 // Tell Jest what will be mocked
 jest.mock('uuid');
-
-const testBaseJobForClaims = (claims: ClaimsRecord, tenantId: string, sector: string): JobRequest => ({
-  tenantId: tenantId,
-  sector: sector,
-  jurisdiction: 'us',
-  resourceType: 'Person',
-  section: 'org.schema',
-  action: '_batch',
-  meta: { // Add the meta object for the test to pass the guard
-    jws: { protected: { alg: 'ML-DSA-44', kid: 'test-kid', jwk: { kid: 'test-kid', kty: 'AKP', alg: 'ML-DSA-44', pub: '...' } } },
-    jwe: { header: { enc: 'A256GCM', skid: 'test-skid', jwk: { kid: 'test-skid', kty: 'OKP', crv: 'ML-KEM-768', x: '...' } } },
-  },
-  input: {
-    aud: 'did:web:api.example.com', // This can be anything for this test
-    response_type: 'json',
-    thid: 'test-thid-456',
-    type: 'json',
-    body: {
-      data: [
-        {
-          meta: { claims },
-          request: { method: 'POST' },
-          type: 'Employee-form-v1.0',
-        },
-      ],
-    },
-  },
-  httpMethod: 'POST',
-  requestUrl: '/default',
-});
 
 describe('EmployeeManager', () => {
   let employeeManager: EmployeeManager;
@@ -92,7 +62,7 @@ describe('EmployeeManager', () => {
   describe('Employee Creation (POST)', () => {
     it('should create employee, index kids securely, and save protected documents', async () => {
       // ARRANGE
-      const job = testBaseJobForClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       mockVaultRepository.put.mockResolvedValue(true);
       mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
 

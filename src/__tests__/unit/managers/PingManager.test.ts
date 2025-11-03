@@ -35,7 +35,7 @@ describe('PingManager', () => {
       action: '_batch',
 
       // --- Decoded Payload ---
-      input: {
+      content: {
         thid: 'test-request-ping-123',
         aud: 'did:web:recipient.example.com',
         iss: 'did:web:requester.example.com',
@@ -59,7 +59,7 @@ describe('PingManager', () => {
     expect(responsePayload.aud).toBe('did:web:requester.example.com');
     expect(responsePayload.body.type).toBe(getBundleResponseTypeForAction('_batch'));
 
-    const requestEntry = mockJob.input.body.data[0];
+    const requestEntry = mockJob.content.body.data[0];
     const responseEntry = responsePayload.body.data[0];
 
     // The response entry should be the original request entry, with a response block appended

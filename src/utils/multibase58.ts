@@ -1,4 +1,5 @@
-// utils/multibase88.ts
+// utils/multibase58.ts
+// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import baseX from "base-x";
 
@@ -32,13 +33,13 @@ export function encodeHexToMultibase58btc(hexStr: string): string {
   return encodeMultibase58btc(bytes);
 }
 
-// multibase base58btc ➜ hex (sin guiones)
+// multibase base58btc ➜ hex (no hyppens)
 export function decodeMultibase58btcToHex(b58str: string): string {
   const bytes = decodeMultibase58btc(b58str);
   return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-// multibase base58btc ➜ UUID (formateado con guiones)
+// multibase base58btc ➜ UUID (with hyppens)
 export function decodeMultibase58btcToUUID(b58str: string): string {
   const hex = decodeMultibase58btcToHex(b58str);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;

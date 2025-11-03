@@ -62,7 +62,7 @@ export class DemoKmsService implements IKmsService {
       const jwsPayload = JSON.parse(message).jws;
       const [protectedB64, payloadB64] = jwsPayload.split('.');
       return {
-        input: Content.base64UrlSafeToJSON(payloadB64),
+        content: Content.base64UrlSafeToJSON(payloadB64),
         meta: {
           jws: {
             protected: Content.base64UrlSafeToJSON(protectedB64),

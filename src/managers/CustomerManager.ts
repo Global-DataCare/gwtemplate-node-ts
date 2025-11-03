@@ -20,7 +20,7 @@ import { CredentialManager } from './CredentialManager';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { parseTenantUrn } from '../utils/urn';
 import { getTenantVaultId } from '../utils/tenant';
-import { Sector } from '../models/path';
+import { Sector } from '../models/urlPath';
 import { determineResourceId } from '../utils/resource';
 import { uuidToBytes } from '../utils/uuid';
 import { encodeMultibase58btc } from '../utils/multibase58';
@@ -62,7 +62,7 @@ export class CustomerManager {
   public async process(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
     // console.log('[CustomerManager] Processing job:', JSON.stringify(job, null, 2));
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
-    const entries = job.input?.body?.data ?? [];
+    const entries = job.content?.body?.data ?? [];
     
     // The Manager is responsible for constructing the vaultId from the job's context
     const tenantVaultId = getTenantVaultId(job.sector!, job.tenantId!);
@@ -80,7 +80,7 @@ export class CustomerManager {
           const resultEntry = await this.processCreationBatch(entries, tenantVaultId, issuerUrn, environment);
           responseEntries.push(resultEntry);
         } catch (error: any) {
-          const errorEntry = this.handleError(error, 'Customer-creation-batch-v1.0', job.input.body);
+          const errorEntry = this.handleError(error, 'Customer-creation-batch-v1.0', job.content.body);
           responseEntries.push(errorEntry);
         }
         break;
@@ -101,9 +101,9 @@ export class CustomerManager {
     };
 
     return {
-      thid: job.input.thid,
+      thid: job.content.thid,
       iss: issuerUrn,
-      aud: job.input.aud,
+      aud: job.content.aud,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: responseBundle,
     };

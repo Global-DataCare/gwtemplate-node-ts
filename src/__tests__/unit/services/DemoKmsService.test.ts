@@ -39,7 +39,7 @@ describe('DemoKmsService', () => {
             const jobRequest = await devKmsService.decodeJobRequest(fakeJweString);
 
             expect(jobRequest).toBeInstanceOf(Object);
-            expect(jobRequest.input).toEqual(innerPayload);
+            expect(jobRequest.content).toEqual(innerPayload);
             expect(jobRequest.meta?.jws?.protected).toEqual(innerProtected);
         });
     });

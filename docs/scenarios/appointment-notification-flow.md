@@ -19,6 +19,24 @@ This scenario leverages the `Person`, FHIR `Communication` resource, and the est
 6.  The patient's mobile app receives a push notification, fetches the new message, and displays the appointment details from the payload.
 7.  The app recognizes the `.ics` attachment and presents an "Accept and add to calendar" option, "Reject" or "Change". When accepted, the app decodes the Base64 data and hands it off to the mobile OS to be added to the native calendar application.
 
+## Authorization Flow: Consent Verification
+
+Before accepting and processing the `Communication` resource, the gateway MUST perform an authorization check. This ensures that the EMR system is acting with the patient's permission, which is crucial for data privacy and trust.
+
+1.  **`partOf` Field**: The incoming FHIR `Communication` resource **MUST** contain a `partOf` field. This field acts as a pointer to the broader context or channel to which this communication belongs.
+2.  **Consent Link**: The `reference` inside the `partOf` field **MUST** be the ID of a valid FHIR `Consent` resource that already exists in the system. For example:
+    ```json
+    "partOf": [
+      { "reference": "urn:uuid:c26e2a2a-6531-4a1f-a185-8a014a6316f7" }
+    ]
+    ```
+3.  **Verification**: The gateway's `AuthorizationManager` reads this `reference` and queries the individual's confidential storage for a `Consent` resource with a matching `id`.
+    -   If a matching and active `Consent` is found, the authorization is successful.
+    -   If the `partOf` field is missing, the gateway rejects the request with a `400 Bad Request`.
+    -   If no matching `Consent` is found, or if it is not active, the gateway rejects the request with a `403 Forbidden`.
+
+This mechanism ensures that every communication is explicitly linked to a prior agreement or established communication channel (e.g., created via a SMART-on-FHIR "launch" flow).
+
 ## FHIR to DIDCommExtended Mapping
 
 A key part of this architecture is the translation of a standard HL7 FHIR `Communication` resource into a secure, internal `DIDCommExtendedMessage` that is stored in the user's confidential storage. This provides a clean separation between the healthcare standard (FHIR) and the secure messaging transport (DIDComm).
@@ -152,23 +170,29 @@ The resulting object stored in the patient's vault is a clean, client-friendly `
   "sub": "urn:uuid:<patient-person-id>",
   "nbf": 1729002600,
   "category": "http://terminology.hl7.org/CodeSystem/communication-category|appointment-reminder",
-  "note": [{ "text": "Your Cardiology appointment is for Jan 15th, 2026 at 10:30 AM." }],
   "body": {
     "data": [
       {
-        "type": "org.hl7.fhir.r4.Reference",
-        "id": "<appointment-uuid>",
+        "type": "Annotation",
+        "id": "<text-uuid-v4>",
         "resource": {
-          "reference": "url-to-original-appointment",
+          "text": "testAppointmentRequestText"
+        }
+      },
+      {
+        "type": "Reference",
+        "id": "<uuid-v4>",
+        "resource": {
+          "reference": "testAppointmentSourceUrl",
           "type": "Appointment"
         }
       },
       {
-        "type": "org.hl7.fhir.r4.Attachment",
+        "type": "Attachment",
         "id": "<attachment-uuid>",
         "resource": {
           "contentType": "text/calendar",
-          "data": "QkVHSU46VkNBTEVOREFSLi4uRU5EOlZDQUxFTkRBUg==",
+          "data": "testCalendarICSBase64",
           "title": "appointment-details.ics", // filename
         }
       },
@@ -186,3 +210,142 @@ The resulting object stored in the patient's vault is a clean, client-friendly `
 -   On user interaction, it decodes the `resource.data` field (Base64) and initiates the OS-level calendar import.
 
 This pattern demonstrates a secure, robust, and user-friendly way to handle healthcare notifications while adhering to interoperability standards like HL7 FHIR.
+
+---
+
+## Developer Guide: Testing with cURL (Legacy Mode)
+
+This section provides `cURL` commands for developers and integrators to test the FHIR Communication endpoint directly in a local development environment.
+
+### Prerequisites
+
+1.  **Run the Server**: Start the server in development mode.
+    ```bash
+    npm run dev
+    ```
+2.  **Bearer Token**: For these tests, we use a mock token: `mock-valid-token-for-fhir`. In a real environment, this would be obtained via an OAuth2 flow.
+
+### 1. Success Case: Valid Consent
+
+This simulates sending a notification that is linked to a valid consent ID.
+
+**Request:**
+```bash
+curl -X POST http://localhost:3002/v1/health-care/individual/org.hl7.fhir.r4/Communication \
+-H "Content-Type: application/fhir+json" \
+-H "Authorization: Bearer mock-valid-token-for-fhir" \
+-d '{
+    "resourceType": "Communication",
+    "status": "completed",
+    "partOf": [{ "reference": "urn:uuid:consent-granted-for-comm" }],
+    "category": [
+        {
+            "coding": [
+                {
+                    "system": "http://terminology.hl7.org/CodeSystem/communication-category",
+                    "code": "appointment-reminder"
+                }
+            ]
+        }
+    ],
+    "recipient": [ { "reference": "did:web:api.acme.org:individual:multibase:zMomQqDS8U8M8MxEbzn7gjG" } ],
+    "sender": { "reference": "did:web:api.acme.org" },
+    "sent": "2024-10-15T14:30:00Z",
+    "note": [{ "text": "This is your new appointment. Best regards." }],
+    "payload": [
+        {
+            "contentReference": {
+                "reference": "https://url-to-appointment-source.com/some-uuid"
+            }
+        },      
+        {
+            "contentAttachment": {
+                "contentType": "text/calendar",
+                "data": "QkVHSU46VkNBTEVOREFSCgpWRVJTSU9OOjIuMApQUk9ESUQ6LS8vQWNtZS8vZGlkOndlYjphcGkuYWNtZS5vcmcvL0VTCkJFR0lOOlZFVkVOVApVSUQ6PHV1aWQtdjQ+CkRUU1RBTVA6MjAyNTEwMTZUMTIwMDAwWgpEVFNUQVJUOjIwMjUxMDE3VDE1MDAwMFoKRF RFTkQ6MjAyNTEwMTdUMTYwMDAwWgpTVU1NQVJZOlJlc3VtZW4gZGUgY2l0YS4KREVTQ1JJUFRJT046RW5jdWVudHJvIHZpcnR1YWwuCkxPQ0FUSU9OOk9ubGluZQpFTkQ6VkVWRU5UCkVORDpWQ0FMRU5EQVI=",
+                "title": "appointment-details.ics"
+            }
+        }
+    ]
+}'
+```
+
+**Expected Response:**
+-   **Status:** `202 Accepted`
+-   **Headers:** A `Location` header pointing to the job status URL.
+-   **Body:** Empty.
+
+### 2. Forbidden Case: Invalid Consent
+
+This simulates sending a notification with a `partOf` reference that does not correspond to an active consent.
+
+**Request:**
+```bash
+curl -X POST http://localhost:3002/v1/health-care/individual/org.hl7.fhir.r4/Communication \
+-H "Content-Type: application/fhir+json" \
+-H "Authorization: Bearer mock-valid-token-for-fhir" \
+-d '{
+    "resourceType": "Communication",
+    "status": "completed",
+    "partOf": [{ "reference": "urn:uuid:consent-not-granted" }],
+    "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/communication-category","code": "appointment-reminder"}]}],
+    "recipient": [ { "reference": "did:web:some-individual" } ],
+    "sender": { "reference": "did:web:some-emr" },
+    "sent": "2024-10-15T14:30:00Z"
+}'
+```
+
+**Expected Response:**
+-   **Status:** `403 Forbidden`
+-   **Body:** A FHIR `OperationOutcome`.
+    ```json
+    {
+        "resourceType": "OperationOutcome",
+        "issue": [
+            {
+                "severity": "error",
+                "code": "forbidden",
+                "details": {
+                    "text": "The provided credentials do not grant permission to perform this action."
+                }
+            }
+        ]
+    }
+    ```
+
+### 3. Bad Request Case: Missing `partOf`
+
+This simulates a malformed request where the mandatory `partOf` field is omitted.
+
+**Request:**
+```bash
+curl -X POST http://localhost:3002/v1/health-care/individual/org.hl7.fhir.r4/Communication \
+-H "Content-Type: application/fhir+json" \
+-H "Authorization: Bearer mock-valid-token-for-fhir" \
+-d '{
+    "resourceType": "Communication",
+    "status": "completed",
+    "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/communication-category","code": "appointment-reminder"}]}],
+    "recipient": [ { "reference": "did:web:some-individual" } ],
+    "sender": { "reference": "did:web:some-emr" },
+    "sent": "2024-10-15T14:30:00Z"
+}'
+```
+
+**Expected Response:**
+-   **Status:** `400 Bad Request`
+-   **Body:** A FHIR `OperationOutcome`.
+    ```json
+    {
+        "resourceType": "OperationOutcome",
+        "issue": [
+            {
+                "severity": "error",
+                "code": "required",
+                "details": {
+                    "text": "The 'partOf' field is required to link this communication to a consent."
+                }
+            }
+        ]
+    }
+    ```
+

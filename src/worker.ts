@@ -89,13 +89,13 @@ export class Worker {
       return this.kmsService.encodeResponse(payloadResponse, [recipientKey], senderVaultId);
       
     } catch (error: any) {
-      console.error(`[Worker Job '${jobName}' failed for thid ${job.input?.thid}]`, error.message);
+      console.error(`[Worker Job '${jobName}' failed for thid ${job.content?.thid}]`, error.message);
       
-      const errorBundle = createErrorBundle(error.message, jobInfo?.action, job.input?.body?.data?.[0]?.type);
+      const errorBundle = createErrorBundle(error.message, jobInfo?.action, job.content?.body?.data?.[0]?.type);
       const errorResponse = {
-        thid: job.input?.thid || 'unknown-thid',
+        thid: job.content?.thid || 'unknown-thid',
         iss: composeHostDidWebId(this.apiBaseUrl),
-        aud: job.input?.iss || 'unknown-aud',
+        aud: job.content?.iss || 'unknown-aud',
         exp: Math.floor(Date.now() / 1000) + 300,
         body: errorBundle,
       };

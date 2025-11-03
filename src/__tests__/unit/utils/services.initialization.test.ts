@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { initializeTenantServices } from '../../../utils/services';
-import { Sector } from '../../../models/path';
+import { Sector } from '../../../models/urlPath';
 import { DidService } from '../../../models/did';
 
 describe('initializeTenantServices', () => {

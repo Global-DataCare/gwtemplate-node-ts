@@ -71,7 +71,7 @@ export function extractHttpRequestDataAsJson(
   const requestData: DataInRequest = {
     requestUrl: url,
     httpMethod: httpMethod.toUpperCase(),
-    input: input,
+    content: input,
     contentType: contentType,
     tenantId: pathParts[cdsIndex - 1],
     jurisdiction: pathParts[cdsIndex].substring(4), // Remove 'cds-'

@@ -1,15 +1,15 @@
-import { CryptographyService } from '../../crypto/CryptographyService';// src/__tests__/integration/organizationApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// File: src/__tests__/integration/organizationApi.test.ts
 
 import express from 'express';
 import request from 'supertest';
 import { v4 as uuidv4 } from 'uuid';
+import { CryptographyService } from '../../crypto/CryptographyService';
 import { createApiRouter } from '../../routes/api';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import {
   testClaimsTenant1Registration,
-  testHostData,
 } from '../data/end-to-end.data';
 import { testHostAlternateName } from '../data/organization.data';
 import {
@@ -114,7 +114,7 @@ describe('Organization Registration API', () => {
       const mockDecodedJob: Omit<JobRequest, 'tenantId'> = {
         resourceType: resourceType,
         action: action,
-        input: {
+        content: {
           aud: `did:web:${testHostAlternateName}`,
           thid: thid,
           type: 'https://didcomm.org/registration/1.0/register',

@@ -3,7 +3,7 @@
 
 import { initializeHostServices, initializeTenantServices } from '../../../utils/services';
 import { EntityConfig } from '../../../models/entity';
-import { Sector } from '../../../models/path';
+import { Sector } from '../../../models/urlPath';
 import { IServerConfig } from '../../../config';
 import { DidService } from '../../../models/did';
 

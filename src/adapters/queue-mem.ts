@@ -43,7 +43,7 @@ export class QueueAdapterMem implements QueueAdapter {
     if (this.queue.length > 0) {
       const job = this.queue.shift();
       if (job) {
-        const thid = job.request.input.thid; // Correctly get thid from the decoded input
+        const thid = job.request.content.thid; // Correctly get thid from the decoded input
         if (!thid) {
           console.error(`Job ${job.name} is missing a 'thid'. Skipping.`);
           return;

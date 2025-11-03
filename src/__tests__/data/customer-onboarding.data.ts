@@ -2,24 +2,24 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../models/schemaorg';
-import { JobAction, Resource, Format, Section } from '../../models/path';
+import { JobAction, Resource, Format, Section, Sector } from '../../models/urlPath';
 import { JobRequest, FormRequest } from '../../models/request';
 import { testCustomer1Data } from './customer.data';
 import { testTenant1AddressCountry,
     testTenant1AlternateName,
-    testTenant1ServiceProviderCategory,
     testTenant1UrlExternal,
     testTenant1DidWebExternal
 } from './organization.data';
 
 export const testCustomer1ServiceProviderAcceptedTerms = "https://provider.example.com/terms";
+export const testCustomer1ServiceProviderCategory = Sector.HEALTH_CARE; // data from the individual consent (terms)
 
 /** http://terminology.hl7.org/CodeSystem/v3-ActReason */
 export const testCustomer1ServiceProviderAcceptedPurposeType = "http://terminology.hl7.org/CodeSystem/v3-ActReason|FAMRQT,PWATRNY,METAMGT,FRAUD,RECORDMGT,COVAUTH,TREAT,DISASTER,HPAYMT,MLTRAINING,ETREAT,HOPERAT,CAREMGT,HSYSADMIN,PATADMIN,PATSFTY";
 
 // Terms of service accepted by the tenant's registrant (the `admin` or tenant's `controller`)
 export const testCustomer1ServiceTermsClaims = {
-    [ClaimsServiceSchemaorg.category]: testTenant1ServiceProviderCategory, // sector type
+    [ClaimsServiceSchemaorg.category]: testCustomer1ServiceProviderCategory, // sector type
     [ClaimsServiceSchemaorg.termsOfService]: testCustomer1ServiceProviderAcceptedTerms,
     [ClaimsServiceSchemaorg.serviceType]: testCustomer1ServiceProviderAcceptedPurposeType
 }
@@ -39,23 +39,25 @@ export const testCustomerOnboardingRelativePath = `${Section.individual}/${Forma
 export const testCustomerBatchRequestUrlExternal =
     `${testTenant1UrlExternal}${testCustomerOnboardingRelativePath}${JobAction._batch}`
 
-export const testCustomer1ConsentOnboardingEvidenceEmbedded = {
+/** OpenID Connect for Identity Assurance "Evidence" with one embedded PDF attached */ 
+export const testCustomer1ConsentSignedOnboardingEvidenceEmbedded = {
     id: 'urn:multibase:<multibase58(multihash(SHA3-256(attachedbytes)))>',
     type: "application/pdf",
     // NOTE: allow only 1 PDF file for the terms/consent
     attachments: [{
         // 'content' is the data bytes encoded in Base64SafeUrl
-        content: "Base64SafeUrl(bytes)",
+        content: "Base64SafeUrl(raw-pdf-bytes)",
         // 'content_type' is a IANA media type
         content_type: "application/pdf",
     }]
 }
 
-export const testIndividualConsentOnboardingEntry =     {
+/** Hybrid "FHIR Bundle Entry" with "meta" for the form "claims" and the evidence after "verification" */
+export const testIndividualConsentSignedOnboardingEntry =     {
     meta: {
         claims: testCustomer1OnboardingClaimsWithTerms,
         verification: {
-            evidence: [testCustomer1ConsentOnboardingEvidenceEmbedded]
+            evidence: [testCustomer1ConsentSignedOnboardingEvidenceEmbedded]
         }
     },
     request: {
@@ -77,7 +79,7 @@ export const testIndividualConsentOnboardingEntry =     {
 export const testIndividualOnboardingBatchEntries = [
     // --- Entry 1: Core Profile & Anchor ---
     // Establishes the anchor ID, core data and proof of consent (terms).
-    { ... testIndividualConsentOnboardingEntry},
+    { ... testIndividualConsentSignedOnboardingEntry},
 
     // --- Entry 2: Legal Identity ---
     // Adds the Legal Identity. The anchor ID links it to the same individual.
@@ -103,12 +105,12 @@ export const testIndividualOnboardingBatchEntries = [
 export const testCreateCustomerJobRequestProfessionalOnboarding: JobRequest = {
     tenantId: `${testTenant1AlternateName}`, // "acme"
     jurisdiction: `${testTenant1AddressCountry}`, // "US"
-    sector: `${testTenant1ServiceProviderCategory}`, // "health-care"
+    sector: `${testCustomer1ServiceTermsClaims}`, // "health-care"
     section: `${Section.individual}`, // "individual"
     format: `${Format.Schema}`, // "org.schema"
     resourceType: `${Resource.Person}`, // "Person"
     action: `${JobAction._create}`, // "_create"
-    input: {
+    content: {
         aud: testTenant1DidWebExternal, // 'did:web:api.acme.org',
         thid: 'thid-customer-prof-onboarding',
         type: 'api+json',

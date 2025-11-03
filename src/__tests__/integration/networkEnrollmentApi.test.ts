@@ -82,7 +82,7 @@ describe('Network Enrollment API', () => {
       const mockJobRequest: JobRequest = {
         tenantId: '',
         resourceType, action,
-        input: {
+        content: {
           ...testInitialNetworkJobInput,
           iss: 'did:web:some-issuer'
         },
@@ -224,7 +224,7 @@ describe('Network Enrollment API', () => {
       };
       const mockJobRequestFromEmployee: JobRequest = {
         tenantId: '', resourceType, action,
-        input: jobFromNonControllerEmployee,
+        content: jobFromNonControllerEmployee,
         meta: {
           jws: {
             protected: { alg: 'ML-DSA-44', kid: employeeKid }

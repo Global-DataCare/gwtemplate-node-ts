@@ -20,7 +20,7 @@ import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
 import { validateNewOrganizationClaims } from '../utils/claims-validator';
-import { Sector } from '../models/path';
+import { Sector } from '../models/urlPath';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { createHostedDidWeb, populateDidDocumentFromJwks, composeHostDidWebId, getPrimaryDidWeb } from '../utils/did';
 import { DidDocument } from '../models/did';
@@ -75,7 +75,7 @@ export class HostingManager {
    * @returns A IPayloadResponse object with the outcome of the registration process.
    */
   async process(job: JobRequest, environment?: string, isBootstrap: boolean = false): Promise<IPayloadResponse> {
-    const jobEntries = job?.input?.body?.data || [];
+    const jobEntries = job?.content?.body?.data || [];
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
 
     for (const entry of jobEntries) {
@@ -102,9 +102,9 @@ export class HostingManager {
     const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
 
     return {
-      thid: job.input.thid,
+      thid: job.content.thid,
       iss: issuerDid,
-      aud: job.input.iss,
+      aud: job.content.iss,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: responseBundle,
     };

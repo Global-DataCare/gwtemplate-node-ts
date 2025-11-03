@@ -121,7 +121,7 @@ describe('KmsService', () => {
       expect(mockCryptoService.parseCompactJws).toHaveBeenCalledWith(Content.bytesToStringUTF8(mockDecryptedBytes));
       
       // The service's job is ONLY to decrypt and parse.
-      expect(jobRequest.input).toEqual(mockJws.payload);
+      expect(jobRequest.content).toEqual(mockJws.payload);
       expect(jobRequest.meta?.jwe?.header).toEqual(mockProtectedHeader);
       // It MUST NOT have resolved or added a JWK. This is the orchestrator's job.
       expect(jobRequest.meta?.jwe?.header?.jwk).toBeUndefined();

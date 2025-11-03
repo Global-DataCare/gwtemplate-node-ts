@@ -133,7 +133,7 @@ export function createApiRouter(
         // --- Signature Verification & Sender Key Resolution (Orchestrator Logic) ---
         // If the sender's public key is not embedded, we must resolve it and verify the signature now.
         if (!decodedJob.meta?.jwe?.header?.jwk) {
-          const senderDid = decodedJob.input?.iss;
+          const senderDid = decodedJob.content?.iss;
           const senderKeyId = decodedJob.meta?.jws?.protected?.kid;
           const jwsToVerify = decodedJob.meta?.jws;
 
@@ -214,7 +214,7 @@ export function createApiRouter(
 
         jobRequest = { 
           ...req.params, 
-          input: req.body, 
+          content: req.body, 
           contentType: contentType, // <-- Ensure contentType is passed in legacy flow
           meta: { 
             bearer: { 
@@ -237,7 +237,7 @@ export function createApiRouter(
     }
 
     // --- 2. Transaction ID Validation ---
-    const thid = jobRequest.input?.thid || jobRequest.input?.id;
+    const thid = jobRequest.content?.thid || jobRequest.content?.id;
     if (!thid) {
       const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Request body must contain a "thid" or "id" property.');
       return res.status(400).json(outcome);

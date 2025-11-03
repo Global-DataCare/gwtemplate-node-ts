@@ -61,7 +61,7 @@ describe('Ping API Endpoint', () => {
       jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockReturnValue([pingServiceConfig]);
       
       const mockDecodedJob: JobRequest = {
-        input: decodedPingMessage,
+        content: decodedPingMessage,
         meta: {
           jws: {
             protected: {
@@ -120,7 +120,7 @@ describe('Ping API Endpoint', () => {
       jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockReturnValue([pingServiceConfig]);
 
       const mockDecodedJob: JobRequest = {
-        input: decodedTenantPingMessage,
+        content: decodedTenantPingMessage,
         meta: {
           jws: {
             protected: {
@@ -231,7 +231,7 @@ describe('Ping API Endpoint', () => {
       
       // CRITICAL: Verify the contentType is set correctly for the worker
       expect(jobRequest.contentType).toBe('application/json');
-      expect(jobRequest.input).toEqual(decodedPingMessage);
+      expect(jobRequest.content).toEqual(decodedPingMessage);
     });
   });
 

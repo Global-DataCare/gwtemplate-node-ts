@@ -1,6 +1,20 @@
 // src/utils/uuid.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { v4 as uuidv4, validate as validateUuid } from 'uuid';
+
+/**
+ * Validates if the given ID is a valid UUID v4. If not, it generates a new one.
+ * @param id The ID to validate. Can be undefined or null.
+ * @returns A valid UUID v4 string.
+ */
+export function validOrNewUuidv4(id?: string | null): string {
+  if (id && validateUuid(id)) {
+    return id;
+  }
+  return uuidv4();
+}
+
 /**
  * Converts a UUID string (with or without hyphens) into a 16-byte Uint8Array.
  * @param uuidStr The UUID string to convert.

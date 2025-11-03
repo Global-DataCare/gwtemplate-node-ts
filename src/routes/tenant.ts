@@ -34,7 +34,7 @@ const startAsyncJob = (req: Request, res: Response) => {
 
   const jobRequest: JobRequest = {
     ...cdsRequest,
-    input: decodedRequest,
+    content: decodedRequest,
     meta: { /* Mocked for now */ }
   };
 

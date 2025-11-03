@@ -21,7 +21,7 @@ import { EntityConfig } from '../../../models/entity';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { IServerConfig } from '../../../config';
-import { Sector } from '../../../models/path';
+import { Sector } from '../../../models/urlPath';
 import { testInvalidUuid, testTenant1AddressCountry, testTenant1LegalName } from '../../data/organization.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { JwkSet } from '../../../models/jwk';
@@ -66,7 +66,7 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
   resourceType: 'Organization',
   section: 'org.schema',
   action: '_batch',
-  input: {
+  content: {
     aud: 'did:web:api.example.com',
     response_type: 'json',
     thid: 'test-thid-123',

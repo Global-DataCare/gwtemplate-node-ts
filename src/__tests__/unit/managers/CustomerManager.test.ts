@@ -119,8 +119,8 @@ describe('CustomerManager', () => {
 
       const job: JobRequest = {
         ...testCreateCustomerJobRequestProfessionalOnboarding,
-        input: {
-          ...testCreateCustomerJobRequestProfessionalOnboarding.input,
+        content: {
+          ...testCreateCustomerJobRequestProfessionalOnboarding.content,
           body: {
             data: [
               {
@@ -137,7 +137,7 @@ describe('CustomerManager', () => {
         },
       };
       
-      (job.input.body!.data[0].meta!.claims as any)['org.schema.Service.category'] = 'health-care';
+      (job.content.body!.data[0].meta!.claims as any)['org.schema.Service.category'] = 'health-care';
       
       mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
 
@@ -165,7 +165,7 @@ describe('CustomerManager', () => {
     it('should return an error if batch entries have inconsistent identifiers', async () => {
         // ARRANGE
         const job = { ...testCreateCustomerJobRequestProfessionalOnboarding };
-        (job.input.body!.data[1].meta!.claims as any)[ClaimsPersonSchemaorg.identifier] = 'urn:uuid:different-uuid';
+        (job.content.body!.data[1].meta!.claims as any)[ClaimsPersonSchemaorg.identifier] = 'urn:uuid:different-uuid';
         mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
 
         // ACT
@@ -187,7 +187,7 @@ describe('CustomerManager', () => {
         tenantId: 'acme',
         action: '_discovery',
         resourceType: 'Person',
-        input: {
+        content: {
           thid: 'thid-test-batch',
           iss: 'iss-test',
           aud: 'aud-test',

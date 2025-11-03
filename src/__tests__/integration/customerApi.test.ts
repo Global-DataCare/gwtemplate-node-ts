@@ -1,4 +1,4 @@
-// src/__tests__/integration/customerApi.test.ts
+// src/__tests__/integration/customerApi.test.ts ($HOME/GITS/gwtemplate-node-ts/src/__tests__/integration/customerApi.test.ts)
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
@@ -73,7 +73,7 @@ describe('Person Onboarding API', () => {
       const sector = 'health-care';
       const section = 'individual';
       const format = 'org.schema';
-      const resourceType = 'Person'; // CORRECTED
+      const resourceType = 'Person';
       const action = '_batch';
       const EXPECTED_RETRY_AFTER = '5';
 
@@ -115,8 +115,8 @@ describe('Person Onboarding API', () => {
         ...testCreateCustomerJobRequestProfessionalOnboarding,
         resourceType: resourceType,
         action: action,
-        input: {
-          ...testCreateCustomerJobRequestProfessionalOnboarding.input,
+        content: {
+          ...testCreateCustomerJobRequestProfessionalOnboarding.content,
           aud: tenantUrn,
           thid: thid,
           iss: 'did:web:some-issuer',
