@@ -93,9 +93,23 @@ export function createApiRouter(
     }
 
     if (job.status === 'COMPLETED' && job.result) {
-      res.set('Content-Type', 'application/x-www-form-urlencoded');
-      res.status(200).send(`response=${job.result}`);
-      asyncResponseStore.delete(thid);
+      try {
+        // The original request was plaintext, so the client expects a plaintext JSON response.
+        // We must decrypt the internally-stored JWE before responding.
+        if (job.contentType?.includes('json')) {
+          const decryptedResponse = await kmsService.decodeJobRequest(job.result);
+          res.set('Content-Type', 'application/json');
+          res.status(200).json(decryptedResponse.content);
+        } else {
+          // The original request was encrypted, so the client expects the encrypted JWE response.
+          res.set('Content-Type', 'application/jose+json');
+          res.status(200).send(job.result);
+        }
+        asyncResponseStore.delete(thid);
+      } catch (error: any) {
+        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'Failed to decode the stored job result: ' + error.message);
+        res.status(500).json(outcome);
+      }
     } else {
       const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'Job failed to process or result was invalid.');
       res.status(500).json(outcome);
@@ -113,6 +127,125 @@ export function createApiRouter(
   router.post(`${cdsRoutePrefix}/_batch-response`, pollingHandler);
   router.get(`${cdsRoutePrefix}/_batch-response`, isFhirSector, pollingHandler);
 
+  /**
+   * @openapi
+   * /host/cds-{jurisdiction}/v1/test/registry/org.schema/Organization/_batch:
+   *   post:
+   *     tags:
+   *       - Tenant Registration
+   *     summary: Register a new Tenant (Organization)
+   *     description: |
+   *       Submits an asynchronous job to register a new tenant on the platform. This is the first step for any new organization.
+   *       The endpoint supports both a plaintext JSON "legacy" flow (for simple onboarding) and a JWE-based "secure" flow.
+   *     parameters:
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *     requestBody:
+   *       description: The registration payload. Can be a plaintext JSON object or a JWE.
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/OrganizationRegistrationLegacy'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: |
+   *           Accepted. The job has been queued. The client should poll the URL provided in the `Location` header to get the result.
+   *         headers:
+   *           Location:
+   *             schema:
+   *               type: string
+   *             description: The polling URL for the job result.
+   *           Retry-After:
+   *             schema:
+   *               type: string
+   *               example: '5'
+   *             description: Suggested delay in seconds before polling.
+   *       '400':
+   *         description: Bad Request. The payload is malformed.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Error'
+   *       '401':
+   *         description: Unauthorized. Invalid or missing Bearer token for legacy flow, or failed JWE decryption/JWS verification for secure flow.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Error'
+   *       '404':
+   *         description: Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or sector).
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Error'
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch:
+   *   post:
+   *     tags:
+   *       - Employee Role Registration
+   *     summary: Create a new Professional (Employee)
+   *     description: |
+   *       Submits an asynchronous job to create a new professional (employee) within an existing tenant.
+   *       The `tenantId` in the path specifies the organization under which the employee is being created.
+   *     parameters:
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       description: The employee creation payload.
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/EmployeeCreationLegacy'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: Accepted. The job has been queued.
+   *         headers:
+   *           Location:
+   *             schema: { type: string }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Person/_batch:
+   *   post:
+   *     tags:
+   *       - Customer Onboarding
+   *     summary: Create a new Customer (Person)
+   *     description: |
+   *       Submits an asynchronous job to create a new customer (individual/person) within an existing tenant.
+   *       The `tenantId` in the path specifies the organization under which the customer is being onboarded.
+   *     parameters:
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       description: The customer creation payload, which may consist of multiple "forms" or claim sets.
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/CustomerCreationLegacy'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: Accepted. The job has been queued.
+   *         headers:
+   *           Location:
+   *             schema: { type: string }
+   */
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
   router.post(`${cdsRoutePrefix}/:action`, async (req, res) => {
     const { tenantId, section, resourceType, sector, action } = req.params;

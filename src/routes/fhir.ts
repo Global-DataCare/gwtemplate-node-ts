@@ -3,6 +3,7 @@
 
 import { Router } from 'express';
 import { QueueAdapter } from '../adapters/queue';
+import { IAuthorizationManager } from '../managers/auth/IAuthorizationManager';
 import { FhirController } from './handlers/fhir/FhirController';
 
 /**
@@ -10,12 +11,11 @@ import { FhirController } from './handlers/fhir/FhirController';
  * This function encapsulates all the FHIR-related endpoints.
  * @returns An Express router instance.
  */
-export function createFhirRouter(queueAdapter: QueueAdapter): Router {
+export function createFhirRouter(queueAdapter: QueueAdapter, authManager: IAuthorizationManager): Router {
   const router = Router();
   
   // Manually instantiate the controller with its required dependencies.
-  // The controller will still use the container for its *own* dependencies.
-  const fhirController = new FhirController(queueAdapter);
+  const fhirController = new FhirController(queueAdapter, authManager);
   
   // Register the routes defined within the controller
   fhirController.register(router);

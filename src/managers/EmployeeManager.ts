@@ -64,7 +64,7 @@ export class EmployeeManager {
     for (const entry of entries) {
       try {
         // Pass the fetched URN and the job metadata down to the entry processor.
-        const resultEntry = await this.processEntry(entry, vaultId, issuerUrn, job.meta, environment);
+        const resultEntry = await this.processEntry(entry, vaultId, issuerUrn, job.meta, job.contentType, environment);
         responseEntries.push(resultEntry);
       } catch (error: any) {
         const errorEntry = this.handleError(error, entry.type, (entry as BundleEntryRequest).meta);
@@ -92,6 +92,7 @@ export class EmployeeManager {
     vaultId: string,
     tenantUrn: string,
     meta: JobRequestMeta,
+    contentType?: string,
     environment?: string,
   ): Promise<BundleEntry> {
     const requestEntry = entry as BundleEntryRequest;
@@ -110,7 +111,7 @@ export class EmployeeManager {
 
     switch (request.method) {
       case 'POST':
-        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type, meta);
+        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type, meta, contentType);
       case 'DELETE':
         return this.disableEmployee(vaultId, employeeId, type);
       default:
@@ -125,14 +126,37 @@ export class EmployeeManager {
     claims: ClaimsRecord,
     entryType: string,
     jobMeta: JobRequestMeta,
+    contentType?: string,
   ): Promise<BundleEntry> {
-    // During bootstrapping (employee creation), the request MUST contain the public keys.
-    const signerJwk = jobMeta?.jws?.protected?.jwk;
-    const encrypterJwk = jobMeta?.jwe?.header?.jwk;
+    let signerJwk: PublicJwk | undefined;
+    let encrypterJwk: PublicJwk | undefined;
 
-    if (!signerJwk || !encrypterJwk) {
-      // TODO: This path should trigger the "managed key" flow in the future.
-      throw new ManagerError('Missing embedded JWKs in the JWS/JWE headers for employee creation.', IssueType.Required);
+    // The flow for obtaining the employee's public keys depends on the request type.
+    if (contentType?.includes('json')) {
+      // LEGACY FLOW: The request is unencrypted. The system must provision keys for the new employee.
+      // We use the employee's URN as the identifier for the new key set.
+      const email = claims[ClaimsPersonSchemaorg.email] as string;
+      const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation] as string;
+      if (!email || !roleCode) {
+        throw new ManagerError('Missing email or hasOccupation claim for legacy employee creation.', IssueType.Required);
+      }
+      const employeeUrnForKeys = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
+      
+      const provisionedKeys = await this.kmsService.provisionKeys(employeeUrnForKeys);
+      signerJwk = provisionedKeys.keys.find(k => k.kty === 'AKP') as PublicJwk;
+      encrypterJwk = provisionedKeys.keys.find(k => k.kty === 'OKP') as PublicJwk;
+
+      if (!signerJwk || !encrypterJwk) {
+        throw new ManagerError('Failed to provision keys for new employee in legacy flow.', IssueType.Exception);
+      }
+    } else {
+      // SECURE FLOW: The request is encrypted, and the client MUST provide the public keys.
+      signerJwk = jobMeta?.jws?.protected?.jwk as PublicJwk;
+      encrypterJwk = jobMeta?.jwe?.header?.jwk as PublicJwk;
+
+      if (!signerJwk || !encrypterJwk) {
+        throw new ManagerError('Missing embedded JWKs in the JWS/JWE headers for employee creation.', IssueType.Required);
+      }
     }
 
     // Additional validation to ensure the keys have kids

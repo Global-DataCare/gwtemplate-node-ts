@@ -72,21 +72,57 @@ export class Worker {
 
       // 2. Delegate to the manager to get the plaintext response.
       const payloadResponse = await manager.process(job);
-      
-            // 3. Secure the final response for the original requester.
+
+      // 3. Determine the vaultId of the job's issuer.
       const senderVaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector, job.tenantId);
 
-      // For legacy, unencrypted requests, the response is also unencrypted.
+      // --- Response Encryption Logic ---
+      // This section determines how the final response payload is encrypted before being stored for polling.
+
+      // Case 1: Standard Secure Flow (request included a public key for the response)
+      // The request was encrypted, so the response is encrypted for the original requester's public key.
+      if (job.meta?.jwe?.header?.jwk) {
+        const recipientKey = job.meta.jwe.header.jwk;
+        return this.kmsService.encodeResponse(payloadResponse, [recipientKey], senderVaultId);
+      }
+      
+      // Case 2: Unencrypted "Legacy" Flow (e.g., application/json)
+      // The request was plaintext, but the response MUST be encrypted before storage.
+      // The response is encrypted for the tenant processing the job (or the new tenant in case of creation).
       if (job.contentType?.startsWith('application/json') || job.contentType?.startsWith('application/fhir+json')) {
-        return JSON.stringify(payloadResponse);
+        let recipientVaultId: string;
+        let responseSenderVaultId: string = senderVaultId;
+
+        if (jobInfo.resourceType === 'Organization' && job.tenantId === 'host') {
+          // Special Subcase: A new tenant is being created.
+          // The response must be encrypted for the NEW tenant. The sender is the host.
+          const newTenantClaims = job.content?.body?.data?.[0]?.meta?.claims;
+          if (!newTenantClaims) {
+            throw new Error('Cannot determine new tenant from job claims to encrypt response.');
+          }
+          const newTenantId = newTenantClaims['org.schema.Organization.alternateName'] as string;
+          const newTenantSector = newTenantClaims['org.schema.Service.category'] as string;
+          
+          if (!newTenantId || !newTenantSector) {
+            throw new Error('Missing alternateName or category in new tenant claims for encryption.');
+          }
+          recipientVaultId = getTenantVaultId(newTenantSector, newTenantId);
+          responseSenderVaultId = 'host';
+        } else {
+          // General Subcase: An existing tenant is processing a job for itself.
+          // The response is encrypted for the tenant who initiated the job.
+          recipientVaultId = senderVaultId;
+        }
+
+        const recipientKeys = await this.kmsService.getPublicJwks(recipientVaultId);
+        if (!recipientKeys || !recipientKeys.keys || recipientKeys.keys.length === 0) {
+          throw new Error(`Could not retrieve public keys for recipient vault '${recipientVaultId}'`);
+        }
+        return this.kmsService.encodeResponse(payloadResponse, recipientKeys.keys, responseSenderVaultId);
       }
 
-      // For the standard secure flow, the response MUST be encrypted.
-      const recipientKey = job.meta?.jwe?.header?.jwk;
-      if (!recipientKey) {
-        throw new Error(`(Secure Flow) Cannot encode response: sender's public key (jwk) not found in original request JWE header.`);
-      }
-      return this.kmsService.encodeResponse(payloadResponse, [recipientKey], senderVaultId);
+      // Fallback: If content type is unknown or there's no encryption key, throw an error.
+      throw new Error(`Unsupported job content type or missing encryption key for job: ${jobName}`);
       
     } catch (error: any) {
       console.error(`[Worker Job '${jobName}' failed for thid ${job.content?.thid}]`, error.message);
@@ -106,7 +142,7 @@ export class Worker {
         // The issuer of a catastrophic error is always the host.
         return this.kmsService.encodeResponse(errorResponse, [recipientKey], 'host');
       } else {
-        // If no key is available (legacy flow or pre-decryption error), return the plaintext error.
+        // If no key is available (unencrypted flow or pre-decryption error), return the plaintext error.
         return JSON.stringify(errorResponse);
       }
     }

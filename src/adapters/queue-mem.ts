@@ -51,7 +51,11 @@ export class QueueAdapterMem implements QueueAdapter {
         try {
           // Delegate to the worker, which now returns the final, encrypted JWE string.
           const encryptedResult = await this.worker.process(job.name, job.request);
-          const finalResult: StoredJob = { status: 'COMPLETED', result: encryptedResult };
+          const finalResult: StoredJob = { 
+            status: 'COMPLETED', 
+            result: encryptedResult,
+            contentType: job.request.contentType, // Persist the original content type
+          };
           this.responseStore.set(thid, finalResult);
         } catch (error) {
           // This catch is for catastrophic errors where the worker itself fails.

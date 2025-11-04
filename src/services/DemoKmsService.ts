@@ -57,23 +57,44 @@ export class DemoKmsService implements IKmsService {
   // --- Inbound Request Processing ---
 
   async decodeJobRequest(message: string): Promise<JobRequest> {
-    console.warn(`[DemoKmsService] Bypassing decryption for JWE. Assuming plaintext JWS.`);
+    console.warn(`[DemoKmsService] Bypassing decryption. Analyzing message format...`);
     try {
-      const jwsPayload = JSON.parse(message).jws;
-      const [protectedB64, payloadB64] = jwsPayload.split('.');
-      return {
-        content: Content.base64UrlSafeToJSON(payloadB64),
-        meta: {
-          jws: {
-            protected: Content.base64UrlSafeToJSON(protectedB64),
-            payload: Content.base64UrlSafeToJSON(payloadB64),
-            signature: 'dev-fake-signature'
+      const parsedMessage = JSON.parse(message);
+
+      // Scenario 1: It's an encoded response from this DemoKmsService (for polling)
+      if (parsedMessage.protected && parsedMessage.ciphertext) {
+        console.warn(`[DemoKmsService] Detected simulated JWE format. Decoding ciphertext.`);
+        return {
+          content: Content.base64UrlSafeToJSON(parsedMessage.ciphertext),
+          meta: {
+            jwe: { header: Content.base64UrlSafeToJSON(parsedMessage.protected) }
+          }
+        } as JobRequest;
+      }
+
+      // Scenario 2: It's a standard inbound request with a nested JWS
+      if (parsedMessage.jws) {
+        console.warn(`[DemoKmsService] Detected inbound JWS format.`);
+        const [protectedB64, payloadB64] = parsedMessage.jws.split('.');
+        return {
+          content: Content.base64UrlSafeToJSON(payloadB64),
+          meta: {
+            jws: {
+              protected: Content.base64UrlSafeToJSON(protectedB64),
+              payload: Content.base64UrlSafeToJSON(payloadB64),
+              signature: 'dev-fake-signature'
+            },
+            jwe: { header: { alg: 'none', enc: 'none' } }
           },
-          jwe: { header: { alg: 'none', enc: 'none' } }
-        },
       } as JobRequest;
+      }
+      
+      // Fallback for simple JSON objects (original logic)
+      console.warn(`[DemoKmsService] Assuming simple JSON object.`);
+      return { content: parsedMessage } as JobRequest;
+
     } catch (e) {
-      throw new Error('Invalid JSON or JWS format provided to DemoKmsService.decodeJobRequest');
+      throw new Error('Invalid JSON format provided to DemoKmsService.decodeJobRequest');
     }
   }
 
@@ -109,11 +130,11 @@ export class DemoKmsService implements IKmsService {
   async encodeResponse(payload: any, recipientJwks: JWK[], senderId: string): Promise<string> {
     console.warn(`[DemoKmsService] Bypassing encryption for response from ${senderId}. Returning plaintext JWE.`);
     const protectedHeader = { enc: 'none', skid: `dev-sender-kid-for-${senderId}` };
-    // Create a fake JWE object with plaintext payload for easy debugging
+    // Create a fake JWE object that mimics the real structure
     const fakeJwe = {
       protected: Content.objectToRawBase64UrlSafe(protectedHeader),
       recipients: recipientJwks.map(r => ({ header: { kid: r.kid } })),
-      payload: payload, // NOT encrypted
+      ciphertext: Content.objectToRawBase64UrlSafe(payload), // Mimic ciphertext by base64-encoding the payload
     };
     return JSON.stringify(fakeJwe);
   }

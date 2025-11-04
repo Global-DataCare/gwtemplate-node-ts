@@ -27,11 +27,9 @@ jest.mock('../../config', () => ({
   })),
 }));
 
-import 'reflect-metadata';
 import * as express from 'express';
 import * as request from 'supertest';
 import { Server } from 'http';
-import { container } from 'tsyringe';
 import { startServer } from '../../server';
 import { QueueAdapter } from '../../adapters/queue';
 import { QueueAdapterMem } from '../../adapters/queue-mem';
@@ -76,9 +74,8 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
   let authManager: MockAuthorizationManager;
 
   beforeAll(async () => {
-    // Dependency injection setup for the mock Authorization Manager
+    // Create the mock authorization manager for testing purposes
     authManager = new MockAuthorizationManager();
-    container.register<IAuthorizationManager>('AuthorizationManager', { useValue: authManager });
 
     // Create a mock authentication middleware
     const mockAuthMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -94,8 +91,11 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
       next();
     };
 
-    // Start the server, passing the mock middleware to be applied before any routes
-    const serverInstance = await startServer({ testMiddlewares: [mockAuthMiddleware] });
+    // Start the server, passing the mock middleware and mock auth manager
+    const serverInstance = await startServer({
+      testMiddlewares: [mockAuthMiddleware],
+      authManager: authManager,
+    });
     app = serverInstance.app;
     server = serverInstance.server;
     queueAdapter = serverInstance.queueAdapter;

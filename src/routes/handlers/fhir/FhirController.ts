@@ -2,7 +2,6 @@
 // File: src/routes/handlers/fhir/FhirController.ts
 
 import { Request, Response, Router } from 'express';
-import { container, injectable } from 'tsyringe';
 import { IAuthorizationManager } from '../../../managers/auth/IAuthorizationManager';
 import { QueueAdapter } from '../../../adapters/queue';
 import { IAccessTokenClaims } from '../../../models/auth';
@@ -12,15 +11,11 @@ import { IssueLevel, IssueType } from '../../../models/fhir/codes';
 import { validOrNewUuidv4 } from '../../../utils/uuid';
 import { v4 as uuidv4 } from 'uuid';
 
-@injectable()
 export class FhirController {
-  private readonly authManager: IAuthorizationManager;
-  private readonly queueAdapter: QueueAdapter;
-
-  constructor(queueAdapter: QueueAdapter) {
-    this.authManager = container.resolve<IAuthorizationManager>('AuthorizationManager');
-    this.queueAdapter = queueAdapter;
-  }
+  constructor(
+    private readonly queueAdapter: QueueAdapter,
+    private readonly authManager: IAuthorizationManager,
+  ) {}
 
   /**
    * Handles the creation of a FHIR Communication resource.

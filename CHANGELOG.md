@@ -32,6 +32,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **Architectural Flaw in Asynchronous Job Processing:** Corrected a major flaw in how the system handles plaintext (`application/json`) asynchronous requests. The new, secure flow is as follows:
+    -   **Problem:** Plaintext requests were generating plaintext responses, which were stored directly in the response store, breaking the polling handler which expects all artifacts to be encrypted JWEs.
+    -   **Solution:** All job results are now **always** stored as encrypted JWEs. For plaintext requests where the client does not provide a public key, the system uses an **"encrypt-to-self"** pattern: the `Worker` encrypts the response using the public key of the tenant processing the job (or for the new tenant in the case of onboarding).
+    -   The `pollingHandler` is now responsible for inspecting the original request's `Content-Type`. If it was a JSON-based type, the handler **decrypts** the stored JWE just-in-time before sending the final plaintext JSON payload back to the client. This ensures clients that send JSON receive JSON, abstracting the internal security measures.
+
 -   **Corrected Onboarding Tests:** Fixed all failing unit tests for `CustomerManager` by aligning the test data's job action with the manager's expectation.
 -   **Resolved `tsc` Compilation Errors**
 

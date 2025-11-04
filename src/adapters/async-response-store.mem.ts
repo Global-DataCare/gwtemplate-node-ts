@@ -7,6 +7,7 @@
 export interface StoredJob {
   status: 'PENDING' | 'COMPLETED' | 'FAILED';
   result?: any; // The encrypted JWE or an error object
+  contentType?: string; // The content type of the original request
 }
 
 /**

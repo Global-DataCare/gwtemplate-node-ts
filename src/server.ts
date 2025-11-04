@@ -1,7 +1,6 @@
 // src/server.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import 'reflect-metadata';
 import * as express from 'express';
 import * as dotenv from 'dotenv';
 import { Worker } from './worker';
@@ -29,7 +28,12 @@ import { BlockchainAdapterMem } from './adapters/BlockchainAdapterMem';
 import { createNetworkRouter } from './routes/network';
 import { IBlockchainAdapter } from './adapters/IBlockchainAdapter';
 import { CommunicationManager } from './managers/CommunicationManager';
+import { IAuthorizationManager } from './managers/auth/IAuthorizationManager';
 import { createFhirRouter } from './routes/fhir';
+import { AuthorizationManager } from './managers/AuthorizationManager';
+import * as swaggerUi from 'swagger-ui-express';
+const swaggerSpec = require('../swagger.config.js');
+
 
 // ===================================================================================
 // CONFIGURATION LOGIC - INTERNAL TO SERVER.TS
@@ -140,6 +144,7 @@ async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServer
 
 interface StartServerOptions {
   testMiddlewares?: express.RequestHandler[];
+  authManager?: IAuthorizationManager;
 }
 
 /**
@@ -226,15 +231,19 @@ async function startServer(options?: StartServerOptions) {
   const worker = new Worker(managerRegistry, config.apiBaseUrl, kmsService);
   const asyncResponseStore = new AsyncResponseStoreMem();
   const queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
+  const authManager = options?.authManager || new AuthorizationManager();
 
   const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService);
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
-  const fhirRouter = createFhirRouter(queueAdapter);
+  const fhirRouter = createFhirRouter(queueAdapter, authManager);
   app.use('/', discoveryRouter);
   app.use('/', apiRouter);
   app.use('/', networkRouter);
   app.use('/', fhirRouter);
+
+  // --- Swagger API Documentation ---
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   const server = app.listen(config.port, () => {
     // console.log(`[GW-API ${config.nodeEnv} Server running on ${config.apiBaseUrl}`);

@@ -80,7 +80,7 @@ export interface BasicInput extends RecordBase {
 export interface EntityConfig extends BasicInput {
   /**
    * The configuration for the services section of the DID Document, defining
-   * all public keys, service endpoints, and other essential metadata.
+   * only the service endpoints configuration which is then multiplexed in the public didDocument
    */
   didConfig: {
     service: DidService[];
@@ -88,7 +88,8 @@ export interface EntityConfig extends BasicInput {
 
   /**
    * The authoritative DID Document for the entity, which is constructed using
-   * information from this configuration.
+   * information from this configuration. It contains all public keys, service
+   * endpoints, and other essential metadata.
    */
   didDocument: {
     '@context': string | string[];
