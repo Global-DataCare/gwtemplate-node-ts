@@ -4,7 +4,7 @@
 import { v4 as uuidv4} from 'uuid';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { Bundle, BundleEntry, BundleEntryRequest, ErrorEntry } from '../models/bundle';
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { JobRequest } from '../models/request';
 import { IPayloadResponse } from '../models/response';
 import { ManagerError } from '../models/errors/manager-error';
@@ -36,7 +36,7 @@ import { ClaimsRecord } from '../models/resource-document';
 const CUSTOMER_SECTION = 'customers';
 
 export class CustomerManager {
-  private vaultRepository: VaultRepository;
+  private vaultRepository: IVaultRepository;
   private kmsService: IKmsService;
   private tenantsCacheManager: TenantsCacheManager;
   private credentialManager: CredentialManager;
@@ -44,7 +44,7 @@ export class CustomerManager {
   private network: string;
 
   constructor(
-    vaultRepository: VaultRepository,
+    vaultRepository: IVaultRepository,
     kmsService: IKmsService,
     tenantsCacheManager: TenantsCacheManager,
     credentialManager: CredentialManager,

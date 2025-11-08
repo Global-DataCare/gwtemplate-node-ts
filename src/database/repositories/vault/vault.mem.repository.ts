@@ -1,7 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/database/repositories/vault/vault.mem.repository.ts
 
-import { VaultRepository } from './vault.repository';
+import { IVaultRepository } from './vault.repository';
 import { RecordBase, VaultConfig } from '../../../models/resource-document';
 import { InMemoryVault } from '../../../models/repository';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
@@ -10,7 +10,7 @@ import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
  * An in-memory implementation of the Vault Repository.
  * Useful for testing and development environments.
  */
-export class VaultMemRepository implements VaultRepository {
+export class VaultMemRepository implements IVaultRepository {
   private vaults = new Map<string, InMemoryVault>();
 
   /**

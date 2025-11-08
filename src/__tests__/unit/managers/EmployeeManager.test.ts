@@ -4,7 +4,7 @@
 import { jest } from '@jest/globals';
 import { v4 as uuidv4 } from 'uuid';
 import { mock, MockProxy } from 'jest-mock-extended';
-import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { EmployeeManager } from '../../../managers/EmployeeManager';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
@@ -22,7 +22,7 @@ jest.mock('uuid');
 
 describe('EmployeeManager', () => {
   let employeeManager: EmployeeManager;
-  let mockVaultRepository: MockProxy<VaultRepository>;
+  let mockVaultRepository: MockProxy<IVaultRepository>;
   let mockKmsService: MockProxy<IKmsService>;
   let mockTenantsCacheManager: MockProxy<TenantsCacheManager>;
 
@@ -34,7 +34,7 @@ describe('EmployeeManager', () => {
   const TENANT_URN = `urn:antifraud:soschain-test:us:v1:${TENANT_SECTOR}:entity:tax:123456789`;
 
   beforeEach(() => {
-    mockVaultRepository = mock<VaultRepository>();
+    mockVaultRepository = mock<IVaultRepository>();
     mockKmsService = mock<IKmsService>();
     mockTenantsCacheManager = mock<TenantsCacheManager>();
     employeeManager = new EmployeeManager(mockVaultRepository, mockKmsService, mockTenantsCacheManager);

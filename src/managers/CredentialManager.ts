@@ -1,7 +1,7 @@
 // src/managers/CredentialManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { VerifiableCredentialV2, ProofEBSIv2 } from '../models/verifiable-credential';
 import { ManagerError } from '../models/errors/manager-error';
@@ -22,13 +22,13 @@ import { parseValidityPeriod } from '../utils/time';
  * validated the business logic and evidence. This manager throws exceptions on failure.
  */
 export class CredentialManager {
-  private vaultRepository: VaultRepository;
+  private vaultRepository: IVaultRepository;
   private kmsService: IKmsService;
   private tenantsCacheManager: TenantsCacheManager;
   private hostDid: string;
 
   constructor(
-    vaultRepository: VaultRepository,
+    vaultRepository: IVaultRepository,
     kmsService: IKmsService,
     tenantsCacheManager: TenantsCacheManager,
     hostExternalDomain: string,

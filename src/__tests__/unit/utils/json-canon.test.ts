@@ -1,4 +1,5 @@
 // src/__tests__/unit/utils/json-canon.test.ts
+// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { canonicalize } from '../../../utils/json-canon';
 import * as testBundle from '../../data/fhir-svc-Bundle-04.json';

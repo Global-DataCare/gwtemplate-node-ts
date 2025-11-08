@@ -3,7 +3,7 @@
 
 import { IServerConfig } from '../config';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { determineResourceId } from '../utils/resource';
 import { createOperationOutcome } from '../utils/outcome';
 import { getTenantVaultId, isValidTenantAlternateName } from '../utils/tenant';
@@ -38,13 +38,13 @@ import { createOrganizationUrn } from '../utils/urn';
  * nodes to reload their tenant cache after a new tenant is persisted.
  */
 export class HostingManager {
-  private vaultRepository: VaultRepository;
+  private vaultRepository: IVaultRepository;
   private kmsService: IKmsService;
   private tenantsCacheManager: TenantsCacheManager;
   private config: IServerConfig;
 
   constructor(
-    vaultRepository: VaultRepository,
+    vaultRepository: IVaultRepository,
     kmsService: IKmsService,
     tenantsCacheManager: TenantsCacheManager,
     config: IServerConfig,

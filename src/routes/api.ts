@@ -17,7 +17,7 @@ import { EntityConfig } from '../models/entity';
 import { JWK } from '../models/jwk';
 import { VerificationMethod } from '../models/did';
 
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { ICryptography } from '../crypto/interfaces/ICryptography';
 import { getTenantVaultIdFromIss, getTenantVaultId } from '../utils/tenant';
 
@@ -65,7 +65,7 @@ export function createApiRouter(
   tenantsCacheManager: TenantsCacheManager,
   kmsService: IKmsService,
   asyncResponseStore: IAsyncResponseStore,
-  vaultRepository: VaultRepository,
+  vaultRepository: IVaultRepository,
   cryptographyService: ICryptography,
 ): express.Router {
   const router = express.Router();

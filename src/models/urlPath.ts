@@ -6,11 +6,13 @@
  * Using an enum ensures type safety and prevents the use of arbitrary strings.
  */
 export enum Sector {
-  SYSTEM = 'system', // Reserved for the host's bootstrap operation.
+  HOST = 'host', // Reserved for the host's bootstrap operation and database collection name.
+  SYSTEM = 'system', // Reserved for the host's bootstrap operation (TODO: deprecate)
   TEST = 'test', // For dummy endpoints
   HEALTH_CARE = 'health-care',
   HEALTH_INSURANCE = 'health-insurance',
   EMERGENCY = 'emergency',
+  RESEARCH = 'research',
 }
 
 export enum Section {

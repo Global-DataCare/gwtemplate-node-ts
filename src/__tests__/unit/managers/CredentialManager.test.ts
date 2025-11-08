@@ -3,7 +3,7 @@
 
 import { jest } from '@jest/globals';
 import { v4 as uuidv4 } from 'uuid';
-import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { CredentialManager } from '../../../managers/CredentialManager';
 import { testClaimsTenant1Registration } from '../../data/end-to-end.data';
@@ -61,7 +61,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 
 describe('CredentialManager', () => {
   let credentialManager: CredentialManager;
-  let vaultRepository: VaultRepository;
+  let vaultRepository: IVaultRepository;
   let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
   let mockConfig: IServerConfig;
 

@@ -13,7 +13,7 @@ import {
 } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
-import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { JobRequest } from '../../../models/request';
 import { ClaimsRecord } from '../../../models/resource-document';
@@ -87,7 +87,7 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
 
 describe('HostingManager', () => {
   let hostingManager: HostingManager;
-  let vaultRepository: VaultRepository;
+  let vaultRepository: IVaultRepository;
   let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
   let mockConfig: IServerConfig;
   const originalEnv = process.env;

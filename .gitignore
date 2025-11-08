@@ -87,3 +87,11 @@ Env
 # Compiled TypeScript files
 lib
 build
+
+# Ignore all .json files in the root, like service account keys
+/*.json
+
+# Ignore all .env files...
+.env*
+# ...except for the example template.
+!.env.example

@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
-import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { EntityConfig } from '../../../models/entity';
 import { getTenantVaultId } from '../../../utils/tenant';
@@ -18,7 +18,7 @@ jest.mock('../../../database/repositories/vault/vault.repository');
 
 describe('TenantsCacheManager', () => {
   let tenantsCacheManager: TenantsCacheManager;
-  let mockVaultRepository: jest.Mocked<VaultRepository>;
+  let mockVaultRepository: jest.Mocked<IVaultRepository>;
   let mockKmsService: jest.Mocked<IKmsService>;
 
   // --- Test Data ---

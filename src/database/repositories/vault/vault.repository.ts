@@ -8,7 +8,7 @@ import { RecordBase, VaultConfig } from "../../../models/resource-document";
  * This interface is agnostic to the underlying storage technology.
  * The concepts of 'vaults' (tenants) and 'sections' (data partitions) are used to organize data.
  */
-export abstract class VaultRepository {
+export abstract class IVaultRepository {
     /** Creates a new vault (e.g., for a new tenant). */
     abstract createNewVault(vaultConfig: VaultConfig): Promise<boolean>;
     /** Checks if a vault exists. */

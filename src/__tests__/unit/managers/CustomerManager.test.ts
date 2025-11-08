@@ -4,7 +4,7 @@
 import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { v4 as uuidv4 } from 'uuid';
-import { VaultRepository } from '../../../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { CustomerManager } from '../../../managers/CustomerManager';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
@@ -42,7 +42,7 @@ jest.mock('../../../utils/jurisdiction', () => ({
   
 describe('CustomerManager', () => {
   let customerManager: CustomerManager;
-  let mockVaultRepository: MockProxy<VaultRepository>;
+  let mockVaultRepository: MockProxy<IVaultRepository>;
   let mockKmsService: MockProxy<IKmsService>;
   let mockTenantsCacheManager: MockProxy<TenantsCacheManager>;
   let mockCredentialManager: MockProxy<CredentialManager>;
@@ -52,7 +52,7 @@ describe('CustomerManager', () => {
   const TENANT_URN = testTenant1IdentifierUrn;
 
   beforeEach(() => {
-    mockVaultRepository = mock<VaultRepository>();
+    mockVaultRepository = mock<IVaultRepository>();
     mockKmsService = mock<IKmsService>();
     mockTenantsCacheManager = mock<TenantsCacheManager>();
     mockCredentialManager = mock<CredentialManager>();

@@ -106,6 +106,7 @@ export const testPayloadCreateTenant1 = {
         meta: {
           claims: testClaimsTenant1Registration,
         },
+        resource: {},
       },
     ],
   },

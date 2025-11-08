@@ -14,7 +14,7 @@ import { createOperationOutcome } from '../utils/outcome';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { getTenantVaultId } from '../utils/tenant';
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { BundleEntry, ErrorEntry, BundleEntryRequest, Bundle } from '../models/bundle';
 import { ClaimsRecord, RecordBase } from '../models/resource-document';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
@@ -27,12 +27,12 @@ import { JobRequest, JobRequestMeta } from '../models/request';
 const EMPLOYEE_SECTION = 'employees';
 
 export class EmployeeManager {
-  private vaultRepository: VaultRepository;
+  private vaultRepository: IVaultRepository;
   private kmsService: IKmsService;
   private tenantsCacheManager: TenantsCacheManager;
 
   constructor(
-    vaultRepository: VaultRepository,
+    vaultRepository: IVaultRepository,
     kmsService: IKmsService,
     tenantsCacheManager: TenantsCacheManager,
   ) {

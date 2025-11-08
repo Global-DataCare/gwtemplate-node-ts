@@ -52,7 +52,7 @@ import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
 import { generateUrnHash } from '../../utils/urn-hash';
 import { createHash } from 'crypto';
 import { normalizePhoneNumber } from '../../utils/phone-number';
-import { VaultRepository } from '../../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
 import { IBlockchainAdapter } from '../../adapters/IBlockchainAdapter';
 import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
 
@@ -76,7 +76,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
   let tenantManager: TenantsCacheManager;
   let createdPersonId: string; // Variable to store the ID of the created person
   let blockchainAdapter: IBlockchainAdapter;
-  let vaultRepository: VaultRepository;
+  let vaultRepository: IVaultRepository;
 
 
   beforeAll(async () => {

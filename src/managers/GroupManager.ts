@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4 } from 'uuid';
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { normalizeInteroperableClaims } from '../utils/claims';
 import { RecordBase } from '../models/resource-document';
 
@@ -16,9 +16,9 @@ export interface GroupInput {
 }
 
 export class GroupManager {
-  private vaultRepository: VaultRepository;
+  private vaultRepository: IVaultRepository;
 
-  constructor(vaultRepository: VaultRepository) {
+  constructor(vaultRepository: IVaultRepository) {
     this.vaultRepository = vaultRepository;
   }
 

@@ -3,7 +3,7 @@
 
 import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { ITenantsManager } from './ITenantsManager';
-import { VaultRepository } from '../database/repositories/vault/vault.repository';
+import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { getTenantVaultId, getIdentifierUrnFromClaims } from '../utils/tenant';
 import { DidDocument, DidService, VerificationMethod } from '../models/did';
@@ -20,14 +20,14 @@ import { parseTenantUrn } from '../utils/urn';
  * ID resolver and service provider. It does not expose the full EntityConfig.
  */
 export class TenantsCacheManager implements ITenantsManager {
-  private vaultRepository: VaultRepository;
+  private vaultRepository: IVaultRepository;
   private kmsServiceResolver: () => IKmsService;
   private tenantCacheByVaultId = new Map<string, any>();
   private get kmsService(): IKmsService {
     return this.kmsServiceResolver();
   }
 
-  constructor(vaultRepository: VaultRepository, kmsServiceResolver: () => IKmsService) {
+  constructor(vaultRepository: IVaultRepository, kmsServiceResolver: () => IKmsService) {
     this.vaultRepository = vaultRepository;
     this.kmsServiceResolver = kmsServiceResolver;
   }
