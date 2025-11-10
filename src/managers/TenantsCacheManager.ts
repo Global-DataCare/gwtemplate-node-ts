@@ -101,9 +101,43 @@ export class TenantsCacheManager implements ITenantsManager {
    * @param vaultId The unique vault identifier for the tenant (e.g., 'host', 'health-care_acme').
    * @returns The tenant's physical collection name (e.g., 'host', 'ES_TAX_B12345..._health-care'), or `undefined` if not found.
    */
-  public getCollectionName(vaultId: string): string | undefined {
-    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
-    return tenantConfig?.collectionName;
+  public async getCollectionName(vaultId: string): Promise<string | undefined> {
+    // 1. Check the cache first.
+    let tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+    if (tenantConfig?.collectionName) {
+      return tenantConfig.collectionName;
+    }
+
+    // 2. If not in cache, fetch from the repository.
+    const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>('host', vaultId, 'tenants');
+
+    // 3. If not in the repository, it doesn't exist. Return undefined.
+    if (!secureTenantRecord) {
+      return undefined;
+    }
+
+    try {
+      // 4. Decrypt the tenant's configuration.
+      tenantConfig = await this.kmsService.unprotectConfidentialData<any>(secureTenantRecord, 'host');
+
+      if (tenantConfig?.claims) {
+        // 5. Generate and add the collectionName to the config object.
+        const collectionName = generateTenantCollectionNameFromClaims(tenantConfig.claims);
+        tenantConfig.collectionName = collectionName;
+
+        // 6. Cache the entire decrypted config for future use.
+        this.tenantCacheByVaultId.set(vaultId, tenantConfig);
+
+        // 7. Return the collection name.
+        return collectionName;
+      } else {
+        console.error(`[TenantsCacheManager] Decrypted record for vaultId '${vaultId}' is invalid or missing claims.`);
+        return undefined;
+      }
+    } catch (error) {
+      console.error(`[TenantsCacheManager] Failed to decrypt tenant record for vaultId '${vaultId}'.`, error);
+      return undefined;
+    }
   }
 
   /**

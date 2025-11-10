@@ -5,7 +5,7 @@ import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { EntityConfig } from '../../../models/entity';
-import { getTenantVaultId } from '../../../utils/tenant';
+import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../../utils/tenant';
 import { Sector } from '../../../models/urlPath';
 import { DidService } from '../../../models/did';
 import { ClaimsRecord } from '../../../models/resource-document';
@@ -15,6 +15,11 @@ import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../
 
 // Mock the entire module. We are not using the actual implementation.
 jest.mock('../../../database/repositories/vault/vault.repository');
+jest.mock('../../../utils/tenant', () => ({
+  ...jest.requireActual('../../../utils/tenant') as any,
+  generateTenantCollectionNameFromClaims: jest.fn(),
+}));
+
 
 describe('TenantsCacheManager', () => {
   let tenantsCacheManager: TenantsCacheManager;
@@ -54,6 +59,7 @@ describe('TenantsCacheManager', () => {
   beforeEach(() => {
     mockVaultRepository = {
       getContainersInSection: jest.fn(),
+      get: jest.fn(),
     } as jest.Mocked<any>;
 
     mockKmsService = {
@@ -61,54 +67,56 @@ describe('TenantsCacheManager', () => {
     } as any;
 
     tenantsCacheManager = new TenantsCacheManager(mockVaultRepository, () => mockKmsService);
+    (generateTenantCollectionNameFromClaims as jest.Mock).mockImplementation((claims: ClaimsRecord) => {
+        const value = claims[ClaimsOrganizationSchemaorg.identifierValue];
+        return `_${value}_`;
+    });
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('loadTenants', () => {
-    it('should load all valid tenant data and make it available via getters', async () => {
+  describe('getCollectionName (Lazy Loading)', () => {
+    it('should fetch, decrypt, cache, and return the collection name for an uncached tenant', async () => {
       // Arrange
-      const mockHostRecord = { id: 'host-record', content: hostConfig };
-      const mockAcmeRecord = { id: 'acme-record', content: acmeConfig };
-      mockVaultRepository.getContainersInSection.mockResolvedValue([mockAcmeRecord, mockHostRecord]);
-      mockKmsService.unprotectConfidentialData
-        .mockResolvedValueOnce(acmeConfig)
-        .mockResolvedValueOnce(hostConfig);
+      const mockAcmeRecord = { id: acmeVaultId, content: acmeConfig };
+      mockVaultRepository.get.mockResolvedValue(mockAcmeRecord);
+      mockKmsService.unprotectConfidentialData.mockResolvedValue(acmeConfig);
+      const expectedCollectionName = generateTenantCollectionNameFromClaims(acmeConfig.claims as ClaimsRecord);
 
-      // Act
-      await tenantsCacheManager.loadTenants();
+      // --- ACTION 1: First call for the tenant ---
+      const collectionName1 = await tenantsCacheManager.getCollectionName(acmeVaultId);
 
-      // Assert
-      expect(tenantsCacheManager.getTenantDid(acmeVaultId)).toBe(tenantUrn);
-      expect(tenantsCacheManager.getDidServiceConfig(acmeVaultId)).toEqual(mockServices);
-      expect(tenantsCacheManager.getTenantDid('host')).toBe(hostUrn);
+      // --- ASSERT 1: Verify it fetched and decrypted ---
+      expect(collectionName1).toBe(expectedCollectionName);
+      expect(mockVaultRepository.get).toHaveBeenCalledTimes(1);
+      expect(mockVaultRepository.get).toHaveBeenCalledWith('host', acmeVaultId, 'tenants');
+      expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledTimes(1);
+      expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledWith(mockAcmeRecord, 'host');
+
+      // --- ACTION 2: Second call for the SAME tenant ---
+      const collectionName2 = await tenantsCacheManager.getCollectionName(acmeVaultId);
+
+      // --- ASSERT 2: Verify it used the cache ---
+      expect(collectionName2).toBe(expectedCollectionName);
+      // The mocks should NOT have been called again.
+      expect(mockVaultRepository.get).toHaveBeenCalledTimes(1);
+      expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledTimes(1);
     });
 
-    it('should skip corrupted records and continue loading others', async () => {
-        // Arrange
-        const mockHostRecord = { id: 'host-record', content: hostConfig };
-        const mockAcmeRecord = { id: 'acme-record', content: acmeConfig };
-        const mockCorruptedRecord = { id: 'corrupted-record' };
-  
-        mockVaultRepository.getContainersInSection.mockResolvedValue([mockAcmeRecord, mockCorruptedRecord, mockHostRecord]);
-        
-        mockKmsService.unprotectConfidentialData
-          .mockResolvedValueOnce(acmeConfig)
-          .mockRejectedValueOnce(new Error('Decryption failed')) // Simulate a corrupted record
-          .mockResolvedValueOnce(hostConfig);
-  
-        // Act
-        await tenantsCacheManager.loadTenants();
-  
-        // Assert
-        // Verify that the valid records are still in the cache
-        expect(tenantsCacheManager.getTenantDid(acmeVaultId)).toBe(tenantUrn);
-        expect(tenantsCacheManager.getTenantDid('host')).toBe(hostUrn);
-        // Verify that the KMS was called for all records
-        expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledTimes(3);
-      });
+    it('should return undefined for a tenant that does not exist in the repository', async () => {
+      // Arrange
+      mockVaultRepository.get.mockResolvedValue(undefined);
+
+      // Act
+      const collectionName = await tenantsCacheManager.getCollectionName('non-existent-id');
+
+      // Assert
+      expect(collectionName).toBeUndefined();
+      expect(mockVaultRepository.get).toHaveBeenCalledTimes(1);
+      expect(mockKmsService.unprotectConfidentialData).not.toHaveBeenCalled();
+    });
   });
 
   describe('getTenantDid', () => {

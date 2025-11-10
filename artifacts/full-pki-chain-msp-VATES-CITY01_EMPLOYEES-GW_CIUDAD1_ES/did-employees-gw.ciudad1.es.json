@@ -3,20 +3,20 @@
   "id": "did:web:employees-gw.ciudad1.es",
   "verificationMethod": [
     {
-      "id": "did:web:employees-gw.ciudad1.es#eHFta0JLR21wdXBPLVp5OUpmaXZfbEJnLTBUdGw2Y0xmcF9LYUhtblNBYw",
+      "id": "did:web:employees-gw.ciudad1.es#ZDNlQWpCVlVjS1VmemUyTDJLdHctOXU1azFXc1VPTVdNR2s2UjRsdGFzNA",
       "type": "JsonWebKey2020",
       "controller": "did:web:employees-gw.ciudad1.es",
       "publicKeyJwk": {
         "kty": "EC",
         "crv": "P-256",
-        "x": "Q98gOzP4E3-HzRvDF1L1U8DvCwGvIsWAxck68yhHums",
-        "y": "OlKtH368Wx78mWH9sJh45sdqXh3BbVz2UdzK5VqERDg",
-        "d": "lvJ6EvgsbQE6MF1Uuc7HwvHejruUJQxeFUFb8osoQso",
-        "kid": "eHFta0JLR21wdXBPLVp5OUpmaXZfbEJnLTBUdGw2Y0xmcF9LYUhtblNBYw"
+        "x": "vXHS-Vg23w1TeZyX6Yea8c-uyQD8mauBAkzVNpquKcs",
+        "y": "ocTf9utHWBjJwxjx-et1G2dC7RIjAgVj2qm4H0-zbLg",
+        "d": "-umCmSZD7XwI2vNtOLNQEYEph0IQRNnBf-PIA4-vd5k",
+        "kid": "ZDNlQWpCVlVjS1VmemUyTDJLdHctOXU1azFXc1VPTVdNR2s2UjRsdGFzNA"
       }
     }
   ],
   "authentication": [
-    "did:web:employees-gw.ciudad1.es#eHFta0JLR21wdXBPLVp5OUpmaXZfbEJnLTBUdGw2Y0xmcF9LYUhtblNBYw"
+    "did:web:employees-gw.ciudad1.es#ZDNlQWpCVlVjS1VmemUyTDJLdHctOXU1azFXc1VPTVdNR2s2UjRsdGFzNA"
   ]
 }

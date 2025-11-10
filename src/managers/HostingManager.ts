@@ -211,6 +211,7 @@ export class HostingManager {
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, logicalVaultId);
     await this.vaultRepository.put(hostCollectionName, [secureDoc], 'tenants');
     
+    // After persisting the host, we MUST reload the cache so that its collection name is available.
     await this.tenantsCacheManager.loadTenants();
 
     const [adminPerson, processedService] = contained;
@@ -299,13 +300,18 @@ export class HostingManager {
       content: tenantConfig,
     };
 
-    const hostCollectionName = this.tenantsCacheManager.getCollectionName('host');
-    if (!hostCollectionName) {
-      throw new ManagerError('CRITICAL: Host collection name could not be resolved.', IssueType.Exception);
-    }
+    const hostBootstrapClaims = {
+      [ClaimsOrganizationSchemaorg.addressCountry]: this.config.host.jurisdiction,
+      [ClaimsOrganizationSchemaorg.identifierType]: this.config.host.idType,
+      [ClaimsOrganizationSchemaorg.identifierValue]: this.config.host.idValue,
+      [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+    };
+    const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
+
     const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
     await this.vaultRepository.put(hostCollectionName, [secureTenantRegistrationDoc], 'tenants');
     
+    // Force a cache reload to make the new tenant's collection name available for subsequent operations.
     await this.tenantsCacheManager.loadTenants();
 
     const [legalRep, processedService] = contained;
