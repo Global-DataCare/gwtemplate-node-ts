@@ -108,6 +108,10 @@ export class VaultMemRepository implements IVaultRepository {
     containerId: string,
     sectionId: string = 'default',
   ): Promise<T | undefined> {
+    // Per architecture, TenantsCacheManager fetches tenant records this way.
+    if (collectionName === 'host' && sectionId === 'tenants') {
+      return this.tenantRegistry.get(containerId) as unknown as T | undefined;
+    }
     const section = this.dataVaults.get(collectionName)?.sections.get(sectionId);
     return section?.get(containerId) as unknown as T | undefined;
   }

@@ -34,7 +34,7 @@ const testHostUuid = "d1d2d3d4-e5f6-7890-1234-567890abcdef";
 export const testHostAlternateName = "host";
 export const testHostAddressCountry = "ES";
 export const testHostIdType = "TAX"; // TAX or EI (TODO: link)
-export const testHostIdValue = "B12345678";
+export const testHostIdValue = "A12345678";
 export const testHostLegalName = "Hosting Organization";
 export const testHostDomain = "host.example.com"
 
@@ -62,7 +62,7 @@ const testTenant1Uuid = "c1c2c3d4-e5f6-7890-1234-567890abcdef";
 export const testTenant1LegalName = "Acme Company";
 export const testTenant1AddressCountry = "ES";
 export const testTenant1IdType = "TAX"; // EI or TAX
-export const testTenant1IdValue = "A0011233";
+export const testTenant1IdValue = "B0011233";
 export const testTenant1AlternateName = "acme";
 export const testTenant1Domain = "api.acme.org";
 

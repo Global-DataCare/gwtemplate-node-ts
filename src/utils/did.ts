@@ -129,12 +129,18 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
 
             const isSignatureKey = key.use === 'sig' || (key.key_ops && key.key_ops.includes('sign'));
             const isEncryptionKey = key.use === 'enc' || (key.key_ops && key.key_ops.includes('encrypt'));
+            let isAddedToVerificationMethods = false;
 
             if (isSignatureKey) {
                 newDidDoc.verificationMethod!.push(vm);
                 newDidDoc.assertionMethod!.push(vm);
+                isAddedToVerificationMethods = true;
             }
             if (isEncryptionKey) {
+                // A key might be for both signing and encryption. Avoid adding it twice to the main list.
+                if (!isAddedToVerificationMethods) {
+                    newDidDoc.verificationMethod!.push(vm);
+                }
                 newDidDoc.keyAgreement!.push(vm);
             }
         }

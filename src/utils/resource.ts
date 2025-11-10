@@ -10,25 +10,22 @@ import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
  * @returns The determined resource ID (either the extracted UUID, a new UUID, or the original identifier).
  */
 export function determineResourceId(identifierClaim: string | undefined, environment?: string): string {
-    // In 'demo' mode, we have special rules
-    if (environment === 'demo' && identifierClaim) {
-        // Attempt to extract a UUID first for consistency
-        const uuidPart = identifierClaim.split('urn:uuid:')[1]?.split(',')[0];
-        if (uuidPart && uuidValidate(uuidPart)) {
-            return uuidPart;
-        }
-        // If not a valid UUID, return the identifier as-is
-        return identifierClaim;
+  // 1. If an identifier claim is provided, try to process it.
+  if (identifierClaim) {
+    const uuidPart = identifierClaim.split('urn:uuid:')[1]?.split(',')[0];
+
+    // 2. If a valid UUID is found within the claim, always use it.
+    if (uuidPart && uuidValidate(uuidPart)) {
+      return uuidPart;
     }
 
-    // In normal environments, strictly validate the UUID
-    if (identifierClaim) {
-        const uuidPart = identifierClaim.split('urn:uuid:')[1]?.split(',')[0];
-        if (uuidPart && uuidValidate(uuidPart)) {
-            return uuidPart;
-        }
+    // 3a. If NOT a valid UUID, but we are in 'demo' mode, use the original claim value.
+    if (environment === 'demo') {
+      return identifierClaim;
     }
-    
-    // If no identifier is provided or the validation fails, generate a new UUID.
-    return uuidv4();
+  }
+
+  // 4. If no identifier was provided at all, OR if the provided one was
+  // invalid in a non-demo environment, generate a new UUID.
+  return uuidv4();
 }
