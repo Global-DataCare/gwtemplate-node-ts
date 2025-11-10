@@ -17,7 +17,9 @@ export interface IServerConfig {
   namespace: string;
   sectorsAllowed: Sector[];
   dbProvider: string;
+  storageProvider: string;
   queueProvider: string;
+  gcsBucketName?: string;
   kekSecret?: string;
   host: {
     legalName?: string;

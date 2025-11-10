@@ -5,13 +5,16 @@
 // It validates the entire LEGACY API flow (unencrypted JSON) from HTTP request to database interaction.
 
 import * as express from 'express';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Server } from 'http';
 import { startServer } from '../../server';
 import { QueueAdapter } from '../../adapters/queue';
 import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
 import { KmsService } from '../../services/KmsService';
 import { ClaimsRecord } from '../../models/resource-document';
+import { DecodedDidcommMessage, JobRequest } from '../../models/request';
+
+import { getGoogleAuthTokenForTesting } from '../utils/auth';
 
 // Mock the KmsService to bypass actual JWE decryption for this legacy test
 jest.mock('../../services/KmsService');
@@ -24,10 +27,13 @@ describe('End-to-End API Flow (Legacy with Live Firestore)', () => {
   let server: Server;
   let queueAdapter: QueueAdapter;
   let addJobSpy: jest.SpyInstance;
+  let authToken: string;
   
   const tenantId = `e2e-legacy-tenant-${Date.now()}`;
   const modifiedClaims: ClaimsRecord = {
     ...testPayloadCreateTenant1.body.data[0].meta.claims,
+    // Ensure the email in the payload matches the test user's email
+    'org.schema.Person.email': process.env.DEMO_ORG1_ADMIN_EMAIL,
     'org.schema.Organization.identifier': `urn:uuid:${tenantId}`,
   };
   
@@ -43,16 +49,20 @@ describe('End-to-End API Flow (Legacy with Live Firestore)', () => {
   };
 
   beforeAll(async () => {
+    authToken = await getGoogleAuthTokenForTesting(
+      process.env.DEMO_ORG1_ADMIN_EMAIL!,
+      process.env.DEMO_ORG1_ADMIN_EMAIL_PASSWORD!,
+    );
     // We are mocking the service, so we need to provide a mock implementation.
     (KmsService as jest.Mock).mockImplementation(() => {
       return {
-        decodeRequest: jest.fn((req: express.Request): Promise<IJob<IJobContent>> => {
+        decodeRequest: jest.fn((req: express.Request): Promise<JobRequest> => {
           // In legacy plaintext mode, the body is the job content. We just pass it through.
-          const jobContent = req.body as IJobContent;
+          const jobContent = req.body as DecodedDidcommMessage;
           return Promise.resolve({
             name: `unsecure-host-registry-org.schema.Organization-_batch`, // Mock a job name
             content: jobContent,
-          });
+          } as JobRequest);
         }),
       };
     });
@@ -83,13 +93,15 @@ describe('End-to-End API Flow (Legacy with Live Firestore)', () => {
     // TODO: Add a cleanup step to delete the created tenant from Firestore
   });
 
+  // No longer skipped, as it should now pass with a valid auth token.
   it('should accept a legacy JSON request to create a new organization, and save it to Firestore', async () => {
     const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
 
-    // 1. ACT: Send the plain JSON request
-    const response = await request.default(app)
+    // 1. ACT: Send the plain JSON request with a valid Bearer token
+    const response = await request(app)
       .post(registrationUrl)
-      .set('Content-Type', 'application/didcomm-plaintext+json') // Use the correct legacy content type
+      .set('Content-Type', 'application/json')
+      .set('Authorization', `Bearer ${authToken}`)
       .send(orgCreationPayload);
 
     // 2. ASSERT (Phase 1): API should accept the job

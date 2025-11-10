@@ -7,27 +7,36 @@ import { InMemoryVault } from '../../../models/repository';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
 /**
- * An in-memory implementation of the Vault Repository.
- * Useful for testing and development environments.
+ * An in-memory implementation of the Vault Repository that faithfully mimics the
+ * separation between logical `vaultId` and physical `collectionName` as defined
+ * in the `IVaultRepository` interface and implemented by `FirestoreVaultRepository`.
+ *
+ * - `vaultExists` operates on logical `vaultId`s held in a dedicated registry.
+ * - `createNewVault` operates on physical `collectionName`s.
+ * - All other data manipulation methods (`put`, `get`, etc.) operate on the physical `collectionName`.
  */
 export class VaultMemRepository implements IVaultRepository {
-  private vaults = new Map<string, InMemoryVault>();
+  // Maps physical collectionName -> InMemoryVault
+  private dataVaults = new Map<string, InMemoryVault>();
+  // Simulates the host's tenant registry, mapping logical vaultId -> registration document
+  private tenantRegistry = new Map<string, ConfidentialStorageDoc>();
 
   /**
-   * Clears all vaults and sections from the in-memory store.
-   * This is useful for ensuring a clean state between test runs.
+   * Clears all state to ensure clean test runs.
    */
   public clear(): void {
-    this.vaults.clear();
-  }  
+    this.dataVaults.clear();
+    this.tenantRegistry.clear();
+  }
+
+  // === Methods from IVaultRepository ===
 
   public async createNewVault(vaultConfig: VaultConfig): Promise<boolean> {
-    // console.log(`[VaultMemRepository] Attempting to create new vault with id: '${vaultConfig.id}'`);
-    if (this.vaults.has(vaultConfig.id)) {
-      console.error(`[VaultMemRepository] Vault creation failed, vault already exists: '${vaultConfig.id}'`);
+    const collectionName = vaultConfig.id; // Per architecture, vaultConfig.id IS the collectionName
+    if (this.dataVaults.has(collectionName)) {
       return false;
     }
-    this.vaults.set(vaultConfig.id, {
+    this.dataVaults.set(collectionName, {
       config: vaultConfig,
       sections: new Map(),
     });
@@ -35,109 +44,140 @@ export class VaultMemRepository implements IVaultRepository {
   }
 
   public async vaultExists(vaultId: string): Promise<boolean> {
-    return this.vaults.has(vaultId);
-  }
-  
-  public async getVaultConfig(vaultId: string): Promise<VaultConfig | undefined> {
-    return this.vaults.get(vaultId)?.config;
+    // Per architecture, this checks for the logical registration entry.
+    return this.tenantRegistry.has(vaultId);
   }
 
-  public async createNewSection(vaultId: string, sectionId: string): Promise<boolean> {
-    const vault = this.vaults.get(vaultId);
+  public async getContainersInSection<T extends RecordBase>(
+    collectionName: string,
+    sectionId: string,
+  ): Promise<T[]> {
+    // Special Case for simulating TenantsCacheManager reading the registry.
+    // The manager calls getContainersInSection('host', 'tenants'). This is a special
+    // logical identifier that we resolve to our internal tenantRegistry.
+    if (collectionName === 'host' && sectionId === 'tenants') {
+      return Array.from(this.tenantRegistry.values()) as unknown as T[];
+    }
+
+    const vault = this.dataVaults.get(collectionName);
+    const section = vault?.sections.get(sectionId);
+    return section ? (Array.from(section.values()) as unknown as T[]) : [];
+  }
+
+  public async put<T extends RecordBase>(
+    collectionName: string,
+    containers: T[],
+    sectionId: string = 'default',
+  ): Promise<boolean> {
+    // Special case: Writing TO the tenant registry. This happens when writing
+    // to the host's physical collection in the 'tenants' section. The host's
+    // physical collection is identified by containing '_system'.
+    if (collectionName.includes('_system') && sectionId === 'tenants') {
+      for (const doc of containers) {
+        if (!doc.id) {
+          throw new Error('Document must have a logical id to be placed in the tenant registry.');
+        }
+        this.tenantRegistry.set(doc.id, doc as unknown as ConfidentialStorageDoc);
+      }
+      return true;
+    }
+
+    const vault = this.dataVaults.get(collectionName);
+    if (!vault) {
+      console.error(`[VaultMemRepository] Cannot put data, physical vault not found: '${collectionName}'`);
+      return false;
+    }
+
+    if (!vault.sections.has(sectionId)) {
+      vault.sections.set(sectionId, new Map<string, RecordBase>());
+    }
+
+    const sectionMap = vault.sections.get(sectionId)!;
+
+    for (const doc of containers) {
+      if (!doc.id) {
+        throw new Error('Document must have an id.');
+      }
+      sectionMap.set(doc.id, doc);
+    }
+    return true;
+  }
+
+  public async get<T extends RecordBase>(
+    collectionName: string,
+    containerId: string,
+    sectionId: string = 'default',
+  ): Promise<T | undefined> {
+    const section = this.dataVaults.get(collectionName)?.sections.get(sectionId);
+    return section?.get(containerId) as unknown as T | undefined;
+  }
+
+  // ===================================================================================
+  // Other IVaultRepository methods...
+  // ===================================================================================
+
+  public async getVaultConfig(collectionName: string): Promise<VaultConfig | undefined> {
+    return this.dataVaults.get(collectionName)?.config;
+  }
+
+  public async createNewSection(collectionName: string, sectionId: string): Promise<boolean> {
+    const vault = this.dataVaults.get(collectionName);
     if (!vault || vault.sections.has(sectionId)) {
       return false;
     }
     vault.sections.set(sectionId, new Map());
     return true;
   }
-  
-  public async updateSection(vaultId: string, sectionId: string, containers: RecordBase[] = []): Promise<boolean> {
-    const vault = this.vaults.get(vaultId);
+
+  public async updateSection(collectionName: string, sectionId: string, containers: RecordBase[] = []): Promise<boolean> {
+    const vault = this.dataVaults.get(collectionName);
     if (!vault) {
       return false;
     }
     const newSection = new Map<string, RecordBase>();
-    containers.forEach(doc => newSection.set(doc.id, doc));
+    containers.forEach((doc) => newSection.set(doc.id, doc));
     vault.sections.set(sectionId, newSection);
     return true;
   }
 
-  public async getAllSections(vaultId: string): Promise<string[]> {
-    const vault = this.vaults.get(vaultId);
+  public async getAllSections(collectionName: string): Promise<string[]> {
+    const vault = this.dataVaults.get(collectionName);
     return vault ? Array.from(vault.sections.keys()) : [];
   }
 
-  public async sectionExists(vaultId: string, sectionId: string): Promise<boolean> {
-    return this.vaults.get(vaultId)?.sections.has(sectionId) ?? false;
+  public async sectionExists(collectionName: string, sectionId: string): Promise<boolean> {
+    return this.dataVaults.get(collectionName)?.sections.has(sectionId) ?? false;
   }
 
-  public async getContainersListInSection(vaultId: string, sectionId: string): Promise<string[]> {
-    const section = this.vaults.get(vaultId)?.sections.get(sectionId);
+  public async getContainersListInSection(collectionName: string, sectionId: string): Promise<string[]> {
+    const section = this.dataVaults.get(collectionName)?.sections.get(sectionId);
     return section ? Array.from(section.keys()) : [];
   }
-  
-  public async getContainersInSection<T extends RecordBase>(vaultId: string, sectionId: string): Promise<T[]> {
-    const section = this.vaults.get(vaultId)?.sections.get(sectionId);
-    return section ? Array.from(section.values()) as T[] : [];
-  }
 
-  public async put<T extends RecordBase>(vaultId: string, containers: T[], sectionId: string = 'default'): Promise<boolean> {
-    // console.log(`[VaultMemRepository] Putting ${containers.length} container(s) into vault: '${vaultId}', section: '${sectionId}'`);
-    const vault = this.vaults.get(vaultId);
-    if (!vault) {
-      console.error(`[VaultMemRepository] Cannot put data, vault not found: '${vaultId}'`);
-      return false;
-    }
-
-    // Ensure the section exists before trying to add to it.
-    if (!vault.sections.has(sectionId)) {
-      vault.sections.set(sectionId, new Map<string, RecordBase>());
-    }
-    
-    // Get a DIRECT REFERENCE to the section map.
-    const sectionMap = vault.sections.get(sectionId)!;
-    
-    for (const doc of containers) {
-      if (!doc.id) {
-        throw new Error('Document must have an id.');
-      }
-      // Modify the original map directly through the reference.
-      sectionMap.set(doc.id, doc);
-    }
-    return true;
-  }
-
-  public async get<T extends RecordBase>(vaultId: string, containerId: string, sectionId: string = 'default'): Promise<T | undefined> {
-    const section = this.vaults.get(vaultId)?.sections.get(sectionId);
-    return section?.get(containerId) as T | undefined;
-  }
-
-  // Mock implementations for methods not strictly required by the test,
-  // but needed to satisfy the interface.
-  public async getHistory(vaultId: string, containerId: string): Promise<any[]> {
-    console.warn("getHistory is not implemented in VaultMemRepository");
+  public async getHistory(collectionName: string, containerId: string): Promise<any[]> {
+    console.warn('getHistory is not implemented in VaultMemRepository');
     return [];
   }
 
-  public async query<T extends RecordBase>(vaultId: string, query: { sectionId: string, where: { attribute: string, equals: string }[] }): Promise<T[]> {
-    const section = this.vaults.get(vaultId)?.sections.get(query.sectionId);
+  public async query<T extends RecordBase>(
+    collectionName: string,
+    query: { sectionId: string; where: { attribute: string; equals: string }[] },
+  ): Promise<T[]> {
+    const section = this.dataVaults.get(collectionName)?.sections.get(query.sectionId);
     if (!section) {
       return [];
     }
 
     const allDocs = Array.from(section.values()) as ConfidentialStorageDoc[];
-    
-    // Filter the documents based on the where clauses
-    const filteredDocs = allDocs.filter(doc => {
+
+    const filteredDocs = allDocs.filter((doc) => {
       if (!doc.indexed?.attributes) {
         return false;
       }
-      
-      // All 'where' conditions must be met (AND logic)
-      return query.where.every(condition => {
-        // Check if any attribute in the document matches the current condition
-        return doc.indexed!.attributes.some(attr => 
-          attr.name === condition.attribute && attr.value === condition.equals
+
+      return query.where.every((condition) => {
+        return doc.indexed!.attributes.some(
+          (attr) => attr.name === condition.attribute && attr.value === condition.equals,
         );
       });
     });
@@ -145,14 +185,13 @@ export class VaultMemRepository implements IVaultRepository {
     return filteredDocs as unknown as T[];
   }
 
-  public async delete(vaultId: string, containerId: string, sectionId?: string): Promise<boolean> {
-    console.warn("delete is not implemented in VaultMemRepository");
+  public async delete(collectionName: string, containerId: string, sectionId?: string): Promise<boolean> {
+    console.warn('delete is not implemented in VaultMemRepository');
     return false;
   }
 
-  public async purge(vaultId: string): Promise<boolean> {
-    console.warn("purge is not implemented in VaultMemRepository");
+  public async purge(collectionName: string): Promise<boolean> {
+    console.warn('purge is not implemented in VaultMemRepository');
     return false;
   }
 }
-

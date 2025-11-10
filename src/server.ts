@@ -1,8 +1,22 @@
 // src/server.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import * as admin from 'firebase-admin';
 import * as express from 'express';
 import * as dotenv from 'dotenv';
+// Load environment variables from .env file at the very top of the application
+dotenv.config();
+
+import { GcsStorageAdapter } from './database/storage/gcs.storage.adapter';
+import { IStorageAdapter } from './database/storage/IStorageAdapter';
+import { StorageMemAdapter } from './database/storage/mem.storage.adapter';
+import { initializeFirebase } from './utils/firebase';
+
+// Initialize Firebase Admin SDK early if configured
+if (process.env.DB_PROVIDER === 'firestore' || process.env.STORAGE_PROVIDER === 'gcs') {
+  initializeFirebase();
+}
+
 import { Worker } from './worker';
 import { IServerConfig } from './config';
 import { Sector } from './models/urlPath';
@@ -15,7 +29,9 @@ import { KmsService } from './services/KmsService';
 import { DemoKmsService } from './services/DemoKmsService';
 import { QueueAdapterMem } from './adapters/queue-mem';
 import { AsyncResponseStoreMem } from './adapters/async-response-store.mem';
+import { IVaultRepository } from './database/repositories/vault/vault.repository';
 import { VaultMemRepository } from './database/repositories/vault/vault.mem.repository';
+import { FirestoreVaultRepository } from './database/repositories/firestore/firestore.vault.repository';
 import { ManagerRegistry } from './managers/registry';
 import { HostingManager } from './managers/HostingManager';
 import { TenantsCacheManager } from './managers/TenantsCacheManager';
@@ -33,7 +49,6 @@ import { createFhirRouter } from './routes/fhir';
 import { AuthorizationManager } from './managers/AuthorizationManager';
 import * as swaggerUi from 'swagger-ui-express';
 const swaggerSpec = require('../swagger.config.js');
-
 
 // ===================================================================================
 // CONFIGURATION LOGIC - INTERNAL TO SERVER.TS
@@ -55,7 +70,7 @@ function buildApiBaseUrl(port: number): string {
 function parseAndValidateSectors(csv: string | undefined): Sector[] {
   if (!csv) return [];
   const allSectors = Object.values(Sector) as string[];
-  const requestedSectors = csv.split(',').map(s => s.trim());
+  const requestedSectors = csv.split(',').map((s) => s.trim());
   for (const sector of requestedSectors) {
     if (sector === Sector.SYSTEM) {
       throw new Error(`Config Error: The '${Sector.SYSTEM}' sector is reserved and cannot be set in SECTORS_ALLOWED.`);
@@ -83,7 +98,9 @@ function getConfig(): IServerConfig {
       namespace: process.env.URN_NAMESPACE || 'antifraud',
       sectorsAllowed: parseAndValidateSectors(process.env.SECTORS_ALLOWED),
       dbProvider: process.env.DB_PROVIDER || 'mem',
+      storageProvider: process.env.STORAGE_PROVIDER || 'mem',
       queueProvider: process.env.QUEUE_PROVIDER || 'mem',
+      gcsBucketName: process.env.GCS_BUCKET_NAME,
       kekSecret: process.env.KEK_SECRET,
       host: {
         legalName: process.env.ORG_HOST_LEGAL_NAME,
@@ -119,7 +136,6 @@ function getConfig(): IServerConfig {
 async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServerConfig) {
   // console.log('[GW-API] Bootstrapping host tenant...');
   const hostClaims = {
-    // [ClaimsOrganizationSchemaorg.identifier] is generated when persisting the host (tenant zero)
     [ClaimsOrganizationSchemaorg.identifierType]: bootConfig.host.idType,
     [ClaimsOrganizationSchemaorg.identifierValue]: bootConfig.host.idValue,
     [ClaimsOrganizationSchemaorg.addressCountry]: bootConfig.host.jurisdiction,
@@ -128,14 +144,12 @@ async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServer
     [ClaimsPersonSchemaorg.email]: bootConfig.host.adminEmail,
     [ClaimsPersonSchemaorg.identifier]: `urn:uuid:${bootConfig.host.adminUid}`,
     [ClaimsPersonSchemaorg.hasOccupation]: bootConfig.host.adminRole,
-    // TODO: Review accepted software manufacturer terms
     [ClaimsServiceSchemaorg.category]: 'system', 
     [ClaimsServiceSchemaorg.identifier]: `urn:uuid:${bootConfig.host.idValue}-service`,
   };
 
   try {
     await hostingManager.bootstrapHost(hostClaims);
-    // console.log('[GW-API] Host tenant bootstrapped successfully.');
   } catch (error) {
     console.error('[GW-API] FATAL: Host tenant bootstrapping failed.', error);
     throw error;
@@ -151,42 +165,55 @@ interface StartServerOptions {
  * Initializes and starts the Express server.
  */
 async function startServer(options?: StartServerOptions) {
-  dotenv.config();
   const config = getConfig();
 
-  // console.log('[GW-API] Initializing...');
   const app = express.default();
   app.use(express.default.urlencoded({ extended: true }));
   app.use(express.default.json({ type: ['application/json', 'application/fhir+json'] }));
 
-  // Apply test middlewares before any routers
   if (options?.testMiddlewares) {
-    options.testMiddlewares.forEach(mw => app.use(mw));
+    options.testMiddlewares.forEach((mw) => app.use(mw));
   }
 
+  // --- DEPENDENCY INJECTION ---
+  let vaultRepository: IVaultRepository;
+  if (config.dbProvider === 'firestore') {
+    const db = admin.firestore();
+    const hostCollectionName = 'host'; 
+    vaultRepository = new FirestoreVaultRepository(db, hostCollectionName);
+    console.log('[GW-API] Using Firestore Vault Repository.');
+  } else {
+    vaultRepository = new VaultMemRepository();
+    (vaultRepository as VaultMemRepository).clear(); // Explicitly clear on start
+    console.log('[GW-API] Using In-Memory Vault Repository (cleared).');
+  }
 
-  const vaultRepository = new VaultMemRepository();
+  let storageAdapter: IStorageAdapter;
+  if (config.storageProvider === 'gcs') {
+    if (!config.gcsBucketName) {
+      throw new Error("STORAGE_PROVIDER is 'gcs', but GCS_BUCKET_NAME is not configured.");
+    }
+    storageAdapter = new GcsStorageAdapter(config.gcsBucketName);
+    console.log(`[GW-API] Using GCS Storage Adapter with bucket: ${config.gcsBucketName}`);
+  } else {
+    storageAdapter = new StorageMemAdapter();
+    console.log('[GW-API] Using In-Memory Storage Adapter.');
+  }
 
   const cryptographyService = new CryptographyService();
 
-  // KmsService and TenantsCacheManager have a circular dependency.
-  // - KmsService needs TenantsCacheManager to resolve DIDs for key lookup.
-  // - TenantsCacheManager needs KmsService to decrypt tenant data from the vault.
-  // To break the cycle, we provide TenantsCacheManager with a function that resolves
-  // to the KmsService instance, which will be fully initialized later.
   let kmsService: IKmsService;
   const tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService);
 
   kmsService =
-    config.nodeEnv === 'demo'
-      ? new DemoKmsService()
-      : new KmsService(cryptographyService, tenantManager);
+    config.nodeEnv === 'demo' ? new DemoKmsService() : new KmsService(cryptographyService, tenantManager);
   await kmsService.init();
 
   const hostingManager = new HostingManager(
     vaultRepository,
     kmsService,
     tenantManager,
+    storageAdapter,
     config,
   );
   const employeeManager = new EmployeeManager(vaultRepository, kmsService, tenantManager);
@@ -198,8 +225,6 @@ async function startServer(options?: StartServerOptions) {
     config.hostExternalDomain,
   );
 
-  // For now, we'll use the in-memory adapter. This can be swapped with a real
-  // Fabric adapter based on config settings in the future.
   const blockchainAdapter: IBlockchainAdapter = new BlockchainAdapterMem();
 
   const customerManager = new CustomerManager(
@@ -208,7 +233,7 @@ async function startServer(options?: StartServerOptions) {
     tenantManager,
     credentialManager,
     blockchainAdapter,
-    config.namespace // Pass the configured network name (e.g., 'antifraud')
+    config.namespace,
   );
 
   const compositionManager = new CompositionManager();
@@ -216,12 +241,15 @@ async function startServer(options?: StartServerOptions) {
 
   const discoveryService = new DiscoveryService(tenantManager);
 
-  if (!(await vaultRepository.vaultExists('host'))) {
+  await tenantManager.loadTenants();
+
+  if (!(await tenantManager.getTenant('host'))) {
+    console.log('[GW-API] Host tenant not found. Bootstrapping...');
     await bootstrapHost(hostingManager, config);
   }
 
-  const managerRegistry: ManagerRegistry = { 
-    hostingManager, 
+  const managerRegistry: ManagerRegistry = {
+    hostingManager,
     tenantManager,
     employeeManager,
     customerManager,
@@ -242,19 +270,17 @@ async function startServer(options?: StartServerOptions) {
   app.use('/', networkRouter);
   app.use('/', fhirRouter);
 
-  // --- Swagger API Documentation ---
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   const server = app.listen(config.port, () => {
     // console.log(`[GW-API ${config.nodeEnv} Server running on ${config.apiBaseUrl}`);
-    // console.log('[GW-API] --- System Initialized Successfully ---');
   });
 
-  return { app, server, queueAdapter, tenantManager, kmsService, blockchainAdapter, vaultRepository, cryptographyService };
+  return { app, server, queueAdapter, tenantManager, vaultRepository, cryptographyService, blockchainAdapter, kmsService };
 }
 
 if (require.main === module) {
-  startServer().catch(error => {
+  startServer().catch((error) => {
     console.error('[GW-API] Failed to start server:', error);
     process.exit(1);
   });

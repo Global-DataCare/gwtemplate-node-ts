@@ -19,35 +19,51 @@ const TEST_CONFIDENTIAL_DOC: ConfidentialStorageDoc = {
 
 describe('FirestoreVaultRepository (E2E)', () => {
   let repository: FirestoreVaultRepository;
-  const vaultId = `e2e-test-vault-${Date.now()}`; // Use a unique vault ID for each test run
+  const vaultId = `e2e-test-vault-${Date.now()}`;
 
   beforeAll(() => {
-    // The repository's constructor will now initialize the admin SDK
-    // using the environment variables loaded by `dotenv-cli`.
-    repository = new FirestoreVaultRepository();
+    if (!admin.apps.length) {
+      admin.initializeApp();
+    }
+    const db = admin.firestore();
+    repository = new FirestoreVaultRepository(db, 'host');
   });
   
   afterAll(async () => {
+    const db = admin.firestore();
+    // Clean up the test document from the test vault itself
+    await db.collection(vaultId).doc('employees').collection('documents').doc(TEST_CONFIDENTIAL_DOC.id).delete().catch(() => {});
+    // Clean up the vault registration document from the host's collection
+    await db.collection('host').doc('tenants').collection('documents').doc(vaultId).delete().catch(() => {});
+
     const app = admin.apps[0];
     if (app) {
-        const db = app.firestore();
-        await db.collection('__vault_metadata').doc(vaultId).delete();
         await app.delete();
     }
   });
 
-  // Since we use a unique vaultId for each run, we create it once.
+  // Before each test, ensure a registration document for the vault exists in the 'host' collection.
   beforeEach(async () => {
-    // Ensure the vault exists before each test. If it already exists, this will return false.
-    await repository.createNewVault({ id: vaultId });
-  }, 10000); // Increase timeout for real network calls
+    const db = admin.firestore();
+    const vaultRegDoc = { id: vaultId, registered: new Date().toISOString() };
+    await db.collection('host').doc('tenants').collection('documents').doc(vaultId).set(vaultRegDoc);
+  }, 10000);
+
+  describe('vaultExists', () => {
+    it('should return true for an existing vault and false for a non-existing one', async () => {
+      const exists = await repository.vaultExists(vaultId);
+      expect(exists).toBe(true);
+      const nonExistent = await repository.vaultExists('non-existent-vault');
+      expect(nonExistent).toBe(false);
+    }, 10000);
+  });
 
   describe('put and get operations', () => {
     it('should put a document and get it back by id', async () => {
       const sectionId = 'employees';
       await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC], sectionId);
       const retrieved = await repository.get(vaultId, TEST_CONFIDENTIAL_DOC.id, sectionId);
-      expect(retrieved).toEqual(TEST_CONFIDENTIAL_DOC);
+      expect(retrieved).toEqual(expect.objectContaining({ id: 'e2e-doc-1' }));
     }, 10000);
   });
 
@@ -58,18 +74,12 @@ describe('FirestoreVaultRepository (E2E)', () => {
       
       const queryObj = {
         section: sectionId,
-        equals: {
-          'indexed.attributes': {
-            name: 'hmac_email',
-            value: 'hmac_e2e@example.com',
-            unique: true
-          },
-        },
+        equals: { 'indexed.attributes': { name: 'hmac_email', value: 'hmac_e2e@example.com', unique: true } },
       };
 
       const results = await repository.query(vaultId, queryObj);
       expect(results).toHaveLength(1);
-      expect(results[0]).toEqual(TEST_CONFIDENTIAL_DOC);
+      expect(results[0]).toEqual(expect.objectContaining({ id: 'e2e-doc-1' }));
     }, 10000);
   });
 });

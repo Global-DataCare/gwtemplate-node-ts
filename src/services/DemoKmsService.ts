@@ -144,18 +144,29 @@ export class DemoKmsService implements IKmsService {
   async protectConfidentialData(doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> {
     console.warn(`[DemoKmsService] Simulating data protection for entity: ${entityId}`);
     if (!doc.content) return doc;
+
     const { content, ...docWithoutContent } = doc;
-    // Simulate moving the content to a 'jwe' property without real encryption
-    const simulatedJwe = { protected: { alg: 'none' }, content: content };
+
+    // Correctly simulate the JWE structure.
+    // The `content` is stringified and base64url-encoded to mimic the `ciphertext`.
+    const simulatedJwe = {
+      protected: Content.objectToRawBase64UrlSafe({ alg: 'dir', enc: 'A256GCM' }),
+      ciphertext: Content.objectToRawBase64UrlSafe(content),
+      // Add other simulated JWE fields for structural validity
+      iv: '_iv_',
+      tag: '_tag_',
+    };
+
     return { ...docWithoutContent, jwe: simulatedJwe };
   }
 
   async unprotectConfidentialData<T>(doc: ConfidentialStorageDoc, entityId: string): Promise<T> {
     console.warn(`[DemoKmsService] Simulating data un-protection for entity: ${entityId}`);
-    if (!doc.jwe || !(doc.jwe as any).content) {
+    if (!doc.jwe || !doc.jwe.ciphertext) {
       throw new Error('DemoKmsService: Cannot unprotect document with invalid simulated JWE.');
     }
-    return (doc.jwe as any).content as T;
+    // Decode the simulated ciphertext back into a JSON object.
+    return Content.base64UrlSafeToJSON(doc.jwe.ciphertext as string) as T;
   }
 
   async getHmacBase64Url(plaintext: string, entityId: string): Promise<string> {

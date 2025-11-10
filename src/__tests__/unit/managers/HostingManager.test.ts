@@ -24,10 +24,16 @@ import { IServerConfig } from '../../../config';
 import { Sector } from '../../../models/urlPath';
 import { testInvalidUuid, testTenant1AddressCountry, testTenant1LegalName } from '../../data/organization.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { JwkSet } from '../../../models/jwk';
 
 // Mock external dependencies
 jest.mock('uuid');
+
+const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
+  upload: jest.fn(),
+};
+
 
 const mockPublicKeys: JwkSet = {
   keys: [
@@ -106,6 +112,7 @@ describe('HostingManager', () => {
       sectorsAllowed: [Sector.HEALTH_CARE, Sector.SYSTEM, Sector.HEALTH_INSURANCE],
       dbProvider: 'mem',
       queueProvider: 'mem',
+      storageProvider: 'mem',
       host: {
         legalName: 'Test Host',
         jurisdiction: 'us',
@@ -116,7 +123,7 @@ describe('HostingManager', () => {
       firebase: {},
     };
 
-    hostingManager = new HostingManager(vaultRepository, mockKmsService, mockTenantsCacheManager, mockConfig);
+    hostingManager = new HostingManager(vaultRepository, mockKmsService, mockTenantsCacheManager, mockStorageAdapter, mockConfig);
     process.env = { ...originalEnv };
 
     jest.clearAllMocks();
@@ -147,13 +154,11 @@ describe('HostingManager', () => {
   it('[5 TENANT (Happy Path): should create full tenant config and protect it', async () => {
     // PRE-CONDITION: Ensure host vault exists before creating a tenant.
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
-    // Clear mocks after bootstrap to isolate this test's assertions.
-    jest.clearAllMocks(); 
-    mockKmsService.provisionKeys.mockResolvedValue(mockPublicKeys);
-    mockKmsService.getPublicJwks.mockResolvedValue(mockPublicKeys);
+    
+    const putSpy = jest.spyOn(vaultRepository, 'put');
+    const initialProtectCalls = mockKmsService.protectConfidentialData.mock.calls.length;
 
     const job = testBaseJobForClaims(testClaimsTenant1Registration);
-    const putSpy = jest.spyOn(vaultRepository, 'put');
     const createVaultSpy = jest.spyOn(vaultRepository, 'createNewVault');
 
     const responsePayload = await hostingManager.process(job);
@@ -163,27 +168,36 @@ describe('HostingManager', () => {
     const alternateName = testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.alternateName];
     const tenantVaultId = tenantUtils.getTenantVaultId(sector, alternateName);
 
+    // A new vault is created for the tenant.
     expect(createVaultSpy).toHaveBeenCalledWith(expect.objectContaining({ id: tenantVaultId }));
+    
+    // Keys are provisioned for the new tenant.
     expect(mockKmsService.provisionKeys).toHaveBeenCalledWith(tenantVaultId);
-    // This should now be 1, because we cleared the mocks after bootstrapping the host.
-    expect(mockKmsService.protectConfidentialData).toHaveBeenCalledTimes(1);
 
-    const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
+    // 3 new calls to protect data (tenant config, legal rep, service).
+    expect(mockKmsService.protectConfidentialData).toHaveBeenCalledTimes(initialProtectCalls + 3);
+
+    const docToProtect = mockKmsService.protectConfidentialData.mock.calls[initialProtectCalls][0];
     const tenantConfig = docToProtect.content as EntityConfig;
 
     expect(tenantConfig).toBeDefined();
     expect((tenantConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.legalName]).toBe(testTenant1LegalName);
     expect(tenantConfig.didConfig.service.length).toBeGreaterThan(0);
-    expect(tenantConfig.didDocument.verificationMethod).toHaveLength(1);
+    expect(tenantConfig.didDocument.verificationMethod).toHaveLength(2);
     expect(tenantConfig.didDocument.service).toBeDefined();
 
-    expect(putSpy).toHaveBeenCalledTimes(1);
-    const savedDoc = putSpy.mock.calls[0][1][0] as ConfidentialStorageDoc;
-    expect(savedDoc.content).toBeUndefined();
-    expect(savedDoc.jwe).toBeDefined();
+    // The tenant's main config is saved in the host's vault.
+    const hostCollectionName = mockTenantsCacheManager.getCollectionName('host');
+    expect(putSpy).toHaveBeenCalledWith(hostCollectionName, expect.any(Array), 'tenants');
+    
+    // The tenant's own resources are persisted in its collection.
+    const tenantCollectionName = mockTenantsCacheManager.getCollectionName(tenantVaultId);
+    expect(putSpy).toHaveBeenCalledWith(tenantCollectionName, expect.any(Array), 'employees');
+    expect(putSpy).toHaveBeenCalledWith(tenantCollectionName, expect.any(Array), 'services');
   });
 
   it("[3 DEMO: should use a non-UUID identifier directly in 'demo' mode", async () => {
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
     const demoClaims = { ...testClaimsTenant1Registration, [ClaimsPersonSchemaorg.identifier]: testTenant1Data.member.admin1.mockedUuid };
     const job = testBaseJobForClaims(demoClaims);
     (uuidValidate as jest.Mock).mockReturnValue(false);
@@ -199,6 +213,7 @@ describe('HostingManager', () => {
   });
 
   it("[2] TENANT: should generate a new UUID for an invalid identifier", async () => {
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
     const invalidClaims = { ...testClaimsTenant1Registration, [ClaimsPersonSchemaorg.identifier]: testInvalidUuid };
     const job = testBaseJobForClaims(invalidClaims);
     (uuidValidate as jest.Mock).mockReturnValue(false);
@@ -213,6 +228,7 @@ describe('HostingManager', () => {
   });
 
   it("[4] TENANT: should generate a new UUID if identifier claim is missing", async () => {
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
     const { [ClaimsPersonSchemaorg.identifier]: _, ...noIdClaims } = testClaimsTenant1Registration;
     const job = testBaseJobForClaims(noIdClaims as ClaimsRecord);
     (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
@@ -290,5 +306,36 @@ describe('HostingManager', () => {
     expect(errorEntry.response.status).toBe('400');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('Multiple sectors (comma-separated) are not allowed');
     expect(errorEntry.response.outcome.issue[0].code).toBe('value');
+  });
+
+  it('[10] TENANT: should persist all original claims in the tenant configuration', async () => {
+    // PRE-CONDITION: Ensure host vault exists before creating a tenant.
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    const initialProtectCalls = mockKmsService.protectConfidentialData.mock.calls.length;
+
+    const job = testBaseJobForClaims(testClaimsTenant1Registration);
+
+    await hostingManager.process(job);
+
+    // We expect protect to be called 3 times for the new tenant.
+    expect(mockKmsService.protectConfidentialData).toHaveBeenCalledTimes(initialProtectCalls + 3);
+
+    // The call after the initial ones should be the tenant's main registration document.
+    const docToProtect = mockKmsService.protectConfidentialData.mock.calls[initialProtectCalls][0];
+    const tenantConfig = docToProtect.content as EntityConfig;
+
+    expect(tenantConfig.claims).toBeDefined();
+    const claims = tenantConfig.claims as ClaimsRecord;
+
+    // Check for an Organization-specific claim
+    expect(claims[ClaimsOrganizationSchemaorg.legalName]).toBe(
+      testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.legalName],
+    );
+    // Check for a Service-specific claim to ensure it wasn't stripped out.
+    expect(claims[ClaimsServiceSchemaorg.category]).toBe(
+      testClaimsTenant1Registration[ClaimsServiceSchemaorg.category],
+    );
+    // Check for a Person-specific claim
+    expect(claims[ClaimsPersonSchemaorg.email]).toBe(testClaimsTenant1Registration[ClaimsPersonSchemaorg.email]);
   });
 });

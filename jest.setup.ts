@@ -5,8 +5,14 @@ import * as path from 'path';
 // Load environment variables based on the test script being run.
 // `npm run test:e2e` will set `process.env.TEST_ENV` to `e2e`.
 if (process.env.TEST_ENV === 'e2e') {
-  dotenv.config({ path: path.resolve(__dirname, '../.env.test') });
-  console.log('Jest setup: Loaded .env.test for E2E tests.');
+  const envPath = path.resolve(__dirname, '.env.test');
+  const result = dotenv.config({ path: envPath, override: true });
+  
+  if (result.error) {
+    console.error('Jest setup: ERROR loading .env.test', result.error);
+  } else {
+    console.log(`Jest setup: Loaded .env.test for E2E tests. Found ${Object.keys(result.parsed || {}).length} variables.`);
+  }
 } else {
   // For all other tests (unit, integration), load the standard .env file if it exists.
   dotenv.config({ path: path.resolve(__dirname, '../.env') });

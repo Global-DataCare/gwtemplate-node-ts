@@ -212,9 +212,9 @@ export const testConfigTenant1: EntityConfig = {
     service: {
       // uuid: testTenant1ServiceProviderUuid,
       identifier: testTenant1ServiceProviderDidWebIdentifier,
-      sectorCategory: testTenant1ServiceProviderCategory,
+      category: testTenant1ServiceProviderCategory,
       termsOfService: testTenant1ServiceProviderTerms,
-      serviceTypePurpose: testTenant1ServiceProviderPurposeType,
+      serviceType: testTenant1ServiceProviderPurposeType,
     },
     vp: [testTenant1Vc]
   },

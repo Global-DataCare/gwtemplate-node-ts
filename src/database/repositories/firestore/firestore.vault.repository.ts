@@ -2,71 +2,56 @@ import * as admin from 'firebase-admin';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { RecordBase, VaultConfig } from '../../../models/resource-document';
 
-const VAULT_METADATA_COLLECTION = '__vault_metadata';
 const DEFAULT_SECTION = 'default';
 
 /**
- * An implementation of the IVaultRepository interface that uses Google Firestore as the backend.
- * This implementation uses the Firebase Admin SDK and is configured via environment variables.
+ * An implementation of the IVaultRepository for Google Cloud Firestore.
+ *
+ * @architecture
+ * This class is intentionally "dumb" regarding business logic. It operates on physical
+ * `collectionName`s provided by the business layer (Managers). The translation from
+ * logical `vaultId` to physical `collectionName` is the responsibility of the
+ * `TenantsCacheManager`.
+ *
+ * The methods `createNewVault` and `vaultExists` are special cases to satisfy the
+ * shared `IVaultRepository` interface.
  */
 export class FirestoreVaultRepository extends IVaultRepository {
   private readonly db: admin.firestore.Firestore;
+  private readonly hostCollectionName: string;
 
-  constructor() {
+  constructor(db: admin.firestore.Firestore, hostCollectionName: string) {
     super();
-    if (admin.apps.length) {
-      this.db = admin.firestore();
-      return;
-    }
-
-    // When FIRESTORE_EMULATOR_HOST is set, the Admin SDK automatically
-    // connects to the emulator, ignoring credentials.
-    if (process.env.FIRESTORE_EMULATOR_HOST) {
-      admin.initializeApp({ projectId: 'firestore-vault-test-2' });
-    } else {
-      const projectId = process.env.FIRESTORE_PROJECT_ID;
-      const credentialsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-
-      if (!credentialsVar) {
-        throw new Error('GOOGLE_APPLICATION_CREDENTIALS must be set.');
-      }
-
-      let credential;
-      try {
-        // Option 1: The variable is a JSON string (for Docker/serverless)
-        credential = admin.credential.cert(JSON.parse(credentialsVar));
-      } catch (e) {
-        // Option 2: The variable is a file path (for local dev)
-        credential = admin.credential.applicationDefault();
-      }
-
-      admin.initializeApp({ credential, projectId });
-    }
-    this.db = admin.firestore();
+    this.db = db;
+    this.hostCollectionName = hostCollectionName;
   }
 
-  // --- Implemented Methods ---
-
+  /**
+   * In the Firestore implementation, this is a no-op that returns true.
+   * The actual creation of a tenant's registration record is handled by a `put`
+   * operation orchestrated by the `HostingManager`. This method exists solely to
+   * satisfy the interface contract established for the in-memory repository.
+   */
   async createNewVault(vaultConfig: VaultConfig): Promise<boolean> {
-    const vaultMetaDocRef = this.db.collection(VAULT_METADATA_COLLECTION).doc(vaultConfig.id);
-    const docSnap = await vaultMetaDocRef.get();
-    if (docSnap.exists) {
-      return false;
-    }
-    await vaultMetaDocRef.set({ ...vaultConfig, createdAt: new Date() });
-    return true;
+    console.log(`[FirestoreVaultRepository] createNewVault for '${vaultConfig.id}' called (no-op).`);
+    return Promise.resolve(true);
   }
 
+  /**
+   * Checks for the existence of a tenant's registration document within the host's vault.
+   * This is the Firestore-specific implementation of checking for a logical vault's existence.
+   * @param vaultId The logical vaultId of the tenant (e.g., 'health-care_acme').
+   */
   async vaultExists(vaultId: string): Promise<boolean> {
-    const vaultMetaDocRef = this.db.collection(VAULT_METADATA_COLLECTION).doc(vaultId);
-    const docSnap = await vaultMetaDocRef.get();
-    return docSnap.exists;
+    const doc = await this.get(this.hostCollectionName, vaultId, 'tenants');
+    return doc !== undefined;
   }
 
-  async put<T extends RecordBase>(vaultId: string, documents: T[], sectionId: string = DEFAULT_SECTION): Promise<boolean> {
+  async put<T extends RecordBase>(collectionName: string, documents: T[], sectionId: string = DEFAULT_SECTION): Promise<boolean> {
     try {
       const batch = this.db.batch();
-      const sectionCollectionRef = this.db.collection(vaultId).doc(sectionId).collection('documents');
+      // Firestore path: {collectionName}/{sectionId}/documents/{documentId}
+      const sectionCollectionRef = this.db.collection(collectionName).doc(sectionId).collection('documents');
       documents.forEach((document) => {
         const docRef = sectionCollectionRef.doc(document.id);
         batch.set(docRef, { ...document });
@@ -74,26 +59,26 @@ export class FirestoreVaultRepository extends IVaultRepository {
       await batch.commit();
       return true;
     } catch (error) {
-      console.error('Firestore put operation failed:', error);
+      console.error(`[FirestoreVaultRepository] 'put' operation failed for collection '${collectionName}':`, error);
       return false;
     }
   }
 
-  async get<T extends RecordBase>(vaultId: string, docId: string, sectionId: string = DEFAULT_SECTION): Promise<T | undefined> {
-    const docRef = this.db.collection(vaultId).doc(sectionId).collection('documents').doc(docId);
+  async get<T extends RecordBase>(collectionName: string, docId: string, sectionId: string = DEFAULT_SECTION): Promise<T | undefined> {
+    const docRef = this.db.collection(collectionName).doc(sectionId).collection('documents').doc(docId);
     const docSnap = await docRef.get();
     return docSnap.exists ? (docSnap.data() as T) : undefined;
   }
 
-  async getContainersInSection<T extends RecordBase>(vaultId: string, sectionId: string): Promise<T[]> {
-    const sectionCollectionRef = this.db.collection(vaultId).doc(sectionId).collection('documents');
+  async getContainersInSection<T extends RecordBase>(collectionName: string, sectionId: string): Promise<T[]> {
+    const sectionCollectionRef = this.db.collection(collectionName).doc(sectionId).collection('documents');
     const querySnapshot = await sectionCollectionRef.get();
     return querySnapshot.docs.map((doc) => doc.data() as T);
   }
 
-  async query<T extends RecordBase>(vaultId: string, q: any): Promise<T[]> {
+  async query<T extends RecordBase>(collectionName: string, q: any): Promise<T[]> {
     const sectionId = q.section || DEFAULT_SECTION;
-    let queryChain: admin.firestore.Query = this.db.collection(vaultId).doc(sectionId).collection('documents');
+    let queryChain: admin.firestore.Query = this.db.collection(collectionName).doc(sectionId).collection('documents');
 
     if (q.equals && q.equals['indexed.attributes']) {
       const attributeToFind = q.equals['indexed.attributes'];
@@ -107,32 +92,13 @@ export class FirestoreVaultRepository extends IVaultRepository {
   }
 
   // --- Stubbed Methods (Not Implemented) ---
-
-  getVaultConfig(vaultId: string): Promise<VaultConfig | undefined> {
-    throw new Error('Method not implemented.');
-  }
-  createNewSection(vaultId: string, sectionId: string): Promise<boolean> {
-    throw new Error('Method not implemented.');
-  }
-  updateSection(vaultId: string, sectionId: string, containers?: any[] | undefined): Promise<boolean> {
-    throw new Error('Method not implemented.');
-  }
-  getAllSections(vaultId: string): Promise<string[]> {
-    throw new Error('Method not implemented.');
-  }
-  sectionExists(vaultId: string, sectionId: string): Promise<boolean> {
-    throw new Error('Method not implemented.');
-  }
-  getContainersListInSection(vaultId: string, sectionId: string): Promise<string[]> {
-    throw new Error('Method not implemented.');
-  }
-  getHistory(vaultId: string, containerId: string): Promise<any[]> {
-    throw new Error('Method not implemented.');
-  }
-  delete(vaultId: string, containerId: string, sectionId?: string | undefined): Promise<boolean> {
-    throw new Error('Method not implemented.');
-  }
-  purge(vaultId: string): Promise<boolean> {
-    throw new Error('Method not implemented.');
-  }
+  getVaultConfig(vaultId: string): Promise<VaultConfig | undefined> { throw new Error('Method not implemented.'); }
+  createNewSection(collectionName: string, sectionId: string): Promise<boolean> { throw new Error('Method not implemented.'); }
+  updateSection(collectionName: string, sectionId: string, containers?: any[] | undefined): Promise<boolean> { throw new Error('Method not implemented.'); }
+  getAllSections(collectionName: string): Promise<string[]> { throw new Error('Method not implemented.'); }
+  sectionExists(collectionName: string, sectionId: string): Promise<boolean> { throw new Error('Method not implemented.'); }
+  getContainersListInSection(collectionName: string, sectionId: string): Promise<string[]> { throw new Error('Method not implemented.'); }
+  getHistory(collectionName: string, containerId: string): Promise<any[]> { throw new Error('Method not implemented.'); }
+  delete(collectionName: string, containerId: string, sectionId?: string | undefined): Promise<boolean> { throw new Error('Method not implemented.'); }
+  purge(collectionName: string): Promise<boolean> { throw new Error('Method not implemented.'); }
 }

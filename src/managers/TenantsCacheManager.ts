@@ -5,7 +5,7 @@ import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { ITenantsManager } from './ITenantsManager';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { getTenantVaultId, getIdentifierUrnFromClaims } from '../utils/tenant';
+import { getTenantVaultId, getIdentifierUrnFromClaims, generateTenantCollectionNameFromClaims } from '../utils/tenant';
 import { DidDocument, DidService, VerificationMethod } from '../models/did';
 import { getEnvironment } from '../utils/environment';
 import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
@@ -44,32 +44,39 @@ export class TenantsCacheManager implements ITenantsManager {
       try {
         const tenantConfig = await this.kmsService.unprotectConfidentialData<any>(record, 'host');
 
-        if (tenantConfig) {
+        if (tenantConfig && tenantConfig.claims) {
           const alternateName = tenantConfig.claims[ClaimsOrganizationSchemaorg.alternateName];
-          let sector: string | undefined;
+          if (!alternateName) continue;
 
-          if (alternateName) {
-            if (alternateName === 'host') {
-              sector = 'governance';
-            } else {
-              // The sector must be parsed from the canonical identifier (URN) in the claims.
-              const urn = getIdentifierUrnFromClaims(tenantConfig.claims);
-              const parsedUrn = urn ? parseTenantUrn(urn) : null;
-              sector = parsedUrn?.sector;
+          let vaultId: string;
+          let collectionName: string;
+          
+          // The host is a special case. Its vaultId is 'host' and its collectionName is also 'host'.
+          if (alternateName === 'host') {
+            vaultId = 'host';
+            collectionName = 'host'; // The host operates on its own logical collection.
+          } else {
+            // For regular tenants, generate the vaultId.
+            const urn = getIdentifierUrnFromClaims(tenantConfig.claims);
+            const parsedUrn = urn ? parseTenantUrn(urn) : null;
+            const sector = parsedUrn?.sector;
+
+            if (!sector) {
+              console.warn(`[TenantsCacheManager] Could not determine sector for tenant with alternateName '${alternateName}'. Skipping cache.`);
+              continue;
             }
-
-            if (sector) {
-              const vaultId =
-                alternateName === 'host' ? 'host' : getTenantVaultId(sector, alternateName);
-
-              if (getEnvironment() !== 'production') {
-                // console.log(`[TenantsCacheManager] Caching tenant with vaultId: ${vaultId}`);
-              }
-              this.tenantCacheByVaultId.set(vaultId, tenantConfig);
-            } else {
-               console.warn(`[TenantsCacheManager] Could not determine sector for tenant with alternateName '${alternateName}'. Skipping cache.`);
-            }
+            vaultId = getTenantVaultId(sector, alternateName);
+            collectionName = generateTenantCollectionNameFromClaims(tenantConfig.claims);
           }
+
+
+          // Add the physical collectionName to the cached config object. This is the core translation.
+          tenantConfig.collectionName = collectionName;
+
+          if (getEnvironment() !== 'production') {
+            // console.log(`[TenantsCacheManager] Caching tenant '${vaultId}' -> collection '${collectionName}'`);
+          }
+          this.tenantCacheByVaultId.set(vaultId, tenantConfig);
         }
       } catch (error) {
         console.error(`[TenantsCacheManager] Failed to decrypt or cache tenant record ${record.id}. Skipping.`, error);
@@ -86,6 +93,17 @@ export class TenantsCacheManager implements ITenantsManager {
    */
   public getTenant(vaultId: string): any | undefined {
     return this.tenantCacheByVaultId.get(vaultId);
+  }
+
+  /**
+   * Retrieves the physical collection name for a given logical vaultId.
+   * This is the primary method for business managers to resolve the storage location for a tenant.
+   * @param vaultId The unique vault identifier for the tenant (e.g., 'host', 'health-care_acme').
+   * @returns The tenant's physical collection name (e.g., 'host', 'ES_TAX_B12345..._health-care'), or `undefined` if not found.
+   */
+  public getCollectionName(vaultId: string): string | undefined {
+    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+    return tenantConfig?.collectionName;
   }
 
   /**

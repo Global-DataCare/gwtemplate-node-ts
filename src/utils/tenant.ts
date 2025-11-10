@@ -1,7 +1,43 @@
 // src/utils/tenant.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
+import { ClaimsRecord } from '../models/resource-document';
+import { Sector } from '../models/urlPath';
+
+/**
+ * Generates the deterministic, physical collection name for a tenant's vault in Firestore.
+ * This name is derived from the tenant's core, immutable claims. This function is the single
+ * source of truth for collection naming and is used by the `TenantsCacheManager` to populate
+ * its cache.
+ *
+ * The pattern is: `[countryCode]_[idType]_[idValue]_[sector]`
+ *
+ * @param claims The claims object from the tenant's `EntityConfig`. Must contain the required schema.org properties.
+ * @returns The physical collection name for the tenant's vault.
+ * @throws An error if any of the required claims are missing.
+ */
+export function generateTenantCollectionNameFromClaims(claims: ClaimsRecord): string {
+  const countryCode = claims[ClaimsOrganizationSchemaorg.addressCountry];
+  const idType = claims[ClaimsOrganizationSchemaorg.identifierType];
+  const idValue = claims[ClaimsOrganizationSchemaorg.identifierValue];
+  const sector = claims[ClaimsServiceSchemaorg.category];
+
+  if (!countryCode || !idType || !idValue || !sector) {
+    throw new Error(
+      `Cannot generate collection name: one or more required claims are missing. ` +
+      `countryCode: ${countryCode}, idType: ${idType}, idValue: ${idValue}, sector: ${sector}`
+    );
+  }
+
+  // Normalize and clean the values to ensure they are valid for Firestore collection names.
+  const cleanCountry = String(countryCode).toUpperCase().trim();
+  const cleanIdType = String(idType).toUpperCase().trim();
+  const cleanIdValue = String(idValue).replace(/[^a-zA-Z0-9]/g, '').trim(); // Remove special chars
+  const cleanSector = String(sector).toLowerCase().trim();
+  
+  return `${cleanCountry}_${cleanIdType}_${cleanIdValue}_${cleanSector}`;
+}
 
   /**
  * Constructs the unique vault identifier for a tenant from its sector and alternate name.
