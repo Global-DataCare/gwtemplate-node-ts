@@ -44,7 +44,7 @@ describe('Well-Known DID Discovery API', () => {
 
     // Configure the mock: The `resolveTenant` middleware will call `getDidDocument` to find the tenant.
     // The final route handler will then call it again via the discoveryService to get the document.
-    mockTenantsCacheManager.getDidDocument.mockReturnValue(expectedDidDoc);
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue(expectedDidDoc);
 
     // --- Act ---
     const response = await request(app).get(expectedUrl);

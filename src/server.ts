@@ -1,11 +1,23 @@
-// src/server.ts
-// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// At the very top of the file, before any other imports.
+// This block loads environment variables from a .env file,
+// but safely ignores errors if the file or module doesn't exist.
+// This is ideal for production environments where variables are injected directly.
+try {
+  require('dotenv').config();
+} catch (e) {
+  // In a deployed environment, the 'dotenv' module might not be installed.
+  // We can safely ignore this error.
+  if (e instanceof Error && e.message.includes("Cannot find module 'dotenv'")) {
+    // This is expected in production, do nothing.
+  } else {
+    // For any other error, re-throw it so we can debug.
+    throw e;
+  }
+}
 
 import * as admin from 'firebase-admin';
 import * as express from 'express';
-import * as dotenv from 'dotenv';
-// Load environment variables from .env file at the very top of the application
-dotenv.config();
+
 
 import { GcsStorageAdapter } from './database/storage/gcs.storage.adapter';
 import { IStorageAdapter } from './database/storage/IStorageAdapter';
@@ -48,8 +60,25 @@ import { IAuthorizationManager } from './managers/auth/IAuthorizationManager';
 import { createFhirRouter } from './routes/fhir';
 import { AuthorizationManager } from './managers/AuthorizationManager';
 import * as swaggerUi from 'swagger-ui-express';
+import * as path from 'path';
 import { generateTenantCollectionNameFromClaims } from './utils/tenant';
-const swaggerSpec = require('../swagger.config.js');
+
+// Load the pre-generated swagger spec. This is the static base.
+let swaggerSpec: any;
+try {
+  // Use path.resolve to create an absolute path from the current file's directory
+  const swaggerSpecPath = path.resolve(__dirname, '../swagger-spec.json');
+  swaggerSpec = require(swaggerSpecPath);
+} catch (error) {
+  console.warn(`WARN: Could not load swagger-spec.json. Did you run \`npm run build\`? Error: ${error}`);
+  swaggerSpec = {
+    openapi: '3.0.0',
+    info: { title: 'Swagger Spec Not Found', version: '0.0.0' },
+    paths: {},
+  };
+}
+
+
 
 // ===================================================================================
 // CONFIGURATION LOGIC - INTERNAL TO SERVER.TS
@@ -57,14 +86,18 @@ const swaggerSpec = require('../swagger.config.js');
 
 let configInstance: IServerConfig;
 
-function buildApiBaseUrl(port: number): string {
-  const nodeEnv = process.env.NODE_ENV || 'development';
-  const protocol = nodeEnv === 'production' ? 'https' : 'http';
-  const hostname = process.env.API_HOSTNAME || 'localhost';
-
-  if ((protocol === 'http' && port === 80) || (protocol === 'https' && port === 443)) {
-    return `${protocol}://${hostname}`;
+function determineApiBaseUrl(port: number): string {
+  // 1. Highest Priority: Use the canonical public URL if it's provided.
+  if (process.env.HOST_PUBLIC_URL) {
+    return process.env.HOST_PUBLIC_URL.replace(/\/$/, ''); // Remove trailing slash
   }
+  // 2. Second Priority: Use the specific deployment URL if provided.
+  if (process.env.HOST_DEPLOY_URL) {
+    return process.env.HOST_DEPLOY_URL.replace(/\/$/, ''); // Remove trailing slash
+  }
+  // 3. Fallback for Local Development: Construct from internal binding info.
+  const protocol = 'http'; // Local is always http
+  const hostname = process.env.HOST_INTERNAL_NAME || 'localhost';
   return `${protocol}://${hostname}:${port}`;
 }
 
@@ -89,13 +122,15 @@ function parseAndValidateSectors(csv: string | undefined): Sector[] {
  */
 function getConfig(): IServerConfig {
   if (!configInstance) {
-    const port = parseInt(process.env.PORT || '3000', 10);
+    const port = parseInt(process.env.HOST_INTERNAL_PORT || '3000', 10);
+    const apiBaseUrl = determineApiBaseUrl(port);
+
     configInstance = {
       nodeEnv: process.env.NODE_ENV || 'development',
       port: port,
-      apiHostname: process.env.API_HOSTNAME || 'localhost',
-      hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || process.env.API_HOSTNAME || 'localhost',
-      apiBaseUrl: buildApiBaseUrl(port),
+      apiHostname: process.env.HOST_INTERNAL_NAME || 'localhost', // Internal binding hostname
+      hostExternalDomain: apiBaseUrl, // The external domain IS the final base URL
+      apiBaseUrl: apiBaseUrl, // Use the definitive URL here
       namespace: process.env.URN_NAMESPACE || 'antifraud',
       sectorsAllowed: parseAndValidateSectors(process.env.SECTORS_ALLOWED),
       dbProvider: process.env.DB_PROVIDER || 'mem',
@@ -167,6 +202,15 @@ interface StartServerOptions {
  */
 async function startServer(options?: StartServerOptions) {
   const config = getConfig();
+
+  // Dynamically configure the Swagger server URL at runtime, just before starting the server.
+  // This ensures that the configuration is loaded and available.
+  if (swaggerSpec.info.title !== 'Swagger Spec Not Found') {
+    swaggerSpec.servers = [{
+      url: config.apiBaseUrl,
+      description: `Server URL for ${config.nodeEnv} environment`
+    }];
+  }
 
   const app = express.default();
   app.use(express.default.urlencoded({ extended: true }));

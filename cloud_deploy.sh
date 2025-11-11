@@ -95,6 +95,42 @@ fi
 echo "⚙️  Pushing the image to Artifact Registry..."
 docker push "$IMAGE_PATH"
 
+# --- Environment Variable Preparation ---
+echo "⚙️  Preparing runtime environment variables for Cloud Run..."
+
+# Define the temporary file for environment variables
+TEMP_ENV_FILE="temp_env.yaml"
+
+# Ensure the temporary file is cleaned up on exit, even if the script fails
+trap 'rm -f "$TEMP_ENV_FILE"' EXIT
+
+# Create a clean temporary file
+> "$TEMP_ENV_FILE"
+
+# List of runtime variables from .env to pass to the Cloud Run instance.
+# CRITICAL: For production, sensitive values should be moved to Google Secret Manager.
+RUNTIME_VARS=(
+  "NODE_ENV" "HOST_INTERNAL_NAME" "HOST_INTERNAL_PORT"
+  "HOST_PUBLIC_URL" "HOST_DEPLOY_URL"
+  "DEV_SEED" "SECTORS_ALLOWED"
+  "ORG_HOST_LEGAL_NAME" "ORG_HOST_JURISDICTION" "ORG_HOST_ID_TYPE" "ORG_HOST_ID_VALUE"
+  "ORG_HOST_ADMIN_EMAIL" "ORG_HOST_ADMIN_UID" "ORG_HOST_ADMIN_ROLE" "ORG_HOST_TERMS_URL"
+  "KEK_SECRET" "QUEUE_PROVIDER" "DB_PROVIDER" "STORAGE_PROVIDER" "FIRESTORE_PROJECT_ID"
+  "GCS_BUCKET_NAME" "FIREBASE_API_KEY"
+)
+
+# Write the variables to the YAML file
+for VAR_NAME in "${RUNTIME_VARS[@]}"; do
+  # Using indirect expansion to get the value of the variable whose name is VAR_NAME
+  VAR_VALUE="${!VAR_NAME}"
+  
+  if [ -n "$VAR_VALUE" ]; then
+    # Write in YAML format: KEY: "VALUE"
+    # The quotes around VAR_VALUE are crucial for handling special characters correctly.
+    echo "$VAR_NAME: \"$VAR_VALUE\"" >> "$TEMP_ENV_FILE"
+  fi
+done
+
 # Deploy the image to Cloud Run
 echo "⚙️  Deploying to Cloud Run service: $DEPLOY_SERVICE_NAME in $DEPLOY_REGION"
 gcloud run deploy "$DEPLOY_SERVICE_NAME" \
@@ -102,6 +138,7 @@ gcloud run deploy "$DEPLOY_SERVICE_NAME" \
   --platform="managed" \
   --region="$DEPLOY_REGION" \
   --port="3000" \
+  --env-vars-file="$TEMP_ENV_FILE" \
   --allow-unauthenticated # WARNING: This makes the service publicly accessible.
 
 echo "--- ✅ Deployment Successful ---"

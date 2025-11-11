@@ -30,7 +30,7 @@ export function createDiscoveryRouter(
     if (req.path.startsWith('/host')) {
       res.locals.vaultId = 'host';
       // Quick check to ensure host is loaded before proceeding.
-      if (!tenantsCacheManager.getDidDocument('host')) {
+      if (!(await tenantsCacheManager.getDidDocument('host'))) {
         return res.status(503).type('text').send('Service Unavailable: Host configuration not loaded.');
       }
       return next();
@@ -45,7 +45,7 @@ export function createDiscoveryRouter(
     
     // Use the public getDidDocument method to check for the tenant's existence.
     // This avoids exposing the entire internal EntityConfig in the middleware.
-    const didDocument = tenantsCacheManager.getDidDocument(vaultId);
+    const didDocument = await tenantsCacheManager.getDidDocument(vaultId);
 
     if (!didDocument) {
       console.warn(`[DiscoveryRouter] Tenant not found for vaultId '${vaultId}' constructed from path.`);
@@ -66,7 +66,7 @@ export function createDiscoveryRouter(
 
   router.get([`${hostWellKnownPrefix}/did.json`, `${tenantWellKnownPrefix}/did.json`], resolveTenant, async (req, res) => {
     // The final handler's responsibility is to fetch the specific document it needs.
-    const didDocument = tenantsCacheManager.getDidDocument(res.locals.vaultId);
+    const didDocument = await tenantsCacheManager.getDidDocument(res.locals.vaultId);
     // The existence check was already done in resolveTenant, so we can be confident it exists.
     res.json(didDocument);
   });
@@ -81,8 +81,8 @@ export function createDiscoveryRouter(
   });
 
   // --- FHIR-Specific Endpoints ---
-  const isFhirSector = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const sector = tenantsCacheManager.getTenantSector(res.locals.vaultId);
+  const isFhirSector = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const sector = await tenantsCacheManager.getTenantSector(res.locals.vaultId);
     if (sector && FHIR_SECTORS.includes(sector)) {
       return next();
     }

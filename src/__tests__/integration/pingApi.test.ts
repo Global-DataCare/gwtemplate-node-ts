@@ -58,7 +58,7 @@ describe('Ping API Endpoint', () => {
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
       // Spy on the correct method used by the router for validation
-      jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockReturnValue([pingServiceConfig]);
+      jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue([pingServiceConfig]);
       
       const mockDecodedJob: JobRequest = {
         content: decodedPingMessage,
@@ -117,7 +117,7 @@ describe('Ping API Endpoint', () => {
       const asyncResponseStore = new AsyncResponseStoreMem();
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
 
-      jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockReturnValue([pingServiceConfig]);
+      jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue([pingServiceConfig]);
 
       const mockDecodedJob: JobRequest = {
         content: decodedTenantPingMessage,
@@ -173,7 +173,7 @@ describe('Ping API Endpoint', () => {
     it('should return 404 if the tenant service config does not exist', async () => {
         const asyncResponseStore = new AsyncResponseStoreMem();
         const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
-        jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockReturnValue(undefined);
+        jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue(undefined);
         const pingUrl = '/nonexistent-tenant/cds-xx/v1/test/ping/standard/resource/_batch';
 
         const response = await request(app)
@@ -189,7 +189,7 @@ describe('Ping API Endpoint', () => {
     it('should return 404 if the service is not in the DID', async () => {
         const asyncResponseStore = new AsyncResponseStoreMem();
         const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
-        jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockReturnValue([]);
+        jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue([]);
         const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
 
         const response = await request(app)
@@ -209,7 +209,7 @@ describe('Ping API Endpoint', () => {
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
   
       // The router must still validate that the service endpoint exists
-      jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockReturnValue([pingServiceConfig]);
+      jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue([pingServiceConfig]);
   
       const pingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch';
       const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');

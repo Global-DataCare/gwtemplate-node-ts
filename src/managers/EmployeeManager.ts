@@ -51,7 +51,7 @@ export class EmployeeManager {
     const vaultId = getTenantVaultId(job.sector, job.tenantId);
 
     // Fetch the tenant's URN once for the entire job.
-    const issuerUrn = this.tenantsCacheManager.getTenantIdentifierUrn(vaultId);
+    const issuerUrn = await this.tenantsCacheManager.getTenantIdentifierUrn(vaultId);
     if (!issuerUrn) {
       throw new ManagerError(`Tenant with ID '${job.tenantId}' not found.`, IssueType.NotFound);
     }

@@ -116,7 +116,7 @@ describe('CredentialManager', () => {
       const jobContext = { tenantId: TENANT_ID, tenantVaultId: testTenant1VaultId };
       const evidence = { type: 'InternalHRProcess', verifier: testTenant1IdentifierUrn };
 
-      jest.spyOn(mockTenantsCacheManager, 'getTenantIdentifierUrn').mockReturnValue(testTenant1IdentifierUrn);
+      jest.spyOn(mockTenantsCacheManager, 'getTenantIdentifierUrn').mockResolvedValue(testTenant1IdentifierUrn);
 
       // --- ACT ---
       const vc = await credentialManager.issueEmployeeCredential(
@@ -140,7 +140,7 @@ describe('CredentialManager', () => {
 
     it('should throw an error if the tenant URN cannot be resolved', async () => {
       // --- ARRANGE ---
-      jest.spyOn(mockTenantsCacheManager, 'getTenantIdentifierUrn').mockReturnValue(undefined);
+      jest.spyOn(mockTenantsCacheManager, 'getTenantIdentifierUrn').mockResolvedValue(undefined);
       const jobContext = { tenantId: 'unknown-tenant', tenantVaultId: 'unknown-vault' };
 
       // --- ACT & ASSERT ---

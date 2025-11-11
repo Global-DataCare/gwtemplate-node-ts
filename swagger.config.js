@@ -8,14 +8,23 @@ const swaggerDefinition = {
     version: '1.0.0',
     description: 'API documentation for the secure gateway, covering both legacy (JSON) and secure (JWE) flows.',
   },
-  servers: [
+  servers: [],
+  // Apply the security scheme globally to all operations
+  security: [
     {
-      url: 'http://localhost:3000',
-      description: 'Development server',
-    },
+      BearerAuth: []
+    }
   ],
   // Add components for reusable schemas, parameters, etc.
   components: {
+    securitySchemes: {
+      BearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Bearer token for legacy (JSON) requests. Use the demo tokens from the cURL guide.'
+      }
+    },
     parameters: {
       TenantId: {
         name: 'tenantId',
@@ -176,6 +185,36 @@ const swaggerDefinition = {
             example: 'ey...'
           }
         }
+      },
+      ConsentCreation: {
+        type: 'object',
+        properties: {
+          thid: { type: 'string', example: 'thid-consent-dynamic' },
+          iss: { type: 'string', example: 'did:web:api.acme.org:employee:...' },
+          aud: { type: 'string', example: 'urn:antifraud:health-care:acme' },
+          body: {
+            type: 'object',
+            properties: {
+              resourceType: { type: 'string', example: 'Consent' },
+              // ... other Consent properties
+            }
+          }
+        }
+      },
+      CommunicationCreation: {
+        type: 'object',
+        properties: {
+          thid: { type: 'string', example: 'thid-comm-dynamic' },
+          iss: { type: 'string', example: 'did:web:api.acme.org:employee:...' },
+          aud: { type: 'string', example: 'urn:antifraud:health-care:acme' },
+          body: {
+            type: 'object',
+            properties: {
+              resourceType: { type: 'string', example: 'Communication' },
+              // ... other Communication properties
+            }
+          }
+        }
       }
     },
     securitySchemes: {
@@ -190,10 +229,13 @@ const swaggerDefinition = {
 
 const options = {
   swaggerDefinition,
-  // Path to the API docs; routes files with JSDoc comments
-  apis: ['./src/routes/*.ts'],
+  // Path to the API docs; routes files with JSDoc comments (recursive)
+  apis: ['./src/routes/**/*.ts'],
 };
 
-const swaggerSpec = swaggerJSDoc(options);
+// Export both the options and the definition separately for reuse in other scripts.
+module.exports = {
+  options,
+  swaggerDefinition,
+};
 
-module.exports = swaggerSpec;

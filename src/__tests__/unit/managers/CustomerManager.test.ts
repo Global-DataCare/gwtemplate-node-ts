@@ -82,7 +82,7 @@ describe('CustomerManager', () => {
     it('HU 2 (Professional Onboarding): should aggregate a batch and create a single customer', async () => {
       // ARRANGE
       const job = testCreateCustomerJobRequestProfessionalOnboarding;
-      mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
 
       // ACT
       const response = await customerManager.process(job);
@@ -139,7 +139,7 @@ describe('CustomerManager', () => {
       
       (job.content.body!.data[0].meta!.claims as any)['org.schema.Service.category'] = 'health-care';
       
-      mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
 
       // ACT
       const response = await customerManager.process(job);
@@ -166,7 +166,7 @@ describe('CustomerManager', () => {
         // ARRANGE
         const job = { ...testCreateCustomerJobRequestProfessionalOnboarding };
         (job.content.body!.data[1].meta!.claims as any)[ClaimsPersonSchemaorg.identifier] = 'urn:uuid:different-uuid';
-        mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
+        mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
 
         // ACT
         const response = await customerManager.process(job);
@@ -213,7 +213,7 @@ describe('CustomerManager', () => {
           }
         }
       };
-      mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
       // Mock the batch response
       mockBlockchainAdapter.discoverDidsByHashes.mockImplementation(async (hashes, channel) => {
         if (channel === 'health-care-eu') {

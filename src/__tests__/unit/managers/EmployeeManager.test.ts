@@ -64,7 +64,7 @@ describe('EmployeeManager', () => {
       // ARRANGE
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       mockVaultRepository.put.mockResolvedValue(true);
-      mockTenantsCacheManager.getTenantIdentifierUrn.mockReturnValue(TENANT_URN);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
 
       // ACT
       const response = await employeeManager.process(job);

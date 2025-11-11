@@ -106,9 +106,9 @@ describe('Person Onboarding API', () => {
       ];
       jest
         .spyOn(tenantsCacheManager, 'getDidServiceConfig')
-        .mockReturnValue(mockTenantServices);
+        .mockResolvedValue(mockTenantServices);
 
-      jest.spyOn(tenantsCacheManager, 'getTenantIdentifierUrn').mockReturnValue(tenantUrn);
+      jest.spyOn(tenantsCacheManager, 'getTenantIdentifierUrn').mockResolvedValue(tenantUrn);
 
       const thid = uuidv4();
       const mockDecodedJob: Omit<JobRequest, 'tenantId'> = {

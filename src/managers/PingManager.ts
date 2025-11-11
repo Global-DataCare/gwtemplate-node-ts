@@ -44,7 +44,7 @@ export class PingManager {
 
     // Determine the issuer's DID from the cache based on the tenantId from the job.
     const vaultId = job.tenantId || 'host';
-    const issuerDid = this.tenantsCacheManager.getTenantDid(vaultId);
+    const issuerDid = await this.tenantsCacheManager.getTenantDid(vaultId);
 
     if (!issuerDid) {
       // This should theoretically never happen if the routing validation is working correctly.

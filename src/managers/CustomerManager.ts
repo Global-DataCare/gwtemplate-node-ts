@@ -67,7 +67,7 @@ export class CustomerManager {
     // The Manager is responsible for constructing the vaultId from the job's context
     const tenantVaultId = getTenantVaultId(job.sector!, job.tenantId!);
 
-    const issuerUrn = this.tenantsCacheManager.getTenantIdentifierUrn(tenantVaultId);
+    const issuerUrn = await this.tenantsCacheManager.getTenantIdentifierUrn(tenantVaultId);
     if (!issuerUrn) {
       throw new ManagerError(`Tenant with vaultId '${tenantVaultId}' could not be resolved.`, IssueType.NotFound);
     }

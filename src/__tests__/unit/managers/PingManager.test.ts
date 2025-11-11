@@ -20,7 +20,7 @@ describe('PingManager', () => {
 
   it('should process a ping job and echo the original entry with a success response', async () => {
     // Arrange: Set up the mock to return a DID for the 'host' tenant
-    mockTenantsCacheManager.getTenantDid.mockReturnValue('did:web:host.example.com');
+    mockTenantsCacheManager.getTenantDid.mockResolvedValue('did:web:host.example.com');
 
     // Arrange: Create a mock job request simulating the path:
     // /host/cds-xx/v1/test/ping/standard/resource/_batch

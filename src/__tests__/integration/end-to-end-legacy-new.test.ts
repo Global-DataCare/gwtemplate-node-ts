@@ -162,7 +162,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     if (queueAdapter instanceof QueueAdapterMem) await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
 
     const vaultId = getTenantVaultId(claims[ClaimsServiceSchemaorg.category], claims['org.schema.Organization.alternateName']);
-    const collectionName = tenantManager.getCollectionName(vaultId);
+    const collectionName = await tenantManager.getCollectionName(vaultId);
     expect(collectionName).toBeDefined();
 
     const services = await vaultRepository.getContainersInSection<IncludedResource>(collectionName!, 'services');

@@ -48,7 +48,7 @@ export class CommunicationManager implements IJobProcessor {
           continue;
         }
 
-        const serverDid = this.tenantsCacheManager.getTenantDid(getTenantVaultId(job.sector as string, job.tenantId as string));
+        const serverDid = await this.tenantsCacheManager.getTenantDid(getTenantVaultId(job.sector as string, job.tenantId as string));
         if (!serverDid) {
             throw new Error(`Could not determine server DID for tenant '${job.tenantId}'.`);
         }
@@ -86,7 +86,7 @@ export class CommunicationManager implements IJobProcessor {
       data: bundleEntries,
     };
     
-    const serverDid = this.tenantsCacheManager.getTenantDid(getTenantVaultId(job.sector as string, job.tenantId as string));
+            const serverDid = await this.tenantsCacheManager.getTenantDid(getTenantVaultId(job.sector as string, job.tenantId as string));
     if (!serverDid) {
       // This is a critical configuration error. The tenant is not in the cache.
       // We cannot issue a response without a valid DID.

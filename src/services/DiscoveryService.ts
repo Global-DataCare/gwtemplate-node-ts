@@ -22,7 +22,7 @@ export class DiscoveryService {
    * @param vaultId The unique vault identifier of the tenant.
    * @returns The DID Document, or undefined if not found.
    */
-  getDidDocument(vaultId: string): DidDocument | undefined {
+  public async getDidDocument(vaultId: string): Promise<DidDocument | undefined> {
     return this.tenantsCacheManager.getDidDocument(vaultId);
   }
 
@@ -43,9 +43,9 @@ export class DiscoveryService {
    * @param vaultId The unique vault identifier of the tenant.
    * @returns A partial OIDC configuration object, or undefined if not found.
    */
-  getOpenIdConfiguration(vaultId: string): object | undefined {
-    const didDoc = this.tenantsCacheManager.getDidDocument(vaultId);
-    const tenantUrl = this.tenantsCacheManager.getTenantDomainUrl(vaultId);
+  public async getOpenIdConfiguration(vaultId: string): Promise<object | undefined> {
+    const didDoc = await this.tenantsCacheManager.getDidDocument(vaultId);
+    const tenantUrl = await this.tenantsCacheManager.getTenantDomainUrl(vaultId);
 
     if (!didDoc || !tenantUrl) return undefined;
     
@@ -64,8 +64,8 @@ export class DiscoveryService {
    * @param vaultId The unique vault identifier of the tenant.
    * @returns A partial SMART configuration object, or undefined if not found.
    */
-  getSmartConfiguration(vaultId: string): object | undefined {
-    const tenantUrl = this.tenantsCacheManager.getTenantDomainUrl(vaultId);
+  public async getSmartConfiguration(vaultId: string): Promise<object | undefined> {
+    const tenantUrl = await this.tenantsCacheManager.getTenantDomainUrl(vaultId);
     if (!tenantUrl) return undefined;
 
     return {

@@ -38,7 +38,7 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
     tenantsCacheManager = new TenantsCacheManager(new VaultMemRepository(), () => demoKmsService);
 
     // Spy on getDidDocument and mock its implementation
-    jest.spyOn(tenantsCacheManager, 'getDidDocument').mockImplementation((vaultId: string) => {
+    jest.spyOn(tenantsCacheManager, 'getDidDocument').mockImplementation(async (vaultId: string) => {
       if (vaultId === 'host') return hostConfig.didDocument;
       if (vaultId === 'health-care_acme_with_url') return tenantConfigWithUrl.didDocument;
       if (vaultId === 'health-care_acme_no_url') return tenantConfigWithoutUrl.didDocument;
@@ -55,16 +55,16 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
     jest.restoreAllMocks();
   });
 
-  it('should return the external domain URL with https if the claim exists', () => {
+  it('should return the external domain URL with https if the claim exists', async () => {
     // ACT
-    const url = tenantsCacheManager.getTenantDomainUrl('health-care_acme_with_url');
+    const url = await tenantsCacheManager.getTenantDomainUrl('health-care_acme_with_url');
     // ASSERT
     expect(url).toBe('https://acme.example.com');
   });
 
-  it('should construct the correct hosted URL if the external domain claim is missing', () => {
+  it('should construct the correct hosted URL if the external domain claim is missing', async () => {
     // ACT
-    const url = tenantsCacheManager.getTenantDomainUrl('health-care_acme_no_url');
+    const url = await tenantsCacheManager.getTenantDomainUrl('health-care_acme_no_url');
     // ASSERT
     const hostDomain = testHostDidWeb.replace('did:web:', '');
     const urnParts = testTenant1IdentifierUrn.split(':');
@@ -73,17 +73,17 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
     expect(url).toBe(expectedUrl);
   });
   
-  it('should return the host URL for the host vaultId', () => {
+  it('should return the host URL for the host vaultId', async () => {
     // ACT
-    const url = tenantsCacheManager.getTenantDomainUrl('host');
+    const url = await tenantsCacheManager.getTenantDomainUrl('host');
     // ASSERT
     const hostDomain = testHostDidWeb.replace('did:web:', '');
     expect(url).toBe(`https://${hostDomain}`);
   });
 
-  it('should return undefined for a non-existent vaultId', () => {
+  it('should return undefined for a non-existent vaultId', async () => {
     // ACT
-    const url = tenantsCacheManager.getTenantDomainUrl('non-existent-vault');
+    const url = await tenantsCacheManager.getTenantDomainUrl('non-existent-vault');
     // ASSERT
     expect(url).toBeUndefined();
   });

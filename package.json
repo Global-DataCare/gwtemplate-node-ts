@@ -10,8 +10,9 @@
   "scripts": {
     "start": "node build/server.js",
     "clean": "rm -rf build",
-    "build": "npm run clean && tsc",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node --transpile-only' src/server.ts",
+    "build": "npm run clean && npm run build:swagger && tsc",
+    "build:swagger": "node scripts/generate-swagger-spec.js",
+    "dev": "npm run build:swagger && nodemon --watch 'src/**/*.ts' --watch 'swagger.config.js' --exec 'ts-node --transpile-only' src/server.ts",
     "prettier": "prettier --write \"src/**/*.ts\"",
     "prettier:check": "prettier --check \"src/**/*.ts\"",
     "lint": "eslint 'src/**/*.{ts,js}' --fix",

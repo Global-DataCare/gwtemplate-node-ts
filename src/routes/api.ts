@@ -234,6 +234,11 @@ export function createApiRouter(
    *         application/json:
    *           schema:
    *             $ref: '#/components/schemas/CustomerCreationLegacy'
+   *           examples:
+   *             fullPayload:
+   *               summary: Full Example Payload
+   *               value:
+   *                 $ref: '#/components/schemas/CustomerCreationLegacy/example'
    *         application/x-www-form-urlencoded:
    *           schema:
    *             $ref: '#/components/schemas/SecureRequest'
@@ -245,6 +250,56 @@ export function createApiRouter(
    *         headers:
    *           Location:
    *             schema: { type: string }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent:
+   *   post:
+   *     tags:
+   *       - FHIR Resources
+   *     summary: Create a FHIR Consent Resource
+   *     description: Submits an async job to create a FHIR Consent resource, which establishes a communication channel.
+   *     parameters:
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/ConsentCreation'
+   *           examples:
+   *             fullPayload:
+   *               summary: Full Example Payload
+   *               value:
+   *                 $ref: '#/components/schemas/ConsentCreation/example'
+   *     responses:
+   *       '202':
+   *         description: Accepted.
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication:
+   *   post:
+   *     tags:
+   *       - FHIR Resources
+   *     summary: Create a FHIR Communication Resource
+   *     description: Submits an async job to create a FHIR Communication resource, subject to a prior Consent.
+   *     parameters:
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/CommunicationCreation'
+   *           examples:
+   *             fullPayload:
+   *               summary: Full Example Payload
+   *               value:
+   *                 $ref: '#/components/schemas/CommunicationCreation/example'
+   *     responses:
+   *       '202':
+   *         description: Accepted.
    */
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
   router.post(`${cdsRoutePrefix}/:action`, async (req, res) => {
