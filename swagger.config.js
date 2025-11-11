@@ -1,5 +1,11 @@
 // swagger.config.js
-const swaggerJSDoc = require('swagger-jsdoc');
+const { 
+  ORGANIZATION_REGISTRATION_MESSAGE,
+  EMPLOYEE_REGISTRATION_MESSAGE,
+  CUSTOMER_ONBOARDING_MESSAGE,
+  CONSENT_CREATION_MESSAGE,
+  COMMUNICATION_CREATION_MESSAGE
+} = require('./src/__tests__/data/example-payloads');
 
 const swaggerDefinition = {
   openapi: '3.0.0',
@@ -48,6 +54,34 @@ const swaggerDefinition = {
         description: 'The business sector.'
       }
     },
+    // Define reusable examples here
+    examples: {
+      OrganizationRegistrationPlaintextMessage: {
+        summary: 'Plaintext Message for Organization Registration',
+        description: 'A DIDComm-like message wrapper containing the registration claims. This is the format for `application/didcomm-plaintext+json`.',
+        value: ORGANIZATION_REGISTRATION_MESSAGE
+      },
+      EmployeeRegistrationPlaintextMessage: {
+        summary: 'Plaintext Message for Employee Registration',
+        description: 'A DIDComm-like message wrapper containing the employee claims.',
+        value: EMPLOYEE_REGISTRATION_MESSAGE
+      },
+      CustomerOnboardingPlaintextMessage: {
+        summary: 'Plaintext Message for Customer Onboarding',
+        description: 'A DIDComm-like message wrapper containing the customer claims.',
+        value: CUSTOMER_ONBOARDING_MESSAGE
+      },
+      ConsentCreationPlaintextMessage: {
+        summary: 'Plaintext Message for FHIR Consent Creation',
+        description: 'A DIDComm-like message wrapper containing a FHIR Consent resource in the `body`.',
+        value: CONSENT_CREATION_MESSAGE
+      },
+      CommunicationCreationPlaintextMessage: {
+        summary: 'Plaintext Message for FHIR Communication',
+        description: 'A DIDComm-like message wrapper containing a FHIR Communication resource in the `body`.',
+        value: COMMUNICATION_CREATION_MESSAGE
+      }
+    },
     schemas: {
       Error: {
         type: 'object',
@@ -70,109 +104,32 @@ const swaggerDefinition = {
         },
       },
       // --- Reusable Request Body Schemas ---
+      // These schemas are now just for structure, the examples are separate
       OrganizationRegistrationLegacy: {
         type: 'object',
         properties: {
-          thid: { type: 'string', example: 'thid-org-c1c2c3d4-e5f6-7890-1234-567890abcdef' },
-          iss: { type: 'string', example: 'admin1@acme.org' },
-          aud: { type: 'string', example: 'did:web:host.example.com' },
-          body: {
-            type: 'object',
-            properties: {
-              data: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    type: { type: 'string', example: 'Organization-registration-form-v1.0' },
-                    meta: {
-                      type: 'object',
-                      properties: {
-                        claims: {
-                          type: 'object',
-                          properties: {
-                            'org.schema.Organization.legalName': { type: 'string', example: 'Acme Organization' },
-                            'org.schema.Organization.identifier.additionalType': { type: 'string', example: 'TAX' },
-                            'org.schema.Organization.identifier.value': { type: 'string', example: 'A123456789' },
-                            'org.schema.Organization.alternateName': { type: 'string', example: 'acme' },
-                            'org.schema.Organization.address.addressCountry': { type: 'string', example: 'ES' },
-                            'org.schema.Person.email': { type: 'string', example: 'admin1@acme.org' },
-                            'org.schema.Service.category': { type: 'string', example: 'health-care' },
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+          thid: { type: 'string' },
+          iss: { type: 'string' },
+          aud: { type: 'string' },
+          body: { type: 'object' }
         }
       },
       EmployeeCreationLegacy: {
         type: 'object',
         properties: {
-          thid: { type: 'string', example: 'thid-employee-11b2c3d4-e5f6-7890-1234-567890abcdef' },
-          iss: { type: 'string', example: 'did:web:host.example.com:acme:...' },
-          aud: { type: 'string', example: 'did:web:host.example.com' },
-          body: {
-            type: 'object',
-            properties: {
-              data: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    type: { type: 'string', example: 'Employee-form-v1.0' },
-                    request: {
-                      type: 'object',
-                      properties: {
-                        method: { type: 'string', example: 'POST' },
-                        url: { type: 'string', example: 'entity/org.schema/Employee/' }
-                      }
-                    },
-                    meta: {
-                      type: 'object',
-                      properties: {
-                        claims: {
-                          type: 'object',
-                          properties: {
-                            'org.schema.Person.identifier': { type: 'string', example: 'urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef' },
-                            'org.schema.Person.hasOccupation': { type: 'string', example: 'ISCO-08:4226' },
-                            'org.schema.Person.email': { type: 'string', example: 'receptionist1@acme.org' },
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+          thid: { type: 'string' },
+          iss: { type: 'string' },
+          aud: { type: 'string' },
+          body: { type: 'object' }
         }
       },
       CustomerCreationLegacy: {
         type: 'object',
         properties: {
-          thid: { type: 'string', example: 'thid-e2e-onboarding-customer-12345' },
-          iss: { type: 'string', example: 'did:web:api.acme.org:employee:...' },
-          aud: { type: 'string', example: 'urn:antifraud:health-care:acme' },
-          body: {
-            type: 'object',
-            properties: {
-              data: {
-                type: 'array',
-                description: 'An array of forms/claims for the customer.',
-                items: {
-                  type: 'object',
-                  properties: {
-                     type: { type: 'string', example: 'Individual-terms-v1.0' },
-                     // ... Simplified for brevity
-                  }
-                }
-              }
-            }
-          }
+          thid: { type: 'string' },
+          iss: { type: 'string' },
+          aud: { type: 'string' },
+          body: { type: 'object' }
         }
       },
       SecureRequest: {
@@ -189,39 +146,20 @@ const swaggerDefinition = {
       ConsentCreation: {
         type: 'object',
         properties: {
-          thid: { type: 'string', example: 'thid-consent-dynamic' },
-          iss: { type: 'string', example: 'did:web:api.acme.org:employee:...' },
-          aud: { type: 'string', example: 'urn:antifraud:health-care:acme' },
-          body: {
-            type: 'object',
-            properties: {
-              resourceType: { type: 'string', example: 'Consent' },
-              // ... other Consent properties
-            }
-          }
+          thid: { type: 'string' },
+          iss: { type: 'string' },
+          aud: { type: 'string' },
+          body: { type: 'object' }
         }
       },
       CommunicationCreation: {
         type: 'object',
         properties: {
-          thid: { type: 'string', example: 'thid-comm-dynamic' },
-          iss: { type: 'string', example: 'did:web:api.acme.org:employee:...' },
-          aud: { type: 'string', example: 'urn:antifraud:health-care:acme' },
-          body: {
-            type: 'object',
-            properties: {
-              resourceType: { type: 'string', example: 'Communication' },
-              // ... other Communication properties
-            }
-          }
+          thid: { type: 'string' },
+          iss: { type: 'string' },
+          aud: { type: 'string' },
+          body: { type: 'object' }
         }
-      }
-    },
-    securitySchemes: {
-      BearerAuth: {
-        type: 'http',
-        scheme: 'bearer',
-        description: 'Bearer token for legacy (JSON) requests.'
       }
     }
   }
@@ -237,5 +175,6 @@ const options = {
 module.exports = {
   options,
   swaggerDefinition,
+  // We also export the definition directly for convenience in the spec generator
+  ...swaggerDefinition 
 };
-

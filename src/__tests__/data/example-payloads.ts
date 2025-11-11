@@ -7,7 +7,7 @@
 
 const pdfEmbeddedData = "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZG9iago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y=";
 
-export const ORGANIZATION_REGISTRATION_PAYLOAD = {
+export const ORGANIZATION_REGISTRATION_MESSAGE = {
   thid: "thid-org-c1c2c3d4-e5f6-7890-1234-567890abcdef",
   iss: "admin1@acme.org",
   aud: "did:web:host.example.com",
@@ -38,7 +38,7 @@ export const ORGANIZATION_REGISTRATION_PAYLOAD = {
   },
 };
 
-export const EMPLOYEE_REGISTRATION_PAYLOAD = {
+export const EMPLOYEE_REGISTRATION_MESSAGE = {
   thid: "thid-employee-11b2c3d4-e5f6-7890-1234-567890abcdef",
   iss: "did:web:acme.org:employee:...",
   aud: "did:web:acme.org",
@@ -59,7 +59,7 @@ export const EMPLOYEE_REGISTRATION_PAYLOAD = {
   },
 };
 
-export const CUSTOMER_ONBOARDING_PAYLOAD = {
+export const CUSTOMER_ONBOARDING_MESSAGE = {
   thid: "thid-e2e-onboarding-customer-12345",
   iss: "did:web:acme.org:employee:...",
   aud: "did:web:acme.org",
@@ -74,7 +74,7 @@ export const CUSTOMER_ONBOARDING_PAYLOAD = {
             "org.schema.Person.identifier": "urn:uuid:8e0d846a-2492-4b9c-8a4e-5e065fb6ba76",
             "org.schema.Person.email": "customer1@example.com",
             "org.schema.Service.category": "health-care",
-            "org.schema.Service.termsOfService": "https://provider.example.com/terms",
+            "org.schema.Service.termsOfService": pdfEmbeddedData,
             "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|FAMRQT,PWATRNY,METAMGT,FRAUD,RECORDMGT,COVAUTH,TREAT,DISASTER,HPAYMT,MLTRAINING,ETREAT,HOPERAT,CAREMGT,HSYSADMIN,PATADMIN,PATSFTY",
           },
         },
@@ -94,7 +94,7 @@ export const CUSTOMER_ONBOARDING_PAYLOAD = {
   },
 };
 
-export const CONSENT_PAYLOAD = {
+export const CONSENT_CREATION_MESSAGE = {
   thid: "thid-consent-dynamic",
   iss: "did:web:acme.org:employee:...",
   aud: "did:web:acme.org",
@@ -114,7 +114,7 @@ export const CONSENT_PAYLOAD = {
   }
 };
 
-export const COMMUNICATION_PAYLOAD = {
+export const COMMUNICATION_CREATION_MESSAGE = {
   thid: "thid-comm-dynamic",
   iss: "did:web:acme.org:employee:...",
   aud: "did:web:acme.org",

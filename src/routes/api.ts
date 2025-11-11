@@ -140,12 +140,17 @@ export function createApiRouter(
    *     parameters:
    *       - $ref: '#/components/parameters/Jurisdiction'
    *     requestBody:
-   *       description: The registration payload. Can be a plaintext JSON object or a JWE.
+   *       description: |
+   *         The DIDComm message for registration.
+   *         The `Content-Type` `application/didcomm-plaintext+json` is canonical, but `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/json:
+   *         application/didcomm-plaintext+json:
    *           schema:
    *             $ref: '#/components/schemas/OrganizationRegistrationLegacy'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/OrganizationRegistrationPlaintextMessage'
    *         application/x-www-form-urlencoded:
    *           schema:
    *             $ref: '#/components/schemas/SecureRequest'
@@ -197,12 +202,15 @@ export function createApiRouter(
    *       - $ref: "#/components/parameters/Jurisdiction"
    *       - $ref: "#/components/parameters/Sector"
    *     requestBody:
-   *       description: The employee creation payload.
+   *       description: The DIDComm message for employee creation.
    *       required: true
    *       content:
-   *         application/json:
+   *         application/didcomm-plaintext+json:
    *           schema:
    *             $ref: '#/components/schemas/EmployeeCreationLegacy'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/EmployeeRegistrationPlaintextMessage'
    *         application/x-www-form-urlencoded:
    *           schema:
    *             $ref: '#/components/schemas/SecureRequest'
@@ -218,27 +226,26 @@ export function createApiRouter(
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Person/_batch:
    *   post:
    *     tags:
-   *       - Customer Onboarding
-   *     summary: Create a new Customer (Person)
+   *       - Personal Unified Data Index Registration
+   *     summary: Create the Global Unified Health Index for an Individual
    *     description: |
-   *       Submits an asynchronous job to create a new customer (individual/person) within an existing tenant.
-   *       The `tenantId` in the path specifies the organization under which the customer is being onboarded.
+   *       Submits an asynchronous job to create the Global Unified Health Index for an individual (Person).
+   *       This is based on the initial consent (signed Terms and Conditions) provided by the individual or their legal guardian,
+   *       and it is performed by an authorized employee of the chosen provider (`tenantId`).
    *     parameters:
    *       - $ref: "#/components/parameters/TenantId"
    *       - $ref: "#/components/parameters/Jurisdiction"
    *       - $ref: "#/components/parameters/Sector"
    *     requestBody:
-   *       description: The customer creation payload, which may consist of multiple "forms" or claim sets.
+   *       description: The DIDComm message for creating the individual's index.
    *       required: true
    *       content:
-   *         application/json:
+   *         application/didcomm-plaintext+json:
    *           schema:
    *             $ref: '#/components/schemas/CustomerCreationLegacy'
    *           examples:
-   *             fullPayload:
-   *               summary: Full Example Payload
-   *               value:
-   *                 $ref: '#/components/schemas/CustomerCreationLegacy/example'
+   *             message:
+   *               $ref: '#/components/examples/CustomerOnboardingPlaintextMessage'
    *         application/x-www-form-urlencoded:
    *           schema:
    *             $ref: '#/components/schemas/SecureRequest'
@@ -254,9 +261,9 @@ export function createApiRouter(
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent:
    *   post:
    *     tags:
-   *       - FHIR Resources
+   *       - Communication and Updates to the Individual Index
    *     summary: Create a FHIR Consent Resource
-   *     description: Submits an async job to create a FHIR Consent resource, which establishes a communication channel.
+   *     description: Submits an async job to create a FHIR Consent resource, wrapped in a DIDComm message.
    *     parameters:
    *       - $ref: "#/components/parameters/TenantId"
    *       - $ref: "#/components/parameters/Jurisdiction"
@@ -264,14 +271,12 @@ export function createApiRouter(
    *     requestBody:
    *       required: true
    *       content:
-   *         application/json:
+   *         application/didcomm-plaintext+json:
    *           schema:
    *             $ref: '#/components/schemas/ConsentCreation'
    *           examples:
-   *             fullPayload:
-   *               summary: Full Example Payload
-   *               value:
-   *                 $ref: '#/components/schemas/ConsentCreation/example'
+   *             message:
+   *               $ref: '#/components/examples/ConsentCreationPlaintextMessage'
    *     responses:
    *       '202':
    *         description: Accepted.
@@ -279,9 +284,9 @@ export function createApiRouter(
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication:
    *   post:
    *     tags:
-   *       - FHIR Resources
+   *       - Communication and Updates to the Individual Index
    *     summary: Create a FHIR Communication Resource
-   *     description: Submits an async job to create a FHIR Communication resource, subject to a prior Consent.
+   *     description: Submits an async job to create a FHIR Communication resource, wrapped in a DIDComm message, subject to a prior Consent.
    *     parameters:
    *       - $ref: "#/components/parameters/TenantId"
    *       - $ref: "#/components/parameters/Jurisdiction"
@@ -289,14 +294,12 @@ export function createApiRouter(
    *     requestBody:
    *       required: true
    *       content:
-   *         application/json:
+   *         application/didcomm-plaintext+json:
    *           schema:
    *             $ref: '#/components/schemas/CommunicationCreation'
    *           examples:
-   *             fullPayload:
-   *               summary: Full Example Payload
-   *               value:
-   *                 $ref: '#/components/schemas/CommunicationCreation/example'
+   *             message:
+   *               $ref: '#/components/examples/CommunicationCreationPlaintextMessage'
    *     responses:
    *       '202':
    *         description: Accepted.
