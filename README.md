@@ -8,65 +8,91 @@ This project follows a Test-Driven Development (TDD) approach. This means that t
 
 1.  **Write a Test (Red):** Start by writing a test case that *fails* because the code doesn't exist yet. This test case should specify the desired behavior of the component.
 2.  **Implement the Code (Green):** Write the minimum amount of code necessary to make the test pass.
-3.  **Refactor (Refactor):** Once the test passes, refactor the code to improve its structure, readability, and maintainability, while ensuring that all tests still pass.
+3.  **Refactor:** Once the test passes, refactor the code to improve its structure, readability, and maintainability, while ensuring that all tests still pass.
 4.  **Repeat:** Repeat this cycle for each feature or functionality you want to add.
 
 Following TDD helps to ensure that the code is well-tested, maintainable, and meets the specified requirements.
 
 ## Project Documentation
 
-This project's documentation is split into several key files. Start here to understand the architecture, development patterns, and testing strategies.
+This project contains extensive documentation covering architecture, development practices, and API usage. All documentation is located in the `docs/` directory.
 
-### Core Architecture & Development
+To get a full overview and navigate the documentation effectively, please start with the main index:
 
-1.  **[Architecture Patterns (`ARCHITECTURE_PATTERNS.md`)](ARCHITECTURE_PATTERNS.md)**
-    This is the **most important document**. It is the single source of truth for the core architectural decisions, data flows, and API structure. It serves as a formal specification and a "prompt" for any AI-assisted development to ensure consistency. **Read this first.**
-
-2.  **[Developer Guide (`DEVELOPER_GUIDE.md`)](DEVELOPER_GUIDE.md)**
-    This guide provides practical instructions for developers, including setup, running the server, and examples of how to interact with the API using `curl`.
-
-3.  **[Setup and Configuration Guide (`SETUP_GUIDE.md`)](SETUP_GUIDE.md)**
-    This document explains how to configure the necessary environment variables for the service to run, especially for the initial `host` setup.
-
-4.  **[New Storage Architecture Plan (`NEW_STORAGE_ARCH.md`)](NEW_STORAGE_ARCH.md)**
-    This document outlines the plan to refactor the storage layer towards a unified Repository pattern. It details the future structure for database interactions, ensuring a clean separation of concerns.
-
-5.  **[Testing Strategy (`src/__tests__/README.md`)](src/__tests__/README.md)**
-    This document explains the testing philosophy, the structure of the integration tests, and how to add new test cases.
-
-### Identity, Trust, and Fabric Integration
-
-This set of documents describes the end-to-end architecture for integrating with a Hyperledger Fabric blockchain as a trust layer, following Self-Sovereign Identity (SSI) principles.
-
-1.  **[Identity Bootstrapping Guide (`IDENTITY_BOOTSTRAP_GUIDE.md`)](IDENTITY_BOOTSTRAP_GUIDE.md)**
-    This is the main guide that describes the conceptual flow for onboarding organizations (`Org A`, `Host B`, `Tenant C`) into the federated trust network, from legal identity verification to blockchain credential issuance.
-
-2.  **[Trust and Assurance Level Policy (`TRUST_POLICY.md`)](TRUST_POLICY.md)**
-    This document defines the business rules and security policies for identity verification, including the different Levels of Assurance (LoA) and the secure protocols for escalating verification when initial evidence is insufficient.
-
-3.  **[Fabric Implementation Plan (`FABRIC_IMPLEMENTATION_PLAN.md`)](FABRIC_IMPLEMENTATION_PLAN.md)**
-    This document provides the detailed technical plan for developers. It specifies the new components, API endpoints, managers, and tests required to implement the Fabric onboarding flow described in the bootstrapping guide.
-
-4.  **[Organization Registration Process (`src/docs/organization_registration.md`)](src/docs/organization_registration.md)**
-    This document details the existing process for registering new tenants, which serves as the foundation for the Fabric integration.
-
+### **[➡️ Go to the Full Documentation Index (`docs/README.md`)](docs/README.md)**
 
 ## Quick Start
 
-1.  Install dependencies:
+Follow these steps to get your local development environment up and running.
 
+### 1. Configure Your Environment
+
+The server's configuration is managed through environment variables. The project uses a `.env` file for this purpose.
+
+First, copy the template file:
+```bash
+cp env.example .env
+```
+**Important:** The `.env` file is included in `.gitignore`, ensuring that your local secrets (like API keys or credentials) are never committed to the repository. The `env.example` file serves as a non-confidential, public template.
+
+Next, open the `.env` file and review its contents. For basic local development, the default values are often sufficient.
+
+### 2. Install Dependencies
+
+Install the necessary Node.js packages:
+```bash
+npm install
+```
+
+### 3. Run the Application
+
+You have two main options for running the application locally:
+
+#### Option A: Using Node.js (Recommended for Development)
+
+This method runs the server directly using `ts-node` and provides hot-reloading, which automatically restarts the server when you make code changes.
+```bash
+npm run dev
+```
+The server will be available at `http://localhost:3000`.
+
+#### Option B: Using Docker
+
+This method runs the application inside a Docker container, which is a great way to ensure a consistent environment. This is the same image that will be deployed to the cloud.
+
+1.  **Build the Docker image:**
+    *(This script uses the `NPM_TOKEN` from your `.env` file if it exists)*
     ```bash
-    npm install
+    ./docker_build_local.sh
     ```
 
-2.  Run the development server:
-
+2.  **Run the container:**
+    *(This script maps port 8080 on your host to port 3000 in the container)*
     ```bash
-    npm run dev
+    ./docker_run_local.sh
     ```
+The server will be available at `http://localhost:8080`.
 
-3.  Run tests:
+### 4. Run Tests
 
-    ```bash
-    npm test
-    ```
+To ensure everything is working correctly, run the test suite:
+```bash
+npm test
+```
+
+## Next Steps: Exploring the API
+
+Once the development server is running (via `npm run dev`), you can explore and interact with the API in two primary ways:
+
+### 1. Interactive API Documentation (Swagger)
+
+The server provides a live, interactive Swagger UI that documents all available endpoints. This is the easiest way to understand the API and send test requests directly from your browser.
+
+*   **URL**: [http://localhost:3000/api-docs](http://localhost:3000/api-docs)
+
+### 2. cURL Examples
+
+For more advanced testing and scripting, the project includes a comprehensive collection of `curl` commands. These are useful for simulating client requests from the command line and are essential for understanding the data structures.
+
+*   **Location**: You can find these examples in the [cURL Tests Documentation](docs/02-API-AND-ENDPOINTS/02.C-CURL-TESTS.md).
+
