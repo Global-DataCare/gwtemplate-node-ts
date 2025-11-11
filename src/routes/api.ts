@@ -383,7 +383,7 @@ export function createApiRouter(
     }
     
     const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
-    const tenantServices = tenantsCacheManager.getDidServiceConfig(vaultId);
+    const tenantServices = await tenantsCacheManager.getDidServiceConfig(vaultId);
 
     if (!isRequestValid(tenantServices, { ...req.params, action })) {
       console.error(`[API] Path/Role validation failed for ${req.originalUrl}. Tenant services found: ${!!tenantServices}.`);

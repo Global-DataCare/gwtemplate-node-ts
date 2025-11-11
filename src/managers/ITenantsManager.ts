@@ -11,24 +11,18 @@ import { DidDocument, DidService } from "../models/did";
  */
 export interface ITenantsManager {
   /**
-   * Loads all tenant configurations from the primary database into the in-memory cache.
-   * This should be called on application startup.
-   */
-  loadTenants(): Promise<void>;
-
-  /**
    * Retrieves a tenant's sovereign URN from the cache by its internal vaultId.
    * @param vaultId The internal vaultId of the tenant (e.g., 'health-care.tenant-1').
    * @returns The URN string or undefined if not found.
    */
-  getTenantIdentifierUrn(vaultId: string): string | undefined;
+  getTenantIdentifierUrn(vaultId: string): Promise<string | undefined>;
 
   /**
    * Retrieves a tenant's service configurations from the cache by its internal vaultId.
    * @param vaultId The internal vaultId of the tenant.
    * @returns An array of DidService configurations or undefined if not found.
    */
-  getDidServiceConfig(vaultId: string): DidService[] | undefined;
+  getDidServiceConfig(vaultId: string): Promise<DidService[] | undefined>;
 
-  getDidDocument(vaultId: string): DidDocument | undefined;
+  getDidDocument(vaultId: string): Promise<DidDocument | undefined>;
 }

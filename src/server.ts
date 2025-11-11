@@ -48,6 +48,7 @@ import { IAuthorizationManager } from './managers/auth/IAuthorizationManager';
 import { createFhirRouter } from './routes/fhir';
 import { AuthorizationManager } from './managers/AuthorizationManager';
 import * as swaggerUi from 'swagger-ui-express';
+import { generateTenantCollectionNameFromClaims } from './utils/tenant';
 const swaggerSpec = require('../swagger.config.js');
 
 // ===================================================================================
@@ -179,7 +180,14 @@ async function startServer(options?: StartServerOptions) {
   let vaultRepository: IVaultRepository;
   if (config.dbProvider === 'firestore') {
     const db = admin.firestore();
-    const hostCollectionName = 'host'; 
+    // Calculate the correct physical collection name for the host from configuration.
+    const hostBootstrapClaims = {
+      [ClaimsOrganizationSchemaorg.addressCountry]: config.host.jurisdiction,
+      [ClaimsOrganizationSchemaorg.identifierType]: config.host.idType,
+      [ClaimsOrganizationSchemaorg.identifierValue]: config.host.idValue,
+      [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+    };
+    const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
     vaultRepository = new FirestoreVaultRepository(db, hostCollectionName);
     console.log('[GW-API] Using Firestore Vault Repository.');
   } else {

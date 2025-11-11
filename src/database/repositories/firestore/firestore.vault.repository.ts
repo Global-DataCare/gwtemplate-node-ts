@@ -65,7 +65,11 @@ export class FirestoreVaultRepository extends IVaultRepository {
   }
 
   async get<T extends RecordBase>(collectionName: string, docId: string, sectionId: string = DEFAULT_SECTION): Promise<T | undefined> {
-    const docRef = this.db.collection(collectionName).doc(sectionId).collection('documents').doc(docId);
+    // If the logical 'host' vault is requested, transparently map it to the physical host collection.
+    const physicalCollectionName = collectionName === 'host' ? this.hostCollectionName : collectionName;
+
+    const docRef = this.db.collection(physicalCollectionName).doc(sectionId).collection('documents').doc(docId);
+    console.log(`[FirestoreVaultRepository DEBUG] GET path: ${docRef.path}`); // <-- DEBUG LOG
     const docSnap = await docRef.get();
     return docSnap.exists ? (docSnap.data() as T) : undefined;
   }

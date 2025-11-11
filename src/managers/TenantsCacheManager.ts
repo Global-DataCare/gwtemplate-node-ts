@@ -86,32 +86,17 @@ export class TenantsCacheManager implements ITenantsManager {
     // console.log(`[TenantsCacheManager] Successfully loaded ${this.tenantCacheByVaultId.size} tenants.`);
   }
 
-  /**
-   * Retrieves the full, cached configuration for a tenant.
-   * @param vaultId The unique vault identifier for the tenant.
-   * @returns The tenant's configuration object, or `undefined` if not found.
-   */
-  public getTenant(vaultId: string): any | undefined {
-    return this.tenantCacheByVaultId.get(vaultId);
-  }
-
-  /**
-   * Retrieves the physical collection name for a given logical vaultId.
-   * This is the primary method for business managers to resolve the storage location for a tenant.
-   * @param vaultId The unique vault identifier for the tenant (e.g., 'host', 'health-care_acme').
-   * @returns The tenant's physical collection name (e.g., 'host', 'ES_TAX_B12345..._health-care'), or `undefined` if not found.
-   */
-  public async getCollectionName(vaultId: string): Promise<string | undefined> {
+  private async _ensureTenantIsInCache(vaultId: string): Promise<any | undefined> {
     // 1. Check the cache first.
     let tenantConfig = this.tenantCacheByVaultId.get(vaultId);
-    if (tenantConfig?.collectionName) {
-      return tenantConfig.collectionName;
+    if (tenantConfig) {
+      return tenantConfig;
     }
 
     // 2. If not in cache, fetch from the repository.
     const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>('host', vaultId, 'tenants');
 
-    // 3. If not in the repository, it doesn't exist. Return undefined.
+    // 3. If not in the repository, it doesn't exist.
     if (!secureTenantRecord) {
       return undefined;
     }
@@ -128,8 +113,7 @@ export class TenantsCacheManager implements ITenantsManager {
         // 6. Cache the entire decrypted config for future use.
         this.tenantCacheByVaultId.set(vaultId, tenantConfig);
 
-        // 7. Return the collection name.
-        return collectionName;
+        return tenantConfig;
       } else {
         console.error(`[TenantsCacheManager] Decrypted record for vaultId '${vaultId}' is invalid or missing claims.`);
         return undefined;
@@ -141,16 +125,38 @@ export class TenantsCacheManager implements ITenantsManager {
   }
 
   /**
+   * Retrieves the full, cached configuration for a tenant.
+   * @param vaultId The unique vault identifier for the tenant.
+   * @returns The tenant's configuration object, or `undefined` if not found.
+   */
+  public async getTenant(vaultId: string): Promise<any | undefined> {
+    return await this._ensureTenantIsInCache(vaultId);
+  }
+
+  /**
+   * Retrieves the physical collection name for a given logical vaultId.
+   * This is the primary method for business managers to resolve the storage location for a tenant.
+   * @param vaultId The unique vault identifier for the tenant (e.g., 'host', 'health-care_acme').
+   * @returns The tenant's physical collection name (e.g., 'host', 'ES_TAX_B12345..._health-care'), or `undefined` if not found.
+   */
+  public async getCollectionName(vaultId: string): Promise<string | undefined> {
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
+    return tenantConfig?.collectionName;
+  }
+
+  /**
    * Finds a tenant in the cache by their full DID identifier.
    * @param did The `did:web:...` identifier of the tenant.
    * @returns The tenant's configuration object, or `undefined` if no tenant matches the DID.
    */
+  // TODO: Refactor findTenantByDid for the new async, on-demand caching architecture.
+  // This synchronous implementation is no longer reliable as it only searches tenants already in the cache.
   public findTenantByDid(did: string): any | undefined {
-    for (const tenantConfig of this.tenantCacheByVaultId.values()) {
-      if (tenantConfig.didDocument?.id === did) {
-        return tenantConfig;
-      }
-    }
+    // for (const tenantConfig of this.tenantCacheByVaultId.values()) {
+    //   if (tenantConfig.didDocument?.id === did) {
+    //     return tenantConfig;
+    //   }
+    // }
     return undefined;
   }
 
@@ -161,21 +167,24 @@ export class TenantsCacheManager implements ITenantsManager {
    * @param did The `did:web:...` identifier of the entity (e.g., an employee).
    * @returns The tenant's configuration object, or `undefined` if no tenant matches.
    */
+  // TODO: Refactor findTenantByDidPrefix for the new async, on-demand caching architecture.
+  // This synchronous implementation is no longer reliable as it only searches tenants already in the cache.
   public findTenantByDidPrefix(did: string): any | undefined {
-    // Find the tenant whose DID is the longest matching prefix of the given DID.
-    let bestMatch: any | undefined;
-    let longestPrefix = 0;
+    // // Find the tenant whose DID is the longest matching prefix of the given DID.
+    // let bestMatch: any | undefined;
+    // let longestPrefix = 0;
 
-    for (const tenantConfig of this.tenantCacheByVaultId.values()) {
-      const tenantDid = tenantConfig.didDocument?.id;
-      if (tenantDid && did.startsWith(tenantDid)) {
-        if (tenantDid.length > longestPrefix) {
-          longestPrefix = tenantDid.length;
-          bestMatch = tenantConfig;
-        }
-      }
-    }
-    return bestMatch;
+    // for (const tenantConfig of this.tenantCacheByVaultId.values()) {
+    //   const tenantDid = tenantConfig.didDocument?.id;
+    //   if (tenantDid && did.startsWith(tenantDid)) {
+    //     if (tenantDid.length > longestPrefix) {
+    //       longestPrefix = tenantDid.length;
+    //       bestMatch = tenantConfig;
+    //     }
+    //   }
+    // }
+    // return bestMatch;
+    return undefined;
   }
 
   /**
@@ -202,18 +211,18 @@ export class TenantsCacheManager implements ITenantsManager {
    * @param vaultId The unique vault identifier for the tenant.
    * @returns The URN string, or `undefined` if not found.
    */
-  public getTenantIdentifierUrn(vaultId: string): string | undefined {
-    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+  public async getTenantIdentifierUrn(vaultId: string): Promise<string | undefined> {
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
     return getIdentifierUrnFromClaims(tenantConfig?.claims);
   }
 
-  public getDidDocument(vaultId: string): DidDocument | undefined {
-    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+  public async getDidDocument(vaultId: string): Promise<DidDocument | undefined> {
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
     return tenantConfig?.didDocument;
   }
 
-  public getDidServiceConfig(vaultId: string): DidService[] | undefined {
-    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+  public async getDidServiceConfig(vaultId: string): Promise<DidService[] | undefined> {
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
     return tenantConfig?.didConfig.service;
   }
 
@@ -222,8 +231,8 @@ export class TenantsCacheManager implements ITenantsManager {
    * @param vaultId The unique vault identifier for the tenant.
    * @returns The DID string, or `undefined` if the tenant is not found in the cache.
    */
-  public getTenantDid(vaultId: string): string | undefined {
-    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+  public async getTenantDid(vaultId: string): Promise<string | undefined> {
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
     return tenantConfig?.didDocument.id;
   }
 
@@ -232,8 +241,8 @@ export class TenantsCacheManager implements ITenantsManager {
    * @param vaultId The unique vault identifier for the tenant.
    * @returns The sector, or `undefined` if the tenant is not found or the URN is malformed.
    */
-  public getTenantSector(vaultId: string): Sector | undefined {
-    const urn = this.getTenantIdentifierUrn(vaultId);
+  public async getTenantSector(vaultId: string): Promise<Sector | undefined> {
+    const urn = await this.getTenantIdentifierUrn(vaultId);
     if (!urn) return undefined;
     
     const parsedUrn = parseTenantUrn(urn);
@@ -245,8 +254,8 @@ export class TenantsCacheManager implements ITenantsManager {
    * @param vaultId The unique vault identifier for the tenant.
    * @returns The jurisdiction string (e.g., 'es'), or `undefined` if not found.
    */
-  public getTenantJurisdiction(vaultId: string): string | undefined {
-    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+  public async getTenantJurisdiction(vaultId: string): Promise<string | undefined> {
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
     if (!tenantConfig) return undefined;
     return tenantConfig.claims[ClaimsOrganizationSchemaorg.addressCountry] as string;
   }
@@ -258,13 +267,13 @@ export class TenantsCacheManager implements ITenantsManager {
    * @param vaultId The unique vault identifier for the tenant.
    * @returns The tenant's service URL, or undefined if the tenant is not found.
    */
-  public getTenantDomainUrl(vaultId: string): string | undefined {
+  public async getTenantDomainUrl(vaultId: string): Promise<string | undefined> {
     if (vaultId === 'host') {
-      const hostDidDoc = this.getDidDocument('host');
+      const hostDidDoc = await this.getDidDocument('host');
       return hostDidDoc ? getBaseUrlFromDidWeb(hostDidDoc.id) : undefined;
     }
 
-    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
     if (!tenantConfig) {
       return undefined;
     }
@@ -273,15 +282,15 @@ export class TenantsCacheManager implements ITenantsManager {
     if (externalUrl) {
       return externalUrl.startsWith('http') ? externalUrl : `https://${externalUrl}`;
     }
-    return this.constructHostedUrl(tenantConfig);
+    return await this.constructHostedUrl(tenantConfig);
   }
 
   /**
    * Constructs the full hosted URL for a tenant based on its configuration.
    * @param config The full tenant configuration object from the cache.
    */
-  private constructHostedUrl(config: any): string | undefined {
-    const hostDidDoc = this.getDidDocument('host');
+  private async constructHostedUrl(config: any): Promise<string | undefined> {
+    const hostDidDoc = await this.getDidDocument('host');
     if (!hostDidDoc) {
       console.error('[TenantsCacheManager] Cannot construct hosted URL: Host DID document not found in cache.');
       return undefined;

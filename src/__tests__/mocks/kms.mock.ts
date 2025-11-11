@@ -21,14 +21,15 @@ export const mockKmsService: jest.Mocked<IKmsService> = {
   signWithReconstructedKey: jest.fn(),
   encodeResponse: jest.fn(),
   protectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc): Promise<ConfidentialStorageDoc> => {
+    // In this mock, we simulate the structure of a protected document but critically,
+    // we DO NOT delete the original `content`. This allows the `unprotect` mock
+    // to retrieve it, simulating a successful decryption cycle for unit/integration tests.
     const secureDoc = { ...doc, jwe: { ciphertext: 'encrypted-content-by-mock' } };
-    delete secureDoc.content;
     return secureDoc;
   }),
   unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc) => {
-    if (doc.jwe) {
-      return { legalName: 'Mocked Decrypted Content' } as any;
-    }
+    // This mock simulates successful decryption by simply returning the `content`
+    // property that the `protectConfidentialData` mock intentionally preserved.
     return doc.content as any;
   }),
   getHostPublicJwkSet: jest.fn(async () => ({ keys: [] })),
