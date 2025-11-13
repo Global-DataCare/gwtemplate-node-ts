@@ -201,6 +201,9 @@ export class HostingManager {
     hostConfig.didConfig.service = initializeHostServices(didId, this.config.sectorsAllowed);
     const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: didId, alsoKnownAs: [] };
     hostConfig.didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
+    
+    // FIX: Explicitly add the initialized services to the final DID document.
+    hostConfig.didDocument.service = hostConfig.didConfig.service;
 
     const docToProtect: ConfidentialStorageDoc = {
       id: logicalVaultId, // The document ID inside the tenants section is the logical ID

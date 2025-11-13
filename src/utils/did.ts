@@ -96,9 +96,10 @@ export function findSigningMethod(didDocument: DidDocument, alg?: string): strin
 export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: JwkSet): DidDocument {
     const newDidDoc: DidDocument = {
         ...skeletonDidDoc,
-        verificationMethod: [],
-        assertionMethod: [],
-        keyAgreement: [],
+        // Explicitly type the arrays to satisfy the DidDocument interface
+        verificationMethod: [] as VerificationMethod[],
+        assertionMethod: [] as (string | VerificationMethod)[],
+        keyAgreement: [] as (string | VerificationMethod)[],
     };
 
     const didWebs = new Set<string>();
@@ -141,7 +142,9 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
 
             if (isSignatureKey) {
                 newDidDoc.verificationMethod!.push(vm);
-                newDidDoc.assertionMethod!.push(vm);
+                // As per W3C DID Core spec, assertionMethod should contain a reference
+                // to the verification method, not the full embedded key.
+                newDidDoc.assertionMethod!.push(verificationMethodId);
                 isAddedToVerificationMethods = true;
             }
             if (isEncryptionKey) {
@@ -149,7 +152,9 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
                 if (!isAddedToVerificationMethods) {
                     newDidDoc.verificationMethod!.push(vm);
                 }
-                newDidDoc.keyAgreement!.push(vm);
+                // As per W3C DID Core spec, keyAgreement should contain a reference
+                // to the verification method, not the full embedded key.
+                newDidDoc.keyAgreement!.push(verificationMethodId);
             }
         }
     }

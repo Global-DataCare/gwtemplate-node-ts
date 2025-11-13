@@ -5,7 +5,12 @@ import * as express from 'express';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { DiscoveryService } from '../services/DiscoveryService';
 import { getTenantVaultId } from '../utils/tenant';
+import { createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { pingHandler } from './handlers/discovery/ping.handler';
+import { signVerifiableCredential } from '../utils/vc-signer';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
+
+import { IKmsService } from '../crypto/interfaces/IKmsService';
 
 // List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
@@ -14,11 +19,13 @@ const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
  * Creates the router for synchronous, public discovery endpoints.
  * @param tenantsCacheManager The cache manager to resolve tenant configurations.
  * @param discoveryService The service to generate discovery documents.
+ * @param kmsService The service to retrieve cryptographic keys.
  * @returns An Express router.
  */
 export function createDiscoveryRouter(
   tenantsCacheManager: TenantsCacheManager,
-  discoveryService: DiscoveryService
+  discoveryService: DiscoveryService,
+  kmsService: IKmsService,
 ): express.Router {
   const router = express.default.Router();
 
@@ -69,6 +76,61 @@ export function createDiscoveryRouter(
     const didDocument = await tenantsCacheManager.getDidDocument(res.locals.vaultId);
     // The existence check was already done in resolveTenant, so we can be confident it exists.
     res.json(didDocument);
+  });
+
+  router.get([`${hostWellKnownPrefix}/jwks.json`, `${tenantWellKnownPrefix}/jwks.json`], resolveTenant, async (req, res) => {
+    try {
+      const jwks = await kmsService.getPublicJwks(res.locals.vaultId);
+      res.json(jwks);
+    } catch (error) {
+      // If keys are not found for the entity, it's a server-side issue.
+      console.error(`[DiscoveryRouter] Failed to get JWKS for vaultId '${res.locals.vaultId}':`, error);
+      res.status(500).type('text').send('Internal Server Error: Could not retrieve key set.');
+    }
+  });
+
+  router.get([`${hostWellKnownPrefix}/legal-participant.vc.json`, `${tenantWellKnownPrefix}/legal-participant.vc.json`], resolveTenant, async (req, res) => {
+    try {
+      const vaultId = res.locals.vaultId;
+      const entityConfig = await tenantsCacheManager.getTenant(vaultId);
+      
+      if (!entityConfig || !entityConfig.claims || !entityConfig.didDocument) {
+        return res.status(404).type('text').send('Not Found: Entity configuration is incomplete.');
+      }
+      
+      const claims = entityConfig.claims;
+      const didDoc = entityConfig.didDocument;
+      const domain = await tenantsCacheManager.getTenantDomainUrl(vaultId);
+
+      const vcOptions = {
+        webDomain: domain!,
+        officialName: claims[ClaimsOrganizationSchemaorg.legalName],
+        did: didDoc.id,
+        issuerDid: didDoc.id, // Self-signed
+        vatId: claims[ClaimsOrganizationSchemaorg.identifierValue],
+        countryCode: claims[ClaimsOrganizationSchemaorg.addressCountry],
+        termsAndConditionsUrl: claims[ClaimsServiceSchemaorg.termsOfService],
+        termsAndConditionsHashHex: claims[`${ClaimsServiceSchemaorg.termsOfService}#hash`],
+      };
+
+      // Create the unsigned credential body
+      const unsignedVc = createGaiaXLegalParticipantCredential(vcOptions);
+      
+      // The verification method is the first assertion method in the DID document.
+      const verificationMethodId = didDoc.assertionMethod?.[0] as string;
+      if (!verificationMethodId) {
+        throw new Error('No assertionMethod found in DID document to sign the credential.');
+      }
+
+      // Sign the credential
+      const signedVc = await signVerifiableCredential(unsignedVc, verificationMethodId, kmsService, vaultId);
+
+      res.json(signedVc);
+
+    } catch (error: any) {
+      console.error(`[DiscoveryRouter] Failed to generate Legal Participant VC for vaultId '${res.locals.vaultId}':`, error);
+      res.status(500).type('text').send('Internal Server Error: ' + error.message);
+    }
   });
 
   router.get([`${hostWellKnownPrefix}/openid-configuration`, `${tenantWellKnownPrefix}/openid-configuration`], resolveTenant, (req, res) => {

@@ -11,51 +11,83 @@ import { MldsaPublicJwk, MlkemPublicJwk } from '../crypto/interfaces/Cryptograph
 import { ParameterData } from '../models/params';
 
 /**
- * A development-only implementation of the Key Management Service that correctly
- * simulates the behavior and data structures of a real KMS without performing
- * actual cryptography. It allows for testing of API flows, managers, and data
- * transformations without the overhead of real encryption/signing.
+ * A development-focused implementation of the Key Management Service that uses a real
+ * KMS instance internally to generate real, deterministic keys, but simulates the
+ * encryption/decryption of the communication layer.
+ *
+ * This provides the best of both worlds for development:
+ * - Real, cryptographically valid `did.json` documents and Verifiable Credentials.
+ * - Simple, plaintext-equivalent API communication without needing to build real JWEs.
  *
  * WARNING: DO NOT USE IN PRODUCTION.
  */
 export class DemoKmsService implements IKmsService {
-  
-  // No dependencies needed for the dev/demo version for now.
-  constructor() {}
+  private _realKmsService: IKmsService;
+
+  // The Demo service now wraps a real KMS instance to handle key generation and signing.
+  constructor(realKmsService: IKmsService) {
+    this._realKmsService = realKmsService;
+  }
 
   async init(): Promise<void> {
-    console.warn(`[DemoKmsService] Initializing host keys...`);
-    // In demo mode, provisioning is a no-op that just logs a message.
-    // We call it here to maintain interface consistency.
-    await this.provisionKeys('host');
+    // The real KMS service is initialized by the server before being passed here.
+    // This init is for the Demo wrapper itself, which is a no-op.
+    console.warn(`[DemoKmsService] Initialized. Key management is delegated to the real KmsService.`);
   }
   
-  // --- Key Lifecycle Management ---
+  // --- DELEGATED METHODS (Real Cryptography) ---
 
+  // Key lifecycle and retrieval methods are delegated directly to the real KMS.
+  // This ensures that did.json and VCs are cryptographically valid.
+  
   async provisionKeys(entityId: string): Promise<JwkSet> {
-    console.warn(`[DemoKmsService] Simulating key provisioning for: ${entityId}`);
-    return this.getPublicJwks(entityId);
+    console.warn(`[DemoKmsService] Delegating real key provisioning for: ${entityId}`);
+    return this._realKmsService.provisionKeys(entityId);
   }
 
   async getPublicJwks(entityId: string): Promise<JwkSet> {
-    return { keys: this.getFakeJwks(entityId) as JWK[] };
+    return this._realKmsService.getPublicJwks(entityId);
   }
 
-  async getPublicVerificationKey(entityId: string): Promise<MldsaPublicJwk | undefined> {
-    return this.getFakeJwks(entityId).find(key => key.kty === 'AKP') as MldsaPublicJwk | undefined;
+  async getPublicVerificationKey(entityId: string, alg?: string): Promise<MldsaPublicJwk | undefined> {
+    return this._realKmsService.getPublicVerificationKey(entityId, alg);
   }
 
-  async getPublicEncryptionKey(entityId: string): Promise<MlkemPublicJwk | undefined> {
-    return this.getFakeJwks(entityId).find(key => key.kty === 'OKP') as MlkemPublicJwk | undefined;
+  async getPublicEncryptionKey(entityId: string, crv?: string): Promise<MlkemPublicJwk | undefined> {
+    return this._realKmsService.getPublicEncryptionKey(entityId, crv);
   }
 
   async getHostPublicJwkSet(): Promise<JwkSet> {
-    // In demo mode, the host's keys are just another set of fake keys.
-    return this.getPublicJwks('host');
-  }  
+    return this._realKmsService.getHostPublicJwkSet();
+  }
+  
+  async signWithManagedKey(payload: Uint8Array, entityId: string): Promise<JwsMultiSign> {
+    console.warn(`[DemoKmsService] Delegating real signing for entity: ${entityId}`);
+    return this._realKmsService.signWithManagedKey(payload, entityId);
+  }
+  
+  async signWithReconstructedKey(
+    payload: Uint8Array,
+    seedPartA: Uint8Array,
+    encryptedSeedPartB: Uint8Array,
+    protectorEntityId: string
+    ): Promise<JwsMultiSign> {
+      return this._realKmsService.signWithReconstructedKey(payload, seedPartA, encryptedSeedPartB, protectorEntityId);
+    }
+    
+  async getHmacBase64Url(plaintext: string, entityId: string): Promise<string> {
+    return this._realKmsService.getHmacBase64Url(plaintext, entityId);
+  }
+  
+  async protectAttributesNameAndValue(attributes: ParameterData[], entityId: string): Promise<IndexedAttribute[]> {
+    return this._realKmsService.protectAttributesNameAndValue(attributes, entityId);
+  }
 
-  // --- Inbound Request Processing ---
+  // --- SIMULATED METHODS (Communication Bypass) ---
 
+  // These methods override the real KMS behavior to allow for simple, unencrypted
+  // communication flows during development.
+  
   async decodeJobRequest(message: string): Promise<JobRequest> {
     console.warn(`[DemoKmsService] Bypassing decryption for JWE-like message.`);
     
@@ -98,35 +130,6 @@ export class DemoKmsService implements IKmsService {
     }
   }
 
-  // --- Signing Operations ---
-
-  async signWithManagedKey(payload: Uint8Array, entityId: string): Promise<JwsMultiSign> {
-    console.warn(`[DemoKmsService] Simulating signing for entity: ${entityId}`);
-    const key = await this.getPublicVerificationKey(entityId);
-    const protectedHeader = { alg: key?.alg, kid: key?.kid };
-    const payloadB64 = Content.bytesToRawBase64UrlSafe(payload);
-    return {
-      payload: payloadB64,
-      signatures: [{
-        protected: Content.objectToRawBase64UrlSafe(protectedHeader),
-        signature: 'dev-fake-signature'
-      }],
-    };
-  }
-
-  async signWithReconstructedKey(
-    payload: Uint8Array,
-    seedPartA: Uint8Array,
-    encryptedSeedPartB: Uint8Array,
-    protectorEntityId: string
-  ): Promise<JwsMultiSign> {
-    console.warn(`[DemoKmsService] Simulating reconstructed key signing for protector: ${protectorEntityId}`);
-    // In dev, we just sign it as if we had the key directly.
-    return this.signWithManagedKey(payload, 'reconstructed-dev-key');
-  }
-
-  // --- Outbound Encryption ---
-
   async encodeResponse(payload: any, recipientJwks: JWK[], senderId: string): Promise<string> {
     console.warn(`[DemoKmsService] Bypassing encryption. Returning Compact JWE representation.`);
     
@@ -152,20 +155,16 @@ export class DemoKmsService implements IKmsService {
     return `${protectedHeader}.${fakeEncryptedKey}.${fakeIv}.${fakeCiphertext}.${fakeTag}`;
   }
 
-  // --- At-Rest Data Protection ---
-
+  // At-rest protection is also simulated to allow easy inspection of the database in dev.
   async protectConfidentialData(doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> {
     console.warn(`[DemoKmsService] Simulating data protection for entity: ${entityId}`);
     if (!doc.content) return doc;
 
     const { content, ...docWithoutContent } = doc;
 
-    // Correctly simulate the JWE structure.
-    // The `content` is stringified and base64url-encoded to mimic the `ciphertext`.
     const simulatedJwe = {
       protected: Content.objectToRawBase64UrlSafe({ alg: 'dir', enc: 'A256GCM' }),
       ciphertext: Content.objectToRawBase64UrlSafe(content),
-      // Add other simulated JWE fields for structural validity
       iv: '_iv_',
       tag: '_tag_',
     };
@@ -178,58 +177,6 @@ export class DemoKmsService implements IKmsService {
     if (!doc.jwe || !doc.jwe.ciphertext) {
       throw new Error('DemoKmsService: Cannot unprotect document with invalid simulated JWE.');
     }
-    // Decode the simulated ciphertext back into a JSON object.
     return Content.base64UrlSafeToJSON(doc.jwe.ciphertext as string) as T;
-  }
-
-  async getHmacBase64Url(plaintext: string, entityId: string): Promise<string> {
-    console.warn(`[DemoKmsService] Simulating HMAC for entity: ${entityId}`);
-    return `hmac-of-${plaintext}`;
-  }
-
-  async protectAttributesNameAndValue(attributes: ParameterData[], entityId: string): Promise<IndexedAttribute[]> {
-    console.warn(`[DemoKmsService] Simulating attribute protection for entity: ${entityId}`);
-    const protectedAttributes: IndexedAttribute[] = [];
-    for (const attribute of attributes) {
-      if (attribute.value === undefined) {
-        continue;
-      }
-      const valueAsString = String(attribute.value);
-      
-      const indexedAttr: IndexedAttribute = {
-        name: `hmac-of-${attribute.name}`,
-        value: `hmac-of-${valueAsString}`,
-        unique: attribute.unique,
-      };
-
-      // Only add the 'type' if it's not the default 'string'
-      if (attribute.type && attribute.type !== 'string') {
-        indexedAttr.type = attribute.type;
-      }
-      
-      protectedAttributes.push(indexedAttr);
-    }
-    return protectedAttributes;
-  }
-
-
-  /**
-   * Creates a consistent, fake JSON Web Key Set (JWKS) based on the entity's ID.
-   */
-  private getFakeJwks(entityId: string): (MldsaPublicJwk | MlkemPublicJwk)[] {
-    return [
-      {
-        kid: `key-pqc-sig-1`, // KIDs should be fragments, not full DIDs
-        kty: 'AKP',
-        alg: 'ML-DSA-44',
-        pub: `fake-ML-DSA-public-key-for-${entityId}`,
-      },
-      {
-        kid: `key-pqc-enc-1`, // KIDs should be fragments, not full DIDs
-        kty: 'OKP',
-        crv: 'ML-KEM-768',
-        x: `fake-ML-KEM-public-key-for-${entityId}`,
-      },
-    ];
   }
 }

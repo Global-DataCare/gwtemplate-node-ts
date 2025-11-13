@@ -63,20 +63,26 @@ export function initializeTenantServices(didId: string, sector: Sector, customSe
   const didIdentifier = didId.substring('did:web:'.length);
   const baseUrl = `https://${didIdentifier.replace(/:/g, '/')}`;
 
-  const discoveryServices: DidService[] = [
-    {
-      id: `${didId}#did-document`,
-      type: 'LinkedDomains',
-      serviceEndpoint: `${baseUrl}/.well-known/did.json`,
-    },
-    {
-      id: `${didId}#jwks`,
-      type: 'JsonWebKeyService2020',
-      serviceEndpoint: `${baseUrl}/jwks.json`,
-    },
-  ];
+    const discoveryServices: DidService[] = [
+        {
+          id: `${didId}#did-document`,
+          type: 'LinkedDomains',
+          serviceEndpoint: `${baseUrl}/.well-known/did.json`,
+        },
+        {
+          id: `${didId}#jwks`,
+          type: 'JsonWebKeyService2020',
+          serviceEndpoint: `${baseUrl}/.well-known/jwks.json`,
+        },
+        {
+          id: `${didId}#legal-participant-credential`,
+          type: 'gx:LegalParticipant', // As per Gaia-X requirements
+          serviceEndpoint: `${baseUrl}/.well-known/legal-participant.vc.json`,
+        },
+    ];
 
   const defaultBusinessServices = generateDefaultBusinessServices(sector);
+
 
   // NOTE: In a real implementation, these network services would likely be added to a tenant's
   // DID Document *after* they have successfully enrolled, not by default.
@@ -127,7 +133,12 @@ export function initializeHostServices(didId: string, sectorsAllowed: Sector[]):
     {
       id: `${didId}#jwks`,
       type: 'JsonWebKeyService2020',
-      serviceEndpoint: `${baseUrl}/jwks.json`,
+      serviceEndpoint: `${baseUrl}/.well-known/jwks.json`,
+    },
+    {
+      id: `${didId}#legal-participant-credential`,
+      type: 'gx:LegalParticipant', // As per Gaia-X requirements
+      serviceEndpoint: `${baseUrl}/.well-known/legal-participant.vc.json`,
     },
   ];
 

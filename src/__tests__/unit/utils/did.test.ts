@@ -75,15 +75,33 @@ describe('DID Utility Functions (Deterministic)', () => {
   });
 
   describe('populateDidDocumentFromJwks', () => {
-    it('should correctly multiplex keys across all did:web identifiers', () => {
-      const result = populateDidDocumentFromJwks(tenantDidDocWithExternal, testJwks);
+    it('should add full verification methods and reference them by ID in assertion/agreement', () => {
+      const skeletonDoc: DidDocument = {
+        '@context': 'https://www.w3.org/ns/did/v1',
+        id: 'did:web:example.com',
+        alsoKnownAs: [],
+      };
       
-      expect(result.verificationMethod).toHaveLength(2); // 1 sig key * 2 dids
-      expect(result.keyAgreement).toHaveLength(2); // 1 enc key * 2 dids
-      expect(result.assertionMethod).toHaveLength(2);
+      const result = populateDidDocumentFromJwks(skeletonDoc, testJwks);
 
-      const externalVm = result.verificationMethod?.find(vm => vm.controller === EXTERNAL_DID);
-      expect(externalVm?.id).toBe(`${EXTERNAL_DID}#sig-ml`);
+      // 1. Check that verificationMethod contains the full key objects
+      expect(result.verificationMethod).toHaveLength(2);
+      expect(result.verificationMethod?.[0]).toHaveProperty('publicKeyJwk');
+      expect(result.verificationMethod?.[0].id).toBe('did:web:example.com#sig-ml');
+
+      expect(result.verificationMethod?.[1]).toHaveProperty('publicKeyJwk');
+      expect(result.verificationMethod?.[1].id).toBe('did:web:example.com#enc-ml');
+
+      // 2. Check that assertionMethod and keyAgreement contain ONLY string references
+      expect(result.assertionMethod).toHaveLength(1);
+      expect(result.assertionMethod?.[0]).toBe('did:web:example.com#sig-ml');
+      // Verify it's a string, not an object
+      expect(typeof result.assertionMethod?.[0]).toBe('string'); 
+
+      expect(result.keyAgreement).toHaveLength(1);
+      expect(result.keyAgreement?.[0]).toBe('did:web:example.com#enc-ml');
+      // Verify it's a string, not an object
+      expect(typeof result.keyAgreement?.[0]).toBe('string');
     });
   });
 

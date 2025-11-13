@@ -38,11 +38,20 @@ export interface DidDocument {
     id: string;
     /** Public keys used for verifying digital signatures */
     verificationMethod?: VerificationMethod[];
-    /** Keys/controllers authorized to make claims */
-    assertionMethod?: VerificationMethod[];
-    /** Keys used for authentication */
+    /** 
+     * Specifies verification methods for making claims. Can be embedded or a string referencing a `verificationMethod`.
+     * @see https://www.w3.org/TR/did-core/#assertion
+     */
+    assertionMethod?: (string | VerificationMethod)[]; 
+    /** 
+     * Specifies methods for authentication. Can be embedded or a string referencing a `verificationMethod`.
+     * @see https://www.w3.org/TR/did-core/#authentication
+     */
     authentication?: (string | VerificationMethod)[]; 
-    /** Keys used to receive encrypted data */
+    /** 
+     * Specifies methods for key agreement. Can be embedded or a string referencing a `verificationMethod`.
+     * @see https://www.w3.org/TR/did-core/#key-agreement
+     */
     keyAgreement?: (string | VerificationMethod)[];
     /** Service endpoints for interacting with the entity */    
     service?: DidService[];

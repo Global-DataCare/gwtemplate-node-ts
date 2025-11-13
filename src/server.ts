@@ -260,8 +260,18 @@ async function startServer(options?: StartServerOptions) {
   let kmsService: IKmsService;
   const tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService);
 
-  kmsService =
-    config.nodeEnv === 'demo' ? new DemoKmsService() : new KmsService(cryptographyService, tenantManager);
+  if (config.nodeEnv === 'demo') {
+    // In demo mode, we create a real KMS service first to handle key generation...
+    const realKmsService = new KmsService(cryptographyService, tenantManager);
+    // ...and then wrap it with the DemoKmsService which bypasses communication crypto.
+    kmsService = new DemoKmsService(realKmsService);
+    console.log('[GW-API] Using DemoKmsService (with real key generation).');
+  } else {
+    // In production, we use the real KMS service directly.
+    kmsService = new KmsService(cryptographyService, tenantManager);
+    console.log('[GW-API] Using KmsService.');
+  }
+  
   await kmsService.init();
 
   const hostingManager = new HostingManager(
@@ -316,7 +326,7 @@ async function startServer(options?: StartServerOptions) {
   const queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
   const authManager = options?.authManager || new AuthorizationManager();
 
-  const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService);
+  const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService, kmsService);
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);
