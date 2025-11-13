@@ -1,9 +1,10 @@
 // At the very top of the file, before any other imports.
-// This block loads environment variables from a .env file,
-// but safely ignores errors if the file or module doesn't exist.
+// This block loads environment variables from a .env.local file for local development.
+// It safely ignores errors if the file or module doesn't exist.
 // This is ideal for production environments where variables are injected directly.
 try {
-  require('dotenv').config();
+  // We explicitly specify the path to '.env.local'.
+  require('dotenv').config({ path: '.env.local' });
 } catch (e) {
   // In a deployed environment, the 'dotenv' module might not be installed.
   // We can safely ignore this error.
@@ -87,11 +88,13 @@ try {
 let configInstance: IServerConfig;
 
 function determineApiBaseUrl(port: number): string {
-  // 1. Highest Priority: Use the canonical public URL if it's provided.
-  if (process.env.HOST_PUBLIC_URL) {
-    return process.env.HOST_PUBLIC_URL.replace(/\/$/, ''); // Remove trailing slash
+  // 1. Highest Priority: Use the canonical external domain if it's provided.
+  if (process.env.HOST_EXTERNAL_DOMAIN) {
+    // Ensure it's a clean domain without protocol, then add https.
+    const domain = process.env.HOST_EXTERNAL_DOMAIN.replace(/^(https?:\/\/)/, '').replace(/\/$/, '');
+    return `https://${domain}`;
   }
-  // 2. Second Priority: Use the specific deployment URL if provided.
+  // 2. Second Priority: Use the specific Cloud Run deployment URL if provided.
   if (process.env.HOST_DEPLOY_URL) {
     return process.env.HOST_DEPLOY_URL.replace(/\/$/, ''); // Remove trailing slash
   }
@@ -129,7 +132,7 @@ function getConfig(): IServerConfig {
       nodeEnv: process.env.NODE_ENV || 'development',
       port: port,
       apiHostname: process.env.HOST_INTERNAL_NAME || 'localhost', // Internal binding hostname
-      hostExternalDomain: apiBaseUrl, // The external domain IS the final base URL
+      hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || new URL(apiBaseUrl).host, // Use .host to include the port
       apiBaseUrl: apiBaseUrl, // Use the definitive URL here
       namespace: process.env.URN_NAMESPACE || 'antifraud',
       sectorsAllowed: parseAndValidateSectors(process.env.SECTORS_ALLOWED),

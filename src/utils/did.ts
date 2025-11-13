@@ -127,8 +127,16 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
                 publicKeyJwk: key as PublicJwk,
             };
 
-            const isSignatureKey = key.use === 'sig' || (key.key_ops && key.key_ops.includes('sign'));
-            const isEncryptionKey = key.use === 'enc' || (key.key_ops && key.key_ops.includes('encrypt'));
+            // Determine key usage from 'alg' (for signing) or 'crv' (for encryption)
+            // as a fallback if 'use' or 'key_ops' are not present.
+            const isSignatureKey = key.use === 'sig' 
+                || (key.key_ops && key.key_ops.includes('sign'))
+                || ('alg' in key && key.alg?.startsWith('ML-DSA'));
+
+            const isEncryptionKey = key.use === 'enc' 
+                || (key.key_ops && key.key_ops.includes('encrypt'))
+                || ('crv' in key && key.crv?.startsWith('ML-KEM'));
+
             let isAddedToVerificationMethods = false;
 
             if (isSignatureKey) {

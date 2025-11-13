@@ -3,18 +3,52 @@
 
 set -e # Exit immediately if a command exits with a non-zero status.
 
-# --- Configuration Loading ---
+# --- Environment Selection ---
 
-# Check if .env file exists
-if [ ! -f .env ]; then
-  echo "ERROR: .env file not found. Please create it from env.example and configure it."
+# Check if an environment argument is provided
+if [ -z "$1" ]; then
+  echo "❌ ERROR: Deployment environment not specified."
+  echo "Usage: ./cloud_deploy.sh [staging|production]"
   exit 1
 fi
 
-# Load environment variables from .env file securely
+ENV=$1
+ENV_FILE=".env.deploy.$ENV"
+
+# --- Configuration Loading ---
+
+# Check if the environment file exists
+if [ ! -f "$ENV_FILE" ]; then
+  echo "❌ ERROR: Configuration file for '$ENV' not found."
+  echo "Please create '$ENV_FILE' from the example template and configure it."
+  exit 1
+fi
+
+# Load environment variables from the specified file securely
 set -a # automatically export all variables
-source .env
+source "$ENV_FILE"
 set +a # stop automatically exporting
+
+# --- Pre-deployment Confirmation ---
+
+echo "--- 🚀 Preparing for GCP Deployment to '$ENV' ---"
+echo "Please review the following critical configuration values:"
+echo "--------------------------------------------------"
+echo "  Service Name:       $DEPLOY_SERVICE_NAME"
+echo "  Project ID:         $FIRESTORE_PROJECT_ID"
+echo "  Region:             $DEPLOY_REGION"
+echo "  External Domain:    $HOST_EXTERNAL_DOMAIN"
+echo "  External Port:      $HOST_EXTERNAL_PORT"
+echo "  Database Provider:  $DB_PROVIDER"
+echo "  Queue Provider:     $QUEUE_PROVIDER"
+echo "--------------------------------------------------"
+read -p "Are you sure you want to proceed with the deployment? (y/n): " -n 1 -r
+echo "" # move to a new line
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  echo "🛑 Deployment cancelled by user."
+  exit 1
+fi
+
 
 
 # --- Variable Validation ---
@@ -111,7 +145,7 @@ trap 'rm -f "$TEMP_ENV_FILE"' EXIT
 # CRITICAL: For production, sensitive values should be moved to Google Secret Manager.
 RUNTIME_VARS=(
   "NODE_ENV" "HOST_INTERNAL_NAME" "HOST_INTERNAL_PORT"
-  "HOST_PUBLIC_URL" "HOST_DEPLOY_URL"
+  "HOST_EXTERNAL_DOMAIN" "HOST_EXTERNAL_PORT"
   "DEV_SEED" "SECTORS_ALLOWED"
   "ORG_HOST_LEGAL_NAME" "ORG_HOST_JURISDICTION" "ORG_HOST_ID_TYPE" "ORG_HOST_ID_VALUE"
   "ORG_HOST_ADMIN_EMAIL" "ORG_HOST_ADMIN_UID" "ORG_HOST_ADMIN_ROLE" "ORG_HOST_TERMS_URL"
@@ -145,4 +179,35 @@ echo "--- ✅ Deployment Successful ---"
 SERVICE_URL=$(gcloud run services describe "$DEPLOY_SERVICE_NAME" --platform="managed" --region="$DEPLOY_REGION" --format='value(status.url)')
 echo "Service Name: $DEPLOY_SERVICE_NAME"
 echo "Service URL: $SERVICE_URL"
+echo "-----------------------------------"
+
+echo ""
+echo "--- 🔍 Performing post-deployment health check ---"
+echo "Waiting 5 seconds for the service to initialize..."
+sleep 5
+
+PING_URL="${SERVICE_URL}/host/cds-xx/v1/test/ping/standard/resource/_batch"
+PING_PAYLOAD='{"thid":"deployment-health-check","type":"json","body":{"data":[{"type":"ping-form-v1.0","meta":{"claims":{"ping":"Hello World!"}}}]}}'
+
+echo "Attempting a live ping to the service at: $PING_URL"
+echo ""
+
+# Use curl to send a POST request with a JSON body.
+# -X POST: Specifies the request method.
+# -H "Content-Type: application/json": Sets the content type header.
+# -d '$PING_PAYLOAD': Provides the JSON data.
+# -s: Silent mode.
+# -f: Fail fast with non-zero exit code on server errors (4xx, 5xx).
+# -o /dev/null: Discard the output body, we only care about the status code.
+if curl -X POST -H "Content-Type: application/json" -d "$PING_PAYLOAD" -s -f -o /dev/null "$PING_URL"; then
+  echo "✅ Health check PASSED. The service responded successfully to a ping."
+  echo "Your service is up and running correctly."
+else
+  echo "⚠️  Health check FAILED. The service did not respond correctly to a ping."
+  echo "The service might be running but is not correctly configured or has failed to start."
+  echo "Please check the logs for the service '$DEPLOY_SERVICE_NAME' in the Google Cloud Console."
+fi
+
+echo ""
+echo "You can check the interactive API docs at: ${SERVICE_URL}/api-docs"
 echo "-----------------------------------"

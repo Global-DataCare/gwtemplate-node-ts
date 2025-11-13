@@ -1,6 +1,8 @@
 # Gateway Template - Node.js & TypeScript
 
-This repository provides a robust, asynchronous, and policy-driven API gateway template. It is designed for building secure, multi-tenant systems that handle complex data interactions, and integration with technologies like Financial API (FAPI), DIDComm and blockchain.
+This repository provides a robust, asynchronous, and policy-driven API gateway template.
+
+It is designed for building secure, multi-tenant systems that handle complex data interactions, and integration with technologies like Financial API (FAPI), DIDComm and blockchain.
 
 ## Test-Driven Development (TDD)
 
@@ -25,17 +27,16 @@ To get a full overview and navigate the documentation effectively, please start 
 
 Follow these steps to get your local development environment up and running.
 
-### 1. Configure Your Environment
+### 1. Configure Your Local Environment
 
-The server's configuration is managed through environment variables. The project uses a `.env` file for this purpose.
+The server's configuration for local development is managed through a `.env.local` file. This file is **not** tracked in Git, ensuring your local settings and secrets are kept private.
 
-First, copy the template file:
+First, copy the template file to create your local configuration:
 ```bash
-cp env.example .env
+cp env.example .env.local
 ```
-**Important:** The `.env` file is included in `.gitignore`, ensuring that your local secrets (like API keys or credentials) are never committed to the repository. The `env.example` file serves as a non-confidential, public template.
 
-Next, open the `.env` file and review its contents. For basic local development, the default values are often sufficient.
+Next, open `.env.local` and review its contents. For basic local development, the default values are often sufficient. The key variable for local testing is `DB_PROVIDER`, which is pre-configured to `mem` for an in-memory database, requiring no external setup.
 
 ### 2. Install Dependencies
 
@@ -61,7 +62,7 @@ The server will be available at `http://localhost:3000`.
 This method runs the application inside a Docker container, which is a great way to ensure a consistent environment. This is the same image that will be deployed to the cloud.
 
 1.  **Build the Docker image:**
-    *(This script uses the `NPM_TOKEN` from your `.env` file if it exists)*
+    *(This script uses the `NPM_TOKEN` from your `.env.local` file if it exists)*
     ```bash
     ./docker_build_local.sh
     ```
