@@ -22,14 +22,20 @@ import { parseTenantUrn } from '../utils/urn';
 export class TenantsCacheManager implements ITenantsManager {
   private vaultRepository: IVaultRepository;
   private kmsServiceResolver: () => IKmsService;
+  private hostCollectionName: string; // The physical collection name for the host
   private tenantCacheByVaultId = new Map<string, any>();
   private get kmsService(): IKmsService {
     return this.kmsServiceResolver();
   }
 
-  constructor(vaultRepository: IVaultRepository, kmsServiceResolver: () => IKmsService) {
+  constructor(
+    vaultRepository: IVaultRepository, 
+    kmsServiceResolver: () => IKmsService,
+    hostCollectionName: string, // Now required
+  ) {
     this.vaultRepository = vaultRepository;
     this.kmsServiceResolver = kmsServiceResolver;
+    this.hostCollectionName = hostCollectionName;
   }
 
   public async loadTenants(): Promise<void> {
@@ -38,7 +44,7 @@ export class TenantsCacheManager implements ITenantsManager {
     this.tenantCacheByVaultId.clear();
 
     const secureTenantRecords =
-      await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>('host', 'tenants');
+      await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(this.hostCollectionName, 'tenants');
 
     for (const record of secureTenantRecords) {
       try {
@@ -94,7 +100,8 @@ export class TenantsCacheManager implements ITenantsManager {
     }
 
     // 2. If not in cache, fetch from the repository.
-    const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>('host', vaultId, 'tenants');
+    const collection = (vaultId === 'host') ? this.hostCollectionName : 'host';
+    const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>(collection, vaultId, 'tenants');
 
     // 3. If not in the repository, it doesn't exist.
     if (!secureTenantRecord) {

@@ -4,12 +4,15 @@
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { DemoKmsService } from '../../../services/DemoKmsService';
+import { KmsService } from '../../../services/KmsService';
+import { CryptographyService } from '../../../crypto/CryptographyService';
 import { testConfigTenant1, testTenant1IdentifierUrn, testHostDidWeb } from '../../data/organization.data';
 import { ClaimsOrganizationSchemaorg } from '../../../models/schemaorg';
 import { EntityConfig } from '../../../models/entity';
 
 describe('TenantsCacheManager - getTenantDomainUrl', () => {
   let tenantsCacheManager: TenantsCacheManager;
+  let realKmsService: KmsService;
 
   const hostConfig: EntityConfig = {
     id: 'host-id',
@@ -34,8 +37,13 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
   delete (tenantConfigWithoutUrl.claims as any)[ClaimsOrganizationSchemaorg.url];
 
   beforeEach(() => {
-    const demoKmsService = new DemoKmsService();
-    tenantsCacheManager = new TenantsCacheManager(new VaultMemRepository(), () => demoKmsService);
+    const cryptoService = new CryptographyService();
+    const vaultRepository = new VaultMemRepository();
+    tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => realKmsService, 'test-host-collection');
+    realKmsService = new KmsService(cryptoService, tenantsCacheManager);
+    const demoKmsService = new DemoKmsService(realKmsService);
+    // Even though we instantiate demoKmsService, the tenantsCacheManager holds a reference to the real one.
+    // This is correct as its internal operations (like decryption) should use the real KMS.
 
     // Spy on getDidDocument and mock its implementation
     jest.spyOn(tenantsCacheManager, 'getDidDocument').mockImplementation(async (vaultId: string) => {

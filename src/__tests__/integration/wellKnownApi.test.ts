@@ -17,6 +17,7 @@ jest.mock('../../managers/TenantsCacheManager');
 const mockTenantsCacheManager = new TenantsCacheManager(
   {} as any,
   {} as any,
+  'test-host-collection',
 ) as jest.Mocked<TenantsCacheManager>;
 
 // Create a fully typed mock of the IKmsService to satisfy the interface

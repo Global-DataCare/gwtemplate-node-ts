@@ -30,8 +30,8 @@ export class DemoKmsService implements IKmsService {
   }
 
   async init(): Promise<void> {
-    // The real KMS service is initialized by the server before being passed here.
-    // This init is for the Demo wrapper itself, which is a no-op.
+    // It's crucial to initialize the wrapped service to provision the host keys.
+    await this._realKmsService.init();
     console.warn(`[DemoKmsService] Initialized. Key management is delegated to the real KmsService.`);
   }
   

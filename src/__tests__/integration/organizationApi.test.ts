@@ -81,7 +81,7 @@ describe('Organization Registration API', () => {
 
   beforeEach(async () => {
     vaultRepository = new VaultMemRepository();
-    tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService);
+    tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, 'test-host-collection');
     asyncResponseStore = new AsyncResponseStoreMem();
 
     mockConfig = {

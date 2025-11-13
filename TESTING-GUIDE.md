@@ -73,7 +73,7 @@ The Firebase Console is the easiest way to manage Firestore, Authentication, and
 
 ### Create `.env.test` File
 1.  In the project root, create a file named `.env.test`.
-2.  Use `.env.example` as a template and fill in all the required values you gathered from the steps above. It should look similar to this:
+2.  Use `env.example` as a template and fill in all the required values you gathered from the steps above. It should look similar to this:
 
     ```
     # .env.test

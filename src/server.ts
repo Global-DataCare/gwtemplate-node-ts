@@ -223,18 +223,19 @@ async function startServer(options?: StartServerOptions) {
     options.testMiddlewares.forEach((mw) => app.use(mw));
   }
 
+  // Calculate the correct physical collection name for the host from configuration.
+  const hostBootstrapClaims = {
+    [ClaimsOrganizationSchemaorg.addressCountry]: config.host.jurisdiction,
+    [ClaimsOrganizationSchemaorg.identifierType]: config.host.idType,
+    [ClaimsOrganizationSchemaorg.identifierValue]: config.host.idValue,
+    [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+  };
+  const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
+  
   // --- DEPENDENCY INJECTION ---
   let vaultRepository: IVaultRepository;
   if (config.dbProvider === 'firestore') {
     const db = admin.firestore();
-    // Calculate the correct physical collection name for the host from configuration.
-    const hostBootstrapClaims = {
-      [ClaimsOrganizationSchemaorg.addressCountry]: config.host.jurisdiction,
-      [ClaimsOrganizationSchemaorg.identifierType]: config.host.idType,
-      [ClaimsOrganizationSchemaorg.identifierValue]: config.host.idValue,
-      [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
-    };
-    const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
     vaultRepository = new FirestoreVaultRepository(db, hostCollectionName);
     console.log('[GW-API] Using Firestore Vault Repository.');
   } else {
@@ -258,7 +259,9 @@ async function startServer(options?: StartServerOptions) {
   const cryptographyService = new CryptographyService();
 
   let kmsService: IKmsService;
-  const tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService);
+  // The TenantsCacheManager now requires the physical host collection name to find the host config.
+  const tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, hostCollectionName);
+
 
   if (config.nodeEnv === 'demo') {
     // In demo mode, we create a real KMS service first to handle key generation...
@@ -311,6 +314,9 @@ async function startServer(options?: StartServerOptions) {
   if (!(await tenantManager.getTenant('host'))) {
     console.log('[GW-API] Host tenant not found. Bootstrapping...');
     await bootstrapHost(hostingManager, config);
+    // After bootstrapping, explicitly warm up the cache for the host to prevent race conditions on startup.
+    console.log('[GW-API] Warming up host cache after bootstrap...');
+    await tenantManager.getTenant('host');
   }
 
   const managerRegistry: ManagerRegistry = {

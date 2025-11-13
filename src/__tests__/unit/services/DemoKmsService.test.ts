@@ -3,29 +3,49 @@
 
 import { jest } from '@jest/globals';
 import { DemoKmsService } from '../../../services/DemoKmsService';
+import { KmsService } from '../../../services/KmsService';
+import { CryptographyService } from '../../../crypto/CryptographyService';
+import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { Content } from '../../../utils/content';
 import { JobRequest } from '../../../models/request';
 
 describe('DemoKmsService', () => {
     let devKmsService: DemoKmsService;
+    let realKmsService: KmsService;
 
     beforeEach(() => {
-        devKmsService = new DemoKmsService();
+        // To test the DemoKmsService decorator, we need a real KmsService to wrap.
+        const cryptoService = new CryptographyService();
+        const vaultRepository = new VaultMemRepository();
+        // The resolver is a lambda to avoid circular dependency issues during instantiation.
+        const tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => realKmsService, 'test-host-collection');
+        realKmsService = new KmsService(cryptoService, tenantsCacheManager);
+        
+        devKmsService = new DemoKmsService(realKmsService);
         jest.clearAllMocks();
     });
 
     describe('provisionKeys and getPublicJwks', () => {
-        it('should return a consistent, fake JWKSet for an entityId', async () => {
+        it('should delegate to the real KMS service to get real keys', async () => {
+            // Set DEV_SEED to ensure deterministic key generation for the test
+            process.env.DEV_SEED = 'true';
+            
             const entityId = 'tenant-123';
+            // This now calls the *real* provisionKeys method
             const jwks = await devKmsService.provisionKeys(entityId);
             
             expect(jwks.keys).toHaveLength(2);
+            // Check for real crypto properties, not just placeholders
             expect(jwks.keys[0].kty).toBe('AKP');
-            expect(jwks.keys[1].kty).toBe('OKP');
+            expect(jwks.keys[0].alg).toBe('ML-DSA-44');
+            expect(jwks.keys[0].pub).toBeDefined();
 
             const retrievedJwks = await devKmsService.getPublicJwks(entityId);
             expect(retrievedJwks).toEqual(jwks);
+
+            delete process.env.DEV_SEED;
         });
     });
 

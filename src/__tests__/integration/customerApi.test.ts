@@ -40,6 +40,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   const tenantsCacheManager = new TenantsCacheManager(
     vaultRepository,
     () => mockKmsService,
+    'test-host-collection', // Add the required hostCollectionName
   );
 
   const cryptographyService = new CryptographyService();

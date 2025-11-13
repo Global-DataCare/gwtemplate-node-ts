@@ -186,24 +186,17 @@ echo "--- 🔍 Performing post-deployment health check ---"
 echo "Waiting 5 seconds for the service to initialize..."
 sleep 5
 
-PING_URL="${SERVICE_URL}/host/cds-xx/v1/test/ping/standard/resource/_batch"
-PING_PAYLOAD='{"thid":"deployment-health-check","type":"json","body":{"data":[{"type":"ping-form-v1.0","meta":{"claims":{"ping":"Hello World!"}}}]}}'
-
-echo "Attempting a live ping to the service at: $PING_URL"
+HEALTH_CHECK_URL="${SERVICE_URL}/host/.well-known/did.json"
+echo "Attempting to fetch the host's DID document from: $HEALTH_CHECK_URL"
 echo ""
 
-# Use curl to send a POST request with a JSON body.
-# -X POST: Specifies the request method.
-# -H "Content-Type: application/json": Sets the content type header.
-# -d '$PING_PAYLOAD': Provides the JSON data.
-# -s: Silent mode.
-# -f: Fail fast with non-zero exit code on server errors (4xx, 5xx).
-# -o /dev/null: Discard the output body, we only care about the status code.
-if curl -X POST -H "Content-Type: application/json" -d "$PING_PAYLOAD" -s -f -o /dev/null "$PING_URL"; then
-  echo "✅ Health check PASSED. The service responded successfully to a ping."
+# Use curl with -f to fail on server errors (like 404 or 500), -s for silent mode,
+# and -o /dev/null to discard the body. We only care about the status code.
+if curl -s -f -o /dev/null "$HEALTH_CHECK_URL"; then
+  echo "✅ Health check PASSED. The host's DID document was retrieved successfully."
   echo "Your service is up and running correctly."
 else
-  echo "⚠️  Health check FAILED. The service did not respond correctly to a ping."
+  echo "⚠️  Health check FAILED. Could not retrieve the host's DID document."
   echo "The service might be running but is not correctly configured or has failed to start."
   echo "Please check the logs for the service '$DEPLOY_SERVICE_NAME' in the Google Cloud Console."
 fi

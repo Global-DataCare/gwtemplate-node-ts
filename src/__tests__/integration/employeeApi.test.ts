@@ -43,6 +43,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   const tenantsCacheManager = new TenantsCacheManager(
     vaultRepository,
     () => mockKmsService,
+    'test-host-collection',
   );
 
   const apiRouter = createApiRouter(

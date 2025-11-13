@@ -64,7 +64,7 @@ describe('TenantsCacheManager', () => {
       unprotectConfidentialData: jest.fn(),
     } as any;
 
-    tenantsCacheManager = new TenantsCacheManager(mockVaultRepository, () => mockKmsService);
+    tenantsCacheManager = new TenantsCacheManager(mockVaultRepository, () => mockKmsService, 'test-host-collection');
     (generateTenantCollectionNameFromClaims as jest.Mock).mockImplementation((claims: ClaimsRecord) => {
       const value = claims[ClaimsOrganizationSchemaorg.identifierValue];
       return `_${value}_`;

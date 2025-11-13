@@ -30,7 +30,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
 
   const vaultRepository = new VaultMemRepository();
   const cryptographyService = new CryptographyService();
-  const tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService);
+  const tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, 'test-host-collection');
   
   jest.spyOn(tenantsCacheManager, 'getDidServiceConfig');
   jest.spyOn(tenantsCacheManager, 'getDidDocument');
