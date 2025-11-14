@@ -56,7 +56,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   init: jest.fn(async () => {}),
   provisionKeys: jest.fn() as jest.MockedFunction<IKmsService['provisionKeys']>,
   getPublicJwks: jest.fn() as jest.MockedFunction<IKmsService['getPublicJwks']>,
-  decodeJobRequest: jest.fn(),
+  decodeRequest: jest.fn(),
   signWithManagedKey: jest.fn(),
   signWithReconstructedKey: jest.fn(),
   encodeResponse: jest.fn(),

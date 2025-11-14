@@ -94,23 +94,34 @@ export function createApiRouter(
 
     if (job.status === 'COMPLETED' && job.result) {
       try {
-        // Scenario 1: The original request was plaintext JSON (legacy flow).
-        // The worker protects the result for at-rest storage and returns it as a stringified
-        // ConfidentialStorageDoc. We must parse it back into an object before unprotecting.
-        if (job.contentType?.includes('json')) {
-          if (!job.vaultId) {
-            throw new Error('Stored job is missing the vaultId needed for decryption.');
+        // --- ARCHITECTURE KEEPER: UNIFIED RESPONSE HANDLING ---
+        // The Worker guarantees that `job.result` is ALWAYS a JWE string (or a stringified
+        // JSON error). This handler's responsibility is to correctly unpack it based on
+        // the original request flow. This consistency prevents architectural drift.
+        
+        // In the rare case of a plaintext error from the worker, we attempt to parse it.
+        // If it's not JSON, we treat it as a raw JWE string.
+        let resultIsJson = false;
+        try {
+          JSON.parse(job.result);
+          resultIsJson = true;
+        } catch(e) { /* ignore, it's a JWE string */ }
+        
+        if (job.contentType?.includes('json') || resultIsJson) {
+          // --- FLOW A: LEGACY / PLAINTEXT ---
+          // The client expects a JSON response. We must decode the JWE to extract the payload.
+          // This also handles plaintext error objects returned by the worker.
+          if (resultIsJson) {
+            res.set('Content-Type', 'application/json');
+            res.status(500).json(JSON.parse(job.result));
+          } else {
+            const decodedResponse = await kmsService.decodeRequest(job.result);
+            res.set('Content-Type', 'application/json');
+            res.status(200).json(decodedResponse.content);
           }
-          // The stored result is a JSON string of the ConfidentialStorageDoc.
-          const protectedDoc = JSON.parse(job.result as string);
-          const decryptedResponse = await kmsService.unprotectConfidentialData<any>(protectedDoc, job.vaultId);
-          
-          // Respond with the original content type of the request.
-          res.set('Content-Type', job.contentType);
-          res.status(200).json(decryptedResponse);
         } else {
-          // Scenario 2: The original request was encrypted (FAPI flow).
-          // The client expects the form-encoded JWE response. The worker provides the compact JWE directly.
+          // --- FLOW B: FAPI / SECURE ---
+          // The client expects the encrypted JWE response directly.
           res.set('Content-Type', 'application/x-www-form-urlencoded');
           res.status(200).send(`response=${job.result}`);
         }
@@ -328,7 +339,7 @@ export function createApiRouter(
           return res.status(400).json(outcome);
         }
         // The KMS decrypts the JWE using the HOST's key and returns the inner JWS, but does not verify it.
-        const decodedJob = await kmsService.decodeJobRequest(req.body.request);
+        const decodedJob = await kmsService.decodeRequest(req.body.request);
 
         // --- Signature Verification & Sender Key Resolution (Orchestrator Logic) ---
         // If the sender's public key is not embedded, we must resolve it and verify the signature now.

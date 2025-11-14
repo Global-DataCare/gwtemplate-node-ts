@@ -88,7 +88,7 @@ export class DemoKmsService implements IKmsService {
   // These methods override the real KMS behavior to allow for simple, unencrypted
   // communication flows during development.
   
-  async decodeJobRequest(message: string): Promise<JobRequest> {
+  async decodeRequest(message: string): Promise<JobRequest> {
     console.warn(`[DemoKmsService] Bypassing decryption for JWE-like message.`);
     
     // This simulates decoding a Compact JWE by splitting it and decoding the payload part.
@@ -100,23 +100,39 @@ export class DemoKmsService implements IKmsService {
       console.warn(`[DemoKmsService] Detected simulated Compact JWE format.`);
       const protectedHeader = Content.base64UrlSafeToJSON(parts[0]);
       const payload = Content.base64UrlSafeToJSON(parts[3]);
-      
-      // We assume the inner content is a JWS, which we also simulate.
-      const jwsParts = (payload as any).jws.split('.');
-      const jwsProtected = Content.base64UrlSafeToJSON(jwsParts[0]);
-      const jwsPayload = Content.base64UrlSafeToJSON(jwsParts[1]);
+                  // ARCHITECTURE: This function must be tolerant to handle multiple JWE formats
+      // to support both new (standard) and legacy (non-standard) test clients.
+      if ((protectedHeader as { cty?: string }).cty === 'JWS') {
+        // --- 1. Standard Flow: Nested JWS via `cty` header ---
+        // The payload is the JWS compact string directly.
+        const jwsString = payload as unknown as string;
+        const jwsParts = jwsString.split('.');
+        const jwsProtected = Content.base64UrlSafeToJSON(jwsParts[0]);
+        const jwsPayload = Content.base64UrlSafeToJSON(jwsParts[1]);
+        return {
+          content: jwsPayload,
+          meta: { jws: { protected: jwsProtected, payload: jwsPayload, signature: 'dev-fake-signature' }, jwe: { header: protectedHeader } },
+        } as JobRequest;
 
-      return {
-        content: jwsPayload,
-        meta: {
-          jws: {
-            protected: jwsProtected,
-            payload: jwsPayload,
-            signature: 'dev-fake-signature',
-          },
-          jwe: { header: protectedHeader },
-        },
-      } as JobRequest;
+      } else if ((payload as any).jws && typeof (payload as any).jws === 'string') {
+        // --- 2. Legacy Flow: JWS wrapped in a JSON object ---
+        // The payload is a JSON object like `{ "jws": "compact.jws.string" }`.
+        const jwsParts = (payload as any).jws.split('.');
+        const jwsProtected = Content.base64UrlSafeToJSON(jwsParts[0]);
+        const jwsPayload = Content.base64UrlSafeToJSON(jwsParts[1]);
+        return {
+          content: jwsPayload,
+          meta: { jws: { protected: jwsProtected, payload: jwsPayload, signature: 'dev-fake-signature' }, jwe: { header: protectedHeader } },
+        } as JobRequest;
+        
+      } else {
+        // --- 3. Response Flow: Payload is the content directly ---
+        // This is a job response from the worker, where the payload is the response body itself.
+        return {
+          content: payload,
+          meta: { jwe: { header: protectedHeader } },
+        } as JobRequest;
+      }
 
     } else {
       // Fallback for simple JSON objects for legacy tests (like the ping health check).

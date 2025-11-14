@@ -88,7 +88,7 @@ describe('Ping API Endpoint', () => {
         section: 'ping',
         format: 'standard'
       };
-      mockKmsService.decodeJobRequest.mockResolvedValue(mockDecodedJob);
+      mockKmsService.decodeRequest.mockResolvedValue(mockDecodedJob);
 
       const pingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch';
       const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
@@ -147,7 +147,7 @@ describe('Ping API Endpoint', () => {
         section: 'ping',
         format: 'standard'
       };
-      mockKmsService.decodeJobRequest.mockResolvedValue(mockDecodedJob);
+      mockKmsService.decodeRequest.mockResolvedValue(mockDecodedJob);
       const pingUrl = '/acme/cds-xx/v1/test/ping/standard/resource/_batch';
       const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
 

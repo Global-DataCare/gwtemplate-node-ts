@@ -30,7 +30,7 @@ export class NetworkActionsController {
         throw new ManagerError(`Discovery action is not supported for resource type '${resourceType}' in this context.`, IssueType.NotSupported);
       }
       
-      const decodedJob = await this.kmsService.decodeJobRequest(req.body.request);
+      const decodedJob = await this.kmsService.decodeRequest(req.body.request);
       if (!decodedJob.content?.thid) {
         throw new ManagerError('Request payload is missing required "thid".', IssueType.Required);
       }

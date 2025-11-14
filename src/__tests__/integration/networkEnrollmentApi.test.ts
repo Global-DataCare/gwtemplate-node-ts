@@ -101,7 +101,7 @@ describe('Network Enrollment API', () => {
           },
         },
       };
-      mockKmsService.decodeJobRequest.mockResolvedValue(mockJobRequest);
+      mockKmsService.decodeRequest.mockResolvedValue(mockJobRequest);
       
       (tenantsCacheManager.getDidDocument as jest.Mock).mockReturnValue(testTenantC_DidDocument);
 
@@ -130,7 +130,7 @@ describe('Network Enrollment API', () => {
      *
      * The flow is as follows:
      * 1. The client sends a JWS with an invalid signature (or a signature from an unauthorized key).
-     * 2. The API controller calls `kmsService.decodeJobRequest`.
+     * 2. The API controller calls `kmsService.decodeRequest`.
      * 3. The `kmsService` attempts to verify the signature. It fails.
      * 4. The `kmsService` MUST throw an exception.
      * 5. The API controller's `try...catch` block MUST catch this exception.
@@ -154,7 +154,7 @@ describe('Network Enrollment API', () => {
 
       // MOCK: Simulate the KMS rejecting the JWS due to an invalid signature.
       // This is the core of the test.
-      mockKmsService.decodeJobRequest.mockRejectedValue(new Error('Invalid signature'));
+      mockKmsService.decodeRequest.mockRejectedValue(new Error('Invalid signature'));
       
       // --- Act ---
       const response = await request(app)
@@ -238,7 +238,7 @@ describe('Network Enrollment API', () => {
         },
       };
       // The KMS successfully verifies the signature (authentication is a success).
-      mockKmsService.decodeJobRequest.mockResolvedValue(mockJobRequestFromEmployee);
+      mockKmsService.decodeRequest.mockResolvedValue(mockJobRequestFromEmployee);
       
       // The DID Document for the tenant does NOT contain the analyst's key in its assertionMethod.
       // The API controller IGNORES this; it's the worker's responsibility to check it.

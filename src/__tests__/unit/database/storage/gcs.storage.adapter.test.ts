@@ -17,23 +17,28 @@ describe('GcsStorageAdapter', () => {
   const testPdfBytes = new Uint8Array(Buffer.from('dummy pdf content'));
   const testContentType = 'application/pdf';
 
-  // Create mock instances for the GCS client methods we use
-  const mockFileSave = jest.fn().mockResolvedValue(undefined);
-  const mockMakePublic = jest.fn().mockResolvedValue(undefined);
-  const mockFile = jest.fn().mockReturnValue({
-    save: mockFileSave,
-    makePublic: mockMakePublic,
-    publicUrl: () => `https://storage.googleapis.com/${testBucketName}/mock-hash`,
-  });
-  const mockBucket = jest.fn().mockReturnValue({
-    file: mockFile,
-  });
+  let mockFileSave: jest.Mock;
+  let mockMakePublic: jest.Mock;
+  let mockFile: jest.Mock;
+  let mockBucket: jest.Mock;
 
   beforeEach(() => {
-    // Clear all mock history and reset implementations before each test
+    // Clear mock history from any previous test runs
     jest.clearAllMocks();
+
+    // Recreate mocks for each test to ensure complete isolation
+    mockFileSave = jest.fn().mockResolvedValue(undefined);
+    mockMakePublic = jest.fn().mockResolvedValue(undefined);
+    mockFile = jest.fn().mockReturnValue({
+      save: mockFileSave,
+      makePublic: mockMakePublic,
+      publicUrl: () => `https://storage.googleapis.com/${testBucketName}/mock-hash`,
+    });
+    mockBucket = jest.fn().mockReturnValue({
+      file: mockFile,
+    });
     
-    // Set up the mock implementation for the Storage constructor
+    // Set up the mock implementation for the Storage constructor to use our recreated mocks
     mockedStorage.mockImplementation(() => ({
       bucket: mockBucket,
     } as any));
@@ -70,15 +75,21 @@ describe('GcsStorageAdapter', () => {
   });
 
   it('should re-throw a specific error if GCS upload fails', async () => {
-    // Arrange: Make the save method fail
+    // Arrange: Make the save method fail for this specific test
     const gcsError = new Error('GCS connection timed out');
     mockFileSave.mockRejectedValue(gcsError);
 
     const adapter = new GcsStorageAdapter(testBucketName);
 
-    // Act & Assert: Expect the upload promise to be rejected with our custom error
+    // Act & Assert
     await expect(adapter.upload(testPdfBytes, testContentType))
       .rejects
       .toThrow(`GCS upload failed: ${gcsError.message}`);
+    
+    // Ensure makePublic was not called in the failure case
+    expect(mockMakePublic).not.toHaveBeenCalled();
+
+    // Clean up the mock for subsequent tests
+    mockFileSave.mockResolvedValue(undefined);
   });
 });

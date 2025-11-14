@@ -29,7 +29,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   getPublicVerificationKey: jest.fn(),
   getPublicEncryptionKey: jest.fn(),
   getHostPublicJwkSet: jest.fn(),
-  decodeJobRequest: jest.fn(),
+  decodeRequest: jest.fn(),
   signWithManagedKey: jest.fn(),
   signWithReconstructedKey: jest.fn(),
   encodeResponse: jest.fn(),

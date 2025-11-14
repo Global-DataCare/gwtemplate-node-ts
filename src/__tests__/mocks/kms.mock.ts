@@ -17,7 +17,7 @@ export const mockKmsService: jest.Mocked<IKmsService> = {
   getPublicJwks: jest.fn(),
   getPublicVerificationKey: jest.fn(),
   getPublicEncryptionKey: jest.fn(),
-  decodeJobRequest: jest.fn(),
+  decodeRequest: jest.fn(),
   signWithManagedKey: jest.fn(),
   signWithReconstructedKey: jest.fn(),
   encodeResponse: jest.fn(),
@@ -25,11 +25,11 @@ export const mockKmsService: jest.Mocked<IKmsService> = {
     // Simulates REAL behavior: removes .content and encodes it inside .jwe.ciphertext
     const { content, ...docWithoutContent } = doc;
     const simulatedJwe = {
-      ciphertext: Content.objectToRawBase64UrlSafe(content),
+      ciphertext: Content.objectToRawBase64UrlSafe(doc.content || {}),
     };
     return { ...docWithoutContent, jwe: simulatedJwe };
   }),
-  unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc) => {
+  unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc): Promise<any> => {
     // Simulates REAL behavior: decodes .jwe.ciphertext to get the content.
     if (!doc.jwe?.ciphertext) {
       throw new Error('MockKmsService: Cannot unprotect document with invalid simulated JWE.');

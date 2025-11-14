@@ -86,7 +86,7 @@ export interface IKmsService {
    * @param message The raw, encrypted JWE string or a signed JWS string.
    * @returns A decoded `JobRequest` object containing the parsed JWE and JWS structures.
    */
-  decodeJobRequest(message: string): Promise<JobRequest>;
+  decodeRequest(message: string): Promise<JobRequest>;
 
   // --- Signing Operations ---
 
@@ -119,6 +119,8 @@ export interface IKmsService {
 
   /**
    * Encrypts a response payload for one or more external recipients.
+   * This method is intended for data in transit (e.g., API responses). The worker
+   * MUST always use this method to prepare the final job result for the `AsyncResponseStore`.
    * @param payload The object to encrypt.
    * @param recipientJwks An array of public keys for the recipients.
    * @param senderId The `entityId` of the internal entity sending the response (e.g., 'host'),
@@ -130,7 +132,9 @@ export interface IKmsService {
   // --- At-Rest Data Protection ---
 
   /**
-   * Encrypts a document for secure storage using an entity's symmetric key.
+   * Encrypts a document for secure, long-term storage (data at rest).
+   * This method is NOT for final job responses, which are considered data in transit.
+   * Use this for protecting records before saving them to the main database (e.g., VaultRepository).
    * @param doc The document to protect. The sensitive data is in the `.content` property.
    * @param entityId The ID of the entity whose key should be used.
    * @returns The protected document with `.content` replaced by a `.jwe` property.

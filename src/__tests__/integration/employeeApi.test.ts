@@ -147,7 +147,7 @@ describe('Employee Creation API', () => {
         httpMethod: 'POST',
         requestUrl: registrationUrl, // Use the constructed URL
       };
-      mockKmsService.decodeJobRequest.mockResolvedValue(
+      mockKmsService.decodeRequest.mockResolvedValue(
         mockDecodedJob as JobRequest,
       );
 
@@ -158,7 +158,7 @@ describe('Employee Creation API', () => {
         .send(`request=${testEncryptedJwe1}`);
 
       // --- Assert ---
-      expect(mockKmsService.decodeJobRequest).toHaveBeenCalledWith(
+      expect(mockKmsService.decodeRequest).toHaveBeenCalledWith(
         testEncryptedJwe1,
       );
 

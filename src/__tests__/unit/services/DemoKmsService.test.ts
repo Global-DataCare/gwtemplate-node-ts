@@ -49,7 +49,7 @@ describe('DemoKmsService', () => {
         });
     });
 
-    describe('decodeJobRequest', () => {
+    describe('decodeRequest', () => {
         it('should decode a simulated Compact JWE string', async () => {
             // --- Arrange ---
             // 1. The innermost content.
@@ -65,7 +65,7 @@ describe('DemoKmsService', () => {
             const simulatedJwe = `${jweProtected}.key.iv.${jweCiphertext}.tag`;
 
             // --- Act ---
-            const jobRequest = await devKmsService.decodeJobRequest(simulatedJwe);
+            const jobRequest = await devKmsService.decodeRequest(simulatedJwe);
 
             // --- Assert ---
             expect(jobRequest).toBeInstanceOf(Object);
@@ -75,7 +75,7 @@ describe('DemoKmsService', () => {
 
         it('should still handle legacy plaintext JSON', async () => {
             const legacyPayload = { data: 'legacy-test' };
-            const jobRequest = await devKmsService.decodeJobRequest(JSON.stringify(legacyPayload));
+            const jobRequest = await devKmsService.decodeRequest(JSON.stringify(legacyPayload));
             expect(jobRequest.content).toEqual(legacyPayload);
         });
     });

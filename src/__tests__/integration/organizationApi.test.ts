@@ -177,7 +177,7 @@ describe('Organization Registration API', () => {
           },
         },
       };
-      mockKmsService.decodeJobRequest.mockResolvedValue(mockDecodedJob as JobRequest);
+      mockKmsService.decodeRequest.mockResolvedValue(mockDecodedJob as JobRequest);
 
       // --- Act ---
       const response = await request(app)
@@ -186,7 +186,7 @@ describe('Organization Registration API', () => {
         .send(`request=${testEncryptedJwe1}`);
 
       // --- Assert ---
-      expect(mockKmsService.decodeJobRequest).toHaveBeenCalledWith(
+      expect(mockKmsService.decodeRequest).toHaveBeenCalledWith(
         testEncryptedJwe1,
       );
       expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);

@@ -39,7 +39,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   init: jest.fn<IKmsService['init']>(),
   provisionKeys: jest.fn<IKmsService['provisionKeys']>(),
   getPublicJwks: jest.fn<IKmsService['getPublicJwks']>(),
-  decodeJobRequest: jest.fn<IKmsService['decodeJobRequest']>(),
+  decodeRequest: jest.fn<IKmsService['decodeRequest']>(),
   signWithManagedKey: jest.fn<IKmsService['signWithManagedKey']>().mockResolvedValue(mockSignResult),
   signWithReconstructedKey: jest.fn<IKmsService['signWithReconstructedKey']>(),
   encodeResponse: jest.fn<IKmsService['encodeResponse']>(),

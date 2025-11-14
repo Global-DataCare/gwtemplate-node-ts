@@ -93,14 +93,14 @@ describe('KmsService', () => {
     });
   });
 
-  describe('decodeJobRequest', () => {
+  describe('decodeRequest', () => {
     it('should decrypt a JWE and return the parsed JWS payload', async () => {
       // Arrange
       await kmsService.init(); 
       const message = 'compact-jwe-string';
       const mockHostKid = 'mock-kem-kid'; // KID of the host's encryption key
       const mockDecryptedBytes = Content.stringToBytesUTF8('protected.payload.signature');
-      const mockProtectedHeader = { enc: 'A256GCM', skid: 'sender-key-id' }; // No JWK
+      const mockProtectedHeader = { enc: 'A256GCM', skid: 'sender-key-id', cty: 'JWS' }; // No JWK
       const mockJws: DataCompactJWT = { 
         protected: { alg: 'ML-DSA-44', kid: 'sender-key-id' }, 
         payload: { thid: '123', iss: 'did:web:sender' }, 
@@ -112,7 +112,7 @@ describe('KmsService', () => {
       mockCryptoService.parseCompactJws.mockReturnValue(mockJws);
 
       // Act
-      const jobRequest = await kmsService.decodeJobRequest(message);
+      const jobRequest = await kmsService.decodeRequest(message);
 
       // Assert
       expect(mockCryptoService.getRecipientKidsFromJwe).toHaveBeenCalledWith(message);

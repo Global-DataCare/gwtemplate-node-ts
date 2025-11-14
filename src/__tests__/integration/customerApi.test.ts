@@ -139,7 +139,7 @@ describe('Person Onboarding API', () => {
         httpMethod: 'POST',
         requestUrl: registrationUrl,
       };
-      mockKmsService.decodeJobRequest.mockResolvedValue(
+      mockKmsService.decodeRequest.mockResolvedValue(
         mockDecodedJob as JobRequest,
       );
 
@@ -150,7 +150,7 @@ describe('Person Onboarding API', () => {
         .send(`request=${testEncryptedJwe1}`);
 
       // --- Assert ---
-      expect(mockKmsService.decodeJobRequest).toHaveBeenCalledWith(
+      expect(mockKmsService.decodeRequest).toHaveBeenCalledWith(
         testEncryptedJwe1,
       );
 

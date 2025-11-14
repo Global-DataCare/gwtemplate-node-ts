@@ -8,7 +8,7 @@ import { parseJobName } from './utils/naming';
 import { composeHostDidWebId } from './utils/did';
 import { IKmsService } from './crypto/interfaces/IKmsService';
 import { getTenantVaultId } from './utils/tenant';
-import { ConfidentialStorageDoc } from './models/confidential-storage';
+import { JWK } from './models/jwk';
 
 /**
  * The Worker is the heart of the background processing logic.
@@ -28,8 +28,8 @@ export class Worker {
 
   /**
    * Processes a job, gets the plaintext response from the appropriate manager,
-   * and then protects or encodes it before returning the final artifact.
-   * @returns A string representation of the final result, either a Compact JWE or a stringified ConfidentialStorageDoc.
+   * and then encrypts it before returning the final artifact.
+   * @returns The final, encrypted JWE response as a string.
    */
   public async process(jobName: string, job: JobRequest): Promise<string> {
     const jobInfo = parseJobName(jobName);
@@ -74,38 +74,56 @@ export class Worker {
       // 2. Delegate to the manager to get the plaintext response.
       const payloadResponse = await manager.process(job);
 
-      // --- 5. Final Response Encoding ---
-      // The worker MUST always return a string. The format of the string depends on the
-      // original request's flow (FAPI or Legacy).
+      // --- ARCHITECTURE KEEPER: UNIFIED RESPONSE ENCODING ---
+      // The Worker MUST ALWAYS use `IKmsService.encodeResponse` to prepare the job result.
+      // This guarantees that the AsyncResponseStore contains a consistent data type (a JWE string)
+      // for the Polling Handler to process, eliminating an entire class of potential errors.
+      // The `protectConfidentialData` method is strictly for long-term "at-rest" storage
+      // in the main vault, not for in-transit responses like this.
 
-      if (job.contentType?.includes('json')) {
-        /**
-         * @architecture LEGACY FLOW
-         * The response payload is protected for at-rest storage. To do this, it MUST
-         * be wrapped in a structure conforming to `ConfidentialStorageDoc` before
-         * being passed to the KMS. The resulting object is then stringified for the queue.
-         */
-        const vaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector!, job.tenantId!);
-        const docToProtect: ConfidentialStorageDoc = {
-          id: 'response-payload', // A placeholder ID for the content within the doc
-          sequence: 0,
-          content: payloadResponse,
-        };
-        const protectedDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
-        return JSON.stringify(protectedDoc);
+      // We determine the intended recipient of the encrypted response based on the original request flow.
+      const senderVaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector, job.tenantId);
+      let recipientJwks: JWK[];
+      let responseSenderVaultId: string = senderVaultId;
+      
+      if (job.meta?.jwe?.header?.jwk) {
+        // --- FLOW A: FAPI / SECURE FLOW ---
+        // The original request was a JWE and included the sender's public key (`jwk`).
+        // We use that key to encrypt the response directly for them.
+        recipientJwks = [job.meta.jwe.header.jwk];
+
       } else {
-        /**
-         * @architecture FAPI FLOW
-         * The response is encoded for the original external caller using their public key
-         * provided in the initial JWE header.
-         */
-        const recipientPublicKey = job.meta?.jwe?.header?.jwk;
-        if (!recipientPublicKey) {
-          throw new Error('Cannot encode response: Missing recipient public key (jwk) from original request.');
+        // --- FLOW B: LEGACY / PLAINTEXT FLOW ---
+        // The original request was unencrypted (e.g., application/json). We must still
+        // encrypt the response for secure storage in the AsyncResponseStore.
+        // The recipient is determined by the nature of the job.
+        let recipientVaultId: string;
+        if (jobInfo.resourceType === 'Organization' && job.tenantId === 'host') {
+          // Special Case: New tenant registration. Encrypt for the NEW tenant.
+          // The sender in this case is the 'host'.
+          const newTenantClaims = job.content?.body?.data?.[0]?.meta?.claims;
+          if (!newTenantClaims) throw new Error('Cannot determine new tenant from claims to encrypt response.');
+          
+          const newTenantId = newTenantClaims['org.schema.Organization.alternateName'] as string;
+          const newTenantSector = newTenantClaims['org.schema.Service.category'] as string;
+          if (!newTenantId || !newTenantSector) throw new Error('Missing alternateName or category in new tenant claims.');
+          
+          recipientVaultId = getTenantVaultId(newTenantSector, newTenantId);
+          responseSenderVaultId = 'host';
+        } else {
+          // Default Case: An existing tenant is processing a job. Encrypt for the tenant itself.
+          recipientVaultId = senderVaultId;
         }
-        const senderVaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector!, job.tenantId!);
-        return this.kmsService.encodeResponse(payloadResponse, [recipientPublicKey], senderVaultId);
+
+        const encryptionKey = await this.kmsService.getPublicEncryptionKey(recipientVaultId);
+        if (!encryptionKey) {
+          throw new Error(`Could not retrieve public encryption key for recipient vault '${recipientVaultId}'`);
+        }
+        recipientJwks = [encryptionKey as JWK];
       }
+
+      return this.kmsService.encodeResponse(payloadResponse, recipientJwks, responseSenderVaultId);
+      
     } catch (error: any) {
       console.error(`[Worker Job '${jobName}' failed for thid ${job.content?.thid}]`, error.message);
       
@@ -118,20 +136,16 @@ export class Worker {
         body: errorBundle,
       };
 
-      // Also attempt to protect error responses, ensuring consistency in return type.
+      // Also attempt to encrypt error responses, ensuring the Polling Handler always
+      // gets a consistent data type if possible.
       const recipientKey = job.meta?.jwe?.header?.jwk;
       if (recipientKey) {
+        // The issuer of a catastrophic error is always the host.
         return this.kmsService.encodeResponse(errorResponse, [recipientKey], 'host');
       } else {
-        // For legacy flow errors, we follow the same "wrap -> protect -> stringify" pattern.
-        const vaultId = job.tenantId && job.sector ? (job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector, job.tenantId)) : 'host';
-        const docToProtect: ConfidentialStorageDoc = {
-          id: 'error-response',
-          sequence: 0,
-          content: errorResponse,
-        };
-        const protectedError = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
-        return JSON.stringify(protectedError);
+        // In the legacy flow, we can't be sure who to encrypt for in an error case,
+        // so we must return a plaintext JSON string. The polling handler MUST handle this.
+        return JSON.stringify(errorResponse);
       }
     }
   }
