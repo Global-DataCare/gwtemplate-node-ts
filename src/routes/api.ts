@@ -95,13 +95,16 @@ export function createApiRouter(
     if (job.status === 'COMPLETED' && job.result) {
       try {
         // Scenario 1: The original request was plaintext JSON (legacy flow).
-        // The client expects a plaintext JSON response. The worker protects the result
-        // using the standard at-rest protection, so we must unprotect it here.
+        // The worker protects the result for at-rest storage and returns it as a stringified
+        // ConfidentialStorageDoc. We must parse it back into an object before unprotecting.
         if (job.contentType?.includes('json')) {
           if (!job.vaultId) {
             throw new Error('Stored job is missing the vaultId needed for decryption.');
           }
-          const decryptedResponse = await kmsService.unprotectConfidentialData<any>(job.result as any, job.vaultId);
+          // The stored result is a JSON string of the ConfidentialStorageDoc.
+          const protectedDoc = JSON.parse(job.result as string);
+          const decryptedResponse = await kmsService.unprotectConfidentialData<any>(protectedDoc, job.vaultId);
+          
           // Respond with the original content type of the request.
           res.set('Content-Type', job.contentType);
           res.status(200).json(decryptedResponse);
