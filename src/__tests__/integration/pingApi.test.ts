@@ -9,12 +9,14 @@ import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { mockKmsService } from '../mocks/kms.mock';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async-response-store.mem';
+import { StoredJob } from '../../adapters/async-response-store.mem';
 import { decodedPingMessage, testEncryptedJwePing, decodedTenantPingMessage } from '../data/ping.data';
 import { testCompletedJob, testPendingJob } from '../data/async-response.data';
 import { createDidServiceId } from '../../utils/did';
 import { IssueType } from '../../models/fhir/codes';
 import { JobRequest } from '../../models/request';
 import { DidService } from '../../models/did';
+import { Content } from '../../utils/content';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -250,6 +252,7 @@ describe('Ping API Endpoint', () => {
         .send(`thid=${thid}`);
 
       expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/application\/x-www-form-urlencoded/);
       expect(response.text).toBe(`response=${testCompletedJob.result}`);
     });
 
@@ -265,6 +268,35 @@ describe('Ping API Endpoint', () => {
 
       expect(response.status).toBe(202);
       expect(response.body.status).toBe('PENDING');
+    });
+
+    it('should return 200 OK with a JSON result if the original job was legacy JSON', async () => {
+      // --- Arrange ---
+      const asyncResponseStore = new AsyncResponseStoreMem();
+      const legacyCompletedJob: StoredJob = {
+        status: 'COMPLETED',
+        vaultId: 'host', // The job was for the host
+        contentType: 'application/json', // Mark as a legacy job
+        result: {
+          // This mimics the structure of a protected document (what the worker would store)
+          jwe: {
+            ciphertext: Content.objectToRawBase64UrlSafe({ ping: 'pong' })
+          }
+        }
+      };
+      asyncResponseStore.set(thid, legacyCompletedJob);
+      const { app } = setupApp(asyncResponseStore);
+      
+      // --- Act ---
+      const response = await request(app)
+        .post(pollingUrl)
+        .set('Content-Type', 'application/x-www-form-urlencoded')
+        .send(`thid=${thid}`);
+
+      // --- Assert ---
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/application\/json/); // The mock uses 'application/json'
+      expect(response.body).toEqual({ ping: 'pong' });
     });
   });
 });

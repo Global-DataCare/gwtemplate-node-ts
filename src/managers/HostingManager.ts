@@ -26,6 +26,7 @@ import { initializeHostServices, initializeTenantServices } from '../utils/servi
 import { generateTenantCollectionNameFromClaims, getTenantVaultId, isValidTenantAlternateName } from '../utils/tenant';
 import { AllowedIndexableClaims } from '../models/indexing';
 import { createOrganizationUrn } from '../utils/urn';
+import { ILogger } from '../loggers/ILogger';
 import { TenantsCacheManager } from './TenantsCacheManager';
 
 /**
@@ -36,6 +37,7 @@ export class HostingManager {
   private kmsService: IKmsService;
   private tenantsCacheManager: TenantsCacheManager;
   private storageAdapter: IStorageAdapter;
+  private logger: ILogger;
   private config: IServerConfig;
 
   constructor(
@@ -43,12 +45,14 @@ export class HostingManager {
     kmsService: IKmsService,
     tenantsCacheManager: TenantsCacheManager,
     storageAdapter: IStorageAdapter,
+    logger: ILogger,
     config: IServerConfig,
   ) {
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
     this.tenantsCacheManager = tenantsCacheManager;
     this.storageAdapter = storageAdapter;
+    this.logger = logger;
     this.config = config;
   }
 
@@ -198,12 +202,13 @@ export class HostingManager {
     };
 
     const didId = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
-    hostConfig.didConfig.service = initializeHostServices(didId, this.config.sectorsAllowed);
+    const services = initializeHostServices(didId, this.config.sectorsAllowed);
+    hostConfig.didConfig.service = services;
     const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: didId, alsoKnownAs: [] };
     hostConfig.didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
     
     // FIX: Explicitly add the initialized services to the final DID document.
-    hostConfig.didDocument.service = hostConfig.didConfig.service;
+    hostConfig.didDocument.service = services;
 
     const docToProtect: ConfidentialStorageDoc = {
       id: logicalVaultId, // The document ID inside the tenants section is the logical ID

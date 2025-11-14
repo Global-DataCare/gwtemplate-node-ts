@@ -94,16 +94,22 @@ export function createApiRouter(
 
     if (job.status === 'COMPLETED' && job.result) {
       try {
-        // The original request was plaintext, so the client expects a plaintext JSON response.
-        // We must decrypt the internally-stored JWE before responding.
+        // Scenario 1: The original request was plaintext JSON (legacy flow).
+        // The client expects a plaintext JSON response. The worker protects the result
+        // using the standard at-rest protection, so we must unprotect it here.
         if (job.contentType?.includes('json')) {
-          const decryptedResponse = await kmsService.decodeJobRequest(job.result);
-          res.set('Content-Type', 'application/json');
-          res.status(200).json(decryptedResponse.content);
+          if (!job.vaultId) {
+            throw new Error('Stored job is missing the vaultId needed for decryption.');
+          }
+          const decryptedResponse = await kmsService.unprotectConfidentialData<any>(job.result as any, job.vaultId);
+          // Respond with the original content type of the request.
+          res.set('Content-Type', job.contentType);
+          res.status(200).json(decryptedResponse);
         } else {
-          // The original request was encrypted, so the client expects the encrypted JWE response.
-          res.set('Content-Type', 'application/jose+json');
-          res.status(200).send(job.result);
+          // Scenario 2: The original request was encrypted (FAPI flow).
+          // The client expects the form-encoded JWE response. The worker provides the compact JWE directly.
+          res.set('Content-Type', 'application/x-www-form-urlencoded');
+          res.status(200).send(`response=${job.result}`);
         }
         asyncResponseStore.delete(thid);
       } catch (error: any) {
@@ -453,7 +459,7 @@ export function createApiRouter(
     const jobName = createJobName(vaultId, resourceType, action);
     jobRequest.action = action; // Ensure action is part of the job request for the worker
     await queueAdapter.addJob(jobName, jobRequest);
-    asyncResponseStore.set(thid, { status: 'PENDING' });
+    asyncResponseStore.set(thid, { status: 'PENDING', vaultId: vaultId });
 
     // --- 5. Success Response ---
     const pollingUrl = req.originalUrl.replace(`/${action}`, '/_batch-response');

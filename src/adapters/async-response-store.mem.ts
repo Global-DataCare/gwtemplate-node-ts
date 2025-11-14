@@ -6,6 +6,7 @@
  */
 export interface StoredJob {
   status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  vaultId?: string; // The vaultId of the tenant who owns the job
   result?: any; // The encrypted JWE or an error object
   contentType?: string; // The content type of the original request
 }

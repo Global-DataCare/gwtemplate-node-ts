@@ -77,23 +77,36 @@ describe('TenantsCacheManager', () => {
 
   describe('getCollectionName (Lazy Loading)', () => {
     it('should fetch, decrypt, cache, and return the collection name for an uncached tenant', async () => {
+      // This test validates the core lazy-loading logic.
+      // It ensures that when a tenant's config is requested for the first time,
+      // the manager correctly queries the HOST's physical collection to find it.
+
       const mockAcmeRecord = { id: acmeVaultId, content: acmeConfig };
       mockVaultRepository.get.mockResolvedValue(mockAcmeRecord);
       mockKmsService.unprotectConfidentialData.mockResolvedValue(acmeConfig);
       const expectedCollectionName = generateTenantCollectionNameFromClaims(acmeConfig.claims as ClaimsRecord);
 
+      // --- First Call (Cache Miss) ---
       const collectionName1 = await tenantsCacheManager.getCollectionName(acmeVaultId);
 
       expect(collectionName1).toBe(expectedCollectionName);
       expect(mockVaultRepository.get).toHaveBeenCalledTimes(1);
+
+      // CRITICAL ARCHITECTURE TEST:
+      // Verify that the manager is correctly calling the repository. It MUST use the
+      // logical name 'host' to ask for the collection, trusting the repository
+      // to handle the translation to a physical name. The manager must remain
+      // agnostic to physical collection names.
       expect(mockVaultRepository.get).toHaveBeenCalledWith('host', acmeVaultId, 'tenants');
       expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledTimes(1);
 
+      // --- Second Call (Cache Hit) ---
       const collectionName2 = await tenantsCacheManager.getCollectionName(acmeVaultId);
 
+      // Assert that we get the same result without calling the repository again.
       expect(collectionName2).toBe(expectedCollectionName);
-      expect(mockVaultRepository.get).toHaveBeenCalledTimes(1);
-      expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledTimes(1);
+      expect(mockVaultRepository.get).toHaveBeenCalledTimes(1); // Should not be called again
+      expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledTimes(1); // Should not be called again
     });
 
     it('should return undefined for a tenant that does not exist in the repository', async () => {

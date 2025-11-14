@@ -59,7 +59,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServices(tenantConfig.didDocument.id, tenantConfig.provider.service.sectorCategory as Sector);
 
       // ASSERT
-      expect(services).toHaveLength(6); // 2 discovery + 2 business + 2 network
+      expect(services).toHaveLength(7); // 3 discovery + 2 business + 2 network
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -80,7 +80,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServices(tenantConfig.didDocument.id, tenantConfig.provider.service.sectorCategory as Sector);
       
       // ASSERT
-      expect(services).toHaveLength(6);
+      expect(services).toHaveLength(7);
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -107,7 +107,7 @@ describe('Service Initialization Utilities', () => {
 
       const jwksService = services.find((s: DidService) => s.id.endsWith('#jwks'));
       expect(jwksService).toBeDefined();
-      expect(jwksService!.serviceEndpoint).toBe('https://acme.com/jwks.json');
+      expect(jwksService!.serviceEndpoint).toBe('https://acme.com/.well-known/jwks.json');
     });
   });
 

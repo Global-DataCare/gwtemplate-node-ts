@@ -92,6 +92,14 @@ export class TenantsCacheManager implements ITenantsManager {
     // console.log(`[TenantsCacheManager] Successfully loaded ${this.tenantCacheByVaultId.size} tenants.`);
   }
 
+  /**
+   * @architecture CRITICAL
+   * To resolve any tenant's configuration (including the host's), this method MUST
+   * query the logical 'host' collection. Per the IVaultRepository contract, the repository
+   * implementation is responsible for translating 'host' into the correct physical
+   * collection name. This manager MUST remain agnostic to physical names and operate
+   * only on logical identifiers. This is a cornerstone of the abstraction layer.
+   */
   private async _ensureTenantIsInCache(vaultId: string): Promise<any | undefined> {
     // 1. Check the cache first.
     let tenantConfig = this.tenantCacheByVaultId.get(vaultId);
@@ -99,9 +107,8 @@ export class TenantsCacheManager implements ITenantsManager {
       return tenantConfig;
     }
 
-    // 2. If not in cache, fetch from the repository.
-    const collection = (vaultId === 'host') ? this.hostCollectionName : 'host';
-    const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>(collection, vaultId, 'tenants');
+    // 2. If not in cache, fetch the tenant's registration record from the 'host' logical vault.
+    const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>('host', vaultId, 'tenants');
 
     // 3. If not in the repository, it doesn't exist.
     if (!secureTenantRecord) {

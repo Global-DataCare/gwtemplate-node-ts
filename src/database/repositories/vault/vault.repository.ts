@@ -4,22 +4,26 @@
 import { RecordBase, VaultConfig } from "../../../models/resource-document";
 
 /**
- * Defines the contract for a Vault Repository.
+ * Defines the contract for a Vault Repository, an abstraction layer over the physical
+ * storage mechanism for tenant data.
  *
- * @architecture
- * This interface represents the lowest level of the storage abstraction layer. It is
- * intentionally "dumb" and operates on physical identifiers (`collectionName`) rather than
- * logical business identifiers (`vaultId`). The responsibility of translating logical IDs
- * to physical ones lies with the `TenantsCacheManager`.
+ * @architecture CRITICAL
+ * This interface adheres to a strict separation of logical and physical identifiers.
+ * - **LOGICAL 'host' IDENTIFIER**: Implementations of this interface MUST translate the logical
+ *   `collectionName` string 'host' into the actual physical collection name of the host's vault.
+ *   This is the ONLY translation the repository is responsible for.
+ * - **PHYSICAL `collectionName`**: For any `collectionName` other than 'host', the repository
+ *   MUST treat it as a direct, physical identifier passed down from a manager.
+ * - **LOGICAL `vaultId`**: The `vaultExists` method operates on a logical `vaultId` (e.g., 'host',
+ *   'health-care_acme') as it checks against the central tenant registry.
  *
- * Methods like `createNewVault` and `vaultExists` are exceptions; they operate on logical
- * `vaultId`s because their scope is the logical existence of a vault, which in the
- * Firestore implementation is managed via a separate metadata collection.
+ * Business logic managers MUST remain agnostic to physical storage details and interact
+ * with the repository using these conventions.
  */
 export abstract class IVaultRepository {
-    /** Creates a new vault's metadata entry. Operates on a logical vaultId. */
+    /** Creates a new physical vault/collection. Operates on a physical collectionName. */
     abstract createNewVault(vaultConfig: VaultConfig): Promise<boolean>;
-    /** Checks if a vault's metadata entry exists. Operates on a logical vaultId. */
+    /** Checks if a tenant's logical registration record exists. Operates on a logical vaultId. */
     abstract vaultExists(vaultId: string): Promise<boolean>;
     /** Retrieves the configuration for a specific vault. */
     abstract getVaultConfig(vaultId: string): Promise<VaultConfig | undefined>;

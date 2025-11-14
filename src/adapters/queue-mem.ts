@@ -1,5 +1,11 @@
-// src/adapters/queue-mem.ts
+import { JobRequest } from '../models/request';
+import { getTenantVaultId } from '../utils/tenant';
+import { IAsyncResponseStore, StoredJob } from './async-response-store.mem';
 import { QueueAdapter } from './queue';
+import { Worker } from '../worker'
+
+/**
+ * An in-memory implementation of the QueueAdapter.
 import { Worker } from '../worker';
 import { JobRequest } from '../models/request';
 import { IAsyncResponseStore, StoredJob } from './async-response-store.mem';
@@ -51,8 +57,17 @@ export class QueueAdapterMem implements QueueAdapter {
         try {
           // Delegate to the worker, which now returns the final, encrypted JWE string.
           const encryptedResult = await this.worker.process(job.name, job.request);
+          
+          // CRITICAL ARCHITECTURE: The vaultId MUST be persisted in the stored job.
+          // It is constructed here from the job's tenantId (alternateName) and sector,
+          // because this is the last point before the result is stored for polling.
+          const vaultId = job.request.tenantId === 'host'
+            ? 'host'
+            : getTenantVaultId(job.request.sector!, job.request.tenantId!);
+
           const finalResult: StoredJob = { 
             status: 'COMPLETED', 
+            vaultId: vaultId, // Persist the vaultId
             result: encryptedResult,
             contentType: job.request.contentType, // Persist the original content type
           };

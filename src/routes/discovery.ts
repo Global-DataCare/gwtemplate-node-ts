@@ -11,6 +11,7 @@ import { signVerifiableCredential } from '../utils/vc-signer';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
 
 import { IKmsService } from '../crypto/interfaces/IKmsService';
+import { ILogger } from '../loggers/ILogger';
 
 // List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
@@ -20,14 +21,16 @@ const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
  * @param tenantsCacheManager The cache manager to resolve tenant configurations.
  * @param discoveryService The service to generate discovery documents.
  * @param kmsService The service to retrieve cryptographic keys.
+ * @param logger The logging service.
  * @returns An Express router.
  */
 export function createDiscoveryRouter(
   tenantsCacheManager: TenantsCacheManager,
   discoveryService: DiscoveryService,
   kmsService: IKmsService,
+  logger: ILogger,
 ): express.Router {
-  const router = express.default.Router();
+  const router = express.Router();
 
   // Middleware to resolve the tenant vaultId based on path parameters and verify existence.
   const resolveTenant = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -84,7 +87,7 @@ export function createDiscoveryRouter(
       res.json(jwks);
     } catch (error) {
       // If keys are not found for the entity, it's a server-side issue.
-      console.error(`[DiscoveryRouter] Failed to get JWKS for vaultId '${res.locals.vaultId}':`, error);
+      logger.error('Failed to get JWKS', error as Error, { vaultId: res.locals.vaultId });
       res.status(500).type('text').send('Internal Server Error: Could not retrieve key set.');
     }
   });
@@ -171,3 +174,4 @@ export function createDiscoveryRouter(
   });
   return router;
 }
+

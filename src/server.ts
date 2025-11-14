@@ -20,6 +20,8 @@ import * as admin from 'firebase-admin';
 import * as express from 'express';
 
 
+import { ILogger } from './loggers/ILogger';
+import { ConsoleLogger } from './loggers/ConsoleLogger';
 import { GcsStorageAdapter } from './database/storage/gcs.storage.adapter';
 import { IStorageAdapter } from './database/storage/IStorageAdapter';
 import { StorageMemAdapter } from './database/storage/mem.storage.adapter';
@@ -60,9 +62,11 @@ import { CommunicationManager } from './managers/CommunicationManager';
 import { IAuthorizationManager } from './managers/auth/IAuthorizationManager';
 import { createFhirRouter } from './routes/fhir';
 import { AuthorizationManager } from './managers/AuthorizationManager';
-import * as swaggerUi from 'swagger-ui-express';
+import { createOperationOutcome } from './utils/outcome';
+import { IssueLevel, IssueType } from './models/fhir/codes';
 import * as path from 'path';
 import { generateTenantCollectionNameFromClaims } from './utils/tenant';
+import * as swaggerUi from 'swagger-ui-express';
 
 // Load the pre-generated swagger spec. This is the static base.
 let swaggerSpec: any;
@@ -216,8 +220,8 @@ async function startServer(options?: StartServerOptions) {
   }
 
   const app = express.default();
-  app.use(express.default.urlencoded({ extended: true }));
-  app.use(express.default.json({ type: ['application/json', 'application/fhir+json'] }));
+  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ type: ['application/json', 'application/fhir+json'] }));
 
   if (options?.testMiddlewares) {
     options.testMiddlewares.forEach((mw) => app.use(mw));
@@ -258,6 +262,10 @@ async function startServer(options?: StartServerOptions) {
 
   const cryptographyService = new CryptographyService();
 
+  // --- Logger Instantiation ---
+  // Default to console logger. This can be expanded with a factory for other providers.
+  const logger: ILogger = new ConsoleLogger();
+
   let kmsService: IKmsService;
   // The TenantsCacheManager now requires the physical host collection name to find the host config.
   const tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, hostCollectionName);
@@ -282,6 +290,7 @@ async function startServer(options?: StartServerOptions) {
     kmsService,
     tenantManager,
     storageAdapter,
+    logger, // Inject logger
     config,
   );
   const employeeManager = new EmployeeManager(vaultRepository, kmsService, tenantManager);
@@ -332,7 +341,7 @@ async function startServer(options?: StartServerOptions) {
   const queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
   const authManager = options?.authManager || new AuthorizationManager();
 
-  const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService, kmsService);
+  const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService, kmsService, logger);
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);
@@ -340,6 +349,23 @@ async function startServer(options?: StartServerOptions) {
   app.use('/', apiRouter);
   app.use('/', networkRouter);
   app.use('/', fhirRouter);
+
+  // --- Global Error Handling Middleware (MUST be the LAST middleware) ---
+  // This captures errors thrown by synchronous middleware (like body-parser for invalid JSON)
+  // or errors passed via next(error) in async routes.
+  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // Check if the error is a SyntaxError from body-parser
+    if (err instanceof SyntaxError && 'body' in err) {
+      logger.error('Malformed JSON received', err, { path: req.path, method: req.method });
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Invalid, `Malformed JSON in request body: ${err.message}`);
+      return res.status(400).json(outcome);
+    }
+
+    // Handle other unexpected errors
+    logger.error('An unexpected error occurred in the global error handler', err, { path: req.path, method: req.method });
+    const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'An unexpected internal server error occurred.');
+    res.status(500).json(outcome);
+  });
 
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

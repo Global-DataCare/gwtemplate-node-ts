@@ -11,6 +11,7 @@ import { DidDocument } from '../../models/did';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../models/schemaorg';
 import { IKmsService } from '../../crypto/interfaces/IKmsService';
 import { parseTenantUrn } from '../../utils/urn';
+import { ILogger } from '../../loggers/ILogger';
 
 jest.mock('../../managers/TenantsCacheManager');
 
@@ -38,10 +39,17 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   protectAttributesNameAndValue: jest.fn(),
 };
 
+const mockLogger = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+} as jest.Mocked<ILogger>;
+
 const app = express();
 const discoveryService = new DiscoveryService(mockTenantsCacheManager);
-// Pass the mocked kmsService to the router
-const discoveryRouter = createDiscoveryRouter(mockTenantsCacheManager, discoveryService, mockKmsService);
+// Pass the mocked kmsService and logger to the router
+const discoveryRouter = createDiscoveryRouter(mockTenantsCacheManager, discoveryService, mockKmsService, mockLogger);
 app.use('/', discoveryRouter);
 
 describe('Well-Known DID Discovery API', () => {

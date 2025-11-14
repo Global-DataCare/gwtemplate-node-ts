@@ -34,6 +34,8 @@ import { HostingManager } from '../../managers/HostingManager';
 import { IStorageAdapter } from '../../database/storage/IStorageAdapter';
 import { testClaimsHostInitialization } from '../data/end-to-end.data';
 
+import { ILogger } from '../../loggers/ILogger';
+
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
   addJob: jest.fn((jobName: string, jobData: JobRequest) => Promise.resolve()),
@@ -41,6 +43,13 @@ const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
   upload: jest.fn(),
+};
+
+const mockLogger: jest.Mocked<ILogger> = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
 };
 
 // Define a reusable setup function to create the app instance
@@ -105,6 +114,7 @@ describe('Organization Registration API', () => {
       mockKmsService,
       tenantsCacheManager,
       mockStorageAdapter,
+      mockLogger,
       mockConfig,
     );
     // Bootstrap the host to ensure its services are configured in the tenantsCacheManager

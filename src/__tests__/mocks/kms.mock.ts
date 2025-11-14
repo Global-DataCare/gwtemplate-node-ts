@@ -4,6 +4,7 @@
 import { jest } from '@jest/globals';
 import { IKmsService } from '../../crypto/interfaces/IKmsService';
 import { ConfidentialStorageDoc } from '../../models/confidential-storage';
+import { Content } from '../../utils/content';
 
 /**
  * Creates a complete, correctly-typed mock of the IKmsService for use in tests.
@@ -21,16 +22,19 @@ export const mockKmsService: jest.Mocked<IKmsService> = {
   signWithReconstructedKey: jest.fn(),
   encodeResponse: jest.fn(),
   protectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc): Promise<ConfidentialStorageDoc> => {
-    // In this mock, we simulate the structure of a protected document but critically,
-    // we DO NOT delete the original `content`. This allows the `unprotect` mock
-    // to retrieve it, simulating a successful decryption cycle for unit/integration tests.
-    const secureDoc = { ...doc, jwe: { ciphertext: 'encrypted-content-by-mock' } };
-    return secureDoc;
+    // Simulates REAL behavior: removes .content and encodes it inside .jwe.ciphertext
+    const { content, ...docWithoutContent } = doc;
+    const simulatedJwe = {
+      ciphertext: Content.objectToRawBase64UrlSafe(content),
+    };
+    return { ...docWithoutContent, jwe: simulatedJwe };
   }),
   unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc) => {
-    // This mock simulates successful decryption by simply returning the `content`
-    // property that the `protectConfidentialData` mock intentionally preserved.
-    return doc.content as any;
+    // Simulates REAL behavior: decodes .jwe.ciphertext to get the content.
+    if (!doc.jwe?.ciphertext) {
+      throw new Error('MockKmsService: Cannot unprotect document with invalid simulated JWE.');
+    }
+    return Content.base64UrlSafeToJSON(doc.jwe.ciphertext as string);
   }),
   getHostPublicJwkSet: jest.fn(async () => ({ keys: [] })),
   getHmacBase64Url: jest.fn(),

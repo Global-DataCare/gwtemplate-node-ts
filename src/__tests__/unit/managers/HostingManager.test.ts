@@ -27,11 +27,20 @@ import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { JwkSet } from '../../../models/jwk';
 
+import { ILogger } from '../../../loggers/ILogger';
+
 // Mock external dependencies
 jest.mock('uuid');
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
   upload: jest.fn(),
+};
+
+const mockLogger: jest.Mocked<ILogger> = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
 };
 
 
@@ -123,7 +132,7 @@ describe('HostingManager', () => {
       firebase: {},
     };
 
-    hostingManager = new HostingManager(vaultRepository, mockKmsService, mockTenantsCacheManager, mockStorageAdapter, mockConfig);
+    hostingManager = new HostingManager(vaultRepository, mockKmsService, mockTenantsCacheManager, mockStorageAdapter, mockLogger, mockConfig);
     process.env = { ...originalEnv };
 
     jest.clearAllMocks();
