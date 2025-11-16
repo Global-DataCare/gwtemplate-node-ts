@@ -17,6 +17,7 @@ try {
 }
 
 import * as admin from 'firebase-admin';
+import app from './app';
 import * as express from 'express';
 
 
@@ -219,7 +220,7 @@ async function startServer(options?: StartServerOptions) {
     }];
   }
 
-  const app = express.default();
+  // const app = express.default();
   app.use(express.urlencoded({ extended: true }));
   app.use(express.json({ type: ['application/json', 'application/fhir+json'] }));
 
@@ -318,7 +319,8 @@ async function startServer(options?: StartServerOptions) {
 
   const discoveryService = new DiscoveryService(tenantManager);
 
-  await tenantManager.loadTenants();
+  // Proactively load the host configuration into the cache at startup.
+  await tenantManager.loadHost();
 
   if (!(await tenantManager.getTenant('host'))) {
     console.log('[GW-API] Host tenant not found. Bootstrapping...');
@@ -342,7 +344,7 @@ async function startServer(options?: StartServerOptions) {
   const authManager = options?.authManager || new AuthorizationManager();
 
   const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService, kmsService, logger);
-  const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService);
+  const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService, config.apiBaseUrl);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);
   app.use('/', discoveryRouter);

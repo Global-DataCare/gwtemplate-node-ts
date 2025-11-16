@@ -8,10 +8,11 @@ const DEFAULT_SECTION = 'default';
  * An implementation of the IVaultRepository for Google Cloud Firestore.
  *
  * @architecture
- * This class is intentionally "dumb" regarding business logic. It operates on physical
- * `collectionName`s provided by the business layer (Managers). The translation from
- * logical `vaultId` to physical `collectionName` is the responsibility of the
- * `TenantsCacheManager`.
+ * `TenantsCacheManager`. However, it makes a single exception for the `vaultExists`
+ * method, which is the designated entry point for this translation. `vaultExists`
+ * checks for a tenant's registration document inside the host's physical collection.
+ * All other methods (`get`, `put`, etc.) are "dumb" and operate directly on the
+ * physical `collectionName` passed to them.
  *
  * The methods `createNewVault` and `vaultExists` are special cases to satisfy the
  * shared `IVaultRepository` interface.
@@ -65,10 +66,7 @@ export class FirestoreVaultRepository extends IVaultRepository {
   }
 
   async get<T extends RecordBase>(collectionName: string, docId: string, sectionId: string = DEFAULT_SECTION): Promise<T | undefined> {
-    // If the logical 'host' vault is requested, transparently map it to the physical host collection.
-    const physicalCollectionName = collectionName === 'host' ? this.hostCollectionName : collectionName;
-
-    const docRef = this.db.collection(physicalCollectionName).doc(sectionId).collection('documents').doc(docId);
+    const docRef = this.db.collection(collectionName).doc(sectionId).collection('documents').doc(docId);
     console.log(`[FirestoreVaultRepository DEBUG] GET path: ${docRef.path}`); // <-- DEBUG LOG
     const docSnap = await docRef.get();
     return docSnap.exists ? (docSnap.data() as T) : undefined;

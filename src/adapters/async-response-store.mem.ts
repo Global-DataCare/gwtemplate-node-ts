@@ -56,4 +56,11 @@ export class AsyncResponseStoreMem implements IAsyncResponseStore {
   public delete(thid: string): void {
     this.store.delete(thid);
   }
+
+  /**
+   * Clears the entire store. Used for test teardown.
+   */
+  public clear(): void {
+    this.store.clear();
+  }
 }

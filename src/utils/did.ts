@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { PublicJwk } from '../crypto/interfaces/Cryptography.types';
-import { DidDocument, VerificationMethod } from '../models/did';
+import { DidDocument, DidService, VerificationMethod } from '../models/did';
 import { JwkSet } from '../models/jwk';
 
 /**
@@ -161,17 +161,26 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
     return newDidDoc;
 }
 
+/**
+ * Creates a standardized service identifier string.
+ * The format MUST follow the convention: `version:sector:section:format[:resourceType]`
+ * @param params An object containing the components of the service ID.
+ * @param {string} params.format The format string, which MUST follow Reverse DNS notation (e.g., 'org.schema', 'org.hl7.fhir.r4').
+ * @returns The composed service identifier string.
+ */
 export const createDidServiceId = (params: { version: string; sector: string; section: string; format: string, resourceType?: string }) => {
   const version = params.version.toLowerCase();
   const sector = params.sector.toLowerCase();
   const section = params.section.toLowerCase();
-  const sanitizedFormat = params.format.toLowerCase().replace(/\./g, '-');
-  let id = `${version}_${sector}_${section}_${sanitizedFormat}`;
+  const format = params.format.toLowerCase();
+  let id = `${version}:${sector}:${section}:${format}`;
   if (params.resourceType) {
-    id += `_${params.resourceType.toLowerCase()}`;
+    id += `:${params.resourceType.toLowerCase()}`;
   }
   return id;
 };
+
+
 
 /**
  * Converts a did:web identifier into a full HTTPS or HTTP base URL.

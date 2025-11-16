@@ -35,7 +35,15 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
 
   mockKmsService.init();
 
-  const apiRouter = createApiRouter(mockQueueAdapter, tenantsCacheManager, mockKmsService, asyncResponseStore, vaultRepository, cryptographyService);
+  const apiRouter = createApiRouter(
+    mockQueueAdapter,
+    tenantsCacheManager,
+    mockKmsService,
+    asyncResponseStore,
+    vaultRepository,
+    cryptographyService,
+    'http://testhost.com' // Mock base URL for testing
+  );
   app.use('/', apiRouter);
 
   return { app, tenantsCacheManager };
@@ -91,7 +99,7 @@ describe('Ping API Endpoint', () => {
       mockKmsService.decodeRequest.mockResolvedValue(mockDecodedJob);
 
       const pingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch';
-      const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
+      const expectedPollingUrl = `http://testhost.com${pingUrl.replace('/_batch', '/_batch-response')}`;
 
       // --- Act ---
       const response = await request(app)
@@ -149,7 +157,7 @@ describe('Ping API Endpoint', () => {
       };
       mockKmsService.decodeRequest.mockResolvedValue(mockDecodedJob);
       const pingUrl = '/acme/cds-xx/v1/test/ping/standard/resource/_batch';
-      const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
+      const expectedPollingUrl = `http://testhost.com${pingUrl.replace('/_batch', '/_batch-response')}`;
 
       // --- Act ---
       const response = await request(app)
@@ -214,7 +222,7 @@ describe('Ping API Endpoint', () => {
       jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue([pingServiceConfig]);
   
       const pingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch';
-      const expectedPollingUrl = pingUrl.replace('/_batch', '/_batch-response');
+      const expectedPollingUrl = `http://testhost.com${pingUrl.replace('/_batch', '/_batch-response')}`;
   
       // --- Act ---
       const response = await request(app)
@@ -273,16 +281,25 @@ describe('Ping API Endpoint', () => {
     it('should return 200 OK with a JSON result if the original job was legacy JSON', async () => {
       // --- Arrange ---
       const asyncResponseStore = new AsyncResponseStoreMem();
+
+      // Use mockImplementation for a robust, type-safe mock.
+      mockKmsService.decodeRequest.mockImplementation(async (message: string) => {
+        return {
+          content: {
+            type: 'application/didcomm-plain+json',
+            thid: decodedPingMessage.thid,
+            aud: 'did:web:host',
+            iss: 'did:web:test',
+            body: { ping: 'pong' }, // This is the payload the test asserts
+          },
+        } as JobRequest;
+      });
+      
       const legacyCompletedJob: StoredJob = {
         status: 'COMPLETED',
-        vaultId: 'host', // The job was for the host
-        contentType: 'application/json', // Mark as a legacy job
-        result: {
-          // This mimics the structure of a protected document (what the worker would store)
-          jwe: {
-            ciphertext: Content.objectToRawBase64UrlSafe({ ping: 'pong' })
-          }
-        }
+        vaultId: 'host',
+        contentType: 'application/json',
+        result: testEncryptedJwePing, // Use a realistic JWE string from test data
       };
       asyncResponseStore.set(thid, legacyCompletedJob);
       const { app } = setupApp(asyncResponseStore);
@@ -295,7 +312,7 @@ describe('Ping API Endpoint', () => {
 
       // --- Assert ---
       expect(response.status).toBe(200);
-      expect(response.headers['content-type']).toMatch(/application\/json/); // The mock uses 'application/json'
+      expect(response.headers['content-type']).toMatch(/application\/json/);
       expect(response.body).toEqual({ ping: 'pong' });
     });
   });

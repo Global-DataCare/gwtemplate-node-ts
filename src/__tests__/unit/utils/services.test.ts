@@ -1,7 +1,7 @@
 // src/__tests__/unit/utils/services.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { initializeHostServices, initializeTenantServices } from '../../../utils/services';
+import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../../../utils/services';
 import { EntityConfig } from '../../../models/entity';
 import { Sector } from '../../../models/urlPath';
 import { IServerConfig } from '../../../config';
@@ -49,17 +49,17 @@ const createTestTenantConfig = (
 
 describe('Service Initialization Utilities', () => {
 
-  describe('initializeTenantServices', () => {
+  describe('initializeTenantServicesConfig', () => {
     
     it('should create default entity and individual services for a non-FHIR tenant', () => {
       // ARRANGE
       const tenantConfig = createTestTenantConfig(Sector.TEST, `did:web:${mockConfig.hostExternalDomain}:acme`);
 
       // ACT
-      const services = initializeTenantServices(tenantConfig.didDocument.id, tenantConfig.provider.service.sectorCategory as Sector);
+      const services = initializeTenantServicesConfig(tenantConfig.provider.service.sectorCategory as Sector);
 
       // ASSERT
-      expect(services).toHaveLength(7); // 3 discovery + 2 business + 2 network
+      expect(services).toHaveLength(4); // 2 business + 2 network
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -77,10 +77,10 @@ describe('Service Initialization Utilities', () => {
       const tenantConfig = createTestTenantConfig(Sector.HEALTH_CARE, `did:web:${mockConfig.hostExternalDomain}:acme`);
 
       // ACT
-      const services = initializeTenantServices(tenantConfig.didDocument.id, tenantConfig.provider.service.sectorCategory as Sector);
+      const services = initializeTenantServicesConfig(tenantConfig.provider.service.sectorCategory as Sector);
       
       // ASSERT
-      expect(services).toHaveLength(7);
+      expect(services).toHaveLength(4);
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -93,25 +93,23 @@ describe('Service Initialization Utilities', () => {
       expect(individualService!.serviceEndpoint).toContain('Patient');
     });
 
-    it('should include standard discovery endpoints', () => {
+    it('should not include standard discovery endpoints', () => {
       // ARRANGE
       const tenantConfig = createTestTenantConfig(Sector.TEST, 'did:web:acme.com');
 
       // ACT
-      const services = initializeTenantServices(tenantConfig.didDocument.id, tenantConfig.provider.service.sectorCategory as Sector);
+      const services = initializeTenantServicesConfig(tenantConfig.provider.service.sectorCategory as Sector);
 
       // ASSERT
       const didDocService = services.find((s: DidService) => s.id.endsWith('#did-document'));
-      expect(didDocService).toBeDefined();
-      expect(didDocService!.serviceEndpoint).toBe('https://acme.com/.well-known/did.json');
+      expect(didDocService).toBeUndefined();
 
       const jwksService = services.find((s: DidService) => s.id.endsWith('#jwks'));
-      expect(jwksService).toBeDefined();
-      expect(jwksService!.serviceEndpoint).toBe('https://acme.com/.well-known/jwks.json');
+      expect(jwksService).toBeUndefined();
     });
   });
 
-  describe('initializeHostServices', () => {
+  describe('initializeHostServicesConfig', () => {
     it('should create registry services for each allowed sector', () => {
       // ARRANGE
       const hostConfig = createTestTenantConfig(Sector.SYSTEM, `did:web:${mockConfig.hostExternalDomain}`, [Sector.TEST, Sector.HEALTH_CARE]);
@@ -120,18 +118,18 @@ describe('Service Initialization Utilities', () => {
       }
 
       // ACT
-      const services = initializeHostServices(hostConfig.didDocument.id, hostConfig.provider.service.sectorsAllowed as Sector[]);
+      const services = initializeHostServicesConfig(hostConfig.provider.service.sectorsAllowed as Sector[]);
 
       // ASSERT
-      const registryServices = services.filter((s: DidService) => s.id.includes('_registry_'));
+      const registryServices = services.filter((s: DidService) => s.id.includes(':registry:'));
       expect(registryServices).toHaveLength(2); // test + health-care
       
-      // The service ID format is v1_SECTOR_registry_org-schema. We search for the sector part.
-      const testRegistry = registryServices.find((s: DidService) => s.id.match(new RegExp(`_${Sector.TEST}_`, 'i')));
+      // The service ID format is v1:SECTOR:registry:org-schema. We search for the sector part.
+      const testRegistry = registryServices.find((s: DidService) => s.id.match(new RegExp(`:${Sector.TEST}:`, 'i')));
       expect(testRegistry).toBeDefined();
       expect(testRegistry!.serviceEndpoint).toBe('Organization');
       
-      const healthRegistry = registryServices.find((s: DidService) => s.id.match(new RegExp(`_${Sector.HEALTH_CARE}_`, 'i')));
+      const healthRegistry = registryServices.find((s: DidService) => s.id.match(new RegExp(`:${Sector.HEALTH_CARE}:`, 'i')));
       expect(healthRegistry).toBeDefined();
     });
   });

@@ -1,4 +1,4 @@
-// src/__tests__/integration/customerApi.test.ts ($HOME/GITS/gwtemplate-node-ts/src/__tests__/integration/customerApi.test.ts)
+// src/__tests__/integration/customerApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
@@ -50,7 +50,8 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
     mockKmsService,
     asyncResponseStore,
     vaultRepository,
-    cryptographyService
+    cryptographyService,
+    'http://localhost:3001',
   );
   app.use('/', apiRouter);
 
@@ -80,16 +81,15 @@ describe('Person Onboarding API', () => {
 
       // --- 2. Programmatically build URLs from constants ---
       const registrationUrl = `/${tenantId}/cds-${jurisdiction}/v1/${sector}/${section}/${format}/${resourceType}/${action}`;
-      const expectedPollingUrl = registrationUrl.replace(
+      const expectedPollingUrl = `http://localhost:3001${registrationUrl.replace(
         '/_batch',
         '/_batch-response',
-      );
+      )}`;
 
       const organizationUrnParams: OrganizationUrnParams = {
         namespace: 'antifraud',
         network: 'test-network',
         jurisdiction: jurisdiction,
-        version: 'v1',
         sector: sector,
         idType: testTenant1IdType,
         idValue: testTenant1IdValue,

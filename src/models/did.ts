@@ -22,7 +22,7 @@ export interface DidServiceIdParts {
 export interface DidService {
     id: string;
     type: string;
-    serviceEndpoint: string | string [];
+    serviceEndpoint: string;
     [key: string]: any; // Allow for additional properties
 }
 

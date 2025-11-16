@@ -29,7 +29,7 @@ import { IAuthorizationManager } from '../../managers/auth/IAuthorizationManager
 import { BundleEntry } from '../../models/bundle';
 import { IAccessTokenClaims } from '../../models/auth';
 import { ClaimsServiceSchemaorg } from '../../models/schemaorg';
-import { getTenantVaultId } from '../../utils/tenant';
+import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { IncludedResource } from '../../models/jsonapi';
 import { testClaimsHostInitialization } from '../data/end-to-end.data';
 import { IKmsService } from '../../crypto/interfaces/IKmsService';
@@ -80,7 +80,8 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     process.env.NODE_ENV = 'development';
     process.env.DEV_SEED = 'true';
     
-    tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, 'host-collection');
+    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, hostCollectionName);
     kmsService = new KmsService(cryptographyService, tenantManager);
     await kmsService.init();
 
@@ -94,6 +95,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     
     const hostingManager = new HostingManager(vaultRepository, kmsService, tenantManager, new StorageMemAdapter(), logger, mockConfig);
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await tenantManager.loadHost();
     
     const managerRegistry: ManagerRegistry = {
       hostingManager: hostingManager,
@@ -112,7 +114,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     app.use(express.json({ type: ['application/json', 'application/fhir+json'] }));
     authManager = new MockAuthorizationManager();
 
-    const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService);
+    const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService, mockConfig.apiBaseUrl);
     const fhirRouter = createFhirRouter(queueAdapter, authManager);
     app.use('/', apiRouter);
     app.use('/', fhirRouter);
@@ -159,11 +161,11 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
 
     await queueAdapter.waitForEmptyQueue();
 
-    // After tenant creation, we must manually reload the tenants into the cache
-    // so the tenantManager in our test scope is aware of the new tenant.
-    await tenantManager.loadTenants();
-
+    // After tenant creation, we must manually load the new tenant into the cache
+    // so the tenantManager in our test scope is aware of it.
     const vaultId = getTenantVaultId(claims[ClaimsServiceSchemaorg.category], claims['org.schema.Organization.alternateName']);
+    await tenantManager.getTenant(vaultId); // This will force a load from the repository into the cache
+
     const collectionName = await tenantManager.getCollectionName(vaultId);
     expect(collectionName).toBeDefined();
 
@@ -187,6 +189,11 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
             .set('Authorization', 'Bearer mock-valid-token')
             .send(orgCreationPayload);
         await queueAdapter.waitForEmptyQueue();
+        
+        // Manually load the 'acme' tenant into the cache so the subsequent API calls can find it.
+        const claims = testPayloadCreateTenant1.body.data[0].meta.claims;
+        const vaultId = getTenantVaultId(claims[ClaimsServiceSchemaorg.category], claims['org.schema.Organization.alternateName']);
+        await tenantManager.getTenant(vaultId); // Force load into cache
     });
 
     const communicationUrl = '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch';

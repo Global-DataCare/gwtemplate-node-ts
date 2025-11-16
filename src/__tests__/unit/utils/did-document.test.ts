@@ -1,63 +1,58 @@
 // src/__tests__/unit/utils/did-document.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { createDefaultDidDocument } from '../../../utils/did-document';
-import { DidService } from '../../../models/did';
+import { populateDidDocumentServices } from '../../../utils/did-document';
+import { Sector } from '../../../models/urlPath';
+import { initializeTenantServicesConfig } from '../../../utils/services';
 
-describe('createDefaultDidDocument', () => {
+describe('populateDidDocumentServices', () => {
 
-  const mockApiHostname = 'example.com';
-
-  it('should create a correct DID Document for the "host"', () => {
+  it('should correctly multiplex services for a HOSTED tenant', () => {
     // --- Arrange ---
-    const params = {
-      alternateName: 'host',
-      apiHostname: mockApiHostname,
-      sector: 'system',
-    };
+    const did = 'did:web:gateway.com:acme:cds-es:v1:health-care';
+    const baseUrl = 'https://gateway.com';
+    const businessConfig = initializeTenantServicesConfig(Sector.HEALTH_CARE);
+    const tenantContext = { alternateName: 'acme', jurisdiction: 'es', version: 'v1', sector: Sector.HEALTH_CARE };
 
     // --- Act ---
-    const didDoc = createDefaultDidDocument(params);
+    const allServices = populateDidDocumentServices(did, baseUrl, businessConfig, true, tenantContext);
 
     // --- Assert ---
-    expect(didDoc.id).toBe('did:web:example.com');
-    expect(didDoc.service).toHaveLength(3);
-    
-    // Check discovery service endpoint
-    const discoveryService = didDoc.service?.find((s: DidService) => s.id === '#did-document');
-    expect(discoveryService).toBeDefined();
-    expect(discoveryService?.serviceEndpoint).toBe('https://example.com/.well-known/did.json');
-    
-    // Check registry service ID
-    const registryService = didDoc.service?.find((s: DidService) => s.type === 'GatewayRegistryService');
-    expect(registryService).toBeDefined();
-    expect(registryService?.id).toBe('v1_system_registry_org-schema');
+    // Multiplexing check: 
+    // Total Business Services = 34 (14 entity + 14 individual + 2 PersonDiscovery + 2 NetworkEnrollment)
+    // Total services = 34 (business) + 2 (well-known) = 36
+    expect(allServices).toHaveLength(36);
+
+    const wellKnownService = allServices.find(s => s.id === `${did}#jwks`);
+    expect(wellKnownService).toBeDefined();
+    expect(wellKnownService!.serviceEndpoint).toBe('https://gateway.com/acme/cds-es/v1/health-care/jwks.json');
+
+    const employeeService = allServices.find(s => s.id.endsWith('#v1:health-care:entity:org-schema:employee:_batch'));
+    expect(employeeService).toBeDefined();
+    expect(employeeService!.serviceEndpoint).toBe('https://gateway.com/acme/cds-es/v1/health-care/entity/org.schema/Employee/_batch');
   });
 
-  it('should create a correct DID Document for a tenant', () => {
+  it('should correctly multiplex services for an OWN-DOMAIN tenant', () => {
     // --- Arrange ---
-    const params = {
-      alternateName: 'acme-corp',
-      apiHostname: mockApiHostname,
-      sector: 'health-care',
-    };
+    const did = 'did:web:api.acme-health.com';
+    const baseUrl = 'https://api.acme-health.com';
+    const businessConfig = initializeTenantServicesConfig(Sector.HEALTH_CARE);
+    const tenantContext = {} as any;
 
     // --- Act ---
-    const didDoc = createDefaultDidDocument(params);
+    const allServices = populateDidDocumentServices(did, baseUrl, businessConfig, false, tenantContext);
 
     // --- Assert ---
-    expect(didDoc.id).toBe('did:web:example.com:acme-corp');
-    expect(didDoc.service).toHaveLength(3);
+    // Multiplexing check: (Same as above) = 30 services
+    // Total services = 34 (business) + 2 (well-known) = 36
+    expect(allServices).toHaveLength(36);
 
-    // Check discovery service endpoint
-    const discoveryService = didDoc.service?.find((s: DidService) => s.id === '#did-document');
-    expect(discoveryService).toBeDefined();
-    expect(discoveryService?.serviceEndpoint).toBe('https://example.com/acme-corp/.well-known/did.json');
+    const wellKnownService = allServices.find(s => s.id === `${did}#jwks`);
+    expect(wellKnownService).toBeDefined();
+    expect(wellKnownService!.serviceEndpoint).toBe('https://api.acme-health.com/jwks.json');
 
-    // Check registry service ID
-    const registryService = didDoc.service?.find((s: DidService) => s.type === 'GatewayRegistryService');
-    expect(registryService).toBeDefined();
-    expect(registryService?.id).toBe('v1_health-care_registry_org-schema');
+    const employeeService = allServices.find(s => s.id.endsWith('#v1:health-care:entity:org-schema:employee:_batch'));
+    expect(employeeService).toBeDefined();
+    expect(employeeService!.serviceEndpoint).toBe('https://api.acme-health.com/entity/org.schema/Employee/_batch');
   });
-
 });

@@ -11,86 +11,59 @@ const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
 
 /**
  * (Internal) Creates a standardized DID Service Endpoint configuration object.
+ * This represents the LOGICAL configuration of a service.
  */
-const createDidEndpointConfig = (id: string, resources: string[], actions: string[] = ['_create', '_batch']): DidService => {
+const createDidEndpointConfig = (id: string, resources: string[], actions: string[]): DidService => {
   const serviceEndpoint = resources.join(',');
   return { id, type: 'ApiService', serviceEndpoint, actions };
 };
 
 /**
- * Generates the default set of BUSINESS LOGIC service endpoints for a new tenant.
- * This function is now decoupled from the EntityConfig object.
+ * (Internal) Generates the default set of BUSINESS LOGIC service endpoints for a new tenant.
  *
- * @param sector The specific sector of the tenant.
- * @returns An array of `DidService` objects for the tenant's business logic endpoints.
+ * @architecture
+ * The resource type names (e.g., 'Employee', 'Patient') use PascalCase because they
+ * directly correspond to the resource names defined in their source schemas
+ * (Schema.org and HL7 FHIR, respectively). The API router's validation logic
+ * handles this by performing a case-insensitive comparison.
  */
 function generateDefaultBusinessServices(sector: Sector): DidService[] {
   const services: DidService[] = [];
   const isFhir = FHIR_SECTORS.includes(sector);
 
   const entityResources = ['Employee', 'EmployeeRole', 'Place', 'Organization', 'Bundle'];
-  // Define the full list of individual-related resources for our roadmap.
   const individualResources = ['Person', 'Composition', 'Communication', 'Subscription', 'RelatedPerson', 'Bundle'];
 
   if (isFhir) {
     entityResources.push('Practitioner', 'PractitionerRole', 'Location');
-    individualResources.push('Patient', 'Appointment'); // Add Appointment for FHIR context
+    individualResources.push('Patient', 'Appointment');
   }
 
   services.push(createDidEndpointConfig(
     createDidServiceId({ version: 'v1', sector, section: 'entity', format: 'org.schema' }),
-    entityResources
+    entityResources,
+    ['_create', '_batch']
   ));
 
-  // This single service definition now enables all planned individual-related endpoints.
   services.push(createDidEndpointConfig(
     createDidServiceId({ version: 'v1', sector, section: 'individual', format: 'org.schema' }),
-    individualResources
+    individualResources,
+    ['_create', '_batch']
   ));
 
   return services;
 }
 
 /**
- * Initializes the complete service list for a Tenant by combining discovery,
- * default business services, and any custom-provided services.
- * @param didId The primary DID identifier for the tenant.
- * @param sector The tenant's business sector.
- * @param customServices An optional array of custom service configurations for future extensibility.
- * @returns The complete array of DidService objects for the didDocument.
+ * Generates the business logic service CONFIGURATION for a new tenant.
+ * This defines the services for `didConfig.service`.
  */
-export function initializeTenantServices(didId: string, sector: Sector, customServices: DidService[] = []): DidService[] {
-  const didIdentifier = didId.substring('did:web:'.length);
-  const baseUrl = `https://${didIdentifier.replace(/:/g, '/')}`;
-
-    const discoveryServices: DidService[] = [
-        {
-          id: `${didId}#did-document`,
-          type: 'LinkedDomains',
-          serviceEndpoint: `${baseUrl}/.well-known/did.json`,
-        },
-        {
-          id: `${didId}#jwks`,
-          type: 'JsonWebKeyService2020',
-          serviceEndpoint: `${baseUrl}/.well-known/jwks.json`,
-        },
-        {
-          id: `${didId}#legal-participant-credential`,
-          type: 'gx:LegalParticipant', // As per Gaia-X requirements
-          serviceEndpoint: `${baseUrl}/.well-known/legal-participant.vc.json`,
-        },
-    ];
-
+export function initializeTenantServicesConfig(sector: Sector, customServices: DidService[] = []): DidService[] {
   const defaultBusinessServices = generateDefaultBusinessServices(sector);
-
-
-  // NOTE: In a real implementation, these network services would likely be added to a tenant's
-  // DID Document *after* they have successfully enrolled, not by default.
-  // They are included here by default to simplify the end-to-end testing flow.
+  
   const defaultNetworkServices: DidService[] = [
       {
           ...(createDidEndpointConfig(
-              // default network is 'test-network'. always as section
               createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Action' }),
               ['Action'],
               ['_batch']
@@ -99,7 +72,6 @@ export function initializeTenantServices(didId: string, sector: Sector, customSe
       },
       {
           ...(createDidEndpointConfig(
-              // default network is 'test-network'. always as section
               createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Person' }),
               ['Person'],
               ['_discovery']
@@ -108,45 +80,27 @@ export function initializeTenantServices(didId: string, sector: Sector, customSe
       },
   ];
 
-  const allServices = [...discoveryServices, ...defaultBusinessServices, ...defaultNetworkServices, ...customServices];
+  const allServices = [...defaultBusinessServices, ...defaultNetworkServices, ...customServices];
   const serviceMap = new Map(allServices.map(s => [s.id, s]));
-  
   return Array.from(serviceMap.values());
 }
 
 /**
- * Generates the specific service list for the Host.
- * @param didId The primary DID identifier for the host.
- * @param sectorsAllowed The list of sectors the host is allowed to manage.
- * @returns The complete array of DidService objects for the host's didDocument.
+ * Generates the business logic service CONFIGURATION for the Host.
+ * This defines the services for `didConfig.service`.
  */
-export function initializeHostServices(didId: string, sectorsAllowed: Sector[]): DidService[] {
-  const didIdentifier = didId.substring('did:web:'.length);
-  const baseUrl = `https://${didIdentifier.replace(/:/g, '/')}`;
-
-  const services: DidService[] = [
-    {
-      id: `${didId}#did-document`,
-      type: 'LinkedDomains',
-      serviceEndpoint: `${baseUrl}/.well-known/did.json`,
-    },
-    {
-      id: `${didId}#jwks`,
-      type: 'JsonWebKeyService2020',
-      serviceEndpoint: `${baseUrl}/.well-known/jwks.json`,
-    },
-    {
-      id: `${didId}#legal-participant-credential`,
-      type: 'gx:LegalParticipant', // As per Gaia-X requirements
-      serviceEndpoint: `${baseUrl}/.well-known/legal-participant.vc.json`,
-    },
-  ];
-
+export function initializeHostServicesConfig(sectorsAllowed: Sector[]): DidService[] {
+  const services: DidService[] = [];
   const uniqueSectors = new Set([...(sectorsAllowed || []), Sector.TEST]);
+
   for (const sector of Array.from(uniqueSectors)) {
+    if (sector === Sector.SYSTEM) {
+      continue;
+    }
     services.push(createDidEndpointConfig(
       createDidServiceId({ version: 'v1', sector, section: 'registry', format: 'org.schema' }),
-      ['Organization']
+      ['Organization'],
+      ['_batch']
     ));
   }
   return services;
@@ -200,7 +154,6 @@ export function initializeCustomerServices(customerConfig: EntityConfig, sector:
     },
   ];
 
-  // Define business services for an individual/customer based on new requirements.
   const isFhir = FHIR_SECTORS.includes(sector);
   const individualResources = ['Customer', 'RelatedPerson', 'Bundle', 'Person'];
   if (isFhir) {
@@ -208,12 +161,14 @@ export function initializeCustomerServices(customerConfig: EntityConfig, sector:
   }
 
   const format = isFhir ? 'org.hl7.fhir.api' : 'org.schema';
-  const section = 'index'; // Section is 'index' for customer sectorial data index.
+  const section = 'index';
 
   const businessService = createDidEndpointConfig(
     createDidServiceId({ version: 'v1', sector, section, format }),
-    individualResources
+    individualResources,
+    ['_create', '_batch']
   );
 
   return [...coreServices, businessService];
 }
+

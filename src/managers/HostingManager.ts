@@ -20,9 +20,10 @@ import { Sector } from '../models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { validateNewOrganizationClaims } from '../utils/claims-validator';
 import { composeHostDidWebId, createHostedDidWeb, populateDidDocumentFromJwks } from '../utils/did';
+import { populateDidDocumentServices } from '../utils/did-document';
 import { createOperationOutcome } from '../utils/outcome';
 import { determineResourceId } from '../utils/resource';
-import { initializeHostServices, initializeTenantServices } from '../utils/services';
+import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../utils/services';
 import { generateTenantCollectionNameFromClaims, getTenantVaultId, isValidTenantAlternateName } from '../utils/tenant';
 import { AllowedIndexableClaims } from '../models/indexing';
 import { createOrganizationUrn } from '../utils/urn';
@@ -186,6 +187,16 @@ export class HostingManager {
     }
   }
 
+  /**
+   * Persists the complete configuration for the host entity.
+   * This function orchestrates key provisioning, DID document creation, and the secure storage of the host's identity.
+   *
+   * @architecture
+   * This method determines the host's authoritative `baseUrl` from the server configuration.
+   * This `baseUrl` is then explicitly passed to `populateDidDocumentServices`, ensuring a clear separation
+   * of concerns where this manager is responsible for *what* the URL is, and the utility is responsible
+   * for *how* it's embedded in the final DID document.
+   */
   private async persistHostConfig(org: IncludedResource, allClaims: ClaimsRecord, contained: IncludedResource[]) {
     const hostCollectionName = generateTenantCollectionNameFromClaims(allClaims);
     const logicalVaultId = 'host';
@@ -198,17 +209,22 @@ export class HostingManager {
     const hostConfig: EntityConfig = {
       type: org.type, status: 'active', id: org.id, claims: allClaims, alternateName: 'host',
       url: `${this.config.apiBaseUrl}/host`, sector: Sector.SYSTEM, sectorsAllowed: this.config.sectorsAllowed,
-      didConfig: { service: [] }, didDocument: {} as any, meta: { lastUpdated: new Date().toISOString() },
+      didConfig: { service: [] }, // This remains for potential internal use, but is not the source of truth for the DID doc.
+      didDocument: {} as any,
+      meta: { lastUpdated: new Date().toISOString() },
     };
 
     const didId = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
-    const services = initializeHostServices(didId, this.config.sectorsAllowed);
-    hostConfig.didConfig.service = services;
     const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: didId, alsoKnownAs: [] };
-    hostConfig.didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
     
-    // FIX: Explicitly add the initialized services to the final DID document.
-    hostConfig.didDocument.service = services;
+    // 1. Set the logical service definitions.
+    hostConfig.didConfig.service = initializeHostServicesConfig(this.config.sectorsAllowed);
+    
+    // 2. Populate the public DID document. For the host, it is not "hosted" and has a simple path structure.
+    const baseUrl = this.config.apiBaseUrl;
+    hostConfig.didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
+    hostConfig.didDocument.service = populateDidDocumentServices(didId, baseUrl, hostConfig.didConfig.service, false, {} as any);
+
 
     const docToProtect: ConfidentialStorageDoc = {
       id: logicalVaultId, // The document ID inside the tenants section is the logical ID
@@ -236,6 +252,18 @@ export class HostingManager {
     }
   }
 
+  /**
+   * Persists the complete configuration for a new tenant entity.
+   * This function handles key provisioning, DID creation (hosted or external), DID document generation,
+   * and the secure storage of the tenant's registration record in the host's vault.
+   *
+   * @architecture
+   * This method implements the critical logic for determining a tenant's authoritative `baseUrl`.
+   * It prioritizes the tenant's self-declared external domain (`url` claim) if present. If not, it constructs
+   * a fallback "hosted" URL on the gateway. This determined `baseUrl` is then explicitly passed to
+   * `populateDidDocumentServices`, upholding the architectural principle of separating business logic
+   * (determining the URL) from utility functions (assembling the DID document).
+   */
   private async persistTenantConfig(
     org: IncludedResource,
     altName: string,
@@ -269,14 +297,25 @@ export class HostingManager {
     if (hostedDid && primaryDid !== hostedDid) alsoKnownAs.push(hostedDid);
 
     const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: primaryDid, alsoKnownAs: alsoKnownAs };
-    const services = initializeTenantServices(tenantUrn, sector);
+    // 1. Set the logical service definitions.
+    const didConfigServices = initializeTenantServicesConfig(sector);
+    
+    // 2. Determine if the tenant is hosted or has its own domain, which dictates URL structure.
+    const isHosted = !(publicTenantUrl && publicTenantUrl.startsWith('https://'));
+    // The baseUrl is ONLY the root domain (e.g., https://gateway.com or https://api.acme.com).
+    const baseUrl = isHosted ? this.config.apiBaseUrl : publicTenantUrl!;
+    
+    // 3. Populate the public DID document with multiplexed service endpoints.
     const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
-    didDocument.service = services;
+    const jurisdiction = allClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;
+    const tenantContext = { alternateName: altName, jurisdiction, version: 'v1', sector };
+    didDocument.service = populateDidDocumentServices(primaryDid, baseUrl, didConfigServices, isHosted, tenantContext);
 
     const tenantConfig: EntityConfig = {
       type: org.type, status: 'active', id: org.id,
       claims: { ...allClaims, [ClaimsOrganizationSchemaorg.identifier]: tenantUrn },
-      didConfig: { service: services }, didDocument: didDocument,
+      didConfig: { service: didConfigServices },
+      didDocument: didDocument,
       meta: { lastUpdated: new Date().toISOString() },
     };
 

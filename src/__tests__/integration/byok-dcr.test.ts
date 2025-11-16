@@ -55,6 +55,7 @@ import { normalizePhoneNumber } from '../../utils/phone-number';
 import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
 import { IBlockchainAdapter } from '../../adapters/IBlockchainAdapter';
 import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
+import { ConsoleLogger } from '../../loggers/ConsoleLogger';
 
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -99,7 +100,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     if (!hostEncryptionKey) {
       throw new Error('Test setup failed: Could not find host encryption key (OKP) in JWKSet.');
     }
-    await tenantManager.loadTenants();
+    await tenantManager.loadHost();
 
     // Generate deterministic keys for the "external client" (the future tenant admin)
     // This makes the test reproducible without relying on static key files.
@@ -197,7 +198,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     
     // CRITICAL: After the organization and its admin are created, we must reload the
     // tenant cache to ensure the new DID documents and keys are available for the next tests.
-    await tenantManager.loadTenants();
+    await tenantManager.loadHost();
   });
 
   it('Part 2: should accept a STANDARD request without embedded JWKs', async () => {
@@ -268,7 +269,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     }
     // CRITICAL: Reload the cache again to pick up the newly created employee's keys,
     // which were added to the tenant's DID document.
-    await tenantManager.loadTenants();
+    await tenantManager.loadHost();
   });
 
   it('Part 3: should create a new customer (individual) and allow polling for the result', async () => {

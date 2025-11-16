@@ -35,6 +35,7 @@ import { IStorageAdapter } from '../../database/storage/IStorageAdapter';
 import { testClaimsHostInitialization } from '../data/end-to-end.data';
 
 import { ILogger } from '../../loggers/ILogger';
+import { generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -67,7 +68,7 @@ const setupApp = (
   // Initialize the mock KMS to simulate the server startup sequence
   mockKmsService.init();
 
-  // Pass the 6 required arguments
+  // Pass the 7 required arguments, including a mock apiBaseUrl
   const apiRouter = createApiRouter(
     mockQueueAdapter,
     tenantsCacheManager,
@@ -75,6 +76,7 @@ const setupApp = (
     asyncResponseStore,
     vaultRepository,
     cryptographyService,
+    'http://testhost.com' // Mock base URL for testing
   );
   app.use('/', apiRouter);
 
@@ -88,9 +90,15 @@ describe('Organization Registration API', () => {
   let asyncResponseStore: IAsyncResponseStore;
   let mockConfig: IServerConfig;
 
-  beforeEach(async () => {
+  // Run the bootstrap once for the entire suite, as it sets up the host state.
+  beforeAll(async () => {
+    // CRITICAL FIX: The host collection name must be deterministic and consistent
+    // between the manager and the test setup.
+    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+
     vaultRepository = new VaultMemRepository();
-    tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, 'test-host-collection');
+    // Use the correctly generated host collection name to initialize the manager.
+    tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
     asyncResponseStore = new AsyncResponseStoreMem();
 
     mockConfig = {
@@ -98,7 +106,7 @@ describe('Organization Registration API', () => {
       port: 3000,
       apiHostname: 'testhost',
       hostExternalDomain: 'testhost.com',
-      apiBaseUrl: 'http://testhost:3000',
+      apiBaseUrl: 'http://testhost.com',
       namespace: 'test-namespace',
       sectorsAllowed: [Sector.HEALTH_CARE, Sector.SYSTEM, Sector.TEST],
       dbProvider: 'mem',
@@ -117,13 +125,21 @@ describe('Organization Registration API', () => {
       mockLogger,
       mockConfig,
     );
-    // Bootstrap the host to ensure its services are configured in the tenantsCacheManager
+    // Bootstrap the host to ensure its data exists in the repository.
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    // After bootstrapping, explicitly load the host into the cache to simulate server startup.
+    await tenantsCacheManager.loadHost();
 
     app = setupApp(asyncResponseStore, tenantsCacheManager, vaultRepository);
   });
 
-  afterEach(() => {
+  beforeEach(() => {
+    // Clear mocks before each test, but don't re-initialize the world.
+    jest.clearAllMocks();
+    (asyncResponseStore as AsyncResponseStoreMem).clear(); // Assuming a clear method
+  });
+
+  afterAll(() => {
     jest.clearAllMocks();
   });
 
@@ -141,7 +157,7 @@ describe('Organization Registration API', () => {
       const EXPECTED_RETRY_AFTER = '5';
 
       const registrationUrl = `/${tenantId}/cds-${jurisdiction}/v1/${sector}/${section}/${format}/${resourceType}/${action}`;
-      const expectedPollingUrl = registrationUrl.replace('/_batch', '/_batch-response');
+      const expectedPollingUrl = `http://testhost.com${registrationUrl.replace('/_batch', '/_batch-response')}`;
 
       const thid = uuidv4();
       const mockDecodedJob: Omit<JobRequest, 'tenantId'> = {

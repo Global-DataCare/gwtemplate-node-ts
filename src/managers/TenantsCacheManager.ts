@@ -31,74 +31,33 @@ export class TenantsCacheManager implements ITenantsManager {
   constructor(
     vaultRepository: IVaultRepository, 
     kmsServiceResolver: () => IKmsService,
-    hostCollectionName: string, // Now required
+    hostCollectionName: string,
   ) {
     this.vaultRepository = vaultRepository;
     this.kmsServiceResolver = kmsServiceResolver;
     this.hostCollectionName = hostCollectionName;
   }
 
-  public async loadTenants(): Promise<void> {
-    // console.log('[TenantsCacheManager] Reloading all tenant configurations into memory...');
-
-    this.tenantCacheByVaultId.clear();
-
-    const secureTenantRecords =
-      await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(this.hostCollectionName, 'tenants');
-
-    for (const record of secureTenantRecords) {
-      try {
-        const tenantConfig = await this.kmsService.unprotectConfidentialData<any>(record, 'host');
-
-        if (tenantConfig && tenantConfig.claims) {
-          const alternateName = tenantConfig.claims[ClaimsOrganizationSchemaorg.alternateName];
-          if (!alternateName) continue;
-
-          let vaultId: string;
-          let collectionName: string;
-          
-          // The host is a special case. Its vaultId is 'host' and its collectionName is also 'host'.
-          if (alternateName === 'host') {
-            vaultId = 'host';
-            collectionName = 'host'; // The host operates on its own logical collection.
-          } else {
-            // For regular tenants, generate the vaultId.
-            const urn = getIdentifierUrnFromClaims(tenantConfig.claims);
-            const parsedUrn = urn ? parseTenantUrn(urn) : null;
-            const sector = parsedUrn?.sector;
-
-            if (!sector) {
-              console.warn(`[TenantsCacheManager] Could not determine sector for tenant with alternateName '${alternateName}'. Skipping cache.`);
-              continue;
-            }
-            vaultId = getTenantVaultId(sector, alternateName);
-            collectionName = generateTenantCollectionNameFromClaims(tenantConfig.claims);
-          }
-
-
-          // Add the physical collectionName to the cached config object. This is the core translation.
-          tenantConfig.collectionName = collectionName;
-
-          if (getEnvironment() !== 'production') {
-            // console.log(`[TenantsCacheManager] Caching tenant '${vaultId}' -> collection '${collectionName}'`);
-          }
-          this.tenantCacheByVaultId.set(vaultId, tenantConfig);
-        }
-      } catch (error) {
-        console.error(`[TenantsCacheManager] Failed to decrypt or cache tenant record ${record.id}. Skipping.`, error);
-      }
-    }
-
-    // console.log(`[TenantsCacheManager] Successfully loaded ${this.tenantCacheByVaultId.size} tenants.`);
+  /**
+   * Proactively loads the 'host' configuration into the cache.
+   * This is intended to be called at server startup to ensure the host's
+   * identity and services are immediately available.
+   */
+  public async loadHost(): Promise<void> {
+    await this._ensureTenantIsInCache('host');
   }
 
+
   /**
-   * @architecture CRITICAL
-   * To resolve any tenant's configuration (including the host's), this method MUST
-   * query the logical 'host' collection. Per the IVaultRepository contract, the repository
-   * implementation is responsible for translating 'host' into the correct physical
-   * collection name. This manager MUST remain agnostic to physical names and operate
-   * only on logical identifiers. This is a cornerstone of the abstraction layer.
+   * Ensures a tenant's configuration is loaded into the cache.
+   * If the tenant is not in the cache, it fetches the record from the host's
+   * physical collection, decrypts it, and adds it to the cache.
+   *
+   * @architecture
+   * This method correctly uses the `hostCollectionName` (a physical identifier)
+   * to query the repository, upholding the principle that the repository layer
+   * is "dumb" and operates only on physical collection names. This manager is
+   * responsible for knowing the physical location of the host's tenant registry.
    */
   private async _ensureTenantIsInCache(vaultId: string): Promise<any | undefined> {
     // 1. Check the cache first.
@@ -107,9 +66,9 @@ export class TenantsCacheManager implements ITenantsManager {
       return tenantConfig;
     }
 
-    // 2. If not in cache, fetch the tenant's registration record from the 'host' logical vault.
-    const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>('host', vaultId, 'tenants');
-
+    // 2. If not in cache, fetch the tenant's registration record from the HOST'S PHYSICAL collection.
+    const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>(this.hostCollectionName, vaultId, 'tenants');
+    
     // 3. If not in the repository, it doesn't exist.
     if (!secureTenantRecord) {
       return undefined;

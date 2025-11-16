@@ -107,7 +107,7 @@ describe('HostingManager', () => {
   let mockConfig: IServerConfig;
   const originalEnv = process.env;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vaultRepository = new VaultMemRepository();
     mockTenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, 'test-host-collection') as jest.Mocked<TenantsCacheManager>;
 
@@ -137,6 +137,12 @@ describe('HostingManager', () => {
 
     jest.clearAllMocks();
     
+    // This is the critical setup step. The host must be loaded into the cache
+    // so that the manager can retrieve the host's collection name when persisting new tenants.
+    const hostDoc = { id: 'host', content: { claims: testClaimsHostInitialization } };
+    jest.spyOn(vaultRepository, 'get').mockResolvedValue(hostDoc as any);
+    await mockTenantsCacheManager.loadHost();
+    
     mockKmsService.provisionKeys.mockResolvedValue(mockPublicKeys);
     mockKmsService.getPublicJwks.mockResolvedValue(mockPublicKeys);
 
@@ -148,8 +154,11 @@ describe('HostingManager', () => {
     process.env = originalEnv;
   });
 
-  it("[1 HOST: should process the 'host' initialization", async () => {
+  it('[1 HOST: should process the "host" initialization]', async () => {
     const job = testBaseJobForClaims(testClaimsHostInitialization);
+    // In the real bootstrap, the host isn't in the cache yet, so we clear the mock for this one test.
+    jest.spyOn(vaultRepository, 'get').mockResolvedValue(undefined as any);
+
     const responsePayload = await hostingManager.process(job);
 
     const entry = responsePayload.body.data[0];
@@ -163,6 +172,7 @@ describe('HostingManager', () => {
   it('[5 TENANT (Happy Path): should create full tenant config and protect it', async () => {
     // PRE-CONDITION: Ensure host vault exists before creating a tenant.
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await mockTenantsCacheManager.loadHost();
     
     const putSpy = jest.spyOn(vaultRepository, 'put');
     const initialProtectCalls = mockKmsService.protectConfidentialData.mock.calls.length;
@@ -193,9 +203,26 @@ describe('HostingManager', () => {
 
     expect(tenantConfig).toBeDefined();
     expect((tenantConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.legalName]).toBe(testTenant1LegalName);
+    
+    // 1. Assert didConfig contains the raw business service definitions
     expect(tenantConfig.didConfig.service.length).toBeGreaterThan(0);
+    expect(tenantConfig.didConfig.service[0].actions).toBeDefined(); // Internal property
+    expect(tenantConfig.didConfig.service[0].serviceEndpoint).not.toContain('http'); // Is a resource list
+
+    // 2. Assert didDocument contains the public, multiplexed service endpoints
     expect(tenantConfig.didDocument.verificationMethod).toHaveLength(2);
-    expect(tenantConfig.didDocument.service).toBeDefined();
+    const publicServices = tenantConfig.didDocument.service!;
+    expect(publicServices.length).toBeGreaterThan(tenantConfig.didConfig.service.length); // Multiplexing works
+
+    const wellKnownService = publicServices.find((s: { id: string | string[]; }) => s.id.includes('#jwks'));
+    expect(wellKnownService).toBeDefined();
+    expect(wellKnownService!.serviceEndpoint).toContain('http'); // Is a full URL
+    
+    // Find a specific multiplexed service
+    const employeeService = publicServices.find((s: { id: string; }) => s.id.endsWith('#v1:health-care:entity:org.schema:employee:_batch'));
+    expect(employeeService).toBeDefined();
+    expect(employeeService!.serviceEndpoint).toContain('http'); // Is a full URL
+    expect((employeeService as any).actions).toBeUndefined(); // No internal properties
 
     // The tenant's main config is saved in the host's vault.
     const hostCollectionName = await mockTenantsCacheManager.getCollectionName('host');
@@ -208,6 +235,7 @@ describe('HostingManager', () => {
 
   it("[3 DEMO: should use a non-UUID identifier directly in 'demo' mode", async () => {
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await mockTenantsCacheManager.loadHost();
     const demoClaims = { ...testClaimsTenant1Registration, [ClaimsPersonSchemaorg.identifier]: testTenant1Data.member.admin1.mockedUuid };
     const job = testBaseJobForClaims(demoClaims);
     (uuidValidate as jest.Mock).mockReturnValue(false);
@@ -225,6 +253,7 @@ describe('HostingManager', () => {
 
   it("[2] TENANT: should generate a new UUID for an invalid identifier", async () => {
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await mockTenantsCacheManager.loadHost();
     const invalidClaims = { ...testClaimsTenant1Registration, [ClaimsPersonSchemaorg.identifier]: testInvalidUuid };
     const job = testBaseJobForClaims(invalidClaims);
     (uuidValidate as jest.Mock).mockReturnValue(false);
@@ -240,6 +269,7 @@ describe('HostingManager', () => {
 
   it("[4] TENANT: should generate a new UUID if identifier claim is missing", async () => {
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await mockTenantsCacheManager.loadHost();
     const { [ClaimsPersonSchemaorg.identifier]: _, ...noIdClaims } = testClaimsTenant1Registration;
     const job = testBaseJobForClaims(noIdClaims as ClaimsRecord);
     (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
@@ -284,6 +314,7 @@ describe('HostingManager', () => {
   it("[8 TENANT: should produce an error entry if identifier and country combination already exists", async () => {
     // PRE-CONDITION: Ensure host vault exists
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await mockTenantsCacheManager.loadHost();
     
     // Arrange: Simulate that the vault for this tenant already exists.
     jest.spyOn(vaultRepository, 'vaultExists').mockResolvedValue(true);
@@ -317,6 +348,7 @@ describe('HostingManager', () => {
   it('[10] TENANT: should persist all original claims in the tenant configuration', async () => {
     // PRE-CONDITION: Ensure host vault exists before creating a tenant.
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await mockTenantsCacheManager.loadHost();
     const initialProtectCalls = mockKmsService.protectConfidentialData.mock.calls.length;
 
     const job = testBaseJobForClaims(testClaimsTenant1Registration);

@@ -7,7 +7,7 @@ import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { QueueAdapter } from '../adapters/queue';
 import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 import { createJobName } from '../utils/naming';
-import { createDidServiceId } from '../utils/did';
+import { isRequestValid } from '../utils/request-validator';
 import { createOperationOutcome } from '../utils/outcome';
 import { JobRequest } from '../models/request';
 import { DidService } from '../models/did';
@@ -24,34 +24,7 @@ import { getTenantVaultIdFromIss, getTenantVaultId } from '../utils/tenant';
 // As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
 
-/**
- * Validates a request against a tenant's service configurations.
- * @param services The array of DidService from the tenant's configuration.
- * @param params The parameters from the request URL.
- * @returns True if the request is valid, false otherwise.
- */
-function isRequestValid(services: DidService[] | undefined, params: any): boolean {
-  // console.log(`[isRequestValid]: params=${JSON.stringify(params)}`);
-  const { sector, section, format, resourceType, action } = params;
 
-  if (!services) {
-    return false;
-  }
-  // console.log(`[isRequestValid]: sector=${sector}, section=${section}, format=${format}`);
-  const expectedServiceId = createDidServiceId({ version: 'v1', sector, section, format });
-  // console.log(`[isRequestValid]: expectedServiceId=${expectedServiceId}`);
-  const matchingService = services.find(s => s.id === expectedServiceId);
-
-  if (!matchingService) {
-    // console.log(`[isRequestValid]: No matching service found. Available services: ${services.map(s => s.id).join(', ')}`);
-    return false;
-  }
-
-  const resourceAllowed = (matchingService.serviceEndpoint as string).split(',').includes(resourceType);
-  const actionAllowed = (matchingService.actions || []).includes(action);
-
-  return resourceAllowed && actionAllowed;
-}
 
 /**
  * Creates the main, dynamic API router according to the patterns defined in ARCHITECTURE_PATTERNS.md.
@@ -67,6 +40,7 @@ export function createApiRouter(
   asyncResponseStore: IAsyncResponseStore,
   vaultRepository: IVaultRepository,
   cryptographyService: ICryptography,
+  apiBaseUrl: string,
 ): express.Router {
   const router = express.Router();
 
@@ -112,12 +86,15 @@ export function createApiRouter(
           // The client expects a JSON response. We must decode the JWE to extract the payload.
           // This also handles plaintext error objects returned by the worker.
           if (resultIsJson) {
+            // A stringified JSON result from the worker indicates an error during processing.
             res.set('Content-Type', 'application/json');
             res.status(500).json(JSON.parse(job.result));
           } else {
+            // The result is a JWE. Decrypt it to get the plaintext payload.
             const decodedResponse = await kmsService.decodeRequest(job.result);
-            res.set('Content-Type', 'application/json');
-            res.status(200).json(decodedResponse.content);
+            // For legacy flows, respond with the decrypted content body using the original request's content type.
+            res.set('Content-Type', job.contentType || 'application/json');
+            res.status(200).json(decodedResponse.content.body);
           }
         } else {
           // --- FLOW B: FAPI / SECURE ---
@@ -127,6 +104,7 @@ export function createApiRouter(
         }
         asyncResponseStore.delete(thid);
       } catch (error: any) {
+        console.log('[Polling Handler] Error caught:', error); // Using console.log for visibility in Jest
         const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'Failed to decode the stored job result: ' + error.message);
         res.status(500).json(outcome);
       }
@@ -476,7 +454,9 @@ export function createApiRouter(
     asyncResponseStore.set(thid, { status: 'PENDING', vaultId: vaultId });
 
     // --- 5. Success Response ---
-    const pollingUrl = req.originalUrl.replace(`/${action}`, '/_batch-response');
+    // According to FHIR Async, the Location header MUST be an absolute URL.
+    const relativeUrl = req.originalUrl.replace(`/${action}`, '/_batch-response');
+    const pollingUrl = new URL(relativeUrl, apiBaseUrl).href;
     res.location(pollingUrl);
     res.set('Retry-After', '5');
     res.status(202).send();

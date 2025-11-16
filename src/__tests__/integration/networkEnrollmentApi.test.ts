@@ -43,7 +43,8 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
     mockKmsService,
     asyncResponseStore,
     vaultRepository,
-    cryptographyService
+    cryptographyService,
+    'http://localhost:3001',
   );
   app.use('/', apiRouter);
 
@@ -68,7 +69,7 @@ describe('Network Enrollment API', () => {
       const action = '_batch';
 
       const enrollmentUrl = `/${tenantId}/cds-${jurisdiction}/v1/${sector}/${section}/${format}/${resourceType}/${action}`;
-      const expectedPollingUrl = enrollmentUrl.replace('/_batch', '/_batch-response');
+      const expectedPollingUrl = `http://localhost:3001${enrollmentUrl.replace('/_batch', '/_batch-response')}`;
 
       // Mock the service config lookup to simulate a valid, registered tenant
       const mockTenantServices: DidService[] = [{

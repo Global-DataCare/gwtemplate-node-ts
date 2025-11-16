@@ -24,6 +24,7 @@ describe('TenantsCacheManager', () => {
   let tenantsCacheManager: TenantsCacheManager;
   let mockVaultRepository: jest.Mocked<IVaultRepository>;
   let mockKmsService: jest.Mocked<IKmsService>;
+  const hostCollectionName = 'test-host-collection'; // Define for the whole suite
 
   // --- Test Data ---
   const mockServices: DidService[] = [{ id: 'service-1', type: 'TestService', serviceEndpoint: 'https://test.com' }];
@@ -64,7 +65,7 @@ describe('TenantsCacheManager', () => {
       unprotectConfidentialData: jest.fn(),
     } as any;
 
-    tenantsCacheManager = new TenantsCacheManager(mockVaultRepository, () => mockKmsService, 'test-host-collection');
+    tenantsCacheManager = new TenantsCacheManager(mockVaultRepository, () => mockKmsService, hostCollectionName);
     (generateTenantCollectionNameFromClaims as jest.Mock).mockImplementation((claims: ClaimsRecord) => {
       const value = claims[ClaimsOrganizationSchemaorg.identifierValue];
       return `_${value}_`;
@@ -92,12 +93,8 @@ describe('TenantsCacheManager', () => {
       expect(collectionName1).toBe(expectedCollectionName);
       expect(mockVaultRepository.get).toHaveBeenCalledTimes(1);
 
-      // CRITICAL ARCHITECTURE TEST:
-      // Verify that the manager is correctly calling the repository. It MUST use the
-      // logical name 'host' to ask for the collection, trusting the repository
-      // to handle the translation to a physical name. The manager must remain
-      // agnostic to physical collection names.
-      expect(mockVaultRepository.get).toHaveBeenCalledWith('host', acmeVaultId, 'tenants');
+             // The manager should now use the PHYSICAL host collection name to find the tenant record.
+       expect(mockVaultRepository.get).toHaveBeenCalledWith(hostCollectionName, acmeVaultId, 'tenants');
       expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledTimes(1);
 
       // --- Second Call (Cache Hit) ---
