@@ -1,9 +1,32 @@
 // src/__tests__/integration/end-to-end-legacy.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+/**
+ * @file This integration test validates the "legacy" plaintext API flow.
+ *
+ * @architecture
+ * This test suite is critical because it covers a complex asynchronous edge case:
+ * the "encrypt-for-a-just-born-tenant" scenario.
+ *
+ * The flow is as follows:
+ * 1. A plaintext JSON request to create a new tenant is sent. The API accepts it (202).
+ * 2. The job is processed by the Worker, which calls the HostingManager.
+ * 3. The HostingManager creates the new tenant, its keys, and its DID Document, persisting them in the database.
+ * 4. Crucially, the HostingManager also explicitly loads the new tenant into the TenantsCacheManager.
+ *    This makes the new tenant's configuration available to other services within the same process.
+ * 5. The Worker must now encrypt the job response for the new tenant (the "encrypt-to-self" pattern).
+ * 6. To do this, it asks the KmsService for the new tenant's public key.
+ * 7. The KmsService, not having this key in its immediate memory, falls back to its lazy-loading mechanism:
+ *    it queries the TenantsCacheManager.
+ * 8. Because the HostingManager pre-emptively loaded the tenant into the cache (step 4), the KmsService
+ *    finds the DID Document, extracts the public key, and successfully encrypts the response.
+ *
+ * This test validates that this entire chain of caching, lazy-loading, and dependency interaction works correctly.
+ */
+
 import * as express from 'express';
 import * as request from 'supertest';
-import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
+import { testPayloadCreateTenant1, testClaimsHostInitialization } from '../data/end-to-end.data';
 import { testCommunicationAppointmentFhirR4 } from '../data/appointment.data';
 import { createApiRouter } from '../../routes/api';
 import { createFhirRouter } from '../../routes/fhir';
@@ -31,14 +54,12 @@ import { IAccessTokenClaims } from '../../models/auth';
 import { ClaimsServiceSchemaorg } from '../../models/schemaorg';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { IncludedResource } from '../../models/jsonapi';
-import { testClaimsHostInitialization } from '../data/end-to-end.data';
 import { IKmsService } from '../../crypto/interfaces/IKmsService';
 
 // Mock implementation for the AuthorizationManager
 class MockAuthorizationManager implements IAuthorizationManager {
   public consentStore: Map<string, boolean> = new Map();
   authorize(req: express.Request, res: express.Response, next: express.NextFunction): void {
-    // For FHIR-specific tests, claims should be injected to simulate a protected route.
     if (req.headers.authorization === 'Bearer mock-valid-token-for-fhir') {
       (req as any).claims = {
         iss: 'did:web:test-issuer.com', sub: 'did:web:test-employee.com', aud: 'did:web:this-gateway.com',
@@ -71,7 +92,6 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
   let kmsService: IKmsService;
 
   beforeEach(async () => {
-    // --- Create a clean, isolated in-memory environment for each test ---
     const logger = new ConsoleLogger();
     const cryptographyService = new CryptographyService();
     vaultRepository = new VaultMemRepository();
@@ -98,12 +118,12 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     await tenantManager.loadHost();
     
     const managerRegistry: ManagerRegistry = {
-      hostingManager: hostingManager,
+      hostingManager,
       employeeManager: new EmployeeManager(vaultRepository, kmsService, tenantManager),
       customerManager: new CustomerManager(vaultRepository, kmsService, tenantManager, new CredentialManager(vaultRepository, kmsService, tenantManager, 'testhost.com'), new BlockchainAdapterMem(), 'test-ns'),
       compositionManager: new CompositionManager(),
       communicationManager: new CommunicationManager({ tenantsCacheManager: tenantManager }),
-      tenantManager: tenantManager,
+      tenantManager,
     };
     
     const worker = new Worker(managerRegistry, mockConfig.apiBaseUrl, kmsService);
@@ -112,6 +132,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
 
     app = express.default();
     app.use(express.json({ type: ['application/json', 'application/fhir+json'] }));
+    app.use(express.urlencoded({ extended: false }));
     authManager = new MockAuthorizationManager();
 
     const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService, mockConfig.apiBaseUrl);
@@ -161,15 +182,16 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
 
     await queueAdapter.waitForEmptyQueue();
 
-    // After tenant creation, we must manually load the new tenant into the cache
-    // so the tenantManager in our test scope is aware of it.
+    // After the async job completes, explicitly load the new tenant into the test's
+    // cache instance to verify the results of the operation.
     const vaultId = getTenantVaultId(claims[ClaimsServiceSchemaorg.category], claims['org.schema.Organization.alternateName']);
-    await tenantManager.getTenant(vaultId); // This will force a load from the repository into the cache
+    await tenantManager.getTenant(vaultId);
 
     const collectionName = await tenantManager.getCollectionName(vaultId);
     expect(collectionName).toBeDefined();
 
     const services = await vaultRepository.getContainersInSection<IncludedResource>(collectionName!, 'services');
+    expect(services).toHaveLength(1);
     const persistedService = services[0];
     const termsUrl = persistedService.meta.claims[ClaimsServiceSchemaorg.termsOfService];
     const termsHash = persistedService.meta.claims[`${ClaimsServiceSchemaorg.termsOfService}#hash`];
@@ -190,21 +212,16 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
             .send(orgCreationPayload);
         await queueAdapter.waitForEmptyQueue();
         
-        // Manually load the 'acme' tenant into the cache so the subsequent API calls can find it.
+        // After the async job completes, explicitly load the new 'acme' tenant into the cache
+        // so that subsequent API calls in other tests can find it.
         const claims = testPayloadCreateTenant1.body.data[0].meta.claims;
         const vaultId = getTenantVaultId(claims[ClaimsServiceSchemaorg.category], claims['org.schema.Organization.alternateName']);
-        await tenantManager.getTenant(vaultId); // Force load into cache
-    });
-
-    const communicationUrl = '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch';
-    const accessToken = 'Bearer mock-valid-token-for-fhir';
-    let canAccessSpy: jest.SpyInstance;
-
-    beforeEach(() => {
-      canAccessSpy = jest.spyOn(authManager, 'canAccess');
+        await tenantManager.getTenant(vaultId);
     });
 
     it('should REJECT a FHIR Communication with 403 Forbidden if consent is NOT present', async () => {
+      const communicationUrl = '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch';
+      const accessToken = 'Bearer mock-valid-token-for-fhir';
       const consentId = 'urn:uuid:consent-not-granted';
       const communicationResource = { 
         ...testCommunicationAppointmentFhirR4, 
@@ -212,12 +229,9 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
       };
       authManager.setConsent(consentId, false);
       
-      // The payload for a batch request is a Bundle-like structure.
       const batchPayload = {
         thid: 'thid-for-fhir-test',
-        body: {
-          data: [communicationResource],
-        },
+        body: { data: [communicationResource] },
       };
 
       const response = await request.default(app)

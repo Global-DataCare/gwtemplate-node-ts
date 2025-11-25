@@ -99,8 +99,19 @@ export class Worker {
         // The recipient is determined by the nature of the job.
         let recipientVaultId: string;
         if (jobInfo.resourceType === 'Organization' && job.tenantId === 'host') {
-          // Special Case: New tenant registration. Encrypt for the NEW tenant.
-          // The sender in this case is the 'host'.
+          // --- SPECIAL CASE: NEW TENANT ONBOARDING IN PLAINTEXT MODE ---
+          // This block handles a unique architectural challenge created by plaintext onboarding.
+          // The flow is as follows:
+          // 1. The HostingManager (called by the worker) creates the new tenant and persists it.
+          // 2. The worker now needs to encrypt the job response ("encrypt-to-self") for the tenant
+          //    that was just created in the same transaction.
+          // 3. At this exact moment, no other component has had a chance to "lazy-load" the new
+          //    tenant's configuration (like its DID Document, which contains its public keys).
+          //
+          // To solve this, the `KmsService` MUST be resilient. Its `getPublicEncryptionKey` method
+          // is designed to, if it cannot find a key in its immediate memory, trigger a lazy-load
+          // by querying the `TenantsCacheManager`. This ensures it can find the public key of the
+          // "just-born" tenant.
           const newTenantClaims = job.content?.body?.data?.[0]?.meta?.claims;
           if (!newTenantClaims) throw new Error('Cannot determine new tenant from claims to encrypt response.');
           

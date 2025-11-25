@@ -374,9 +374,9 @@ export class HostingManager {
 
   private async _handleServiceAttachment(service?: IncludedResource): Promise<IncludedResource | undefined> {
     if (!service) return undefined;
-    const termsOfService = service.meta.claims[ClaimsServiceSchemaorg.termsOfService] as string;
+    const termsOfService = service.meta.claims[ClaimsServiceSchemaorg.termsOfService];
 
-    if (termsOfService && !termsOfService.startsWith('http')) {
+    if (typeof termsOfService === 'string' && !termsOfService.startsWith('http')) {
       try {
         const pdfBytes = Buffer.from(termsOfService, 'base64');
         const { publicUrl, encodedMultiHash } = await this.storageAdapter.upload(pdfBytes, 'application/pdf');

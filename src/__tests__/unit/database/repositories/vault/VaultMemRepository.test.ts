@@ -84,5 +84,22 @@ describe('VaultMemRepository', () => {
         // Assert
         expect(results).toEqual([]);
     });
+
+    it('should add multiple documents to the same section across multiple calls', async () => {
+      // Arrange
+      const docA: RecordBase = { id: 'doc-a', data: 'value-a' };
+      const docB: RecordBase = { id: 'doc-b', data: 'value-b' };
+      const sectionId = 'multiple-puts';
+      
+      // Act
+      await repository.put(vaultId, [docA], sectionId);
+      await repository.put(vaultId, [docB], sectionId); // This call was overwriting the section
+      
+      // Assert
+      const retrievedDocs = await repository.getContainersInSection(vaultId, sectionId);
+      expect(retrievedDocs).toHaveLength(2);
+      expect(retrievedDocs).toContainEqual(docA);
+      expect(retrievedDocs).toContainEqual(docB);
+    });
   });
 });

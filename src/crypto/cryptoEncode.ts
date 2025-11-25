@@ -3,7 +3,7 @@
 
 // Function to encode a payload into a JWT with the header "alg=none"
 // senderTenant signs and encrypts to recipient(s)
-export function encodeJWT(senderKeysSet: any[], payload: any, recipientsEncKey: any[], header: any): string {
+export function encodeUnsignedJWT(senderKeysSet: any[], payload: any, recipientsEncKey: any[], header: any): string {
     try {
       // 1. Convert the header to JSON and then Base64Url encode it
       const encodedHeader = base64UrlEncode(JSON.stringify(header));

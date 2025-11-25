@@ -1,8 +1,10 @@
 // src/__tests__/e2e/api.e2e.spec.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-// This E2E test runs against a LIVE Firestore instance, configured via .env.test.
+// This E2E test runs against a LIVE Firestore instance, configured via .env.local
 // It validates the entire LEGACY API flow (unencrypted JSON) from HTTP request to database interaction.
+// NOTE: This test requires TEST_USER_EMAIL and TEST_USER_PASSWORD to be set in .env.local
+//       and for that user to exist in the Firebase Auth project.
 
 import * as express from 'express';
 import request from 'supertest';
@@ -13,7 +15,6 @@ import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
 import { KmsService } from '../../services/KmsService';
 import { ClaimsRecord } from '../../models/resource-document';
 import { DecodedDidcommMessage, JobRequest } from '../../models/request';
-
 import { getGoogleAuthTokenForTesting } from '../utils/auth';
 
 // Mock the KmsService to bypass actual JWE decryption for this legacy test
@@ -22,45 +23,32 @@ jest.mock('../../services/KmsService');
 // Increase the timeout for all tests in this file
 jest.setTimeout(20000);
 
-describe('End-to-End API Flow (Legacy with Live Firestore)', () => {
+// Conditionally describe the test suite based on environment variables
+const describeIfConfigured = 
+  (process.env.TEST_USER_EMAIL && process.env.TEST_USER_PASSWORD) 
+  ? describe 
+  : describe.skip;
+
+describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
   let app: express.Express;
   let server: Server;
   let queueAdapter: QueueAdapter;
   let addJobSpy: jest.SpyInstance;
   let authToken: string;
-  
-  const tenantId = `e2e-legacy-tenant-${Date.now()}`;
-  const modifiedClaims: ClaimsRecord = {
-    ...testPayloadCreateTenant1.body.data[0].meta.claims,
-    // Ensure the email in the payload matches the test user's email
-    'org.schema.Person.email': process.env.DEMO_ORG1_ADMIN_EMAIL,
-    'org.schema.Organization.identifier': `urn:uuid:${tenantId}`,
-  };
-  
-  const orgCreationPayload = {
-    ...testPayloadCreateTenant1,
-    body: {
-      data: [{
-        ...testPayloadCreateTenant1.body.data[0],
-        meta: { claims: modifiedClaims },
-        resource: {}, // Keep empty resource as per user correction
-      }]
-    }
-  };
 
   beforeAll(async () => {
     authToken = await getGoogleAuthTokenForTesting(
-      process.env.DEMO_ORG1_ADMIN_EMAIL!,
-      process.env.DEMO_ORG1_ADMIN_EMAIL_PASSWORD!,
+      process.env.TEST_USER_EMAIL!,
+      process.env.TEST_USER_PASSWORD!,
     );
-    // We are mocking the service, so we need to provide a mock implementation.
+    
+    // We are mocking the KmsService for this legacy flow test.
     (KmsService as jest.Mock).mockImplementation(() => {
       return {
         decodeRequest: jest.fn((req: express.Request): Promise<JobRequest> => {
-          // In legacy plaintext mode, the body is the job content. We just pass it through.
           const jobContent = req.body as DecodedDidcommMessage;
           return Promise.resolve({
-            name: `unsecure-host-registry-org.schema.Organization-_batch`, // Mock a job name
+            name: `unsecure-host-registry-org.schema.Organization-_batch`,
             content: jobContent,
           } as JobRequest);
         }),
@@ -82,20 +70,39 @@ describe('End-to-End API Flow (Legacy with Live Firestore)', () => {
     if (addJobSpy) {
       addJobSpy.mockRestore();
     }
-    await new Promise<void>((resolve, reject) => {
-      server.close((err) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve();
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err: any) => { // Add type to err to satisfy TS
+          if (err) {
+            return reject(err);
+          }
+          resolve();
+        });
       });
-    });
+    }
     // TODO: Add a cleanup step to delete the created tenant from Firestore
   });
 
-  // No longer skipped, as it should now pass with a valid auth token.
   it('should accept a legacy JSON request to create a new organization, and save it to Firestore', async () => {
     const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
+    
+    const tenantId = `e2e-legacy-tenant-${Date.now()}`;
+    const modifiedClaims: ClaimsRecord = {
+      ...testPayloadCreateTenant1.body.data[0].meta.claims,
+      'org.schema.Person.email': process.env.TEST_USER_EMAIL,
+      'org.schema.Organization.identifier': `urn:uuid:${tenantId}`,
+    };
+    
+    const orgCreationPayload = {
+      ...testPayloadCreateTenant1,
+      body: {
+        data: [{
+          ...testPayloadCreateTenant1.body.data[0],
+          meta: { claims: modifiedClaims },
+          resource: {},
+        }]
+      }
+    };
 
     // 1. ACT: Send the plain JSON request with a valid Bearer token
     const response = await request(app)

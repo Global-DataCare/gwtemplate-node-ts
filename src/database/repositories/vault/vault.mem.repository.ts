@@ -53,17 +53,8 @@ export class VaultMemRepository implements IVaultRepository {
    * The `IVaultRepository` interface's `vaultExists` signature is ambiguous for non-host vaults.
    * This mock now assumes it will be called in a way that is verifiable in tests.
    */
-  public async vaultExists(vaultId: string): Promise<boolean> {
-      // In the corrected architecture, this is primarily used by HostingManager to check for duplicates.
-      // HostingManager calls this with a LOGICAL vaultId. This mock simulates checking if that
-      // logical ID has been registered in ANY vault's 'tenants' section.
-      for (const vault of this.dataVaults.values()) {
-          const tenantsSection = vault.sections.get('tenants');
-          if (tenantsSection?.has(vaultId)) {
-              return true;
-          }
-      }
-      return false;
+  public async vaultExists(collectionName: string): Promise<boolean> {
+      return this.dataVaults.has(collectionName);
   }
 
   /**
@@ -76,14 +67,11 @@ export class VaultMemRepository implements IVaultRepository {
   ): Promise<boolean> {
     // To support the bootstrap flow in tests, auto-create the vault if it doesn't exist.
     if (!this.dataVaults.has(collectionName)) {
-      this.createNewVault({ id: collectionName, name: collectionName });
+      await this.createNewVault({ id: collectionName, name: collectionName });
     }
     const vault = this.dataVaults.get(collectionName)!;
 
-    if (!vault.sections.has(sectionId)) {
-      vault.sections.set(sectionId, new Map<string, RecordBase>());
-    }
-    const sectionMap = vault.sections.get(sectionId)!;
+    const sectionMap = vault.sections.get(sectionId) || new Map<string, RecordBase>();
 
     for (const doc of documents) {
       if (!doc.id) {
@@ -91,8 +79,9 @@ export class VaultMemRepository implements IVaultRepository {
       }
       // DEBUG LOG: See exactly what is being saved
       console.log(`[TEST DEBUG] VaultMemRepository.put: collection='${collectionName}', section='${sectionId}', doc.id='${doc.id}'`);
-      sectionMap.set(doc.id, doc);
+      sectionMap.set(doc.id, doc); // This adds or updates the document in the section
     }
+    vault.sections.set(sectionId, sectionMap); // Ensure the updated map is set back
     return true;
   }
 

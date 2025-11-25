@@ -22,7 +22,7 @@ import { normalizeCodeSystemAndValue } from '../utils/attributes';
 import { ParameterData } from '../models/params';
 import { PublicJwk } from '../crypto/interfaces/Cryptography.types';
 import { DidDocument, VerificationMethod } from '../models/did';
-import { JobRequest, JobRequestMeta } from '../models/request';
+import { JobRequest, JobDecodedMetadata } from '../models/request';
 
 const EMPLOYEE_SECTION = 'employees';
 
@@ -91,7 +91,7 @@ export class EmployeeManager {
     entry: BundleEntry,
     vaultId: string,
     tenantUrn: string,
-    meta: JobRequestMeta,
+    meta: JobDecodedMetadata,
     contentType?: string,
     environment?: string,
   ): Promise<BundleEntry> {
@@ -125,7 +125,7 @@ export class EmployeeManager {
     employeeId: string,
     claims: ClaimsRecord,
     entryType: string,
-    jobMeta: JobRequestMeta,
+    jobMeta: JobDecodedMetadata,
     contentType?: string,
   ): Promise<BundleEntry> {
     let signerJwk: PublicJwk | undefined;
