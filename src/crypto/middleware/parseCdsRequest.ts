@@ -3,19 +3,19 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { extractHttpRequestDataAsJson } from '../../utils/http-parser';
-import { DataInRequest } from '../../models/request';
+import { JobProcessingInfo } from '../../models/confidential-job';
 
 // Extend the Express Request type to include our custom property
 declare global {
   namespace Express {
     interface Request {
-      cdsRequest?: DataInRequest;
+      cdsRequest?: JobProcessingInfo;
     }
   }
 }
 
 /**
- * Middleware to parse an incoming HTTP request into a structured `DataInRequest` object.
+ * Middleware to parse an incoming HTTP request into a structured `JobProcessingInfo` object.
  * It uses the `extractHttpRequestDataAsJson` utility to parse the complex CDS URL
  * and the request body. The resulting object is attached to `req.cdsRequest` for
  * use by subsequent middlewares and handlers.

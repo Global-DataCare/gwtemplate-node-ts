@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { DidService } from '../models/did';
-import { createDidServiceId } from './did';
+import { createDidServiceIdBase } from './did';
 
 /**
  * Validates a request against a tenant's service configurations by checking if the requested
@@ -21,8 +21,8 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
   
   // The service ID in the config could be general (without resourceType) or specific.
   // We construct both possibilities to check against the tenant's service list.
-  const baseServiceId = createDidServiceId({ version: 'v1', sector, section, format });
-  const specificServiceId = createDidServiceId({ version: 'v1', sector, section, format, resourceType });
+  const baseServiceId = createDidServiceIdBase({ version: 'v1', sector, section, format });
+  const specificServiceId = createDidServiceIdBase({ version: 'v1', sector, section, format, resourceType });
   
   // A request is valid if it matches EITHER a specific service definition OR a more general one.
   const matchingService = services.find(s => s.id === specificServiceId || s.id === baseServiceId);

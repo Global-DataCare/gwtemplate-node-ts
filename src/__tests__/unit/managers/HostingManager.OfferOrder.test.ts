@@ -1,0 +1,229 @@
+// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// File: src/__tests__/unit/managers/HostingManager.OfferOrder.test.ts
+
+import { jest } from '@jest/globals';
+import { v4 as uuidv4 } from 'uuid';
+import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
+import { IServerConfig } from '../../../config';
+import { Sector } from '../../../models/urlPath';
+import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
+import { ILogger } from '../../../loggers/ILogger';
+import { HostingManager } from '../../../managers/HostingManager';
+import { IKmsService } from '../../../crypto/interfaces/IKmsService';
+import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+
+// Create a mock KMS service for testing.
+const mockKmsService: jest.Mocked<IKmsService> = {
+  init: jest.fn(async () => {}),
+  provisionKeys: jest.fn() as jest.MockedFunction<IKmsService['provisionKeys']>,
+  getPublicJwks: jest.fn() as jest.MockedFunction<IKmsService['getPublicJwks']>,
+  decodeRequest: jest.fn(),
+  signWithManagedKey: jest.fn(),
+  signWithReconstructedKey: jest.fn(),
+  encodeResponse: jest.fn(),
+  protectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> => {
+    // In this mock, we retain the content so that unprotect can retrieve it.
+    const secureDoc = { ...doc, jwe: { ciphertext: 'encrypted-content' }, content: doc.content };
+    delete (secureDoc as any).protectedAttributes;
+    return secureDoc;
+  }),
+  unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string) =>
+    Promise.resolve(doc.content as any),
+  ),
+  createDetachedJws: jest.fn(),
+  getHostPublicJwkSet: jest.fn(),
+  getPublicVerificationKey: jest.fn(),
+  getPublicEncryptionKey: jest.fn(),
+  getHmacBase64Url: jest.fn(),
+  protectAttributesNameAndValue: jest.fn(),
+};
+import {
+  ORGANIZATION_REGISTRATION_JOB,
+  ORGANIZATION_ORDER_JOB,
+} from '../../data/example-jobs';
+import { testClaimsHostInitialization } from '../../data/end-to-end.data';
+import {
+  ClaimsOrganizationSchemaorg,
+  ClaimsOfferSchemaorg,
+  ClaimsServiceSchemaorg,
+} from '../../../models/schemaorg';
+import * as tenantUtils from '../../../utils/tenant';
+import { testTenant1LegalName } from '../../data/organization.data';
+
+// Mock external dependencies
+jest.mock('uuid');
+
+const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
+  upload: jest.fn(),
+};
+
+const mockLogger: jest.Mocked<ILogger> = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+};
+
+describe('HostingManager - Offer/Order Flow', () => {
+  let hostingManager: HostingManager;
+  let vaultRepository: VaultMemRepository;
+  let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
+  let mockConfig: IServerConfig;
+  let hostCollectionName: string;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
+
+    // Use the intelligent, self-learning mock repository
+    vaultRepository = new VaultMemRepository();
+    hostCollectionName = tenantUtils.generateTenantCollectionNameFromClaims(
+      testClaimsHostInitialization,
+    );
+    mockTenantsCacheManager = new TenantsCacheManager(
+      vaultRepository,
+      () => mockKmsService,
+      hostCollectionName,
+    ) as jest.Mocked<TenantsCacheManager>;
+
+    mockConfig = {
+      nodeEnv: 'test',
+      port: 3000,
+      apiHostname: 'testhost',
+      hostExternalDomain: 'testhost.com',
+      apiBaseUrl: 'http://testhost:3000',
+      namespace: 'test-namespace',
+      sectorsAllowed: [Sector.HEALTH_CARE, Sector.SYSTEM, Sector.HEALTH_INSURANCE],
+      dbProvider: 'mem',
+      queueProvider: 'mem',
+      storageProvider: 'mem',
+      allowedPaymentMethods: ['Stripe'],
+      host: {
+        legalName: 'Test Host',
+        jurisdiction: 'us',
+        idType: 'test-id',
+        idValue: '12345',
+      },
+      mongo: { dbName: 'test' },
+      firebase: {},
+    };
+
+    hostingManager = new HostingManager(
+      vaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      mockConfig,
+    );
+
+    mockKmsService.getPublicJwks.mockResolvedValue({
+      keys: [{ kid: 'sig-key-1', use: 'sig', alg: 'ML-DSA-44' } as any],
+    });
+
+    // Bootstrap the host. This will teach the mock repository the host's collection name.
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await mockTenantsCacheManager.loadHost();
+
+    // Mock the storage adapter to simulate a successful file upload.
+    mockStorageAdapter.upload.mockResolvedValue({
+      publicUrl: 'https://storage.example.com/terms.pdf',
+      encodedMultiHash: 'zQm...',
+    });
+  });
+
+  it('should create a PROVISIONAL tenant record and return an Offer', async () => {
+    const job = { ...ORGANIZATION_REGISTRATION_JOB };
+    const responsePayload = await hostingManager.process(job);
+
+    const entry = responsePayload.body.data[0];
+    expect(entry.response.status).toBe('201');
+    expect(entry.type).toBe('Organization-registration-offer-v1.0');
+    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
+
+    const claims = job.content!.body!.data[0]!.meta!.claims;
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      claims[ClaimsServiceSchemaorg.category] as Sector,
+      claims[ClaimsOrganizationSchemaorg.alternateName],
+    );
+
+    const provisionalDoc = (await vaultRepository.get(
+      hostCollectionName,
+      tenantVaultId,
+      'tenants',
+    )) as ConfidentialStorageDoc;
+    expect(provisionalDoc).toBeDefined();
+    expect(provisionalDoc.content).toBeDefined();
+    expect(provisionalDoc.content!.status).toBe('pending');
+    expect(
+      provisionalDoc.content!.claims[ClaimsOrganizationSchemaorg.legalName],
+    ).toBe(testTenant1LegalName);
+  });
+
+  it('should process an Order to finalize a registration', async () => {
+    // Step 1: Create the provisional registration to get an Offer ID
+    const registrationJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    const offerResponse = await hostingManager.process(registrationJob);
+    const offerId = offerResponse.body.data[0].meta.claims[
+      ClaimsOfferSchemaorg.identifier
+    ] as string;
+    expect(offerId).toBeDefined();
+
+    // Step 2: Create and process the Order
+    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    orderJob.content!.body!.data[0]!.meta!.claims[
+      'Order.acceptedOffer.identifier'
+    ] = offerId;
+
+    const finalResponse = await hostingManager.process(orderJob);
+
+    // Assert the final response
+    const finalEntry = finalResponse.body.data[0];
+    expect(finalEntry.response.status).toBe('201');
+    expect(finalEntry.type).toBe('Organization');
+
+    // Assert the state of the finalized tenant record in the host's vault
+    const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      regClaims[ClaimsServiceSchemaorg.category] as Sector,
+      regClaims[ClaimsOrganizationSchemaorg.alternateName],
+    );
+    const finalDoc = (await vaultRepository.get(
+      hostCollectionName,
+      tenantVaultId,
+      'tenants',
+    )) as ConfidentialStorageDoc;
+    expect(finalDoc).toBeDefined();
+    expect(finalDoc.content).toBeDefined();
+    expect(finalDoc.sequence).toBe(1);
+    expect(finalDoc.content!.status).toBe('active');
+    expect(finalDoc.content!.networkStatus[0].status).toBe('active');
+    expect(finalDoc.content!.didDocument).toBeDefined();
+
+    // Assert that the tenant's own vault and resources were created
+    const tenantCollectionName =
+      tenantUtils.generateTenantCollectionNameFromClaims(regClaims);
+    const vcDoc = await vaultRepository.get(
+      tenantCollectionName,
+      'vc.json',
+      '.well-known',
+    );
+    expect(vcDoc).toBeDefined();
+  });
+
+  it('should return a 404 Not Found for an Order with an invalid offerId', async () => {
+    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    orderJob.content!.body!.data[0]!.meta!.claims[
+      'Order.acceptedOffer.identifier'
+    ] = 'urn:uuid:invalid-offer-id';
+
+    const responsePayload = await hostingManager.process(orderJob);
+
+    const errorEntry = responsePayload.body.data[0];
+    expect(errorEntry.response.status).toBe('404');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain(
+      'No pending registration found for offerId',
+    );
+  });
+});

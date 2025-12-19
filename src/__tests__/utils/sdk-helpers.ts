@@ -3,7 +3,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { ClaimsRecord } from '../../models/resource-document';
-import { JobRequest } from '../../models/request';
+import { JobRequest, JobStatus } from '../../models/confidential-job';
 import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
 import { determineResourceId } from '../../utils/resource';
 import { BundleEntry } from '../../models/bundle';
@@ -64,9 +64,14 @@ export const sdkCreateJobRequest = (
   const tenantId = didParts.length > 3 ? didParts[3] : '';
 
   return {
+    id: uuidv4(),
+    status: JobStatus.DRAFT,
+    sequence: 0,
+    createdAtTimestamp: Date.now(),
     action: JobAction._batch,
     tenantId,
     content: {
+      jti: uuidv4(),
       thid: uuidv4(), // Use UUID for transaction IDs.
       iss: issuerDid,
       aud: targetDid,

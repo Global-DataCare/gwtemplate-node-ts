@@ -13,14 +13,14 @@
  * @basedon https://www.hl7.org/fhir/R4/appointmentresponse.html
  */
 export const AppointmentResponseClaimsFhirR4 = {
-  'org.hl7.fhir.r4.core.AppointmentResponse.identifier': String,
+  'org.hl7.fhir.r4.core.AppointmentResponse.actor': String,
   'org.hl7.fhir.r4.core.AppointmentResponse.appointment': String, // Reference to Appointment
+  'org.hl7.fhir.r4.core.AppointmentResponse.comment': String,
+  'org.hl7.fhir.r4.core.AppointmentResponse.identifier': String,
   'org.hl7.fhir.r4.core.AppointmentResponse.start': String,
   'org.hl7.fhir.r4.core.AppointmentResponse.end': String,
   'org.hl7.fhir.r4.core.AppointmentResponse.participant-type': String,
-  'org.hl7.fhir.r4.core.AppointmentResponse.actor': String,
   'org.hl7.fhir.r4.core.AppointmentResponse.participant-status': String,
-  'org.hl7.fhir.r4.core.AppointmentResponse.comment': String,
   'org.hl7.fhir.r4.core.AppointmentResponse.resource.id': String,
 };
 

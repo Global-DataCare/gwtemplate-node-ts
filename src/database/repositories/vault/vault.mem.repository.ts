@@ -4,30 +4,26 @@
 import { IVaultRepository } from './vault.repository';
 import { RecordBase, VaultConfig } from '../../../models/resource-document';
 import { InMemoryVault } from '../../../models/repository';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 
 /**
  * An in-memory implementation of the Vault Repository.
  *
  * @architecture
- * This class is intentionally "dumb" and mimics the behavior of a physical database.
- * It has no concept of a separate "tenant registry" or logical identifiers like "host".
- * It only contains physical vaults (collections), identified by a `collectionName`.
- *
- * The host's tenant registry is simply the 'tenants' section within the host's physical vault.
- * This class operates solely on the `collectionName` provided to it, making it a predictable
- * mock for a physical database. The responsibility of translating a logical `vaultId`
- * to a physical `collectionName` lies entirely with the business logic layer (e.g., TenantsCacheManager).
+ * This implementation mimics the behavior of a production repository (e.g., Firestore)
+ * by dynamically learning which physical collection belongs to the host. It remains
+ * agnostic to the naming convention of the collection itself.
  */
 export class VaultMemRepository implements IVaultRepository {
   // Maps a physical collectionName -> InMemoryVault
   private dataVaults = new Map<string, InMemoryVault>();
+  private hostCollectionName: string | null = null;
 
   /**
    * Clears all state to ensure clean test runs.
    */
   public clear(): void {
     this.dataVaults.clear();
+    this.hostCollectionName = null;
   }
 
   // === Core IVaultRepository Methods ===
@@ -36,7 +32,7 @@ export class VaultMemRepository implements IVaultRepository {
    * Creates a new, empty physical vault (collection).
    */
   public async createNewVault(vaultConfig: VaultConfig): Promise<boolean> {
-    const collectionName = vaultConfig.id; // The vaultConfig.id IS the physical collectionName
+    const collectionName = vaultConfig.id;
     if (this.dataVaults.has(collectionName)) {
       return false; // Vault already exists
     }
@@ -48,40 +44,54 @@ export class VaultMemRepository implements IVaultRepository {
   }
 
   /**
-   * Checks for the existence of a tenant's registration document.
-   * This implementation has been simplified to better align with architectural principles.
-   * The `IVaultRepository` interface's `vaultExists` signature is ambiguous for non-host vaults.
-   * This mock now assumes it will be called in a way that is verifiable in tests.
+   * Checks for the existence of a tenant's registration document within the host's collection.
+   * This implementation now correctly uses the host collection name it learns dynamically
+   * when the host's own configuration document is saved via `put`.
    */
-  public async vaultExists(collectionName: string): Promise<boolean> {
-      return this.dataVaults.has(collectionName);
+  public async vaultExists(vaultId: string): Promise<boolean> {
+    // The host's own registration is a special case.
+    if (vaultId === 'host') {
+      return !!this.hostCollectionName && this.dataVaults.has(this.hostCollectionName);
+    }
+    
+    if (!this.hostCollectionName) {
+      // If the host isn't registered yet, no tenants can be.
+      return false;
+    }
+    const hostVault = this.dataVaults.get(this.hostCollectionName);
+    const tenantsSection = hostVault?.sections.get('tenants');
+    return tenantsSection?.has(vaultId) ?? false;
   }
 
   /**
    * Places documents into a specific section of a physical vault.
+   * It dynamically learns the host's physical collection name when the host's
+   * own configuration document (`id: 'host'`) is saved.
    */
   public async put<T extends RecordBase>(
     collectionName: string,
     documents: T[],
     sectionId: string = 'default',
   ): Promise<boolean> {
-    // To support the bootstrap flow in tests, auto-create the vault if it doesn't exist.
+    // Auto-learn the host collection name when any document with id 'host' is saved.
+    // This is robust enough to handle the bootstrap process correctly.
+    if (!this.hostCollectionName && documents.some(doc => doc.id === 'host')) {
+      this.hostCollectionName = collectionName;
+    }
+
     if (!this.dataVaults.has(collectionName)) {
-      await this.createNewVault({ id: collectionName, name: collectionName });
+      await this.createNewVault({ id: collectionName });
     }
     const vault = this.dataVaults.get(collectionName)!;
-
     const sectionMap = vault.sections.get(sectionId) || new Map<string, RecordBase>();
 
     for (const doc of documents) {
       if (!doc.id) {
         throw new Error('Document being put into a vault must have an id.');
       }
-      // DEBUG LOG: See exactly what is being saved
-      console.log(`[TEST DEBUG] VaultMemRepository.put: collection='${collectionName}', section='${sectionId}', doc.id='${doc.id}'`);
-      sectionMap.set(doc.id, doc); // This adds or updates the document in the section
+      sectionMap.set(doc.id, doc);
     }
-    vault.sections.set(sectionId, sectionMap); // Ensure the updated map is set back
+    vault.sections.set(sectionId, sectionMap);
     return true;
   }
 
@@ -109,32 +119,24 @@ export class VaultMemRepository implements IVaultRepository {
     return section ? (Array.from(section.values()) as T[]) : [];
   }
   
-  // ===================================================================================
-  // Other IVaultRepository methods... (Simplified or stubbed)
-  // ===================================================================================
-
   public async query<T extends RecordBase>(
     collectionName: string,
-    query: { sectionId: string; where: { attribute: string; equals: string }[] },
+    query: { sectionId: string; where: { name: string; value: string }[] },
     ): Promise<T[]> {
       const section = this.dataVaults.get(collectionName)?.sections.get(query.sectionId);
-      if (!section) {
-        return [];
-      }
-  
+      if (!section) { return []; }
       const allDocs = Array.from(section.values()) as any[];
-  
-      const filteredDocs = allDocs.filter((doc) => {
-        if (!doc.indexed?.attributes) {
-          return false;
-        }
+      return allDocs.filter((doc) => {
+        if (!doc.indexed?.attributes) { return false; }
         return query.where.every((condition) => 
-          (doc.indexed.attributes as any[]).some(attr => attr.name === condition.attribute && attr.value === condition.equals)
+          (doc.indexed.attributes as any[]).some(attr => attr.name === condition.name && attr.value === condition.value)
         );
-      });
-  
-      return filteredDocs as T[];
+      }) as T[];
     }
+    
+  // ===================================================================================
+  // Stubs and other less critical methods
+  // ===================================================================================
     
   public async getVaultConfig(collectionName: string): Promise<VaultConfig | undefined> {
     return this.dataVaults.get(collectionName)?.config;
@@ -142,9 +144,7 @@ export class VaultMemRepository implements IVaultRepository {
 
   public async createNewSection(collectionName: string, sectionId: string): Promise<boolean> {
     const vault = this.dataVaults.get(collectionName);
-    if (!vault || vault.sections.has(sectionId)) {
-      return false;
-    }
+    if (!vault || vault.sections.has(sectionId)) { return false; }
     vault.sections.set(sectionId, new Map());
     return true;
   }
@@ -158,7 +158,6 @@ export class VaultMemRepository implements IVaultRepository {
     return this.dataVaults.get(collectionName)?.sections.has(sectionId) ?? false;
   }
 
-  // Stubs for unused methods
   public async updateSection(collectionName: string, sectionId: string, containers: RecordBase[] = []): Promise<boolean> {
     const vault = this.dataVaults.get(collectionName);
     if (!vault) return false;
@@ -173,18 +172,7 @@ export class VaultMemRepository implements IVaultRepository {
     return section ? Array.from(section.keys()) : [];
   }
 
-  public async getHistory(collectionName: string, containerId: string): Promise<any[]> {
-    console.warn('getHistory is not implemented in VaultMemRepository');
-    return [];
-  }
-
-  public async delete(collectionName: string, containerId: string, sectionId?: string): Promise<boolean> {
-    console.warn('delete is not implemented in VaultMemRepository');
-    return false;
-  }
-
-  public async purge(collectionName: string): Promise<boolean> {
-    console.warn('purge is not implemented in VaultMemRepository');
-    return this.dataVaults.delete(collectionName);
-  }
+  public async getHistory(collectionName: string, containerId: string): Promise<any[]> { return []; }
+  public async delete(collectionName: string, containerId: string, sectionId?: string): Promise<boolean> { return false; }
+  public async purge(collectionName: string): Promise<boolean> { return this.dataVaults.delete(collectionName); }
 }

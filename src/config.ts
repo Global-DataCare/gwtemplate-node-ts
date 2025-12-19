@@ -16,6 +16,7 @@ export interface IServerConfig {
   apiBaseUrl: string;
   namespace: string;
   sectorsAllowed: Sector[];
+  allowedPaymentMethods: string[];
   dbProvider: string;
   storageProvider: string;
   queueProvider: string;

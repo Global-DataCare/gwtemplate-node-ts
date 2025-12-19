@@ -11,7 +11,8 @@ export type ClaimsRecord = Record<string, any>;
  */
 export interface RecordBase {
   id: string;
-  [key: string]: any;
+  type?: string;
+  meta?: any;
 }
 
 /**

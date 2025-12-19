@@ -1,4 +1,4 @@
-import { JobRequest } from '../models/request';
+import { JobRequest } from '../models/confidential-job';
 import { getTenantVaultId } from '../utils/tenant';
 import { IAsyncResponseStore, StoredJob } from './async-response-store.mem';
 import { QueueAdapter } from './queue';
@@ -7,7 +7,7 @@ import { Worker } from '../worker'
 /**
  * An in-memory implementation of the QueueAdapter.
 import { Worker } from '../worker';
-import { JobRequest } from '../models/request';
+import { JobRequest } from '../models/confidential-job';
 import { IAsyncResponseStore, StoredJob } from './async-response-store.mem';
 
 /**
@@ -49,7 +49,7 @@ export class QueueAdapterMem implements QueueAdapter {
     if (this.queue.length > 0) {
       const job = this.queue.shift();
       if (job) {
-        const thid = job.request.content.thid; // Correctly get thid from the decoded input
+        const thid = job.request.content?.thid;
         if (!thid) {
           console.error(`Job ${job.name} is missing a 'thid'. Skipping.`);
           return;

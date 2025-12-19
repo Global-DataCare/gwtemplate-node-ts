@@ -1,0 +1,208 @@
+// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// File: src/__tests__/unit/managers/FamilyManager.OfferOrder.test.ts
+
+import { jest } from '@jest/globals';
+import { v4 as uuidv4 } from 'uuid';
+import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
+import { IServerConfig } from '../../../config';
+import { Sector } from '../../../models/urlPath';
+import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
+import { ILogger } from '../../../loggers/ILogger';
+import { HostingManager } from '../../../managers/HostingManager';
+import { IKmsService } from '../../../crypto/interfaces/IKmsService';
+import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { FamilyManager } from '../../../managers/FamilyManager';
+import { ORGANIZATION_ORDER_JOB, ORGANIZATION_REGISTRATION_JOB } from '../../data/example-jobs';
+import { FAMILY_ORDER_REQUEST, FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
+import * as tenantUtils from '../../../utils/tenant';
+import { ClaimsOfferSchemaorg } from '../../../models/schemaorg';
+import { JobRequest, JobStatus } from '../../../models/confidential-job';
+
+jest.mock('uuid');
+
+const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
+  upload: jest.fn(),
+};
+
+const mockLogger: jest.Mocked<ILogger> = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+};
+
+const mockKmsService: jest.Mocked<IKmsService> = {
+  init: jest.fn(async () => {}),
+  provisionKeys: jest.fn() as any,
+  getPublicJwks: jest.fn() as any,
+  decodeRequest: jest.fn() as any,
+  signWithManagedKey: jest.fn() as any,
+  signWithReconstructedKey: jest.fn() as any,
+  createDetachedJws: jest.fn(async () => 'mock-jws'),
+  encodeResponse: jest.fn() as any,
+  getHostPublicJwkSet: jest.fn() as any,
+  getPublicVerificationKey: jest.fn() as any,
+  getPublicEncryptionKey: jest.fn() as any,
+  getHmacBase64Url: jest.fn() as any,
+  protectAttributesNameAndValue: jest.fn() as any,
+  protectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc) => {
+    const { content, ...rest } = doc;
+    return { ...rest, jwe: { ciphertext: 'encrypted' }, _content: content } as any;
+  }),
+  unprotectConfidentialData: jest.fn(async (doc: any) => doc._content),
+};
+
+describe('FamilyManager - Offer/Order Flow', () => {
+  let vaultRepository: VaultMemRepository;
+  let tenantsCacheManager: TenantsCacheManager;
+  let hostingManager: HostingManager;
+  let familyManager: FamilyManager;
+  let hostCollectionName: string;
+  let config: IServerConfig;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
+
+    vaultRepository = new VaultMemRepository();
+
+    const hostClaims = {
+      'org.schema.Organization.alternateName': 'host',
+      'org.schema.Organization.legalName': 'Hosting Organization',
+      'org.schema.Organization.identifier.additionalType': 'TAX',
+      'org.schema.Organization.identifier.value': 'A12345678',
+      'org.schema.Organization.identifier': 'did:web:host.example.com',
+      'org.schema.Organization.address.addressCountry': 'ES',
+      'org.schema.Person.identifier': 'urn:uuid:a1b2c3d4-e5f6-7890-1234-567890abcdef',
+      'org.schema.Person.hasOccupation': 'ISCO-08:1120',
+      'org.schema.Person.email': 'admin1@host.example.com',
+      'org.schema.Service.category': 'system',
+      'org.schema.Service.identifier': 'urn:web:<manufacturer>',
+      'org.schema.Service.serviceType': 'http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC',
+      'org.schema.Service.termsOfService': 'https://github.com/<manufacturer>/<software>/terms',
+    };
+    hostCollectionName = tenantUtils.generateTenantCollectionNameFromClaims(hostClaims as any);
+
+    tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
+
+    config = {
+      nodeEnv: 'test',
+      port: 3000,
+      apiHostname: 'testhost',
+      hostExternalDomain: 'host.example.com',
+      apiBaseUrl: 'http://host.example.com',
+      namespace: 'test-namespace',
+      sectorsAllowed: [Sector.HEALTH_CARE, Sector.SYSTEM, Sector.TEST],
+      dbProvider: 'mem',
+      queueProvider: 'mem',
+      storageProvider: 'mem',
+      allowedPaymentMethods: ['Stripe'],
+      host: { legalName: 'Test Host', jurisdiction: 'es', idType: 'TAX', idValue: 'A12345678' },
+      mongo: { dbName: 'test' },
+      firebase: {},
+    };
+
+    mockStorageAdapter.upload.mockResolvedValue({
+      publicUrl: 'https://storage.example.com/terms.pdf',
+      encodedMultiHash: 'zQm...',
+    });
+
+    mockKmsService.getPublicJwks.mockResolvedValue({
+      keys: [{ kid: 'sig-key-1', use: 'sig', alg: 'ML-DSA-44' } as any],
+    });
+
+    hostingManager = new HostingManager(
+      vaultRepository,
+      mockKmsService,
+      tenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      config,
+    );
+
+    // Bootstrap host and register the provider tenant (acme) so FamilyManager can resolve it via TenantsCacheManager.
+    await hostingManager.bootstrapHost(hostClaims as any);
+    await tenantsCacheManager.loadHost();
+
+    const registrationJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    const offerResponse = await hostingManager.process(registrationJob);
+    const offerId = offerResponse.body.data[0].meta.claims[ClaimsOfferSchemaorg.identifier] as string;
+
+    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    orderJob.content!.body!.data[0]!.meta!.claims['Order.acceptedOffer.identifier'] = offerId;
+    await hostingManager.process(orderJob);
+
+    familyManager = new FamilyManager(
+      vaultRepository,
+      mockKmsService,
+      tenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      config,
+    );
+  });
+
+  it('should create a pending family record and return an Offer', async () => {
+    const tenantId = 'acme';
+    const familyRegistrationJob: JobRequest = {
+      id: 'job-family-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      action: '_batch',
+      resourceType: 'Organization',
+      content: FAMILY_REGISTRATION_REQUEST as any,
+    };
+
+    const responsePayload = await familyManager.process(familyRegistrationJob);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+    expect(entry.type).toBe('Family-registration-offer-v1.0');
+    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
+  });
+
+  it('should process a family Order and finalize the family registration', async () => {
+    const tenantId = 'acme';
+    const familyRegistrationJob: JobRequest = {
+      id: 'job-family-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      action: '_batch',
+      resourceType: 'Organization',
+      content: FAMILY_REGISTRATION_REQUEST as any,
+    };
+
+    const offerPayload = await familyManager.process(familyRegistrationJob);
+    const offerId = offerPayload.body.data[0].meta.claims[ClaimsOfferSchemaorg.identifier] as string;
+
+    const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
+    orderContent.body.data[0].meta.claims['Order.acceptedOffer.identifier'] = offerId;
+
+    const familyOrderJob: JobRequest = {
+      id: 'job-family-order-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      action: '_batch',
+      resourceType: 'Order',
+      content: orderContent,
+    };
+
+    const finalPayload = await familyManager.process(familyOrderJob);
+    const entry = finalPayload.body.data[0];
+    expect(entry.response.status).toBe('201');
+    expect(entry.type).toBe('Organization');
+  });
+});

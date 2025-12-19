@@ -25,7 +25,6 @@
  */
 
 import * as express from 'express';
-import * as request from 'supertest';
 import { testPayloadCreateTenant1, testClaimsHostInitialization } from '../data/end-to-end.data';
 import { testCommunicationAppointmentFhirR4 } from '../data/appointment.data';
 import { createApiRouter } from '../../routes/api';
@@ -36,7 +35,7 @@ import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { HostingManager } from '../../managers/HostingManager';
 import { EmployeeManager } from '../../managers/EmployeeManager';
-import { CustomerManager } from '../../managers/CustomerManager';
+import { IndividualManager } from '../../managers/IndividualManager';
 import { CredentialManager } from '../../managers/CredentialManager';
 import { CompositionManager } from '../../managers/CompositionManager';
 import { CommunicationManager } from '../../managers/CommunicationManager';
@@ -55,6 +54,8 @@ import { ClaimsServiceSchemaorg } from '../../models/schemaorg';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { IncludedResource } from '../../models/jsonapi';
 import { IKmsService } from '../../crypto/interfaces/IKmsService';
+import { invokeExpress } from './helpers/invokeExpress';
+import { Sector } from '../../models/urlPath';
 
 // Mock implementation for the AuthorizationManager
 class MockAuthorizationManager implements IAuthorizationManager {
@@ -107,7 +108,8 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
 
     const mockConfig: IServerConfig = {
       nodeEnv: 'test', port: 3000, apiHostname: 'testhost', hostExternalDomain: 'testhost.com',
-      apiBaseUrl: 'http://testhost:3000', namespace: 'test-namespace', sectorsAllowed: [],
+      apiBaseUrl: 'http://testhost:3000', namespace: 'test-namespace', sectorsAllowed: [Sector.HEALTH_CARE, Sector.TEST],
+      allowedPaymentMethods: ['Stripe'],
       dbProvider: 'mem', queueProvider: 'mem', storageProvider: 'mem',
       host: { legalName: 'Test Host', jurisdiction: 'us', idType: 'test-id', idValue: '12345' },
       mongo: { dbName: 'test' }, firebase: {},
@@ -117,14 +119,14 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await tenantManager.loadHost();
     
-    const managerRegistry: ManagerRegistry = {
-      hostingManager,
-      employeeManager: new EmployeeManager(vaultRepository, kmsService, tenantManager),
-      customerManager: new CustomerManager(vaultRepository, kmsService, tenantManager, new CredentialManager(vaultRepository, kmsService, tenantManager, 'testhost.com'), new BlockchainAdapterMem(), 'test-ns'),
-      compositionManager: new CompositionManager(),
-      communicationManager: new CommunicationManager({ tenantsCacheManager: tenantManager }),
-      tenantManager,
-    };
+	    const managerRegistry: ManagerRegistry = {
+	      hostingManager,
+	      employeeManager: new EmployeeManager(vaultRepository, kmsService, tenantManager),
+	      individualManager: new IndividualManager(vaultRepository, kmsService, tenantManager, new CredentialManager(vaultRepository, kmsService, tenantManager, 'testhost.com'), new BlockchainAdapterMem(), 'test-ns'),
+	      compositionManager: new CompositionManager(),
+	      communicationManager: new CommunicationManager({ tenantsCacheManager: tenantManager }),
+	      tenantManager,
+	    };
     
     const worker = new Worker(managerRegistry, mockConfig.apiBaseUrl, kmsService);
     queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
@@ -151,11 +153,15 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     const orgCreationPayload = { ...testPayloadCreateTenant1 };
     const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
 
-    const response = await request.default(app)
-      .post(registrationUrl)
-      .set('Content-Type', 'application/json')
-      .set('Authorization', 'Bearer mock-valid-token')
-      .send(orgCreationPayload);
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: registrationUrl,
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer mock-valid-token',
+      },
+      body: orgCreationPayload,
+    });
 
     expect(response.status).toBe(202);
     expect(response.headers.location).toBeDefined();
@@ -168,33 +174,36 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     const orgCreationPayloadWithPdf = JSON.parse(JSON.stringify(testPayloadCreateTenant1));
     const claims = orgCreationPayloadWithPdf.body.data[0].meta.claims;
     claims[ClaimsServiceSchemaorg.termsOfService] = pdfBase64;
+    // Ensure the Service resource can be materialized into a stored document.
+    claims['org.schema.Service.identifier'] = 'urn:uuid:service-001';
     claims['org.schema.Organization.alternateName'] = 'acme-with-pdf';
     const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
 
-    const response = await request.default(app)
-      .post(registrationUrl)
-      .set('Content-Type', 'application/json')
-      .set('Authorization', 'Bearer mock-valid-token')
-      .send(orgCreationPayloadWithPdf);
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: registrationUrl,
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer mock-valid-token',
+      },
+      body: orgCreationPayloadWithPdf,
+    });
 
     expect(response.status).toBe(202);
     expect(addJobSpy).toHaveBeenCalledTimes(1);
 
     await queueAdapter.waitForEmptyQueue();
 
-    // After the async job completes, explicitly load the new tenant into the test's
-    // cache instance to verify the results of the operation.
+    // Registration step creates a provisional tenant record stored in the HOST vault.
     const vaultId = getTenantVaultId(claims[ClaimsServiceSchemaorg.category], claims['org.schema.Organization.alternateName']);
-    await tenantManager.getTenant(vaultId);
+    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
 
-    const collectionName = await tenantManager.getCollectionName(vaultId);
-    expect(collectionName).toBeDefined();
+    const secureTenantRecord = await vaultRepository.get<any>(hostCollectionName, vaultId, 'tenants');
+    expect(secureTenantRecord).toBeDefined();
 
-    const services = await vaultRepository.getContainersInSection<IncludedResource>(collectionName!, 'services');
-    expect(services).toHaveLength(1);
-    const persistedService = services[0];
-    const termsUrl = persistedService.meta.claims[ClaimsServiceSchemaorg.termsOfService];
-    const termsHash = persistedService.meta.claims[`${ClaimsServiceSchemaorg.termsOfService}#hash`];
+    const decryptedProvisional = await kmsService.unprotectConfidentialData<any>(secureTenantRecord, 'host');
+    const termsUrl = decryptedProvisional.claims[ClaimsServiceSchemaorg.termsOfService];
+    const termsHash = decryptedProvisional.claims[`${ClaimsServiceSchemaorg.termsOfService}#hash`];
     
     expect(termsUrl).not.toBe(pdfBase64);
     expect(termsUrl).toContain('/local-storage/');
@@ -205,11 +214,15 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     beforeEach(async () => {
         const orgCreationPayload = { ...testPayloadCreateTenant1 };
         const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
-        await request.default(app)
-            .post(registrationUrl)
-            .set('Content-Type', 'application/json')
-            .set('Authorization', 'Bearer mock-valid-token')
-            .send(orgCreationPayload);
+        await invokeExpress(app, {
+          method: 'POST',
+          url: registrationUrl,
+          headers: {
+            'content-type': 'application/json',
+            authorization: 'Bearer mock-valid-token',
+          },
+          body: orgCreationPayload,
+        });
         await queueAdapter.waitForEmptyQueue();
         
         // After the async job completes, explicitly load the new 'acme' tenant into the cache
@@ -220,7 +233,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     });
 
     it('should REJECT a FHIR Communication with 403 Forbidden if consent is NOT present', async () => {
-      const communicationUrl = '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch';
+      const communicationUrl = '/v1/health-care/individual/org.hl7.fhir.r4/Communication';
       const accessToken = 'Bearer mock-valid-token-for-fhir';
       const consentId = 'urn:uuid:consent-not-granted';
       const communicationResource = { 
@@ -229,19 +242,17 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
       };
       authManager.setConsent(consentId, false);
       
-      const batchPayload = {
-        thid: 'thid-for-fhir-test',
-        body: { data: [communicationResource] },
-      };
-
-      const response = await request.default(app)
-        .post(communicationUrl)
-        .set('Content-Type', 'application/json')
-        .set('Authorization', accessToken)
-        .send(batchPayload);
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: communicationUrl,
+        headers: {
+          'content-type': 'application/json',
+          authorization: accessToken,
+        },
+        body: communicationResource,
+      });
 
       expect(response.status).toBe(403);
     });
   });
 });
-

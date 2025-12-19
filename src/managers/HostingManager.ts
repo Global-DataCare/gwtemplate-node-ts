@@ -1,23 +1,26 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/HostingManager.ts
 
+import { v4 as uuidv4 } from 'uuid';
 import { IServerConfig } from '../config';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { IStorageAdapter } from '../database/storage/IStorageAdapter';
-import { Bundle, BundleEntry, ErrorEntry } from '../models/bundle';
+import { BundleJsonApi, BundleEntry, ErrorEntry } from '../models/bundle';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { DidDocument } from '../models/did';
-import { EntityConfig } from '../models/entity';
+import { OrganizationConfig } from '../models/entity';
 import { ManagerError } from '../models/errors/manager-error';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { IncludedResource } from '../models/jsonapi';
-import { JobRequest } from '../models/request';
-import { IPayloadResponse } from '../models/response';
+import { JobRequest } from '../models/confidential-job';
+import { IPayloadResponse } from '../models/confidential-message';
+import { DidCommDecodedMetadata } from '../models/confidential-message';
 import { ClaimsRecord } from '../models/resource-document';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
 import { Sector } from '../models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
+import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { validateNewOrganizationClaims } from '../utils/claims-validator';
 import { composeHostDidWebId, createHostedDidWeb, populateDidDocumentFromJwks } from '../utils/did';
 import { populateDidDocumentServices } from '../utils/did-document';
@@ -29,9 +32,30 @@ import { AllowedIndexableClaims } from '../models/indexing';
 import { createOrganizationUrn } from '../utils/urn';
 import { ILogger } from '../loggers/ILogger';
 import { TenantsCacheManager } from './TenantsCacheManager';
+import { generateLicenseOffer } from '../utils/offer';
+import { VC_CONTEXT_V2, VerifiableCredentialV2 } from '../models/verifiable-credential';
+import { EntityLifecycleStatus, EntityType, NetworkAccessStatus, NetworkName, BundleEntryType } from '../models/enums';
+import { EntityConfig } from '../models/entity';
+import { ParameterData } from '../models/params';
+import { normalizeCodeSystemAndValue } from '../utils/attributes';
+import { VerificationMethod } from '../models/did';
+import { PublicJwk } from '../crypto/interfaces/Cryptography.types';
+import { DeviceLicense } from '../models/device-license';
 
 /**
- * Manages the business logic for HOSTING, including new tenant registration.
+ * Manages the initial onboarding of new tenants onto the Gateway.
+ *
+ * @architecture
+ * This manager's responsibility is strictly limited to the **Phase 1 Onboarding** process, which grants
+ * a new tenant an active account on the Gateway and automatically enables them for the `test` network.
+ *
+ * It follows a two-step Offer/Order pattern:
+ * 1.  `processOrganizationRegistration`: Creates a provisional (`pending`) tenant record and returns an `Offer`.
+ * 2.  `processOrder`: Finalizes the registration upon `Order` confirmation, activates the tenant for the `test`
+ *     network, and creates a provisional, host-signed `vc.json` to facilitate frontend development and testing.
+ *
+ * The subsequent, more complex process of onboarding to the `production` network is handled by a separate
+ * set of managers (e.g., `NetworkEnrollmentManager`) and is initiated by a separate user action.
  */
 export class HostingManager {
   private vaultRepository: IVaultRepository;
@@ -65,41 +89,331 @@ export class HostingManager {
   }
 
   async process(job: JobRequest, environment?: string, isBootstrap: boolean = false): Promise<IPayloadResponse> {
+    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    
+    try {
+      switch (job.resourceType) {
+        case 'Organization':
+          return await this.processOrganizationRegistration(job, environment, isBootstrap);
+        case 'Order':
+          return await this.processOrder(job, environment);
+        default:
+          throw new ManagerError(`Unsupported resourceType for hosting process: '${job.resourceType}'`, IssueType.NotSupported);
+      }
+    } catch (error) {
+      const entry = (job.content?.body?.data && job.content.body.data[0]) ? job.content.body.data[0] : { type: job.resourceType || 'unknown' };
+      const errorEntry = this.handleError(error, entry.type, entry.meta);
+      return {
+        jti: uuidv4(),
+        type: 'hosting-response',
+        thid: job.content?.thid as string,
+        iss: issuerDid,
+        aud: job.content?.iss as string,
+        body: {
+          data: [errorEntry],
+          resourceType: 'Bundle',
+          type: 'batch-response',
+          total: 1,
+        },
+      };
+    }
+  }
+
+  /**
+   * Handles Phase 1, Step 1: Provisional Registration.
+   */
+  private async processOrganizationRegistration(job: JobRequest, environment?: string, isBootstrap: boolean = false): Promise<IPayloadResponse> {
     const jobEntries = job?.content?.body?.data || [];
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
 
     for (const entry of jobEntries) {
       try {
-        const resultEntry = await this.processRegistrationEntry(entry, environment);
+        const resultEntry = await this.processRegistrationEntry(entry, environment, job.content?.meta);
         responseEntries.push(resultEntry);
       } catch (error) {
-        if (isBootstrap) {
-          throw error;
-        }
+        if (isBootstrap) { throw error; }
         const errorEntry = this.handleError(error, entry.type, entry.meta);
         responseEntries.push(errorEntry);
       }
     }
 
-    const responseBundle: Bundle = {
+    const responseBundle: BundleJsonApi = {
+      data: responseEntries,
+      resourceType: 'Bundle',
       type: getBundleResponseTypeForAction(job.action),
       total: responseEntries.length,
-      data: responseEntries,
     };
 
     const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
 
     return {
-      thid: job.content.thid,
+      jti: uuidv4(),
+      type: 'hosting-response',
+      thid: job.content?.thid as string,
       iss: issuerDid,
-      aud: job.content.iss,
+      aud: job.content?.iss as string,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: responseBundle,
     };
   }
 
-  private async processRegistrationEntry(entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
-    const claims = entry?.meta?.claims;
+  /**
+   * Handles Phase 1, Step 2: Finalizing Registration via Order.
+   */
+  private async processOrder(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
+    const jobEntries = job?.content?.body?.data || [];
+    const responseEntries: (BundleEntry | ErrorEntry)[] = [];
+
+    for (const entry of jobEntries) {
+      try {
+        const resultEntry = await this.processOrderEntry(entry, environment);
+        responseEntries.push(resultEntry);
+      } catch (error) {
+        const errorEntry = this.handleError(error, entry.type, entry.meta);
+        responseEntries.push(errorEntry);
+      }
+    }
+
+    const responseBundle: BundleJsonApi = {
+      data: responseEntries,
+      resourceType: 'Bundle',
+      type: getBundleResponseTypeForAction(job.action),
+      total: responseEntries.length,
+    };
+
+    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+
+    return {
+      jti: uuidv4(),
+      type: 'hosting-response',
+      thid: job.content?.thid as string,
+      iss: issuerDid,
+      aud: job.content?.iss as string,
+      exp: Math.floor(Date.now() / 1000) + 300,
+      body: responseBundle,
+    };
+  }
+  
+  /**
+   * Processes an Order entry to finalize a tenant's registration.
+   */
+  private async processOrderEntry(entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
+    const rawClaims = entry?.meta?.claims;
+    const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
+    if (!claims) {
+      throw new ManagerError('Malformed order entry: missing meta.claims', IssueType.Required);
+    }
+
+    const offerId = getClaimValue<string>(claims, 'Order.acceptedOffer.identifier');
+    if (!offerId) {
+      throw new ManagerError(`Missing required claim in Order: 'Order.acceptedOffer.identifier'`, IssueType.Required);
+    }
+
+    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    
+    const query = {
+      sectionId: 'tenants',
+      where: [{ name: ClaimsOfferSchemaorg.identifier, value: offerId }],
+    };
+    
+    const results = await this.vaultRepository.query(hostCollectionName!, query);
+
+    if (results.length === 0) {
+      throw new ManagerError(`No pending registration found for offerId: '${offerId}'`, IssueType.NotFound);
+    }
+    if (results.length > 1) {
+      this.logger.error(`CRITICAL: Multiple pending registrations found for the same offerId: '${offerId}'`);
+      throw new ManagerError(`Internal system conflict. Multiple pending registrations found.`, IssueType.Conflict);
+    }
+
+    const secureDoc = results[0] as ConfidentialStorageDoc;
+    const decryptedContent = await this.kmsService.unprotectConfidentialData<ConfidentialStorageDoc['content']>(
+      secureDoc,
+      'host',
+    );
+
+    if (decryptedContent?.status !== EntityLifecycleStatus.Pending) {
+      throw new ManagerError(`Found registration for offerId '${offerId}', but it is not in 'pending' state.`, IssueType.Conflict);
+    }
+
+    const { claims: processedClaims } = decryptedContent;
+    const alternateName = processedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
+    const sector = processedClaims[ClaimsServiceSchemaorg.category] as Sector;
+    const { organization, person, service } = this.extractResources(processedClaims, environment);
+
+    // Finalize the registration and grant test network access.
+    const vaultId = getTenantVaultId(sector, alternateName);
+    const tenantCollectionName = generateTenantCollectionNameFromClaims(processedClaims);
+    
+    // Create the physical vault and keys for the new tenant.
+    await this.vaultRepository.createNewVault({ id: tenantCollectionName });
+    await this.kmsService.provisionKeys(vaultId);
+    
+    // Generate the final configuration.
+    const finalTenantConfig = await this.finalizeTenantConfig(organization, alternateName, processedClaims, sector, vaultId);
+
+    // Persist all artifacts
+    const attributes = AllowedIndexableClaims.organizationRegistry
+      .map(claimKey => ({ name: claimKey, value: String(processedClaims[claimKey]), ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }) }))
+      .filter(attr => attr.value !== 'undefined' && attr.value !== 'null');
+
+    const finalTenantRegistrationDoc: ConfidentialStorageDoc = {
+      id: vaultId,
+      sequence: 1, // Increment sequence for update
+      indexed: { attributes, hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' } },
+      content: finalTenantConfig,
+    };
+    
+    const secureFinalDoc = await this.kmsService.protectConfidentialData(finalTenantRegistrationDoc, 'host');
+    await this.vaultRepository.put(hostCollectionName!, [secureFinalDoc], 'tenants');
+    
+    // Save VCs and other resources into the TENANT's own vault
+    const vcDoc: ConfidentialStorageDoc = { id: 'vc.json', sequence: 0, content: finalTenantConfig.governanceVc };
+    const selfDescDoc: ConfidentialStorageDoc = { id: 'self-description.json', sequence: 0, content: finalTenantConfig.selfDescriptionVc };
+    const secureVcDoc = await this.kmsService.protectConfidentialData(vcDoc, vaultId);
+    const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, vaultId);
+    await this.vaultRepository.put(tenantCollectionName, [secureVcDoc, secureSelfDescDoc], '.well-known');
+
+    const [legalRep, processedService] = [person, service];
+    if (legalRep) {
+      const email = legalRep.meta?.claims?.[ClaimsPersonSchemaorg.email] as string | undefined;
+      const roleCode = legalRep.meta?.claims?.[ClaimsPersonSchemaorg.hasOccupation] as string | undefined;
+      if (!email || !roleCode) {
+        throw new ManagerError('Missing required admin Person claims (email, hasOccupation) during order finalization.', IssueType.Required);
+      }
+
+      const tenantUrn = createOrganizationUrn({
+        namespace: this.config.namespace,
+        network: 'test-network',
+        jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+        sector,
+        idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+        idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+      });
+      const employeeUrn = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
+
+      const storedKeys = (decryptedContent as any)?.registrationKeys as
+        | { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk }
+        | undefined;
+
+      let signerJwk = storedKeys?.signerJwk;
+      let encrypterJwk = storedKeys?.encrypterJwk;
+      if (!signerJwk || !encrypterJwk) {
+        const provisioned = await this.kmsService.provisionKeys(employeeUrn);
+        signerJwk = provisioned.keys.find(k => (k as any).kty === 'AKP') as PublicJwk | undefined;
+        encrypterJwk = provisioned.keys.find(k => (k as any).kty === 'OKP') as PublicJwk | undefined;
+      }
+      if (!signerJwk?.kid || !encrypterJwk?.kid) {
+        throw new ManagerError('Admin keys are missing "kid" properties.', IssueType.Required);
+      }
+
+      const verificationMethods: VerificationMethod[] = [
+        {
+          id: `${employeeUrn}#${signerJwk.kid}`,
+          controller: employeeUrn,
+          type: 'JsonWebKey2020',
+          publicKeyJwk: signerJwk,
+        },
+        {
+          id: `${employeeUrn}#${encrypterJwk.kid}`,
+          controller: employeeUrn,
+          type: 'JsonWebKey2020',
+          publicKeyJwk: encrypterJwk,
+        },
+      ];
+
+      const employeeConfig: EntityConfig = {
+        id: legalRep.id,
+        type: EntityType.Person,
+        status: EntityLifecycleStatus.Active,
+        claims: legalRep.meta?.claims || {},
+        didDocument: {
+          '@context': 'https://www.w3.org/ns/did/v1',
+          id: employeeUrn,
+          verificationMethod: verificationMethods,
+          authentication: [verificationMethods[0].id],
+          keyAgreement: [verificationMethods[1].id],
+          service: [],
+        },
+        didConfig: { service: [] },
+        meta: { lastUpdated: new Date().toISOString() },
+      };
+
+      const attributesToIndex: ParameterData[] = [
+        { name: 'email', value: email, unique: true, type: 'string' },
+        { name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token' },
+        { name: 'kid', value: signerJwk.kid, unique: false, type: 'string' },
+        { name: 'kid', value: encrypterJwk.kid, unique: false, type: 'string' },
+      ];
+      const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(attributesToIndex, vaultId);
+
+      const employeeDoc: ConfidentialStorageDoc = {
+        id: employeeConfig.id,
+        sequence: 0,
+        content: employeeConfig,
+        indexed: { attributes: protectedAttributes },
+      };
+      const secureEmployeeDoc = await this.kmsService.protectConfidentialData(employeeDoc, vaultId);
+      await this.vaultRepository.put(tenantCollectionName, [secureEmployeeDoc], 'employees');
+    }
+	    if (processedService) {
+	      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, sequence: 0, content: processedService };
+	      const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, vaultId);
+	      await this.vaultRepository.put(tenantCollectionName, [secureServiceDoc], 'services');
+	    }
+	    
+	    // Create the initial employee device licenses purchased via the registration Offer.
+	    const initialEmployeeSeats = processedClaims[ClaimsOfferSchemaorg.eligibleQuantityValue] as number | undefined;
+	    const offerIdentifier = processedClaims[ClaimsOfferSchemaorg.identifier] as string | undefined;
+	    if (initialEmployeeSeats && initialEmployeeSeats > 0 && offerIdentifier) {
+	      const now = Date.now();
+	      const expiryDate = new Date(now);
+	      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+	      const exp = Math.floor(expiryDate.getTime() / 1000);
+	
+	      const licenseDocs: ConfidentialStorageDoc[] = [];
+	      for (let i = 0; i < initialEmployeeSeats; i++) {
+	        const licenseId = uuidv4();
+	        const license: DeviceLicense = {
+	          id: licenseId,
+	          tenantId: alternateName,
+	          orderId: offerIdentifier,
+	          userClass: 'employee',
+	          userCategory: 'default',
+	          type: 'mobile',
+	          status: 'available',
+	          plan: 'default',
+	          renewalCycle: '12m',
+	          reactivationEnabled: false,
+	          exp,
+	        };
+	        licenseDocs.push({ id: licenseId, sequence: 0, content: license });
+	      }
+	      await this.vaultRepository.put(vaultId, licenseDocs, 'device-licenses');
+	    }
+
+	    return {
+	      type: 'Organization',
+	      resource: {
+        ...organization,
+        resourceType: 'Organization',
+        meta: { ...organization.meta, claims: processedClaims },
+        contained: [person, service],
+      },
+      response: { status: '201' },
+    };
+  }
+
+  /**
+   * Processes a new organization registration entry, creating a provisional record.
+   */
+  private async processRegistrationEntry(
+    entry: BundleEntry,
+    environment?: string,
+    jobMeta?: DidCommDecodedMetadata,
+  ): Promise<BundleEntry | ErrorEntry> {
+    const rawClaims = entry?.meta?.claims;
+    const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
     const entryType = entry.type || 'Organization-unknown';
 
     if (!claims) {
@@ -133,6 +447,8 @@ export class HostingManager {
         }
         validatedSector = requestedSector;
 
+        // ARCHITECTURAL NOTE: This is the ONLY place a vault existence check should occur.
+        // It happens during the initial provisional request to prevent duplicate alternateNames.
         const vaultId = getTenantVaultId(validatedSector, alternateName);
         if (await this.vaultRepository.vaultExists(vaultId)) {
           throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
@@ -141,25 +457,62 @@ export class HostingManager {
 
       const { organization, person, service } = this.extractResources(claims, environment);
       const processedService = await this._handleServiceAttachment(service);
-      const processedClaims = { ...claims, ...(processedService?.meta.claims || {}) };
+      let processedClaims = { ...claims, ...(processedService?.meta.claims || {}) };
 
       if (alternateName === 'host') {
         await this.persistHostConfig(organization, processedClaims, [person, processedService!]);
       } else {
-        await this.persistTenantConfig(organization, alternateName, processedClaims, [person, processedService!], validatedSector!);
+        const registrationKeys = {
+          signerJwk: jobMeta?.jws?.protected?.jwk as PublicJwk | undefined,
+          encrypterJwk: jobMeta?.jwe?.header?.jwk as PublicJwk | undefined,
+        };
+
+        const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+        const jurisdiction = processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;
+        const offerClaims = generateLicenseOffer(
+          processedClaims[ClaimsOrganizationSchemaorg.numberOfEmployees] as number,
+          hostDid,
+          jurisdiction,
+          validatedSector!,
+          this.config.allowedPaymentMethods
+        );
+  
+        processedClaims = { ...processedClaims, ...offerClaims };
+
+	        const tenantRegistrationDoc: ConfidentialStorageDoc = {
+	          id: getTenantVaultId(validatedSector!, alternateName),
+	          sequence: 0,
+	          indexed: {
+	            attributes: [
+	              { name: 'status', value: 'pending' },
+	              { name: ClaimsOfferSchemaorg.identifier, value: processedClaims[ClaimsOfferSchemaorg.identifier] as string, unique: true },
+	            ],
+	            hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+	          },
+	          content: {
+	            status: EntityLifecycleStatus.Pending,
+	            claims: processedClaims,
+	            contained: [person, processedService],
+	            ...(registrationKeys.signerJwk || registrationKeys.encrypterJwk ? { registrationKeys } : {}),
+	          },
+	        };
+
+        const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+        const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
+        await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], 'tenants');
       }
 
       return {
-        type: entryType,
+        type: BundleEntryType.OrgRegistrationOffer,
+        meta: { claims: processedClaims },
         resource: {
           resourceType: 'Organization',
           id: organization.id,
-          meta: organization.meta,
-          contained: [person, processedService],
         },
         response: { status: '201' },
       };
     } catch (error: any) {
+      console.log('--- DEBUG: Caught error in processRegistrationEntry ---', error);
       return this.handleError(error, entryType, entry.meta);
     }
   }
@@ -175,7 +528,7 @@ export class HostingManager {
         },
       };
     } else {
-      console.error('Unexpected error during registration processing:', error);
+      this.logger.error('Unexpected error during registration processing:', error);
       return {
         type: entryType,
         meta: meta,
@@ -187,16 +540,6 @@ export class HostingManager {
     }
   }
 
-  /**
-   * Persists the complete configuration for the host entity.
-   * This function orchestrates key provisioning, DID document creation, and the secure storage of the host's identity.
-   *
-   * @architecture
-   * This method determines the host's authoritative `baseUrl` from the server configuration.
-   * This `baseUrl` is then explicitly passed to `populateDidDocumentServices`, ensuring a clear separation
-   * of concerns where this manager is responsible for *what* the URL is, and the utility is responsible
-   * for *how* it's embedded in the final DID document.
-   */
   private async persistHostConfig(org: IncludedResource, allClaims: ClaimsRecord, contained: IncludedResource[]) {
     const hostCollectionName = generateTenantCollectionNameFromClaims(allClaims);
     const logicalVaultId = 'host';
@@ -206,28 +549,26 @@ export class HostingManager {
     
     const publicKeys = await this.kmsService.getPublicJwks(logicalVaultId);
 
-    const hostConfig: EntityConfig = {
-      type: org.type, status: 'active', id: org.id, claims: allClaims, alternateName: 'host',
-      url: `${this.config.apiBaseUrl}/host`, sector: Sector.SYSTEM, sectorsAllowed: this.config.sectorsAllowed,
-      didConfig: { service: [] }, // This remains for potential internal use, but is not the source of truth for the DID doc.
-      didDocument: {} as any,
+    const didId = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: didId, alsoKnownAs: [] };
+    const didConfigServices = initializeHostServicesConfig(this.config.sectorsAllowed);
+    const baseUrl = this.config.apiBaseUrl;
+    const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
+    didDocument.service = populateDidDocumentServices(didId, baseUrl, didConfigServices, false, {} as any);
+
+    const hostConfig: OrganizationConfig = {
+      id: org.id,
+      type: EntityType.Organization,
+      status: EntityLifecycleStatus.Active,
+      claims: allClaims,
+      didConfig: { service: didConfigServices },
+      didDocument: didDocument,
+      networkStatus: [], // Host does not participate in networks as a tenant.
       meta: { lastUpdated: new Date().toISOString() },
     };
 
-    const didId = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
-    const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: didId, alsoKnownAs: [] };
-    
-    // 1. Set the logical service definitions.
-    hostConfig.didConfig.service = initializeHostServicesConfig(this.config.sectorsAllowed);
-    
-    // 2. Populate the public DID document. For the host, it is not "hosted" and has a simple path structure.
-    const baseUrl = this.config.apiBaseUrl;
-    hostConfig.didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
-    hostConfig.didDocument.service = populateDidDocumentServices(didId, baseUrl, hostConfig.didConfig.service, false, {} as any);
-
-
     const docToProtect: ConfidentialStorageDoc = {
-      id: logicalVaultId, // The document ID inside the tenants section is the logical ID
+      id: logicalVaultId,
       sequence: 0,
       content: hostConfig,
     };
@@ -235,16 +576,12 @@ export class HostingManager {
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, logicalVaultId);
     await this.vaultRepository.put(hostCollectionName, [secureDoc], 'tenants');
     
-    // The cache will be populated on-demand by getCollectionName. No need to force a reload.
-
     const [adminPerson, processedService] = contained;
-
     if (adminPerson) {
       const adminDoc: ConfidentialStorageDoc = { id: adminPerson.id, sequence: 0, content: adminPerson };
       const secureAdminDoc = await this.kmsService.protectConfidentialData(adminDoc, logicalVaultId);
       await this.vaultRepository.put(hostCollectionName, [secureAdminDoc], 'employees');
     }
-    
     if (processedService) {
       const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, sequence: 0, content: processedService };
       const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, logicalVaultId);
@@ -253,16 +590,7 @@ export class HostingManager {
   }
 
   /**
-   * Persists the complete configuration for a new tenant entity.
-   * This function handles key provisioning, DID creation (hosted or external), DID document generation,
-   * and the secure storage of the tenant's registration record in the host's vault.
-   *
-   * @architecture
-   * This method implements the critical logic for determining a tenant's authoritative `baseUrl`.
-   * It prioritizes the tenant's self-declared external domain (`url` claim) if present. If not, it constructs
-   * a fallback "hosted" URL on the gateway. This determined `baseUrl` is then explicitly passed to
-   * `populateDidDocumentServices`, upholding the architectural principle of separating business logic
-   * (determining the URL) from utility functions (assembling the DID document).
+   * Finalizes a tenant's configuration, saves it, and grants initial 'test' network access.
    */
   private async persistTenantConfig(
     org: IncludedResource,
@@ -274,137 +602,208 @@ export class HostingManager {
     const vaultId = getTenantVaultId(sector, altName);
     const tenantCollectionName = generateTenantCollectionNameFromClaims(allClaims);
     
+    // The vault is created here, during finalization. The existence check was done previously.
     await this.vaultRepository.createNewVault({ id: tenantCollectionName });
     await this.kmsService.provisionKeys(vaultId);
+    
+    const finalTenantConfig = await this.finalizeTenantConfig(org, altName, allClaims, sector, vaultId);
+    
+    // 6. Persist all artifacts
+    const attributes = AllowedIndexableClaims.organizationRegistry
+      .map(claimKey => ({ name: claimKey, value: String(allClaims[claimKey]), ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }) }))
+      .filter(attr => attr.value !== 'undefined' && attr.value !== 'null');
+
+    const tenantRegistrationDoc: ConfidentialStorageDoc = {
+      id: vaultId,
+      sequence: 0,
+      indexed: { attributes, hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' } },
+      content: finalTenantConfig,
+    };
+    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
+    await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], 'tenants');
+
+    // Save VCs and other resources into the TENANT's own vault
+    const vcDoc: ConfidentialStorageDoc = { id: 'vc.json', sequence: 0, content: finalTenantConfig.governanceVc };
+    const selfDescDoc: ConfidentialStorageDoc = { id: 'self-description.json', sequence: 0, content: finalTenantConfig.selfDescriptionVc };
+    const secureVcDoc = await this.kmsService.protectConfidentialData(vcDoc, vaultId);
+    const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, vaultId);
+    await this.vaultRepository.put(tenantCollectionName, [secureVcDoc, secureSelfDescDoc], '.well-known');
+
+    const [legalRep, processedService] = contained;
+    if (legalRep) {
+      const legalRepDoc: ConfidentialStorageDoc = { id: legalRep.id, sequence: 0, content: legalRep };
+      const secureLegalRepDoc = await this.kmsService.protectConfidentialData(legalRepDoc, vaultId);
+      await this.vaultRepository.put(tenantCollectionName, [secureLegalRepDoc], 'employees');
+    }
+    if (processedService) {
+      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, sequence: 0, content: processedService };
+      const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, vaultId);
+      await this.vaultRepository.put(tenantCollectionName, [secureServiceDoc], 'services');
+    }
+
+    // Handoff: The tenant may now initiate a separate request for production network onboarding.
+  }
+
+  /**
+   * Generates the final tenant configuration, including DIDs and VCs.
+   */
+  private async finalizeTenantConfig(
+    org: IncludedResource,
+    altName: string,
+    allClaims: ClaimsRecord,
+    sector: Sector,
+    vaultId: string,
+  ): Promise<OrganizationConfig> {
     const publicKeys = await this.kmsService.getPublicJwks(vaultId);
 
+    // 1. Separate Organization claims from Service claims for the provider object
+    const orgClaims: ClaimsRecord = {};
+    const serviceClaims: ClaimsRecord = {};
+    for (const key in allClaims) {
+      if (key.startsWith('org.schema.Service')) {
+        serviceClaims[key] = allClaims[key];
+      } else if (key.startsWith('org.schema.Organization') || key.startsWith('org.schema.Person')) {
+        orgClaims[key] = allClaims[key];
+      }
+    }
+    // Keep the tenant's sector available in `claims` for deterministic vault/collection naming.
+    orgClaims[ClaimsServiceSchemaorg.category] = allClaims[ClaimsServiceSchemaorg.category];
+
+    // 2. Construct DID and DID Document
     const tenantUrn = createOrganizationUrn({
       namespace: this.config.namespace, network: 'test-network',
       jurisdiction: allClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       sector: sector, idType: allClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
       idValue: allClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
     });
-
     const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
     const context = { jurisdiction: allClaims[ClaimsOrganizationSchemaorg.addressCountry] as string, version: 'v1', sector: sector };
     const hostedDid = createHostedDidWeb(hostDid, altName, context);
     const publicTenantUrl = allClaims[ClaimsOrganizationSchemaorg.url] as string | undefined;
     const externalDid = publicTenantUrl && publicTenantUrl.startsWith('https://') ? `did:web:${new URL(publicTenantUrl).hostname}` : undefined;
-
     const primaryDid = externalDid || hostedDid;
-    const alsoKnownAs = [tenantUrn];
-    if (externalDid && primaryDid !== externalDid) alsoKnownAs.push(externalDid);
-    if (hostedDid && primaryDid !== hostedDid) alsoKnownAs.push(hostedDid);
-
+    const alsoKnownAs = [tenantUrn, ...(externalDid && primaryDid !== externalDid ? [externalDid] : []), ...(hostedDid && primaryDid !== hostedDid ? [hostedDid] : [])];
     const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: primaryDid, alsoKnownAs: alsoKnownAs };
-    // 1. Set the logical service definitions.
     const didConfigServices = initializeTenantServicesConfig(sector);
-    
-    // 2. Determine if the tenant is hosted or has its own domain, which dictates URL structure.
-    const isHosted = !(publicTenantUrl && publicTenantUrl.startsWith('https://'));
-    // The baseUrl is ONLY the root domain (e.g., https://gateway.com or https://api.acme.com).
+    const isHosted = !publicTenantUrl?.startsWith('https://');
     const baseUrl = isHosted ? this.config.apiBaseUrl : publicTenantUrl!;
-    
-    // 3. Populate the public DID document with multiplexed service endpoints.
     const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
-    const jurisdiction = allClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;
-    const tenantContext = { alternateName: altName, jurisdiction, version: 'v1', sector };
+    const tenantContext = { alternateName: altName, jurisdiction: allClaims[ClaimsOrganizationSchemaorg.addressCountry] as string, version: 'v1', sector };
     didDocument.service = populateDidDocumentServices(primaryDid, baseUrl, didConfigServices, isHosted, tenantContext);
+    
+    // 3. Create provisional, host-signed vc.json for test/demo purposes
+    const hostSignerKid = (await this.kmsService.getPublicJwks('host')).keys.find(k => k.use === 'sig')?.kid;
+    if (!hostSignerKid) {
+      throw new ManagerError('Host signing key not found, cannot issue provisional VC.', IssueType.Exception);
+    }
+    const governanceVcPayload: Omit<VerifiableCredentialV2, 'proof'> = {
+      '@context': [VC_CONTEXT_V2],
+      type: ['VerifiableCredential', 'GaiaxCredential'],
+      id: `urn:uuid:${uuidv4()}`,
+      issuer: hostDid,
+      validFrom: new Date().toISOString(),
+      credentialSubject: {
+        id: primaryDid,
+        ...allClaims,
+      },
+    };
+    const govDetachedJws = await this.kmsService.createDetachedJws(governanceVcPayload, hostSignerKid, 'host');
+    const governanceVc: VerifiableCredentialV2 = {
+        ...governanceVcPayload,
+        proof: [{
+            type: 'JsonWebSignature2020',
+            created: new Date().toISOString(),
+            proofPurpose: 'assertionMethod',
+            verificationMethod: `${hostDid}#${hostSignerKid}`,
+            jws: govDetachedJws,
+        }]
+    };
 
-    const tenantConfig: EntityConfig = {
-      type: org.type, status: 'active', id: org.id,
-      claims: { ...allClaims, [ClaimsOrganizationSchemaorg.identifier]: tenantUrn },
+    // 4. Create self-signed self-description.json
+    const tenantSignerKid = publicKeys.keys.find(k => k.use === 'sig')?.kid;
+    if (!tenantSignerKid) {
+      throw new ManagerError('Tenant signing key not found, cannot issue self-description.', IssueType.Exception);
+    }
+    const selfDescriptionPayload: Omit<VerifiableCredentialV2, 'proof'> = { ...governanceVcPayload, issuer: primaryDid };
+    const selfDescDetachedJws = await this.kmsService.createDetachedJws(selfDescriptionPayload, tenantSignerKid, vaultId);
+    const selfDescriptionVc: VerifiableCredentialV2 = {
+        ...selfDescriptionPayload,
+        proof: [{
+            type: 'JsonWebSignature2020',
+            created: new Date().toISOString(),
+            proofPurpose: 'assertionMethod',
+            verificationMethod: `${primaryDid}#${tenantSignerKid}`,
+            jws: selfDescDetachedJws,
+        }]
+    };
+
+    // 5. Construct the final OrganizationConfig
+    const tenantConfig: OrganizationConfig = {
+      id: org.id,
+      type: EntityType.Organization,
+      status: EntityLifecycleStatus.Active, // Gateway account status is active
+      networkStatus: [
+        {
+          networkName: NetworkName.Test, // Grant initial access to the test network
+          status: NetworkAccessStatus.Active,
+          activationDate: new Date().toISOString(),
+        }
+      ],
+      claims: orgClaims,
+      provider: {
+        service: serviceClaims,
+      },
       didConfig: { service: didConfigServices },
       didDocument: didDocument,
+      governanceVc: governanceVc,
+      selfDescriptionVc: selfDescriptionVc,
       meta: { lastUpdated: new Date().toISOString() },
     };
-
-    // Build attributes for indexing based on the central configuration
-    const attributes = AllowedIndexableClaims.organizationRegistry
-    .map(claimKey => {
-      const value = allClaims[claimKey];
-      // Ensure value is not null or undefined before creating the attribute
-      if (value === undefined || value === null) {
-        return null;
-      }
-      return { 
-        name: claimKey, 
-        value: String(value),
-        // Mark alternateName as unique
-        ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true })
-      };
-    })
-    .filter(Boolean) as { name: string; value: string; unique?: boolean }[];
-
-
-    const tenantRegistrationDoc: ConfidentialStorageDoc = {
-      id: vaultId, sequence: 0,
-      indexed: {
-        attributes: attributes,
-        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
-      },
-      content: tenantConfig,
-    };
-
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
-    if (!hostCollectionName) {
-      // This should be an impossible state if bootstrap ran correctly.
-      throw new ManagerError('Host configuration is not available. Cannot register new tenant.', IssueType.NotFound);
-    }
-
-    const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
-    await this.vaultRepository.put(hostCollectionName, [secureTenantRegistrationDoc], 'tenants');
     
-    // The cache will be populated on-demand by getCollectionName. No need to force a reload.
-
-    const [legalRep, processedService] = contained;
-
-    if (legalRep) {
-      const legalRepDoc: ConfidentialStorageDoc = { id: legalRep.id, sequence: 0, content: legalRep };
-      const secureLegalRepDoc = await this.kmsService.protectConfidentialData(legalRepDoc, vaultId);
-      await this.vaultRepository.put(tenantCollectionName, [secureLegalRepDoc], 'employees');
-    }
-
-    if (processedService) {
-      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, sequence: 0, content: processedService };
-      const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, vaultId);
-      await this.vaultRepository.put(tenantCollectionName, [secureServiceDoc], 'services');
-    }
+    return tenantConfig;
   }
+
 
   private async _handleServiceAttachment(service?: IncludedResource): Promise<IncludedResource | undefined> {
     if (!service) return undefined;
-    const termsOfService = service.meta.claims[ClaimsServiceSchemaorg.termsOfService];
+    let termsOfService = service.meta.claims[ClaimsServiceSchemaorg.termsOfService] as string | undefined;
 
-    if (typeof termsOfService === 'string' && !termsOfService.startsWith('http')) {
+    if (termsOfService && !termsOfService.startsWith('http')) {
       try {
+        if (termsOfService.startsWith('data:')) {
+          const parts = termsOfService.split(',');
+          if (parts.length !== 2) { throw new Error('Malformed data URL.'); }
+          termsOfService = parts[1];
+        }
         const pdfBytes = Buffer.from(termsOfService, 'base64');
-        const { publicUrl, encodedMultiHash } = await this.storageAdapter.upload(pdfBytes, 'application/pdf');
-        
+        const uploadResult = await this.storageAdapter.upload(pdfBytes, 'application/pdf');
+        if (!uploadResult) { throw new Error('Storage adapter returned undefined result.'); }
+        const { publicUrl, encodedMultiHash } = uploadResult;
         service.meta.claims[ClaimsServiceSchemaorg.termsOfService] = publicUrl;
         (service.meta.claims as any)[`${ClaimsServiceSchemaorg.termsOfService}#hash`] = encodedMultiHash;
       } catch (error) {
-        throw new ManagerError(`Invalid Base64 encoding for service attachment.`, IssueType.Invalid);
+        const e = error as Error;
+        throw new ManagerError(`Error processing service attachment: ${e.message}`, IssueType.Invalid);
       }
     }
     return service;
   }
 
   private extractResources(claims: ClaimsRecord, environment?: string) {
+    console.log('--- DEBUG: Input claims for extractResources ---', JSON.stringify(claims, null, 2));
     const resourceTypes = ['Organization', 'Person', 'Service'];
     const resources: Record<string, any> = {};
 
     for (const type of resourceTypes) {
       const resourceClaims: Record<string, any> = { '@type': type };
       let claimFound = false;
-
       for (const key in claims) {
         if (key.startsWith(`org.schema.${type}.`)) {
           resourceClaims[key] = claims[key];
           claimFound = true;
         }
       }
-
       if (claimFound) {
         const identifierClaim = resourceClaims[`org.schema.${type}.identifier`];
         const resourceId = determineResourceId(identifierClaim, environment);
@@ -415,6 +814,7 @@ export class HostingManager {
         };
       }
     }
+    console.log('--- DEBUG: Extracted resources ---', JSON.stringify(resources, null, 2));
     if (!resources.organization || !resources.person || !resources.service) {
       throw new ManagerError('Incomplete claims: Organization, Person, and Service resources are required.', IssueType.Required);
     }

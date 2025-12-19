@@ -1,6 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/database/repositories/vault/vault.repository.ts
 
+import { ConsentRule } from "../../../models/consent-rule";
 import { RecordBase, VaultConfig } from "../../../models/resource-document";
 
 /**

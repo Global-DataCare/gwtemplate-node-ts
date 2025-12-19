@@ -12,6 +12,7 @@ import { ClaimsRecord } from '../../../models/resource-document';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
 import { testConfigDataHost, testConfigTenant1 } from '../../data/organization.data';
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
+import { EntityLifecycleStatus, EntityType } from '../../../models/enums';
 
 // Mock the entire module. We are not using the actual implementation.
 jest.mock('../../../database/repositories/vault/vault.repository');
@@ -32,8 +33,8 @@ describe('TenantsCacheManager', () => {
   const hostUrn = (testClaimsHostInitialization as ClaimsRecord)[ClaimsOrganizationSchemaorg.identifier];
   const hostConfig: EntityConfig = {
     id: testConfigDataHost.id,
-    type: 'Organization',
-    status: 'active',
+    type: EntityType.Organization,
+    status: EntityLifecycleStatus.Active,
     claims: testClaimsHostInitialization,
     didConfig: { service: [] },
     didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: hostUrn },
@@ -43,8 +44,8 @@ describe('TenantsCacheManager', () => {
   const tenantUrn = (testClaimsTenant1Registration as ClaimsRecord)[ClaimsOrganizationSchemaorg.identifier];
   const acmeConfig: EntityConfig = {
     id: testConfigTenant1.id,
-    type: 'Organization',
-    status: 'active',
+    type: EntityType.Organization,
+    status: EntityLifecycleStatus.Active,
     claims: testClaimsTenant1Registration,
     didConfig: { service: mockServices },
     didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: tenantUrn },
@@ -118,14 +119,14 @@ describe('TenantsCacheManager', () => {
   describe('getTenantDid', () => {
     // These tests now check the on-demand caching logic.
     it('should return the DID for an existing tenant', async () => {
-      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId, content: acmeConfig });
+      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId } as any);
       mockKmsService.unprotectConfidentialData.mockResolvedValue(acmeConfig);
       const result = await tenantsCacheManager.getTenantDid(acmeVaultId);
       expect(result).toBe(tenantUrn);
     });
 
     it('should return the DID for the host', async () => {
-      mockVaultRepository.get.mockResolvedValue({ id: 'host', content: hostConfig });
+      mockVaultRepository.get.mockResolvedValue({ id: 'host' } as any);
       mockKmsService.unprotectConfidentialData.mockResolvedValue(hostConfig);
       const result = await tenantsCacheManager.getTenantDid('host');
       expect(result).toBe(hostUrn);
@@ -140,14 +141,14 @@ describe('TenantsCacheManager', () => {
 
   describe('getDidServiceConfig', () => {
     it('should return the service configuration for an existing tenant', async () => {
-      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId, content: acmeConfig });
+      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId } as any);
       mockKmsService.unprotectConfidentialData.mockResolvedValue(acmeConfig);
       const result = await tenantsCacheManager.getDidServiceConfig(acmeVaultId);
       expect(result).toEqual(mockServices);
     });
 
     it('should return the service configuration for the host', async () => {
-      mockVaultRepository.get.mockResolvedValue({ id: 'host', content: hostConfig });
+      mockVaultRepository.get.mockResolvedValue({ id: 'host' } as any);
       mockKmsService.unprotectConfidentialData.mockResolvedValue(hostConfig);
       const result = await tenantsCacheManager.getDidServiceConfig('host');
       expect(result).toEqual([]);
@@ -162,7 +163,7 @@ describe('TenantsCacheManager', () => {
 
   describe('getTenantSector', () => {
     it('should correctly extract the sector from a cached tenant', async () => {
-      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId, content: acmeConfig });
+      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId } as any);
       mockKmsService.unprotectConfidentialData.mockResolvedValue(acmeConfig);
       const sector = await tenantsCacheManager.getTenantSector(acmeVaultId);
       expect(sector).toBe(acmeSector);
@@ -171,7 +172,7 @@ describe('TenantsCacheManager', () => {
 
   describe('getTenantJurisdiction', () => {
     it('should correctly extract the jurisdiction from a cached tenant', async () => {
-      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId, content: acmeConfig });
+      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId } as any);
       mockKmsService.unprotectConfidentialData.mockResolvedValue(acmeConfig);
       const jurisdiction = await tenantsCacheManager.getTenantJurisdiction(acmeVaultId);
       expect(jurisdiction).toBe((acmeConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.addressCountry]);

@@ -3,13 +3,13 @@
 // Description: Manager for handling business logic related to FHIR Communications.
 
 import { CommMsgExtended, DataEntry, FhirCommunication } from '../models/comm';
-import { IPayloadResponse } from '../models/response';
-import { Bundle, BundleEntryResponse, ErrorEntry } from '../models/bundle';
+import { IDecodedDidcommPayload } from '../models/confidential-message';
+import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from '../models/bundle';
 import { determineResourceId } from '../utils/resource';
 import { v4 as uuidv4 } from 'uuid';
 import { IJobProcessor } from './registry';
 import { TenantsCacheManager } from './TenantsCacheManager';
-import { JobRequest } from '../models/request';
+import { JobRequest } from '../models/confidential-job';
 import { getTenantVaultId } from '../utils/tenant';
 
 interface CommunicationManagerOptions {
@@ -33,9 +33,13 @@ export class CommunicationManager implements IJobProcessor {
    * @param job The job to process.
    * @returns A promise that resolves to a payload response containing the converted messages.
    */
-  public async process(job: JobRequest): Promise<IPayloadResponse> {
+  public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const bundleEntries: (BundleEntryResponse | ErrorEntry)[] = [];
     const now = Math.floor(Date.now() / 1000);
+
+    if (!job.content) {
+      throw new Error('Job content is missing');
+    }
 
     const entries = job.content.body.data || [job.content.body];
 
@@ -81,12 +85,14 @@ export class CommunicationManager implements IJobProcessor {
       }
     }
 
-    const responseBundle: Bundle<BundleEntryResponse | ErrorEntry> = {
-      type: `${job.action}-response`,
+    const responseBundle: BundleJsonApi<BundleEntryResponse | ErrorEntry> = {
+      resourceType: 'Bundle',
+      type: `${job.action}-response`, // FHIR based: batch-resonse, transaction-response
       data: bundleEntries,
     };
     
-            const serverDid = await this.tenantsCacheManager.getTenantDid(getTenantVaultId(job.sector as string, job.tenantId as string));
+    const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+    const serverDid = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
     if (!serverDid) {
       // This is a critical configuration error. The tenant is not in the cache.
       // We cannot issue a response without a valid DID.
@@ -94,15 +100,18 @@ export class CommunicationManager implements IJobProcessor {
     }
 
     // The audience of our response should be the issuer of the request
-    const aud = job.meta?.bearer?.jwt?.payload?.iss || '';
+    const aud = job.content.meta?.bearer?.jwt?.payload?.iss || '';
 
-    return {
+    const result: IDecodedDidcommPayload = {
+      jti: uuidv4(),
       iss: serverDid,
       aud: aud,
       exp: now + 300, // 5 minutes expiration
       thid: job.content.thid,
+      type: 'api+json',
       body: responseBundle,
     };
+    return result;
   }
 
   /**

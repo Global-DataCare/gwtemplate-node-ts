@@ -4,7 +4,7 @@
 import { MldsaPublicJwk } from '../../crypto/interfaces/Cryptography.types';
 import { ClaimsActionSchemaorg } from '../../models/schemaorg';
 import { DidDocument } from '../../models/did';
-import { DecodedDidcommMessage } from '../../models/request';
+import { IDecodedDidcommPayload } from '../../models/confidential-message';
 import { testTenant1Data, testClaimsTenant1Registration } from './end-to-end.data';
 import { testHostDidWeb, testTenant1DidWebExternal, testTenant1DidWebHosted } from './organization.data';
 
@@ -69,7 +69,8 @@ export const testNetworkEnrollmentRequestBody = {
   }],
 };
 
-export const testInitialNetworkJobInput: DecodedDidcommMessage = {
+export const testInitialNetworkJobInput: IDecodedDidcommPayload = {
+  jti: 'jti-network-enrollment',
   aud: testHostDidWeb, 
   iss: testEmployeeUrnControllerT, 
   thid: 'test-thid-network-enrollment',

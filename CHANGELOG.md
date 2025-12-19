@@ -21,6 +21,9 @@ All notable changes to this project will be documented in this file.
     -   The backend handles URN construction, hashing, and dynamic routing to the appropriate blockchain channel (`<sector>-eu` or `<sector>-global`) and smart contract (`discovery-person`) based on "convention over configuration".
     -   Introduced `NetworkActionsController` and a dedicated `networkRouter` to manage this new API section.
     -   Added new utility modules to support the discovery logic: `identifier-parser.ts`, `jurisdiction.ts`, and `phone-number.ts`.
+-   **Contextualized Claims Normalization:** Added claim normalization + deterministic ordering for contextualized schema.org claims (see `src/utils/claims.ts`) to support future canonical hashing.
+-   **Family Onboarding (Offer/Order):** Added `FamilyManager` and data fixtures to support family (household) registration with the same Offer/Order pattern used for tenant onboarding.
+-   **Sandbox-Safe Integration Test Harness:** Added `invokeExpress` helper to run integration tests without binding a TCP port (required in sandboxed environments).
 
 ### Changed
 
@@ -29,6 +32,8 @@ All notable changes to this project will be documented in this file.
     -   The smart contract is expected to implement a "first match wins" optimization for these batch queries.
 -   **Updated `IBlockchainAdapter`:** The interface was changed from `discoverDidByHash` to the batch-aware `discoverDidsByHashes` to support the performance optimization.
 -   **Updated Service Definitions (`services.ts`):**
+-   **Customer → Individual:** Renamed the worker registry key from `customerManager` to `individualManager` and renamed the unit test file to `IndividualManager.test.ts`.
+-   **Secure API Routing:** Path params are now authoritative when building the async `jobRequest` (prevents decoded payload fields from overriding `tenantId/sector/section/resourceType`).
 
 ### Fixed
 
@@ -39,6 +44,10 @@ All notable changes to this project will be documented in this file.
 
 -   **Corrected Onboarding Tests:** Fixed all failing unit tests for `CustomerManager` by aligning the test data's job action with the manager's expectation.
 -   **Resolved `tsc` Compilation Errors**
+-   **BYOK End-to-End Flow:** Fixed `byok-dcr` integration test by making the flow complete Offer→Order and making polling robust.
+-   **CORS + In-Memory Express Invocation:** Fixed crashes in integration tests caused by `cors/vary` expecting Node `ServerResponse` header APIs.
+-   **Hosting Offer/Order:** Fixed Offer identifier handling, ensured tenant config retains required claims, and persisted an indexable admin employee record so secure key resolution can find `kid/skid`.
+-   **KMS Key Metadata:** Ensured managed JWKs are marked with `use: 'sig'|'enc'` so downstream key selection works reliably.
 
 ### Internal
 
@@ -46,6 +55,8 @@ All notable changes to this project will be documented in this file.
 -   **End-to-End Test:** Added a new test case (`Part 8`) to the main integration test suite (`end-to-end-flow.test.ts`). This test verifies the full, asynchronous submit-and-poll flow for the `_discovery` endpoint using a real, encrypted JWE payload.
 -   **Documentation:** Created a new, detailed architecture document for the discovery feature at `docs/03-IDENTITY-AND-TRUST/03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md`, which includes a Mermaid sequence diagram illustrating the entire flow, and ``.
 -   **Code Cleanup:** Removed the obsolete `CustomerDiscoveryManager` and its test file, as its logic was consolidated into `CustomerManager`. Disabled verbose cryptographic logs to improve test readability.
+-   **Integration Suite Hardening:** Updated Jest config and integration tests to avoid sandbox-incompatible e2e/firestore runs and to use in-memory Express invocation.
+-   **Docs:** Updated `docs/API_INTEGRATORS_GUIDE.md` with contextualized claims normalization rules and license gating notes.
 
 ## [Unreleased]
 

@@ -1,6 +1,6 @@
 // src/adapters/queue.ts
 
-import { DataInRequest, JobRequest } from "../models/request";
+import { JobRequest } from "../models/confidential-job";
 
 
 export interface QueueAdapter {

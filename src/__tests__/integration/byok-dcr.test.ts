@@ -3,9 +3,15 @@
 
 // This MUST be the first line to ensure deterministic key generation for the test run.
 process.env.DEV_SEED = 'true';
+process.env.NODE_ENV = 'test';
+process.env.DB_PROVIDER = 'mem';
+process.env.STORAGE_PROVIDER = 'mem';
+process.env.QUEUE_PROVIDER = 'mem';
+process.env.SECTORS_ALLOWED = 'health-care,test';
+process.env.HOST_EXTERNAL_DOMAIN = 'provider.com';
 
-// IMPORTANT: This mock MUST be at the top of the file, after setting the env var.
-// It replaces the real config with a controlled test version.
+// This mock now includes Stripe keys to prevent startup failure.
+// It also mocks dbProvider to use 'mem' for this test suite.
 const TEST_API_BASE_URL = 'http://localhost:3001';
 jest.mock('../../config', () => ({
   getConfig: jest.fn(() => ({
@@ -15,7 +21,7 @@ jest.mock('../../config', () => ({
     hostExternalDomain: 'localhost',
     apiBaseUrl: TEST_API_BASE_URL,
     sectorsAllowed: ['health-care', 'test'],
-    dbProvider: 'mem',
+    dbProvider: 'mem', // IMPORTANT: Force in-memory DB for this test
     queueProvider: 'mem',
     kekSecret: 'test-kek-secret-dd-key-256-bits',
     host: {
@@ -28,11 +34,12 @@ jest.mock('../../config', () => ({
     },
     mongo: { dbName: 'test-db' },
     firebase: {},
+    STRIPE_SECRET_KEY: 'sk_test_mock_key',
+    STRIPE_WEBHOOK_SIGNING_SECRET: 'whsec_mock_secret'
   })),
 }));
 
 import * as express from 'express';
-import * as request from 'supertest';
 import { Server } from 'http';
 import { startServer } from '../../server';
 import { CryptographyService } from '../../crypto/CryptographyService';
@@ -41,22 +48,19 @@ import { Content } from '../../utils/content';
 import { QueueAdapter } from '../../adapters/queue';
 import { QueueAdapterMem } from '../../adapters/queue-mem';
 import { testPayloadCreateTenant1, testTenant1Data } from '../data/end-to-end.data';
-import { externalClientSignerJwk, externalClientEncrypterJwk } from '../data/external-client.data';
 import { testClaimsTenant1Receptionist1, testTenant1Receptionist1DidExternal, testTenant1Receptionist1Urn } from '../data/employee.data';
 import { IKmsService } from '../../crypto/interfaces/IKmsService';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
-import { testTenant1AlternateName, testTenant1AddressCountry } from '../data/organization.data';
+import { testTenant1AlternateName } from '../data/organization.data';
 import { testIndividualOnboardingBatchEntries } from '../data/customer-onboarding.data';
-import { IPayloadResponse } from '../../models/response';
-import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
+import {IPayloadResponse } from '../../models/confidential-message';
+import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from '../../models/schemaorg';
 import { generateUrnHash } from '../../utils/urn-hash';
 import { createHash } from 'crypto';
-import { normalizePhoneNumber } from '../../utils/phone-number';
 import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
 import { IBlockchainAdapter } from '../../adapters/IBlockchainAdapter';
 import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
-import { ConsoleLogger } from '../../loggers/ConsoleLogger';
-
+import { invokeExpress } from './helpers/invokeExpress';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -66,7 +70,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('End-to-End API Flow (BYOK Onboarding)', () => {
   let app: express.Express;
-  let server: Server;
+  let server: Server | undefined;
   let queueAdapter: QueueAdapter;
   let addJobSpy: jest.SpyInstance;
   let cryptoService: CryptographyService;
@@ -82,7 +86,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
   beforeAll(async () => {
     // Start the server, which will use the mocked config and generate deterministic keys
-    const serverInstance = await startServer();
+    const serverInstance = await startServer({ listen: false });
     app = serverInstance.app;
     server = serverInstance.server;
     queueAdapter = serverInstance.queueAdapter;
@@ -127,23 +131,27 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     if (queueAdapter instanceof QueueAdapterMem) {
       (queueAdapter as QueueAdapterMem).stop();
     }
-    await new Promise<void>((resolve, reject) => {
-      server.close((err) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve();
+    const serverToClose = server;
+    if (serverToClose) {
+      await new Promise<void>((resolve, reject) => {
+        serverToClose.close((err: any) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve();
+        });
       });
-    });
+    }
   });
 
-  it('Part 1: should accept a BOOTSTRAPPING request with embedded JWKs', async () => {
+  it('Part 1: should accept a BOOTSTRAPPING request, process it, and return a verifiable Offer', async () => {
     // This part tests the "Bring-Your-Own-Key" (BYOK) scenario.
     // During the very first "organization creation" request, the client's DID (`iss`)
     // is not yet registered in the system. To establish trust, the client MUST
     // embed their public keys (JWKs) directly into the JWS and JWE protected headers.
     // The server will then associate these keys with the new admin employee being created.
     const orgCreationPayload = { ...testPayloadCreateTenant1 };
+    const thid = orgCreationPayload.thid;
 
     const jwsProtectedHeader = {
       alg: externalSigner.alg,
@@ -181,24 +189,145 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     );
     const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
 
-    const response = await request.default(app)
-      .post(registrationUrl)
-      .set('Content-Type', 'application/x-www-form-urlencoded')
-      .send(`request=${compactJwe}`);
+    // 1. ACT (Phase 1): Post the initial job
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: registrationUrl,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { request: compactJwe },
+    });
 
+    // 2. ASSERT (Phase 1): Check for 202 Accepted and polling location
     expect(response.status).toBe(202);
     expect(response.headers.location).toBeDefined();
+    const pollingUrl = response.headers.location;
     expect(addJobSpy).toHaveBeenCalledTimes(1);
 
+    // 3. ACT (Phase 2): Wait for job completion and poll for the result
     if (queueAdapter instanceof QueueAdapterMem) {
       await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
     } else {
       await delay(200);
     }
     
-    // CRITICAL: After the organization and its admin are created, we must reload the
-    // tenant cache to ensure the new DID documents and keys are available for the next tests.
+    const pollingPath = new URL(pollingUrl).pathname;
+    const pollResponse = await invokeExpress(app, {
+      method: 'POST',
+      url: pollingPath,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { thid },
+    });
+
+    // 4. ASSERT (Phase 2): Check for 200 OK and decrypt the final response
+    expect(pollResponse.status).toBe(200);
+    const encryptedFinalResponse = pollResponse.text.startsWith('response=')
+      ? pollResponse.text.slice('response='.length)
+      : pollResponse.text;
+    
+    const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
+    const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IPayloadResponse;
+
+    // 5. ASSERT (Phase 3): Verify the content of the final, decrypted Offer
+    expect(finalResponse.thid).toBe(thid);
+    const responseEntry = finalResponse.body.data[0];
+    const claims = responseEntry.meta.claims;
+
+    expect(responseEntry.type).toBe('Organization-registration-offer-v1.0');
+    expect(claims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(2);
+    expect(claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
+    expect(claims[ClaimsOfferSchemaorg.price]).toBe('0.00'); // Or the calculated price
+    expect(claims[ClaimsOfferSchemaorg.offeredBy]).toBe('did:web:provider.com');
+
+    // --- ACT (Phase 4): Accept the Offer by submitting an Order ---
+    const offerId = claims[ClaimsOfferSchemaorg.identifier] as string;
+    const orderThid = `${thid}-order`;
+    const orderPayload = {
+      thid: orderThid,
+      iss: orgCreationPayload.iss,
+      aud: orgCreationPayload.aud,
+      jti: `jti-${orderThid}`,
+      type: 'api+json',
+      body: {
+        data: [
+          {
+            type: 'Organization-order-request-v1.0',
+            meta: { claims: { 'Order.acceptedOffer.identifier': offerId } },
+          },
+        ],
+      },
+    };
+
+    const orderJwsProtectedHeader = {
+      alg: externalSigner.alg,
+      kid: externalSigner.kid,
+      jwk: {
+        alg: externalSigner.alg,
+        kid: externalSigner.kid,
+        kty: externalSigner.kty,
+        pub: externalSigner.pub,
+      },
+    };
+    const orderJwsParts = await cryptoService.signDataJws(orderPayload, orderJwsProtectedHeader, externalSigner.privBytes);
+    const orderCompactJws = `${orderJwsParts.protected}.${orderJwsParts.payload}.${orderJwsParts.signature}`;
+
+    const orderJweProtectedHeader = {
+      enc: 'A256GCM',
+      cty: 'JWS',
+      skid: externalEncrypter.kid,
+      jwk: {
+        crv: externalEncrypter.crv,
+        kid: externalEncrypter.kid,
+        kty: externalEncrypter.kty,
+        x: externalEncrypter.x,
+      },
+    };
+    const orderCompactJwe = await cryptoService.encryptJweToCompact(
+      orderCompactJws,
+      orderJweProtectedHeader,
+      externalEncrypter,
+      hostEncryptionKey,
+    );
+
+    const orderUrl = `/host/cds-ES/v1/test/registry/org.schema/Order/_batch`;
+    const orderPostResponse = await invokeExpress(app, {
+      method: 'POST',
+      url: orderUrl,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { request: orderCompactJwe },
+    });
+    expect(orderPostResponse.status).toBe(202);
+    expect(orderPostResponse.headers.location).toBeDefined();
+
+    const orderPollingPath = new URL(orderPostResponse.headers.location).pathname;
+    let orderPollResponse: { status: number; headers: any; text: string } | undefined;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      if (queueAdapter instanceof QueueAdapterMem) {
+        await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
+      } else {
+        await delay(50);
+      }
+      orderPollResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: orderPollingPath,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { thid: orderThid },
+      });
+      if (orderPollResponse.status === 200) break;
+      await delay(25);
+    }
+
+    expect(orderPollResponse?.status).toBe(200);
+    const encryptedOrderFinalResponse = orderPollResponse!.text.startsWith('response=')
+      ? orderPollResponse!.text.slice('response='.length)
+      : orderPollResponse!.text;
+    const { decryptedBytes: orderDecryptedBytes } = await cryptoService.decryptJwe(encryptedOrderFinalResponse, externalEncrypter);
+    const orderFinalResponse = JSON.parse(Content.bytesToStringUTF8(orderDecryptedBytes)) as IPayloadResponse;
+    expect(orderFinalResponse.thid).toBe(orderThid);
+    expect(orderFinalResponse.body?.data?.[0]?.response?.status).toBe('201');
+
+    // Reload host + tenant caches after finalization to make subsequent tests deterministic.
     await tenantManager.loadHost();
+    expect(await tenantManager.getTenantDid('health-care_acme')).toBeDefined();
   });
 
   it('Part 2: should accept a STANDARD request without embedded JWKs', async () => {
@@ -251,10 +380,12 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     const registrationUrl = `/acme/cds-ES/v1/health-care/entity/org.schema/Employee/_batch`;
 
-    const response = await request.default(app)
-      .post(registrationUrl)
-      .set('Content-Type', 'application/x-www-form-urlencoded')
-      .send(`request=${compactJwe}`);
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: registrationUrl,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { request: compactJwe },
+    });
 
     expect(response.status).toBe(202);
     expect(response.headers.location).toBeDefined();
@@ -308,10 +439,12 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     const registrationUrl = `/${tenantId}/cds-${jurisdiction}/v1/health-care/individual/org.schema/Person/_batch`;
     
-    const postResponse = await request.default(app)
-      .post(registrationUrl)
-      .set('Content-Type', 'application/x-www-form-urlencoded')
-      .send(`request=${compactJwe}`);
+    const postResponse = await invokeExpress(app, {
+      method: 'POST',
+      url: registrationUrl,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { request: compactJwe },
+    });
 
     // 3. ASSERT (Phase 1): Check for 202 Accepted and Location header
     expect(postResponse.status).toBe(202);
@@ -326,14 +459,19 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       await delay(200);
     }
     
-    const pollResponse = await request.default(app)
-      .post(pollingUrl) // Use POST for secure polling to keep thid out of logs
-      .set('Content-Type', 'application/x-www-form-urlencoded')
-      .send({ thid: thid });
+    const pollingPath = new URL(pollingUrl).pathname;
+    const pollResponse = await invokeExpress(app, {
+      method: 'POST',
+      url: pollingPath, // Use POST for secure polling to keep thid out of logs
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { thid },
+    });
 
     // 5. ASSERT (Phase 2): Check for 200 OK and decrypt the final response
     expect(pollResponse.status).toBe(200);
-    const encryptedFinalResponse = pollResponse.text;
+    const encryptedFinalResponse = pollResponse.text.startsWith('response=')
+      ? pollResponse.text.slice('response='.length)
+      : pollResponse.text;
     
     // To simulate the external client decrypting the response, we use the cryptoService 
     // with the client's private key and the server's public key (embedded in the JWE).
@@ -393,10 +531,12 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
     const registrationUrl = `/acme/cds-es/v1/health-care/individual/org.schema/Composition/_batch`;
-    const response = await request.default(app)
-      .post(registrationUrl)
-      .set('Content-Type', 'application/x-www-form-urlencoded')
-      .send(`request=${compactJwe}`);
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: registrationUrl,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { request: compactJwe },
+    });
 
     expect(response.status).toBe(202); // We only test submission for now
   });
@@ -451,10 +591,12 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
     const registrationUrl = `/acme/cds-es/v1/health-care/individual/org.schema/Communication/_batch`;
-    const response = await request.default(app)
-      .post(registrationUrl)
-      .set('Content-Type', 'application/x-www-form-urlencoded')
-      .send(`request=${compactJwe}`);
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: registrationUrl,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { request: compactJwe },
+    });
 
     expect(response.status).toBe(202);
   });
@@ -557,10 +699,12 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     const discoveryUrl = `/acme/cds-es/v1/health-care/test-network/org.schema/Person/_discovery`;
     
-    const postResponse = await request.default(app)
-      .post(discoveryUrl)
-      .set('Content-Type', 'application/x-www-form-urlencoded')
-      .send(`request=${compactJwe}`);
+    const postResponse = await invokeExpress(app, {
+      method: 'POST',
+      url: discoveryUrl,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { request: compactJwe },
+    });
 
     // 4. ASSERT (Phase 1): Check for 202 Accepted
     expect(postResponse.status).toBe(202);
@@ -568,20 +712,27 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const pollingUrl = postResponse.headers.location;
 
     // 5. ACT (Phase 2): Wait and poll for the result
-    if (queueAdapter instanceof QueueAdapterMem) {
+    const pollingPath = new URL(pollingUrl).pathname;
+    let pollResponse: { status: number; headers: any; text: string } | undefined;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      if (queueAdapter instanceof QueueAdapterMem) {
         await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
-    } else {
-        await delay(200);
+      } else {
+        await delay(50);
+      }
+      pollResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: pollingPath,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { thid },
+      });
+      if (pollResponse.status === 200) break;
+      await delay(25);
     }
-    
-    const pollResponse = await request.default(app)
-      .post(pollingUrl)
-      .set('Content-Type', 'application/x-www-form-urlencoded')
-      .send({ thid: thid });
       
     // 6. ASSERT (Phase 2): Decrypt and verify the final response
-    expect(pollResponse.status).toBe(200);
-    const encryptedFinalResponse = pollResponse.text.replace('response=', '');
+    expect(pollResponse?.status).toBe(200);
+    const encryptedFinalResponse = pollResponse!.text.replace('response=', '');
     
     const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
     const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IPayloadResponse;

@@ -101,9 +101,16 @@ describe('KmsService', () => {
       const mockHostKid = 'mock-kem-kid'; // KID of the host's encryption key
       const mockDecryptedBytes = Content.stringToBytesUTF8('protected.payload.signature');
       const mockProtectedHeader = { enc: 'A256GCM', skid: 'sender-key-id', cty: 'JWS' }; // No JWK
+      const mockDecodedPayload = {
+        thid: '123',
+        iss: 'did:web:sender',
+        aud: 'did:web:receiver',
+        type: 'api+json',
+        body: { data: [] },
+      };
       const mockJws: DataCompactJWT = { 
         protected: { alg: 'ML-DSA-44', kid: 'sender-key-id' }, 
-        payload: { thid: '123', iss: 'did:web:sender' }, 
+        payload: mockDecodedPayload as any, 
         signature: new Uint8Array() 
       };
 
@@ -121,10 +128,12 @@ describe('KmsService', () => {
       expect(mockCryptoService.parseCompactJws).toHaveBeenCalledWith(Content.bytesToStringUTF8(mockDecryptedBytes));
       
       // The service's job is ONLY to decrypt and parse.
-      expect(jobRequest.content).toEqual(mockJws.payload);
-      expect(jobRequest.meta?.jwe?.header).toEqual(mockProtectedHeader);
+      expect(jobRequest.content).toBeDefined();
+      const content = jobRequest.content!;
+      expect(content.body).toEqual(mockDecodedPayload.body);
+      expect(content.meta?.jwe?.header).toEqual(mockProtectedHeader);
       // It MUST NOT have resolved or added a JWK. This is the orchestrator's job.
-      expect(jobRequest.meta?.jwe?.header?.jwk).toBeUndefined();
+      expect(content.meta?.jwe?.header?.jwk).toBeUndefined();
     });
   });
 

@@ -5,7 +5,7 @@ import { Request, Response, Router } from 'express';
 import { IAuthorizationManager } from '../../../managers/auth/IAuthorizationManager';
 import { QueueAdapter } from '../../../adapters/queue';
 import { IAccessTokenClaims } from '../../../models/auth';
-import { JobRequest } from '../../../models/request';
+import { JobRequest } from '../../../models/confidential-job';
 import { createOperationOutcome } from '../../../utils/outcome';
 import { IssueLevel, IssueType } from '../../../models/fhir/codes';
 import { validOrNewUuidv4 } from '../../../utils/uuid';
@@ -52,21 +52,27 @@ export class FhirController {
     // 3. If authorized, create and enqueue the job
     const thid = validOrNewUuidv4(resource.id);
     const job: JobRequest = {
+      id: '',
+      sequence: 0,
+      status: 'DRAFT' as any,
+      createdAtTimestamp: Date.now(),
       action: 'create',
       resourceType: 'Communication',
       tenantId: accessTokenClaims.iss, 
       sector: req.params.sector,
       content: {
+        iss: accessTokenClaims.iss,
+        jti: uuidv4(),
         type: 'https://didcomm.org/fhir/v1.0/Communication',
         thid: thid,
         aud: accessTokenClaims.iss, // The message is intended for the tenant itself to process
         body: {
           resource: resource
+        },
+        meta: {
+          bearer: { jwt: { payload: accessTokenClaims } }
         }
       },
-      meta: {
-        bearer: { jwt: { payload: accessTokenClaims } }
-      }
     };
 
     await this.queueAdapter.addJob('Communication', job);

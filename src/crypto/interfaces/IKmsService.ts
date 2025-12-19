@@ -6,7 +6,7 @@ import { JwkSet, JWK } from '../../models/jwk';
 import { JwsMultiSign } from '../../models/jws';
 import { ParameterData } from '../../models/params'; // extends ParamAttribute with `type` and others.
 import { ConfidentialStorageDoc, IndexedAttribute } from '../../models/confidential-storage';
-import { JobRequest } from '../../models/request';
+import { JobRequest } from '../../models/confidential-job';
 import { MldsaPublicJwk, MlkemPublicJwk } from './Cryptography.types';
 
 /**
@@ -114,6 +114,18 @@ export interface IKmsService {
     encryptedSeedPartB: Uint8Array,
     protectorEntityId: string
   ): Promise<JwsMultiSign>;
+
+  /**
+   * Creates a detached JWS signature for a JSON payload.
+   * This is the high-level primitive for creating `proof` blocks in Verifiable Credentials.
+   * It handles payload canonicalization, construction of the JWS protected header,
+   * signing with a managed key, and returning the signature in detached format (HEADER..SIGNATURE).
+   * @param payload The JSON object to be signed.
+   * @param signerKid The 'kid' of the signing key to use.
+   * @param signerVaultId The vault ID of the entity that owns the key.
+   * @returns A promise that resolves to the detached JWS string.
+   */
+  createDetachedJws(payload: object, signerKid: string, signerVaultId: string): Promise<string>;
 
   // --- Outbound Encryption ---
 

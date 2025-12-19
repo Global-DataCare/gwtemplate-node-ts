@@ -1,8 +1,9 @@
 // File: src/managers/PingManager.ts
 
-import { JobRequest } from '../models/request';
-import { IPayloadResponse } from '../models/response';
-import { Bundle, BundleEntry } from '../models/bundle';
+import { v4 as uuidv4 } from 'uuid';
+import { JobRequest } from '../models/confidential-job';
+import { IDecodedDidcommPayload, IPayloadResponse } from '../models/confidential-message';
+import { BundleJsonApi, BundleEntry } from '../models/bundle';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { ManagerError } from '../models/errors/manager-error';
@@ -36,10 +37,11 @@ export class PingManager {
       },
     }));
 
-    const responseBundle: Bundle = {
-      type: getBundleResponseTypeForAction(job.action),
-      total: responseEntries.length,
+    const responseBundle: BundleJsonApi = {
       data: responseEntries,
+      resourceType: 'Bundle',
+      total: responseEntries.length,
+      type: getBundleResponseTypeForAction(job.action),
     };
 
     // Determine the issuer's DID from the cache based on the tenantId from the job.
@@ -53,9 +55,11 @@ export class PingManager {
 
     // Construct the final JARM-compliant response payload.
     return {
-      thid: job.content.thid,
+      jti: uuidv4(),
+      type: 'ping-response',
+      thid: job.content?.thid as string,
       iss: issuerDid,
-      aud: job.content.iss,   // The response is for the original requester
+      aud: job.content?.iss as string,   // The response is for the original requester
       exp: Math.floor(Date.now() / 1000) + 300, // Expires in 5 minutes
       body: responseBundle,
     };

@@ -1,5 +1,5 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
-// File: src/utils/resourceUtils.ts
+// File: src/utils/resource.ts
 
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 

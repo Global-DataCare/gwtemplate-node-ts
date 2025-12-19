@@ -2,8 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { TenantsCacheManager } from './TenantsCacheManager';
-import { JobRequest } from '../models/request';
-import { IPayloadResponse } from '../models/response';
+import { JobRequest } from '../models/confidential-job';
+import { IPayloadResponse } from '../models/confidential-message';
 
 /**
  * Defines the standard contract for any manager that processes a job.
@@ -25,10 +25,14 @@ export interface IJobProcessor {
 export interface ManagerRegistry {
   hostingManager: IJobProcessor;
   tenantManager: TenantsCacheManager;
+  familyManager?: IJobProcessor;
   employeeManager?: IJobProcessor;
-  customerManager?: IJobProcessor;
+  individualManager?: IJobProcessor;
   compositionManager?: IJobProcessor;
   communicationManager?: IJobProcessor;
+  deviceRegistrationManager?: IJobProcessor;
+  licenseManager?: IJobProcessor;
+  tokenManager?: IJobProcessor;
   // groupManager?: IJobProcessor;
   // listManager?: IJobProcessor;
 }

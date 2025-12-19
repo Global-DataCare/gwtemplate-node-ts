@@ -4,7 +4,7 @@
 import { EntityConfig } from '../models/entity';
 import { Sector } from '../models/urlPath';
 import { DidService } from '../models/did';
-import { createDidServiceId } from './did';
+import { createDidServiceIdBase } from './did';
 
 // As per SYSTEM_DESIGN.md, these sectors are FHIR-enabled.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
@@ -32,7 +32,9 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   const isFhir = FHIR_SECTORS.includes(sector);
 
   const entityResources = ['Employee', 'EmployeeRole', 'Place', 'Organization', 'Bundle'];
-  const individualResources = ['Person', 'Composition', 'Communication', 'Subscription', 'RelatedPerson', 'Bundle'];
+  // NOTE: `Organization`/`Order` under `individual/org.schema` is used for the Family onboarding flow
+  // (the "family" is modelled as an Organization representing a household).
+  const individualResources = ['Person', 'Organization', 'Order', 'Composition', 'Communication', 'Subscription', 'RelatedPerson', 'Bundle'];
 
   if (isFhir) {
     entityResources.push('Practitioner', 'PractitionerRole', 'Location');
@@ -40,15 +42,15 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   }
 
   services.push(createDidEndpointConfig(
-    createDidServiceId({ version: 'v1', sector, section: 'entity', format: 'org.schema' }),
+    createDidServiceIdBase({ version: 'v1', sector, section: 'entity', format: 'org.schema' }),
     entityResources,
-    ['_create', '_batch']
+    ['_batch']
   ));
 
   services.push(createDidEndpointConfig(
-    createDidServiceId({ version: 'v1', sector, section: 'individual', format: 'org.schema' }),
+    createDidServiceIdBase({ version: 'v1', sector, section: 'individual', format: 'org.schema' }),
     individualResources,
-    ['_create', '_batch']
+    ['_batch']
   ));
 
   return services;
@@ -64,7 +66,7 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
   const defaultNetworkServices: DidService[] = [
       {
           ...(createDidEndpointConfig(
-              createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Action' }),
+              createDidServiceIdBase({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Action' }),
               ['Action'],
               ['_batch']
           )),
@@ -72,7 +74,7 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
       },
       {
           ...(createDidEndpointConfig(
-              createDidServiceId({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Person' }),
+              createDidServiceIdBase({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Person' }),
               ['Person'],
               ['_discovery']
           )),
@@ -80,7 +82,18 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
       },
   ];
 
-  const allServices = [...defaultBusinessServices, ...defaultNetworkServices, ...customServices];
+  const defaultOidcServices: DidService[] = [
+    createDidEndpointConfig(
+      // 1. The BASE ID defines the group, without a resource.
+      createDidServiceIdBase({ version: 'v1', sector, section: 'identity', format: 'openid' }),
+      // 2. The RESOURCES to be multiplexed.
+      ['Device'],
+      // 3. The ACTIONS to be multiplexed.
+      ['_dcr']
+    ),
+  ];
+
+  const allServices = [...defaultBusinessServices, ...defaultNetworkServices, ...defaultOidcServices, ...customServices];
   const serviceMap = new Map(allServices.map(s => [s.id, s]));
   return Array.from(serviceMap.values());
 }
@@ -98,8 +111,8 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[]): DidServi
       continue;
     }
     services.push(createDidEndpointConfig(
-      createDidServiceId({ version: 'v1', sector, section: 'registry', format: 'org.schema' }),
-      ['Organization'],
+      createDidServiceIdBase({ version: 'v1', sector, section: 'registry', format: 'org.schema' }),
+      ['Organization', 'Order'],
       ['_batch']
     ));
   }
@@ -111,8 +124,11 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[]): DidServi
  * @param employeeConfig The configuration object for the new employee.
  * @returns The array of DidService objects for the employee's didDocument.
  */
-export function initializeEmployeeServices(employeeConfig: EntityConfig): DidService[] {
+export function initializeEmployeeServices(employeeConfig: EntityConfig, tenantClaims: any): DidService[] {
   const { didDocument } = employeeConfig;
+  if (!didDocument?.id) {
+    throw new TypeError("Cannot initialize employee services: didDocument with id is missing from the configuration.");
+  }
   const baseUrl = didDocument.id.replace('did:web:', 'https://').replace(/:/g, '/');
 
   const services: DidService[] = [
@@ -137,8 +153,11 @@ export function initializeEmployeeServices(employeeConfig: EntityConfig): DidSer
  * @param sector The sector of the tenant under which the customer is being created.
  * @returns The array of DidService objects for the customer's didDocument.
  */
-export function initializeCustomerServices(customerConfig: EntityConfig, sector: Sector): DidService[] {
+export function initializeCustomerServices(customerConfig: EntityConfig, sector: Sector, tenantClaims: any): DidService[] {
   const { didDocument } = customerConfig;
+  if (!didDocument?.id) {
+    throw new TypeError("Cannot initialize customer services: didDocument with id is missing from the configuration.");
+  }
   const baseUrl = didDocument.id.replace('did:web:', 'https://').replace(/:/g, '/');
 
   const coreServices: DidService[] = [
@@ -164,11 +183,10 @@ export function initializeCustomerServices(customerConfig: EntityConfig, sector:
   const section = 'index';
 
   const businessService = createDidEndpointConfig(
-    createDidServiceId({ version: 'v1', sector, section, format }),
+    createDidServiceIdBase({ version: 'v1', sector, section, format }),
     individualResources,
-    ['_create', '_batch']
+    ['_batch']
   );
 
   return [...coreServices, businessService];
 }
-

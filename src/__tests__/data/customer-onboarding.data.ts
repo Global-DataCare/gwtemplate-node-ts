@@ -3,7 +3,8 @@
 
 import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../models/schemaorg';
 import { JobAction, Resource, Format, Section, Sector } from '../../models/urlPath';
-import { JobRequest, FormRequest } from '../../models/request';
+import { IDecodedDidcommPayload } from '../../models/confidential-message';
+import { JobRequest, FormRequest, JobStatus } from '../../models/confidential-job';
 import { testCustomer1Data } from './customer.data';
 import { testTenant1AddressCountry,
     testTenant1AlternateName,
@@ -105,14 +106,16 @@ export const testIndividualOnboardingBatchEntries = [
 export const testCreateCustomerJobRequestProfessionalOnboarding: JobRequest = {
     tenantId: `${testTenant1AlternateName}`, // "acme"
     jurisdiction: `${testTenant1AddressCountry}`, // "US"
-    sector: `${testCustomer1ServiceTermsClaims}`, // "health-care"
+    sector: `${testCustomer1ServiceProviderCategory}`, // "health-care"
     section: `${Section.individual}`, // "individual"
     format: `${Format.Schema}`, // "org.schema"
     resourceType: `${Resource.Person}`, // "Person"
     action: `${JobAction._create}`, // "_create"
     content: {
+        iss: 'did:web:professional.app.example.com', // Issuer of the request
         aud: testTenant1DidWebExternal, // 'did:web:api.acme.org',
         thid: 'thid-customer-prof-onboarding',
+        jti: 'jti-customer-prof-onboarding',
         type: 'api+json',
         body: {
             data: testIndividualOnboardingBatchEntries,
@@ -120,5 +123,9 @@ export const testCreateCustomerJobRequestProfessionalOnboarding: JobRequest = {
     },
     httpMethod: 'POST',
     // External url: 'https://api.acme.org/individual/org.schema/Person/_batch'
-    requestUrl: testCustomerBatchRequestUrlExternal
+    requestUrl: testCustomerBatchRequestUrlExternal,
+    id: 'job-id-customer-prof-onboarding',
+    status: JobStatus.DRAFT,
+    sequence: 0,
+    createdAtTimestamp: 1672531200000, // Jan 1, 2023
 };

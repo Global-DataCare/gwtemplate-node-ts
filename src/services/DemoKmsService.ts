@@ -2,8 +2,10 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { ConfidentialStorageDoc, IndexedAttribute } from '../models/confidential-storage';
-import { JobRequest } from '../models/request';
-import { JwsMultiSign } from '../models/jws';
+import { IDecodedDidcommPayload } from '../models/confidential-message';
+import { v4 as uuidv4 } from 'uuid';
+import { JobRequest, JobStatus } from '../models/confidential-job';
+import { JwsHeader, JwsMultiSign } from '../models/jws';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { JwkSet, JWK } from '../models/jwk';
 import { Content } from '../utils/content';
@@ -79,8 +81,14 @@ export class DemoKmsService implements IKmsService {
     return this._realKmsService.getHmacBase64Url(plaintext, entityId);
   }
   
+      
   async protectAttributesNameAndValue(attributes: ParameterData[], entityId: string): Promise<IndexedAttribute[]> {
     return this._realKmsService.protectAttributesNameAndValue(attributes, entityId);
+  }
+
+  async createDetachedJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
+    console.warn(`[DemoKmsService] Delegating real detached JWS creation for: ${signerVaultId}`);
+    return this._realKmsService.createDetachedJws(payload, signerKid, signerVaultId);
   }
 
   // --- SIMULATED METHODS (Communication Bypass) ---
@@ -91,6 +99,13 @@ export class DemoKmsService implements IKmsService {
   async decodeRequest(message: string): Promise<JobRequest> {
     console.warn(`[DemoKmsService] Bypassing decryption for JWE-like message.`);
     
+    const result: JobRequest = {
+      id: uuidv4(),
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+    };
+
     // This simulates decoding a Compact JWE by splitting it and decoding the payload part.
     // The expected format is: {protected}.{encrypted_key}.{iv}.{ciphertext}.{tag}
     const parts = message.split('.');
@@ -107,31 +122,25 @@ export class DemoKmsService implements IKmsService {
         // The payload is the JWS compact string directly.
         const jwsString = payload as unknown as string;
         const jwsParts = jwsString.split('.');
-        const jwsProtected = Content.base64UrlSafeToJSON(jwsParts[0]);
-        const jwsPayload = Content.base64UrlSafeToJSON(jwsParts[1]);
-        return {
-          content: jwsPayload,
-          meta: { jws: { protected: jwsProtected, payload: jwsPayload, signature: 'dev-fake-signature' }, jwe: { header: protectedHeader } },
-        } as JobRequest;
+        const jwsProtectedRaw = Content.base64UrlSafeToJSON(jwsParts[0]) as Partial<JwsHeader>;
+        const jwsPayload = Content.base64UrlSafeToJSON(jwsParts[1]) as IDecodedDidcommPayload;
+        result.content = jwsPayload;
+        result.content.meta = { jws: { protected: { alg: jwsProtectedRaw.alg || 'none', kid: jwsProtectedRaw.kid || 'none' }, signature: 'dev-fake-signature' }, jwe: { header: protectedHeader } };
 
       } else if ((payload as any).jws && typeof (payload as any).jws === 'string') {
         // --- 2. Legacy Flow: JWS wrapped in a JSON object ---
         // The payload is a JSON object like `{ "jws": "compact.jws.string" }`.
         const jwsParts = (payload as any).jws.split('.');
-        const jwsProtected = Content.base64UrlSafeToJSON(jwsParts[0]);
-        const jwsPayload = Content.base64UrlSafeToJSON(jwsParts[1]);
-        return {
-          content: jwsPayload,
-          meta: { jws: { protected: jwsProtected, payload: jwsPayload, signature: 'dev-fake-signature' }, jwe: { header: protectedHeader } },
-        } as JobRequest;
+        const jwsProtectedRaw = Content.base64UrlSafeToJSON(jwsParts[0]) as Partial<JwsHeader>;
+        const jwsPayload = Content.base64UrlSafeToJSON(jwsParts[1]) as IDecodedDidcommPayload;
+        result.content = jwsPayload;
+        result.content.meta = { jws: { protected: { alg: jwsProtectedRaw.alg || 'none', kid: jwsProtectedRaw.kid || 'none' }, signature: 'dev-fake-signature' }, jwe: { header: protectedHeader } };
         
       } else {
         // --- 3. Response Flow: Payload is the content directly ---
         // This is a job response from the worker, where the payload is the response body itself.
-        return {
-          content: payload,
-          meta: { jwe: { header: protectedHeader } },
-        } as JobRequest;
+        result.content = payload as IDecodedDidcommPayload;
+        result.content.meta = { jwe: { header: protectedHeader } };
       }
 
     } else {
@@ -139,11 +148,12 @@ export class DemoKmsService implements IKmsService {
       try {
         const parsedMessage = JSON.parse(message);
         console.warn(`[DemoKmsService] Assuming simple JSON object for legacy flow.`);
-        return { content: parsedMessage } as JobRequest;
+        result.content = parsedMessage;
       } catch (e) {
         throw new Error('Message is not a valid simulated JWE or a plain JSON object.');
       }
     }
+    return result;
   }
 
   async encodeResponse(payload: any, recipientJwks: JWK[], senderId: string): Promise<string> {

@@ -9,7 +9,7 @@ import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 import { createJobName } from '../utils/naming';
 import { isRequestValid } from '../utils/request-validator';
 import { createOperationOutcome } from '../utils/outcome';
-import { JobRequest } from '../models/request';
+import { JobRequest } from '../models/confidential-job';
 import { DidService } from '../models/did';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { Content } from '../utils/content';
@@ -92,6 +92,9 @@ export function createApiRouter(
           } else {
             // The result is a JWE. Decrypt it to get the plaintext payload.
             const decodedResponse = await kmsService.decodeRequest(job.result);
+            if (!decodedResponse.content?.body) {
+              throw new Error('Decoded response from worker is missing expected content body.');
+            }
             // For legacy flows, respond with the decrypted content body using the original request's content type.
             res.set('Content-Type', job.contentType || 'application/json');
             res.status(200).json(decodedResponse.content.body);
@@ -256,7 +259,7 @@ export function createApiRouter(
    *           Location:
    *             schema: { type: string }
    *
-   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent:
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent/_batch:
    *   post:
    *     tags:
    *       - Communication and Updates to the Individual Index
@@ -279,7 +282,7 @@ export function createApiRouter(
    *       '202':
    *         description: Accepted.
    *
-   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication:
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication/_batch:
    *   post:
    *     tags:
    *       - Communication and Updates to the Individual Index
@@ -311,7 +314,7 @@ export function createApiRouter(
     try {
       // --- 1. Payload Handling & JobRequest Construction ---
       if (contentType.startsWith('application/x-www-form-urlencoded')) {
-        // ENCRYPTED FLOW
+        // ENCRYPTED FLOW (FAPI/JAR-style)
         if (!req.body.request) {
           const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, "Missing 'request' parameter in form-encoded body.");
           return res.status(400).json(outcome);
@@ -321,54 +324,86 @@ export function createApiRouter(
 
         // --- Signature Verification & Sender Key Resolution (Orchestrator Logic) ---
         // If the sender's public key is not embedded, we must resolve it and verify the signature now.
-        if (!decodedJob.meta?.jwe?.header?.jwk) {
+        if (!decodedJob.content?.meta?.jwe?.header?.jwk) {
           const senderDid = decodedJob.content?.iss;
-          const senderKeyId = decodedJob.meta?.jws?.protected?.kid;
-          const jwsToVerify = decodedJob.meta?.jws;
+          const jwsToVerify = decodedJob.content?.meta?.jws;
 
-          if (!senderDid || !senderKeyId || !jwsToVerify) {
+          if (!senderDid || !jwsToVerify || !jwsToVerify.protected || !jwsToVerify.signature || !jwsToVerify.protected.kid) {
             throw new Error("Secure request is missing 'iss', 'kid', or a valid JWS structure.");
           }
+          const senderSigningKeyId = jwsToVerify.protected.kid;
+          const senderEncryptionKeyId = decodedJob.content?.meta?.jwe?.header?.skid;
+          if (!senderEncryptionKeyId) {
+            throw new Error("Secure request is missing 'skid' in the JWE protected header.");
+          }
 
-          // 1. Determine the tenant vault from the issuer's DID.
-          const vaultId = getTenantVaultIdFromIss(senderDid);
-          if (!vaultId) {
-            throw new Error(`Could not determine vaultId for issuer DID: ${senderDid}`);
+          // 1. Determine the tenant vault from the request path (authoritative).
+          // Some legacy hosted DIDs do not encode `cds-XX/v1/{sector}` segments, so parsing the DID is not reliable.
+          const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
+          try {
+            const vaultIdFromDid = getTenantVaultIdFromIss(senderDid);
+            if (vaultIdFromDid !== vaultId) {
+              throw new Error(`Issuer DID does not belong to tenant. did=${senderDid} pathVault=${vaultId} didVault=${vaultIdFromDid}`);
+            }
+          } catch {
+            // Ignore: legacy DID formats are validated by path-based routing instead.
+          }
+          const collectionName = await tenantsCacheManager.getCollectionName(vaultId);
+          if (!collectionName) {
+            throw new Error(`Could not resolve collectionName for vaultId '${vaultId}'`);
           }
           
           // 2. Protect query parameters using HMAC (Secure Query Pattern).
           const protectedAttrName = await kmsService.getHmacBase64Url('kid', vaultId);
-          const protectedAttrValue = await kmsService.getHmacBase64Url(senderKeyId, vaultId);
+          const protectedAttrValue = await kmsService.getHmacBase64Url(senderSigningKeyId, vaultId);
 
           // 3. Query the vault for the sender's encrypted document.
-          const queryResult = await vaultRepository.query(vaultId, {
+          // Prefer the tenant's physical collectionName, but fall back to legacy vaultId storage.
+          let queryResult = await vaultRepository.query(collectionName, {
             sectionId: 'employees', // Employees are the primary actors who can sign.
-            where: [{ attribute: protectedAttrName, equals: protectedAttrValue }],
+            where: [{ name: protectedAttrName, value: protectedAttrValue }],
           });
-
           if (!queryResult || queryResult.length === 0) {
-            throw new Error(`Could not find an entity with key ID '${senderKeyId}' in vault '${vaultId}'.`);
+            queryResult = await vaultRepository.query(vaultId, {
+              sectionId: 'employees',
+              where: [{ name: protectedAttrName, value: protectedAttrValue }],
+            });
+          }
+          if (!queryResult || queryResult.length === 0) {
+            throw new Error(`Could not find an entity with key ID '${senderSigningKeyId}' in vault '${vaultId}'.`);
           }
 
           // 4. Unprotect the document to get the sender's full config.
           const employeeDoc = queryResult[0];
           const employeeConfig = await kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
 
-          // 5. Find the specific public key that matches the key ID.
-          const verificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
-            (vm: VerificationMethod) => vm.id.endsWith(`#${senderKeyId}`)
+          // 5. Find the specific public keys that match the key IDs.
+          const signingVerificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
+            (vm: VerificationMethod) => vm.id.endsWith(`#${senderSigningKeyId}`)
           );
-          const senderPublicKey = verificationMethod?.publicKeyJwk;
+          const encryptionVerificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
+            (vm: VerificationMethod) => vm.id.endsWith(`#${senderEncryptionKeyId}`)
+          );
+          const senderSigningKey = signingVerificationMethod?.publicKeyJwk;
+          const senderEncryptionKey = encryptionVerificationMethod?.publicKeyJwk;
           
-          if (!senderPublicKey) {
-            throw new Error(`Key ID '${senderKeyId}' not found in resolved DID document for '${senderDid}'.`);
+          if (!senderSigningKey) {
+            throw new Error(`Signing key ID '${senderSigningKeyId}' not found in resolved DID document for '${senderDid}'.`);
+          }
+          if (!senderEncryptionKey) {
+            throw new Error(`Encryption key ID '${senderEncryptionKeyId}' not found in resolved DID document for '${senderDid}'.`);
           }
 
           // 6. Verify the JWS signature.
+          // The cryptographic `meta` field is added by the server after decryption and is not part of the signed payload.
+          const signedPayload = { ...(decodedJob.content as any) };
+          delete (signedPayload as any).meta;
+          const protectedHeaderB64Url = Content.objectToRawBase64UrlSafe(jwsToVerify.protected);
+          const detachedJws = `${protectedHeaderB64Url}..${jwsToVerify.signature}`;
           const isValid = await cryptographyService.verifyDetachedJws(
-            Content.stringToBytesUTF8(`${jwsToVerify.protected}.${jwsToVerify.payload}`),
-            jwsToVerify.signature,
-            senderPublicKey
+            Content.objectToBytes(signedPayload),
+            detachedJws,
+            senderSigningKey
           );
           if (!isValid) {
             throw new Error('Invalid signature.');
@@ -376,45 +411,63 @@ export function createApiRouter(
 
           // 7. Enrich the job request with the resolved & verified key for the worker.
           // The worker needs this to encrypt the response.
-          if (decodedJob.meta?.jwe?.header) {
-            decodedJob.meta.jwe.header.jwk = senderPublicKey as JWK;
+          if (decodedJob.content?.meta?.jwe?.header) {
+            decodedJob.content.meta.jwe.header.jwk = senderEncryptionKey as JWK;
           }
         }
         
-        jobRequest = { ...req.params, ...decodedJob };
+        // Path parameters are authoritative for routing and must override any values embedded in the payload.
+        jobRequest = {
+          ...decodedJob,
+          ...req.params,
+          contentType: contentType,
+        };
 
-      } else if (contentType.startsWith('application/json') || contentType.startsWith('application/fhir+json')) {
-        // LEGACY / UNENCRYPTED FLOW
+      } else if (
+        contentType.startsWith('application/didcomm-plaintext+json') ||
+        contentType.startsWith('application/json') ||
+        contentType.startsWith('application/fhir+json')
+      ) {
+        // LEGACY / PLAINTEXT FLOW (demo/dev convenience)
         const authToken = req.headers.authorization;
         // The 'ping' endpoint is a public health check and does not require authentication for legacy requests.
         if (section !== 'ping' && (!authToken || !authToken.startsWith('Bearer '))) {
           const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Missing or invalid Bearer token.');
           return res.status(401).json(outcome);
         }
+
         // TODO: Implement actual token validation (e.g., call a verifier like GoogleTokenVerifier).
         // For now, any Bearer token is accepted in non-production environments.
         if (process.env.NODE_ENV === 'production') {
-            // In production, we would validate the token here.
-            // const isValid = await verifyToken(authToken.split(' ')[1]);
-            // if (!isValid) {
-            //   return res.status(401).json(createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Invalid Bearer token.'));
-            // }
+          // In production, we would validate the token here.
+          // const isValid = await verifyToken(authToken.split(' ')[1]);
+          // if (!isValid) {
+          //   return res.status(401).json(createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Invalid Bearer token.'));
+          // }
         }
 
-        jobRequest = { 
-          ...req.params, 
-          content: req.body, 
-          contentType: contentType, // <-- Ensure contentType is passed in legacy flow
-          meta: { 
-            bearer: { 
-              token: authToken,
-              // TODO: This structure should be populated by a real JWT verification function
-              // that decodes the token. For now, we use placeholders.
-              jwt: { header: {alg: "", kid: ""}, payload: {} } 
-            } 
-          }
-        };
+        const legacyBody = req.body || {};
+        const legacyMeta = legacyBody?.meta || {};
 
+        jobRequest = {
+          ...req.params,
+          id: '', // Will be filled later if needed, but needs to exist
+          sequence: 0,
+          status: 'DRAFT' as any, // TODO: fix this any
+          createdAtTimestamp: Date.now(),
+          content: {
+            ...legacyBody,
+            meta: {
+              ...legacyMeta,
+              bearer: {
+                token: authToken,
+                // TODO: This structure should be populated by a real JWT verification function.
+                jwt: { header: { alg: '', kid: '' }, payload: {} },
+              },
+            },
+          },
+          contentType: contentType,
+        };
       } else {
         const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotSupported, `Unsupported Content-Type: ${contentType}`);
         return res.status(415).json(outcome);
@@ -426,7 +479,10 @@ export function createApiRouter(
     }
 
     // --- 2. Transaction ID Validation ---
-    const thid = jobRequest.content?.thid || jobRequest.content?.id;
+    // Ensure contentType is always present for downstream handling (e.g. worker response encryption paths).
+    (jobRequest as any).contentType = (jobRequest as any).contentType || contentType;
+
+    const thid = jobRequest.content?.thid;
     if (!thid) {
       const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Request body must contain a "thid" or "id" property.');
       return res.status(400).json(outcome);

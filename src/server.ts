@@ -53,21 +53,28 @@ import { HostingManager } from './managers/HostingManager';
 import { TenantsCacheManager } from './managers/TenantsCacheManager';
 import { EmployeeManager } from './managers/EmployeeManager';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from './models/schemaorg';
-import { CustomerManager } from './managers/CustomerManager';
+import { IndividualManager } from './managers/IndividualManager';
 import { CredentialManager } from './managers/CredentialManager';
 import { CompositionManager } from './managers/CompositionManager';
 import { BlockchainAdapterMem } from './adapters/BlockchainAdapterMem';
 import { createNetworkRouter } from './routes/network';
+import { createWebhooksRouter } from './routes/webhooks';
 import { IBlockchainAdapter } from './adapters/IBlockchainAdapter';
 import { CommunicationManager } from './managers/CommunicationManager';
+import { DeviceRegistrationManager } from './managers/DeviceRegistrationManager';
 import { IAuthorizationManager } from './managers/auth/IAuthorizationManager';
 import { createFhirRouter } from './routes/fhir';
-import { AuthorizationManager } from './managers/AuthorizationManager';
-import { createOperationOutcome } from './utils/outcome';
-import { IssueLevel, IssueType } from './models/fhir/codes';
+import { createGlobalErrorHandler } from './middlewares/global-error-handler';
 import * as path from 'path';
 import { generateTenantCollectionNameFromClaims } from './utils/tenant';
 import * as swaggerUi from 'swagger-ui-express';
+import { LicenseManager } from './managers/LicenseManager';
+import { TokenManager } from './managers/TokenManager';
+import { DemoTokenVerifier } from './auth/DemoTokenVerifier';
+import { createAuthRouter } from './routes/auth';
+import { SmartAuthorizationManager } from './managers/auth/SmartAuthorizationManager';
+import { AppAuthorizationManager } from './managers/AppAuthorizationManager';
+import { FamilyManager } from './managers/FamilyManager';
 
 // Load the pre-generated swagger spec. This is the static base.
 let swaggerSpec: any;
@@ -141,6 +148,7 @@ function getConfig(): IServerConfig {
       apiBaseUrl: apiBaseUrl, // Use the definitive URL here
       namespace: process.env.URN_NAMESPACE || 'antifraud',
       sectorsAllowed: parseAndValidateSectors(process.env.SECTORS_ALLOWED),
+  allowedPaymentMethods: (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(','),
       dbProvider: process.env.DB_PROVIDER || 'mem',
       storageProvider: process.env.STORAGE_PROVIDER || 'mem',
       queueProvider: process.env.QUEUE_PROVIDER || 'mem',
@@ -203,6 +211,8 @@ async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServer
 interface StartServerOptions {
   testMiddlewares?: express.RequestHandler[];
   authManager?: IAuthorizationManager;
+  /** When false, builds the app without binding a TCP port (sandbox-safe for tests). */
+  listen?: boolean;
 }
 
 /**
@@ -305,7 +315,7 @@ async function startServer(options?: StartServerOptions) {
 
   const blockchainAdapter: IBlockchainAdapter = new BlockchainAdapterMem();
 
-  const customerManager = new CustomerManager(
+  const individualManager = new IndividualManager(
     vaultRepository,
     kmsService,
     tenantManager,
@@ -314,8 +324,29 @@ async function startServer(options?: StartServerOptions) {
     config.namespace,
   );
 
+  const familyManager = new FamilyManager(
+    vaultRepository,
+    kmsService,
+    tenantManager,
+    storageAdapter,
+    logger,
+    config,
+  );
+
   const compositionManager = new CompositionManager();
   const communicationManager = new CommunicationManager({ tenantsCacheManager: tenantManager });
+  const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl);
+  const licenseManager = new LicenseManager(vaultRepository);
+
+  // --- Auth Flow Dependencies ---
+  const tokenVerifier = new DemoTokenVerifier();
+  const appAuthManager = new AppAuthorizationManager(
+    vaultRepository,
+    tokenVerifier,
+    kmsService,
+    cryptographyService
+  );
+  const tokenManager = new TokenManager(kmsService, tenantManager);
 
   const discoveryService = new DiscoveryService(tenantManager);
 
@@ -333,47 +364,46 @@ async function startServer(options?: StartServerOptions) {
   const managerRegistry: ManagerRegistry = {
     hostingManager,
     tenantManager,
+    familyManager,
     employeeManager,
-    customerManager,
+    individualManager,
     compositionManager,
     communicationManager,
+    deviceRegistrationManager,
+    licenseManager,
+    // tokenManager is NOT a worker job processor and is not included here
   };
   const worker = new Worker(managerRegistry, config.apiBaseUrl, kmsService);
   const asyncResponseStore = new AsyncResponseStoreMem();
   const queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
-  const authManager = options?.authManager || new AuthorizationManager();
+  
+  // This is the FHIR-specific AuthorizationManager, not our AppAuthorizationManager.
+  const authManager: IAuthorizationManager = options?.authManager || new SmartAuthorizationManager();
 
   const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService, kmsService, logger);
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService, config.apiBaseUrl);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);
+  const webhooksRouter = createWebhooksRouter(queueAdapter);
+  const authRouter = createAuthRouter(appAuthManager, tokenManager);
   app.use('/', discoveryRouter);
   app.use('/', apiRouter);
   app.use('/', networkRouter);
   app.use('/', fhirRouter);
+  app.use('/webhooks', webhooksRouter);
+  app.use('/auth', authRouter);
 
   // --- Global Error Handling Middleware (MUST be the LAST middleware) ---
-  // This captures errors thrown by synchronous middleware (like body-parser for invalid JSON)
-  // or errors passed via next(error) in async routes.
-  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    // Check if the error is a SyntaxError from body-parser
-    if (err instanceof SyntaxError && 'body' in err) {
-      logger.error('Malformed JSON received', err, { path: req.path, method: req.method });
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Invalid, `Malformed JSON in request body: ${err.message}`);
-      return res.status(400).json(outcome);
-    }
-
-    // Handle other unexpected errors
-    logger.error('An unexpected error occurred in the global error handler', err, { path: req.path, method: req.method });
-    const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'An unexpected internal server error occurred.');
-    res.status(500).json(outcome);
-  });
+  app.use(createGlobalErrorHandler(logger));
 
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-  const server = app.listen(config.port, () => {
-    // console.log(`[GW-API ${config.nodeEnv} Server running on ${config.apiBaseUrl}`);
-  });
+  const server =
+    options?.listen === false
+      ? undefined
+      : app.listen(config.port, () => {
+          // console.log(`[GW-API ${config.nodeEnv} Server running on ${config.apiBaseUrl}`);
+        });
 
   return { app, server, queueAdapter, tenantManager, vaultRepository, cryptographyService, blockchainAdapter, kmsService };
 }

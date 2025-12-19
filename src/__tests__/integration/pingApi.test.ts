@@ -2,7 +2,6 @@ import { CryptographyService } from '../../crypto/CryptographyService';// src/__
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
-import request from 'supertest';
 import { createApiRouter } from '../../routes/api';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
@@ -12,11 +11,12 @@ import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async
 import { StoredJob } from '../../adapters/async-response-store.mem';
 import { decodedPingMessage, testEncryptedJwePing, decodedTenantPingMessage } from '../data/ping.data';
 import { testCompletedJob, testPendingJob } from '../data/async-response.data';
-import { createDidServiceId } from '../../utils/did';
+import { createDidServiceIdBase } from '../../utils/did';
 import { IssueType } from '../../models/fhir/codes';
-import { JobRequest } from '../../models/request';
+import { JobRequest } from '../../models/confidential-job';
 import { DidService } from '../../models/did';
 import { Content } from '../../utils/content';
+import { invokeExpress } from './helpers/invokeExpress';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -55,7 +55,7 @@ describe('Ping API Endpoint', () => {
   });
 
   const pingServiceConfig: DidService = {
-    id: createDidServiceId({ version: 'v1', sector: 'test', section: 'ping', format: 'standard' }),
+    id: createDidServiceIdBase({ version: 'v1', sector: 'test', section: 'ping', format: 'standard' }),
     type: 'ApiService',
     serviceEndpoint: 'resource',
     actions: ['_batch'],
@@ -71,23 +71,29 @@ describe('Ping API Endpoint', () => {
       jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue([pingServiceConfig]);
       
       const mockDecodedJob: JobRequest = {
-        content: decodedPingMessage,
-        meta: {
-          jws: {
-            protected: {
-              alg: 'ML-DSA-44',
-              kid: 'did:web:some-issuer#key-1',
+        id: 'mock-job-id',
+        status: 'DRAFT' as any,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        content: {
+          ...decodedPingMessage,
+          meta: {
+            jws: {
+              protected: {
+                alg: 'ML-DSA-44',
+                kid: 'did:web:some-issuer#key-1',
+              },
             },
-          },
-          jwe: {
-            header: {
-              skid: 'did:web:some-issuer#enc-key-1',
-              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+            jwe: {
+              header: {
+                skid: 'did:web:some-issuer#enc-key-1',
+                jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+              }
+            },
+            bearer: {
+              jwt: { payload: { email: 'ping@test.com' } },
             }
           },
-          bearer: {
-            jwt: { payload: { email: 'ping@test.com' } },
-          }
         },
         tenantId: 'host',
         resourceType: 'resource',
@@ -102,10 +108,12 @@ describe('Ping API Endpoint', () => {
       const expectedPollingUrl = `http://testhost.com${pingUrl.replace('/_batch', '/_batch-response')}`;
 
       // --- Act ---
-      const response = await request(app)
-        .post(pingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`request=${testEncryptedJwePing}`);
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: pingUrl,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { request: testEncryptedJwePing },
+      });
         
       // --- Assert ---
       expect(response.status).toBe(202);
@@ -130,23 +138,29 @@ describe('Ping API Endpoint', () => {
       jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue([pingServiceConfig]);
 
       const mockDecodedJob: JobRequest = {
-        content: decodedTenantPingMessage,
-        meta: {
-          jws: {
-            protected: {
-              alg: 'ML-DSA-44',
-              kid: 'did:web:some-issuer#key-1',
+        id: 'mock-job-id-2',
+        status: 'DRAFT' as any,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        content: {
+          ...decodedTenantPingMessage,
+          meta: {
+            jws: {
+              protected: {
+                alg: 'ML-DSA-44',
+                kid: 'did:web:some-issuer#key-1',
+              },
             },
-          },
-          jwe: {
-            header: {
-              skid: 'did:web:some-issuer#enc-key-1',
-              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+            jwe: {
+              header: {
+                skid: 'did:web:some-issuer#enc-key-1',
+                jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+              }
+            },
+            bearer: {
+              jwt: { payload: { email: 'ping@test.com' } },
             }
           },
-          bearer: {
-            jwt: { payload: { email: 'ping@test.com' } },
-          }
         },
         tenantId: 'acme',
         resourceType: 'resource',
@@ -160,10 +174,12 @@ describe('Ping API Endpoint', () => {
       const expectedPollingUrl = `http://testhost.com${pingUrl.replace('/_batch', '/_batch-response')}`;
 
       // --- Act ---
-      const response = await request(app)
-        .post(pingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`request=${testEncryptedJwePing}`);
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: pingUrl,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { request: testEncryptedJwePing },
+      });
 
       // --- Assert ---
       expect(response.status).toBe(202);
@@ -186,13 +202,16 @@ describe('Ping API Endpoint', () => {
         jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue(undefined);
         const pingUrl = '/nonexistent-tenant/cds-xx/v1/test/ping/standard/resource/_batch';
 
-        const response = await request(app)
-          .post(pingUrl)
-          .set('Content-Type', 'application/x-www-form-urlencoded')
-          .send(`request=${testEncryptedJwePing}`);
+        const response = await invokeExpress(app, {
+          method: 'POST',
+          url: pingUrl,
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: { request: testEncryptedJwePing },
+        });
 
         expect(response.status).toBe(404);
-        expect(response.body.issue[0].code).toBe(IssueType.NotFound);
+        const outcome = JSON.parse(response.text);
+        expect(outcome.issue[0].code).toBe(IssueType.NotFound);
         expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
       });
 
@@ -202,10 +221,12 @@ describe('Ping API Endpoint', () => {
         jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue([]);
         const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
 
-        const response = await request(app)
-          .post(pingUrl)
-          .set('Content-Type', 'application/x-www-form-urlencoded')
-          .send(`request=${testEncryptedJwePing}`);
+        const response = await invokeExpress(app, {
+          method: 'POST',
+          url: pingUrl,
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: { request: testEncryptedJwePing },
+        });
 
         expect(response.status).toBe(404);
         expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
@@ -225,10 +246,12 @@ describe('Ping API Endpoint', () => {
       const expectedPollingUrl = `http://testhost.com${pingUrl.replace('/_batch', '/_batch-response')}`;
   
       // --- Act ---
-      const response = await request(app)
-        .post(pingUrl)
-        .set('Content-Type', 'application/json')
-        .send(decodedPingMessage); // Send the raw JSON payload
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: pingUrl,
+        headers: { 'content-type': 'application/json' },
+        body: decodedPingMessage,
+      });
         
       // --- Assert ---
       expect(response.status).toBe(202);
@@ -241,7 +264,7 @@ describe('Ping API Endpoint', () => {
       
       // CRITICAL: Verify the contentType is set correctly for the worker
       expect(jobRequest.contentType).toBe('application/json');
-      expect(jobRequest.content).toEqual(decodedPingMessage);
+      expect(jobRequest.content).toEqual(expect.objectContaining(decodedPingMessage));
     });
   });
 
@@ -254,10 +277,12 @@ describe('Ping API Endpoint', () => {
       asyncResponseStore.set(thid, testCompletedJob);
       const { app } = setupApp(asyncResponseStore);
 
-      const response = await request(app)
-        .post(pollingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`thid=${thid}`);
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: pollingUrl,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { thid },
+      });
 
       expect(response.status).toBe(200);
       expect(response.headers['content-type']).toMatch(/application\/x-www-form-urlencoded/);
@@ -269,13 +294,16 @@ describe('Ping API Endpoint', () => {
       asyncResponseStore.set(thid, testPendingJob);
       const { app } = setupApp(asyncResponseStore);
 
-      const response = await request(app)
-        .post(pollingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`thid=${thid}`);
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: pollingUrl,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { thid },
+      });
 
       expect(response.status).toBe(202);
-      expect(response.body.status).toBe('PENDING');
+      const payload = JSON.parse(response.text);
+      expect(payload.status).toBe('PENDING');
     });
 
     it('should return 200 OK with a JSON result if the original job was legacy JSON', async () => {
@@ -305,15 +333,17 @@ describe('Ping API Endpoint', () => {
       const { app } = setupApp(asyncResponseStore);
       
       // --- Act ---
-      const response = await request(app)
-        .post(pollingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`thid=${thid}`);
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: pollingUrl,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { thid },
+      });
 
       // --- Assert ---
       expect(response.status).toBe(200);
       expect(response.headers['content-type']).toMatch(/application\/json/);
-      expect(response.body).toEqual({ ping: 'pong' });
+      expect(JSON.parse(response.text)).toEqual({ ping: 'pong' });
     });
   });
 });

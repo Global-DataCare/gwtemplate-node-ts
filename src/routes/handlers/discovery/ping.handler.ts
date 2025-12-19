@@ -1,11 +1,12 @@
 // src/routes/handlers/discovery/ping.handler.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { v4 as uuidv4 } from 'uuid';
 import { Request, Response } from 'express';
 import { createOperationOutcome } from '../../../utils/outcome';
 import { compactJWT } from '../../../utils/jwt';
 import { convertPrimaryDocToFhirBundle } from '../../../utils/jsonapi';
-import { IPayloadResponse } from '../../../models/response';
+import { IDecodedDidcommPayload, IPayloadResponse } from '../../../models/confidential-message';
 import { IssueLevel, IssueType } from '../../../models/fhir/codes';
 
 /**
@@ -54,6 +55,8 @@ export const pingHandler = () => async (req: Request, res: Response) => {
             // The issuer MUST be derived from the Host header to match the client's expectation.
             const issuerDid = `did:web:${getEncodedHostFromRequest(req)}`;
             const responsePayload: IPayloadResponse = {
+                jti: uuidv4(),
+                type: 'ping-response',
                 thid: `ping-${Date.now()}`,
                 iss: issuerDid,
                 aud: 'anonymous',

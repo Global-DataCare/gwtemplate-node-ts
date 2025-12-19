@@ -31,11 +31,13 @@ export class ListManager {
 
     const listDocument: RecordBase & { claims: any; '@context': string; '@type': string; entry: any[] } = {
       id: listId,
-      vaultId: input.vaultId,
       '@context': input.payload['@context'],
       '@type': input.payload['@type'],
       claims: normalizedClaims,
       entry: [],
+      meta: {
+        lastUpdated: new Date().toISOString(),
+      },
     };
 
     await this.vaultRepository.put(input.vaultId, [listDocument], 'lists');

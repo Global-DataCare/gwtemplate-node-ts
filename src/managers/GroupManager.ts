@@ -31,7 +31,6 @@ export class GroupManager {
 
     const groupDocument: RecordBase & { claims: any; '@context': string; '@type': string } = {
       id: groupId,
-      vaultId: input.vaultId,
       '@context': input.payload['@context'],
       '@type': input.payload['@type'],
       claims: normalizedClaims,
@@ -45,4 +44,3 @@ export class GroupManager {
     return groupDocument;
   }
 }
-

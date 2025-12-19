@@ -19,15 +19,14 @@ describe('populateDidDocumentServices', () => {
 
     // --- Assert ---
     // Multiplexing check: 
-    // Total Business Services = 34 (14 entity + 14 individual + 2 PersonDiscovery + 2 NetworkEnrollment)
-    // Total services = 34 (business) + 2 (well-known) = 36
-    expect(allServices).toHaveLength(36);
+    // Total multiplexed services = 21 (18 business + 2 network + 1 dcr) + 2 (well-known) = 23
+    expect(allServices).toHaveLength(23);
 
     const wellKnownService = allServices.find(s => s.id === `${did}#jwks`);
     expect(wellKnownService).toBeDefined();
     expect(wellKnownService!.serviceEndpoint).toBe('https://gateway.com/acme/cds-es/v1/health-care/jwks.json');
 
-    const employeeService = allServices.find(s => s.id.endsWith('#v1:health-care:entity:org-schema:employee:_batch'));
+    const employeeService = allServices.find(s => s.id.endsWith('#v1:health-care:entity:org.schema:employee:_batch'));
     expect(employeeService).toBeDefined();
     expect(employeeService!.serviceEndpoint).toBe('https://gateway.com/acme/cds-es/v1/health-care/entity/org.schema/Employee/_batch');
   });
@@ -43,15 +42,14 @@ describe('populateDidDocumentServices', () => {
     const allServices = populateDidDocumentServices(did, baseUrl, businessConfig, false, tenantContext);
 
     // --- Assert ---
-    // Multiplexing check: (Same as above) = 30 services
-    // Total services = 34 (business) + 2 (well-known) = 36
-    expect(allServices).toHaveLength(36);
+    // Total multiplexed services = 21 (18 business + 2 network + 1 dcr) + 2 (well-known) = 23
+    expect(allServices).toHaveLength(23);
 
     const wellKnownService = allServices.find(s => s.id === `${did}#jwks`);
     expect(wellKnownService).toBeDefined();
     expect(wellKnownService!.serviceEndpoint).toBe('https://api.acme-health.com/jwks.json');
 
-    const employeeService = allServices.find(s => s.id.endsWith('#v1:health-care:entity:org-schema:employee:_batch'));
+    const employeeService = allServices.find(s => s.id.endsWith('#v1:health-care:entity:org.schema:employee:_batch'));
     expect(employeeService).toBeDefined();
     expect(employeeService!.serviceEndpoint).toBe('https://api.acme-health.com/entity/org.schema/Employee/_batch');
   });

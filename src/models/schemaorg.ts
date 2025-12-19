@@ -41,6 +41,22 @@ export enum ClaimsOrganizationSchemaorg {
     email = "org.schema.Organization.email",
     /** Public contact phone */
     telephone = "org.schema.Organization.telephone",
+    numberOfEmployees = "org.schema.Organization.numberOfEmployees.value" // to purchase licenses for device profile's activation
+}
+
+export enum ClaimsOfferSchemaorg {
+    acceptedPaymentMethod = "org.schema.Offer.acceptedPaymentMethod",
+    category = "org.schema.Offer.category",
+    checkoutPageURLTemplate = "org.schema.Offer.checkoutPageURLTemplate",
+    eligibleCustomerType = "org.schema.Offer.eligibleCustomerType",
+    eligibleQuantityValue = "org.schema.Offer.eligibleQuantity.value",
+    identifier = "org.schema.Offer.identifier",
+    itemOfferedName = "org.schema.Offer.itemOffered.name",
+    itemOfferedSku = "org.schema.Offer.itemOffered.sku",
+    offeredBy = "org.schema.Offer.offeredBy",
+    price = "org.schema.Offer.price",
+    priceCurrency = "org.schema.Offer.priceCurrency",
+    serialNumber = "org.schema.Offer.serialNumber",
 }
 
 /** For Employees (and Employee Role, but no PII) and customers / related persons.

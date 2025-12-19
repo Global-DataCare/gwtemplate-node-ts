@@ -61,6 +61,66 @@ export const processResponseModesClaim = (claim: string | undefined): string => 
   return `${propertyId}|${finalModes.join(',')}`;
 };
 
+export function sortClaimsAlphabetically<T extends Record<string, any>>(claims: T): T {
+  const sortedKeys = Object.keys(claims).sort((a, b) => a.localeCompare(b));
+  const sorted: Record<string, any> = {};
+  for (const key of sortedKeys) sorted[key] = claims[key];
+  return sorted as T;
+}
+
+export function getClaimValue<T = any>(claims: Record<string, any>, key: string): T | undefined {
+  if (claims[key] !== undefined) return claims[key] as T;
+
+  const context = claims['@context'];
+  if (typeof context === 'string' && context.length > 0) {
+    const prefixedKey = context.endsWith('.') ? `${context}${key}` : `${context}.${key}`;
+    if (claims[prefixedKey] !== undefined) return claims[prefixedKey] as T;
+  }
+
+  return undefined;
+}
+
+/**
+ * Normalizes a claims object where `@context` defines the namespace prefix (e.g., `org.schema`)
+ * and clients may send "contextualized" keys without that prefix (e.g., `Offer.identifier`).
+ *
+ * Normalization rules:
+ * - Keep `@context`/`@type` and interoperable fully-qualified claims as-is.
+ * - For any other key that doesn't start with the context prefix, prepend `${@context}.`.
+ * - Return a new object with keys sorted alphabetically (stable canonicalization).
+ */
+export function normalizeContextualizedClaims(rawClaims: Record<string, any>): Record<string, any> {
+  const context = rawClaims?.['@context'];
+  if (typeof context !== 'string' || context.trim().length === 0) {
+    return sortClaimsAlphabetically({ ...(rawClaims || {}) });
+  }
+
+  const trimmedContext = context.trim();
+  const prefix = trimmedContext.endsWith('.') ? trimmedContext : `${trimmedContext}.`;
+
+  const normalized: Record<string, any> = {};
+  for (const key of Object.keys(rawClaims)) {
+    if (key === '@context' || key === '@type') {
+      normalized[key] = rawClaims[key];
+      continue;
+    }
+
+    const lowerKey = key.toLowerCase();
+    const isInteroperable = knownDomainsReversed.some((domain) => lowerKey.startsWith(`${domain}.`));
+    if (isInteroperable || key.startsWith(prefix)) {
+      normalized[key] = rawClaims[key];
+      continue;
+    }
+
+    const normalizedKey = `${prefix}${key}`;
+    if (normalized[normalizedKey] === undefined) {
+      normalized[normalizedKey] = rawClaims[key];
+    }
+  }
+
+  return sortClaimsAlphabetically(normalized);
+}
+
 
 /**
  * Normalizes a raw claims object from a client application.

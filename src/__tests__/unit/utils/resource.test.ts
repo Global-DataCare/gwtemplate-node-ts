@@ -60,4 +60,3 @@ describe('determineResourceId', () => {
         expect(uuidv4).not.toHaveBeenCalled();
     });
 });
-

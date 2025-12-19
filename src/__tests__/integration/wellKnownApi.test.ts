@@ -2,7 +2,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
-import request from 'supertest';
 import { createDiscoveryRouter } from '../../routes/discovery';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { DiscoveryService } from '../../services/DiscoveryService';
@@ -12,6 +11,7 @@ import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../model
 import { IKmsService } from '../../crypto/interfaces/IKmsService';
 import { parseTenantUrn } from '../../utils/urn';
 import { ILogger } from '../../loggers/ILogger';
+import { invokeExpress } from './helpers/invokeExpress';
 
 jest.mock('../../managers/TenantsCacheManager');
 
@@ -32,6 +32,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   decodeRequest: jest.fn(),
   signWithManagedKey: jest.fn(),
   signWithReconstructedKey: jest.fn(),
+  createDetachedJws: jest.fn(),
   encodeResponse: jest.fn(),
   protectConfidentialData: jest.fn(),
   unprotectConfidentialData: jest.fn(),
@@ -82,12 +83,12 @@ describe('Well-Known DID Discovery API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue(expectedDidDoc);
 
     // --- Act ---
-    const response = await request(app).get(expectedUrl);
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
 
     // --- Assert ---
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toMatch(/application\/json/);
-    expect(response.body).toEqual(expectedDidDoc);
+    expect(JSON.parse(response.text)).toEqual(expectedDidDoc);
     
     // Verify the middleware and the service handler used the correctly constructed vaultId to find the tenant.
     expect(mockTenantsCacheManager.getDidDocument).toHaveBeenCalledWith(testTenant1VaultId);
@@ -114,12 +115,12 @@ describe('Well-Known JWKS Discovery API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
 
     // --- Act ---
-    const response = await request(app).get(expectedUrl);
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
 
     // --- Assert ---
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toMatch(/application\/json/);
-    expect(response.body).toEqual(expectedJwks);
+    expect(JSON.parse(response.text)).toEqual(expectedJwks);
     expect(mockKmsService.getPublicJwks).toHaveBeenCalledWith('host');
   });
 
@@ -134,11 +135,11 @@ describe('Well-Known JWKS Discovery API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
 
     // --- Act ---
-    const response = await request(app).get(expectedUrl);
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
 
     // --- Assert ---
     expect(response.status).toBe(200);
-    expect(response.body).toEqual(expectedJwks);
+    expect(JSON.parse(response.text)).toEqual(expectedJwks);
     expect(mockKmsService.getPublicJwks).toHaveBeenCalledWith(testTenant1VaultId);
   });
 });
@@ -175,22 +176,22 @@ describe('Well-Known Legal Participant VC API', () => {
     });
 
     // --- Act ---
-    const response = await request(app).get('/host/.well-known/legal-participant.vc.json');
+    const response = await invokeExpress(app, { method: 'GET', url: '/host/.well-known/legal-participant.vc.json' });
 
     // --- Assert ---
     expect(response.status).toBe(200);
-    expect(response.body).toBeInstanceOf(Object);
-    expect(response.body.type).toContain('gx:LegalParticipant');
-    expect(response.body.issuer).toBe('did:web:host');
-    expect(response.body.credentialSubject.id).toBe('did:web:host');
+    const parsed = JSON.parse(response.text);
+    expect(parsed).toBeInstanceOf(Object);
+    expect(parsed.type).toContain('gx:LegalParticipant');
+    expect(parsed.issuer).toBe('did:web:host');
+    expect(parsed.credentialSubject.id).toBe('did:web:host');
     
     // Check for the presence of a valid-looking proof
-    expect(response.body.proof).toBeDefined();
-    expect(response.body.proof.type).toBe('JsonWebSignature2020');
-    expect(response.body.proof.proofValue).toContain('dummySignature');
+    expect(parsed.proof).toBeDefined();
+    expect(parsed.proof.type).toBe('JsonWebSignature2020');
+    expect(parsed.proof.proofValue).toContain('dummySignature');
     
     expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith('host');
     expect(mockKmsService.signWithManagedKey).toHaveBeenCalled();
   });
 });
-

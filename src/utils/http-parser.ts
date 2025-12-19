@@ -2,7 +2,8 @@
 // File: src/utils/http-parser.ts
 
 import { URL } from 'url';
-import { DataInRequest } from '../models/request'; // Import from the new central model file
+import { JobProcessingInfo, JobRequest, JobStatus } from '../models/confidential-job'; // Import from the new central model file
+import { v4 as uuidv4 } from 'uuid';
 
 // --- Helper Functions ---
 
@@ -50,7 +51,7 @@ export function extractHttpRequestDataAsJson(
   input: any,
   contentType: string,
   httpMethod: string
-): DataInRequest {
+): JobRequest {
   const urlObj = new URL(url, 'http://localhost'); // Base is required for parsing
   const pathParts = urlObj.pathname.split('/').filter(part => part);
 
@@ -68,7 +69,11 @@ export function extractHttpRequestDataAsJson(
     throw new Error('Invalid action format. Must start with an underscore (_).');
   }
 
-  const requestData: DataInRequest = {
+  const requestData: JobRequest = {
+    id: uuidv4(),
+    status: JobStatus.DRAFT,
+    sequence: 0,
+    createdAtTimestamp: Date.now(),
     requestUrl: url,
     httpMethod: httpMethod.toUpperCase(),
     content: input,

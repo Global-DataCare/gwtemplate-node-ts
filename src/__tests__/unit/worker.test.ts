@@ -5,31 +5,31 @@ import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { Worker } from '../../worker';
 import { IJobProcessor, ManagerRegistry } from '../../managers/registry';
-import { JobRequest } from '../../models/request';
+import { JobRequest } from '../../models/confidential-job';
 import { testCreateCustomerJobRequestProfessionalOnboarding } from '../data/customer-onboarding.data';
 import { createJobName } from '../../utils/naming';
 import { IKmsService } from '../../crypto/interfaces/IKmsService';
-import { IPayloadResponse } from '../../models/response';
+import { IDecodedDidcommPayload, IPayloadResponse } from '../../models/confidential-message';
 
 describe('Worker', () => {
   let worker: Worker;
   let mockManagerRegistry: MockProxy<ManagerRegistry>;
-  let mockCustomerManager: MockProxy<IJobProcessor>;
+  let mockIndividualManager: MockProxy<IJobProcessor>;
   let mockKmsService: MockProxy<IKmsService>;
   const API_BASE_URL = 'https://api.example.com';
 
   beforeEach(() => {
-    mockCustomerManager = mock<IJobProcessor>();
+    mockIndividualManager = mock<IJobProcessor>();
     mockKmsService = mock<IKmsService>();
     mockManagerRegistry = mock<ManagerRegistry>({
-      customerManager: mockCustomerManager,
+      individualManager: mockIndividualManager,
     });
     
     worker = new Worker(mockManagerRegistry, API_BASE_URL, mockKmsService);
     jest.clearAllMocks();
   });
 
-  it('should route a "Person" resourceType job to the CustomerManager and encode the response', async () => {
+  it('should route a "Person" resourceType job to the IndividualManager and encode the response', async () => {
     // ARRANGE
     const resourceType = 'Person';
     const vaultId = 'health-care_acme';
@@ -48,23 +48,26 @@ describe('Worker', () => {
     };
 
     const mockManagerResponse: IPayloadResponse = {
+      jti: 'mock-jti-response',
+      type: 'transaction-response',
       iss: API_BASE_URL,
       aud: 'urn:did:example:123',
       exp: Math.floor(Date.now() / 1000) + 300,
-      thid: job.content.thid,
+      thid: job.content?.thid as string,
       body: { data: [] },
     };
-    mockCustomerManager.process.mockResolvedValue(mockManagerResponse);
-    mockKmsService.getPublicJwks.mockResolvedValue({ keys: [{ kid: 'key-1' } as any]});
+    mockIndividualManager.process.mockResolvedValue(mockManagerResponse);
+    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'key-1' } as any);
     mockKmsService.encodeResponse.mockResolvedValue('encrypted.jwe.string');
 
     // ACT
     await worker.process(jobName, job);
 
     // ASSERT
-    expect(mockCustomerManager.process).toHaveBeenCalledTimes(1);
-    expect(mockCustomerManager.process).toHaveBeenCalledWith(job);
+    expect(mockIndividualManager.process).toHaveBeenCalledTimes(1);
+    expect(mockIndividualManager.process).toHaveBeenCalledWith(job);
     expect(mockKmsService.encodeResponse).toHaveBeenCalledTimes(1);
+    expect(mockKmsService.getPublicEncryptionKey).toHaveBeenCalledWith(vaultId);
     expect(mockKmsService.protectConfidentialData).not.toHaveBeenCalled();
   });
 
@@ -92,7 +95,7 @@ describe('Worker', () => {
     const response = JSON.parse(responseString);
 
     // ASSERT
-    expect(mockCustomerManager.process).not.toHaveBeenCalled();
+    expect(mockIndividualManager.process).not.toHaveBeenCalled();
     const errorIssue = response.body.data[0].response.outcome.issue![0];
     expect(errorIssue.diagnostics).toContain(`No manager configured for resourceType '${resourceType}'`);
   });
@@ -111,16 +114,18 @@ describe('Worker', () => {
       };
 
       const mockManagerResponse: IPayloadResponse = {
+        jti: 'mock-jti-response-2',
+        type: 'transaction-response',
         iss: API_BASE_URL,
         aud: 'urn:did:example:123',
         exp: Math.floor(Date.now() / 1000) + 300,
-        thid: job.content.thid,
+        thid: job.content!.thid,
         body: { data: [{ type: 'Bundle', id: 'some-bundle-id' }] },
       };
-      mockCustomerManager.process.mockResolvedValue(mockManagerResponse);
+      mockIndividualManager.process.mockResolvedValue(mockManagerResponse);
       
-      const mockRecipientPublicJwks = { keys: [{ kty: 'OKP', crv: 'ML-KEM-768', kid: 'key-1', x: '...' }]};
-      mockKmsService.getPublicJwks.mockResolvedValue(mockRecipientPublicJwks);
+      const mockRecipientPublicEncryptionKey = { kty: 'OKP', crv: 'ML-KEM-768', kid: 'key-1', x: '...' };
+      mockKmsService.getPublicEncryptionKey.mockResolvedValue(mockRecipientPublicEncryptionKey as any);
 
       // ACT
       await worker.process(jobName, job);
@@ -131,7 +136,7 @@ describe('Worker', () => {
       expect(mockKmsService.encodeResponse).toHaveBeenCalledTimes(1);
       expect(mockKmsService.encodeResponse).toHaveBeenCalledWith(
         mockManagerResponse,
-        mockRecipientPublicJwks.keys,
+        [mockRecipientPublicEncryptionKey],
         'health-care_acme' // senderVaultId
       );
 

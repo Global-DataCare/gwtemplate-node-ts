@@ -15,11 +15,14 @@ describe('VaultMemRepository', () => {
   it('should create a new vault and confirm it exists', async () => {
     // Act
     const result = await repository.createNewVault({ id: 'test-vault' });
-    const exists = await repository.vaultExists('test-vault');
+    const vaultConfig = await repository.getVaultConfig('test-vault');
+    const registeredAsTenant = await repository.vaultExists('test-vault');
 
     // Assert
     expect(result).toBe(true);
-    expect(exists).toBe(true);
+    expect(vaultConfig).toBeDefined();
+    // `vaultExists` checks tenant registration inside the host's `tenants` section, not physical vault creation.
+    expect(registeredAsTenant).toBe(false);
   });
 
   it('should return false if creating a vault that already exists', async () => {
@@ -34,7 +37,8 @@ describe('VaultMemRepository', () => {
   });
 
   describe('put and get operations', () => {
-    const testDoc: RecordBase = { id: 'doc-1', data: 'some-value' };
+    type TestDoc = RecordBase & { data: string };
+    const testDoc: TestDoc = { id: 'doc-1', data: 'some-value' };
     const vaultId = 'my-vault';
 
     beforeEach(async () => {
@@ -66,7 +70,7 @@ describe('VaultMemRepository', () => {
 
     it('should update an existing document when put is called again with the same id', async () => {
       // Arrange
-      const updatedDoc: RecordBase = { id: 'doc-1', data: 'new-value' };
+      const updatedDoc: TestDoc = { id: 'doc-1', data: 'new-value' };
       await repository.put(vaultId, [testDoc]); // Put initial version
 
       // Act
@@ -87,8 +91,8 @@ describe('VaultMemRepository', () => {
 
     it('should add multiple documents to the same section across multiple calls', async () => {
       // Arrange
-      const docA: RecordBase = { id: 'doc-a', data: 'value-a' };
-      const docB: RecordBase = { id: 'doc-b', data: 'value-b' };
+      const docA: TestDoc = { id: 'doc-a', data: 'value-a' };
+      const docB: TestDoc = { id: 'doc-b', data: 'value-b' };
       const sectionId = 'multiple-puts';
       
       // Act

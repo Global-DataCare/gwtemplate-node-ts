@@ -3,6 +3,13 @@
 
 import { EvidenceObjectDLT } from "./oidc4ida.evidence.model"
 
+/**
+ * Defines the JSON-LD context URI for W3C Verifiable Credentials Data Model v2.0.
+ * This constant MUST be used for all V2 credential creations to ensure consistency.
+ * @see https://www.w3.org/TR/vc-data-model-2.0/#contexts
+ */
+export const VC_CONTEXT_V2 = 'https://www.w3.org/ns/credentials/v2';
+
 /** ProofEBSIv2 foresees the possibility to use different types of proofs for Verifiable Credentials,
  *  such as proofs derived from eIDAS keys (qualified) to DID keys (unqualified).
  *  In EBSI 2.0, every V-ID will only contain a single proof, which must be derived from eIDAS keys.

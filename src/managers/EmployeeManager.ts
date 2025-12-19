@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4 } from 'uuid';
-import { IPayloadResponse } from '../models/response';
+import { IDecodedDidcommPayload } from '../models/confidential-message';
 import { ManagerError } from '../models/errors/manager-error';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { IKmsService } from '../crypto/interfaces/IKmsService';
@@ -15,16 +15,20 @@ import { ConfidentialStorageDoc } from '../models/confidential-storage';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { getTenantVaultId } from '../utils/tenant';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
-import { BundleEntry, ErrorEntry, BundleEntryRequest, Bundle } from '../models/bundle';
+import { BundleEntry, ErrorEntry, BundleEntryRequest, BundleJsonApi } from '../models/bundle';
 import { ClaimsRecord, RecordBase } from '../models/resource-document';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { normalizeCodeSystemAndValue } from '../utils/attributes';
 import { ParameterData } from '../models/params';
 import { PublicJwk } from '../crypto/interfaces/Cryptography.types';
 import { DidDocument, VerificationMethod } from '../models/did';
-import { JobRequest, JobDecodedMetadata } from '../models/request';
+import { JobRequest } from '../models/confidential-job';
+import { EntityLifecycleStatus, EntityType } from '../models/enums';
+import { DeviceLicense } from '../models/device-license';
+import { generateLicenseOffer } from '../utils/offer';
 
 const EMPLOYEE_SECTION = 'employees';
+const DEVICE_LICENSE_SECTION = 'device-licenses';
 
 export class EmployeeManager {
   private vaultRepository: IVaultRepository;
@@ -41,9 +45,13 @@ export class EmployeeManager {
     this.tenantsCacheManager = tenantsCacheManager;
   }
 
-  public async process(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
+  public async process(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
-    const entries = job.content?.body?.data ?? [];
+    
+    if (!job.content) {
+      throw new ManagerError('Job content is missing', IssueType.Required);
+    }
+    const entries = job.content.body?.data ?? [];
 
     if (!job.tenantId || !job.sector) {
       throw new ManagerError('Job is missing required tenantId or sector.', IssueType.Required);
@@ -56,7 +64,7 @@ export class EmployeeManager {
       throw new ManagerError(`Tenant with ID '${job.tenantId}' not found.`, IssueType.NotFound);
     }
 
-    if (!job.meta) {
+    if (!job.content.meta) {
       // This should ideally never happen if the request passed through the security layer.
       throw new ManagerError('Job is missing cryptographic metadata.', IssueType.Invalid);
     }
@@ -64,7 +72,16 @@ export class EmployeeManager {
     for (const entry of entries) {
       try {
         // Pass the fetched URN and the job metadata down to the entry processor.
-        const resultEntry = await this.processEntry(entry, vaultId, issuerUrn, job.meta, job.contentType, environment);
+        const resultEntry = await this.processEntry(
+          entry,
+          vaultId,
+          issuerUrn,
+          job.content.meta,
+          job.contentType,
+          environment,
+          job.sector,
+          job.jurisdiction,
+        );
         responseEntries.push(resultEntry);
       } catch (error: any) {
         const errorEntry = this.handleError(error, entry.type, (entry as BundleEntryRequest).meta);
@@ -72,28 +89,34 @@ export class EmployeeManager {
       }
     }
 
-    const responseBundle: Bundle = {
-      type: getBundleResponseTypeForAction(job.action),
-      total: responseEntries.length,
+    const responseBundle: BundleJsonApi = {
       data: responseEntries,
+      resourceType: 'Bundle',
+      total: responseEntries.length,
+      type: getBundleResponseTypeForAction(job.action),
     };
 
-    return {
-      thid: job.content.thid,
+    const result: IDecodedDidcommPayload = {
+      jti: uuidv4(),
+      thid: job.content.thid as string,
       iss: issuerUrn, // Use the tenant's URN as the issuer
-      aud: job.content.aud,
+      aud: job.content.aud as string,
       exp: Math.floor(Date.now() / 1000) + 300,
+      type: 'batch-response',
       body: responseBundle,
     };
+    return result;
   }
 
   private async processEntry(
     entry: BundleEntry,
     vaultId: string,
     tenantUrn: string,
-    meta: JobDecodedMetadata,
+    meta: IDecodedDidcommPayload['meta'],
     contentType?: string,
     environment?: string,
+    sector?: string,
+    jurisdiction?: string,
   ): Promise<BundleEntry> {
     const requestEntry = entry as BundleEntryRequest;
     const { request, meta: entryMeta, type } = requestEntry;
@@ -111,7 +134,7 @@ export class EmployeeManager {
 
     switch (request.method) {
       case 'POST':
-        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type, meta, contentType);
+        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction);
       case 'DELETE':
         return this.disableEmployee(vaultId, employeeId, type);
       default:
@@ -125,23 +148,38 @@ export class EmployeeManager {
     employeeId: string,
     claims: ClaimsRecord,
     entryType: string,
-    jobMeta: JobDecodedMetadata,
+    jobMeta: IDecodedDidcommPayload['meta'],
     contentType?: string,
+    sector?: string,
+    jurisdiction?: string,
   ): Promise<BundleEntry> {
     let signerJwk: PublicJwk | undefined;
     let encrypterJwk: PublicJwk | undefined;
+
+    const email = claims[ClaimsPersonSchemaorg.email];
+    if (!email || typeof email !== 'string') {
+      throw new ManagerError('Missing or invalid email claim.', IssueType.Required);
+    }
+
+    const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation] as string; // e.g. ISCO-08:<code>
+    if (!roleCode) {
+      throw new ManagerError('Missing or invalid hasOccupation claim.', IssueType.Required);
+    }
+
+    const employeeUrnForKeys = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
+
+    const licenseOffer = await this.tryConsumeEmployeeSeatOrOffer({
+      vaultId,
+      employeeId,
+      sector: sector || 'health-care',
+      jurisdiction: jurisdiction || 'us',
+    });
+    if (licenseOffer) return licenseOffer;
 
     // The flow for obtaining the employee's public keys depends on the request type.
     if (contentType?.includes('json')) {
       // LEGACY FLOW: The request is unencrypted. The system must provision keys for the new employee.
       // We use the employee's URN as the identifier for the new key set.
-      const email = claims[ClaimsPersonSchemaorg.email] as string;
-      const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation] as string;
-      if (!email || !roleCode) {
-        throw new ManagerError('Missing email or hasOccupation claim for legacy employee creation.', IssueType.Required);
-      }
-      const employeeUrnForKeys = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
-      
       const provisionedKeys = await this.kmsService.provisionKeys(employeeUrnForKeys);
       signerJwk = provisionedKeys.keys.find(k => k.kty === 'AKP') as PublicJwk;
       encrypterJwk = provisionedKeys.keys.find(k => k.kty === 'OKP') as PublicJwk;
@@ -150,28 +188,21 @@ export class EmployeeManager {
         throw new ManagerError('Failed to provision keys for new employee in legacy flow.', IssueType.Exception);
       }
     } else {
-      // SECURE FLOW: The request is encrypted, and the client MUST provide the public keys.
+      // SECURE FLOW: The request is encrypted.
+      // If the client provides embedded JWKs, use them; otherwise provision keys server-side.
       signerJwk = jobMeta?.jws?.protected?.jwk as PublicJwk;
       encrypterJwk = jobMeta?.jwe?.header?.jwk as PublicJwk;
 
       if (!signerJwk || !encrypterJwk) {
-        throw new ManagerError('Missing embedded JWKs in the JWS/JWE headers for employee creation.', IssueType.Required);
+        const provisionedKeys = await this.kmsService.provisionKeys(employeeUrnForKeys);
+        signerJwk = provisionedKeys.keys.find(k => k.kty === 'AKP') as PublicJwk;
+        encrypterJwk = provisionedKeys.keys.find(k => k.kty === 'OKP') as PublicJwk;
       }
     }
 
     // Additional validation to ensure the keys have kids
     if (!signerJwk.kid || !encrypterJwk.kid) {
       throw new ManagerError('Embedded JWKs must have a "kid" property.', IssueType.Required);
-    }
-
-    const email = claims[ClaimsPersonSchemaorg.email];
-    if (!email || typeof email !== 'string') {
-      throw new ManagerError('Missing or invalid email claim.', IssueType.Required);
-    }
-
-    const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation]; // e.g. ISCO-08:<code>
-    if (!roleCode || typeof roleCode !== 'string') {
-      throw new ManagerError('Missing or invalid hasOccupation claim.', IssueType.Required);
     }
 
     // Construct the hierarchical URN using the parent tenant's URN.
@@ -209,20 +240,28 @@ export class EmployeeManager {
 
     const employeeConfig: EntityConfig = {
       id: employeeId,
-      type: 'EmployeeConfig',
-      status: 'active',
+      type: EntityType.Person,
+      status: EntityLifecycleStatus.Active,
       claims,
       didDocument: employeeDidDocument,
       didConfig: { // didConfig property is required by EntityConfig
         service: []
       },
+      meta: {
+        lastUpdated: new Date().toISOString(),
+      },
     };
 
-    // Initialize services using the newly created config
-    employeeConfig.didDocument.service = initializeEmployeeServices(employeeConfig);
+    const tenantClaims = await this.tenantsCacheManager.getEntityClaims(vaultId);
+    if (!tenantClaims) {
+      throw new ManagerError(`Could not retrieve claims for tenant vault ${vaultId}`, IssueType.NotFound);
+    }
+    
+    // Initialize services using the tenant's service claims and the new employee config.
+    employeeConfig.didDocument!.service = initializeEmployeeServices(employeeConfig, tenantClaims);
     
     // Also, update the didConfig with the same services.
-    employeeConfig.didConfig.service = employeeConfig.didDocument.service;
+    employeeConfig.didConfig!.service = employeeConfig.didDocument!.service;
 
     const occupationDoc: RecordBase & { employeeId: string } = {
       id: uuidv4(),
@@ -268,6 +307,59 @@ export class EmployeeManager {
     };
   }
 
+  private async tryConsumeEmployeeSeatOrOffer(params: {
+    vaultId: string;
+    employeeId: string;
+    sector: string;
+    jurisdiction: string;
+  }): Promise<BundleEntry | undefined> {
+    const licenseDocs =
+      (await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+        params.vaultId,
+        DEVICE_LICENSE_SECTION,
+      )) || [];
+
+    const employeeLicenseDocs = licenseDocs.filter((doc) => (doc.content as DeviceLicense | undefined)?.userClass === 'employee');
+    if (employeeLicenseDocs.length === 0) {
+      // No employee licenses in the vault => licensing not configured; do not gate.
+      return undefined;
+    }
+
+    const availableDoc = employeeLicenseDocs.find((doc) => (doc.content as DeviceLicense).status === 'available');
+    if (!availableDoc) {
+      const hostDid = (await this.tenantsCacheManager.getTenantDid('host')) || 'did:web:host';
+      const allowedPaymentMethods = (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(',').map(s => s.trim()).filter(Boolean);
+      const offerClaims = generateLicenseOffer(
+        1,
+        hostDid,
+        params.jurisdiction,
+        params.sector,
+        allowedPaymentMethods,
+        'employee',
+      );
+
+      return {
+        type: 'Employee-license-offer-v1.0',
+        meta: { claims: offerClaims },
+        response: { status: '200' },
+      };
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const updatedLicense: DeviceLicense = {
+      ...(availableDoc.content as DeviceLicense),
+      status: 'issued',
+      subjectId: params.employeeId,
+      issuedAt: nowSec,
+    };
+    await this.vaultRepository.put(
+      params.vaultId,
+      [{ ...availableDoc, content: updatedLicense }],
+      DEVICE_LICENSE_SECTION,
+    );
+    return undefined;
+  }
+
   private async disableEmployee(vaultId: string, employeeId: string, entryType: string): Promise<BundleEntry> {
     const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(vaultId, employeeId, EMPLOYEE_SECTION);
     if (!employeeDoc) {
@@ -275,7 +367,7 @@ export class EmployeeManager {
     }
 
     const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
-    employee.status = 'disabled';
+    employee.status = EntityLifecycleStatus.Inactive;
 
     const docToProtect: ConfidentialStorageDoc = { ...employeeDoc, content: employee };
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);

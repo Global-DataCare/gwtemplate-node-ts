@@ -15,6 +15,7 @@ import { ClaimsServiceSchemaorg } from '../models/schemaorg';
  * @throws {ManagerError} If any validation rule is not met.
  */
 export function validateNewOrganizationClaims(claims: ClaimsRecord): void {
+  console.log('--- DEBUG: Validating claims ---', JSON.stringify(claims, null, 2));
   const requestedSector = claims[ClaimsServiceSchemaorg.category];
 
   // Rule: A single registration entry must correspond to a single business sector.

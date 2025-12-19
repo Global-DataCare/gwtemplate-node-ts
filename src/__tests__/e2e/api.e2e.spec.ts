@@ -14,7 +14,7 @@ import { QueueAdapter } from '../../adapters/queue';
 import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
 import { KmsService } from '../../services/KmsService';
 import { ClaimsRecord } from '../../models/resource-document';
-import { DecodedDidcommMessage, JobRequest } from '../../models/request';
+import { IDecodedDidcommPayload, JobRequest } from '../../models/confidential-job';
 import { getGoogleAuthTokenForTesting } from '../utils/auth';
 
 // Mock the KmsService to bypass actual JWE decryption for this legacy test
@@ -46,7 +46,7 @@ describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
     (KmsService as jest.Mock).mockImplementation(() => {
       return {
         decodeRequest: jest.fn((req: express.Request): Promise<JobRequest> => {
-          const jobContent = req.body as DecodedDidcommMessage;
+          const jobContent = req.body as IDecodedDidcommPayload;
           return Promise.resolve({
             name: `unsecure-host-registry-org.schema.Organization-_batch`,
             content: jobContent,

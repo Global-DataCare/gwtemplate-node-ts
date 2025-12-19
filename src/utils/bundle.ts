@@ -1,7 +1,7 @@
 // src/utils/bundle.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { Bundle, ErrorEntry } from '../models/bundle';
+import { BundleJsonApi, ErrorEntry } from '../models/bundle';
 import { IssueLevel, IssueType } from '../models/fhir/codes';
 import { safelyJoinUrl } from './url';
 
@@ -49,7 +49,7 @@ export function getBundleResponseTypeForAction(action?: string): BundleType {
  * @param originalEntryType The 'type' from the original request entry, if available.
  * @returns A response Bundle containing a single error entry.
  */
-export function createErrorBundle(errorMessage: string, action?: string, originalEntryType?: string): Bundle {
+export function createErrorBundle(errorMessage: string, action?: string, originalEntryType?: string): BundleJsonApi {
   const errorEntry: ErrorEntry = {
     // Reflect the original type if known, otherwise use a generic error type.
     type: originalEntryType || 'unknown-error-v1.0',
@@ -67,6 +67,7 @@ export function createErrorBundle(errorMessage: string, action?: string, origina
   };
 
   return {
+    resourceType: 'Bundle',
     type: getBundleResponseTypeForAction(action),
     data: [errorEntry]
   };

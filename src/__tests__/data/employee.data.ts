@@ -1,6 +1,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/data/employee.data.ts
-import { JobRequest } from '../../models/request';
+import { JobRequest, JobStatus } from '../../models/confidential-job';
 import { ClaimsRecord } from '../../models/resource-document';
 import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
 import { testTenant1DidWebExternal, testTenant1Domain, testTenant1IdentifierUrn } from './organization.data';
@@ -94,20 +94,20 @@ export const testClaimsTenant1Nurse1 = {
 
 
 export const testBaseJobForEmployeeClaims = (claims: ClaimsRecord, tenantId: string, sector: string): JobRequest => ({
+  id: 'test-job-id',
+  status: JobStatus.DRAFT,
+  sequence: 0,
+  createdAtTimestamp: Date.now(),
   tenantId: tenantId,
   sector: sector,
   jurisdiction: 'us',
   resourceType: 'Person',
-  section: 'org.schema',
   action: '_batch',
-  meta: { // Add the meta object for the test to pass the guard
-    jws: { protected: { alg: 'ML-DSA-44', kid: 'test-kid', jwk: { kid: 'test-kid', kty: 'AKP', alg: 'ML-DSA-44', pub: '...' } } },
-    jwe: { header: { enc: 'A256GCM', skid: 'test-skid', jwk: { kid: 'test-skid', kty: 'OKP', crv: 'ML-KEM-768', x: '...' } } },
-  },
   content: {
-    aud: 'did:web:api.example.com', // This can be anything for this test
-    response_type: 'json',
+    iss: 'did:web:app.example.com',
+    aud: 'did:web:api.example.com',
     thid: 'test-thid-456',
+    jti: 'test-jti-789',
     type: 'json',
     body: {
       data: [
@@ -117,6 +117,10 @@ export const testBaseJobForEmployeeClaims = (claims: ClaimsRecord, tenantId: str
           type: 'Employee-form-v1.0',
         },
       ],
+    },
+    meta: { // JWS/JWE info from the cryptographic envelope
+      jws: { protected: { alg: 'ML-DSA-44', kid: 'test-kid', jwk: { kid: 'test-kid', kty: 'AKP', alg: 'ML-DSA-44', pub: '...' } } },
+      jwe: { header: { enc: 'A256GCM', skid: 'test-skid', jwk: { kid: 'test-skid', kty: 'OKP', crv: 'ML-KEM-768', x: '...' } } },
     },
   },
   httpMethod: 'POST',

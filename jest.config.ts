@@ -2,6 +2,8 @@
 
 import type { JestConfigWithTsJest } from 'ts-jest';
 
+const isE2E = process.env.TEST_ENV === 'e2e';
+
 const config: JestConfigWithTsJest = {
   testEnvironment: 'node',
   injectGlobals: true,   // make describe/it/expect/jest global
@@ -12,7 +14,14 @@ const config: JestConfigWithTsJest = {
 
   roots: ['<rootDir>/src'],
   testMatch: ['**/src/**/*.test.ts', '**/src/**/*.spec.ts'],
-  testPathIgnorePatterns: ['/node_modules/', '/src/__tests__/old/', 'snomed-ips.test.ts'], // Exclude old tests
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/src/__tests__/old/',
+    'snomed-ips.test.ts',
+    ...(isE2E ? [] : ['/src/__tests__/e2e/']),
+    // Firestore integration tests require external services/credentials.
+    '/src/__tests__/integration/repositories/firestore',
+  ], // Exclude old tests and e2e by default
 
   // Important: we will transform .ts via ts-jest, and specific node_modules .js via babel-jest
   transform: {
@@ -56,6 +65,7 @@ const config: JestConfigWithTsJest = {
   ], 
 
   clearMocks: true,
+  watchman: false,
   testTimeout: 12000,
   verbose: true,
 
@@ -76,5 +86,3 @@ const config: JestConfigWithTsJest = {
 };
 
 export default config;
-
-

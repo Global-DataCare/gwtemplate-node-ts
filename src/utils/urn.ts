@@ -1,8 +1,23 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/utils/urn.ts
 
-import { OrganizationUrnParams, EmployeeUrnParams } from "../models/entity";
+export interface EntityUrnBaseParams {
+  namespace: string;
+  network: 'test-network';
+  jurisdiction: string;
+  version?: string;
+  sector: string;
+}
 
+export interface OrganizationUrnParams extends EntityUrnBaseParams {
+  idType: string;
+  idValue: string;
+}
+
+export interface EmployeeUrnParams extends OrganizationUrnParams {
+  email: string;
+  role: string;
+}
 
 /**
  * Creates a canonical URN string from a given UUID.

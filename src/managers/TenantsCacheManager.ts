@@ -5,9 +5,8 @@ import { IKmsService } from '../crypto/interfaces/IKmsService';
 import { ITenantsManager } from './ITenantsManager';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { getTenantVaultId, getIdentifierUrnFromClaims, generateTenantCollectionNameFromClaims } from '../utils/tenant';
+import { getIdentifierUrnFromClaims, generateTenantCollectionNameFromClaims } from '../utils/tenant';
 import { DidDocument, DidService, VerificationMethod } from '../models/did';
-import { getEnvironment } from '../utils/environment';
 import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
 import { Sector } from '../models/urlPath';
 import { getBaseUrlFromDidWeb } from '../utils/did';
@@ -206,7 +205,18 @@ export class TenantsCacheManager implements ITenantsManager {
    */
   public async getTenantDid(vaultId: string): Promise<string | undefined> {
     const tenantConfig = await this._ensureTenantIsInCache(vaultId);
-    return tenantConfig?.didDocument.id;
+    return tenantConfig?.didDocument?.id;
+  }
+
+  /**
+   * Retrieves the cached claims for a given entity configuration.
+   * Note: In this manager, it specifically resolves tenant entities.
+   * @param vaultId The unique vault identifier for the tenant.
+   * @returns The claims object, or `undefined` if not found.
+   */
+  public async getEntityClaims(vaultId: string): Promise<any | undefined> {
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
+    return tenantConfig?.claims;
   }
 
   /**

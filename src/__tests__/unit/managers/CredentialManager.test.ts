@@ -42,6 +42,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   decodeRequest: jest.fn<IKmsService['decodeRequest']>(),
   signWithManagedKey: jest.fn<IKmsService['signWithManagedKey']>().mockResolvedValue(mockSignResult),
   signWithReconstructedKey: jest.fn<IKmsService['signWithReconstructedKey']>(),
+  createDetachedJws: jest.fn<IKmsService['createDetachedJws']>(),
   encodeResponse: jest.fn<IKmsService['encodeResponse']>(),
   protectConfidentialData: jest.fn<IKmsService['protectConfidentialData']>(async (doc) => ({ ...doc, sequence: 0, jwe: {} })),
   unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string) =>
@@ -158,7 +159,7 @@ describe('CredentialManager', () => {
       const decryptionEntityId = 'some-entity';
       const putSpy = jest.spyOn(vaultRepository, 'put');
 
-      await vaultRepository.createNewVault({ id: testTenant1VaultId, sequence: 0, meta: {} });
+      await vaultRepository.createNewVault({ id: testTenant1VaultId, meta: {} });
       
       // Simulate the KMS returning HMACed attributes
       mockKmsService.protectAttributesNameAndValue.mockResolvedValue([
@@ -238,4 +239,3 @@ describe('CredentialManager', () => {
     });
   });
 });
-

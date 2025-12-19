@@ -2,10 +2,11 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../../../utils/services';
-import { EntityConfig } from '../../../models/entity';
+import { OrganizationConfig } from '../../../models/entity';
 import { Sector } from '../../../models/urlPath';
 import { IServerConfig } from '../../../config';
 import { DidService } from '../../../models/did';
+import { EntityLifecycleStatus, EntityType } from '../../../models/enums';
 
 // Create a mock config object for the tests.
 const mockConfig: IServerConfig = {
@@ -17,11 +18,12 @@ const createTestTenantConfig = (
   sector: Sector,
   didId: string,
   sectorsAllowed: Sector[] = []
-): EntityConfig => {
-  const result: EntityConfig = {
+): OrganizationConfig => {
+  const result: OrganizationConfig = {
     id: 'urn:uuid:tenant-uuid',
-    type: 'org.schema.Organization', // Missing 'type' property added
-    status: 'active',
+    type: EntityType.Organization,
+    status: EntityLifecycleStatus.Active,
+    networkStatus: [],
     meta: { lastUpdated: '' },
     claims: {
       alternateName: 'acme',
@@ -29,9 +31,7 @@ const createTestTenantConfig = (
       addressCountry: 'ES',
       url: 'https://acme.com',
     },
-    didConfig: { // Missing 'didConfig' property added
-      service: []
-    },
+    didConfig: { service: [] },
     didDocument: {
       '@context': 'https://www.w3.org/ns/did/v1',
       id: didId,
@@ -43,7 +43,7 @@ const createTestTenantConfig = (
         sectorsAllowed: sectorsAllowed,
       }
     }
-  } as unknown as EntityConfig;
+  };
   return result;
 };
 
@@ -56,10 +56,10 @@ describe('Service Initialization Utilities', () => {
       const tenantConfig = createTestTenantConfig(Sector.TEST, `did:web:${mockConfig.hostExternalDomain}:acme`);
 
       // ACT
-      const services = initializeTenantServicesConfig(tenantConfig.provider.service.sectorCategory as Sector);
+      const services = initializeTenantServicesConfig(tenantConfig.provider!.service.sectorCategory as Sector);
 
       // ASSERT
-      expect(services).toHaveLength(4); // 2 business + 2 network
+      expect(services).toHaveLength(5); // 2 business + 2 network + 1 OIDC
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -77,10 +77,10 @@ describe('Service Initialization Utilities', () => {
       const tenantConfig = createTestTenantConfig(Sector.HEALTH_CARE, `did:web:${mockConfig.hostExternalDomain}:acme`);
 
       // ACT
-      const services = initializeTenantServicesConfig(tenantConfig.provider.service.sectorCategory as Sector);
+      const services = initializeTenantServicesConfig(tenantConfig.provider!.service.sectorCategory as Sector);
       
       // ASSERT
-      expect(services).toHaveLength(4);
+      expect(services).toHaveLength(5); // 2 business + 2 network + 1 OIDC
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -98,7 +98,7 @@ describe('Service Initialization Utilities', () => {
       const tenantConfig = createTestTenantConfig(Sector.TEST, 'did:web:acme.com');
 
       // ACT
-      const services = initializeTenantServicesConfig(tenantConfig.provider.service.sectorCategory as Sector);
+      const services = initializeTenantServicesConfig(tenantConfig.provider!.service.sectorCategory as Sector);
 
       // ASSERT
       const didDocService = services.find((s: DidService) => s.id.endsWith('#did-document'));
@@ -118,7 +118,7 @@ describe('Service Initialization Utilities', () => {
       }
 
       // ACT
-      const services = initializeHostServicesConfig(hostConfig.provider.service.sectorsAllowed as Sector[]);
+      const services = initializeHostServicesConfig(hostConfig.provider!.service.sectorsAllowed as Sector[]);
 
       // ASSERT
       const registryServices = services.filter((s: DidService) => s.id.includes(':registry:'));
@@ -127,7 +127,7 @@ describe('Service Initialization Utilities', () => {
       // The service ID format is v1:SECTOR:registry:org-schema. We search for the sector part.
       const testRegistry = registryServices.find((s: DidService) => s.id.match(new RegExp(`:${Sector.TEST}:`, 'i')));
       expect(testRegistry).toBeDefined();
-      expect(testRegistry!.serviceEndpoint).toBe('Organization');
+      expect(testRegistry!.serviceEndpoint).toBe('Organization,Order');
       
       const healthRegistry = registryServices.find((s: DidService) => s.id.match(new RegExp(`:${Sector.HEALTH_CARE}:`, 'i')));
       expect(healthRegistry).toBeDefined();

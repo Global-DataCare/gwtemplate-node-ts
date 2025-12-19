@@ -77,6 +77,7 @@ export const testClaimsTenant1Registration: ClaimsRecord = {
   [ClaimsOrganizationSchemaorg.identifierValue]: testTenant1IdValue,
   [ClaimsOrganizationSchemaorg.url]: testTenant1Domain,
   [ClaimsOrganizationSchemaorg.alternateName]: testTenant1AlternateName,
+  [ClaimsOrganizationSchemaorg.numberOfEmployees]: 2, // Add employee count for offer generation
 
   // --- Person (Admin) Claims ---
   ...testClaimsEmployeeAdminTenant1,

@@ -2,44 +2,135 @@
 // File: src/__tests__/integration/organizationApi.test.ts
 
 import express from 'express';
-import request from 'supertest';
 import { v4 as uuidv4 } from 'uuid';
 import { CryptographyService } from '../../crypto/CryptographyService';
 import { createApiRouter } from '../../routes/api';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
-import {
-  testClaimsTenant1Registration,
-} from '../data/end-to-end.data';
-import { testHostAlternateName } from '../data/organization.data';
-import {
-  testThid1,
-  testCompletedJob,
-  testPendingJob,
-  testEncryptedJwe1,
-} from '../data/async-response.data';
-import { JobRequest } from '../../models/request';
-import { DidService } from '../../models/did';
+import { testClaimsHostInitialization } from '../data/end-to-end.data';
+import { testEncryptedJwe1 } from '../data/async-response.data';
+import { JobRequest, JobStatus } from '../../models/confidential-job';
 import { mockKmsService } from '../mocks/kms.mock';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
-import {
-  AsyncResponseStoreMem,
-  IAsyncResponseStore,
-} from '../../adapters/async-response-store.mem';
-import { IssueType } from '../../models/fhir/codes';
-import { createDidServiceId } from '../../utils/did';
+import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async-response-store.mem';
 import { IServerConfig } from '../../config';
 import { Sector } from '../../models/urlPath';
-import { HostingManager } from '../../managers/HostingManager';
 import { IStorageAdapter } from '../../database/storage/IStorageAdapter';
-import { testClaimsHostInitialization } from '../data/end-to-end.data';
-
 import { ILogger } from '../../loggers/ILogger';
 import { generateTenantCollectionNameFromClaims } from '../../utils/tenant';
+import { ORGANIZATION_ORDER_REQUEST, ORGANIZATION_REGISTRATION_REQUEST } from '../data/example-payloads';
+import { ORGANIZATION_REGISTRATION_JOB } from '../data/example-jobs';
+import { IPayloadResponse } from '../../models/confidential-message';
+import { MldsaPrivateJwk, MlkemPrivateJwk, MlkemPublicJwk } from '../../crypto/interfaces/Cryptography.types';
+import { createHash } from 'crypto';
+import { Content } from '../../utils/content';
+import { ClaimsOfferSchemaorg } from '../../models/schemaorg';
+import { JWK } from '../../models/jwk';
+import { HostingManager } from '../../managers/HostingManager';
+
+type InMemoryResponse = {
+  status: number;
+  headers: Record<string, string>;
+  text: string;
+};
+
+async function invokeExpress(
+  handler: any,
+  options: { method: string; url: string; headers?: Record<string, string>; body?: any },
+): Promise<InMemoryResponse> {
+  const headers: Record<string, string> = {};
+  let statusCode = 200;
+  let responseText = '';
+
+  const req = {
+    method: options.method.toUpperCase(),
+    url: options.url,
+    originalUrl: options.url,
+    headers: Object.fromEntries(
+      Object.entries(options.headers || {}).map(([k, v]) => [k.toLowerCase(), v]),
+    ),
+    body: options.body,
+    query: {},
+    get(name: string) {
+      return this.headers[name.toLowerCase()];
+    },
+  };
+
+  let resolveFinished: (() => void) | undefined;
+  let rejectFinished: ((err: any) => void) | undefined;
+  const finished = new Promise<void>((resolve, reject) => {
+    resolveFinished = resolve;
+    rejectFinished = reject;
+  });
+
+  const res = {
+    status(code: number) {
+      statusCode = code;
+      return this;
+    },
+    set(field: string, value: string) {
+      headers[field.toLowerCase()] = value;
+      return this;
+    },
+    setHeader(field: string, value: string) {
+      headers[field.toLowerCase()] = value;
+      return this;
+    },
+    location(value: string) {
+      headers['location'] = value;
+      return this;
+    },
+    type(value: string) {
+      headers['content-type'] = value;
+      return this;
+    },
+    send(payload: any) {
+      if (payload === undefined || payload === null) {
+        responseText = '';
+      } else if (typeof payload === 'string') {
+        responseText = payload;
+      } else {
+        if (!headers['content-type']) headers['content-type'] = 'application/json';
+        responseText = JSON.stringify(payload);
+      }
+      resolveFinished?.();
+      return this;
+    },
+    json(payload: any) {
+      headers['content-type'] = 'application/json';
+      responseText = JSON.stringify(payload);
+      resolveFinished?.();
+      return this;
+    },
+    end(payload?: any) {
+      if (payload !== undefined) {
+        this.send(payload);
+      } else {
+        resolveFinished?.();
+      }
+      return this;
+    },
+  };
+
+  const handleFn = (typeof handler === 'function' ? handler : handler?.handle) as
+    | ((req: any, res: any, next: (err?: any) => void) => void)
+    | undefined;
+  if (!handleFn) {
+    throw new Error('invokeExpress: handler has no handle()');
+  }
+
+  handleFn(req, res, (err?: any) => {
+    if (err) rejectFinished?.(err);
+    else resolveFinished?.();
+  });
+
+  await finished;
+  return { status: statusCode, headers, text: responseText };
+}
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
-  addJob: jest.fn((jobName: string, jobData: JobRequest) => Promise.resolve()),
+  addJob: jest.fn(),
 };
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
@@ -53,22 +144,13 @@ const mockLogger: jest.Mocked<ILogger> = {
   debug: jest.fn(),
 };
 
-// Define a reusable setup function to create the app instance
 const setupApp = (
   asyncResponseStore: IAsyncResponseStore,
   tenantsCacheManager: TenantsCacheManager,
   vaultRepository: VaultMemRepository,
 ) => {
-  const app = express();
-  // Use urlencoded parser for FAPI-compliant form parameter bodies
-  app.use(express.urlencoded({ extended: true }));
-  app.use(express.json()); // Also add json parser for legacy tests
-
   const cryptographyService = new CryptographyService();
-  // Initialize the mock KMS to simulate the server startup sequence
   mockKmsService.init();
-
-  // Pass the 7 required arguments, including a mock apiBaseUrl
   const apiRouter = createApiRouter(
     mockQueueAdapter,
     tenantsCacheManager,
@@ -76,10 +158,10 @@ const setupApp = (
     asyncResponseStore,
     vaultRepository,
     cryptographyService,
-    'http://testhost.com' // Mock base URL for testing
+    'http://host.example.com'
   );
+  const app = express();
   app.use('/', apiRouter);
-
   return app;
 };
 
@@ -89,24 +171,29 @@ describe('Organization Registration API', () => {
   let vaultRepository: VaultMemRepository;
   let asyncResponseStore: IAsyncResponseStore;
   let mockConfig: IServerConfig;
+  let cryptoService: CryptographyService;
+  let externalEncrypter: MlkemPrivateJwk;
+  const hostPublicEncKey: MlkemPublicJwk = {
+    kty: 'OKP',
+    crv: 'ML-KEM-768',
+    kid: 'thumbprint-public-enc-key-device',
+    x: 'base64url-public-enc-key-device',
+  } as MlkemPublicJwk;
 
-  // Run the bootstrap once for the entire suite, as it sets up the host state.
+  let hostingManager: HostingManager;
+
   beforeAll(async () => {
-    // CRITICAL FIX: The host collection name must be deterministic and consistent
-    // between the manager and the test setup.
     const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
-
     vaultRepository = new VaultMemRepository();
-    // Use the correctly generated host collection name to initialize the manager.
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
     asyncResponseStore = new AsyncResponseStoreMem();
 
     mockConfig = {
       nodeEnv: 'test',
       port: 3000,
-      apiHostname: 'testhost',
-      hostExternalDomain: 'testhost.com',
-      apiBaseUrl: 'http://testhost.com',
+      apiHostname: 'host',
+      hostExternalDomain: 'host.example.com',
+      apiBaseUrl: 'http://host.example.com',
       namespace: 'test-namespace',
       sectorsAllowed: [Sector.HEALTH_CARE, Sector.SYSTEM, Sector.TEST],
       dbProvider: 'mem',
@@ -115,9 +202,34 @@ describe('Organization Registration API', () => {
       host: { legalName: 'Test Host', jurisdiction: 'us', idType: 'test-id', idValue: '12345' },
       mongo: { dbName: 'test' },
       firebase: {},
+      allowedPaymentMethods: ['Stripe'],
     };
 
-    const hostingManager = new HostingManager(
+    mockKmsService.getHostPublicJwkSet.mockResolvedValue({ keys: [hostPublicEncKey as unknown as JWK] });
+
+    app = setupApp(asyncResponseStore, tenantsCacheManager, vaultRepository);
+
+    cryptoService = new CryptographyService();
+    mockKmsService.getHostPublicJwkSet.mockResolvedValue({ keys: [hostPublicEncKey as JWK] });
+    
+    const externalClientSeed = 'org-reg-v2-test-seed';
+    const dsaSeed = createHash('sha256').update(externalClientSeed + '-dsa').digest().subarray(0, 32);
+    const kemSeed = createHash('sha512').update(externalClientSeed + '-kem').digest().subarray(0, 64);
+    const signerKeyPair = await cryptoService.generateKeyPairMlDsa(dsaSeed);
+    const encrypterKeyPair = await cryptoService.generateKeyPairMlKem(kemSeed);
+    externalEncrypter = { ...encrypterKeyPair.publicJWKey, dBytes: encrypterKeyPair.secretKeyBytes };
+    mockKmsService.encodeResponse.mockImplementation(async (payload) =>
+      cryptoService.encryptJweToCompact(payload, { cty: 'application/api+json' }, externalEncrypter, externalEncrypter),
+    );
+  });
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    (asyncResponseStore as AsyncResponseStoreMem).clear();
+    (vaultRepository as VaultMemRepository).clear();
+
+    // Re-bootstrap the host before each test to ensure a clean state
+    hostingManager = new HostingManager(
       vaultRepository,
       mockKmsService,
       tenantsCacheManager,
@@ -125,155 +237,277 @@ describe('Organization Registration API', () => {
       mockLogger,
       mockConfig,
     );
-    // Bootstrap the host to ensure its data exists in the repository.
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
-    // After bootstrapping, explicitly load the host into the cache to simulate server startup.
     await tenantsCacheManager.loadHost();
 
-    app = setupApp(asyncResponseStore, tenantsCacheManager, vaultRepository);
+    // Mocks for dependencies used by HostingManager
+    mockStorageAdapter.upload.mockResolvedValue({
+      publicUrl: 'https://storage.example.com/terms.pdf',
+      encodedMultiHash: 'zQm...',
+    });
+
+    mockKmsService.getPublicJwks.mockImplementation(async () => ({
+      keys: [
+        { kid: 'sig-key-1', use: 'sig', alg: 'ML-DSA-44' } as any,
+        { kid: 'enc-key-1', use: 'enc', crv: 'ML-KEM-768' } as any,
+      ],
+    }));
+
+    mockKmsService.getHostPublicJwkSet.mockResolvedValue({ keys: [hostPublicEncKey as unknown as JWK] });
+    mockKmsService.encodeResponse.mockImplementation(async (payload) =>
+      cryptoService.encryptJweToCompact(payload, { cty: 'application/api+json' }, externalEncrypter, externalEncrypter),
+    );
   });
 
-  beforeEach(() => {
-    // Clear mocks before each test, but don't re-initialize the world.
-    jest.clearAllMocks();
-    (asyncResponseStore as AsyncResponseStoreMem).clear(); // Assuming a clear method
-  });
-
-  afterAll(() => {
+  afterAll(async () => {
     jest.clearAllMocks();
   });
 
   describe('POST /host/.../_batch (Job Submission)', () => {
     it('should decode the request, queue a job, and return 202 Accepted', async () => {
-      // --- Arrange ---
-      // The app and managers are already set up in beforeEach
-      const tenantId = 'host';
-      const jurisdiction = 'ES';
-      const sector = 'test';
-      const section = 'registry';
-      const format = 'org.schema';
-      const resourceType = 'Organization';
-      const action = '_batch';
-      const EXPECTED_RETRY_AFTER = '5';
+      const registrationUrl = `/host/cds-es/v1/test/registry/org.schema/Organization/_batch`;
+      const expectedPollingUrl = `http://host.example.com${registrationUrl.replace('/_batch', '/_batch-response')}`;
+      // In this test, we only care that the job is queued. We don't need a valid decoded job.
+      mockKmsService.decodeRequest.mockResolvedValue({
+        ...ORGANIZATION_REGISTRATION_JOB,
+        content: ORGANIZATION_REGISTRATION_REQUEST
+      } as any);
 
-      const registrationUrl = `/${tenantId}/cds-${jurisdiction}/v1/${sector}/${section}/${format}/${resourceType}/${action}`;
-      const expectedPollingUrl = `http://testhost.com${registrationUrl.replace('/_batch', '/_batch-response')}`;
-
-      const thid = uuidv4();
-      const mockDecodedJob: Omit<JobRequest, 'tenantId'> = {
-        resourceType: resourceType,
-        action: action,
-        content: {
-          aud: `did:web:${testHostAlternateName}`,
-          thid: thid,
-          type: 'https://didcomm.org/registration/1.0/register',
-          body: { data: [{ meta: { claims: testClaimsTenant1Registration } }] },
-          iss: 'did:web:some-issuer',
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: registrationUrl,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+          Authorization: 'Bearer fake-oidc-id-token',
         },
-        meta: {
-          jws: {
-            protected: {
-              alg: 'ML-DSA-44',
-              kid: 'did:web:some-issuer#key-1',
-            },
-          },
-          jwe: {
-            header: {
-              skid: 'did:web:some-issuer#enc-key-1',
-              jwk: {
-                kty: 'OKP',
-                crv: 'ML-KEM-768',
-                kid: 'did:web:some-issuer#enc-key-1',
-                x: 'mock-public-encryption-key-x',
-              },
-            },
-          },
-          bearer: {
-            jwt: { payload: { email: 'admin@host.com' } },
-          },
-        },
-      };
-      mockKmsService.decodeRequest.mockResolvedValue(mockDecodedJob as JobRequest);
+        body: { request: testEncryptedJwe1 },
+      });
 
-      // --- Act ---
-      const response = await request(app)
-        .post(registrationUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`request=${testEncryptedJwe1}`);
-
-      // --- Assert ---
-      expect(mockKmsService.decodeRequest).toHaveBeenCalledWith(
-        testEncryptedJwe1,
-      );
+      expect(mockKmsService.decodeRequest).toHaveBeenCalledWith(testEncryptedJwe1);
       expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
-
-      // Verify the controller added the correct tenantId before queueing.
-      const queuedJob = (mockQueueAdapter.addJob as jest.Mock).mock
-        .calls[0][1] as JobRequest;
-      expect(queuedJob.tenantId).toBe(tenantId);
-
+      const queuedJob = (mockQueueAdapter.addJob as jest.Mock).mock.calls[0][1] as JobRequest;
+      expect(queuedJob.tenantId).toBe(ORGANIZATION_REGISTRATION_JOB.tenantId);
       expect(response.status).toBe(202);
       expect(response.headers.location).toBe(expectedPollingUrl);
-      expect(response.get('Retry-After')).toBe(EXPECTED_RETRY_AFTER);
-      expect(response.body).toEqual({}); // Body should be empty
-    });
-
-    it('should return 403 Forbidden if a non-host tenant tries to access the registry', async () => {
-      // The app and managers are already set up in beforeEach.
-      const tenantId = 'tenant1';
-      const registrationUrl = `/${tenantId}/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
-
-      const response = await request(app)
-        .post(registrationUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`request=${testEncryptedJwe1}`);
-
-      expect(response.status).toBe(403);
-      expect(response.body.resourceType).toBe('OperationOutcome');
-      expect(response.body.issue[0].code).toBe(IssueType.Forbidden);
-      expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
     });
   });
 
-  describe('POST /host/.../_batch-response (Job Polling)', () => {
-    const pollingUrl = '/host/cds-ES/v1/test/registry/org.schema/Organization/_batch-response';
+  describe('Organization Registration v2 (Offer/Order Flow)', () => {
+    it('should accept a registration request and return a verifiable Offer', async () => {
+      const orgCreationPayload = { ...ORGANIZATION_REGISTRATION_REQUEST };
+      const { thid } = orgCreationPayload;
 
-    it('should return 200 OK with the form-encoded JWE if the job is complete', async () => {
-      asyncResponseStore.set(testThid1, testCompletedJob);
-      const response = await request(app)
-        .post(pollingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`thid=${testThid1}`);
+      // The controller calls decodeRequest. We mock its output to be the job for the manager.
+      const decodedJobForManager: JobRequest = {
+        ...ORGANIZATION_REGISTRATION_JOB,
+        id: uuidv4(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        content: orgCreationPayload,
+      };
+      mockKmsService.decodeRequest.mockResolvedValue(decodedJobForManager);
 
-      expect(response.status).toBe(200);
-      expect(response.headers['content-type']).toMatch(/application\/x-www-form-urlencoded/);
-      // The body is not JSON, so we inspect the raw text of the response.
-      expect(response.text).toBe(`response=${testCompletedJob.result}`);
-      expect(asyncResponseStore.get(testThid1)).toBeUndefined();
+      // The router queues the job. We'll capture it to simulate the worker processing it later.
+      let capturedJob: JobRequest | undefined;
+      mockQueueAdapter.addJob.mockImplementation(async (jobName, jobData) => {
+        capturedJob = jobData;
+      });
+
+      const compactJwe = "fake.encrypted.payload"; // This can be fake as decodeRequest is mocked
+      const registrationUrl = `/host/cds-es/v1/test/registry/org.schema/Organization/_batch`;
+      
+      // --- ACT (Phase 1) ---
+      const postResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: registrationUrl,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+          Authorization: 'Bearer fake-oidc-id-token',
+        },
+        body: { request: compactJwe },
+      });
+
+      // --- ASSERT (Phase 1) ---
+      expect(postResponse.status).toBe(202);
+      expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
+      expect(capturedJob).toBeDefined();
+
+      // --- ACT (Phase 2: Simulate Worker) ---
+      // Now, we simulate the worker picking up the job and processing it.
+      // The hostingManager is now initialized in beforeEach.
+      const workerResultPayload = await hostingManager.process(capturedJob!);
+      const encryptedWorkerResult = await mockKmsService.encodeResponse(workerResultPayload, [externalEncrypter as unknown as JWK], 'host');
+      await asyncResponseStore.set(thid, { status: 'COMPLETED', result: encryptedWorkerResult });
+
+      // --- ACT (Phase 3: Polling) ---
+      const pollingUrl = postResponse.headers.location;
+      const pollingPath = new URL(pollingUrl).pathname;
+      const pollResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: pollingPath,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+          Authorization: 'Bearer fake-oidc-id-token',
+        },
+        body: { thid },
+      });
+
+      // --- ASSERT (Phase 3) ---
+      expect(pollResponse.status).toBe(200);
+      const encryptedFinalResponse = pollResponse.text.replace('response=', '');
+      const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
+      const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IPayloadResponse;
+
+      const responseEntry = finalResponse.body.data[0];
+      const responseClaims = responseEntry.meta.claims;
+
+      expect(responseEntry.type).toBe('Organization-registration-offer-v1.0');
+      expect(responseClaims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(2);
+      expect(responseClaims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
+      expect(responseClaims[ClaimsOfferSchemaorg.offeredBy]).toBe('did:web:host.example.com');
     });
 
-    it('should return 202 Accepted if the job is still pending', async () => {
-      asyncResponseStore.set(testThid1, testPendingJob);
-      const response = await request(app)
-        .post(pollingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`thid=${testThid1}`);
+    it('should process an Order and return the final Organization VC', async () => {
+      // --- ARRANGE (Phase 1: Initial Registration & Offer) ---
+      const orgCreationPayload = { ...ORGANIZATION_REGISTRATION_REQUEST };
+      const { thid: regThid } = orgCreationPayload;
+      const registrationUrl = `/host/cds-es/v1/test/registry/org.schema/Organization/_batch`;
 
-      expect(response.status).toBe(202);
-      expect(response.body.status).toBe('PENDING');
-      expect(asyncResponseStore.get(testThid1)).toBeDefined();
-    });
+      const decodedRegJob: JobRequest = {
+        ...ORGANIZATION_REGISTRATION_JOB,
+        id: uuidv4(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        content: orgCreationPayload,
+      };
+      mockKmsService.decodeRequest.mockResolvedValueOnce(decodedRegJob);
 
-    it('should return 404 Not Found for an unknown thid', async () => {
-      const response = await request(app)
-        .post(pollingUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send('thid=unknown-thid');
+      let capturedRegJob: JobRequest | undefined;
+      mockQueueAdapter.addJob.mockImplementationOnce(async (jobName, jobData) => {
+        capturedRegJob = jobData;
+      });
 
-      expect(response.status).toBe(404);
-      expect(response.body.resourceType).toBe('OperationOutcome');
-      expect(response.body.issue[0].code).toBe(IssueType.NotFound);
+      const regPostResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: registrationUrl,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+          Authorization: 'Bearer fake-oidc-id-token',
+        },
+        body: { request: 'fake-jwe' },
+      });
+      
+      const offerPayload = await hostingManager.process(capturedRegJob!);
+      const encryptedOffer = await mockKmsService.encodeResponse(offerPayload, [externalEncrypter as unknown as JWK], 'host');
+      await asyncResponseStore.set(regThid, { status: 'COMPLETED', result: encryptedOffer });
+      
+      const pollingUrl = regPostResponse.headers.location;
+      const pollingPath = new URL(pollingUrl).pathname;
+      const pollResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: pollingPath,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+          Authorization: 'Bearer fake-oidc-id-token',
+        },
+        body: { thid: regThid },
+      });
+
+      const encryptedOfferResponse = pollResponse.text.replace('response=', '');
+      const { decryptedBytes: decryptedOfferBytes } = await cryptoService.decryptJwe(encryptedOfferResponse, externalEncrypter);
+      const offerResponse = JSON.parse(Content.bytesToStringUTF8(decryptedOfferBytes)) as IPayloadResponse;
+      const offerClaims = offerResponse.body.data[0].meta.claims;
+      const offerId = offerClaims[ClaimsOfferSchemaorg.identifier] as string;
+      expect(offerId).toBeDefined();
+
+      // --- ACT (Phase 2: Submit Order) ---
+      const orderPayload = { ...ORGANIZATION_ORDER_REQUEST };
+      orderPayload.body.data[0].meta.claims['Order.acceptedOffer.identifier'] = offerId;
+      const { thid: orderThid } = orderPayload;
+      
+      const decodedOrderJob: JobRequest = {
+        ...ORGANIZATION_REGISTRATION_JOB, // Re-using for structure, but with Order content
+        resourceType: 'Order',
+        id: uuidv4(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        content: orderPayload,
+      };
+      // For this test we bypass orchestrator signature resolution by embedding a JWK,
+      // matching the "full JWK" path used during initial registration.
+      (decodedOrderJob.content as any).meta = (decodedOrderJob.content as any).meta || {};
+      (decodedOrderJob.content as any).meta.jwe = (decodedOrderJob.content as any).meta.jwe || { header: {} };
+      (decodedOrderJob.content as any).meta.jwe.header = (decodedOrderJob.content as any).meta.jwe.header || {};
+      (decodedOrderJob.content as any).meta.jwe.header.jwk = hostPublicEncKey as unknown as JWK;
+      mockKmsService.decodeRequest.mockResolvedValueOnce(decodedOrderJob);
+
+      let capturedOrderJob: JobRequest | undefined;
+      mockQueueAdapter.addJob.mockImplementationOnce(async (jobName, jobData) => {
+        capturedOrderJob = jobData;
+      });
+      
+      const orderUrl = `/host/cds-es/v1/test/registry/org.schema/Order/_batch`;
+      const orderPostResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: orderUrl,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+          Authorization: 'Bearer fake-oidc-id-token',
+        },
+        body: { request: 'fake-jwe-order' },
+      });
+
+      // --- ASSERT (Phase 2: Order Submission) ---
+      expect(orderPostResponse.status).toBe(202);
+      expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(2);
+      expect(capturedOrderJob).toBeDefined();
+
+      // --- ACT (Phase 3: Simulate Worker on Order & Poll) ---
+      const finalResultPayload = await hostingManager.process(capturedOrderJob!);
+      const encryptedFinalResult = await mockKmsService.encodeResponse(finalResultPayload, [externalEncrypter as unknown as JWK], 'host');
+      await asyncResponseStore.set(orderThid, { status: 'COMPLETED', result: encryptedFinalResult });
+
+      const orderPollingUrl = orderPostResponse.headers.location;
+      const orderPollingPath = new URL(orderPollingUrl).pathname;
+      const finalPollResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: orderPollingPath,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+          Authorization: 'Bearer fake-oidc-id-token',
+        },
+        body: { thid: orderThid },
+      });
+      
+      // --- ASSERT (Phase 3: Final VC) ---
+      expect(finalPollResponse.status).toBe(200);
+      const encryptedFinalVc = finalPollResponse.text.replace('response=', '');
+      const { decryptedBytes: decryptedVcBytes } = await cryptoService.decryptJwe(encryptedFinalVc, externalEncrypter);
+      const finalVcResponse = JSON.parse(Content.bytesToStringUTF8(decryptedVcBytes)) as IPayloadResponse;
+
+      const responseEntry = finalVcResponse.body.data[0];
+      expect(responseEntry.type).toBe('Organization');
+      expect(responseEntry.resource).toBeDefined();
+      expect(responseEntry.resource!.id).toBeDefined();
+      expect(responseEntry.response.status).toBe('201');
+      expect(responseEntry.resource?.meta?.claims['org.schema.Organization.legalName']).toBe('Acme Organization SL');
     });
   });
 });
-

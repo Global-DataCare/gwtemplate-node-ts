@@ -7,15 +7,16 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { EmployeeManager } from '../../../managers/EmployeeManager';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
-import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from '../../../models/schemaorg';
 import { RecordBase, ClaimsRecord } from '../../../models/resource-document';
 import { JwkSet } from '../../../models/jwk';
 import { testBaseJobForEmployeeClaims as testBaseJobForEmployeeClaims, testClaimsTenant1Receptionist1 } from '../../data/employee.data';
-import { JobRequest } from '../../../models/request';
+import { JobRequest } from '../../../models/confidential-job';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { EntityConfig } from '../../../models/entity';
 import { normalizeCodeSystemAndValue } from '../../../utils/attributes';
+import { DeviceLicense } from '../../../models/device-license';
 
 // Tell Jest what will be mocked
 jest.mock('uuid');
@@ -65,6 +66,7 @@ describe('EmployeeManager', () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       mockVaultRepository.put.mockResolvedValue(true);
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockTenantsCacheManager.getEntityClaims.mockResolvedValue({});
 
       // ACT
       const response = await employeeManager.process(job);
@@ -73,8 +75,8 @@ describe('EmployeeManager', () => {
       expect(mockTenantsCacheManager.getTenantIdentifierUrn).toHaveBeenCalledWith(TENANT_VAULT_ID);
 
       // Verify that all expected attributes were sent to be protected for indexing
-      const signerKid = job.meta?.jws?.protected?.jwk?.kid;
-      const encrypterKid = job.meta?.jwe?.header?.jwk?.kid;
+      const signerKid = job.content?.meta?.jws?.protected?.jwk?.kid;
+      const encrypterKid = job.content?.meta?.jwe?.header?.jwk?.kid;
       const email = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email];
       const roleCode = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.hasOccupation];
 
@@ -92,7 +94,7 @@ describe('EmployeeManager', () => {
       const employeeConfig = docToProtect.content as EntityConfig;
 
       const expectedUrn = `${TENANT_URN}:employee:email:${email}:role:isco-08:${roleCode}`;
-      expect(employeeConfig.didDocument.id).toBe(expectedUrn);
+      expect(employeeConfig.didDocument!.id).toBe(expectedUrn);
 
       // Verify that the protected indexes from the mock were added to the document
       expect(docToProtect.indexed?.attributes).toHaveLength(4);
@@ -108,6 +110,70 @@ describe('EmployeeManager', () => {
 
       expect(response.body.data[0].response.status).toBe('201');
       expect(response.iss).toBe(TENANT_URN);
+    });
+
+    it('should return an Offer when employee licenses exist but none are available', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue('did:web:host.example.com');
+
+      const issuedLicense: DeviceLicense = {
+        id: 'lic-1',
+        tenantId: TENANT_ALTERNATE_NAME,
+        orderId: 'order-1',
+        userClass: 'employee',
+        userCategory: 'default',
+        type: 'mobile',
+        status: 'issued',
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      };
+      mockVaultRepository.getContainersInSection.mockResolvedValueOnce([
+        { id: issuedLicense.id, sequence: 0, content: issuedLicense } as unknown as ConfidentialStorageDoc,
+      ]);
+
+      const response = await employeeManager.process(job);
+
+      const entry = response.body.data[0] as any;
+      expect(entry.type).toBe('Employee-license-offer-v1.0');
+      expect(entry.meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeDefined();
+      expect(mockVaultRepository.put).not.toHaveBeenCalled();
+    });
+
+    it('should consume an available employee license before creating the employee', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      mockVaultRepository.put.mockResolvedValue(true);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockTenantsCacheManager.getEntityClaims.mockResolvedValue({});
+
+      const availableLicense: DeviceLicense = {
+        id: 'lic-available',
+        tenantId: TENANT_ALTERNATE_NAME,
+        orderId: 'order-1',
+        userClass: 'employee',
+        userCategory: 'default',
+        type: 'mobile',
+        status: 'available',
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      };
+      mockVaultRepository.getContainersInSection.mockResolvedValueOnce([
+        { id: availableLicense.id, sequence: 0, content: availableLicense } as unknown as ConfidentialStorageDoc,
+      ]);
+
+      const response = await employeeManager.process(job);
+
+      // First `put` consumes the license; second `put` persists the employee.
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(2);
+      const consumeCall = mockVaultRepository.put.mock.calls[0];
+      expect(consumeCall[0]).toBe(TENANT_VAULT_ID);
+      expect(consumeCall[2]).toBe('device-licenses');
+
+      expect(response.body.data[0].response.status).toBe('201');
     });
   });
 

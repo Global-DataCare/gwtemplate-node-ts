@@ -9,7 +9,7 @@ import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
 import { Content } from '../../../utils/content';
-import { JobRequest } from '../../../models/request';
+import { JobRequest } from '../../../models/confidential-job';
 
 describe('DemoKmsService', () => {
     let devKmsService: DemoKmsService;
@@ -52,12 +52,19 @@ describe('DemoKmsService', () => {
     describe('decodeRequest', () => {
         it('should decode a simulated Compact JWE string', async () => {
             // --- Arrange ---
-            // 1. The innermost content.
-            const innerPayload = { data: 'test' };
+            // 1. The innermost content (payload body).
+            const innerBody = { data: 'test' };
 
             // 2. A simulated JWS containing the content.
             const jwsProtected = { alg: 'ML-DSA-44', kid: 'test-kid' };
-            const jwsPayload = { jws: `${Content.objectToRawBase64UrlSafe(jwsProtected)}.${Content.objectToRawBase64UrlSafe(innerPayload)}.fakesig` };
+            const decodedPayload = {
+              thid: 'thid-test',
+              iss: 'did:web:sender.test',
+              aud: 'did:web:receiver.test',
+              type: 'api+json',
+              body: innerBody,
+            };
+            const jwsPayload = { jws: `${Content.objectToRawBase64UrlSafe(jwsProtected)}.${Content.objectToRawBase64UrlSafe(decodedPayload)}.fakesig` };
             
             // 3. A simulated Compact JWE containing the JWS payload.
             const jweProtected = Content.objectToRawBase64UrlSafe({ alg: 'none', enc: 'none' });
@@ -69,14 +76,23 @@ describe('DemoKmsService', () => {
 
             // --- Assert ---
             expect(jobRequest).toBeInstanceOf(Object);
-            expect(jobRequest.content).toEqual(innerPayload);
-            expect(jobRequest.meta?.jws?.protected).toEqual(jwsProtected);
+            expect(jobRequest.content).toBeDefined();
+            const content = jobRequest.content!;
+            expect(content.body).toEqual(innerBody);
+            expect(content.meta?.jws?.protected).toEqual(jwsProtected);
         });
 
         it('should still handle legacy plaintext JSON', async () => {
-            const legacyPayload = { data: 'legacy-test' };
-            const jobRequest = await devKmsService.decodeRequest(JSON.stringify(legacyPayload));
-            expect(jobRequest.content).toEqual(legacyPayload);
+            const legacyBody = { data: 'legacy-test' };
+            const legacyDecodedPayload = {
+              thid: 'legacy-thid',
+              iss: 'did:web:legacy.sender',
+              aud: 'did:web:legacy.receiver',
+              type: 'api+json',
+              body: legacyBody,
+            };
+            const jobRequest = await devKmsService.decodeRequest(JSON.stringify(legacyDecodedPayload));
+            expect(jobRequest.content?.body).toEqual(legacyBody);
         });
     });
 

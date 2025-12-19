@@ -3,7 +3,7 @@
 
 import { IJobProcessor, ManagerRegistry } from './managers/registry';
 import { createErrorBundle } from './utils/bundle';
-import { JobRequest } from './models/request';
+import { JobRequest } from './models/confidential-job';
 import { parseJobName } from './utils/naming';
 import { composeHostDidWebId } from './utils/did';
 import { IKmsService } from './crypto/interfaces/IKmsService';
@@ -47,21 +47,34 @@ export class Worker {
       // 1. Route to the appropriate manager based on the parsed job name
       switch (resourceType) {
         case 'Organization':
-          manager = this.managers.hostingManager;
+          // Organization is overloaded:
+          // - `registry/*/Organization` => host onboarding
+          // - `individual/*/Organization` => family onboarding (household modeled as Organization)
+          manager = job.section === 'individual' ? this.managers.familyManager : this.managers.hostingManager;
+          break;
+        case 'Order':
+          // Orders follow the same routing as their corresponding onboarding flow.
+          manager = job.section === 'individual' ? this.managers.familyManager : this.managers.hostingManager;
           break;
         case 'Practitioner':
         case 'Employee':
           manager = this.managers.employeeManager;
           break;
-        case 'Customer':
-        case 'Person':
-          manager = this.managers.customerManager;
-          break;
+	        case 'Customer':
+	        case 'Person':
+	          manager = this.managers.individualManager;
+	          break;
         case 'Composition':
           manager = this.managers.compositionManager;
           break;
         case 'Communication':
           manager = this.managers.communicationManager;
+          break;
+        case 'Device':
+          manager = this.managers.deviceRegistrationManager;
+          break;
+        case 'License':
+          manager = this.managers.licenseManager;
           break;
         default:
           throw new Error(`No manager configured for resourceType '${resourceType}'`);
@@ -86,11 +99,11 @@ export class Worker {
       let recipientJwks: JWK[];
       let responseSenderVaultId: string = senderVaultId;
       
-      if (job.meta?.jwe?.header?.jwk) {
+      if (job.content?.meta?.jwe?.header?.jwk) {
         // --- FLOW A: FAPI / SECURE FLOW ---
         // The original request was a JWE and included the sender's public key (`jwk`).
         // We use that key to encrypt the response directly for them.
-        recipientJwks = [job.meta.jwe.header.jwk];
+        recipientJwks = [job.content.meta.jwe.header.jwk];
 
       } else {
         // --- FLOW B: LEGACY / PLAINTEXT FLOW ---
@@ -149,7 +162,7 @@ export class Worker {
 
       // Also attempt to encrypt error responses, ensuring the Polling Handler always
       // gets a consistent data type if possible.
-      const recipientKey = job.meta?.jwe?.header?.jwk;
+      const recipientKey = job.content?.meta?.jwe?.header?.jwk;
       if (recipientKey) {
         // The issuer of a catastrophic error is always the host.
         return this.kmsService.encodeResponse(errorResponse, [recipientKey], 'host');

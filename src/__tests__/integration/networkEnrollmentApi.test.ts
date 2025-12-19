@@ -2,12 +2,12 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
-import request from 'supertest';
 import { createApiRouter } from '../../routes/api';
 import { CryptographyService } from '../../crypto/CryptographyService';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
-import { JobRequest, DecodedDidcommMessage } from '../../models/request';
+import { IDecodedDidcommPayload } from '../../models/confidential-message';
+import { JobRequest } from '../../models/confidential-job';
 import { mockKmsService } from '../mocks/kms.mock';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { IAsyncResponseStore, AsyncResponseStoreMem } from '../../adapters/async-response-store.mem';
@@ -16,7 +16,8 @@ import { testTenant1AddressCountry, testTenant1AlternateName, testTenant1Service
 import { testInitialNetworkJobInput, testTenantC_DidDocument } from '../data/network-enrollment.data';
 import { getTenantVaultId } from '../../utils/tenant';
 import { DidService } from '../../models/did';
-import { createDidServiceId } from '../../utils/did';
+import { createDidServiceIdBase } from '../../utils/did';
+import { invokeExpress } from './helpers/invokeExpress';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -73,7 +74,7 @@ describe('Network Enrollment API', () => {
 
       // Mock the service config lookup to simulate a valid, registered tenant
       const mockTenantServices: DidService[] = [{
-        id: createDidServiceId({ version: 'v1', sector, section, format }),
+        id: createDidServiceIdBase({ version: 'v1', sector, section, format }),
         type: 'NetworkEnrollmentService',
         serviceEndpoint: resourceType,
         actions: [action],
@@ -81,24 +82,28 @@ describe('Network Enrollment API', () => {
       (tenantsCacheManager.getDidServiceConfig as jest.Mock).mockReturnValue(mockTenantServices);
 
       const mockJobRequest: JobRequest = {
+        id: 'mock-job-id',
+        status: 'DRAFT' as any,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
         tenantId: '',
         resourceType, action,
         content: {
           ...testInitialNetworkJobInput,
-          iss: 'did:web:some-issuer'
-        },
-        meta: {
-          jws: {
-            protected: {
-              alg: 'ML-DSA-44',
-              kid: 'did:web:some-issuer#key-1',
+          iss: 'did:web:some-issuer',
+          meta: {
+            jws: {
+              protected: {
+                alg: 'ML-DSA-44',
+                kid: 'did:web:some-issuer#key-1',
+              },
             },
-          },
-          jwe: {
-            header: {
-              skid: 'did:web:some-issuer#enc-key-1',
-              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
-            }
+            jwe: {
+              header: {
+                skid: 'did:web:some-issuer#enc-key-1',
+                jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: 'did:web:some-issuer#enc-key-1', x: 'mock-key' }
+              }
+            },
           },
         },
       };
@@ -107,10 +112,12 @@ describe('Network Enrollment API', () => {
       (tenantsCacheManager.getDidDocument as jest.Mock).mockReturnValue(testTenantC_DidDocument);
 
       // --- Act ---
-      const response = await request(app)
-        .post(enrollmentUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`request=${testEncryptedJwe1}`);
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: enrollmentUrl,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { request: testEncryptedJwe1 },
+      });
 
       // --- Assert ---
       expect(response.status).toBe(202);
@@ -158,10 +165,12 @@ describe('Network Enrollment API', () => {
       mockKmsService.decodeRequest.mockRejectedValue(new Error('Invalid signature'));
       
       // --- Act ---
-      const response = await request(app)
-        .post(enrollmentUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`request=${testEncryptedJwe1}`);
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: enrollmentUrl,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { request: testEncryptedJwe1 },
+      });
 
       // --- Assert ---
       expect(response.status).toBe(401);
@@ -208,7 +217,7 @@ describe('Network Enrollment API', () => {
 
       // The service must exist for the path validation to pass.
       const mockTenantServices: DidService[] = [{
-        id: createDidServiceId({ version: 'v1', sector, section, format }),
+        id: createDidServiceIdBase({ version: 'v1', sector, section, format }),
         type: 'NetworkEnrollmentService',
         serviceEndpoint: resourceType,
         actions: [action],
@@ -219,22 +228,28 @@ describe('Network Enrollment API', () => {
       const employeeDid = `did:web:${tenantId}:employee:analyst@${tenantId}.org:role:analyst`;
       const employeeKid = `urn:ietf:rfc:7638:thumbprint-of-analyst-key`;
       
-      const jobFromNonControllerEmployee: DecodedDidcommMessage = {
+      const jobFromNonControllerEmployee: IDecodedDidcommPayload = {
         ...testInitialNetworkJobInput,
         iss: employeeDid,
       };
       const mockJobRequestFromEmployee: JobRequest = {
+        id: 'mock-job-id-2',
+        status: 'DRAFT' as any,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
         tenantId: '', resourceType, action,
-        content: jobFromNonControllerEmployee,
-        meta: {
-          jws: {
-            protected: { alg: 'ML-DSA-44', kid: employeeKid }
-          },
-          jwe: {
-            header: {
-              skid: employeeKid, // Assuming sender uses same key for signing and encryption ID
-              jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: employeeKid, x: 'mock-key' }
-            }
+        content: {
+          ...jobFromNonControllerEmployee,
+          meta: {
+            jws: {
+              protected: { alg: 'ML-DSA-44', kid: employeeKid }
+            },
+            jwe: {
+              header: {
+                skid: employeeKid, // Assuming sender uses same key for signing and encryption ID
+                jwk: { kty: 'OKP', crv: 'ML-KEM-768', kid: employeeKid, x: 'mock-key' }
+              }
+            },
           },
         },
       };
@@ -246,10 +261,12 @@ describe('Network Enrollment API', () => {
       (tenantsCacheManager.getDidDocument as jest.Mock).mockReturnValue(testTenantC_DidDocument);
 
       // --- Act ---
-      const response = await request(app)
-        .post(enrollmentUrl)
-        .set('Content-Type', 'application/x-www-form-urlencoded')
-        .send(`request=${testEncryptedJwe1}`);
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: enrollmentUrl,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: { request: testEncryptedJwe1 },
+      });
 
       // --- Assert ---
       // The API's job is to accept the authenticated request for a valid route. It returns 202.

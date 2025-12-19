@@ -8,7 +8,7 @@ import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 import { parseCdsRequest } from '../crypto/middleware/parseCdsRequest';
 import { ICryptography } from '../crypto/interfaces/ICryptography';
 import { createDecodeRequestMiddleware } from '../crypto/middleware/decodeRequest';
-import { DataInRequest, JobRequest } from '../models/request';
+import { JobProcessingInfo, JobRequest } from '../models/confidential-job';
 import { Worker } from '../worker';
 
 export function createTenantRouter(
@@ -19,7 +19,7 @@ export function createTenantRouter(
 const router = express.Router();
 const decodeRequest = createDecodeRequestMiddleware(cryptoService);
 
-const createJobName = (cdsRequest: DataInRequest): string => {
+const createJobName = (cdsRequest: JobProcessingInfo): string => {
   const { tenantId, resourceType, action } = cdsRequest;
   return `${tenantId}:${resourceType}:_${action}`;
 };

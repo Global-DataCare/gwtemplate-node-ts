@@ -168,7 +168,7 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
  * @param {string} params.format The format string, which MUST follow Reverse DNS notation (e.g., 'org.schema', 'org.hl7.fhir.r4').
  * @returns The composed service identifier string.
  */
-export const createDidServiceId = (params: { version: string; sector: string; section: string; format: string, resourceType?: string }) => {
+export const createDidServiceIdBase = (params: { version: string; sector: string; section: string; format: string, resourceType?: string }) => {
   const version = params.version.toLowerCase();
   const sector = params.sector.toLowerCase();
   const section = params.section.toLowerCase();

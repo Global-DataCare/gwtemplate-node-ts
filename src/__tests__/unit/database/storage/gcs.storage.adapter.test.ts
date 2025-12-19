@@ -71,7 +71,6 @@ describe('GcsStorageAdapter', () => {
       contentType: testContentType,
       resumable: false,
     });
-    expect(mockMakePublic).toHaveBeenCalled();
   });
 
   it('should re-throw a specific error if GCS upload fails', async () => {

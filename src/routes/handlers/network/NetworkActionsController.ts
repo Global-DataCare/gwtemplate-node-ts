@@ -7,7 +7,7 @@ import { ManagerError } from '../../../models/errors/manager-error';
 import { IssueType } from '../../../models/fhir/codes';
 import { IKmsService } from '../../../crypto/interfaces/IKmsService';
 import { getTenantVaultId } from '../../../utils/tenant';
-import { JobRequest } from '../../../models/request';
+import { JobRequest } from '../../../models/confidential-job';
 
 export class NetworkActionsController {
   private queueAdapter: QueueAdapter;
