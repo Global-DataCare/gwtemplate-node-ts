@@ -4,12 +4,13 @@
 import { jest } from '@jest/globals';
 import { DemoKmsService } from '../../../services/DemoKmsService';
 import { KmsService } from '../../../services/KmsService';
-import { CryptographyService } from '../../../crypto/CryptographyService';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { AdapterCryptoSdkNode } from '../../../gdc-backend-utils-node/adapters/node/crypto';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
-import { Content } from '../../../utils/content';
-import { JobRequest } from '../../../models/confidential-job';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { Content } from 'gdc-common-utils-ts/utils/content';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 
 describe('DemoKmsService', () => {
     let devKmsService: DemoKmsService;
@@ -17,7 +18,7 @@ describe('DemoKmsService', () => {
 
     beforeEach(() => {
         // To test the DemoKmsService decorator, we need a real KmsService to wrap.
-        const cryptoService = new CryptographyService();
+        const cryptoService = new CryptographyService(new AdapterCryptoSdkNode());
         const vaultRepository = new VaultMemRepository();
         // The resolver is a lambda to avoid circular dependency issues during instantiation.
         const tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => realKmsService, 'test-host-collection');
@@ -124,7 +125,7 @@ describe('DemoKmsService', () => {
     describe('protectConfidentialData', () => {
         it('should move the "content" into a simulated "jwe.ciphertext" property', async () => {
             const originalContent = { sensitive: 'data' };
-            const doc: ConfidentialStorageDoc = { id: 'doc1', content: originalContent, sequence: 0 };
+            const doc: ConfidentialStorageDoc = { id: 'doc1', status: 'active', content: originalContent, sequence: 0 };
             const protectedDoc = await devKmsService.protectConfidentialData(doc, 'tenant-123');
 
             expect(protectedDoc.content).toBeUndefined();
@@ -142,6 +143,7 @@ describe('DemoKmsService', () => {
             // The protected doc now has a base64url-encoded ciphertext property
             const protectedDoc: ConfidentialStorageDoc = { 
                 id: 'doc1', 
+                status: 'active',
                 jwe: { ciphertext: Content.objectToRawBase64UrlSafe(originalContent) }, 
                 sequence: 0 
             };
@@ -152,10 +154,10 @@ describe('DemoKmsService', () => {
         });
 
         it('should throw if jwe or jwe.ciphertext is invalid', async () => {
-            const invalidDoc1: ConfidentialStorageDoc = { id: 'doc1', jwe: { some: 'field' }, sequence: 0 };
+            const invalidDoc1: ConfidentialStorageDoc = { id: 'doc1', status: 'active', jwe: { some: 'field' }, sequence: 0 };
             await expect(devKmsService.unprotectConfidentialData(invalidDoc1, 'tenant-123')).rejects.toThrow();
 
-            const invalidDoc2: ConfidentialStorageDoc = { id: 'doc1', jwe: { ciphertext: null }, sequence: 0 };
+            const invalidDoc2: ConfidentialStorageDoc = { id: 'doc1', status: 'active', jwe: { ciphertext: null }, sequence: 0 };
             await expect(devKmsService.unprotectConfidentialData(invalidDoc2, 'tenant-123')).rejects.toThrow();
         });
     });

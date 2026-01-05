@@ -1,10 +1,11 @@
 // src/services/DiscoveryService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { EntityConfig } from '../models/entity';
-import { DidDocument } from '../models/did';
-import { JwkSet } from '../models/jwk';
+import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
+import { DidDocument } from '../gdc-backend-utils-node/models/did';
+import { JwkSet } from '../gdc-backend-utils-node/models/jwk';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
+import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 
 /**
  * Handles the stateless, synchronous logic for generating public discovery documents
@@ -49,9 +50,8 @@ export class DiscoveryService {
 
     if (!didDoc || !tenantUrl) return undefined;
     
-    // The jwks_uri path needs to be updated to match the new routing structure.
-    // This now correctly uses the tenant's primary DID as the base.
-    const jwks_uri = new URL('/.well-known/jwks.json', didDoc.id.replace('did:web:', 'https://')).toString();
+    const jwksBaseUrl = getBaseUrlFromDidWeb(didDoc.id);
+    const jwks_uri = new URL('/.well-known/jwks.json', jwksBaseUrl).toString();
     
     return {
       issuer: tenantUrl,

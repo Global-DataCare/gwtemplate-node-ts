@@ -1,15 +1,15 @@
 // src/managers/TenantsCacheManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { IKmsService } from '../crypto/interfaces/IKmsService';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ITenantsManager } from './ITenantsManager';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { getIdentifierUrnFromClaims, generateTenantCollectionNameFromClaims } from '../utils/tenant';
-import { DidDocument, DidService, VerificationMethod } from '../models/did';
-import { ClaimsOrganizationSchemaorg } from '../models/schemaorg';
-import { Sector } from '../models/urlPath';
-import { getBaseUrlFromDidWeb } from '../utils/did';
+import { DidDocument, DidService, VerificationMethod } from '../gdc-backend-utils-node/models/did';
+import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 import { parseTenantUrn } from '../utils/urn';
 
 /**
@@ -195,7 +195,7 @@ export class TenantsCacheManager implements ITenantsManager {
 
   public async getDidServiceConfig(vaultId: string): Promise<DidService[] | undefined> {
     const tenantConfig = await this._ensureTenantIsInCache(vaultId);
-    return tenantConfig?.didConfig.service;
+    return tenantConfig?.didConfig?.service;
   }
 
   /**

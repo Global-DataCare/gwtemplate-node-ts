@@ -3,16 +3,16 @@
   "version": "1.0.0",
   "license": "Apache-2.0",
   "main": "src/server.ts",
-  "type": "commonjs",
+  "type": "module",
   "engines": {
     "node": "^22.0.0"
   },
   "scripts": {
-    "start": "node build/server.js",
+    "start": "node --experimental-specifier-resolution=node build/main.js",
     "clean": "rm -rf build",
     "build": "npm run clean && npm run build:swagger && tsc",
-    "build:swagger": "node scripts/generate-swagger-spec.js",
-    "dev": "npm run build:swagger && nodemon --watch 'src/**/*.ts' --watch 'swagger.config.js' --exec 'ts-node --transpile-only' src/server.ts",
+    "build:swagger": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"ESNext\",\"moduleResolution\":\"bundler\",\"allowImportingTsExtensions\":true}' node --loader ts-node/esm --experimental-specifier-resolution=node scripts/generate-swagger-spec.mts",
+    "dev": "npm run build:swagger && nodemon --watch 'src/**/*.ts' --watch 'swagger.config.cjs' --exec 'DOTENV_CONFIG_PATH=.env.local node --import dotenv/config --loader ts-node/esm --experimental-specifier-resolution=node src/main.ts' ",
     "prettier": "prettier --write \"src/**/*.ts\"",
     "prettier:check": "prettier --check \"src/**/*.ts\"",
     "lint": "eslint 'src/**/*.{ts,js}' --fix",
@@ -25,7 +25,7 @@
     "test:unit": "jest --coverage src/__tests__/unit",
     "test:integration": "jest --coverage src/__tests__/integration",
     "test:e2e": "TEST_ENV=e2e jest --no-coverage src/__tests__/e2e",
-    "seed:dev": "ts-node scripts/seed-dev-cas.ts",
+    "seed:dev": "ts-node --esm scripts/seed-dev-cas.ts",
     "update-deps": "node update-deps.js",
     "docker:build": "./docker_build.sh",
     "docker:run": "./docker_run.sh"

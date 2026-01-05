@@ -1,6 +1,6 @@
 // src/utils/vc-signer.ts
 
-import { IKmsService } from '../crypto/interfaces/IKmsService';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { canonicalize } from './json-canon';
 import { createHash } from 'crypto';
 

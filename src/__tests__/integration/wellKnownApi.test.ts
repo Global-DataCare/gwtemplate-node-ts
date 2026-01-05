@@ -6,9 +6,9 @@ import { createDiscoveryRouter } from '../../routes/discovery';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { DiscoveryService } from '../../services/DiscoveryService';
 import { testTenant1AlternateName, testTenant1DidWebHosted, testTenant1IdentifierUrn, testTenant1VaultId } from '../data/organization.data';
-import { DidDocument } from '../../models/did';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../models/schemaorg';
-import { IKmsService } from '../../crypto/interfaces/IKmsService';
+import { DidDocument } from '../../gdc-backend-utils-node/models/did';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import { parseTenantUrn } from '../../utils/urn';
 import { ILogger } from '../../loggers/ILogger';
 import { invokeExpress } from './helpers/invokeExpress';
@@ -33,6 +33,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   signWithManagedKey: jest.fn(),
   signWithReconstructedKey: jest.fn(),
   createDetachedJws: jest.fn(),
+  createCompactJws: jest.fn(),
   encodeResponse: jest.fn(),
   protectConfidentialData: jest.fn(),
   unprotectConfidentialData: jest.fn(),

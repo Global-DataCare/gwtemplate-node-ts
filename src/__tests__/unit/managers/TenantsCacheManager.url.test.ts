@@ -5,10 +5,11 @@ import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { DemoKmsService } from '../../../services/DemoKmsService';
 import { KmsService } from '../../../services/KmsService';
-import { CryptographyService } from '../../../crypto/CryptographyService';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { AdapterCryptoSdkNode } from '../../../gdc-backend-utils-node/adapters/node/crypto';
 import { testConfigTenant1, testTenant1IdentifierUrn, testHostDidWeb } from '../../data/organization.data';
-import { ClaimsOrganizationSchemaorg } from '../../../models/schemaorg';
-import { EntityConfig } from '../../../models/entity';
+import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
 
 describe('TenantsCacheManager - getTenantDomainUrl', () => {
   let tenantsCacheManager: TenantsCacheManager;
@@ -37,7 +38,7 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
   delete (tenantConfigWithoutUrl.claims as any)[ClaimsOrganizationSchemaorg.url];
 
   beforeEach(() => {
-    const cryptoService = new CryptographyService();
+    const cryptoService = new CryptographyService(new AdapterCryptoSdkNode());
     const vaultRepository = new VaultMemRepository();
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => realKmsService, 'test-host-collection');
     realKmsService = new KmsService(cryptoService, tenantsCacheManager);

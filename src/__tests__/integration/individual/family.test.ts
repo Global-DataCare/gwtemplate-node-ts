@@ -5,16 +5,17 @@ import { createApiRouter } from '../../../routes/api';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { AsyncResponseStoreMem } from '../../../adapters/async-response-store.mem';
-import { CryptographyService } from '../../../crypto/CryptographyService';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { AdapterCryptoSdkNode } from '../../../gdc-backend-utils-node/adapters/node/crypto';
 import { mockKmsService } from '../../mocks/kms.mock';
 import { HostingManager } from '../../../managers/HostingManager';
-import { Sector } from '../../../models/urlPath';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { generateTenantCollectionNameFromClaims } from '../../../utils/tenant';
 import { testClaimsHostInitialization } from '../../data/end-to-end.data';
 import { ORGANIZATION_ORDER_JOB, ORGANIZATION_REGISTRATION_JOB } from '../../data/example-jobs';
-import { ClaimsOfferSchemaorg } from '../../../models/schemaorg';
+import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
-import { JobRequest, JobStatus } from '../../../models/confidential-job';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
 
@@ -165,7 +166,7 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
     await hostingManager.process(orderJob);
 
     const asyncResponseStore = new AsyncResponseStoreMem();
-    const crypto = new CryptographyService();
+    const crypto = new CryptographyService(new AdapterCryptoSdkNode());
     const apiRouter = createApiRouter(
       mockQueueAdapter as any,
       tenantsCacheManager,
@@ -184,18 +185,19 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
     const tenantId = 'acme';
     const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_batch`;
 
-    const decodedJob: JobRequest = {
-      id: 'job-family-1',
-      status: JobStatus.DRAFT,
-      sequence: 0,
-      createdAtTimestamp: Date.now(),
-      tenantId,
-      sector: Sector.HEALTH_CARE,
-      section: 'individual',
-      action: '_batch',
-      resourceType: 'Organization',
-      content: FAMILY_REGISTRATION_REQUEST as any,
-    };
+	    const decodedJob: JobRequest = {
+	      id: 'job-family-1',
+	      status: JobStatus.DRAFT,
+	      sequence: 0,
+	      createdAtTimestamp: Date.now(),
+	      tenantId,
+	      sector: Sector.HEALTH_CARE,
+	      section: 'individual',
+	      format: 'org.schema',
+	      action: '_batch',
+	      resourceType: 'Organization',
+	      content: FAMILY_REGISTRATION_REQUEST as any,
+	    };
     mockKmsService.decodeRequest.mockResolvedValueOnce(decodedJob as any);
 
     const response = await invokeExpress(app, {

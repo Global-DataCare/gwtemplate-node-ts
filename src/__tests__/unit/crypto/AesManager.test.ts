@@ -3,8 +3,8 @@
 
 import { jest } from '@jest/globals';
 import { randomBytes } from 'crypto'; // Use Node.js native crypto module
-import { ProtectedDataAES } from '../../../models/aes';
-import { AesManager } from '../../../crypto/AesManager';
+import { ProtectedDataAES } from 'gdc-common-utils-ts/models/aes';
+import { AesManager } from 'gdc-common-utils-ts';
 
 describe('AesManager', () => {
   let aesManager: AesManager;
@@ -51,4 +51,3 @@ describe('AesManager', () => {
     ).rejects.toThrow();
   });
 });
-

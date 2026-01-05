@@ -3,12 +3,12 @@
 
 import { IJobProcessor, ManagerRegistry } from './managers/registry';
 import { createErrorBundle } from './utils/bundle';
-import { JobRequest } from './models/confidential-job';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { parseJobName } from './utils/naming';
-import { composeHostDidWebId } from './utils/did';
-import { IKmsService } from './crypto/interfaces/IKmsService';
+import { composeHostDidWebId } from './utils/did-backend';
+import { IKmsService } from './gdc-backend-utils-node/models/IKmsService';
 import { getTenantVaultId } from './utils/tenant';
-import { JWK } from './models/jwk';
+import { JWK } from 'gdc-common-utils-ts/models/jwk';
 
 /**
  * The Worker is the heart of the background processing logic.
@@ -70,8 +70,21 @@ export class Worker {
         case 'Communication':
           manager = this.managers.communicationManager;
           break;
+        case 'Observation':
+          manager = this.managers.observationManager;
+          break;
+        case 'RelatedPerson':
+          manager = this.managers.relatedPersonManager;
+          break;
+        case 'Smart':
+        case 'smart':
+          manager = this.managers.openIdAuthManager;
+          break;
         case 'Device':
           manager = this.managers.deviceRegistrationManager;
+          break;
+        case 'Token':
+          manager = this.managers.identityTokenManager;
           break;
         case 'License':
           manager = this.managers.licenseManager;
@@ -99,7 +112,8 @@ export class Worker {
       let recipientJwks: JWK[];
       let responseSenderVaultId: string = senderVaultId;
       
-      if (job.content?.meta?.jwe?.header?.jwk) {
+      const isSecureFlow = String(job.contentType || '').startsWith('application/x-www-form-urlencoded');
+      if (isSecureFlow && job.content?.meta?.jwe?.header?.jwk) {
         // --- FLOW A: FAPI / SECURE FLOW ---
         // The original request was a JWE and included the sender's public key (`jwk`).
         // We use that key to encrypt the response directly for them.
@@ -112,27 +126,9 @@ export class Worker {
         // The recipient is determined by the nature of the job.
         let recipientVaultId: string;
         if (jobInfo.resourceType === 'Organization' && job.tenantId === 'host') {
-          // --- SPECIAL CASE: NEW TENANT ONBOARDING IN PLAINTEXT MODE ---
-          // This block handles a unique architectural challenge created by plaintext onboarding.
-          // The flow is as follows:
-          // 1. The HostingManager (called by the worker) creates the new tenant and persists it.
-          // 2. The worker now needs to encrypt the job response ("encrypt-to-self") for the tenant
-          //    that was just created in the same transaction.
-          // 3. At this exact moment, no other component has had a chance to "lazy-load" the new
-          //    tenant's configuration (like its DID Document, which contains its public keys).
-          //
-          // To solve this, the `KmsService` MUST be resilient. Its `getPublicEncryptionKey` method
-          // is designed to, if it cannot find a key in its immediate memory, trigger a lazy-load
-          // by querying the `TenantsCacheManager`. This ensures it can find the public key of the
-          // "just-born" tenant.
-          const newTenantClaims = job.content?.body?.data?.[0]?.meta?.claims;
-          if (!newTenantClaims) throw new Error('Cannot determine new tenant from claims to encrypt response.');
-          
-          const newTenantId = newTenantClaims['org.schema.Organization.alternateName'] as string;
-          const newTenantSector = newTenantClaims['org.schema.Service.category'] as string;
-          if (!newTenantId || !newTenantSector) throw new Error('Missing alternateName or category in new tenant claims.');
-          
-          recipientVaultId = getTenantVaultId(newTenantSector, newTenantId);
+          // Special case (legacy plaintext onboarding):
+          // Encrypt-to-host so the polling handler can always decrypt, even before the new tenant's keys exist.
+          recipientVaultId = 'host';
           responseSenderVaultId = 'host';
         } else {
           // Default Case: An existing tenant is processing a job. Encrypt for the tenant itself.
@@ -164,8 +160,12 @@ export class Worker {
       // gets a consistent data type if possible.
       const recipientKey = job.content?.meta?.jwe?.header?.jwk;
       if (recipientKey) {
-        // The issuer of a catastrophic error is always the host.
-        return this.kmsService.encodeResponse(errorResponse, [recipientKey], 'host');
+        try {
+          // The issuer of a catastrophic error is always the host.
+          return await this.kmsService.encodeResponse(errorResponse, [recipientKey], 'host');
+        } catch {
+          return JSON.stringify(errorResponse);
+        }
       } else {
         // In the legacy flow, we can't be sure who to encrypt for in an error case,
         // so we must return a plaintext JSON string. The polling handler MUST handle this.

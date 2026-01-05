@@ -1,9 +1,9 @@
 import { externalClientSignerJwk } from '../../data/external-client.data';
 import * as mlDsa from '@noble/post-quantum/ml-dsa';
-import { withKid } from '../../../crypto/jwk-thumbprint';
-import { Content } from '../../../utils/content';
-import { MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
-import { encodeHeader, encodePayload, encodeSignature, decodeHeader } from '../../../utils/jwt';
+import { withKid } from '../../../gdc-backend-utils-node/jwk-thumbprint';
+import { Content } from 'gdc-common-utils-ts/utils/content';
+import { MldsaPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { encodeHeader, encodePayload, encodeSignature, decodeHeader } from 'gdc-common-utils-ts/utils/jwt';
 
 // Define a type for the private key for clarity and type safety.
 type MldsaPrivateJwk = MldsaPublicJwk & { priv: string };

@@ -2,8 +2,8 @@ import * as express from 'express';
 import { randomUUID } from 'crypto';
 import { TokenManager } from '../managers/TokenManager';
 import { createOperationOutcome } from '../utils/outcome';
-import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { ManagerError } from '../models/errors/manager-error';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 
 /**
@@ -23,7 +23,7 @@ export function createAuthRouter(
    * /auth/token:
    *   post:
    *     tags:
-   *       - Authentication
+   *       - 99. Legacy / Internal
    *     summary: Exchange an Activation Code for an Initial Access Token
    *     description: |
    *       This endpoint performs a token exchange. The user authenticates by presenting a valid `id_token` (from an OIDC provider) as a Bearer token.
@@ -53,7 +53,9 @@ export function createAuthRouter(
    *       '409':
    *         description: Conflict. The activation code has already been used.
    */
-  router.post('/auth/token', async (req: express.Request, res: express.Response) => {
+  // Back-compat: previously mounted under `/auth` but also used `/auth/token` internally.
+  // The effective path became `/auth/auth/token`. Keep accepting `/auth/token` for now.
+  router.post(['/token', '/auth/token'], async (req: express.Request, res: express.Response) => {
     try {
       // This endpoint is an orchestrator, not a job processor.
       // It handles a synchronous request flow.

@@ -1,12 +1,12 @@
 // src/__tests__/data/credential.data.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { VerifiableCredentialV2 } from "../../models/verifiable-credential";
+import { VerifiableCredentialV2 } from "../../gdc-backend-utils-node/models/verifiable-credential";
 import {
   testTenant1IdentifierUrn,
   testHostDidWeb,
   testRootOrgDidWeb
-} from "./organization.data";
+} from "./organization.constants";
 
 // ===================================================================================
 // MOCK VERIFIABLE CREDENTIALS

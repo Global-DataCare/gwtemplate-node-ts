@@ -5,7 +5,7 @@ import * as express from 'express';
 import * as stripe from 'stripe';
 import { v4 as uuidv4 } from 'uuid';
 import { QueueAdapter } from '../adapters/queue';
-import { JobRequest } from '../models/confidential-job';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { createJobName } from '../utils/naming';
 
 /**
@@ -15,14 +15,15 @@ import { createJobName } from '../utils/naming';
 export function createWebhooksRouter(queueAdapter: QueueAdapter): express.Router {
   const router = express.Router();
 
-  // This check is important. If the keys are not in the environment, the app should not start.
+  // Stripe is an optional integration surface. In production, we fail fast if it's enabled but misconfigured.
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SIGNING_SECRET) {
-    // In test environments we allow the server to start without Stripe configured,
-    // because webhooks are an optional integration surface.
-    if (process.env.NODE_ENV === 'test') {
-      return router;
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'Stripe environment variables (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SIGNING_SECRET) are not configured.',
+      );
     }
-    throw new Error('Stripe environment variables (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SIGNING_SECRET) are not configured.');
+    console.warn('[Webhooks] Stripe not configured. /webhooks/stripe will be disabled.');
+    return router;
   }
 
   const stripeClient = new stripe.Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-11-17.clover' });
@@ -70,6 +71,10 @@ export function createWebhooksRouter(queueAdapter: QueueAdapter): express.Router
           status: 'DRAFT' as any,
           createdAtTimestamp: Date.now(),
           tenantId: 'host', // The job is processed by the host system
+          section: 'system',
+          format: 'org.schema',
+          resourceType: 'License',
+          action: 'create',
           content: {
               iss: 'did:web:stripe.com',
               jti: uuidv4(),

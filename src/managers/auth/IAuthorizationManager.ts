@@ -1,8 +1,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/auth/IAuthorizationManager.ts
 
-import { IAccessTokenClaims } from '../../models/auth';
-import { BundleEntry } from '../../models/bundle';
+import { IAccessTokenClaims } from 'gdc-common-utils-ts/models/auth';
+import { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 
 /**
  * Defines the contract for the Authorization Manager.

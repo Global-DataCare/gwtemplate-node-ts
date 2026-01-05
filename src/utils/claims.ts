@@ -2,8 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4, validate as uuidValidate} from 'uuid';
-import { knownDomainsReversed } from "../models/urlPath";
-import { findCanonicalClaimCase } from '../models/schema-definitions';
+import { knownDomainsReversed } from "gdc-common-utils-ts/models/urlPath";
+import { findCanonicalClaimCase } from '../gdc-backend-utils-node/models/schema-definitions';
 
 /**
  * Defines the constant for the response modes property ID.

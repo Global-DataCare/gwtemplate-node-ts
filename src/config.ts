@@ -1,7 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/config.ts
 
-import { Sector } from "./models/urlPath";
+import { Sector } from "gdc-common-utils-ts/models/urlPath";
 
 /**
  * Defines the shape of the application's configuration object.

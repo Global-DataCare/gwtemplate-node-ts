@@ -4,7 +4,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { normalizeInteroperableClaims } from '../utils/claims';
-import { RecordBase } from '../models/resource-document';
+import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 
 export interface ListInput {
   vaultId: string; // The patient's vault where this List will be stored
@@ -29,7 +29,7 @@ export class ListManager {
       input.payload
     );
 
-    const listDocument: RecordBase & { claims: any; '@context': string; '@type': string; entry: any[] } = {
+    const listDocument: RecordBase & { claims: any; '@context': string; '@type': string; entry: any[]; meta?: Record<string, any> } = {
       id: listId,
       '@context': input.payload['@context'],
       '@type': input.payload['@type'],

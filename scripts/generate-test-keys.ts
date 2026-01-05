@@ -3,7 +3,7 @@
 
 // Note: npx ts-node scripts/generate-test-keys.ts
 
-import { Content } from '../src/utils/content';
+import { Content } from '../src/crypto-ts/utils/content';
 import { CryptographyService } from '../src/crypto/CryptographyService';
 
 async function generateKeys() {

@@ -52,7 +52,7 @@ curl -i --location --request POST 'http://localhost:3000/acme/cds-ES/v1/health-c
 --header 'Content-Type: application/json' \
 --data-raw '{
     "thid": "thid-consent-predetermined-final-3",
-    "iss": "did:web:api.acme.org:employee:email:receptionist1@api.acme.org:role:ISCO-08:4226",
+    "iss": "did:web:api.acme.org:employee:receptionist1@api.acme.org:role:ISCO-08|4226",
     "aud": "urn:antifraud:health-care:acme",
     "body": {
       "resourceType": "Consent",
@@ -146,7 +146,7 @@ curl -i --location --request POST 'http://localhost:3000/acme/cds-ES/v1/health-c
 --header 'Content-Type: application/json' \
 --data-raw '{
   "thid": "thid-comm-diag-report-1",
-  "iss": "did:web:api.acme.org:employee:email:radiologist1@api.acme.org:role:ISCO-08:2224",
+  "iss": "did:web:api.acme.org:employee:radiologist1@api.acme.org:role:ISCO-08|2224",
   "aud": "urn:antifraud:health-care:acme",
   "body": {
     "resourceType": "Communication",

@@ -2,13 +2,13 @@
 
 import { createHash, randomUUID } from 'crypto';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
-import { BundleEntryRequest, BundleJsonApi, BundleEntryResponse, ErrorEntry } from '../models/bundle';
-import { ConsentRule, ClaimConsent } from '../models/consent-rule';
-import { IDecodedDidcommPayload } from '../models/confidential-message';
-import { JobRequest } from '../models/confidential-job';
+import { BundleEntryRequest, BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
+import { ConsentRule, ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { createOperationOutcome } from '../utils/outcome';
-import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { RecordBase } from '../models/resource-document';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { buildConsentRuleKey, hashConsentRuleId } from '../utils/consent';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 

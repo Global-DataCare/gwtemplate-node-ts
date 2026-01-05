@@ -3,27 +3,27 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { IServerConfig } from '../config';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { IStorageAdapter } from '../database/storage/IStorageAdapter';
 import { ILogger } from '../loggers/ILogger';
-import { BundleEntry, BundleJsonApi, ErrorEntry } from '../models/bundle';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { JobRequest } from '../models/confidential-job';
-import { IPayloadResponse } from '../models/confidential-message';
-import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { IncludedResource } from '../models/jsonapi';
-import { ClaimsRecord } from '../models/resource-document';
-import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
-import { Sector } from '../models/urlPath';
+import { BundleEntry, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { createOperationOutcome } from '../utils/outcome';
 import { determineResourceId } from '../utils/resource';
 import { getTenantVaultId } from '../utils/tenant';
 import { generateLicenseOffer } from '../utils/offer';
-import { ManagerError } from '../models/errors/manager-error';
-import { EntityLifecycleStatus } from '../models/enums';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
 import { TenantsCacheManager } from './TenantsCacheManager';
 
 type FamilyRegistrationContent = {
@@ -42,7 +42,7 @@ export class FamilyManager {
     private config: IServerConfig,
   ) {}
 
-  async process(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
+  async process(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
     const jobEntries = job?.content?.body?.data || [];
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
 
@@ -137,6 +137,7 @@ export class FamilyManager {
 
     const registrationDoc: ConfidentialStorageDoc = {
       id: familyDocId,
+      status: EntityLifecycleStatus.Pending,
       sequence: 0,
       indexed: {
         attributes: [
@@ -214,6 +215,7 @@ export class FamilyManager {
 
     const updatedDoc: ConfidentialStorageDoc = {
       id: secureDoc.id,
+      status: finalizedContent.status,
       sequence: (secureDoc.sequence || 0) + 1,
       indexed: secureDoc.indexed,
       content: finalizedContent,

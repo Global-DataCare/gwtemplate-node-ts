@@ -1,5 +1,5 @@
 import { RulesTestEnvironment, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { FirestoreVaultRepository } from '../../../database/repositories/firestore/firestore.vault.repository';
 
 // A realistic test document that simulates a document with HMAC'd indexed attributes.

@@ -16,19 +16,19 @@ import {
   testClaimsTenant1AlternateNameInvalidPrefix,
 } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
-import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
-import { JobRequest, JobStatus } from '../../../models/confidential-job';
-import { ClaimsRecord } from '../../../models/resource-document';
-import { EntityConfig } from '../../../models/entity';
-import { IKmsService } from '../../../crypto/interfaces/IKmsService';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
+import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { IServerConfig } from '../../../config';
-import { Sector } from '../../../models/urlPath';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
-import { JwkSet } from '../../../models/jwk';
+import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
 
 import { ILogger } from '../../../loggers/ILogger';
 import { testTenant1LegalName } from '../../data/organization.data';
@@ -74,6 +74,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
     Promise.resolve(doc.content as any),
   ),
   createDetachedJws: jest.fn(),
+  createCompactJws: jest.fn(),
   getHostPublicJwkSet: jest.fn(),  
   getPublicVerificationKey: jest.fn(),
   getPublicEncryptionKey: jest.fn(),
@@ -89,13 +90,13 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
   tenantId: (claims as any)[ClaimsOrganizationSchemaorg.alternateName] || 'host',
   jurisdiction: (claims as any)[ClaimsOrganizationSchemaorg.addressCountry],
   resourceType: 'Organization',
-  section: 'org.schema',
+  section: 'registry',
+  format: 'org.schema',
   action: '_batch',
   content: {
     iss: 'did:web:requester.example.com',
     jti: 'mock-jti-123',
     aud: 'did:web:api.example.com',
-    response_type: 'json',
     thid: 'test-thid-123',
     type: 'json',
     body: {
@@ -346,4 +347,3 @@ describe('HostingManager', () => {
     expect(claims[ClaimsPersonSchemaorg.email]).toBe(testClaimsTenant1Registration[ClaimsPersonSchemaorg.email]);
   });
 });
-

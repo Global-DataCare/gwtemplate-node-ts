@@ -2,8 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { initializeTenantServicesConfig } from '../../../utils/services';
-import { Sector } from '../../../models/urlPath';
-import { DidService } from '../../../models/did';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { DidService } from '../../../gdc-backend-utils-node/models/did';
 
 describe('initializeTenantServicesConfig', () => {
   it('should include the "test-network" enrollment service by default for all new tenants', () => {

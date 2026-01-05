@@ -3,16 +3,16 @@
 
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
-import { IKmsService } from '../../../crypto/interfaces/IKmsService';
-import { EntityConfig } from '../../../models/entity';
+import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
 import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../../utils/tenant';
-import { Sector } from '../../../models/urlPath';
-import { DidService } from '../../../models/did';
-import { ClaimsRecord } from '../../../models/resource-document';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { DidService } from '../../../gdc-backend-utils-node/models/did';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { testConfigDataHost, testConfigTenant1 } from '../../data/organization.data';
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
-import { EntityLifecycleStatus, EntityType } from '../../../models/enums';
+import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
 
 // Mock the entire module. We are not using the actual implementation.
 jest.mock('../../../database/repositories/vault/vault.repository');

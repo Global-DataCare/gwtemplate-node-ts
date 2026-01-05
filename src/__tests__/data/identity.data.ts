@@ -1,7 +1,7 @@
 // src/__tests__/data/identity.data.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { encodeMultibase58btc } from "../../utils/multibase58";
+import { encodeMultibase58btc } from "gdc-common-utils-ts/utils/multibase58";
 import { uuidToBytes } from "../../utils/uuid";
 
 // A standard UUID for deterministic testing.
@@ -13,7 +13,7 @@ export const INDIVIDUAL_MULTIBASE_ID = encodeMultibase58btc(uuidToBytes(INDIVIDU
 export const RELATED_PERSON_MULTIBASE_ID = encodeMultibase58btc(uuidToBytes(RELATED_PERSON_UUID));
 
 export const testExamplesDidWeb = {
-  professional: 'did:web:api.acme.org:employee:email:receptionist1@api.acme.org:role:ISCO-08:4226',
+  professional: 'did:web:api.acme.org:employee:receptionist1@api.acme.org:role:ISCO-08|4226',
   individual: `did:web:api.acme.org:individual:multibase:${INDIVIDUAL_MULTIBASE_ID}`,
   customer: `did:web:api.acme.org:individual:multibase:z(customer-uuid-base58)`
 };

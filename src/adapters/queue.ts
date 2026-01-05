@@ -1,6 +1,6 @@
 // src/adapters/queue.ts
 
-import { JobRequest } from "../models/confidential-job";
+import { JobRequest } from "gdc-common-utils-ts/models/confidential-job";
 
 
 export interface QueueAdapter {

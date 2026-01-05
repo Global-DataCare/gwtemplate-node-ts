@@ -46,9 +46,11 @@ This describes the complete lifecycle of an organization from initial contact to
 
 This phase is about creating the organization's account and giving them a sandbox to develop in.
 
-1.  **Request (`POST /host/cds-{jurisdiction}/v1/test/registry/org.schema/Organization/_batch`):** A legal representative submits the organization's details.
+1.  **Request (`POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch`):** A legal representative submits the organization's details.
 2.  **Offer:** The `HostingManager` creates a provisional tenant record (`status: 'pending'`) and returns a formal `Offer` for the `test` service (cost may be zero).
-3.  **Order (`POST /host/cds-{jurisdiction}/v1/test/registry/org.schema/Order/_batch`):** The representative accepts the `Offer`.
+3.  **Order (`POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`):** The representative accepts the `Offer`.
+
+Note: for host onboarding, `{sector}` is a network-environment selector: `test` (demo/test), `test-network` (development/staging), `network` (production).
 4.  **Final State (Phase 1):** The `HostingManager` provisions the tenant's vault and keys, and persists the final `OrganizationConfig` with the following state:
     *   `status: 'active'` (The gateway account is now fully active).
     *   `networkStatus: [{ networkName: 'test', status: 'active', ... }]` (The organization is immediately granted access to the test network).

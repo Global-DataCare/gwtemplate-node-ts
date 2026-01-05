@@ -1,9 +1,9 @@
 // src/utils/tenant.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
-import { ClaimsRecord } from '../models/resource-document';
-import { Sector } from '../models/urlPath';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 
 /**
  * Generates the deterministic, physical collection name for a tenant's vault in Firestore.

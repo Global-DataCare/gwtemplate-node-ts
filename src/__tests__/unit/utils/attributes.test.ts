@@ -1,7 +1,7 @@
 // src/__tests__/unit/utils/attributes.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { normalizeCodeSystemAndValue } from "../../../utils/attributes";
+import { normalizeCodeSystemAndValue } from "../../../utils/normalize-codeAndSystem";
 
 describe('normalizeCodeSystemAndValue', () => {
 
@@ -30,7 +30,7 @@ describe('normalizeCodeSystemAndValue', () => {
 
   it('should normalize a non-URL code system with a pipe separator', () => {
     const input = 'ISCO-08|4226';
-    const expected = 'isco-08:4226';
+    const expected = 'isco-08|4226';
     expect(normalizeCodeSystemAndValue(input)).toBe(expected);
   });
 

@@ -49,6 +49,8 @@ docs/
 *   **[04.D-DISCOVERY-SERVICES.md](04-DEEP-DIVES/04.D-DISCOVERY-SERVICES.md)**: In-depth look at the services responsible for discovering entities and data.
 *   **[04.E-NEW-STORAGE-ARCHITECTURE.md](04-DEEP-DIVES/04.E-NEW-STORAGE-ARCHITECTURE.md)**: Plan for refactoring the storage layer to a unified repository pattern.
 *   **[04.F-PERSISTENCE-PATTERNS.md](04-DEEP-DIVES/04.F-PERSISTENCE-PATTERNS.md)**: Describes patterns for data persistence and storage.
+*   **[04.G-CONVERSATIONAL-AI-ANONYMIZATION-PIPELINE.md](04-DEEP-DIVES/04.G-CONVERSATIONAL-AI-ANONYMIZATION-PIPELINE.md)**: Design for conversation storage, anonymization, and derivation of Observations with ledger-safe tags.
+*   **[04.H-DATASPACE-PUBLICATION-ATTESTATION.md](04-DEEP-DIVES/04.H-DATASPACE-PUBLICATION-ATTESTATION.md)**: Clarifies what is published by link vs anchored on-ledger (hashes/tags), and how attestation/provenance fits.
 
 ### 📂 scenarios
 *   **[appointment-notification-flow.md](scenarios/appointment-notification-flow.md)**: E2E description of an appointment notification use case.

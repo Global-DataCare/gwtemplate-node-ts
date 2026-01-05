@@ -1,15 +1,16 @@
 import { createHash, randomUUID } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
-import { JobRequest, JobStatus } from '../../models/confidential-job';
-import { IDecodedDidcommPayload } from '../../models/confidential-message';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { ConsentManager } from '../../managers/ConsentManager';
 import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
-import { BundleJsonApi, BundleEntryRequest, BundleEntryMeta, BundleEntryResponse, ErrorEntry } from '../../models/bundle';
-import { OperationOutcome } from '../../models/fhir/operation-outcome';
-import { ConsentRule, ClaimConsent } from '../../models/consent-rule';
+import { BundleJsonApi, BundleEntryRequest, BundleEntryMeta, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
+import { OperationOutcome } from 'gdc-sdk-client-ts/src/models/operation-outcome';
+import { ConsentRule, ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { CONSENT_CREATION_MESSAGE } from '../data/example-payloads';
 import { buildConsentRuleKey, hashConsentRuleId } from '../../utils/consent';
 import { getClaimValue } from '../../utils/claims';
+import { knownDomainsReversed, knownDomainsReversedEnum } from 'gdc-common-utils-ts/models/urlPath';
 
 /**
  * @fileoverview This test suite verifies the functionality of the ConsentManager.
@@ -79,7 +80,10 @@ describe('ConsentManager', () => {
       tenantId: mockTenantId,
       jurisdiction: mockJurisdiction,
       sector: mockSector,
-      format: 'org.hl7.fhir.api',
+      section: 'individual',
+      format: knownDomainsReversedEnum['org.hl7.fhir.api'],
+      resourceType: 'Consent',
+      action: '_batch',
       id: randomUUID(),
       status: JobStatus.DRAFT,
       sequence: 0,

@@ -2,12 +2,12 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
-import { JobRequest, JobStatus } from '../../models/confidential-job';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { randomUUID } from 'crypto';
-import { ConfidentialStorageDoc } from '../../models/confidential-storage';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { LicenseManager } from '../../managers/LicenseManager';
-import { DeviceLicense, DeviceRestrictions } from '../../models/device-license';
-import { IDecodedDidcommPayload } from '../../models/confidential-message';
+import { DeviceLicense, DeviceRestrictions } from 'gdc-common-utils-ts/models/device-license';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 
 // --- Mocks ---
 
@@ -71,6 +71,10 @@ const createMockLicenseJob = (options: MockLicenseJobOptions): JobRequest => {
     sequence: 0,
     createdAtTimestamp: Date.now(),
     tenantId: 'host', // The job is initiated by the system/host
+    section: 'system',
+    format: 'org.schema',
+    resourceType: 'License',
+    action: 'create',
     content: jobContent,
   };
 };
@@ -188,4 +192,3 @@ describe('LicenseManager', () => {
     });
   });
 });
-

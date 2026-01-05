@@ -3,14 +3,14 @@
 
 import { jest } from '@jest/globals';
 import { KmsService } from '../../../services/KmsService';
-import { Content } from '../../../utils/content';
-import { ICryptography } from '../../../crypto/interfaces/ICryptography';
-import { MldsaPublicJwk, MlkemPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
-import { JWK } from '../../../models/jwk';
-import { DataCompactJWT } from '../../../models/jwt';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { Content } from 'gdc-common-utils-ts/utils/content';
+import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
+import { MldsaPublicJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { JWK } from '../../../gdc-backend-utils-node/models/jwk';
+import { DataCompactJWT } from 'gdc-common-utils-ts/models/jwt';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
-import { IKmsService } from '../../../crypto/interfaces/IKmsService';
+import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 
 // Mock the dependency
 const mockCryptoService: jest.Mocked<ICryptography> = {
@@ -205,7 +205,7 @@ describe('KmsService', () => {
       const entityId = 'tenant-123';
       const docContent = { sensitive: 'data' };
       const doc: ConfidentialStorageDoc = {
-        id: 'doc-1', content: docContent, sequence: 0
+        id: 'doc-1', status: 'active', content: docContent, sequence: 0
       };
       const mockEncryptedData = { ciphertext: 'c', iv: 'i', tag: 't' };
 

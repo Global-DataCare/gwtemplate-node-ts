@@ -4,10 +4,10 @@
 import { Request, Response, Router } from 'express';
 import { IAuthorizationManager } from '../../../managers/auth/IAuthorizationManager';
 import { QueueAdapter } from '../../../adapters/queue';
-import { IAccessTokenClaims } from '../../../models/auth';
-import { JobRequest } from '../../../models/confidential-job';
+import { IAccessTokenClaims } from 'gdc-common-utils-ts/models/auth';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { createOperationOutcome } from '../../../utils/outcome';
-import { IssueLevel, IssueType } from '../../../models/fhir/codes';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
 import { validOrNewUuidv4 } from '../../../utils/uuid';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -56,6 +56,8 @@ export class FhirController {
       sequence: 0,
       status: 'DRAFT' as any,
       createdAtTimestamp: Date.now(),
+      section: 'individual',
+      format: 'org.hl7.fhir.r4',
       action: 'create',
       resourceType: 'Communication',
       tenantId: accessTokenClaims.iss, 

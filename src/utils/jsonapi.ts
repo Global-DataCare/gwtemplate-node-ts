@@ -1,7 +1,7 @@
 // src/utils/jsonapi.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { safelyJoinUrl } from "./url";
+import { safelyJoinUrl } from "gdc-common-utils-ts/utils/url";
 
 /**
 * Converts a resource (FHIR or JSON:API) into a standardized array of entries.

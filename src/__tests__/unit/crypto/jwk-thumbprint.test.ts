@@ -3,12 +3,12 @@
 // WebCrypto is available in Node 18+. This line makes it available to the test runner.
 global.crypto = require("node:crypto").webcrypto as any;
 
-import { MlkemPublicJwk, MldsaPublicJwk } from "../../../crypto/interfaces/Cryptography.types";
+import { MlkemPublicJwk, MldsaPublicJwk } from "gdc-common-utils-ts/interfaces/Cryptography.types";
 import {
     toBaseJwk,
     computeJwkThumbprint,
     makePublicJwkWithKid,
-} from "../../../crypto/jwk-thumbprint";
+} from "../../../gdc-backend-utils-node/jwk-thumbprint";
 import { canonicalize } from "../../../utils/json-canon";
 
 describe("JWK thumbprints for ML-KEM (OKP) and ML-DSA (AKP)", () => {

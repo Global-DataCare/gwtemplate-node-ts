@@ -2,29 +2,30 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4 } from 'uuid';
-import { IDecodedDidcommPayload } from '../models/confidential-message';
-import { ManagerError } from '../models/errors/manager-error';
-import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { ClaimsPersonSchemaorg } from '../models/schemaorg';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { determineResourceId } from '../utils/resource';
-import { EntityConfig } from '../models/entity';
+import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { initializeEmployeeServices } from '../utils/services';
 import { createOperationOutcome } from '../utils/outcome';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { getTenantVaultId } from '../utils/tenant';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
-import { BundleEntry, ErrorEntry, BundleEntryRequest, BundleJsonApi } from '../models/bundle';
-import { ClaimsRecord, RecordBase } from '../models/resource-document';
+import { BundleEntry, ErrorEntry, BundleEntryRequest, BundleJsonApi } from 'gdc-common-utils-ts/models/bundle';
+import { ClaimsRecord, RecordBase } from 'gdc-common-utils-ts/models/resource-document';
+import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
-import { normalizeCodeSystemAndValue } from '../utils/attributes';
-import { ParameterData } from '../models/params';
-import { PublicJwk } from '../crypto/interfaces/Cryptography.types';
-import { DidDocument, VerificationMethod } from '../models/did';
-import { JobRequest } from '../models/confidential-job';
-import { EntityLifecycleStatus, EntityType } from '../models/enums';
-import { DeviceLicense } from '../models/device-license';
+import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
+import { ParameterData } from 'gdc-common-utils-ts/models/params';
+import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { DidDocument, VerificationMethod } from '../gdc-backend-utils-node/models/did';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { EntityLifecycleStatus, EntityType } from '../gdc-backend-utils-node/models/enums';
+import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { generateLicenseOffer } from '../utils/offer';
 
 const EMPLOYEE_SECTION = 'employees';
@@ -161,12 +162,12 @@ export class EmployeeManager {
       throw new ManagerError('Missing or invalid email claim.', IssueType.Required);
     }
 
-    const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation] as string; // e.g. ISCO-08:<code>
+    const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation] as string; // e.g. ISCO-08|<code>
     if (!roleCode) {
       throw new ManagerError('Missing or invalid hasOccupation claim.', IssueType.Required);
     }
 
-    const employeeUrnForKeys = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
+    const employeeUrnForKeys = `${tenantUrn}:employee:${email}:role:isco-08|${roleCode}`;
 
     const licenseOffer = await this.tryConsumeEmployeeSeatOrOffer({
       vaultId,
@@ -206,7 +207,7 @@ export class EmployeeManager {
     }
 
     // Construct the hierarchical URN using the parent tenant's URN.
-    const employeeUrn = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
+    const employeeUrn = `${tenantUrn}:employee:${email}:role:isco-08|${roleCode}`;
 
     // Create verification methods from the provided JWKs
     const verificationMethods: VerificationMethod[] = [
@@ -263,7 +264,7 @@ export class EmployeeManager {
     // Also, update the didConfig with the same services.
     employeeConfig.didConfig!.service = employeeConfig.didDocument!.service;
 
-    const occupationDoc: RecordBase & { employeeId: string } = {
+    const occupationDoc: IncludedResource & { employeeId: string } = {
       id: uuidv4(),
       type: 'Occupation',
       employeeId: employeeId,
@@ -286,6 +287,7 @@ export class EmployeeManager {
 
     const docToProtect: ConfidentialStorageDoc = {
       id: employeeConfig.id,
+      status: employeeConfig.status,
       sequence: 0,
       content: employeeConfig,
       indexed: { attributes: protectedAttributes },

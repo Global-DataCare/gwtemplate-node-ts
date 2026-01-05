@@ -8,9 +8,9 @@ import { getTenantVaultId } from '../utils/tenant';
 import { createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { pingHandler } from './handlers/discovery/ping.handler';
 import { signVerifiableCredential } from '../utils/vc-signer';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 
-import { IKmsService } from '../crypto/interfaces/IKmsService';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ILogger } from '../loggers/ILogger';
 
 // List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
@@ -31,6 +31,146 @@ export function createDiscoveryRouter(
   logger: ILogger,
 ): express.Router {
   const router = express.Router();
+
+  /**
+   * @openapi
+   * /host/.well-known/ping:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Ping (host)
+   *     description: Health check for the host tenant.
+   *     responses:
+   *       '200': { description: OK }
+   *       '503': { description: Service Unavailable }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/ping:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Ping (tenant)
+   *     description: Health check for a tenant resolved by its CDS path.
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   *
+   * /host/.well-known/did.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: DID document (host)
+   *     responses:
+   *       '200': { description: OK }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/did.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: DID document (tenant)
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   *
+   * /host/.well-known/jwks.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: JWKS (host)
+   *     responses:
+   *       '200': { description: OK }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/jwks.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: JWKS (tenant)
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   *
+   * /host/.well-known/openid-configuration:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: OpenID configuration (host)
+   *     responses:
+   *       '200': { description: OK }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/openid-configuration:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: OpenID configuration (tenant)
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   *
+   * /host/.well-known/smart-configuration:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: SMART configuration (host)
+   *     responses:
+   *       '200': { description: OK }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/smart-configuration:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: SMART configuration (tenant)
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   *
+   * /host/.well-known/legal-participant.vc.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Gaia-X Legal Participant VC (host)
+   *     responses:
+   *       '200': { description: OK }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/legal-participant.vc.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Gaia-X Legal Participant VC (tenant)
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: FHIR CapabilityStatement (tenant)
+   *     description: Returns the tenant's FHIR capability statement for supported sectors.
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   */
 
   // Middleware to resolve the tenant vaultId based on path parameters and verify existence.
   const resolveTenant = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -174,4 +314,3 @@ export function createDiscoveryRouter(
   });
   return router;
 }
-

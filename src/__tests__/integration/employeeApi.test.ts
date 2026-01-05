@@ -10,18 +10,18 @@
 
 import express from 'express';
 import { createApiRouter } from '../../routes/api';
-import { CryptographyService } from '../../crypto/CryptographyService';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { testEncryptedJwe1 } from '../data/async-response.data';
 import { mockKmsService } from '../mocks/kms.mock';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async-response-store.mem';
-import { DidService } from '../../models/did';
-import { createDidServiceIdBase } from '../../utils/did';
+import { DidService } from '../../gdc-backend-utils-node/models/did';
 import { testTenant1AlternateName, testTenant1AddressCountry } from '../data/organization.data';
 import { ORGANIZATION_REGISTRATION_JOB } from '../data/example-jobs'; // Using a canonical job fixture
 import { invokeExpress } from './helpers/invokeExpress';
+import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -35,7 +35,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
 
   const vaultRepository = new VaultMemRepository();
   const tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, 'test-host-collection');
-  const cryptographyService = new CryptographyService();
+  const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
 
   const apiRouter = createApiRouter(
     mockQueueAdapter,
@@ -74,10 +74,11 @@ describe('Employee Onboarding API', () => {
 
     const mockTenantServices: DidService[] = [
       {
-        id: createDidServiceIdBase({ version: 'v1', sector, section, format }),
+        id: `#${section}:${format}`,
         type: 'EmployeeOnboardingService',
         serviceEndpoint: resourceType,
         actions: [action],
+        selector: { section, format },
       },
     ];
     jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue(mockTenantServices);

@@ -1,9 +1,9 @@
 // src/__tests__/unit/utils/did.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { DidDocument } from '../../../models/did';
-import { JwkSet } from '../../../models/jwk';
-import { createHostedDidWeb, getPrimaryDidWeb, findSigningMethod, populateDidDocumentFromJwks, getBaseUrlFromDidWeb } from '../../../utils/did';
+import { DidDocument } from '../../../gdc-backend-utils-node/models/did';
+import { JwkSet } from '../../../gdc-backend-utils-node/models/jwk';
+import { createHostedDidWeb, getPrimaryDidWeb, findSigningMethod, populateDidDocumentFromJwks, getBaseUrlFromDidWeb } from '../../../utils/did-backend';
 
 // --- Test Data ---
 const HOST_DID = 'did:web:host.com';

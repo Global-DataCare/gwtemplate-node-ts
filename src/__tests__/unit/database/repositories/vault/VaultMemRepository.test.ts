@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { VaultMemRepository } from '../../../../../database/repositories/vault/vault.mem.repository';
-import { RecordBase } from '../../../../../models/resource-document';
+import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 
 describe('VaultMemRepository', () => {
   let repository: VaultMemRepository;

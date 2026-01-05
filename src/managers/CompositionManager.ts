@@ -1,6 +1,6 @@
 // src/managers/CompositionManager.ts
-import { JobRequest } from '../models/confidential-job';
-import { IDecodedDidcommPayload } from '../models/confidential-message';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { IJobProcessor } from './registry';
 
 export class CompositionManager implements IJobProcessor {

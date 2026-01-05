@@ -3,44 +3,43 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { IServerConfig } from '../config';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { IStorageAdapter } from '../database/storage/IStorageAdapter';
-import { BundleJsonApi, BundleEntry, ErrorEntry } from '../models/bundle';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { DidDocument } from '../models/did';
-import { OrganizationConfig } from '../models/entity';
-import { ManagerError } from '../models/errors/manager-error';
-import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { IncludedResource } from '../models/jsonapi';
-import { JobRequest } from '../models/confidential-job';
-import { IPayloadResponse } from '../models/confidential-message';
-import { DidCommDecodedMetadata } from '../models/confidential-message';
-import { ClaimsRecord } from '../models/resource-document';
-import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
-import { Sector } from '../models/urlPath';
+import { BundleJsonApi, BundleEntry, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { DidDocument } from 'gdc-common-utils-ts/models/did';
+import { OrganizationConfig } from '../gdc-backend-utils-node/models/entity';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { DidCommDecodedMetadata, IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { validateNewOrganizationClaims } from '../utils/claims-validator';
-import { composeHostDidWebId, createHostedDidWeb, populateDidDocumentFromJwks } from '../utils/did';
+import { composeHostDidWebId, createHostedDidWeb, populateDidDocumentFromJwks } from '../utils/did-backend';
 import { populateDidDocumentServices } from '../utils/did-document';
 import { createOperationOutcome } from '../utils/outcome';
 import { determineResourceId } from '../utils/resource';
 import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../utils/services';
 import { generateTenantCollectionNameFromClaims, getTenantVaultId, isValidTenantAlternateName } from '../utils/tenant';
-import { AllowedIndexableClaims } from '../models/indexing';
+import { AllowedIndexableClaims } from '../gdc-backend-utils-node/models/indexing';
 import { createOrganizationUrn } from '../utils/urn';
 import { ILogger } from '../loggers/ILogger';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { generateLicenseOffer } from '../utils/offer';
-import { VC_CONTEXT_V2, VerifiableCredentialV2 } from '../models/verifiable-credential';
-import { EntityLifecycleStatus, EntityType, NetworkAccessStatus, NetworkName, BundleEntryType } from '../models/enums';
-import { EntityConfig } from '../models/entity';
-import { ParameterData } from '../models/params';
-import { normalizeCodeSystemAndValue } from '../utils/attributes';
-import { VerificationMethod } from '../models/did';
-import { PublicJwk } from '../crypto/interfaces/Cryptography.types';
-import { DeviceLicense } from '../models/device-license';
+import { VC_CONTEXT_V2, VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
+import { EntityLifecycleStatus, EntityType, NetworkAccessStatus, NetworkName, BundleEntryType } from '../gdc-backend-utils-node/models/enums';
+import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
+import { ParameterData } from 'gdc-common-utils-ts/models/params';
+import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
+import { VerificationMethod } from 'gdc-common-utils-ts/models/did';
+import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 
 /**
  * Manages the initial onboarding of new tenants onto the Gateway.
@@ -88,7 +87,7 @@ export class HostingManager {
     await this.persistHostConfig(organization, allClaims, [person, processedService!]);
   }
 
-  async process(job: JobRequest, environment?: string, isBootstrap: boolean = false): Promise<IPayloadResponse> {
+  async process(job: JobRequest, environment?: string, isBootstrap: boolean = false): Promise<IDecodedDidcommPayload> {
     const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
     
     try {
@@ -122,7 +121,7 @@ export class HostingManager {
   /**
    * Handles Phase 1, Step 1: Provisional Registration.
    */
-  private async processOrganizationRegistration(job: JobRequest, environment?: string, isBootstrap: boolean = false): Promise<IPayloadResponse> {
+  private async processOrganizationRegistration(job: JobRequest, environment?: string, isBootstrap: boolean = false): Promise<IDecodedDidcommPayload> {
     const jobEntries = job?.content?.body?.data || [];
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
 
@@ -160,7 +159,7 @@ export class HostingManager {
   /**
    * Handles Phase 1, Step 2: Finalizing Registration via Order.
    */
-  private async processOrder(job: JobRequest, environment?: string): Promise<IPayloadResponse> {
+  private async processOrder(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
     const jobEntries = job?.content?.body?.data || [];
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
 
@@ -239,6 +238,17 @@ export class HostingManager {
     const { claims: processedClaims } = decryptedContent;
     const alternateName = processedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
     const sector = processedClaims[ClaimsServiceSchemaorg.category] as Sector;
+    // Ensure the canonical tenant identifier URN exists for downstream managers (e.g., EmployeeManager issuer).
+    const tenantUrn = createOrganizationUrn({
+      namespace: this.config.namespace,
+      network: 'test-network',
+      jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+      sector,
+      idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+      idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+    });
+    (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = tenantUrn;
+
     const { organization, person, service } = this.extractResources(processedClaims, environment);
 
     // Finalize the registration and grant test network access.
@@ -259,6 +269,7 @@ export class HostingManager {
 
     const finalTenantRegistrationDoc: ConfidentialStorageDoc = {
       id: vaultId,
+      status: finalTenantConfig.status,
       sequence: 1, // Increment sequence for update
       indexed: { attributes, hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' } },
       content: finalTenantConfig,
@@ -268,8 +279,8 @@ export class HostingManager {
     await this.vaultRepository.put(hostCollectionName!, [secureFinalDoc], 'tenants');
     
     // Save VCs and other resources into the TENANT's own vault
-    const vcDoc: ConfidentialStorageDoc = { id: 'vc.json', sequence: 0, content: finalTenantConfig.governanceVc };
-    const selfDescDoc: ConfidentialStorageDoc = { id: 'self-description.json', sequence: 0, content: finalTenantConfig.selfDescriptionVc };
+    const vcDoc: ConfidentialStorageDoc = { id: 'vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
+    const selfDescDoc: ConfidentialStorageDoc = { id: 'self-description.json', status: 'active', sequence: 0, content: finalTenantConfig.selfDescriptionVc };
     const secureVcDoc = await this.kmsService.protectConfidentialData(vcDoc, vaultId);
     const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, vaultId);
     await this.vaultRepository.put(tenantCollectionName, [secureVcDoc, secureSelfDescDoc], '.well-known');
@@ -282,15 +293,7 @@ export class HostingManager {
         throw new ManagerError('Missing required admin Person claims (email, hasOccupation) during order finalization.', IssueType.Required);
       }
 
-      const tenantUrn = createOrganizationUrn({
-        namespace: this.config.namespace,
-        network: 'test-network',
-        jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
-        sector,
-        idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
-        idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
-      });
-      const employeeUrn = `${tenantUrn}:employee:email:${email}:role:isco-08:${roleCode}`;
+      const employeeUrn = `${tenantUrn}:employee:${email}:role:isco-08|${roleCode}`;
 
       const storedKeys = (decryptedContent as any)?.registrationKeys as
         | { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk }
@@ -349,6 +352,7 @@ export class HostingManager {
 
       const employeeDoc: ConfidentialStorageDoc = {
         id: employeeConfig.id,
+        status: employeeConfig.status,
         sequence: 0,
         content: employeeConfig,
         indexed: { attributes: protectedAttributes },
@@ -357,7 +361,7 @@ export class HostingManager {
       await this.vaultRepository.put(tenantCollectionName, [secureEmployeeDoc], 'employees');
     }
 	    if (processedService) {
-	      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, sequence: 0, content: processedService };
+	      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, status: 'active', sequence: 0, content: processedService };
 	      const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, vaultId);
 	      await this.vaultRepository.put(tenantCollectionName, [secureServiceDoc], 'services');
 	    }
@@ -387,7 +391,7 @@ export class HostingManager {
 	          reactivationEnabled: false,
 	          exp,
 	        };
-	        licenseDocs.push({ id: licenseId, sequence: 0, content: license });
+	        licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
 	      }
 	      await this.vaultRepository.put(vaultId, licenseDocs, 'device-licenses');
 	    }
@@ -469,6 +473,18 @@ export class HostingManager {
 
         const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
         const jurisdiction = processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;
+
+        // Persist a canonical tenant identifier URN early (even while pending) so the cache/discovery can resolve it.
+        const tenantUrn = createOrganizationUrn({
+          namespace: this.config.namespace,
+          network: 'test-network',
+          jurisdiction,
+          sector: validatedSector!,
+          idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+          idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+        });
+        (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = tenantUrn;
+
         const offerClaims = generateLicenseOffer(
           processedClaims[ClaimsOrganizationSchemaorg.numberOfEmployees] as number,
           hostDid,
@@ -481,6 +497,7 @@ export class HostingManager {
 
 	        const tenantRegistrationDoc: ConfidentialStorageDoc = {
 	          id: getTenantVaultId(validatedSector!, alternateName),
+	          status: EntityLifecycleStatus.Pending,
 	          sequence: 0,
 	          indexed: {
 	            attributes: [
@@ -551,7 +568,7 @@ export class HostingManager {
 
     const didId = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
     const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: didId, alsoKnownAs: [] };
-    const didConfigServices = initializeHostServicesConfig(this.config.sectorsAllowed);
+    const didConfigServices = initializeHostServicesConfig(this.config.sectorsAllowed, this.config.nodeEnv);
     const baseUrl = this.config.apiBaseUrl;
     const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
     didDocument.service = populateDidDocumentServices(didId, baseUrl, didConfigServices, false, {} as any);
@@ -569,6 +586,7 @@ export class HostingManager {
 
     const docToProtect: ConfidentialStorageDoc = {
       id: logicalVaultId,
+      status: hostConfig.status,
       sequence: 0,
       content: hostConfig,
     };
@@ -578,12 +596,12 @@ export class HostingManager {
     
     const [adminPerson, processedService] = contained;
     if (adminPerson) {
-      const adminDoc: ConfidentialStorageDoc = { id: adminPerson.id, sequence: 0, content: adminPerson };
+      const adminDoc: ConfidentialStorageDoc = { id: adminPerson.id, status: 'active', sequence: 0, content: adminPerson };
       const secureAdminDoc = await this.kmsService.protectConfidentialData(adminDoc, logicalVaultId);
       await this.vaultRepository.put(hostCollectionName, [secureAdminDoc], 'employees');
     }
     if (processedService) {
-      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, sequence: 0, content: processedService };
+      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, status: 'active', sequence: 0, content: processedService };
       const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, logicalVaultId);
       await this.vaultRepository.put(hostCollectionName, [secureServiceDoc], 'services');
     }
@@ -615,6 +633,7 @@ export class HostingManager {
 
     const tenantRegistrationDoc: ConfidentialStorageDoc = {
       id: vaultId,
+      status: finalTenantConfig.status,
       sequence: 0,
       indexed: { attributes, hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' } },
       content: finalTenantConfig,
@@ -624,20 +643,20 @@ export class HostingManager {
     await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], 'tenants');
 
     // Save VCs and other resources into the TENANT's own vault
-    const vcDoc: ConfidentialStorageDoc = { id: 'vc.json', sequence: 0, content: finalTenantConfig.governanceVc };
-    const selfDescDoc: ConfidentialStorageDoc = { id: 'self-description.json', sequence: 0, content: finalTenantConfig.selfDescriptionVc };
+    const vcDoc: ConfidentialStorageDoc = { id: 'vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
+    const selfDescDoc: ConfidentialStorageDoc = { id: 'self-description.json', status: 'active', sequence: 0, content: finalTenantConfig.selfDescriptionVc };
     const secureVcDoc = await this.kmsService.protectConfidentialData(vcDoc, vaultId);
     const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, vaultId);
     await this.vaultRepository.put(tenantCollectionName, [secureVcDoc, secureSelfDescDoc], '.well-known');
 
     const [legalRep, processedService] = contained;
     if (legalRep) {
-      const legalRepDoc: ConfidentialStorageDoc = { id: legalRep.id, sequence: 0, content: legalRep };
+      const legalRepDoc: ConfidentialStorageDoc = { id: legalRep.id, status: 'active', sequence: 0, content: legalRep };
       const secureLegalRepDoc = await this.kmsService.protectConfidentialData(legalRepDoc, vaultId);
       await this.vaultRepository.put(tenantCollectionName, [secureLegalRepDoc], 'employees');
     }
     if (processedService) {
-      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, sequence: 0, content: processedService };
+      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, status: 'active', sequence: 0, content: processedService };
       const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, vaultId);
       await this.vaultRepository.put(tenantCollectionName, [secureServiceDoc], 'services');
     }

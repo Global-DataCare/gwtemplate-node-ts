@@ -1,7 +1,7 @@
 // src/managers/auth/SmartAuthorizationManager.ts
 
 import { IAuthorizationManager } from './IAuthorizationManager';
-import { IAccessTokenClaims } from '../../models/auth';
+import { IAccessTokenClaims } from 'gdc-common-utils-ts/models/auth';
 
 export class SmartAuthorizationManager implements IAuthorizationManager {
   public async canAccess(

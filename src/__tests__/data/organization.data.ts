@@ -1,12 +1,13 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/data/organization.data.ts
 
-import { OrganizationConfig } from "../../models/entity";
+import { OrganizationConfig } from "../../gdc-backend-utils-node/models/entity";
 import { URN_NAMESPACE, URN_NETWORK, URN_VERSION } from "./urn.data";
-import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from "../../models/schemaorg";
-import { Sector } from "../../models/urlPath";
-import { EntityLifecycleStatus, EntityType } from "../../models/enums";
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from "gdc-common-utils-ts/constants/schemaorg";
+import { Sector } from "gdc-common-utils-ts/models/urlPath";
+import { EntityLifecycleStatus, EntityType } from "../../gdc-backend-utils-node/models/enums";
 import { testTenant1Vc } from "./credential.data";
+import { testHostDidWeb, testRootOrgDidWeb, testHostDomain, testTenant1IdentifierUrn } from "./organization.constants";
 
 /**
  * This file contains foundational data objects for test organizations.
@@ -32,7 +33,7 @@ export const testClaimsRegisterTenantExpanded = {
   [ClaimsOrganizationSchemaorg.numberOfEmployees]: 2,
   [ClaimsOrganizationSchemaorg.url]: "api.acme.org",
   [ClaimsPersonSchemaorg.email]: "admin1@acme.org",
-  [ClaimsPersonSchemaorg.hasOccupation]: "ISCO-08:1120",
+  [ClaimsPersonSchemaorg.hasOccupation]: "ISCO-08|1120",
   [ClaimsServiceSchemaorg.category]: "health-care",
   [ClaimsServiceSchemaorg.identifier]: "did:web:api-provider.example.com",
   [ClaimsServiceSchemaorg.serviceType]: "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
@@ -47,13 +48,12 @@ export const testHostAddressCountry = "ES";
 export const testHostIdType = "TAX";
 export const testHostIdValue = "A12345678";
 export const testHostLegalName = "Hosting Organization";
-export const testHostDomain = "host.example.com";
-export const testHostDidWeb = `did:web:${testHostDomain}`;
+export { testHostDomain, testHostDidWeb };
 const testServiceManufacturerDidWebIdentifier = `urn:web:<manufacturer>`;
 const testServiceManufacturerCategory = "system";
 const testServiceManufacturerTerms = "https://github.com/<manufacturer>/<software>/terms";
 const testServiceManufacturerPurposeType = "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC";
-export const testRootOrgDidWeb = `did:web:testca.unid.es`; // https://testca.unid.es/.well-known/did.json
+export { testRootOrgDidWeb }; // https://testca.unid.es/.well-known/did.json
 
 export const testConfigDataHost: OrganizationConfig = {
   id: testHostUuid,
@@ -100,8 +100,7 @@ export const testTenant1DidWebExternal = `did:web:${testTenant1Domain}`;
 export const testTenant1DidWebHosted = `did:web:${testHostDomain}:${testTenant1AlternateName}:${testTenant1AddressCountry}:v1:${testTenant1ServiceProviderCategory}`;
 export const testTenant1VaultId = `${testTenant1ServiceProviderCategory}_${testTenant1AlternateName}`;
 
-export const testTenant1IdentifierUrn = 
-  `urn:${URN_NAMESPACE}:${URN_NETWORK}:${testTenant1AddressCountry}:${URN_VERSION}:${testTenant1ServiceProviderCategory}:entity:${testTenant1IdType}:${testTenant1IdValue}`;
+export { testTenant1IdentifierUrn };
 
 export const testConfigTenant1: OrganizationConfig = {
   id: testTenant1Uuid,

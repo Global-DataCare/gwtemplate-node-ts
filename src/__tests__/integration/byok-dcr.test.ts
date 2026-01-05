@@ -42,19 +42,19 @@ jest.mock('../../config', () => ({
 import * as express from 'express';
 import { Server } from 'http';
 import { startServer } from '../../server';
-import { CryptographyService } from '../../crypto/CryptographyService';
-import { MldsaPrivateJwk, MlkemPrivateJwk, MlkemPublicJwk } from '../../crypto/interfaces/Cryptography.types';
-import { Content } from '../../utils/content';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { MldsaPrivateJwk, MlkemPrivateJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { Content } from 'gdc-common-utils-ts/utils/content';
 import { QueueAdapter } from '../../adapters/queue';
 import { QueueAdapterMem } from '../../adapters/queue-mem';
 import { testPayloadCreateTenant1, testTenant1Data } from '../data/end-to-end.data';
 import { testClaimsTenant1Receptionist1, testTenant1Receptionist1DidExternal, testTenant1Receptionist1Urn } from '../data/employee.data';
-import { IKmsService } from '../../crypto/interfaces/IKmsService';
+import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { testTenant1AlternateName } from '../data/organization.data';
 import { testIndividualOnboardingBatchEntries } from '../data/customer-onboarding.data';
-import {IPayloadResponse } from '../../models/confidential-message';
-import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from '../../models/schemaorg';
+import {IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { generateUrnHash } from '../../utils/urn-hash';
 import { createHash } from 'crypto';
 import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
@@ -225,7 +225,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       : pollResponse.text;
     
     const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
-    const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IPayloadResponse;
+    const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
 
     // 5. ASSERT (Phase 3): Verify the content of the final, decrypted Offer
     expect(finalResponse.thid).toBe(thid);
@@ -321,7 +321,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       ? orderPollResponse!.text.slice('response='.length)
       : orderPollResponse!.text;
     const { decryptedBytes: orderDecryptedBytes } = await cryptoService.decryptJwe(encryptedOrderFinalResponse, externalEncrypter);
-    const orderFinalResponse = JSON.parse(Content.bytesToStringUTF8(orderDecryptedBytes)) as IPayloadResponse;
+    const orderFinalResponse = JSON.parse(Content.bytesToStringUTF8(orderDecryptedBytes)) as IDecodedDidcommPayload;
     expect(orderFinalResponse.thid).toBe(orderThid);
     expect(orderFinalResponse.body?.data?.[0]?.response?.status).toBe('201');
 
@@ -337,7 +337,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     // resolved by the server to find the correct public keys for signature
     // verification and response encryption. Therefore, the client NO LONGER
     // needs to embed the full JWKs in every request, saving bandwidth.
-    const issuerDid = `did:web:provider.com:${testTenant1AlternateName}:employee:email:${testTenant1Data.member.admin1.email}`;
+    const issuerDid = `did:web:provider.com:${testTenant1AlternateName}:employee:${testTenant1Data.member.admin1.email}`;
     const targetDid = 'did:web:provider.com';
 
     const employeeCreationPayload = {
@@ -476,7 +476,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     // To simulate the external client decrypting the response, we use the cryptoService 
     // with the client's private key and the server's public key (embedded in the JWE).
     const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
-    const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IPayloadResponse;
+    const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
 
     // 6. ASSERT (Phase 3): Verify the content of the final, decrypted response
     expect(finalResponse.thid).toBe(thid);
@@ -735,7 +735,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const encryptedFinalResponse = pollResponse!.text.replace('response=', '');
     
     const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
-    const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IPayloadResponse;
+    const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
     
     const responseEntry = finalResponse.body.data[0];
     expect(responseEntry.response.status).toBe('200');

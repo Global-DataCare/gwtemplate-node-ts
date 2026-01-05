@@ -1,13 +1,33 @@
 // src/utils/services.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { EntityConfig } from '../models/entity';
-import { Sector } from '../models/urlPath';
-import { DidService } from '../models/did';
-import { createDidServiceIdBase } from './did';
+import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { DidService, ServiceEndpointSelector } from 'gdc-common-utils-ts/models/did';
 
 // As per SYSTEM_DESIGN.md, these sectors are FHIR-enabled.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
+
+export type HostRegistrySector = 'test' | 'test-network' | 'network';
+
+/**
+ * Resolves which host "registry sector" to use based on runtime environment.
+ *
+ * @architecture
+ * The host onboarding endpoints are special: the `sector` segment represents the network
+ * environment, not the business sector.
+ *
+ * - `demo`/`test` -> `test` (no blockchain integration; in-memory demo/MVP)
+ * - `development`/`staging` -> `test-network` (Hyperledger Fabric test network)
+ * - `production` -> `network` (Hyperledger Fabric production network)
+ */
+export function resolveHostRegistrySector(nodeEnv: string | undefined): HostRegistrySector {
+  const env = String(nodeEnv || '').trim().toLowerCase();
+  if (env === 'production') return 'network';
+  if (env === 'development' || env === 'staging') return 'test-network';
+  // Jest sets NODE_ENV=test; demo mode is explicitly NODE_ENV=demo.
+  return 'test';
+}
 
 /**
  * (Internal) Creates a standardized DID Service Endpoint configuration object.
@@ -16,6 +36,17 @@ const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
 const createDidEndpointConfig = (id: string, resources: string[], actions: string[]): DidService => {
   const serviceEndpoint = resources.join(',');
   return { id, type: 'ApiService', serviceEndpoint, actions };
+};
+
+const createDidEndpointConfigFromSelector = (
+  selector: Pick<ServiceEndpointSelector, 'section' | 'format'> & Partial<Pick<ServiceEndpointSelector, 'sector'>>,
+  resources: string[],
+  actions: string[],
+  type: DidService['type'] = 'ApiService',
+): DidService => {
+  const serviceEndpoint = resources.join(',');
+  // Internal identifier (not a DID URI). Public `didDocument.service[].id` is derived separately.
+  return { id: `#${selector.section}:${selector.format}`, type, serviceEndpoint, actions, selector };
 };
 
 /**
@@ -41,17 +72,37 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     individualResources.push('Patient', 'Appointment');
   }
 
-  services.push(createDidEndpointConfig(
-    createDidServiceIdBase({ version: 'v1', sector, section: 'entity', format: 'org.schema' }),
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'entity', format: 'org.schema' },
     entityResources,
     ['_batch']
   ));
 
-  services.push(createDidEndpointConfig(
-    createDidServiceIdBase({ version: 'v1', sector, section: 'individual', format: 'org.schema' }),
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'individual', format: 'org.schema' },
     individualResources,
     ['_batch']
   ));
+
+  // FHIR endpoints are exposed under explicit FHIR formats (as documented in API_INTEGRATORS_GUIDE and Swagger).
+  // Keep them separate from `org.schema` so request validation matches the URL path format segment.
+  if (isFhir) {
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'individual', format: 'org.hl7.fhir.r4' },
+        ['Consent', 'Communication', 'Composition', 'RelatedPerson', 'Bundle'],
+        ['_batch'],
+      ),
+    );
+    // Personal (non-clinical) data collection endpoints use the versionless `org.hl7.fhir.api` context.
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'individual', format: 'org.hl7.fhir.api' },
+        ['Observation', 'RelatedPerson'],
+        ['_batch'],
+      ),
+    );
+  }
 
   return services;
 }
@@ -65,16 +116,16 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
   
   const defaultNetworkServices: DidService[] = [
       {
-          ...(createDidEndpointConfig(
-              createDidServiceIdBase({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Action' }),
+          ...(createDidEndpointConfigFromSelector(
+              { sector, section: 'test-network', format: 'org.schema' },
               ['Action'],
               ['_batch']
           )),
           type: 'NetworkEnrollmentService'
       },
       {
-          ...(createDidEndpointConfig(
-              createDidServiceIdBase({ version: 'v1', sector, section: 'test-network', format: 'org.schema', resourceType: 'Person' }),
+          ...(createDidEndpointConfigFromSelector(
+              { sector, section: 'test-network', format: 'org.schema' },
               ['Person'],
               ['_discovery']
           )),
@@ -83,18 +134,40 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
   ];
 
   const defaultOidcServices: DidService[] = [
-    createDidEndpointConfig(
-      // 1. The BASE ID defines the group, without a resource.
-      createDidServiceIdBase({ version: 'v1', sector, section: 'identity', format: 'openid' }),
-      // 2. The RESOURCES to be multiplexed.
+    // Provider federation: external OIDC -> Firebase custom token.
+    // (Used to normalize identity to Firebase before any other protected step.)
+    createDidEndpointConfigFromSelector(
+      { sector, section: 'identity', format: 'firebase' },
+      ['Token'],
+      ['_custom'],
+    ),
+    // Initial access token exchange for DCR (requires a Firebase id_token + activation_code).
+    createDidEndpointConfigFromSelector(
+      { sector, section: 'identity', format: 'openid' },
+      ['Token'],
+      ['_exchange'],
+    ),
+    // Device registration (DCR) endpoint.
+    createDidEndpointConfigFromSelector(
+      { sector, section: 'identity', format: 'openid' },
       ['Device'],
-      // 3. The ACTIONS to be multiplexed.
-      ['_dcr']
+      ['_dcr'],
+    ),
+    // SMART token issuance endpoint.
+    createDidEndpointConfigFromSelector(
+      { sector, section: 'identity', format: 'openid' },
+      ['smart'],
+      ['token'],
     ),
   ];
 
   const allServices = [...defaultBusinessServices, ...defaultNetworkServices, ...defaultOidcServices, ...customServices];
-  const serviceMap = new Map(allServices.map(s => [s.id, s]));
+  const serviceMap = new Map<string, DidService>();
+  for (const service of allServices) {
+    const selectorSector = ((service as any).selector as { sector?: string } | undefined)?.sector || '';
+    const key = `${service.id}|${selectorSector}|${service.type}|${service.serviceEndpoint}|${(service.actions || []).join(',')}`;
+    serviceMap.set(key, service);
+  }
   return Array.from(serviceMap.values());
 }
 
@@ -102,19 +175,38 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
  * Generates the business logic service CONFIGURATION for the Host.
  * This defines the services for `didConfig.service`.
  */
-export function initializeHostServicesConfig(sectorsAllowed: Sector[]): DidService[] {
+export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: string): DidService[] {
   const services: DidService[] = [];
-  const uniqueSectors = new Set([...(sectorsAllowed || []), Sector.TEST]);
+  const hostRegistrySector = resolveHostRegistrySector(nodeEnv);
 
-  for (const sector of Array.from(uniqueSectors)) {
-    if (sector === Sector.SYSTEM) {
-      continue;
-    }
-    services.push(createDidEndpointConfig(
-      createDidServiceIdBase({ version: 'v1', sector, section: 'registry', format: 'org.schema' }),
+  // Host onboarding (Organization registration + Order) is exposed under a "network env sector".
+  services.push(
+    createDidEndpointConfigFromSelector(
+      { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
       ['Organization', 'Order'],
-      ['_batch']
-    ));
+      ['_batch'],
+    ),
+  );
+
+  // Identity endpoints also exist at the host level (onboarding convenience), but these remain
+  // business-sector specific because they are consumed by tenants/apps in that sector.
+  const uniqueBusinessSectors = new Set([...(sectorsAllowed || [])]);
+  for (const sector of Array.from(uniqueBusinessSectors)) {
+    if (sector === Sector.SYSTEM || sector === Sector.TEST) continue;
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'identity', format: 'firebase' },
+        ['Token'],
+        ['_custom'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'identity', format: 'openid' },
+        ['Token'],
+        ['_exchange'],
+      ),
+    );
   }
   return services;
 }
@@ -182,10 +274,10 @@ export function initializeCustomerServices(customerConfig: EntityConfig, sector:
   const format = isFhir ? 'org.hl7.fhir.api' : 'org.schema';
   const section = 'index';
 
-  const businessService = createDidEndpointConfig(
-    createDidServiceIdBase({ version: 'v1', sector, section, format }),
+  const businessService = createDidEndpointConfigFromSelector(
+    { section, format },
     individualResources,
-    ['_batch']
+    ['_batch'],
   );
 
   return [...coreServices, businessService];

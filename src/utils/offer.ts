@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4 } from 'uuid';
-import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg } from '../models/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 
 // Simple tier calculation for demonstration purposes.
 // In a real scenario, this would come from a more complex pricing engine or configuration.

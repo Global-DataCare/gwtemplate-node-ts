@@ -4,7 +4,7 @@
 import { Storage } from '@google-cloud/storage';
 import { IStorageAdapter, UploadResult } from './IStorageAdapter';
 import { sha3_384 } from '@noble/hashes/sha3.js';
-import { encodeMultibase58btc } from '../../utils/multibase58';
+import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 
 const SHA3_384_MULTIHASH_PREFIX = new Uint8Array([0x15, 0x30]); // 0x15: sha3-384, 0x30: 48-byte length
 

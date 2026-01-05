@@ -6,8 +6,8 @@ import {
   RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { generateCollectionName } from '../../../utils/firestore';
-import { Sector } from '../../../models/urlPath';
-import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 
 let testEnv: RulesTestEnvironment;
 

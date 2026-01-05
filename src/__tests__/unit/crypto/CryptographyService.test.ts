@@ -1,16 +1,16 @@
 // src/__tests__/unit/crypto/CryptographyService.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { CryptographyService } from '../../../crypto/CryptographyService';
-import { AesManager } from '../../../crypto/AesManager';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { AdapterCryptoSdkNode } from '../../../gdc-backend-utils-node/adapters/node/crypto';
+import { AesManager } from 'gdc-common-utils-ts';
 import { ml_kem768 } from '@noble/post-quantum/ml-kem';
-import { MlkemPrivateJwk, MlkemPublicJwk, MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
-import { Content } from '../../../utils/content';
+import { MlkemPrivateJwk, MlkemPublicJwk, MldsaPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { Content } from 'gdc-common-utils-ts/utils/content';
 import { randomBytes } from 'crypto';
-import { JweObject, RecipientDataJWE } from '../../../models/jwe';
+import { JweObject, RecipientDataJWE } from 'gdc-common-utils-ts/models/jwe';
 import * as mlDsa from '@noble/post-quantum/ml-dsa';
-import { ProtectedDataAES } from '../../../models/aes';
-import { withKid } from '../../../crypto/jwk-thumbprint';
+import { ProtectedDataAES } from 'gdc-common-utils-ts/models/aes';
 
 jest.mock('@noble/post-quantum/ml-kem');
 jest.mock('@noble/post-quantum/ml-dsa', () => ({
@@ -31,19 +31,17 @@ jest.mock('@noble/post-quantum/ml-dsa', () => ({
     keygen: jest.fn(),
   },
 }));
-jest.mock('../../../crypto/jwk-thumbprint');
 
 const mockMlKem768 = ml_kem768 as jest.Mocked<typeof ml_kem768>;
 // Point the primary mock to the dsa44 variant, as it's our default
 const mockMlDsa = mlDsa.ml_dsa44 as jest.Mocked<typeof mlDsa.ml_dsa44>;
-const mockWithKid = withKid as jest.Mocked<typeof withKid>;
 
 describe('CryptographyService', () => {
   let cryptoService: CryptographyService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    cryptoService = new CryptographyService();
+    cryptoService = new CryptographyService(new AdapterCryptoSdkNode());
   });
 
   // --- Formatting & Parsing Utilities ---
@@ -273,15 +271,14 @@ describe('CryptographyService', () => {
       // Use correct key sizes for ML-DSA-44: Pub=1312, Priv=2560
       mockMlDsa.keygen.mockReturnValue({ secretKey: randomBytes(2560), publicKey: randomBytes(1312) });
       mockMlKem768.keygen.mockReturnValue({ secretKey: randomBytes(2400), publicKey: randomBytes(1184) });
-      // Mock withKid to return the JWK with a predictable kid
-      (withKid as jest.Mock).mockImplementation(async (jwk: any) => ({ ...jwk, kid: 'mock-kid' }));
     });
 
     it('should generate a valid ML-DSA key pair', async () => {
       const { publicJWKey, secretKeyBytes } = await cryptoService.generateKeyPairMlDsa();
       expect(publicJWKey.kty).toBe('AKP');
       expect(publicJWKey.alg).toBe('ML-DSA-44'); // Assert the new default
-      expect(publicJWKey.kid).toBe('mock-kid');
+      expect(publicJWKey.kid).toEqual(expect.any(String));
+      expect(publicJWKey.kid.length).toBeGreaterThan(0);
       expect(secretKeyBytes).toBeInstanceOf(Uint8Array);
       expect(secretKeyBytes.length).toBe(2560);
     });
@@ -290,7 +287,8 @@ describe('CryptographyService', () => {
       const { publicJWKey, secretKeyBytes } = await cryptoService.generateKeyPairMlKem();
       expect(publicJWKey.kty).toBe('OKP');
       expect(publicJWKey.crv).toBe('ML-KEM-768');
-      expect(publicJWKey.kid).toBe('mock-kid');
+      expect(publicJWKey.kid).toEqual(expect.any(String));
+      expect(publicJWKey.kid.length).toBeGreaterThan(0);
       expect(secretKeyBytes).toBeInstanceOf(Uint8Array);
     });
   });

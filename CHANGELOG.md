@@ -24,6 +24,8 @@ All notable changes to this project will be documented in this file.
 -   **Contextualized Claims Normalization:** Added claim normalization + deterministic ordering for contextualized schema.org claims (see `src/utils/claims.ts`) to support future canonical hashing.
 -   **Family Onboarding (Offer/Order):** Added `FamilyManager` and data fixtures to support family (household) registration with the same Offer/Order pattern used for tenant onboarding.
 -   **Sandbox-Safe Integration Test Harness:** Added `invokeExpress` helper to run integration tests without binding a TCP port (required in sandboxed environments).
+-   **SMART Token Issuance (Async):** Added `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token` job flow with polling via `.../identity/openid/smart/_batch-response`, including consent-rule matching by actor (jurisdiction URN / did:web / email), role, purpose, and requested LOINC sections.
+-   **Consent Rule Fixtures:** Added `src/__tests__/data/consent-rules.data.ts` and unit/integration coverage for consent-based SMART token gating.
 
 ### Changed
 
@@ -32,8 +34,12 @@ All notable changes to this project will be documented in this file.
     -   The smart contract is expected to implement a "first match wins" optimization for these batch queries.
 -   **Updated `IBlockchainAdapter`:** The interface was changed from `discoverDidByHash` to the batch-aware `discoverDidsByHashes` to support the performance optimization.
 -   **Updated Service Definitions (`services.ts`):**
+-   **DID Service ID Convention (SDK parity):** DID Document service IDs now follow `#<section>:<format>:<resourceType>:<action>` via `generateServiceId()` (and request validation supports both config selectors and DID fragments).
+-   **Backend Crypto Adapter (Node):** `CryptographyService` is now instantiated with a Node `ICryptoHelper` adapter (random UUIDs/bytes + SHA/SHA3 digests) to match the SDK’s platform-adapter approach.
 -   **Customer → Individual:** Renamed the worker registry key from `customerManager` to `individualManager` and renamed the unit test file to `IndividualManager.test.ts`.
 -   **Secure API Routing:** Path params are now authoritative when building the async `jobRequest` (prevents decoded payload fields from overriding `tenantId/sector/section/resourceType`).
+-   **OIDC Service Definitions:** Split OIDC service templates so `Device/_dcr` and `smart/token` don’t cross-combine (no accidental `Smart/_dcr` or `Device/token` in DID service multiplexing).
+-   **Test Environment Isolation:** `src/server.ts` no longer loads `.env.local` (or initializes Firebase) under Jest, and Jest now sets safe default host env vars for `startServer()`-based integration tests.
 
 ### Fixed
 
@@ -48,6 +54,7 @@ All notable changes to this project will be documented in this file.
 -   **CORS + In-Memory Express Invocation:** Fixed crashes in integration tests caused by `cors/vary` expecting Node `ServerResponse` header APIs.
 -   **Hosting Offer/Order:** Fixed Offer identifier handling, ensured tenant config retains required claims, and persisted an indexable admin employee record so secure key resolution can find `kid/skid`.
 -   **KMS Key Metadata:** Ensured managed JWKs are marked with `use: 'sig'|'enc'` so downstream key selection works reliably.
+-   **DCR Example Data:** Updated test fixtures so the DCR `code` is a valid UUID, aligning with `DeviceRegistrationManager` activation-code validation.
 
 ### Internal
 

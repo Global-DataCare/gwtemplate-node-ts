@@ -4,19 +4,19 @@
 import { jest } from '@jest/globals';
 import { v4 as uuidv4 } from 'uuid';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
-import { IKmsService } from '../../../crypto/interfaces/IKmsService';
+import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { CredentialManager } from '../../../managers/CredentialManager';
 import { testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { IServerConfig } from '../../../config';
 import { testClaimsTenant1Receptionist1, testTenant1Receptionist1Email, testTenant1Receptionist1Urn } from '../../data/employee.data';
-import { MldsaPublicJwk } from '../../../crypto/interfaces/Cryptography.types';
-import { ProofEBSIv2, VerifiableCredentialV2 } from '../../../models/verifiable-credential';
-import { JwsMultiSign } from '../../../models/jws';
+import { MldsaPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { ProofEBSIv2, VerifiableCredentialV2 } from '../../../gdc-backend-utils-node/models/verifiable-credential';
+import { JwsMultiSign } from 'gdc-common-utils-ts/models/jws';
 import { testHostDidWeb, testHostDomain, testTenant1IdentifierUrn, testTenant1VaultId } from '../../data/organization.data';
-import { ClaimsPersonSchemaorg } from '../../../models/schemaorg';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 
 // Mock external dependencies
 jest.mock('uuid');
@@ -43,6 +43,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   signWithManagedKey: jest.fn<IKmsService['signWithManagedKey']>().mockResolvedValue(mockSignResult),
   signWithReconstructedKey: jest.fn<IKmsService['signWithReconstructedKey']>(),
   createDetachedJws: jest.fn<IKmsService['createDetachedJws']>(),
+  createCompactJws: jest.fn<IKmsService['createCompactJws']>(),
   encodeResponse: jest.fn<IKmsService['encodeResponse']>(),
   protectConfidentialData: jest.fn<IKmsService['protectConfidentialData']>(async (doc) => ({ ...doc, sequence: 0, jwe: {} })),
   unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc, entityId: string) =>
@@ -159,7 +160,7 @@ describe('CredentialManager', () => {
       const decryptionEntityId = 'some-entity';
       const putSpy = jest.spyOn(vaultRepository, 'put');
 
-      await vaultRepository.createNewVault({ id: testTenant1VaultId, meta: {} });
+      await vaultRepository.createNewVault({ id: testTenant1VaultId });
       
       // Simulate the KMS returning HMACed attributes
       mockKmsService.protectAttributesNameAndValue.mockResolvedValue([
@@ -199,6 +200,7 @@ describe('CredentialManager', () => {
 
       const encryptedDoc: ConfidentialStorageDoc = {
         id: vc.id as string,
+        status: 'active',
         sequence: 0,
         jwe: { ciphertext: 'encrypted-vc' },
         indexed: { attributes: [{ name: 'identifier', value: 'protected-urn', unique: true }] },

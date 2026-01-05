@@ -2,7 +2,7 @@
 // File: src/utils/http-parser.ts
 
 import { URL } from 'url';
-import { JobProcessingInfo, JobRequest, JobStatus } from '../models/confidential-job'; // Import from the new central model file
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Helper Functions ---

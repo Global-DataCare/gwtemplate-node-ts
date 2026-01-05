@@ -1,5 +1,5 @@
 
-import { Content } from '../../../src/utils/content';
+import { Content } from 'gdc-common-utils-ts/utils/content';
 
 // This file contains constants and fixtures for cryptographic tests,
 // ensuring reproducibility and avoiding "magic values".

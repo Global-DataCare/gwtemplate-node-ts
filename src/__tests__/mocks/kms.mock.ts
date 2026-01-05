@@ -2,9 +2,9 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { jest } from '@jest/globals';
-import { IKmsService } from '../../crypto/interfaces/IKmsService';
-import { ConfidentialStorageDoc } from '../../models/confidential-storage';
-import { Content } from '../../utils/content';
+import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { Content } from 'gdc-common-utils-ts/utils/content';
 
 // This is the definitive, globally-safe mock.
 // It uses the original JWE structure and Content helpers to be compatible with all tests.
@@ -46,6 +46,14 @@ export const mockKmsService: jest.Mocked<IKmsService> = {
     const signature = `fake-signature-for-payload-${JSON.stringify(payload)}`;
     const signatureB64 = Buffer.from(signature).toString('base64url');
     return `${protectedHeaderB64}..${signatureB64}`;
+  }),
+  createCompactJws: jest.fn(async (payload: object, signerKid: string) => {
+    const protectedHeader = { alg: 'ML-DSA-44', kid: signerKid };
+    const protectedHeaderB64 = Buffer.from(JSON.stringify(protectedHeader)).toString('base64url');
+    const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const signature = `fake-signature-for-payload-${JSON.stringify(payload)}`;
+    const signatureB64 = Buffer.from(signature).toString('base64url');
+    return `${protectedHeaderB64}.${payloadB64}.${signatureB64}`;
   }),
   encodeResponse: jest.fn(),
   protectConfidentialData: jest.fn(protectConfidentialData),

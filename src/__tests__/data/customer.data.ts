@@ -1,7 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/data/customer.data.ts
 
-import { ClaimsPersonSchemaorg } from '../../models/schemaorg';
+import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { testTenant1DidWebExternal, testTenant1IdentifierUrn } from './organization.data';
 
 // ===================================================================================

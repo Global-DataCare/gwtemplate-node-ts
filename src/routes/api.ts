@@ -2,29 +2,26 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import * as express from 'express';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { QueueAdapter } from '../adapters/queue';
 import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 import { createJobName } from '../utils/naming';
 import { isRequestValid } from '../utils/request-validator';
 import { createOperationOutcome } from '../utils/outcome';
-import { JobRequest } from '../models/confidential-job';
-import { DidService } from '../models/did';
-import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { Content } from '../utils/content';
-import { EntityConfig } from '../models/entity';
-import { JWK } from '../models/jwk';
-import { VerificationMethod } from '../models/did';
-
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { Content } from 'gdc-common-utils-ts/utils/content';
+import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
+import { JWK } from 'gdc-common-utils-ts/models/jwk';
+import { VerificationMethod } from '../gdc-backend-utils-node/models/did';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
-import { ICryptography } from '../crypto/interfaces/ICryptography';
+import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { getTenantVaultIdFromIss, getTenantVaultId } from '../utils/tenant';
+import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 
 // As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
-
-
 
 /**
  * Creates the main, dynamic API router according to the patterns defined in ARCHITECTURE_PATTERNS.md.
@@ -41,6 +38,7 @@ export function createApiRouter(
   vaultRepository: IVaultRepository,
   cryptographyService: ICryptography,
   apiBaseUrl: string,
+  appAuthManager?: AppAuthorizationManager,
 ): express.Router {
   const router = express.Router();
 
@@ -125,25 +123,49 @@ export function createApiRouter(
     return next();
   };
 
+  // Canonical polling pattern: the Location URL is always the original request URL + `-response`.
+  // Examples:
+  // - `.../Organization/_batch` -> `.../Organization/_batch-response`
+  // - `.../identity/openid/Device/_dcr` -> `.../identity/openid/Device/_dcr-response`
+  // - `.../identity/openid/smart/token` -> `.../identity/openid/smart/token-response`
+  const pollingRoute = `${cdsRoutePrefix}/:actionResponse`;
+  const pollingGate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const actionResponse = String(req.params.actionResponse || '');
+    if (!actionResponse.endsWith('-response')) return next();
+    return pollingHandler(req, res);
+  };
+  router.post(pollingRoute, pollingGate);
+  router.get(pollingRoute, isFhirSector, pollingGate);
+
+  // Backward-compat alias: older versions used a fixed `_batch-response` action.
   router.post(`${cdsRoutePrefix}/_batch-response`, pollingHandler);
   router.get(`${cdsRoutePrefix}/_batch-response`, isFhirSector, pollingHandler);
 
   /**
    * @openapi
-   * /host/cds-{jurisdiction}/v1/test/registry/org.schema/Organization/_batch:
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch:
    *   post:
    *     tags:
-   *       - Tenant Registration
+   *       - 1.1 Organization Registration
    *     summary: Register a new Tenant (Organization)
    *     description: |
    *       Submits an asynchronous job to register a new tenant on the platform. This is the first step for any new organization.
    *       The endpoint supports both a plaintext JSON "legacy" flow (for simple onboarding) and a JWE-based "secure" flow.
+   *
+   *       The `{sector}` segment is a host onboarding "network environment" selector:
+   *       - demo/test: `test`
+   *       - development/staging: `test-network`
+   *       - production: `network`
    *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
    *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
    *     requestBody:
    *       description: |
    *         The DIDComm message for registration.
-   *         The `Content-Type` `application/didcomm-plaintext+json` is canonical, but `application/json` is also accepted for simplicity.
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
    *         application/didcomm-plaintext+json:
@@ -152,6 +174,9 @@ export function createApiRouter(
    *           examples:
    *             message:
    *               $ref: '#/components/examples/OrganizationRegistrationPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/OrganizationRegistrationLegacy'
    *         application/x-www-form-urlencoded:
    *           schema:
    *             $ref: '#/components/schemas/SecureRequest'
@@ -193,17 +218,22 @@ export function createApiRouter(
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch:
    *   post:
    *     tags:
-   *       - Employee Role Registration
+   *       - 3.1 Employee Role
    *     summary: Create a new Professional (Employee)
    *     description: |
    *       Submits an asynchronous job to create a new professional (employee) within an existing tenant.
    *       The `tenantId` in the path specifies the organization under which the employee is being created.
    *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
    *       - $ref: "#/components/parameters/TenantId"
    *       - $ref: "#/components/parameters/Jurisdiction"
    *       - $ref: "#/components/parameters/Sector"
    *     requestBody:
-   *       description: The DIDComm message for employee creation.
+   *       description: |
+   *         DIDComm request for employee creation.
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
    *         application/didcomm-plaintext+json:
@@ -212,6 +242,9 @@ export function createApiRouter(
    *           examples:
    *             message:
    *               $ref: '#/components/examples/EmployeeRegistrationPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/EmployeeCreationLegacy'
    *         application/x-www-form-urlencoded:
    *           schema:
    *             $ref: '#/components/schemas/SecureRequest'
@@ -224,21 +257,175 @@ export function createApiRouter(
    *           Location:
    *             schema: { type: string }
    *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch-response:
+   *   post:
+   *     tags:
+   *       - 3.1 Employee Role
+   *       - Async Polling
+   *     summary: Poll the employee creation job result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom:
+   *   post:
+   *     tags:
+   *       - 2.1.1 Identity Federation
+   *     summary: Federate external OIDC id_token to Firebase custom token (async)
+   *     description: |
+   *       Submits an async job that verifies a provider id_token (e.g. eIDAS) and returns a Firebase custom_token.
+   *
+   *       This endpoint is always DIDComm (plaintext in demo, encrypted in production).
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/FirebaseCustomTokenPlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *       '400': { description: Bad Request. }
+   *       '401': { description: Unauthorized. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom-response:
+   *   post:
+   *     tags:
+   *       - 2.1.1 Identity Federation
+   *       - Async Polling
+   *     summary: Poll the federation result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange:
+   *   post:
+   *     tags:
+   *       - 2.1.2 Initial Access Token Exchange
+   *     summary: Exchange activation code for initial_access_token (async)
+   *     description: |
+   *       Submits an async job that exchanges activation code + Firebase id_token for an initial_access_token.
+   *
+   *       Submit-time errors are returned immediately if the request cannot be accepted/enqueued.
+   *       Processing/business errors are returned when polling.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/InitialAccessTokenExchangePlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *       '400': { description: Bad Request. }
+   *       '401': { description: Missing/invalid Firebase id_token. }
+   *       '404': { description: Activation code not found. }
+   *       '409': { description: Activation code already used. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response:
+   *   post:
+   *     tags:
+   *       - 2.1.2 Initial Access Token Exchange
+   *       - Async Polling
+   *     summary: Poll the initial_access_token exchange result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Person/_batch:
    *   post:
    *     tags:
-   *       - Personal Unified Data Index Registration
-   *     summary: Create the Global Unified Health Index for an Individual
+   *       - 99. Legacy / Internal
+   *     summary: (Legacy) Create a Person (individual vault)
    *     description: |
-   *       Submits an asynchronous job to create the Global Unified Health Index for an individual (Person).
-   *       This is based on the initial consent (signed Terms and Conditions) provided by the individual or their legal guardian,
-   *       and it is performed by an authorized employee of the chosen provider (`tenantId`).
+   *       This endpoint existed for the older "customer onboarding" flow where a provider created an individual's vault directly.
+   *
+   *       Current onboarding is modeled via the Family Organization offer/order flow (`individual/org.schema/Organization/_batch`),
+   *       which is the canonical path described in API_INTEGRATORS_GUIDE.
    *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
    *       - $ref: "#/components/parameters/TenantId"
    *       - $ref: "#/components/parameters/Jurisdiction"
    *       - $ref: "#/components/parameters/Sector"
    *     requestBody:
-   *       description: The DIDComm message for creating the individual's index.
+   *       description: |
+   *         Legacy endpoint. Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
    *         application/didcomm-plaintext+json:
@@ -247,6 +434,9 @@ export function createApiRouter(
    *           examples:
    *             message:
    *               $ref: '#/components/examples/CustomerOnboardingPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/CustomerCreationLegacy'
    *         application/x-www-form-urlencoded:
    *           schema:
    *             $ref: '#/components/schemas/SecureRequest'
@@ -262,14 +452,20 @@ export function createApiRouter(
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent/_batch:
    *   post:
    *     tags:
-   *       - Communication and Updates to the Individual Index
+   *       - 5. Consent
    *     summary: Create a FHIR Consent Resource
    *     description: Submits an async job to create a FHIR Consent resource, wrapped in a DIDComm message.
    *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
    *       - $ref: "#/components/parameters/TenantId"
    *       - $ref: "#/components/parameters/Jurisdiction"
    *       - $ref: "#/components/parameters/Sector"
    *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Legacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.
    *       required: true
    *       content:
    *         application/didcomm-plaintext+json:
@@ -278,21 +474,79 @@ export function createApiRouter(
    *           examples:
    *             message:
    *               $ref: '#/components/examples/ConsentCreationPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/ConsentCreation'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *         application/fhir+json:
+   *           schema:
+   *             type: object
+   *           description: |
+   *             Legacy FHIR JSON (raw Bundle without DIDComm envelope). Allowed only in non-production environments and only for `org.hl7.fhir.*` endpoints.
    *     responses:
    *       '202':
    *         description: Accepted.
    *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent/_batch-response:
+   *   post:
+   *     tags:
+   *       - 5. Consent
+   *       - Async Polling
+   *     summary: Poll the Consent job result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202':
+   *         description: Pending. Retry later.
+   *         headers:
+   *           Retry-After:
+   *             schema: { type: string, example: '5' }
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/AsyncPollPending' }
+   *       '200':
+   *         description: Completed.
+   *         content:
+   *           application/json:
+   *             schema: { type: object }
+   *           application/x-www-form-urlencoded:
+   *             schema: { $ref: '#/components/schemas/AsyncPollSecureResponse' }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication/_batch:
    *   post:
    *     tags:
-   *       - Communication and Updates to the Individual Index
+   *       - 6. Communication
    *     summary: Create a FHIR Communication Resource
    *     description: Submits an async job to create a FHIR Communication resource, wrapped in a DIDComm message, subject to a prior Consent.
    *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
    *       - $ref: "#/components/parameters/TenantId"
    *       - $ref: "#/components/parameters/Jurisdiction"
    *       - $ref: "#/components/parameters/Sector"
    *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Legacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.
    *       required: true
    *       content:
    *         application/didcomm-plaintext+json:
@@ -301,9 +555,641 @@ export function createApiRouter(
    *           examples:
    *             message:
    *               $ref: '#/components/examples/CommunicationCreationPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/CommunicationCreation'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *         application/fhir+json:
+   *           schema:
+   *             type: object
+   *           description: |
+   *             Legacy FHIR JSON (raw Bundle without DIDComm envelope). Allowed only in non-production environments and only for `org.hl7.fhir.*` endpoints.
    *     responses:
    *       '202':
    *         description: Accepted.
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication/_batch-response:
+   *   post:
+   *     tags:
+   *       - 6. Communication
+   *       - Async Polling
+   *     summary: Poll the Communication job result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202':
+   *         description: Pending. Retry later.
+   *         headers:
+   *           Retry-After:
+   *             schema: { type: string, example: '5' }
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/AsyncPollPending' }
+   *       '200':
+   *         description: Completed.
+   *         content:
+   *           application/json:
+   *             schema: { type: object }
+   *           application/x-www-form-urlencoded:
+   *             schema: { $ref: '#/components/schemas/AsyncPollSecureResponse' }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch:
+   *   post:
+   *     tags:
+   *       - 7. Composition
+   *     summary: Update the Unified Health Index (FHIR Composition)
+   *     description: Submits an async job to update the individual's index using a FHIR Composition bundle entry.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Legacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/CompositionUpdatePlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *         application/fhir+json:
+   *           schema:
+   *             type: object
+   *           description: |
+   *             Legacy FHIR JSON (raw Bundle without DIDComm envelope). Allowed only in non-production environments and only for `org.hl7.fhir.*` endpoints.
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: Accepted.
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch-response:
+   *   post:
+   *     tags:
+   *       - 7. Composition
+   *       - Async Polling
+   *     summary: Poll the Composition job result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202':
+   *         description: Pending. Retry later.
+   *         headers:
+   *           Retry-After:
+   *             schema: { type: string, example: '5' }
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/AsyncPollPending' }
+   *       '200':
+   *         description: Completed.
+   *         content:
+   *           application/json:
+   *             schema: { type: object }
+   *           application/x-www-form-urlencoded:
+   *             schema: { $ref: '#/components/schemas/AsyncPollSecureResponse' }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch:
+   *   post:
+   *     tags:
+   *       - 4.3 Family Member Relationship
+   *     summary: Register a family member relationship (emergency contact)
+   *     description: |
+   *       Stores a relationship/emergency-contact record for an individual using contextualized flat claims (`@context: org.hl7.fhir.api`).
+   *       This is intended for family-controlled or self-managed emergency contacts and non-clinical context.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch-response:
+   *   post:
+   *     tags:
+   *       - 4.3 Family Member Relationship
+   *       - Async Polling
+   *     summary: Poll the relationship registration result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Observation/_batch:
+   *   post:
+   *     tags:
+   *       - 8.4 Personal Observations
+   *     summary: Collect personal (non-clinical) observations
+   *     description: |
+   *       Collects non-clinical observations created by the individual (or their family controller) for emergencies and care continuity.
+   *       These observations are not "official clinical data"; they are self-reported and intended for context and emergency use.
+   *
+   *       Use contextualized flat claims with `@context: org.hl7.fhir.api` (keys like `Observation.category`, `Observation.code`, `Observation.valueString`, etc.).
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Observation/_batch-response:
+   *   post:
+   *     tags:
+   *       - 8.4 Personal Observations
+   *       - Async Polling
+   *     summary: Poll the observation collection result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   * 
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch:
+   *   post:
+   *     tags:
+   *       - 1.2 Organization Order
+   *     summary: Confirm the organization registration order (host)
+   *     description: |
+   *       Step 2 of onboarding. Submits an Order that accepts a prior Offer from Step 1 (tenant registration).
+   *       The final polled result typically contains a payment/checkout URL.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/OrganizationOrderPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response:
+   *   post:
+   *     tags:
+   *       - 1.1 Organization Registration
+   *       - Async Polling
+   *     summary: Poll the organization registration result (host)
+   *     description: |
+   *       Polls the asynchronous job submitted to `.../Organization/_batch`.
+   *
+   *       Submit vs poll behavior:
+   *       - Submit (`_batch`) returns immediate errors if the request cannot be accepted/enqueued.
+   *       - Poll (`_batch-response`) returns `202` while pending, then `200` (success) or `500` (processing error).
+   *
+   *       Response format depends on the original submission flow:
+   *       - Legacy/plaintext: returns JSON.
+   *       - Secure (form-encoded JWE): returns `application/x-www-form-urlencoded` with `response=<jwe>`.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202':
+   *         description: Pending. Retry later.
+   *         headers:
+   *           Retry-After:
+   *             schema: { type: string, example: '5' }
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/AsyncPollPending' }
+   *             examples:
+   *               message: { $ref: '#/components/examples/AsyncPollPending' }
+   *       '200':
+   *         description: Completed. Returns either JSON (legacy) or `response=<jwe>` (secure).
+   *         content:
+   *           application/json:
+   *             schema: { type: object }
+   *           application/x-www-form-urlencoded:
+   *             schema: { $ref: '#/components/schemas/AsyncPollSecureResponse' }
+   *             examples:
+   *               message: { $ref: '#/components/examples/AsyncPollSecureResponse' }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response:
+   *   post:
+   *     tags:
+   *       - 1.2 Organization Order
+   *       - Async Polling
+   *     summary: Poll the organization order result (host)
+   *     description: Polls the asynchronous job submitted to `.../Order/_batch`.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202':
+   *         description: Pending. Retry later.
+   *         headers:
+   *           Retry-After:
+   *             schema: { type: string, example: '5' }
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/AsyncPollPending' }
+   *       '200':
+   *         description: Completed. Returns either JSON (legacy) or `response=<jwe>` (secure).
+   *         content:
+   *           application/json:
+   *             schema: { type: object }
+   *           application/x-www-form-urlencoded:
+   *             schema: { $ref: '#/components/schemas/AsyncPollSecureResponse' }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch:
+   *   post:
+   *     tags:
+   *       - 4.1 Family Registration
+   *     summary: Register a Family Organization (Offer)
+   *     description: |
+   *       Registers a Family Organization hosted by a tenant, following the same Offer/Order pattern as tenant onboarding.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/FamilyRegistrationPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the Offer result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response:
+   *   post:
+   *     tags:
+   *       - 4.1 Family Registration
+   *       - Async Polling
+   *     summary: Poll the family registration result (Offer)
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch:
+   *   post:
+   *     tags:
+   *       - 4.2 Family Order
+   *     summary: Confirm the Family Organization order (accept Offer)
+   *     description: |
+   *       Submits an Order that accepts a Family registration Offer to complete onboarding and move into payment/activation.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/FamilyOrderPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch-response:
+   *   post:
+   *     tags:
+   *       - 4.2 Family Order
+   *       - Async Polling
+   *     summary: Poll the family order result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr:
+   *   post:
+   *     tags:
+   *       - 2.1.3 Device Registration (DCR)
+   *     summary: Register device keys (OpenID DCR)
+   *     description: |
+   *       Registers a device/client using OpenID Dynamic Client Registration. Requires an initial_access_token from Token/_exchange.
+   *       Request is usually a secure (form-encoded JWE) DIDComm message; demo plaintext is also accepted.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/DeviceRegistrationPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response:
+   *   post:
+   *     tags:
+   *       - 2.1.3 Device Registration (DCR)
+   *       - Async Polling
+   *     summary: Poll the device registration (DCR) result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token:
+   *   post:
+   *     tags:
+   *       - 2.2 SMART Token
+   *     summary: Request a SMART access_token (async)
+   *     description: |
+   *       Requests a SMART access token. The request MUST include the gateway context-pinning scope item:
+   *       `patient/Composition.<cruds>?subject=<did:web:...:individual:<id>>`.
+   *
+   *       The worker will validate the target subject exists and that at least one consent rule matches the actor.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/SmartTokenRequestPlaintextMessage'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll `.../identity/openid/smart/_batch-response` with `thid`. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response:
+   *   post:
+   *     tags:
+   *       - 2.2 SMART Token
+   *       - Async Polling
+   *     summary: Poll the SMART token issuance result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
    */
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
   router.post(`${cdsRoutePrefix}/:action`, async (req, res) => {
@@ -321,6 +1207,14 @@ export function createApiRouter(
         }
         // The KMS decrypts the JWE using the HOST's key and returns the inner JWS, but does not verify it.
         const decodedJob = await kmsService.decodeRequest(req.body.request);
+        // The Bearer token (e.g., Firebase id_token) is still an HTTP concern, but some identity endpoints
+        // need it during async processing. We propagate it into the decoded payload meta for the worker.
+        const bearerToken = req.headers.authorization;
+        if (bearerToken) {
+          (decodedJob as any).content = (decodedJob as any).content || {};
+          (decodedJob as any).content.meta = (decodedJob as any).content.meta || {};
+          (decodedJob as any).content.meta.bearer = { token: bearerToken, jwt: { header: {}, payload: {} } };
+        }
 
         // --- Signature Verification & Sender Key Resolution (Orchestrator Logic) ---
         // If the sender's public key is not embedded, we must resolve it and verify the signature now.
@@ -438,12 +1332,19 @@ export function createApiRouter(
 
         // TODO: Implement actual token validation (e.g., call a verifier like GoogleTokenVerifier).
         // For now, any Bearer token is accepted in non-production environments.
-        if (process.env.NODE_ENV === 'production') {
-          // In production, we would validate the token here.
-          // const isValid = await verifyToken(authToken.split(' ')[1]);
-          // if (!isValid) {
-          //   return res.status(401).json(createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Invalid Bearer token.'));
-          // }
+        if (
+          appAuthManager &&
+          section === 'identity' &&
+          String(req.params.format || '').toLowerCase() === 'openid' &&
+          String(resourceType || '').toLowerCase() === 'device' &&
+          action === '_dcr'
+        ) {
+          // DCR is gated by an `initial_access_token` (host-signed) to consume a license seat securely.
+          const bearerToken = authToken?.split(' ')[1];
+          if (!bearerToken) {
+            throw new Error('Missing Bearer token for DCR initial_access_token validation.');
+          }
+          await appAuthManager.verifyInitialAccessToken(bearerToken);
         }
 
         const legacyBody = req.body || {};
@@ -511,7 +1412,7 @@ export function createApiRouter(
 
     // --- 5. Success Response ---
     // According to FHIR Async, the Location header MUST be an absolute URL.
-    const relativeUrl = req.originalUrl.replace(`/${action}`, '/_batch-response');
+    const relativeUrl = `${req.originalUrl}-response`;
     const pollingUrl = new URL(relativeUrl, apiBaseUrl).href;
     res.location(pollingUrl);
     res.set('Retry-After', '5');

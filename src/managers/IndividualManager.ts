@@ -3,36 +3,36 @@
 
 import { v4 as uuidv4} from 'uuid';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
-import { BundleJsonApi, BundleEntry, BundleEntryRequest, ErrorEntry } from '../models/bundle';
+import { BundleJsonApi, BundleEntry, BundleEntryRequest, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
-import { JobRequest } from '../models/confidential-job';
-import { IDecodedDidcommPayload } from '../models/confidential-message';
-import { ManagerError } from '../models/errors/manager-error';
-import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../models/schemaorg';
-import { EntityConfig } from '../models/entity';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { initializeCustomerServices } from '../utils/services'; 
 import { createOperationOutcome } from '../utils/outcome';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { ParameterData } from '../models/params'; // extends ParamAttribute with `type` and others
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { ParameterData } from 'gdc-common-utils-ts/models/params'; // extends ParamAttribute with `type` and others
 import { CredentialManager } from './CredentialManager';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { parseTenantUrn } from '../utils/urn';
 import { getTenantVaultId } from '../utils/tenant';
-import { Sector } from '../models/urlPath';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { determineResourceId } from '../utils/resource';
 import { uuidToBytes } from '../utils/uuid';
-import { encodeMultibase58btc } from '../utils/multibase58';
+import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import { getJurisdictionGroup } from '../utils/jurisdiction';
 import { normalizePhoneNumber } from '../utils/phone-number';
 import { parseIdentifierType } from '../utils/identifier-parser';
 import { generateUrnHash } from '../utils/urn-hash';
 import { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
-import { IncludedResource } from '../models/jsonapi';
-import { ClaimsRecord } from '../models/resource-document';
-import { EntityLifecycleStatus, EntityType } from '../models/enums';
-import { DeviceLicense } from '../models/device-license';
+import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { EntityLifecycleStatus, EntityType } from '../gdc-backend-utils-node/models/enums';
+import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { generateLicenseOffer } from '../utils/offer';
 
 
@@ -173,6 +173,7 @@ export class IndividualManager {
 
     const docToStore: ConfidentialStorageDoc = {
       id: internalId,
+      status: individualConfig.status,
       sequence: 0,
       indexed: { attributes: indexedAttributes },
       content: individualConfig,

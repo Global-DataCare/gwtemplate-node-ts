@@ -4,7 +4,7 @@
 import { GcsStorageAdapter } from '../../../../database/storage/gcs.storage.adapter';
 import { Storage } from '@google-cloud/storage';
 import { sha3_384 } from '@noble/hashes/sha3.js';
-import { encodeMultibase58btc } from '../../../../utils/multibase58';
+import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 
 // Mock the entire @google-cloud/storage library
 jest.mock('@google-cloud/storage');

@@ -1,7 +1,8 @@
 // src/utils/did-document.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { DidService } from '../models/did';
+import { DidService, ServiceEndpointSelector } from 'gdc-common-utils-ts/models/did';
+import { generateServiceId } from 'gdc-common-utils-ts/utils/did';
 
 /**
  * Creates the standard, public-facing "well-known" service endpoints for a DID Document.
@@ -58,19 +59,34 @@ export function populateDidDocumentServices(
 
   // 2. Multiplex the internal business service templates into discrete, public service endpoints.
   const populatedBusinessServices: DidService[] = businessServicesConfig.flatMap(configService => {
-    const resourceTypes = (configService.serviceEndpoint as string).split(',');
-    const actions = configService.actions || [];
-    const pathParts = configService.id.split(':'); // e.g., [v1, health-care, entity, org.schema]
-    const section = pathParts[2];
-    const format = pathParts[3]; // Format now contains dots directly.
+    const selector = (configService as any).selector as Pick<ServiceEndpointSelector, 'section' | 'format'> | undefined;
+
+    // Backward-compat fallback for legacy configs that encoded section/format in `id`.
+    let section = selector?.section;
+    let format = selector?.format;
+    if (!section || !format) {
+      if (configService.id.startsWith('#')) {
+        const parts = configService.id.slice(1).split(':');
+        section = parts[0];
+        format = parts[1];
+      } else {
+        const parts = configService.id.split(':'); // legacy: v1:sector:section:format[:resourceType]
+        section = parts[2];
+        format = parts[3];
+      }
+    }
+
+    if (!section || !format) {
+      return [];
+    }
+
+    const resourceTypes = (configService.serviceEndpoint as string).split(',').map((s) => s.trim()).filter(Boolean);
+    const actions = (configService.actions || []).map((a: string) => a.trim()).filter(Boolean);
     
     // This is the core multiplexing logic.
     return resourceTypes.flatMap(resourceType => {
       return actions.map((action: string) => {
-        // Create the new, granular, public-facing service ID using the full context.
-        // The final service ID fragment MUST be lowercased for consistency.
-        const serviceId = `${configService.id}:${resourceType.trim().toLowerCase()}:${action.toLowerCase()}`;
-        const functionalPath = `${section}/${format}/${resourceType.trim()}/${action}`;
+        const functionalPath = `${section}/${format}/${resourceType}/${action}`;
 
         let serviceEndpointUrl: string;
         if (isHosted) {
@@ -84,7 +100,7 @@ export function populateDidDocumentServices(
 
         // Return the final, public service object.
         return {
-          id: `${did}#${serviceId}`,
+          id: `${did}${generateServiceId({ section, format, resourceType, action })}`,
           type: configService.type,
           serviceEndpoint: serviceEndpointUrl,
         };

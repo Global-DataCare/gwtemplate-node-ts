@@ -18,21 +18,33 @@ import { testFamilyRegisterExpanded } from './family.data';
 const pdfEmbeddedData = "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y=";
 
 const deviceKidMldsa = "thumbprint-public-sig-key-device";
-const deviceJwkMldsa = {
+// Canonical JWK thumbprint material (RFC 7638): do NOT include `kid` or `use`.
+const deviceJwkMldsaThumbprint = {
   "alg": "ML-DSA-44",
-  "kid": deviceKidMldsa,
   "kty": "AKP",
   "pub": "base64url-public-sig-key-device",
+} as const;
+// Full JWK as it appears in JWKS (kid/use are fine here for routing/selection).
+const deviceJwkMldsa = {
+  ...deviceJwkMldsaThumbprint,
+  "kid": deviceKidMldsa,
   "use": "sig",
 } as const;
 
 const deviceKidMlkem = "thumbprint-public-enc-key-device";
-const deviceJwkMlkem = {
+// Recipient encryption key id (resolved from the destination DID Document / JWKS).
+const recipientKidMlkem = "thumbprint-public-enc-key-recipient";
+// Canonical JWK thumbprint material (RFC 7638): do NOT include `kid` or `use`.
+const deviceJwkMlkemThumbprint = {
   "crv": "ML-KEM-768",
-  "kid": deviceKidMlkem,
   "kty": "OKP",
-  "use": "enc",
   "x": "base64url-public-enc-key-device",
+} as const;
+// Full JWK as it appears in JWKS (kid/use are fine here for routing/selection).
+const deviceJwkMlkem = {
+  ...deviceJwkMlkemThumbprint,
+  "kid": deviceKidMlkem,
+  "use": "enc",
 } as const;
 
 const deviceJWKeySet = {
@@ -50,14 +62,28 @@ const deviceJWKeySet = {
 export const metaRequestBodyFullJWK = {
   "jwe": {
     "header": {
-      "jwk": { ...deviceJwkMlkem },
+      "typ": "application/didcomm-encrypted+json",
+      // Nested JOSE: JWE wraps a compact JWS payload.
+      "cty": "JWS",
+      "enc": "A256GCM",
+      "alg": "ML-KEM-768",
+      // Recipient (target) key id.
+      "kid": recipientKidMlkem,
+      // Sender key id.
+      "skid": deviceKidMlkem,
+      // Bootstrap: provide the sender's public encryption key (without `kid`/`use`).
+      "jwk": { ...deviceJwkMlkemThumbprint },
     }
   },    
   "jws": {
     "protected": {
+      "typ": "application/didcomm-signed+json",
+      // The JWS payload is a DIDComm plaintext JSON object.
+      "cty": "application/didcomm-plaintext+json",
       "alg": deviceJwkMldsa.alg,
       "kid": deviceKidMldsa,
-      "jwk": { ...deviceJwkMldsa },
+      // Bootstrap: provide the sender's public signing key (without `kid`/`use`).
+      "jwk": { ...deviceJwkMldsaThumbprint },
     }
   }
 };
@@ -69,11 +95,18 @@ export const metaRequestBodyFullJWK = {
 const metaRequestBodyOnlyKidHeader = {
   "jwe": {
     "header": {
+      "typ": "application/didcomm-encrypted+json",
+      "cty": "JWS",
+      "enc": "A256GCM",
+      "alg": "ML-KEM-768",
+      "kid": recipientKidMlkem,
       "skid": deviceKidMlkem,
     }
   },    
   "jws": {
     "protected": {
+      "typ": "application/didcomm-signed+json",
+      "cty": "application/didcomm-plaintext+json",
       "alg": deviceJwkMldsa.alg,
       "kid": deviceKidMldsa,
     }
@@ -185,6 +218,26 @@ export const ORGANIZATION_ORDER_RESPONSE = {
   }
 };
 
+// --- Async Polling (HTTP-level payloads) ---
+
+export const ASYNC_POLL_REQUEST = {
+  "thid": "org-registration-thread-id",
+};
+
+export const ASYNC_POLL_PENDING_RESPONSE = {
+  "thid": "org-registration-thread-id",
+  "status": "PENDING",
+};
+
+// For legacy/plaintext submissions, the polling endpoint returns the decoded business `body` only.
+export const ORGANIZATION_REGISTRATION_POLL_RESULT_BODY = ORGANIZATION_REGISTRATION_RESPONSE.body;
+export const ORGANIZATION_ORDER_POLL_RESULT_BODY = ORGANIZATION_ORDER_RESPONSE.body;
+
+// For secure submissions, the polling endpoint returns a form-encoded `response=<jwe>`.
+export const ASYNC_POLL_SECURE_RESPONSE_FORM = {
+  response: 'eyJ...<jwe>',
+};
+
 
 // --- 2. Device and Identity Registration ---
 
@@ -195,7 +248,7 @@ export const ORGANIZATION_ORDER_RESPONSE = {
 export const DCR_REQUEST_BODY = {
   "application_type": "native",
   "client_name": "App for [email] as [role] on [iOS, Android, Web]",
-  "code": "<license-code>",
+  "code": "00000000-0000-0000-0000-000000000000",
   "redirect_uris": ["myapp://callback"],
   "token_endpoint_auth_method": "private_key_jwt",
   "ext_device_info": {
@@ -259,10 +312,50 @@ export const SMART_TOKEN_REQUEST = {
   "body": {
     "expires_in": 300,
     "token_type": "Bearer",
-    "sub": "did:web:api.acme.org",
-    "scope": "organization/PractitionerRole.crus"
+    "sub": "did:web:api.acme.org:employee:doctor1@acme.org:role:ISCO-08|2211",
+    "purpose": "TREAT",
+    "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=LOINC|48765-2 patient/Consent.cruds"
   },
   "meta": { ...metaRequestBodyOnlyKidHeader }
+};
+
+/**
+ * @see API_INTEGRATORS_GUIDE.md section 7.1.2
+ * Exchange activation code + Firebase id_token for initial_access_token (DCR).
+ *
+ * Note: Authorization header carries the Firebase id_token; body carries `subject_token`.
+ */
+export const INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST = {
+  "jti": "token-exchange-request-id",
+  "thid": "token-exchange-thread-id",
+  "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+  "aud": "did:web:api.acme.org#identity_openid_token_exchange",
+  "exp": 1678886460,
+  "iat": 1678886400,
+  "nbf": 1678886400,
+  "type": "application/json",
+  "body": {
+    "subject_token": "<license-activation-code>"
+  }
+};
+
+/**
+ * @see API_INTEGRATORS_GUIDE.md section 7.1.1
+ * Federate external OIDC id_token into Firebase custom token.
+ */
+export const FIREBASE_CUSTOM_TOKEN_REQUEST = {
+  "jti": "firebase-custom-token-request-id",
+  "thid": "firebase-custom-token-thread-id",
+  "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+  "aud": "did:web:api.acme.org#identity_firebase_token_custom",
+  "exp": 1678886460,
+  "iat": 1678886400,
+  "nbf": 1678886400,
+  "type": "application/json",
+  "body": {
+    "provider": "eidas",
+    "id_token": "<external-oidc-id-token>"
+  }
 };
 
 
@@ -287,7 +380,7 @@ export const EMPLOYEE_REGISTRATION_REQUEST = {
       "meta": {
         "claims": {
           "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-          "org.schema.Person.hasOccupation": "ISCO-08:4226",
+          "org.schema.Person.hasOccupation": "ISCO-08|4226",
           "org.schema.Person.email": "receptionist1@acme.org"
         }
       }
@@ -413,7 +506,7 @@ export const CONSENT_CREATION_MESSAGE = {
           "Consent.purpose": "TREAT",
           "Consent.action": "LOINC|48765-2",
           "Consent.actor-identifier": "did:web:hospital.example.com",
-          "Consent.actor-role": "ISCO-08|2221",
+          "Consent.actor-role": "ISCO-08|2211",
           "Consent.attachment-contentType": "application/odrl+json",
           "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
         }
@@ -511,6 +604,182 @@ export const COMMUNICATION_CREATION_MESSAGE = {
           }
         ]
       }
+    }]
+  }
+};
+
+/**
+ * @see API_INTEGRATORS_GUIDE.md section 9
+ * Update the Unified Health Index (FHIR Composition) with a single entry.
+ */
+export const COMPOSITION_UPDATE_MESSAGE = {
+  "jti": "composition-update-request-id",
+  "thid": "composition-update-thread-id",
+  "iss": "did:web:hospital.example.com",
+  "aud": "did:web:api.acme.org",
+  "exp": 1678886460,
+  "iat": 1678886400,
+  "nbf": 1678886400,
+  "type": "org.hl7.fhir.r4.Bundle",
+  "body": {
+    "resourceType": "Bundle",
+    "type": "batch",
+    "entry": [{
+      "type": "Composition",
+      "meta": {
+        "claims": {
+          "@context": "org.hl7.fhir.api",
+          "@type": "Composition:IndexEntry",
+          "Composition.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+          "Composition.section": "LOINC|48765-2",
+          "Composition.entry": "https://ehr.hospital.example.com/fhir/AllergyIntolerance/12345,https://ehr.hospital.example.com/fhir/DiagnosticReport/67890",
+          "Composition.date": "2025-11-26T10:00:00Z",
+          "Composition.author": "did:web:hospital.example.com",
+          "Composition.title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
+          "Composition.type": "LOINC|60591-5"
+        }
+      },
+      "request": {
+        "method": "POST",
+        "url": "individual/org.hl7.fhir.r4/Composition"
+      },
+      "resource": {
+        "resourceType": "Composition",
+        "status": "final",
+        "subject": { "reference": "did:web:api.acme.org:individual:<unified-health-identifier>" },
+        "date": "2025-11-26T10:00:00Z",
+        "author": [{ "reference": "did:web:hospital.example.com" }],
+        "title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
+        "type": { "coding": [{ "system": "http://loinc.org", "code": "60591-5" }] },
+        "section": [{
+          "title": "Allergies and Intolerances",
+          "code": { "coding": [{ "system": "http://loinc.org", "code": "48765-2" }] },
+          "entry": [
+            { "reference": "https://ehr.hospital.example.com/fhir/AllergyIntolerance/12345" },
+            { "reference": "https://ehr.hospital.example.com/fhir/DiagnosticReport/67890" }
+          ]
+        }]
+      }
+    }]
+  }
+};
+
+// --- 8. Personal Observations (non-clinical) ---
+
+export const PERSONAL_OBSERVATION_MESSAGE = {
+  jti: "personal-observation-message-id",
+  thid: "thid-personal-observation",
+  iss: "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+  aud: "did:web:api.acme.org",
+  type: "org.hl7.fhir.r4.Bundle",
+  body: {
+    resourceType: "Bundle",
+    type: "batch",
+    entry: [{
+      type: "Observation",
+      meta: {
+        claims: {
+          "@context": "org.hl7.fhir.api",
+          "@type": "Observation:SelfReported",
+          "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+          "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
+          // User-selected code (e.g., from a picker based on a curated SNOMED IPS ValueSet).
+          // NOTE:
+          // - Keep observations atomic: one concept per Observation.
+          // - SNOMED codes MUST be concept IDs (not description IDs). In the IPS release file, the "conceptId" is the code.
+          "Observation.code": "SNOMED|48694002",
+          "Observation.code-userselected": true,
+          // FHIR: `issued` = when the Observation was created/recorded.
+          // `effective[x]` = when the finding applies (e.g., NIGHT for recurring symptoms).
+          "Observation.issued": "2025-11-27T10:00:00Z",
+          // Flat claims follow the FHIR SearchParameter "date" concept (effective[x]) and custom extensions.
+          // Canonical internal mapping can convert this to `effectiveTiming.repeat.when`.
+          "Observation.date-when": "NIGHT",
+          // Free text details (optional). If you want to capture "music preferences", emit separate Observations.
+          // FHIR search-param style value key:
+          "Observation.value-string": "Feels anxious at night.",
+          // Optional short English tags for grouping/routing (comma-separated).
+          "Observation.meta-tag": "Anxiety,Night",
+        }
+      },
+      request: { method: "POST", url: "individual/org.hl7.fhir.api/Observation" },
+      resource: { resourceType: "Observation", status: "final" }
+    }]
+  }
+};
+
+export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
+  jti: "personal-preferences-mds-message-id",
+  thid: "thid-personal-preferences-mds",
+  iss: "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+  aud: "did:web:api.acme.org",
+  type: "org.hl7.fhir.r4.Bundle",
+  body: {
+    resourceType: "Bundle",
+    type: "batch",
+    entry: [
+      {
+        type: "Observation",
+        meta: {
+          claims: {
+            "@context": "org.hl7.fhir.api",
+            "@type": "Observation:SelfReported",
+            "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+            "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
+            "Observation.code": "LOINC|54728-1",
+            "Observation.code-userselected": true,
+            "Observation.issued": "2025-11-27T10:05:00Z",
+            "Observation.value-concept": "http://terminology.hl7.org/CodeSystem/v2-0136|Y",
+          }
+        },
+        request: { method: "POST", url: "individual/org.hl7.fhir.api/Observation" },
+        resource: { resourceType: "Observation", status: "final" }
+      },
+      {
+        type: "Observation",
+        meta: {
+          claims: {
+            "@context": "org.hl7.fhir.api",
+            "@type": "Observation:SelfReported",
+            "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+            "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
+            "Observation.code": "LOINC|54723-2",
+            "Observation.code-userselected": true,
+            "Observation.issued": "2025-11-27T10:05:05Z",
+            "Observation.value-concept": "http://terminology.hl7.org/CodeSystem/v2-0136|Y",
+          }
+        },
+        request: { method: "POST", url: "individual/org.hl7.fhir.api/Observation" },
+        resource: { resourceType: "Observation", status: "final" }
+      }
+    ]
+  }
+};
+
+export const FAMILY_MEMBER_RELATIONSHIP_MESSAGE = {
+  jti: "family-relationship-message-id",
+  thid: "thid-family-relationship",
+  iss: "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+  aud: "did:web:api.acme.org",
+  type: "org.hl7.fhir.r4.Bundle",
+  body: {
+    resourceType: "Bundle",
+    type: "batch",
+    entry: [{
+      type: "RelatedPerson",
+      meta: {
+        claims: {
+          "@context": "org.hl7.fhir.api",
+          "@type": "RelatedPerson:EmergencyContact",
+          "RelatedPerson.patient": "did:web:api.acme.org:individual:<unified-health-identifier>",
+          "RelatedPerson.identifier": "urn:uuid:related-person-uuid",
+          "RelatedPerson.relationship": "http://terminology.hl7.org/CodeSystem/v3-RoleCode|PRN",
+          "RelatedPerson.telecom": "tel:+34600123456",
+          "RelatedPerson.name": "Jane Doe",
+        }
+      },
+      request: { method: "POST", url: "individual/org.hl7.fhir.api/RelatedPerson" },
+      resource: { resourceType: "RelatedPerson" }
     }]
   }
 };

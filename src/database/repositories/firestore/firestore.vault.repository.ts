@@ -1,6 +1,6 @@
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
-import { RecordBase, VaultConfig } from '../../../models/resource-document';
+import { RecordBase, VaultConfig } from 'gdc-common-utils-ts/models/resource-document';
 
 const DEFAULT_SECTION = 'default';
 

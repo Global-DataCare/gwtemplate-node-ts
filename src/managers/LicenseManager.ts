@@ -3,13 +3,13 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { IJobProcessor } from './registry';
-import { JobRequest } from '../models/confidential-job';
-import { IPayloadResponse } from '../models/confidential-message';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
-import { ManagerError } from '../models/errors/manager-error';
-import { IssueType } from '../models/fhir/codes';
-import { DeviceLicense } from '../models/device-license';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 
 import { getTenantVaultId } from '../utils/tenant';
 
@@ -31,7 +31,7 @@ export class LicenseManager implements IJobProcessor {
    * @returns A promise resolving to a response payload indicating the result.
    * @throws {ManagerError} If the input is invalid or incomplete.
    */
-  public async process(job: JobRequest): Promise<IPayloadResponse> {
+  public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const {
       targetTenantId,
       quantity,
@@ -94,6 +94,7 @@ export class LicenseManager implements IJobProcessor {
 
       const doc: ConfidentialStorageDoc = {
         id: licenseId,
+        status: license.status,
         sequence: 0,
         content: license,
       };

@@ -2,8 +2,8 @@
 
 import { Router } from 'express';
 import { QueueAdapter } from '../adapters/queue';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { parseCdsRequest } from '../crypto/middleware/parseCdsRequest';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import { parseCdsRequest } from '../gdc-backend-utils-node/middleware/parseCdsRequest';
 import { NetworkActionsController } from './handlers/network/NetworkActionsController';
 
 export function createNetworkRouter(

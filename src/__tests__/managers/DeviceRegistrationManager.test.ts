@@ -3,7 +3,7 @@
 
 import cloneDeep from 'lodash.clonedeep';
 import { validate as uuidValidate } from 'uuid';
-import { BundleEntryResponse, BundleJsonApi, ErrorEntry } from '../../models/bundle';
+import { BundleEntryResponse, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { DeviceRegistrationManager } from '../../managers/DeviceRegistrationManager';
 import { DCR_REGISTRATION_JOB } from '../data/example-jobs';
 
@@ -68,7 +68,7 @@ describe('DeviceRegistrationManager', () => {
       const errorEntry = (result.body as BundleJsonApi).data[0] as ErrorEntry;
       expect(errorEntry.response.status).toEqual('400');
       expect(errorEntry.response.outcome.issue[0].diagnostics).toContain(
-        '`jwks` is a required field and must contain at least one key.'
+        'Either `jwks` or `jwks_uri` is a required field.'
       );
     });
   });

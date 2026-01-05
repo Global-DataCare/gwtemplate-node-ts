@@ -1,8 +1,8 @@
 // src/utils/outcome.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { OperationOutcome } from '../models/fhir/operation-outcome';
-import { IssueLevel, IssueTypeCode } from '../models/fhir/codes';
+import { OperationOutcome } from 'gdc-sdk-client-ts/src/models/operation-outcome';
+import { IssueLevel, IssueTypeCode } from 'gdc-sdk-client-ts/src/models/issue';
 
 /**
  * Creates a standardized FHIR OperationOutcome object.

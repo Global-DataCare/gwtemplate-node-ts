@@ -1,9 +1,9 @@
 // src/utils/bundle.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { BundleJsonApi, ErrorEntry } from '../models/bundle';
-import { IssueLevel, IssueType } from '../models/fhir/codes';
-import { safelyJoinUrl } from './url';
+import { BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { safelyJoinUrl } from 'gdc-common-utils-ts/utils/url';
 
 export const BundleType = {
   BatchResponse: 'batch-response',

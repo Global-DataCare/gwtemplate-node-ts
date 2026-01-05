@@ -1,10 +1,10 @@
 // src/__tests__/data/network-enrollment.data.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { MldsaPublicJwk } from '../../crypto/interfaces/Cryptography.types';
-import { ClaimsActionSchemaorg } from '../../models/schemaorg';
-import { DidDocument } from '../../models/did';
-import { IDecodedDidcommPayload } from '../../models/confidential-message';
+import { MldsaPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { ClaimsActionSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { DidDocument } from '../../gdc-backend-utils-node/models/did';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { testTenant1Data, testClaimsTenant1Registration } from './end-to-end.data';
 import { testHostDidWeb, testTenant1DidWebExternal, testTenant1DidWebHosted } from './organization.data';
 

@@ -3,15 +3,14 @@
 
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { ITokenVerifier, VerificationResult } from '../auth/ITokenVerifier';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { ICryptography } from '../crypto/interfaces/ICryptography';
-import { ManagerError } from '../models/errors/manager-error';
-import { IssueType } from '../models/fhir/codes';
-import { DeviceLicense } from '../models/device-license';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { getTenantVaultId } from '../utils/tenant';
-import { Content } from '../utils/content';
-import { stringToBytesUTF8 } from '../utils/string-convert';
+import { Content } from 'gdc-common-utils-ts/utils/content';
 
 /**
  * Manages application-specific authorization logic, such as validating tokens and codes.
@@ -63,21 +62,37 @@ export class AppAuthorizationManager {
     const now = Math.floor(Date.now() / 1000);
     const vaultId = getTenantVaultId(sector, tenantId);
 
-    // Note: Activation codes are not the primary ID of the license document.
-    // We need a way to query by the `activationCode` field.
-    // This assumes the repository's query method can handle this.
-    const queryResults = await this.vaultRepository.query(vaultId, { activationCode: code }) as ConfidentialStorageDoc[];
-    
-    if (!queryResults || queryResults.length === 0) {
+    // Activation codes are not the primary ID of the license document.
+    // Prefer a secure indexed lookup (HMAC-protected) and fall back to a scan in memory/dev.
+    const protectedName = await this.kmsService.getHmacBase64Url('activationCode', vaultId);
+    const protectedValue = await this.kmsService.getHmacBase64Url(code, vaultId);
+
+    let licenseDocs: ConfidentialStorageDoc[] = [];
+    try {
+      licenseDocs = (await this.vaultRepository.query(vaultId, {
+        sectionId: 'device-licenses',
+        where: [{ name: protectedName, value: protectedValue }],
+      })) as unknown as ConfidentialStorageDoc[];
+    } catch {
+      // Ignore: some repository implementations may not support query for this use case yet.
+      licenseDocs = [];
+    }
+
+    if (!licenseDocs || licenseDocs.length === 0) {
+      // Fallback scan (works for in-memory/dev repositories).
+      const all = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(vaultId, 'device-licenses');
+      licenseDocs = all.filter((doc) => (doc.content as any)?.activationCode === code);
+    }
+
+    if (!licenseDocs || licenseDocs.length === 0) {
       throw new ManagerError('Activation code not found or invalid.', IssueType.NotFound);
     }
-    if (queryResults.length > 1) {
-      // This case indicates a serious data integrity issue.
+    if (licenseDocs.length > 1) {
       throw new ManagerError('Multiple licenses found for the same activation code.', IssueType.Exception);
     }
-    
-    const licenseDoc = queryResults[0];
-    const license = licenseDoc.content as DeviceLicense;
+
+    const licenseDoc = licenseDocs[0];
+    const license = licenseDoc.content as DeviceLicense & { activationCode?: string; activatedAt?: number };
 
     // A license must be 'issued' to a user before it can be activated.
     if (license.status !== 'issued') {
@@ -113,8 +128,10 @@ export class AppAuthorizationManager {
     if (!hostSignKey) {
       throw new ManagerError('Host signing key not found, cannot verify token.', IssueType.Exception);
     }
-    const bytesToVerify = stringToBytesUTF8(`${header}.${payload}`);
-    const isValid = await this.cryptographyService.verifyDetachedJws(bytesToVerify, signature, hostSignKey);
+    const isValid = await this.cryptographyService.verifyJws(
+      { protected: header, payload, signature },
+      hostSignKey,
+    );
 
     if (!isValid) {
       throw new ManagerError('Invalid signature for initial_access_token.', IssueType.Security);

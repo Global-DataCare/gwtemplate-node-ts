@@ -2,17 +2,17 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { VerifiableCredentialV2, ProofEBSIv2 } from '../models/verifiable-credential';
-import { ManagerError } from '../models/errors/manager-error';
-import { objectToBytes } from '../utils/object-convert';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import { VerifiableCredentialV2, ProofEBSIv2 } from '../gdc-backend-utils-node/models/verifiable-credential';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { objectToBytes } from 'gdc-common-utils-ts/utils/object-convert';
 import { TenantsCacheManager } from './TenantsCacheManager';
-import { ConfidentialStorageDoc } from '../models/confidential-storage';
-import { IssueType } from '../models/fhir/codes';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
 import { generateVcId } from '../utils/vc-id';
-import { MldsaPublicJwk } from '../crypto/interfaces/Cryptography.types';
-import { ClaimsRecord } from '../models/resource-document';
-import { ParameterData } from '../models/params';
+import { MldsaPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { ParameterData } from 'gdc-common-utils-ts/models/params';
 import { parseValidityPeriod } from '../utils/time';
 
 /**
@@ -107,6 +107,7 @@ export class CredentialManager {
     const docToProtect: ConfidentialStorageDoc = {
       sequence: 0,
       id: vc.id as string,
+      status: 'active',
       content: vc,
       indexed: { attributes: protectedIndexes },
     };

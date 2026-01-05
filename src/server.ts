@@ -1,24 +1,8 @@
-// At the very top of the file, before any other imports.
-// This block loads environment variables from a .env.local file for local development.
-// It safely ignores errors if the file or module doesn't exist.
-// This is ideal for production environments where variables are injected directly.
-try {
-  // We explicitly specify the path to '.env.local'.
-  require('dotenv').config({ path: '.env.local' });
-} catch (e) {
-  // In a deployed environment, the 'dotenv' module might not be installed.
-  // We can safely ignore this error.
-  if (e instanceof Error && e.message.includes("Cannot find module 'dotenv'")) {
-    // This is expected in production, do nothing.
-  } else {
-    // For any other error, re-throw it so we can debug.
-    throw e;
-  }
-}
+const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
 
-import * as admin from 'firebase-admin';
 import app from './app';
 import * as express from 'express';
+import admin from 'firebase-admin';
 
 
 import { ILogger } from './loggers/ILogger';
@@ -29,18 +13,19 @@ import { StorageMemAdapter } from './database/storage/mem.storage.adapter';
 import { initializeFirebase } from './utils/firebase';
 
 // Initialize Firebase Admin SDK early if configured
-if (process.env.DB_PROVIDER === 'firestore' || process.env.STORAGE_PROVIDER === 'gcs') {
+if (!isTestEnv && (process.env.DB_PROVIDER === 'firestore' || process.env.STORAGE_PROVIDER === 'gcs')) {
   initializeFirebase();
 }
 
 import { Worker } from './worker';
 import { IServerConfig } from './config';
-import { Sector } from './models/urlPath';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { createApiRouter } from './routes/api';
 import { createDiscoveryRouter } from './routes/discovery';
 import { DiscoveryService } from './services/DiscoveryService';
-import { IKmsService } from './crypto/interfaces/IKmsService';
-import { CryptographyService } from './crypto/CryptographyService';
+import { IKmsService } from './gdc-backend-utils-node/models/IKmsService';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { AdapterCryptoSdkNode } from './gdc-backend-utils-node/adapters/node/crypto';
 import { KmsService } from './services/KmsService';
 import { DemoKmsService } from './services/DemoKmsService';
 import { QueueAdapterMem } from './adapters/queue-mem';
@@ -52,7 +37,7 @@ import { ManagerRegistry } from './managers/registry';
 import { HostingManager } from './managers/HostingManager';
 import { TenantsCacheManager } from './managers/TenantsCacheManager';
 import { EmployeeManager } from './managers/EmployeeManager';
-import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from './models/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { IndividualManager } from './managers/IndividualManager';
 import { CredentialManager } from './managers/CredentialManager';
 import { CompositionManager } from './managers/CompositionManager';
@@ -72,16 +57,21 @@ import { LicenseManager } from './managers/LicenseManager';
 import { TokenManager } from './managers/TokenManager';
 import { DemoTokenVerifier } from './auth/DemoTokenVerifier';
 import { createAuthRouter } from './routes/auth';
+import { OpenIdAuthManager } from './managers/OpenIdAuthManager';
+import { IdentityTokenManager } from './managers/IdentityTokenManager';
+import { ObservationManager } from './managers/ObservationManager';
+import { RelatedPersonManager } from './managers/RelatedPersonManager';
 import { SmartAuthorizationManager } from './managers/auth/SmartAuthorizationManager';
 import { AppAuthorizationManager } from './managers/AppAuthorizationManager';
 import { FamilyManager } from './managers/FamilyManager';
+import { FirebaseTokenVerifier } from './auth/FirebaseTokenVerifier';
+import * as fs from 'fs';
 
 // Load the pre-generated swagger spec. This is the static base.
 let swaggerSpec: any;
 try {
-  // Use path.resolve to create an absolute path from the current file's directory
-  const swaggerSpecPath = path.resolve(__dirname, '../swagger-spec.json');
-  swaggerSpec = require(swaggerSpecPath);
+  const swaggerSpecPath = path.resolve(process.cwd(), 'swagger-spec.json');
+  swaggerSpec = JSON.parse(fs.readFileSync(swaggerSpecPath, 'utf8'));
 } catch (error) {
   console.warn(`WARN: Could not load swagger-spec.json. Did you run \`npm run build\`? Error: ${error}`);
   swaggerSpec = {
@@ -271,7 +261,7 @@ async function startServer(options?: StartServerOptions) {
     console.log('[GW-API] Using In-Memory Storage Adapter.');
   }
 
-  const cryptographyService = new CryptographyService();
+  const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
 
   // --- Logger Instantiation ---
   // Default to console logger. This can be expanded with a factory for other providers.
@@ -339,7 +329,10 @@ async function startServer(options?: StartServerOptions) {
   const licenseManager = new LicenseManager(vaultRepository);
 
   // --- Auth Flow Dependencies ---
-  const tokenVerifier = new DemoTokenVerifier();
+  const tokenVerifier =
+    isTestEnv || process.env.AUTH_TOKEN_VERIFIER === 'demo'
+      ? new DemoTokenVerifier()
+      : new FirebaseTokenVerifier();
   const appAuthManager = new AppAuthorizationManager(
     vaultRepository,
     tokenVerifier,
@@ -347,6 +340,10 @@ async function startServer(options?: StartServerOptions) {
     cryptographyService
   );
   const tokenManager = new TokenManager(kmsService, tenantManager);
+  const identityTokenManager = new IdentityTokenManager(appAuthManager, tokenManager);
+  const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository);
+  const observationManager = new ObservationManager(vaultRepository);
+  const relatedPersonManager = new RelatedPersonManager(vaultRepository);
 
   const discoveryService = new DiscoveryService(tenantManager);
 
@@ -364,6 +361,9 @@ async function startServer(options?: StartServerOptions) {
   const managerRegistry: ManagerRegistry = {
     hostingManager,
     tenantManager,
+    identityTokenManager,
+    observationManager,
+    relatedPersonManager,
     familyManager,
     employeeManager,
     individualManager,
@@ -371,7 +371,7 @@ async function startServer(options?: StartServerOptions) {
     communicationManager,
     deviceRegistrationManager,
     licenseManager,
-    // tokenManager is NOT a worker job processor and is not included here
+    openIdAuthManager,
   };
   const worker = new Worker(managerRegistry, config.apiBaseUrl, kmsService);
   const asyncResponseStore = new AsyncResponseStoreMem();
@@ -381,7 +381,7 @@ async function startServer(options?: StartServerOptions) {
   const authManager: IAuthorizationManager = options?.authManager || new SmartAuthorizationManager();
 
   const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService, kmsService, logger);
-  const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService, config.apiBaseUrl);
+  const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService, config.apiBaseUrl, appAuthManager);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);
   const webhooksRouter = createWebhooksRouter(queueAdapter);
@@ -406,13 +406,6 @@ async function startServer(options?: StartServerOptions) {
         });
 
   return { app, server, queueAdapter, tenantManager, vaultRepository, cryptographyService, blockchainAdapter, kmsService };
-}
-
-if (require.main === module) {
-  startServer().catch((error) => {
-    console.error('[GW-API] Failed to start server:', error);
-    process.exit(1);
-  });
 }
 
 export { startServer };

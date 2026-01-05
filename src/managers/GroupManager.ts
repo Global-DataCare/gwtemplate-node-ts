@@ -4,7 +4,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { normalizeInteroperableClaims } from '../utils/claims';
-import { RecordBase } from '../models/resource-document';
+import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 
 export interface GroupInput {
   vaultId: string; // The vault where this group definition will be stored
@@ -29,7 +29,7 @@ export class GroupManager {
       input.payload,
     );
 
-    const groupDocument: RecordBase & { claims: any; '@context': string; '@type': string } = {
+    const groupDocument: RecordBase & { claims: any; '@context': string; '@type': string; meta?: Record<string, any> } = {
       id: groupId,
       '@context': input.payload['@context'],
       '@type': input.payload['@type'],

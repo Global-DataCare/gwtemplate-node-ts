@@ -1,8 +1,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__test__/data/end-to-end.data.ts
 
-import { ClaimsRecord } from '../../models/resource-document';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from '../../models/schemaorg';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import {
   testHostAdmin1,
   testTenant1Admin1,

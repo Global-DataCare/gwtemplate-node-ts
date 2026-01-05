@@ -1,6 +1,6 @@
 // src/__tests__/unit/utils/convert.test.ts
 
-import { Content } from '../../../utils/content';
+import { Content } from 'gdc-common-utils-ts/utils/content';
 
 describe("Content Class - Conversion Utilities", () => {
 

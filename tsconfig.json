@@ -13,8 +13,21 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "typeRoots": ["./src/types", "./node_modules/@types"]
+    "typeRoots": [
+      "./src/types",
+      "./node_modules/@types"
+    ],
+    "preserveSymlinks": true
   },
-  "include": ["./src/**/*.tsx", "./src/**/*.ts"],
-  "exclude": ["./build", "node_modules", "*.test.ts", "**/*.spec.ts"]
+  "include": [
+    "./src/**/*.tsx",
+    "./src/**/*.ts"
+  ],
+  "exclude": [
+    "./build",
+    "node_modules",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "src/__tests__/**"
+  ]
 }

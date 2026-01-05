@@ -3,6 +3,8 @@
 import type { JestConfigWithTsJest } from 'ts-jest';
 
 const isE2E = process.env.TEST_ENV === 'e2e';
+const includeArtifacts = process.env.TEST_ARTIFACTS === '1';
+const collectCoverage = process.env.COVERAGE === '1';
 
 const config: JestConfigWithTsJest = {
   testEnvironment: 'node',
@@ -18,6 +20,7 @@ const config: JestConfigWithTsJest = {
     '/node_modules/',
     '/src/__tests__/old/',
     'snomed-ips.test.ts',
+    ...(includeArtifacts ? [] : ['/src/__tests__/artifacts/']),
     ...(isE2E ? [] : ['/src/__tests__/e2e/']),
     // Firestore integration tests require external services/credentials.
     '/src/__tests__/integration/repositories/firestore',
@@ -30,13 +33,11 @@ const config: JestConfigWithTsJest = {
       {
         useESM: true,
         tsconfig: {
-          // Override tsconfig.json for Jest
           module: 'ESNext',
           moduleResolution: 'bundler',
-          // These are required for ESM support in ts-jest
           allowSyntheticDefaultImports: true,
           esModuleInterop: true,
-        }
+        },
       }
     ],
     '^.+\\.(mjs|js)$': 'babel-jest'
@@ -62,7 +63,14 @@ const config: JestConfigWithTsJest = {
         '@peculiar/webcrypto'
       ].join('|')
     }))`
-  ], 
+  ],
+
+  // Allow TS ESM source files to import with .js specifiers (NodeNext style).
+  // Jest/ts-jest resolves TS sources directly, so we strip the .js extension for relative imports.
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
+ 
 
   clearMocks: true,
   watchman: false,
@@ -70,7 +78,7 @@ const config: JestConfigWithTsJest = {
   verbose: true,
 
   // Coverage configuration
-  collectCoverage: true,
+  collectCoverage,
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.test.ts',

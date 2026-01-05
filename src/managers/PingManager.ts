@@ -1,13 +1,13 @@
 // File: src/managers/PingManager.ts
 
 import { v4 as uuidv4 } from 'uuid';
-import { JobRequest } from '../models/confidential-job';
-import { IDecodedDidcommPayload, IPayloadResponse } from '../models/confidential-message';
-import { BundleJsonApi, BundleEntry } from '../models/bundle';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { BundleJsonApi, BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { TenantsCacheManager } from './TenantsCacheManager';
-import { ManagerError } from '../models/errors/manager-error';
-import { IssueType } from '../models/fhir/codes';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
 
 /**
  * Manages the business logic for the 'ping' operation.
@@ -24,9 +24,9 @@ export class PingManager {
   /**
    * Processes a ping job by echoing the input entries back in the response.
    * @param job The job object containing the ping request data.
-   * @returns A IPayloadResponse object with the echoed entries.
+   * @returns A IDecodedDidcommPayload object with the echoed entries.
    */
-  async process(job: JobRequest): Promise<IPayloadResponse> {
+  async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const jobEntries = job?.content?.body?.data || [];
 
     // Create response entries by appending a success status to each original entry.

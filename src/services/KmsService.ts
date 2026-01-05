@@ -1,20 +1,20 @@
-import { VerificationMethod } from '../models/did';// src/services/KmsService.ts
+import { VerificationMethod } from '../gdc-backend-utils-node/models/did';// src/services/KmsService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { JWK, JwkSet } from '../models/jwk';
-import { JwsHeader, JwsMultiSign } from '../models/jws';
-import { ConfidentialStorageDoc, IndexedAttribute } from '../models/confidential-storage';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { ICryptography } from '../crypto/interfaces/ICryptography';
-import { IDecodedDidcommPayload } from '../models/confidential-message';
-import { JobRequest, JobStatus } from '../models/confidential-job';
+import { JWK, JwkSet } from '../gdc-backend-utils-node/models/jwk';
+import { JwsHeader, JwsMultiSign } from 'gdc-common-utils-ts/models/jws';
+import { ConfidentialStorageDoc, IndexedAttribute } from 'gdc-common-utils-ts/models/confidential-storage';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { v4 as uuidv4 } from 'uuid';
-import { MldsaPublicJwk, MlkemPrivateJwk, MlkemPublicJwk } from '../crypto/interfaces/Cryptography.types';
-import { Content } from '../utils/content';
+import { MldsaPublicJwk, MlkemPrivateJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { Content } from 'gdc-common-utils-ts/utils/content';
 import { createHash, randomBytes } from 'crypto';
-import { computeHmacSha256Base64Url } from '../crypto/hmac';
-import { ProtectedDataAES } from '../models/aes';
-import { ParameterData } from '../models/params';
+import { computeHmacSha256Base64Url } from 'gdc-common-utils-ts/hmac';
+import { ProtectedDataAES } from 'gdc-common-utils-ts/models/aes';
+import { ParameterData } from 'gdc-common-utils-ts/models/params';
 
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 
@@ -244,6 +244,12 @@ export class KmsService implements IKmsService {
       status: JobStatus.DRAFT,
       sequence: 0,
       createdAtTimestamp: Date.now(),
+      // These are populated by the HTTP layer (path params / middleware) in normal flows.
+      // `decodeRequest()` only deals with JOSE decoding and may be used standalone in tests.
+      section: 'unknown',
+      format: 'unknown',
+      resourceType: 'unknown',
+      action: 'unknown',
     };
 
     const recipientKids = this.crypto.getRecipientKidsFromJwe(message);
@@ -369,6 +375,18 @@ export class KmsService implements IKmsService {
     
     // Format as detached JWS: HEADER..SIGNATURE
     return `${jwsParts.protected}..${jwsParts.signature}`;
+  }
+
+  async createCompactJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
+    this.checkInitialized();
+    const keyPairSet = this._managedKeys.get(signerVaultId);
+    if (!keyPairSet || keyPairSet.verificationKeyPair.publicJWKey.kid !== signerKid) {
+      throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);
+    }
+    const { publicJWKey, secretKeyBytes } = keyPairSet.verificationKeyPair;
+    const protectedHeader = { alg: publicJWKey.alg, kid: publicJWKey.kid };
+    const jwsParts = await this.crypto.signDataJws(payload, protectedHeader, secretKeyBytes);
+    return `${jwsParts.protected}.${jwsParts.payload}.${jwsParts.signature}`;
   }
 
   // --- Outbound Encryption ---

@@ -1,7 +1,8 @@
-import { CryptographyService } from '../../crypto/CryptographyService';// src/__tests__/integration/pingApi.test.ts
+// src/__tests__/integration/pingApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import express from 'express';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import { createApiRouter } from '../../routes/api';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
@@ -11,12 +12,12 @@ import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async
 import { StoredJob } from '../../adapters/async-response-store.mem';
 import { decodedPingMessage, testEncryptedJwePing, decodedTenantPingMessage } from '../data/ping.data';
 import { testCompletedJob, testPendingJob } from '../data/async-response.data';
-import { createDidServiceIdBase } from '../../utils/did';
-import { IssueType } from '../../models/fhir/codes';
-import { JobRequest } from '../../models/confidential-job';
-import { DidService } from '../../models/did';
-import { Content } from '../../utils/content';
+import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { DidService } from '../../gdc-backend-utils-node/models/did';
+import { Content } from 'gdc-common-utils-ts/utils/content';
 import { invokeExpress } from './helpers/invokeExpress';
+import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -30,7 +31,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.json());
 
   const vaultRepository = new VaultMemRepository();
-  const cryptographyService = new CryptographyService();
+  const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
   const tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, 'test-host-collection');
 
   mockKmsService.init();
@@ -55,10 +56,11 @@ describe('Ping API Endpoint', () => {
   });
 
   const pingServiceConfig: DidService = {
-    id: createDidServiceIdBase({ version: 'v1', sector: 'test', section: 'ping', format: 'standard' }),
+    id: '#ping:standard',
     type: 'ApiService',
     serviceEndpoint: 'resource',
     actions: ['_batch'],
+    selector: { section: 'ping', format: 'standard' },
   };
 
   describe('POST /host/.../_batch (Host Ping)', () => {

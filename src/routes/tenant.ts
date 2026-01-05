@@ -5,10 +5,10 @@ import express, { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { QueueAdapter } from '../adapters/queue';
 import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
-import { parseCdsRequest } from '../crypto/middleware/parseCdsRequest';
-import { ICryptography } from '../crypto/interfaces/ICryptography';
-import { createDecodeRequestMiddleware } from '../crypto/middleware/decodeRequest';
-import { JobProcessingInfo, JobRequest } from '../models/confidential-job';
+import { parseCdsRequest } from '../gdc-backend-utils-node/middleware/parseCdsRequest';
+import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
+import { createDecodeRequestMiddleware } from '../gdc-backend-utils-node/middleware/decodeRequest';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { Worker } from '../worker';
 
 export function createTenantRouter(
@@ -19,7 +19,7 @@ export function createTenantRouter(
 const router = express.Router();
 const decodeRequest = createDecodeRequestMiddleware(cryptoService);
 
-const createJobName = (cdsRequest: JobProcessingInfo): string => {
+const createJobName = (cdsRequest: JobRequest): string => {
   const { tenantId, resourceType, action } = cdsRequest;
   return `${tenantId}:${resourceType}:_${action}`;
 };
@@ -85,4 +85,3 @@ router.post(cdsRoute, (req, res, next) => {
 
   return router;
 }
-

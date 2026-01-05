@@ -2,8 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { TenantsCacheManager } from './TenantsCacheManager';
-import { JobRequest } from '../models/confidential-job';
-import { IPayloadResponse } from '../models/confidential-message';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 
 /**
  * Defines the standard contract for any manager that processes a job.
@@ -14,7 +14,7 @@ export interface IJobProcessor {
    * @param job The complete, authenticated, and authorized job request.
    * @returns A promise that resolves to the JARM-compliant response payload.
    */
-  process(job: JobRequest): Promise<IPayloadResponse>;
+  process(job: JobRequest): Promise<IDecodedDidcommPayload>;
 }
 
 /**
@@ -25,6 +25,9 @@ export interface IJobProcessor {
 export interface ManagerRegistry {
   hostingManager: IJobProcessor;
   tenantManager: TenantsCacheManager;
+  identityTokenManager?: IJobProcessor;
+  observationManager?: IJobProcessor;
+  relatedPersonManager?: IJobProcessor;
   familyManager?: IJobProcessor;
   employeeManager?: IJobProcessor;
   individualManager?: IJobProcessor;
@@ -32,7 +35,7 @@ export interface ManagerRegistry {
   communicationManager?: IJobProcessor;
   deviceRegistrationManager?: IJobProcessor;
   licenseManager?: IJobProcessor;
-  tokenManager?: IJobProcessor;
+  openIdAuthManager?: IJobProcessor;
   // groupManager?: IJobProcessor;
   // listManager?: IJobProcessor;
 }

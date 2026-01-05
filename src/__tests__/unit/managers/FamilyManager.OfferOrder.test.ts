@@ -5,19 +5,19 @@ import { jest } from '@jest/globals';
 import { v4 as uuidv4 } from 'uuid';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { IServerConfig } from '../../../config';
-import { Sector } from '../../../models/urlPath';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
 import { HostingManager } from '../../../managers/HostingManager';
-import { IKmsService } from '../../../crypto/interfaces/IKmsService';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { FamilyManager } from '../../../managers/FamilyManager';
 import { ORGANIZATION_ORDER_JOB, ORGANIZATION_REGISTRATION_JOB } from '../../data/example-jobs';
 import { FAMILY_ORDER_REQUEST, FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
 import * as tenantUtils from '../../../utils/tenant';
-import { ClaimsOfferSchemaorg } from '../../../models/schemaorg';
-import { JobRequest, JobStatus } from '../../../models/confidential-job';
+import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 
 jest.mock('uuid');
 
@@ -40,6 +40,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   signWithManagedKey: jest.fn() as any,
   signWithReconstructedKey: jest.fn() as any,
   createDetachedJws: jest.fn(async () => 'mock-jws'),
+  createCompactJws: jest.fn(async () => 'mock-compact-jws'),
   encodeResponse: jest.fn() as any,
   getHostPublicJwkSet: jest.fn() as any,
   getPublicVerificationKey: jest.fn() as any,
@@ -75,7 +76,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       'org.schema.Organization.identifier': 'did:web:host.example.com',
       'org.schema.Organization.address.addressCountry': 'ES',
       'org.schema.Person.identifier': 'urn:uuid:a1b2c3d4-e5f6-7890-1234-567890abcdef',
-      'org.schema.Person.hasOccupation': 'ISCO-08:1120',
+      'org.schema.Person.hasOccupation': 'ISCO-08|1120',
       'org.schema.Person.email': 'admin1@host.example.com',
       'org.schema.Service.category': 'system',
       'org.schema.Service.identifier': 'urn:web:<manufacturer>',
@@ -153,6 +154,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       tenantId,
       sector: Sector.HEALTH_CARE,
       section: 'individual',
+      format: 'org.schema',
       action: '_batch',
       resourceType: 'Organization',
       content: FAMILY_REGISTRATION_REQUEST as any,
@@ -176,6 +178,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       tenantId,
       sector: Sector.HEALTH_CARE,
       section: 'individual',
+      format: 'org.schema',
       action: '_batch',
       resourceType: 'Organization',
       content: FAMILY_REGISTRATION_REQUEST as any,
@@ -195,6 +198,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       tenantId,
       sector: Sector.HEALTH_CARE,
       section: 'individual',
+      format: 'org.schema',
       action: '_batch',
       resourceType: 'Order',
       content: orderContent,

@@ -1,5 +1,5 @@
-import * as admin from 'firebase-admin';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import admin from 'firebase-admin';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { FirestoreVaultRepository } from '../../../database/repositories/firestore/firestore.vault.repository';
 
 // IMPORTANT: This E2E test is configured via the .env.test file.

@@ -3,11 +3,11 @@
 
 import express from 'express';
 import { createApiRouter } from '../../routes/api';
-import { CryptographyService } from '../../crypto/CryptographyService';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
-import { IDecodedDidcommPayload } from '../../models/confidential-message';
-import { JobRequest } from '../../models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { mockKmsService } from '../mocks/kms.mock';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { IAsyncResponseStore, AsyncResponseStoreMem } from '../../adapters/async-response-store.mem';
@@ -15,9 +15,9 @@ import { testEncryptedJwe1 } from '../data/async-response.data';
 import { testTenant1AddressCountry, testTenant1AlternateName, testTenant1ServiceProviderCategory } from '../data/organization.data';
 import { testInitialNetworkJobInput, testTenantC_DidDocument } from '../data/network-enrollment.data';
 import { getTenantVaultId } from '../../utils/tenant';
-import { DidService } from '../../models/did';
-import { createDidServiceIdBase } from '../../utils/did';
+import { DidService } from '../../gdc-backend-utils-node/models/did';
 import { invokeExpress } from './helpers/invokeExpress';
+import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -30,7 +30,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   app.use(express.json());
 
   const vaultRepository = new VaultMemRepository();
-  const cryptographyService = new CryptographyService();
+  const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
   const tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, 'test-host-collection');
   
   jest.spyOn(tenantsCacheManager, 'getDidServiceConfig');
@@ -74,23 +74,28 @@ describe('Network Enrollment API', () => {
 
       // Mock the service config lookup to simulate a valid, registered tenant
       const mockTenantServices: DidService[] = [{
-        id: createDidServiceIdBase({ version: 'v1', sector, section, format }),
+        id: `#${section}:${format}`,
         type: 'NetworkEnrollmentService',
         serviceEndpoint: resourceType,
         actions: [action],
+        selector: { section, format },
       }];
       (tenantsCacheManager.getDidServiceConfig as jest.Mock).mockReturnValue(mockTenantServices);
 
-      const mockJobRequest: JobRequest = {
-        id: 'mock-job-id',
-        status: 'DRAFT' as any,
-        sequence: 0,
-        createdAtTimestamp: Date.now(),
-        tenantId: '',
-        resourceType, action,
-        content: {
-          ...testInitialNetworkJobInput,
-          iss: 'did:web:some-issuer',
+	      const mockJobRequest: JobRequest = {
+	        id: 'mock-job-id',
+	        status: 'DRAFT' as any,
+	        sequence: 0,
+	        createdAtTimestamp: Date.now(),
+	        tenantId: '',
+	        sector,
+	        section,
+	        format,
+	        resourceType,
+	        action,
+	        content: {
+	          ...testInitialNetworkJobInput,
+	          iss: 'did:web:some-issuer',
           meta: {
             jws: {
               protected: {
@@ -217,10 +222,11 @@ describe('Network Enrollment API', () => {
 
       // The service must exist for the path validation to pass.
       const mockTenantServices: DidService[] = [{
-        id: createDidServiceIdBase({ version: 'v1', sector, section, format }),
+        id: `#${section}:${format}`,
         type: 'NetworkEnrollmentService',
         serviceEndpoint: resourceType,
         actions: [action],
+        selector: { section, format },
       }];
       (tenantsCacheManager.getDidServiceConfig as jest.Mock).mockReturnValue(mockTenantServices);
 
@@ -232,15 +238,20 @@ describe('Network Enrollment API', () => {
         ...testInitialNetworkJobInput,
         iss: employeeDid,
       };
-      const mockJobRequestFromEmployee: JobRequest = {
-        id: 'mock-job-id-2',
-        status: 'DRAFT' as any,
-        sequence: 0,
-        createdAtTimestamp: Date.now(),
-        tenantId: '', resourceType, action,
-        content: {
-          ...jobFromNonControllerEmployee,
-          meta: {
+	      const mockJobRequestFromEmployee: JobRequest = {
+	        id: 'mock-job-id-2',
+	        status: 'DRAFT' as any,
+	        sequence: 0,
+	        createdAtTimestamp: Date.now(),
+	        tenantId: '',
+	        sector,
+	        section,
+	        format,
+	        resourceType,
+	        action,
+	        content: {
+	          ...jobFromNonControllerEmployee,
+	          meta: {
             jws: {
               protected: { alg: 'ML-DSA-44', kid: employeeKid }
             },

@@ -2,8 +2,8 @@
 
 import { PingManager } from '../../../managers/PingManager';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
-import { BundleEntryResponse, BundleJsonApi } from '../../../models/bundle';
-import { JobRequest } from '../../../models/confidential-job';
+import { BundleEntryResponse, BundleJsonApi } from 'gdc-common-utils-ts/models/bundle';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { getBundleResponseTypeForAction } from '../../../utils/bundle';
 
 describe('PingManager', () => {
@@ -45,7 +45,6 @@ describe('PingManager', () => {
         thid: 'test-request-ping-123',
         aud: 'did:web:recipient.example.com',
         iss: 'did:web:requester.example.com',
-        response_type: 'json',
         type: 'json',
         body: {
           data: [{

@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { generateLicenseOffer } from '../../../utils/offer';
-import { ClaimsOfferSchemaorg } from '../../../models/schemaorg';
+import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 
 describe('generateLicenseOffer', () => {
   const hostDid = 'did:web:host.example.com';

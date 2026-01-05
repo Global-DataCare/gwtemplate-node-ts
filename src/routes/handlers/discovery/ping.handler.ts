@@ -4,10 +4,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Request, Response } from 'express';
 import { createOperationOutcome } from '../../../utils/outcome';
-import { compactJWT } from '../../../utils/jwt';
+import { compactJWT } from 'gdc-common-utils-ts/utils/jwt';
 import { convertPrimaryDocToFhirBundle } from '../../../utils/jsonapi';
-import { IDecodedDidcommPayload, IPayloadResponse } from '../../../models/confidential-message';
-import { IssueLevel, IssueType } from '../../../models/fhir/codes';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
 
 /**
  * Encodes a hostname from a request's Host header for use in a did:web.
@@ -54,7 +54,7 @@ export const pingHandler = () => async (req: Request, res: Response) => {
             // For FAPI/JARM-compliant clients, we demonstrate the full secure response format.
             // The issuer MUST be derived from the Host header to match the client's expectation.
             const issuerDid = `did:web:${getEncodedHostFromRequest(req)}`;
-            const responsePayload: IPayloadResponse = {
+            const responsePayload: IDecodedDidcommPayload = {
                 jti: uuidv4(),
                 type: 'ping-response',
                 thid: `ping-${Date.now()}`,

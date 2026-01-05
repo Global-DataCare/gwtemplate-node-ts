@@ -1,8 +1,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/database/repositories/vault/vault.repository.ts
 
-import { ConsentRule } from "../../../models/consent-rule";
-import { RecordBase, VaultConfig } from "../../../models/resource-document";
+import { ConsentRule } from "gdc-common-utils-ts/models/consent-rule";
+import { RecordBase, VaultConfig } from "gdc-common-utils-ts/models/resource-document";
 
 /**
  * Defines the contract for a Vault Repository, an abstraction layer over the physical

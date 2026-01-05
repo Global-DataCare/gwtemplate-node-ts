@@ -1,4 +1,4 @@
-import { ClaimsServiceSchemaorg } from "../../models/schemaorg";
+import { ClaimsServiceSchemaorg } from "gdc-common-utils-ts/constants/schemaorg";
 import { testConfigDataHost, testConfigTenant1 } from "./organization.data";
 
 // Terms of service accepted for running the software service

@@ -1,11 +1,10 @@
 // src/managers/TokenManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { ManagerError } from '../models/errors/manager-error';
-import { IssueType } from '../models/fhir/codes';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
 import { TenantsCacheManager } from './TenantsCacheManager';
-import { Content } from '../utils/content';
 
 /**
  * Manages the business logic for creating and signing system-level tokens,
@@ -46,8 +45,7 @@ export class TokenManager {
         throw new ManagerError('Could not resolve host signing key.', IssueType.Exception);
     }
 
-    // 3. Construct the JWT Header and Payload
-    const jwtHeader = { alg: 'ML-DSA-44', typ: 'JWT', kid: hostSignKey.kid };
+    // 3. Construct the JWT payload (the protected header is produced by the KMS).
     const jwtPayload = {
         ...claims, // Spread the input claims first
         iss: hostDid,
@@ -56,17 +54,8 @@ export class TokenManager {
         nbf: now,
         scope: 'dcr:register',
     };
-    
-    // 4. Manually construct the parts to be signed
-    const encodedHeader = Content.stringToBase64Url(JSON.stringify(jwtHeader));
-    const encodedPayload = Content.stringToBase64Url(JSON.stringify(jwtPayload));
-    const dataToSign = Content.stringToBytesUTF8(`${encodedHeader}.${encodedPayload}`);
 
-    // 5. Call KMS to get the signature
-    const jwsObject = await this.kmsService.signWithManagedKey(dataToSign, 'host');
-    const signature = jwsObject.signatures[0].signature;
-    
-    // 6. Assemble the final compact JWT
-    return `${encodedHeader}.${encodedPayload}.${signature}`;
+    // Must be a standard compact JWS (HEADER.PAYLOAD.SIGNATURE) so the verifier can validate it.
+    return this.kmsService.createCompactJws(jwtPayload, hostSignKey.kid, 'host');
   }
 }

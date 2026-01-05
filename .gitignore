@@ -4,6 +4,7 @@ admin*.*
 **/.DS_Store
 .idea/
 
+stripe.*
 _private_
 *private*.*
 *.production

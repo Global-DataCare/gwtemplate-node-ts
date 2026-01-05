@@ -6,17 +6,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { EmployeeManager } from '../../../managers/EmployeeManager';
-import { IKmsService } from '../../../crypto/interfaces/IKmsService';
-import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from '../../../models/schemaorg';
-import { RecordBase, ClaimsRecord } from '../../../models/resource-document';
-import { JwkSet } from '../../../models/jwk';
+import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { RecordBase, ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { JwkSet } from '../../../gdc-backend-utils-node/models/jwk';
 import { testBaseJobForEmployeeClaims as testBaseJobForEmployeeClaims, testClaimsTenant1Receptionist1 } from '../../data/employee.data';
-import { JobRequest } from '../../../models/confidential-job';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
-import { EntityConfig } from '../../../models/entity';
-import { normalizeCodeSystemAndValue } from '../../../utils/attributes';
-import { DeviceLicense } from '../../../models/device-license';
+import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
+import { normalizeCodeSystemAndValue } from '../../../utils/normalize-codeAndSystem';
+import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 
 // Tell Jest what will be mocked
 jest.mock('uuid');
@@ -93,7 +93,7 @@ describe('EmployeeManager', () => {
       const docToProtect = mockKmsService.protectConfidentialData.mock.calls[0][0];
       const employeeConfig = docToProtect.content as EntityConfig;
 
-      const expectedUrn = `${TENANT_URN}:employee:email:${email}:role:isco-08:${roleCode}`;
+      const expectedUrn = `${TENANT_URN}:employee:${email}:role:isco-08|${roleCode}`;
       expect(employeeConfig.didDocument!.id).toBe(expectedUrn);
 
       // Verify that the protected indexes from the mock were added to the document

@@ -2,23 +2,22 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { TokenManager } from '../../managers/TokenManager';
-import { IKmsService } from '../../crypto/interfaces/IKmsService';
+import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
-import { DidDocument } from '../../models/did';
-import { JwsMultiSign } from '../../models/jws';
-import { Content } from '../../utils/content';
+import { DidDocument } from '../../gdc-backend-utils-node/models/did';
+import { Content } from 'gdc-common-utils-ts/utils/content';
 
 // --- Mocks ---
 
 const mockKmsService: jest.Mocked<IKmsService> = {
-  signWithManagedKey: jest.fn(),
   getPublicVerificationKey: jest.fn(),
+  createCompactJws: jest.fn(),
   // Add other methods of IKmsService as jest.fn() to satisfy the interface
   init: jest.fn(), provisionKeys: jest.fn(), getPublicJwks: jest.fn(),
   getPublicEncryptionKey: jest.fn(), getHostPublicJwkSet: jest.fn(),
   decodeRequest: jest.fn(), signWithReconstructedKey: jest.fn(),
   createDetachedJws: jest.fn(),
-  encodeResponse: jest.fn(), protectConfidentialData: jest.fn(),
+  signWithManagedKey: jest.fn(), encodeResponse: jest.fn(), protectConfidentialData: jest.fn(),
   unprotectConfidentialData: jest.fn(), getHmacBase64Url: jest.fn(),
   protectAttributesNameAndValue: jest.fn(),
 };
@@ -43,14 +42,15 @@ describe('TokenManager', () => {
       // Arrange
       const mockHostDid = 'did:web:testhost.com';
       const mockHostDidDoc: DidDocument = { id: mockHostDid, verificationMethod: [] } as any;
-      const mockSignature: JwsMultiSign = {
-        payload: '',
-        signatures: [{ protected: 'mockProtectedHeader', signature: 'mockSignature' }]
-      };
       
       mockTenantsCacheManager.getDidDocument.mockResolvedValue(mockHostDidDoc);
       mockKmsService.getPublicVerificationKey.mockResolvedValue({ kid: 'host-key-1' } as any);
-      mockKmsService.signWithManagedKey.mockResolvedValue(mockSignature);
+      mockKmsService.createCompactJws.mockImplementation(async (payload: any) => {
+        const headerB64 = Content.stringToBase64Url(JSON.stringify({ alg: 'ML-DSA-44', kid: 'host-key-1' }));
+        const payloadB64 = Content.stringToBase64Url(JSON.stringify(payload));
+        const sigB64 = Content.stringToBase64Url('sig');
+        return `${headerB64}.${payloadB64}.${sigB64}`;
+      });
 
       const inputClaims = {
         sub: 'user-123',
@@ -64,8 +64,8 @@ describe('TokenManager', () => {
       const token = await manager.createInitialAccessToken(inputClaims, tokenLifetime);
 
       // Assert
-      expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(expect.any(Uint8Array), 'host');
-      expect(token).toContain('mockSignature');
+      expect(mockKmsService.createCompactJws).toHaveBeenCalledWith(expect.any(Object), 'host-key-1', 'host');
+      expect(token).toContain('.'); // compact JWS
 
       // Decode the payload to verify its contents
       const payloadB64 = token.split('.')[1];

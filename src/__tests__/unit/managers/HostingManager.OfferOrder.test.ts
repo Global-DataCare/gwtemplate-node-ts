@@ -1,17 +1,17 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/HostingManager.OfferOrder.test.ts
 
-import { jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { v4 as uuidv4 } from 'uuid';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { IServerConfig } from '../../../config';
-import { Sector } from '../../../models/urlPath';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
 import { HostingManager } from '../../../managers/HostingManager';
-import { IKmsService } from '../../../crypto/interfaces/IKmsService';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 
 // Create a mock KMS service for testing.
 const mockKmsService: jest.Mocked<IKmsService> = {
@@ -32,6 +32,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
     Promise.resolve(doc.content as any),
   ),
   createDetachedJws: jest.fn(),
+  createCompactJws: jest.fn(),
   getHostPublicJwkSet: jest.fn(),
   getPublicVerificationKey: jest.fn(),
   getPublicEncryptionKey: jest.fn(),
@@ -47,7 +48,7 @@ import {
   ClaimsOrganizationSchemaorg,
   ClaimsOfferSchemaorg,
   ClaimsServiceSchemaorg,
-} from '../../../models/schemaorg';
+} from 'gdc-common-utils-ts/constants/schemaorg';
 import * as tenantUtils from '../../../utils/tenant';
 import { testTenant1LegalName } from '../../data/organization.data';
 

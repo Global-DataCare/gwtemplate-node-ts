@@ -3,30 +3,31 @@
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { CryptographyService } from '../../crypto/CryptographyService';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import { createApiRouter } from '../../routes/api';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { testClaimsHostInitialization } from '../data/end-to-end.data';
 import { testEncryptedJwe1 } from '../data/async-response.data';
-import { JobRequest, JobStatus } from '../../models/confidential-job';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { mockKmsService } from '../mocks/kms.mock';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async-response-store.mem';
 import { IServerConfig } from '../../config';
-import { Sector } from '../../models/urlPath';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { IStorageAdapter } from '../../database/storage/IStorageAdapter';
 import { ILogger } from '../../loggers/ILogger';
 import { generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ORGANIZATION_ORDER_REQUEST, ORGANIZATION_REGISTRATION_REQUEST } from '../data/example-payloads';
 import { ORGANIZATION_REGISTRATION_JOB } from '../data/example-jobs';
-import { IPayloadResponse } from '../../models/confidential-message';
-import { MldsaPrivateJwk, MlkemPrivateJwk, MlkemPublicJwk } from '../../crypto/interfaces/Cryptography.types';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { MlkemPrivateJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { createHash } from 'crypto';
-import { Content } from '../../utils/content';
-import { ClaimsOfferSchemaorg } from '../../models/schemaorg';
-import { JWK } from '../../models/jwk';
+import { Content } from 'gdc-common-utils-ts/utils/content';
+import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { JWK } from 'gdc-common-utils-ts/models/jwk';
 import { HostingManager } from '../../managers/HostingManager';
+import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
 
 type InMemoryResponse = {
   status: number;
@@ -149,7 +150,7 @@ const setupApp = (
   tenantsCacheManager: TenantsCacheManager,
   vaultRepository: VaultMemRepository,
 ) => {
-  const cryptographyService = new CryptographyService();
+  const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
   mockKmsService.init();
   const apiRouter = createApiRouter(
     mockQueueAdapter,
@@ -195,7 +196,7 @@ describe('Organization Registration API', () => {
       hostExternalDomain: 'host.example.com',
       apiBaseUrl: 'http://host.example.com',
       namespace: 'test-namespace',
-      sectorsAllowed: [Sector.HEALTH_CARE, Sector.SYSTEM, Sector.TEST],
+      sectorsAllowed: [Sector.HEALTH_CARE, Sector.TEST, Sector.SYSTEM],
       dbProvider: 'mem',
       queueProvider: 'mem',
       storageProvider: 'mem',
@@ -209,7 +210,7 @@ describe('Organization Registration API', () => {
 
     app = setupApp(asyncResponseStore, tenantsCacheManager, vaultRepository);
 
-    cryptoService = new CryptographyService();
+    cryptoService = new CryptographyService(new AdapterCryptoSdkNode());
     mockKmsService.getHostPublicJwkSet.mockResolvedValue({ keys: [hostPublicEncKey as JWK] });
     
     const externalClientSeed = 'org-reg-v2-test-seed';
@@ -363,7 +364,7 @@ describe('Organization Registration API', () => {
       expect(pollResponse.status).toBe(200);
       const encryptedFinalResponse = pollResponse.text.replace('response=', '');
       const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
-      const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IPayloadResponse;
+      const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
 
       const responseEntry = finalResponse.body.data[0];
       const responseClaims = responseEntry.meta.claims;
@@ -427,7 +428,7 @@ describe('Organization Registration API', () => {
 
       const encryptedOfferResponse = pollResponse.text.replace('response=', '');
       const { decryptedBytes: decryptedOfferBytes } = await cryptoService.decryptJwe(encryptedOfferResponse, externalEncrypter);
-      const offerResponse = JSON.parse(Content.bytesToStringUTF8(decryptedOfferBytes)) as IPayloadResponse;
+      const offerResponse = JSON.parse(Content.bytesToStringUTF8(decryptedOfferBytes)) as IDecodedDidcommPayload;
       const offerClaims = offerResponse.body.data[0].meta.claims;
       const offerId = offerClaims[ClaimsOfferSchemaorg.identifier] as string;
       expect(offerId).toBeDefined();
@@ -500,7 +501,7 @@ describe('Organization Registration API', () => {
       expect(finalPollResponse.status).toBe(200);
       const encryptedFinalVc = finalPollResponse.text.replace('response=', '');
       const { decryptedBytes: decryptedVcBytes } = await cryptoService.decryptJwe(encryptedFinalVc, externalEncrypter);
-      const finalVcResponse = JSON.parse(Content.bytesToStringUTF8(decryptedVcBytes)) as IPayloadResponse;
+      const finalVcResponse = JSON.parse(Content.bytesToStringUTF8(decryptedVcBytes)) as IDecodedDidcommPayload;
 
       const responseEntry = finalVcResponse.body.data[0];
       expect(responseEntry.type).toBe('Organization');

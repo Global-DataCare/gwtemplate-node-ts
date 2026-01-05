@@ -42,20 +42,21 @@ import { CommunicationManager } from '../../managers/CommunicationManager';
 import { ManagerRegistry } from '../../managers/registry';
 import { Worker } from '../../worker';
 import { KmsService } from '../../services/KmsService';
-import { CryptographyService } from '../../crypto/CryptographyService';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
 import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
 import { StorageMemAdapter } from '../../database/storage/mem.storage.adapter';
 import { ConsoleLogger } from '../../loggers/ConsoleLogger';
 import { IServerConfig } from '../../config';
 import { IAuthorizationManager } from '../../managers/auth/IAuthorizationManager';
-import { BundleEntry } from '../../models/bundle';
-import { IAccessTokenClaims } from '../../models/auth';
-import { ClaimsServiceSchemaorg } from '../../models/schemaorg';
+import { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
+import { IAccessTokenClaims } from 'gdc-common-utils-ts/models/auth';
+import { ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
-import { IncludedResource } from '../../models/jsonapi';
-import { IKmsService } from '../../crypto/interfaces/IKmsService';
+import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
+import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import { invokeExpress } from './helpers/invokeExpress';
-import { Sector } from '../../models/urlPath';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 
 // Mock implementation for the AuthorizationManager
 class MockAuthorizationManager implements IAuthorizationManager {
@@ -94,7 +95,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
 
   beforeEach(async () => {
     const logger = new ConsoleLogger();
-    const cryptographyService = new CryptographyService();
+    const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
     vaultRepository = new VaultMemRepository();
     const asyncResponseStore = new AsyncResponseStoreMem();
     

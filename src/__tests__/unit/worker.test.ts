@@ -5,11 +5,11 @@ import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { Worker } from '../../worker';
 import { IJobProcessor, ManagerRegistry } from '../../managers/registry';
-import { JobRequest } from '../../models/confidential-job';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { testCreateCustomerJobRequestProfessionalOnboarding } from '../data/customer-onboarding.data';
 import { createJobName } from '../../utils/naming';
-import { IKmsService } from '../../crypto/interfaces/IKmsService';
-import { IDecodedDidcommPayload, IPayloadResponse } from '../../models/confidential-message';
+import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 
 describe('Worker', () => {
   let worker: Worker;
@@ -47,7 +47,7 @@ describe('Worker', () => {
       contentType: 'application/json',
     };
 
-    const mockManagerResponse: IPayloadResponse = {
+    const mockManagerResponse: IDecodedDidcommPayload = {
       jti: 'mock-jti-response',
       type: 'transaction-response',
       iss: API_BASE_URL,
@@ -86,7 +86,7 @@ describe('Worker', () => {
       resourceType: resourceType,
     };
 
-    // For the error case, the worker creates an IPayloadResponse and then encodes it.
+    // For the error case, the worker creates an IDecodedDidcommPayload and then encodes it.
     // We can mock the encode function to simply stringify the payload, so we can inspect it.
     mockKmsService.encodeResponse.mockImplementation(async (payload) => JSON.stringify(payload));
 
@@ -113,7 +113,7 @@ describe('Worker', () => {
         contentType: 'application/json', // This marks it as a "legacy" flow job
       };
 
-      const mockManagerResponse: IPayloadResponse = {
+      const mockManagerResponse: IDecodedDidcommPayload = {
         jti: 'mock-jti-response-2',
         type: 'transaction-response',
         iss: API_BASE_URL,

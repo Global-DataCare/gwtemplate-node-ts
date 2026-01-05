@@ -2,7 +2,7 @@
 // File: src/__tests__/data/appointment.data.ts
 // Description: Contains test data fixtures related to FHIR Appointments and Communications.
 
-import { AppointmentClaimsFhirApi, AppointmentStatus } from '../../models/fhir/Appointment.claims';
+import { AppointmentClaimsFhirApi, AppointmentStatus } from '../../gdc-backend-utils-node/models/fhir/Appointment.claims';
 import { testExamplesDidWeb } from './identity.data';
 import { testTenant1DidWebExternal } from './organization.data';
 

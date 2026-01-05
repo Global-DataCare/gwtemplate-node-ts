@@ -1,8 +1,7 @@
 // src/utils/request-validator.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { DidService } from '../models/did';
-import { createDidServiceIdBase } from './did';
+import { DidService } from 'gdc-common-utils-ts/models/did';
 
 /**
  * Validates a request against a tenant's service configurations by checking if the requested
@@ -18,25 +17,66 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
   if (!services) {
     return false;
   }
-  
-  // The service ID in the config could be general (without resourceType) or specific.
-  // We construct both possibilities to check against the tenant's service list.
-  const baseServiceId = createDidServiceIdBase({ version: 'v1', sector, section, format });
-  const specificServiceId = createDidServiceIdBase({ version: 'v1', sector, section, format, resourceType });
-  
-  // A request is valid if it matches EITHER a specific service definition OR a more general one.
-  const matchingService = services.find(s => s.id === specificServiceId || s.id === baseServiceId);
 
-  if (!matchingService) {
+  const normalizedSection = String(section || '').toLowerCase();
+  const normalizedFormat = String(format || '').toLowerCase();
+  const normalizedResourceType = String(resourceType || '').toLowerCase();
+  const normalizedAction = String(action || '');
+  const normalizedSector = String(sector || '').toLowerCase();
+
+  if (!normalizedSection || !normalizedFormat || !normalizedResourceType || !normalizedAction) {
     return false;
   }
 
-  const resourceAllowed = (matchingService.serviceEndpoint as string)
-    .toLowerCase()
-    .split(',')
-    .map(r => r.trim())
-    .includes(resourceType.toLowerCase());
-  const actionAllowed = (matchingService.actions || []).includes(action);
+  const getSelectorFromService = (service: DidService): { sector?: string; section?: string; format?: string } => {
+    const selector = (service as any).selector as { sector?: string; section?: string; format?: string } | undefined;
+    if (selector?.section && selector?.format) {
+      return selector;
+    }
+    const id = String(service.id || '');
+    const fragment = id.includes('#') ? id.split('#').pop() : undefined;
+    if (fragment) {
+      const parts = fragment.split(':').filter(Boolean);
+      // Current SDK convention: `#<section>:<format>:<resourceType>:<action>`
+      if (parts.length >= 4) {
+        return { section: parts[0], format: parts[1] };
+      }
+      // Minimal convention: `#<section>:<format>`
+      if (parts.length === 2) {
+        return { section: parts[0], format: parts[1] };
+      }
+      // Legacy convention: `#<sector>:<section>:<format>`
+      if (parts.length === 3) {
+        return { sector: parts[0], section: parts[1], format: parts[2] };
+      }
+    }
+    // Legacy format: v1:sector:section:format[:resourceType]
+    const parts = (service.id || '').split(':');
+    if (parts.length >= 4) {
+      return { sector: parts[1], section: parts[2], format: parts[3] };
+    }
+    return {};
+  };
 
-  return resourceAllowed && actionAllowed;
+  return services.some((service) => {
+    const serviceSelector = getSelectorFromService(service);
+    if (serviceSelector.sector && normalizedSector && serviceSelector.sector.toLowerCase() !== normalizedSector) {
+      return false;
+    }
+    if (
+      (serviceSelector.section || '').toLowerCase() !== normalizedSection ||
+      (serviceSelector.format || '').toLowerCase() !== normalizedFormat
+    ) {
+      return false;
+    }
+
+    const resourceAllowed = String(service.serviceEndpoint || '')
+      .split(',')
+      .map((r) => r.trim().toLowerCase())
+      .includes(normalizedResourceType);
+    if (!resourceAllowed) return false;
+
+    const actionAllowed = (service.actions || []).includes(normalizedAction);
+    return actionAllowed;
+  });
 }

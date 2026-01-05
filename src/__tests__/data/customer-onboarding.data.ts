@@ -1,10 +1,10 @@
 // src/__tests__/data/customer-onboarding.data.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../models/schemaorg';
-import { JobAction, Resource, Format, Section, Sector } from '../../models/urlPath';
-import { IDecodedDidcommPayload } from '../../models/confidential-message';
-import { JobRequest, FormRequest, JobStatus } from '../../models/confidential-job';
+import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { JobAction, Resource, Format, Section, Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { testCustomer1Data } from './customer.data';
 import { testTenant1AddressCountry,
     testTenant1AlternateName,
@@ -65,7 +65,7 @@ export const testIndividualConsentSignedOnboardingEntry =     {
         method: 'POST',
         url: testCustomerOnboardingRelativePath
     },
-    type: FormRequest.IndividualTerms,
+    type: 'IndividualTerms',
 };
 
 // ===================================================================================
@@ -96,7 +96,7 @@ export const testIndividualOnboardingBatchEntries = [
             method: 'POST',
             url: testCustomerOnboardingRelativePath
         },
-        type: FormRequest.PersonalIdentity,
+        type: 'PersonalIdentity',
     }
 ];
 

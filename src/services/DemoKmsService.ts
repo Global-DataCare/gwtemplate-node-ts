@@ -1,16 +1,16 @@
 // src/services/DemoKmsService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { ConfidentialStorageDoc, IndexedAttribute } from '../models/confidential-storage';
-import { IDecodedDidcommPayload } from '../models/confidential-message';
+import { ConfidentialStorageDoc, IndexedAttribute } from 'gdc-common-utils-ts/models/confidential-storage';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { v4 as uuidv4 } from 'uuid';
-import { JobRequest, JobStatus } from '../models/confidential-job';
-import { JwsHeader, JwsMultiSign } from '../models/jws';
-import { IKmsService } from '../crypto/interfaces/IKmsService';
-import { JwkSet, JWK } from '../models/jwk';
-import { Content } from '../utils/content';
-import { MldsaPublicJwk, MlkemPublicJwk } from '../crypto/interfaces/Cryptography.types';
-import { ParameterData } from '../models/params';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
+import { JwsHeader, JwsMultiSign } from 'gdc-common-utils-ts/models/jws';
+import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import { JwkSet, JWK } from '../gdc-backend-utils-node/models/jwk';
+import { Content } from 'gdc-common-utils-ts/utils/content';
+import { MldsaPublicJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { ParameterData } from 'gdc-common-utils-ts/models/params';
 
 /**
  * A development-focused implementation of the Key Management Service that uses a real
@@ -91,6 +91,11 @@ export class DemoKmsService implements IKmsService {
     return this._realKmsService.createDetachedJws(payload, signerKid, signerVaultId);
   }
 
+  async createCompactJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
+    console.warn(`[DemoKmsService] Delegating real compact JWS creation for: ${signerVaultId}`);
+    return this._realKmsService.createCompactJws(payload, signerKid, signerVaultId);
+  }
+
   // --- SIMULATED METHODS (Communication Bypass) ---
 
   // These methods override the real KMS behavior to allow for simple, unencrypted
@@ -104,6 +109,11 @@ export class DemoKmsService implements IKmsService {
       status: JobStatus.DRAFT,
       sequence: 0,
       createdAtTimestamp: Date.now(),
+      // These are populated by the HTTP layer (path params / middleware) in normal flows.
+      section: 'unknown',
+      format: 'unknown',
+      resourceType: 'unknown',
+      action: 'unknown',
     };
 
     // This simulates decoding a Compact JWE by splitting it and decoding the payload part.

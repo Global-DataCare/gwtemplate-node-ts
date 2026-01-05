@@ -3,11 +3,11 @@
 import { NextFunction, Request, Response } from 'express';
 import { QueueAdapter } from '../../../adapters/queue';
 import { createJobName } from '../../../utils/naming';
-import { ManagerError } from '../../../models/errors/manager-error';
-import { IssueType } from '../../../models/fhir/codes';
-import { IKmsService } from '../../../crypto/interfaces/IKmsService';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { getTenantVaultId } from '../../../utils/tenant';
-import { JobRequest } from '../../../models/confidential-job';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 
 export class NetworkActionsController {
   private queueAdapter: QueueAdapter;
@@ -37,7 +37,8 @@ export class NetworkActionsController {
 
       const vaultId = getTenantVaultId(sector!, tenantId!);
       const jobName = createJobName(vaultId, resourceType, '_discovery');
-      const job: JobRequest = { ...req.cdsRequest!, ...decodedJob };
+      // Path-derived routing is authoritative; keep it over any placeholder values from `decodeRequest()`.
+      const job: JobRequest = { ...decodedJob, ...req.cdsRequest! };
 
       await this.queueAdapter.addJob(jobName, job);
       

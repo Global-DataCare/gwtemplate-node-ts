@@ -1,4 +1,4 @@
-import { JobRequest } from '../models/confidential-job';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { getTenantVaultId } from '../utils/tenant';
 import { IAsyncResponseStore, StoredJob } from './async-response-store.mem';
 import { QueueAdapter } from './queue';

@@ -3,14 +3,14 @@
 
 import { validate as uuidValidate, v4 as uuidv4 } from 'uuid';
 import { IJobProcessor } from './registry';
-import { JobRequest } from '../models/confidential-job';
-import { BundleJsonApi, BundleEntry, ErrorEntry } from '../models/bundle';
-import { composeHostDidWebId } from '../utils/did';
-import { ManagerError } from '../models/errors/manager-error';
-import { IssueType, IssueLevel } from '../models/fhir/codes';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { BundleJsonApi, BundleEntry, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
+import { composeHostDidWebId } from '../utils/did-backend';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueType, IssueLevel } from 'gdc-sdk-client-ts/src/models/issue';
 import { createOperationOutcome } from '../utils/outcome';
-import { DcrRegistrationRequest, DcrRegistrationResponse } from '../models/openid-device';
-import { IPayloadResponse } from '../models/confidential-message';
+import { DcrRegistrationRequest, DcrRegistrationResponse } from 'gdc-common-utils-ts/models/openid-device';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -29,7 +29,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
    * @param job The incoming job request containing the DCR payload.
    * @returns A promise resolving to a JARM-compliant response payload.
    */
-  public async process(job: JobRequest): Promise<IPayloadResponse> {
+  public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     let responseEntry: BundleEntry | ErrorEntry;
     const entryType = job.content?.type || 'openid-dcr-request';
 

@@ -61,7 +61,7 @@ export function createEmployeeUrn(params: EmployeeUrnParams): string {
   const roleScheme = roleParts.length > 1 ? roleParts[0] : 'isco-08';
   const roleCode = roleParts.length > 1 ? roleParts[1] : roleParts[0];
 
-  return `${orgUrn}:employee:email:${email.toLowerCase()}:role:${roleScheme}:${roleCode}`;
+  return `${orgUrn}:employee:${email.toLowerCase()}:role:${roleScheme}:${roleCode}`;
 }
 
 /**

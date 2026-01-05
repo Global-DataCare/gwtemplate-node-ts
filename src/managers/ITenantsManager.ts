@@ -1,7 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/ITenantsManager.ts
 
-import { DidDocument, DidService } from "../models/did";
+import { DidDocument, DidService } from "../gdc-backend-utils-node/models/did";
 
 /**
  * Defines the contract for the Tenants Manager cache.

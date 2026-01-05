@@ -6,14 +6,14 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { v4 as uuidv4 } from 'uuid';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { IndividualManager } from '../../../managers/IndividualManager';
-import { IKmsService } from '../../../crypto/interfaces/IKmsService';
-import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from '../../../models/schemaorg';
-import { IDecodedDidcommPayload } from '../../../models/confidential-message';
-import { JobRequest, JobStatus } from '../../../models/confidential-job';
-import { ConfidentialStorageDoc } from '../../../models/confidential-storage';
+import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 
 import { CredentialManager } from '../../../managers/CredentialManager';
-import { EntityConfig } from '../../../models/entity';
+import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
 import { testTenant1IdentifierUrn } from '../../data/organization.data';
 import { testCustomer1Uuid } from '../../data/customer.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
@@ -22,8 +22,8 @@ import {
   testCreateCustomerJobRequestProfessionalOnboarding,
   testIndividualOnboardingBatchEntries,
 } from '../../data/customer-onboarding.data';
-import { BundleEntry, BundleEntryResponse, ErrorEntry } from '../../../models/bundle';
-import { DeviceLicense } from '../../../models/device-license';
+import { BundleEntry, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
+import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 
 
 // Mock the uuidv4 function to return a predictable value for tests
@@ -236,6 +236,8 @@ describe('IndividualManager', () => {
         createdAtTimestamp: Date.now(),
         sector: 'health-care',
         tenantId: 'acme',
+        section: 'test-network',
+        format: 'org.schema',
         action: '_discovery',
         resourceType: 'Person',
         content: {

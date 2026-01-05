@@ -1,6 +1,6 @@
 // src/database/repositories/rules/rules.repository.ts
 
-import { ConsentRule } from "../../../models/consent-rule";
+import { ConsentRule } from "gdc-common-utils-ts/models/consent-rule";
 
 /**
  * Defines the scope or partition for a set of consent rules.

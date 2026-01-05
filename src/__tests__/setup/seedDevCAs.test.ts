@@ -26,32 +26,50 @@ function getEnv(key: string): string {
   return value;
 }
 
-const ROOT_CA_SEED = getEnv('ROOT_CA_SEED');
-const ICA_SEED = getEnv('ICA_SEED');
-const BASE_DOMAIN = getEnv('BASE_DOMAIN');
-// ... (load other env vars)
+const REQUIRED_ENV_VARS = [
+  'ROOT_CA_SEED',
+  'ICA_SEED',
+  'BASE_DOMAIN',
+  'ROOT_CA_LEGAL_NUMBER',
+  'ROOT_CA_ORG_NAME',
+  'ICA_LEGAL_NUMBER',
+  'ICA_ORG_NAME',
+  'ORG_JURISDICTION',
+  'ORG_CITY',
+  'ORG_STREET',
+  'ORG_POSTAL_CODE',
+] as const;
 
-const rootCAConfig: AuthorityConfig = {
-  // ... (config loaded from env)
-  legalRegistrationNumber: getEnv('ROOT_CA_LEGAL_NUMBER'),
-  domain: `root-ca.${BASE_DOMAIN}`,
-  subjectCN: `root-ca.${BASE_DOMAIN}`,
-  officialName: getEnv('ROOT_CA_ORG_NAME'),
-  countryCode: getEnv('ORG_JURISDICTION'),
-  location: { city: getEnv('ORG_CITY'), street: getEnv('ORG_STREET'), postalCode: getEnv('ORG_POSTAL_CODE') },
-  seed: ROOT_CA_SEED,
-};
+const missingEnv = REQUIRED_ENV_VARS.filter((k) => !process.env[k]);
+const describeIfEnv = missingEnv.length === 0 ? describe : describe.skip;
 
-const icaConfig: AuthorityConfig = {
-  // ... (config loaded from env)
-  legalRegistrationNumber: getEnv('ICA_LEGAL_NUMBER'),
-  domain: `ica.${BASE_DOMAIN}`,
-  subjectCN: `ica.${BASE_DOMAIN}`,
-  officialName: getEnv('ICA_ORG_NAME'),
-  countryCode: getEnv('ORG_JURISDICTION'),
-  location: { city: getEnv('ORG_CITY'), street: getEnv('ORG_STREET'), postalCode: getEnv('ORG_POSTAL_CODE') },
-  seed: ICA_SEED,
-};
+const ROOT_CA_SEED = process.env.ROOT_CA_SEED ? getEnv('ROOT_CA_SEED') : '';
+const ICA_SEED = process.env.ICA_SEED ? getEnv('ICA_SEED') : '';
+const BASE_DOMAIN = process.env.BASE_DOMAIN ? getEnv('BASE_DOMAIN') : '';
+
+function buildRootCAConfig(): AuthorityConfig {
+  return {
+    legalRegistrationNumber: getEnv('ROOT_CA_LEGAL_NUMBER'),
+    domain: `root-ca.${BASE_DOMAIN}`,
+    subjectCN: `root-ca.${BASE_DOMAIN}`,
+    officialName: getEnv('ROOT_CA_ORG_NAME'),
+    countryCode: getEnv('ORG_JURISDICTION'),
+    location: { city: getEnv('ORG_CITY'), street: getEnv('ORG_STREET'), postalCode: getEnv('ORG_POSTAL_CODE') },
+    seed: ROOT_CA_SEED,
+  };
+}
+
+function buildIcaConfig(): AuthorityConfig {
+  return {
+    legalRegistrationNumber: getEnv('ICA_LEGAL_NUMBER'),
+    domain: `ica.${BASE_DOMAIN}`,
+    subjectCN: `ica.${BASE_DOMAIN}`,
+    officialName: getEnv('ICA_ORG_NAME'),
+    countryCode: getEnv('ORG_JURISDICTION'),
+    location: { city: getEnv('ORG_CITY'), street: getEnv('ORG_STREET'), postalCode: getEnv('ORG_POSTAL_CODE') },
+    seed: ICA_SEED,
+  };
+}
 
 function resolveOutputDir(...segments: string[]) {
     const dir = path.join(process.cwd(), ...segments);
@@ -59,9 +77,12 @@ function resolveOutputDir(...segments: string[]) {
     return dir;
 }
 
-describe('Development CAs Seeding', () => {
+describeIfEnv('Development CAs Seeding', () => {
   it('should generate all required crypto material for Root CA and Intermediate CA', async () => {
     // console.log('🔥 Starting generation of crypto material for development CAs...');
+
+    const rootCAConfig = buildRootCAConfig();
+    const icaConfig = buildIcaConfig();
 
     const rootDir = resolveOutputDir('fabric-ca-server-root');
     const icaDir = resolveOutputDir('fabric-ca-server-ica');

@@ -2,14 +2,14 @@
 // File: src/managers/CommunicationManager.ts
 // Description: Manager for handling business logic related to FHIR Communications.
 
-import { CommMsgExtended, DataEntry, FhirCommunication } from '../models/comm';
-import { IDecodedDidcommPayload } from '../models/confidential-message';
-import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from '../models/bundle';
+import { CommMsgExtended, DataEntry, FhirCommunication } from 'gdc-common-utils-ts/models/comm';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { determineResourceId } from '../utils/resource';
 import { v4 as uuidv4 } from 'uuid';
 import { IJobProcessor } from './registry';
 import { TenantsCacheManager } from './TenantsCacheManager';
-import { JobRequest } from '../models/confidential-job';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { getTenantVaultId } from '../utils/tenant';
 
 interface CommunicationManagerOptions {
@@ -45,7 +45,13 @@ export class CommunicationManager implements IJobProcessor {
 
     for (const entry of entries) {
       try {
-        const fhirResource: FhirCommunication = entry.resource;
+        const fhirResource: FhirCommunication | undefined = (entry as any).resource
+          ? (entry as any).resource
+          : this.buildFhirCommunicationFromClaims((entry as any)?.meta?.claims);
+
+        if (!fhirResource) {
+          throw new Error('Malformed entry: missing resource and missing meta.claims');
+        }
         
         if (fhirResource.resourceType !== 'Communication') {
           console.warn(`Skipping resource of type ${fhirResource.resourceType}`);
@@ -57,15 +63,24 @@ export class CommunicationManager implements IJobProcessor {
             throw new Error(`Could not determine server DID for tenant '${job.tenantId}'.`);
         }
         const commMsg = this.convertFhirToCommMsg(job.content.thid, serverDid, fhirResource);
+
+        const identifierClaim =
+          (entry as any)?.meta?.claims?.['Communication.identifier'] ??
+          (entry as any)?.resource?.id;
+        const resourceId = determineResourceId(identifierClaim, process.env.NODE_ENV);
         
         bundleEntries.push({
           response: { status: '200' },
-          id: determineResourceId(entry),
+          id: resourceId,
           type: 'CommMsgExtended',
           resource: commMsg,
         });
 
       } catch (error) {
+        const identifierClaim =
+          (entry as any)?.meta?.claims?.['Communication.identifier'] ??
+          (entry as any)?.resource?.id;
+        const resourceId = determineResourceId(identifierClaim, process.env.NODE_ENV);
         bundleEntries.push({
           response: {
             status: '500',
@@ -78,7 +93,7 @@ export class CommunicationManager implements IJobProcessor {
               }],
             }
           },
-          id: determineResourceId(entry),
+          id: resourceId,
           type: 'OperationOutcome',
           meta: entry.meta,
         });
@@ -197,5 +212,38 @@ export class CommunicationManager implements IJobProcessor {
       // about: flattenReference(fhirResource.about),
       // encounter: fhirResource.encounter?.reference,
     };
+  }
+
+  private buildFhirCommunicationFromClaims(claims: Record<string, any> | undefined): FhirCommunication | undefined {
+    if (!claims || typeof claims !== 'object') return undefined;
+
+    const sent = claims['Communication.sent'];
+    const subject = claims['Communication.subject'];
+    const recipient = claims['Communication.recipient'];
+    const sender = claims['Communication.sender'];
+    const text = claims['Communication.text'];
+
+    const toRefs = typeof recipient === 'string'
+      ? recipient.split(',').map((r: string) => r.trim()).filter(Boolean).map((reference: string) => ({ reference }))
+      : Array.isArray(recipient)
+        ? recipient.map((r) => (typeof r === 'string' ? ({ reference: r }) : r)).filter(Boolean)
+        : undefined;
+
+    const senderRef =
+      typeof sender === 'string'
+        ? { reference: sender }
+        : sender && typeof sender === 'object' && typeof sender.reference === 'string'
+          ? sender
+          : undefined;
+
+    return {
+      resourceType: 'Communication',
+      status: 'completed',
+      sent: typeof sent === 'string' ? sent : undefined,
+      subject: typeof subject === 'string' ? { reference: subject } : undefined,
+      recipient: toRefs,
+      sender: senderRef,
+      note: typeof text === 'string' ? [{ text }] : undefined,
+    } as unknown as FhirCommunication;
   }
 }

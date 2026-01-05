@@ -3,7 +3,7 @@
 
 import { StorageMemAdapter } from '../../../../database/storage/mem.storage.adapter';
 import { sha3_384 } from '@noble/hashes/sha3.js';
-import { encodeMultibase58btc } from '../../../../utils/multibase58';
+import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 
 describe('StorageMemAdapter', () => {
   let adapter: StorageMemAdapter;

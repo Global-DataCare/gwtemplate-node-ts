@@ -37,7 +37,7 @@ RUN npm install --omit=dev
 COPY --from=builder /usr/src/app/build ./build
 
 # Copy the swagger configuration file, which is required at runtime
-COPY --from=builder /usr/src/app/swagger.config.js ./
+COPY --from=builder /usr/src/app/swagger.config.cjs ./
 
 # Copy the pre-generated swagger specification
 COPY --from=builder /usr/src/app/swagger-spec.json ./
@@ -53,4 +53,3 @@ RUN ls -la
 
 # The command to run the application
 CMD [ "npm", "start" ]
-

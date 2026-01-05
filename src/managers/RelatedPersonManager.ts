@@ -1,0 +1,115 @@
+// src/managers/RelatedPersonManager.ts
+// Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+
+import { randomUUID } from 'crypto';
+import { IJobProcessor } from './registry';
+import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { IVaultRepository } from '../database/repositories/vault/vault.repository';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { createOperationOutcome } from '../utils/outcome';
+import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
+import { determineResourceId } from '../utils/resource';
+
+type FhirBundleEntryLike = {
+  type?: string;
+  meta?: { claims?: Record<string, any> };
+  resource?: any;
+  request?: any;
+};
+
+type FhirBundleLike = {
+  resourceType?: string;
+  type?: string;
+  entry?: FhirBundleEntryLike[];
+};
+
+/**
+ * Registers family member relationships / emergency contacts using FHIR RelatedPerson-style claims.
+ *
+ * Contract:
+ * - Endpoint: `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch`
+ * - Payload is a DIDComm message whose body is a FHIR Bundle with `entry[]` and `meta.claims` using `@context: org.hl7.fhir.api`.
+ */
+export class RelatedPersonManager implements IJobProcessor {
+  constructor(private readonly vaultRepository: IVaultRepository) {}
+
+  public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const thid = job.content?.thid as string | undefined;
+    if (!thid) throw new ManagerError('Missing thid.', IssueType.Required);
+    if (!job.tenantId || !job.sector || !job.jurisdiction) {
+      throw new ManagerError('Missing tenantId, sector, or jurisdiction.', IssueType.Required);
+    }
+
+    const bundle = (job.content?.body || {}) as any;
+    const entries: FhirBundleEntryLike[] =
+      (bundle as FhirBundleLike).entry ||
+      (bundle?.data as any[]) ||
+      [];
+
+    const responseEntries: any[] = [];
+
+    for (const entry of entries) {
+      const rawClaims = entry?.meta?.claims;
+      try {
+        if (!rawClaims || typeof rawClaims !== 'object') {
+          throw new ManagerError('Missing meta.claims in RelatedPerson entry.', IssueType.Required);
+        }
+
+        const claims = normalizeContextualizedClaims(rawClaims);
+        const subject =
+          getClaimValue<string>(claims, 'RelatedPerson.patient') ||
+          getClaimValue<string>(claims, 'RelatedPerson.subject');
+        if (!subject) {
+          throw new ManagerError('Missing RelatedPerson.patient (or RelatedPerson.subject) claim.', IssueType.Required);
+        }
+
+        const individualVaultId = `${job.tenantId}/${job.jurisdiction}/${job.sector}/individual/${subject}`;
+        const vaultExists = await this.vaultRepository.vaultExists(individualVaultId);
+        if (!vaultExists) {
+          throw new ManagerError(`Individual vault not found for subject: ${subject}`, IssueType.NotFound);
+        }
+
+        const identifierClaim =
+          getClaimValue<string>(claims, 'RelatedPerson.identifier') ||
+          getClaimValue<string>(claims, 'RelatedPerson.identifier.value');
+        const id = determineResourceId(identifierClaim, process.env.NODE_ENV);
+
+        await this.vaultRepository.put(individualVaultId, [{ id, ...claims } as any], 'related-persons');
+
+        responseEntries.push({
+          type: 'RelatedPerson',
+          response: { status: '201', location: `/${job.sector}/individual/org.hl7.fhir.api/RelatedPerson/${id}` },
+          meta: { claims },
+        });
+      } catch (e: any) {
+        const status = e instanceof ManagerError ? e.status : '400';
+        const code = e instanceof ManagerError ? e.code : IssueType.Invalid;
+        responseEntries.push({
+          type: 'RelatedPerson',
+          meta: { claims: rawClaims || {} },
+          response: {
+            status,
+            outcome: createOperationOutcome(IssueLevel.Error, code, e?.message || String(e)),
+          },
+        });
+      }
+    }
+
+    return {
+      jti: randomUUID(),
+      type: 'transaction-response',
+      thid,
+      iss: job.content?.aud as string,
+      aud: job.content?.iss as string,
+      exp: Math.floor(Date.now() / 1000) + 300,
+      body: {
+        resourceType: 'Bundle',
+        type: `${String(job.action || '')}-response`,
+        data: responseEntries,
+      },
+    };
+  }
+}
+

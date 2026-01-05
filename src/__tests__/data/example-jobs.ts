@@ -1,8 +1,8 @@
 // src/__tests__/data/example-jobs.ts
 
 import { v4 as uuidv4 } from 'uuid';
-import { JobRequest, JobStatus } from '../../models/confidential-job';
-import { Sector } from '../../models/urlPath';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { DEVICE_REGISTRATION_REQUEST, ORGANIZATION_ORDER_REQUEST, ORGANIZATION_REGISTRATION_REQUEST } from './example-payloads';
 
 /**
@@ -15,7 +15,10 @@ export const DCR_REGISTRATION_JOB: JobRequest = {
   sequence: 0,
   createdAtTimestamp: Date.now(),
   content: DEVICE_REGISTRATION_REQUEST,
-  sector: 'test-sector',
+  sector: Sector.TEST,
+  section: 'identity',
+  format: 'openid',
+  resourceType: 'Device',
   action: '_dcr',
   tenantId: 'test-tenant',
 };
@@ -31,6 +34,8 @@ export const ORGANIZATION_REGISTRATION_JOB: JobRequest = {
   createdAtTimestamp: Date.now(),
   content: ORGANIZATION_REGISTRATION_REQUEST,
   sector: Sector.TEST,
+  section: 'registry',
+  format: 'org.schema',
   action: '_batch',
   resourceType: 'Organization',
   tenantId: 'host',

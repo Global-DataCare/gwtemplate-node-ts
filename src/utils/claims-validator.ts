@@ -1,10 +1,10 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/utils/claims-validator.ts
 
-import { ClaimsRecord } from '../models/resource-document';
-import { ManagerError } from '../models/errors/manager-error';
-import { IssueType } from '../models/fhir/codes';
-import { ClaimsServiceSchemaorg } from '../models/schemaorg';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 
 /**
  * Validates the claims provided for a new organization registration request.
