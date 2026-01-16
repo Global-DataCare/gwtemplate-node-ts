@@ -11,7 +11,7 @@ import { BundleEntry, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/mode
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';

@@ -10,7 +10,7 @@ import { createJobName } from '../utils/naming';
 import { isRequestValid } from '../utils/request-validator';
 import { createOperationOutcome } from '../utils/outcome';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { JWK } from 'gdc-common-utils-ts/models/jwk';

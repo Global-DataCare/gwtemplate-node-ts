@@ -2,7 +2,23 @@
 // File: src/__tests__/data/observation.data.ts
 
 import type { ConfidentialStorageDoc, MetaTagCoding } from 'gdc-common-utils-ts/models/confidential-storage';
-import { ClaimsObservationContext } from 'gdc-sdk-client-ts/src/uhc-fhir-utils-ts/models/params/Observation.params.model.js';
+
+// import { ClaimsObservationContext } from 'gdc-sdk-client-ts/src/uhc-fhir-utils-ts/models/params/Observation.params.model.js';
+// Keep these keys local to avoid pulling gdc-sdk-client-ts into Docker builds for tests.
+const ClaimsObservationContext = {
+  Context: '@context',
+  Type: '@type',
+  Subject: 'Observation.subject',
+  Identifier: 'Observation.identifier',
+  Category: 'Observation.category',
+  Code: 'Observation.code',
+  CodeUserSelected: 'Observation.code-userselected',
+  Issued: 'Observation.issued',
+  DatePeriod: 'Observation.date-period',
+  DateWhen: 'Observation.date-when',
+  ValueQuantity: 'Observation.value-quantity',
+  ValueString: 'Observation.value-string',
+} as const;
 
 /**
  * Test fixtures for the Observation flat-claims contract + how it is persisted in Confidential Storage.

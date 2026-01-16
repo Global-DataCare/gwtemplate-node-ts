@@ -2,7 +2,7 @@ import * as express from 'express';
 import { randomUUID } from 'crypto';
 import { TokenManager } from '../managers/TokenManager';
 import { createOperationOutcome } from '../utils/outcome';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 

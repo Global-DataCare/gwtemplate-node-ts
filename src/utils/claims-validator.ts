@@ -3,7 +3,7 @@
 
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 
 /**

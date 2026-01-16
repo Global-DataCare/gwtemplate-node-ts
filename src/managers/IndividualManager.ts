@@ -8,7 +8,7 @@ import { IVaultRepository } from '../database/repositories/vault/vault.repositor
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';

@@ -7,7 +7,7 @@ import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { BundleJsonApi, BundleEntry, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { composeHostDidWebId } from '../utils/did-backend';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueType, IssueLevel } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueType, IssueLevel } from 'gdc-common-utils-ts/models/issue';
 import { createOperationOutcome } from '../utils/outcome';
 import { DcrRegistrationRequest, DcrRegistrationResponse, OpenIdDeviceInfo } from 'gdc-common-utils-ts/models/openid-device';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';

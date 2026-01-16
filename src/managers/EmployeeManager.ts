@@ -4,7 +4,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { determineResourceId } from '../utils/resource';

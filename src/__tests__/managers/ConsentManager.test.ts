@@ -5,7 +5,7 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { ConsentManager } from '../../managers/ConsentManager';
 import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
 import { BundleJsonApi, BundleEntryRequest, BundleEntryMeta, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
-import { OperationOutcome } from 'gdc-sdk-client-ts/src/models/operation-outcome';
+import { OperationOutcome } from 'gdc-common-utils-ts/models/operation-outcome';
 import { ConsentRule, ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { CONSENT_CREATION_MESSAGE } from '../data/example-payloads';
 import { buildConsentRuleKey, hashConsentRuleId } from '../../utils/consent';

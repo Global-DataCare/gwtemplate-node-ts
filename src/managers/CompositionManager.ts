@@ -6,7 +6,7 @@ import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import type { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import type { BundleEntryResponse, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import type { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { createOperationOutcome } from '../utils/outcome';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { getTenantVaultId } from '../utils/tenant';

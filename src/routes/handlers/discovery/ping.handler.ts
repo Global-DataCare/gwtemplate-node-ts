@@ -7,7 +7,7 @@ import { createOperationOutcome } from '../../../utils/outcome';
 import { compactJWT } from 'gdc-common-utils-ts/utils/jwt';
 import { convertPrimaryDocToFhirBundle } from '../../../utils/jsonapi';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 
 /**
  * Encodes a hostname from a request's Host header for use in a did:web.

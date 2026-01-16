@@ -8,7 +8,7 @@ import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { objectToBytes } from 'gdc-common-utils-ts/utils/object-convert';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
-import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { generateVcId } from '../utils/vc-id';
 import { MldsaPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';

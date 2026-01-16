@@ -7,7 +7,7 @@ import { BundleJsonApi, BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 
 /**
  * Manages the business logic for the 'ping' operation.

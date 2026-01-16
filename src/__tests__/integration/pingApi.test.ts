@@ -12,7 +12,7 @@ import { AsyncResponseStoreMem, IAsyncResponseStore } from '../../adapters/async
 import { StoredJob } from '../../adapters/async-response-store.mem';
 import { decodedPingMessage, testEncryptedJwePing, decodedTenantPingMessage } from '../data/ping.data';
 import { testCompletedJob, testPendingJob } from '../data/async-response.data';
-import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { DidService } from '../../gdc-backend-utils-node/models/did';
 import { Content } from 'gdc-common-utils-ts/utils/content';

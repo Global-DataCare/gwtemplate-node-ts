@@ -6,7 +6,7 @@ import { IJobProcessor } from './registry';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { AppAuthorizationManager } from './AppAuthorizationManager';
 import { TokenManager } from './TokenManager';
 import { federateOidcIdTokenToFirebaseCustomToken } from '../auth/OidcFederationService';

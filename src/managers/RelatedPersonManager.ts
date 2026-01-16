@@ -7,7 +7,7 @@ import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { createOperationOutcome } from '../utils/outcome';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { determineResourceId } from '../utils/resource';

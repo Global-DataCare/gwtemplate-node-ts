@@ -212,12 +212,11 @@ interface StartServerOptions {
 async function startServer(options?: StartServerOptions) {
   const config = getConfig();
 
-  // Dynamically configure the Swagger server URL at runtime, just before starting the server.
-  // This ensures that the configuration is loaded and available.
+  // Initialize the Swagger server URL once; /api-docs will refine it per-request.
   if (swaggerSpec.info.title !== 'Swagger Spec Not Found') {
     swaggerSpec.servers = [{
       url: config.apiBaseUrl,
-      description: `Server URL for ${config.nodeEnv} environment`
+      description: `Server URL for ${config.nodeEnv} environment`,
     }];
   }
 
@@ -399,7 +398,21 @@ async function startServer(options?: StartServerOptions) {
   // --- Global Error Handling Middleware (MUST be the LAST middleware) ---
   app.use(createGlobalErrorHandler(logger));
 
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  app.use('/api-docs', (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    if (swaggerSpec.info.title !== 'Swagger Spec Not Found') {
+      const forwardedProto = req.headers['x-forwarded-proto'];
+      const forwardedHost = req.headers['x-forwarded-host'];
+      const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)?.split(',')[0]?.trim()
+        || req.protocol;
+      const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
+      const baseUrl = host ? `${protocol}://${host}` : config.apiBaseUrl;
+      swaggerSpec.servers = [{
+        url: baseUrl,
+        description: `Server URL for ${config.nodeEnv} environment`,
+      }];
+    }
+    next();
+  }, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   const server =
     options?.listen === false

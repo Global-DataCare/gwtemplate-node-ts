@@ -4,7 +4,7 @@
 import * as express from 'express';
 import { ILogger } from '../loggers/ILogger';
 import { createOperationOutcome } from '../utils/outcome';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 
 export function createGlobalErrorHandler(logger: ILogger): express.ErrorRequestHandler {
   return (err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

@@ -4,7 +4,7 @@ import { NextFunction, Request, Response } from 'express';
 import { QueueAdapter } from '../../../adapters/queue';
 import { createJobName } from '../../../utils/naming';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { getTenantVaultId } from '../../../utils/tenant';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';

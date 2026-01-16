@@ -7,7 +7,7 @@ import { ConsentRule, ClaimConsent } from 'gdc-common-utils-ts/models/consent-ru
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { createOperationOutcome } from '../utils/outcome';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { buildConsentRuleKey, hashConsentRuleId } from '../utils/consent';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';

@@ -7,7 +7,7 @@ import { QueueAdapter } from '../../../adapters/queue';
 import { IAccessTokenClaims } from 'gdc-common-utils-ts/models/auth';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { createOperationOutcome } from '../../../utils/outcome';
-import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { validOrNewUuidv4 } from '../../../utils/uuid';
 import { v4 as uuidv4 } from 'uuid';
 

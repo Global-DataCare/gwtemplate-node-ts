@@ -7,7 +7,7 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueType } from 'gdc-sdk-client-ts/src/models/issue';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { getTenantVaultId } from '../utils/tenant';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
