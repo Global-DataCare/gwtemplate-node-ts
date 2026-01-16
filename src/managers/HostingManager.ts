@@ -40,6 +40,7 @@ import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { VerificationMethod } from 'gdc-common-utils-ts/models/did';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { issueActivationCodeFromPool } from '../utils/license-issuance';
 
 /**
  * Manages the initial onboarding of new tenants onto the Gateway.
@@ -394,6 +395,33 @@ export class HostingManager {
 	        licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
 	      }
 	      await this.vaultRepository.put(vaultId, licenseDocs, 'device-licenses');
+
+        // Auto-issue the first activation code for the legal representative so they can register their first device
+        // right after accepting/paying the Order (no manual "invite" step needed for the first controller).
+        const legalRepEmail = processedClaims[ClaimsPersonSchemaorg.email] as string | undefined;
+        const legalRepRole = processedClaims[ClaimsPersonSchemaorg.hasOccupation] as string | undefined;
+        if (legalRepEmail && legalRepRole) {
+          try {
+            const { activationCode } = await issueActivationCodeFromPool({
+              vaultRepository: this.vaultRepository,
+              kmsService: this.kmsService,
+              tenantVaultId: vaultId,
+              userClass: 'employee',
+              type: 'mobile',
+              email: legalRepEmail,
+              role: legalRepRole,
+            });
+            // The activation code is conceptually a "license key"/serial number for a newly issued seat.
+            // Use schema.org-aligned claim names for the public API contract.
+            (processedClaims as any)['org.schema.IndividualProduct.serialNumber'] = activationCode;
+            // Disambiguate the seat class for integrators (employee/professional vs family/individual vs device).
+            (processedClaims as any)['org.schema.IndividualProduct.category'] = 'professional';
+          } catch (e: any) {
+            this.logger.warn?.(
+              `[HostingManager] Failed to auto-issue legal rep activation code: ${String(e?.message || e)}`,
+            );
+          }
+        }
 	    }
 
 	    return {
@@ -466,10 +494,28 @@ export class HostingManager {
       if (alternateName === 'host') {
         await this.persistHostConfig(organization, processedClaims, [person, processedService!]);
       } else {
-        const registrationKeys = {
-          signerJwk: jobMeta?.jws?.protected?.jwk as PublicJwk | undefined,
-          encrypterJwk: jobMeta?.jwe?.header?.jwk as PublicJwk | undefined,
-        };
+        // The client bootstraps its keys during the first request by providing:
+        // - `jwk`: the public JWK *thumbprint material* (RFC 7638) WITHOUT `kid`/`use`
+        // - `kid`: a key identifier in the JOSE header (often the JWK thumbprint, but treat it as opaque)
+        // Persist the *full* public JWKs (including `kid`) so the legal representative can later be
+        // represented as a DID subject.
+        const signerKid = jobMeta?.jws?.protected?.kid as string | undefined;
+        const signerAlg = jobMeta?.jws?.protected?.alg as string | undefined;
+        const signerJwkThumbprintMaterial = jobMeta?.jws?.protected?.jwk as PublicJwk | undefined;
+        const signerJwk: PublicJwk | undefined =
+          signerJwkThumbprintMaterial && signerKid
+            ? ({ ...signerJwkThumbprintMaterial, kid: signerKid, use: 'sig', ...(signerAlg ? { alg: signerAlg } : {}) } as any)
+            : undefined;
+
+        // In JWE, `kid` is the recipient's key id, while `skid` is the sender's key id.
+        const encrypterKid = (jobMeta?.jwe?.header as any)?.skid as string | undefined;
+        const encrypterJwkThumbprintMaterial = jobMeta?.jwe?.header?.jwk as PublicJwk | undefined;
+        const encrypterJwk: PublicJwk | undefined =
+          encrypterJwkThumbprintMaterial && encrypterKid
+            ? ({ ...encrypterJwkThumbprintMaterial, kid: encrypterKid, use: 'enc' } as any)
+            : undefined;
+
+        const registrationKeys = { signerJwk, encrypterJwk };
 
         const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
         const jurisdiction = processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;

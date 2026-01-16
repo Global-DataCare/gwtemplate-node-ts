@@ -1,6 +1,7 @@
 # Testing Guide
 
 This document outlines the testing strategies and procedures for this project.
+For E2E setup and GCP details, see `TESTING-GUIDE.md`.
 
 ## 1. Core Philosophy: The `IVaultRepository` Pattern
 
@@ -29,3 +30,21 @@ This setup file is responsible for loading the correct environment variables (`.
 -   **Firestore-Specific Tests:**
     Testing against Firestore requires a specific setup, either with a local emulator or a live GCP project. For detailed instructions on this, please refer to the dedicated guide:
     **[./TESTING-FIRESTORE.md](./TESTING-FIRESTORE.md)**
+
+-   **E2E Tests (explicit opt-in):**
+    E2E suites that touch external services are disabled by default. To run them, set the flags below (typically in your shell before running `npm run test:e2e`):
+    ```shell
+    # Firestore E2E (requires emulator or valid credentials)
+    FIRESTORE_E2E=true
+
+    # GCS E2E (requires valid credentials + bucket)
+    GCS_E2E=true
+
+    # Legacy API E2E (requires a real Firebase Auth user)
+    TEST_USER_EMAIL=you@example.com
+    TEST_USER_PASSWORD=your-password
+    ```
+    Notes:
+    - E2E tests read from `.env.test` via `jest.setup.ts`.
+    - Firestore E2E runs only when `FIRESTORE_E2E=true` and either `FIRESTORE_EMULATOR_HOST` or valid Google credentials are present.
+    - GCS E2E runs only when `GCS_E2E=true` and `GCS_BUCKET_NAME` is set.

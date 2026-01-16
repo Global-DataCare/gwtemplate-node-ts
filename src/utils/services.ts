@@ -153,11 +153,24 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
       ['Device'],
       ['_dcr'],
     ),
+    // Device search (admin listing).
+    createDidEndpointConfigFromSelector(
+      { sector, section: 'identity', format: 'openid' },
+      ['Device'],
+      ['_search'],
+    ),
     // SMART token issuance endpoint.
     createDidEndpointConfigFromSelector(
       { sector, section: 'identity', format: 'openid' },
       ['smart'],
       ['token'],
+    ),
+    // License issuance/reservation endpoint (creates an activation code for a specific target user/device).
+    // This is used by tenant admins/IT to invite professionals after licenses have been purchased.
+    createDidEndpointConfigFromSelector(
+      { sector, section: 'identity', format: 'openid' },
+      ['License'],
+      ['_issue'],
     ),
   ];
 

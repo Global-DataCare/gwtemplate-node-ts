@@ -39,6 +39,7 @@ import { IndividualManager } from '../../managers/IndividualManager';
 import { CredentialManager } from '../../managers/CredentialManager';
 import { CompositionManager } from '../../managers/CompositionManager';
 import { CommunicationManager } from '../../managers/CommunicationManager';
+import { LicenseManager } from '../../managers/LicenseManager';
 import { ManagerRegistry } from '../../managers/registry';
 import { Worker } from '../../worker';
 import { KmsService } from '../../services/KmsService';
@@ -124,8 +125,9 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
 	      hostingManager,
 	      employeeManager: new EmployeeManager(vaultRepository, kmsService, tenantManager),
 	      individualManager: new IndividualManager(vaultRepository, kmsService, tenantManager, new CredentialManager(vaultRepository, kmsService, tenantManager, 'testhost.com'), new BlockchainAdapterMem(), 'test-ns'),
-	      compositionManager: new CompositionManager(),
+	      compositionManager: new CompositionManager(vaultRepository),
 	      communicationManager: new CommunicationManager({ tenantsCacheManager: tenantManager }),
+	      licenseManager: new LicenseManager(vaultRepository, kmsService),
 	      tenantManager,
 	    };
     

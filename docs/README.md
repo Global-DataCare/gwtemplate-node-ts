@@ -17,6 +17,11 @@ docs/
 
 ## File Index
 
+## Generated Artifacts
+
+- **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
+- **Docs QA (Flow Report)**: `artifacts/api-integrators-guide.flow-report.json` is generated via `npm run docs:flow-report` and captures the onboarding journey requests/responses.
+
 ### 📂 01-OVERVIEW-AND-GUIDES
 *   **[01.A-ARCHITECTURE-OVERVIEW.md](01-OVERVIEW-AND-GUIDES/01.A-ARCHITECTURE-OVERVIEW.md)**: **(START HERE)** The main document outlining the core architectural patterns, data flows, and principles.
 *   **[01.B-CREDENTIAL-ARCHITECTURE.md](01-OVERVIEW-AND-GUIDES/01.B-CREDENTIAL-ARCHITECTURE.md)**: Describes the architecture for handling digital credentials and claims.

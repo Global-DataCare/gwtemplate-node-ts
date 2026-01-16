@@ -381,6 +381,34 @@ export function createApiRouter(
    *       '404': { description: Activation code not found. }
    *       '409': { description: Activation code already used. }
    *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/License/_issue:
+   *   post:
+   *     tags:
+   *       - 2.1.1 License Issuance (Invite)
+   *     summary: Issue (reserve) an activation code from the tenant license pool (async)
+   *     description: |
+   *       Tenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role
+   *       and returns a single-use activation code for subsequent `Token/_exchange`.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response:
    *   post:
    *     tags:

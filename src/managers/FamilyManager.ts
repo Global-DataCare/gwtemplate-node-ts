@@ -14,7 +14,7 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
 import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
-import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
@@ -25,6 +25,8 @@ import { generateLicenseOffer } from '../utils/offer';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
 import { TenantsCacheManager } from './TenantsCacheManager';
+import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { issueActivationCodeFromPool } from '../utils/license-issuance';
 
 type FamilyRegistrationContent = {
   status: EntityLifecycleStatus;
@@ -222,6 +224,56 @@ export class FamilyManager {
     };
     const secureUpdatedDoc = await this.kmsService.protectConfidentialData(updatedDoc, tenantVaultId);
     await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], 'families');
+
+    // Create individual (family member) license seats purchased via the family registration Offer and auto-issue one for the controller.
+    const familySeats = finalizedContent.claims[ClaimsOfferSchemaorg.eligibleQuantityValue] as number | undefined;
+    const familyOfferIdentifier = finalizedContent.claims[ClaimsOfferSchemaorg.identifier] as string | undefined;
+    if (familySeats && familySeats > 0 && familyOfferIdentifier) {
+      const now = Date.now();
+      const expiryDate = new Date(now);
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      const exp = Math.floor(expiryDate.getTime() / 1000);
+
+      const licenseDocs: ConfidentialStorageDoc[] = [];
+      for (let i = 0; i < familySeats; i++) {
+        const licenseId = uuidv4();
+        const license: DeviceLicense = {
+          id: licenseId,
+          tenantId,
+          orderId: familyOfferIdentifier,
+          userClass: 'individual',
+          type: 'mobile',
+          status: 'available',
+          plan: 'default',
+          renewalCycle: '12m',
+          reactivationEnabled: false,
+          exp,
+        } as any;
+        licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
+      }
+      await this.vaultRepository.put(tenantVaultId, licenseDocs, 'device-licenses');
+
+      const controllerEmail = finalizedContent.claims[ClaimsPersonSchemaorg.email] as string | undefined;
+      const controllerRole =
+        (finalizedContent.claims[ClaimsPersonSchemaorg.hasOccupation] as string | undefined) || 'FAMILY_CONTROLLER';
+      if (controllerEmail) {
+        try {
+          const { activationCode } = await issueActivationCodeFromPool({
+            vaultRepository: this.vaultRepository,
+            kmsService: this.kmsService,
+            tenantVaultId,
+            userClass: 'individual',
+            type: 'mobile',
+            email: controllerEmail,
+            role: controllerRole,
+          });
+          (finalizedContent.claims as any)['org.schema.IndividualProduct.serialNumber'] = activationCode;
+          (finalizedContent.claims as any)['org.schema.IndividualProduct.category'] = 'individual';
+        } catch (e: any) {
+          this.logger.warn?.(`[FamilyManager] Failed to auto-issue family controller activation code: ${String(e?.message || e)}`);
+        }
+      }
+    }
 
     return {
       type: 'Organization',

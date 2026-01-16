@@ -13,8 +13,9 @@ import { startServer } from '../../server';
 import { QueueAdapter } from '../../adapters/queue';
 import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
 import { KmsService } from '../../services/KmsService';
-import { ClaimsRecord } from '../../models/resource-document';
-import { IDecodedDidcommPayload, JobRequest } from '../../models/confidential-job';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { getGoogleAuthTokenForTesting } from '../utils/auth';
 
 // Mock the KmsService to bypass actual JWE decryption for this legacy test
@@ -31,7 +32,7 @@ const describeIfConfigured =
 
 describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
   let app: express.Express;
-  let server: Server;
+  let server: Server | undefined;
   let queueAdapter: QueueAdapter;
   let addJobSpy: jest.SpyInstance;
   let authToken: string;
@@ -47,10 +48,18 @@ describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
       return {
         decodeRequest: jest.fn((req: express.Request): Promise<JobRequest> => {
           const jobContent = req.body as IDecodedDidcommPayload;
-          return Promise.resolve({
-            name: `unsecure-host-registry-org.schema.Organization-_batch`,
+          const job: JobRequest = {
+            id: `job-${Date.now()}`,
+            status: JobStatus.SENT,
+            sequence: 0,
+            createdAtTimestamp: Date.now(),
+            section: 'registry',
+            format: 'org.schema',
+            resourceType: 'Organization',
+            action: '_batch',
             content: jobContent,
-          } as JobRequest);
+          };
+          return Promise.resolve(job);
         }),
       };
     });
@@ -70,9 +79,10 @@ describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
     if (addJobSpy) {
       addJobSpy.mockRestore();
     }
-    if (server) {
+    const serverInstance = server;
+    if (serverInstance) {
       await new Promise<void>((resolve, reject) => {
-        server.close((err: any) => { // Add type to err to satisfy TS
+        serverInstance.close((err: any) => { // Add type to err to satisfy TS
           if (err) {
             return reject(err);
           }
@@ -120,4 +130,3 @@ describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
     console.log('TODO: Verify that the tenant with ID', tenantId, 'was created in Firestore.');
   });
 });
-

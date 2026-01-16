@@ -1,0 +1,94 @@
+Organizations:
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: organizations/ordererOrganizations/example.com/msp
+
+  - &Org1
+    Name: Org1MSP
+    ID: Org1MSP
+    MSPDir: organizations/peerOrganizations/org1.example.com/msp
+    AnchorPeers:
+      - Host: peer0-org1
+        Port: 7051
+
+  - &Org2
+    Name: Org2MSP
+    ID: Org2MSP
+    MSPDir: organizations/peerOrganizations/org2.example.com/msp
+    AnchorPeers:
+      - Host: peer0-org2
+        Port: 7051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V3_0: true
+  Orderer: &OrdererCapabilities
+    V3_0: true
+  Application: &ApplicationCapabilities
+    V3_0: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer:7050
+  EtcdRaft:
+    Consenters:
+      - Host: orderer
+        Port: 7050
+        ClientTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+        ServerTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+  Organizations:
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  GdcGenesis:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Consortiums:
+      GdcConsortium:
+        Organizations:
+          - *Org1
+          - *Org2
+
+  GdcChannel:
+    Consortium: GdcConsortium
+    <<: *ChannelDefaults
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Org1
+        - *Org2
+
+  # DEMO-style: single host org only (tenants are client identities, not peer operators)
+  GdcGenesisSingleHost:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Consortiums:
+      GdcConsortium:
+        Organizations:
+          - *Org1
+
+  GdcChannelSingleHost:
+    Consortium: GdcConsortium
+    <<: *ChannelDefaults
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Org1

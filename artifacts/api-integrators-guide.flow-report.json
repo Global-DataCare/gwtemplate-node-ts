@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2025-12-23T18:34:35.732Z",
+  "generatedAt": "2026-01-11T03:57:57.728Z",
   "steps": [
     {
       "name": "Discovery: /host/.well-known/ping",
@@ -16,11 +16,11 @@
           "access-control-expose-headers": "Location, Retry-After",
           "content-type": "application/json"
         },
-        "bodyText": "{\"type\":\"batch-response\",\"meta\":{\"timestamp\":\"2025-12-23T18:34:35.734Z\"},\"data\":[{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"information\",\"code\":\"throttled\",\"diagnostics\":\"Ping successful\"}]}]}",
+        "bodyText": "{\"type\":\"batch-response\",\"meta\":{\"timestamp\":\"2026-01-11T03:57:57.731Z\"},\"data\":[{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"information\",\"code\":\"throttled\",\"diagnostics\":\"Ping successful\"}]}]}",
         "bodyJson": {
           "type": "batch-response",
           "meta": {
-            "timestamp": "2025-12-23T18:34:35.734Z"
+            "timestamp": "2026-01-11T03:57:57.731Z"
           },
           "data": [
             {
@@ -52,42 +52,42 @@
           "access-control-expose-headers": "Location, Retry-After",
           "content-type": "application/json"
         },
-        "bodyText": "{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:web:localhost%3A3000\",\"alsoKnownAs\":[],\"verificationMethod\":[{\"id\":\"did:web:localhost%3A3000#Eewj6PU_i8e639a1NbdaqzvyvwihFVzWl9xEiD58yvU\",\"controller\":\"did:web:localhost%3A3000\",\"type\":\"JsonWebKey2020\",\"publicKeyJwk\":{\"kty\":\"AKP\",\"alg\":\"ML-DSA-44\",\"pub\":\"5JbWIq1nSEXOR_ujv5QOQwoU8bqP6nqDQd1TZFBULEOjhVBGjhN8QjsOTK_xe82qrTX5W-y-J9wQllSElWFGs8ZgL0x-ZlRhfxdReOdHOVv2S2PRG4ieliyavD9tT63KJBbjzDXT0mk-9MUcVdK2bQSgBxfEsuKEVm_D24Aa3nRdONuHg659IMpDvK_V6uij7IPbyMgBDF_jT1nhpTUv8MUUu5BJSVpKApvvBax-DgvzdrSgZKZB8j6bke_zDsANKuv-OPqqMW5hbNTa7OH9DXgvKhH7Dbuiqf79gxRGcb-bCBhJ-5Ajknz2vw9-Ul8G5zReWn5dMJlu6eYM7apgLyzb_FFP5ccWHytYJgKL1G21HzFZMl6pefZSKGbeE0MNRo9bW065sqU8XMyBinDYqVWYZLbN5q-6OmscceSpkUyug7_BKAIdIdM3i2qJF1IIL7pIRDcoONyEpJsTLYc8ba_9ei-gv5B-kj9wv86-r95mvt_VAY4ipRoBhcmP8CpTRGXES88wCBlbBw9vMnhw-Q9tZCACr4LvGHslVsOWSWdcWWIKujitvIRymhML10GOY8jH7jpspPJVAhA3dpw7Qh1l2xCN2EjJSDnJ9Czhdgg0-3gT9KYe83Fv1FtX3XDOzmJTf8UEKpAZ-kdiJ2Gi3J7EZiFrh1XNQsJakLblfMJ-W30zoilTciMr9zzdrRD2WLFyxVuYFEsCqc1kZwVBelFnm9ZMfAxIa9iUYAzwjDo1eyl1WNBSV-F7jgyOtXf5jmTEG5LJly8fpNV1xt7RbVf7LEXokTaqksNLsElNChrKMtbu1FYzVQqSloMUpAQu41wq-Z-nSPpmm2zaP508viBgestDpgYttyRo6kx2p-txnAmCXIrvEEbaQ0xIYL_WvyJKKV3LcCLl8Pj7X8UXM6iWad9mOrelM-6WpfFTqJGTi-jDzxsv6JjHiUOB3uXcNCTesL8AfyrSOTaxGxrn3SUrpMF7TBKsT741azMLntJ7BnNiaSLLNKq_V0zJIAQdYvM1JYilR64PiKA3jk0XsD_ATubodvdJrELyMPMCD6rU-MEZeChF3daVpH3V8KRPgtDKRGQzr1JPogL_0GDFs131fBZO_sht77l6VXqAtTLtRsFAiAQdko-Gr0XwtenJAhW526IAtieS6KXd924u0qs6YETGQ_7uFpJUl0pc1nHF0tGALpbkhMcqZ88Wei_6T6ckLhfBM3okseYVAv9mV2R7j0zDhNzMlIA_aRETyK-hC4ALkZQ288OLSpUPWJLopqSULzp2NHEBTTrIRkaz6w6r9RKCIubJEtGwg_8Ta1U7hGlAynuVy9qxDEFYrSKQXgPk3jRyJM7aBF66fissGsNh9J1p7wSE-QDpGgq9sAVBcGCFLLXaa3uHz6spm_aklDjMcRjlSfRXkYmkvoooGA7H0GBDTVYky8QC86ghjBgCrArAcomiexVC-21AC_KrcEfoHxGvYQpRcw7pmHz5eiyLCHLoEZ6UdmI8u01lUkOPevkQ9aUfTW0H4mlB7usv9OcAZ75a50C6besGbUqNcgbLbQi_KYuIric2w4NEEJkEPp76MCeusyzo1ykWoLyei3KgPwIg1k1qKKXpfY7BnIxBwHSlo4aH0nUNdpMk3Qh_AU4bahPfjXSbIVyXrIx-TkNCsK-AktuVQC4R4PjbxkBElJEBhTE_L3zh1-n9mpd7W8pg8PbJLJRL7NnUglAdFjeOrNnXdWkapC6KrOe9vQ\",\"kid\":\"Eewj6PU_i8e639a1NbdaqzvyvwihFVzWl9xEiD58yvU\",\"use\":\"sig\"}},{\"id\":\"did:web:localhost%3A3000#prbcvAlzB-i1LGD4tk89arqRWAq60nWZ5kRITOQU3q4\",\"controller\":\"did:web:localhost%3A3000\",\"type\":\"JsonWebKey2020\",\"publicKeyJwk\":{\"kty\":\"OKP\",\"crv\":\"ML-KEM-768\",\"x\":\"QhO1lFJAfzpKbhOynvtWMjI1hzeUmFkCZCcJKvGXPyoI0EmEqqY13alrR_eEDhrAc6Fa7FST1UIeA6txqxWtoZBScXucbHhuxqcYdVOtv1C5KkzIWigN-9MOnfRHtWSu-rI5zOM607sPaVFs3FWBMbqCrDKncCJdiiwVVjwwgYFDpRa-ONcle3A1b7qWbAO5ZdAwWTYDavqrN7qL_xOdlPqmiBkHg6s_etaC52O-f8t7TUbB8vCmZPlp_ctemtpb7ztWv8lPODVADVBv35ElNFO-wsaCWjM133N5Mru_mbOMKMNOvdOgSYbBqPm4YykhKKuaaXQEtGCsfJWrQogZsOYxDTtk_2imhbFE1WtfFneJ41t080I_GoEAPlYwfbw2KsmNCuyCZ_Kyl3ACHKNVOnZzc4trG7y7sEzBWlUr39jHF1hUU9wQqnKQhaqzlCvH7cKnmJlf2VSGytI97sWrcnGAj_IVwxYoQkYLF7e9rZEwE9NQVZKtHPSvuoWzFFAQf-EQoXMGfhXDlRRGhDVD6NYzB9iIjCIFnvmpb_KuV3gfsiq2ODaOYJmGlCysBgKyZKIenplrOLdjqhPDfiCU2SatjEmHcyC09lfLUakkdXfGgVWq7owUtMoOVNjLwOenttas7pqsdINTEORSzLSOIEl7_iWPWxKmmZa_kvu2lsxwNeTHW6lQS2tqJXqdyCfK6qTO9tbBzfsq2di9tYGEIeyCgvMadUgcb4aWJ0wxS1Y1h1iqUtF0HoGDv4HCpeQu7ECIJXk00Pk8enaTaoBIiyyTY8k74FA4Unt3zoqksYkMsUcenUEud4KeEAhX5cjFINqnkrM_1mGONYMW9jHGgOgOJ5eKMpK_HDhXmGoldvOScNt4Cqta7cOVrqqWQBQ87uBbBfHGbQyRvKkxLjVhm6Nit8VIh8fHYBZcghcvh0USeBETO4qAAPArN7kCcJWafxl0qYM-dQZ6ivixZpueLAipmaupz3BjP0K7sYW1GRaF-QRtHLJGsIJdRnRqQDV8sqHECgoLS0GuZjxXM8SjrXqQblikyjrMelEK2AIuVVQ-bJEh9aVBBqMc3Fid_5dYpVNfCgFl4luvyfSkIkyiB5JnxvijlaZJNbJsJWNSNnMeQmx3l1haTVBAh8mMyFKDLJhVtdlM-yXESnAULTpt4nkhdLEaNnJq_hMDzvAlskWo8Iu6x2NTldzDbHrHlzJszXhcshDCE7af3UQ8aaWzBAFPdvMAOko927RYZqMhsQA6IRa9z7nKQ9qji0VdjyJ57iqDN_uFwMPNOazNTEh3sthK6aus5wm3lIW0UVdisCuitbR2o1en1zAzITdV2XBdolxfQmYi-tdKvlRul8Yd3zi5FRyp8Zkboalz7vGDLMydrkTOVhkHzBYctABR_jtxDzZSD8gzJMiWkJE052OU6_Fvivx13dS_x1EohHmdobyRUciKH6GhqKJrFTqDlFYhQqKxnFg85DKboBVnMXp5KytXz8HD4eyossIm0oy94RcGtrGJ14w8PegwsxdqLYY53SRpnIxV6EHT1cmt41mF1-ZLrSu9X-KjwEwii8G1A4c\",\"kid\":\"prbcvAlzB-i1LGD4tk89arqRWAq60nWZ5kRITOQU3q4\",\"use\":\"enc\"}}],\"assertionMethod\":[\"did:web:localhost%3A3000#Eewj6PU_i8e639a1NbdaqzvyvwihFVzWl9xEiD58yvU\"],\"keyAgreement\":[\"did:web:localhost%3A3000#prbcvAlzB-i1LGD4tk89arqRWAq60nWZ5kRITOQU3q4\"],\"service\":[{\"id\":\"did:web:localhost%3A3000#did-document\",\"type\":\"LinkedDomains\",\"serviceEndpoint\":\"http://localhost:3000/.well-known/did.json\"},{\"id\":\"did:web:localhost%3A3000#jwks\",\"type\":\"JsonWebKeyService2020\",\"serviceEndpoint\":\"http://localhost:3000/jwks.json\"},{\"id\":\"did:web:localhost%3A3000#registry:org.schema:organization:_batch\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/registry/org.schema/Organization/_batch\"},{\"id\":\"did:web:localhost%3A3000#registry:org.schema:order:_batch\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/registry/org.schema/Order/_batch\"},{\"id\":\"did:web:localhost%3A3000#identity:firebase:token:_custom\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/identity/firebase/Token/_custom\"},{\"id\":\"did:web:localhost%3A3000#identity:openid:token:_exchange\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/identity/openid/Token/_exchange\"}]}",
+        "bodyText": "{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:web:localhost%3A3000\",\"alsoKnownAs\":[],\"verificationMethod\":[{\"id\":\"did:web:localhost%3A3000#D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps\",\"controller\":\"did:web:localhost%3A3000\",\"type\":\"JsonWebKey2020\",\"publicKeyJwk\":{\"kty\":\"AKP\",\"alg\":\"ML-DSA-44\",\"pub\":\"-QCkuwr1--mlqqPrSWx-OT4LOVQwiy0ZZHBeHrcBRYTVnramC7vbdqPMOQa6X66pFS7NuXEQ_wrOE8LAXGNMvGcT4KRgTtnXvbHkY3mWDMvewEviUeG7kkCYbvG-cz7sSuzw8nIGJK5tvIT3C68i6aNzjZDSLnohVr8N9l2IwFzPUkSh-ZtKjUhtlW9KDBIoGKUpnyFSvRSaTBGJ7u5CRb1VbGeWWlfr7HfqWqdyJsvZn3zZUQpS4KPj9h6vH3QHKoryCrXKtJknzPdO4AMYF1OYZgQBcyf1iT3ChQoc-fPVmJPRU8ede-LJjlTtl1Lkhi-cnI_HJEOuacwd3J-7LoFB885EQvFPKKl-p7czDJrfsF-lTssYPhBMHwU5xmhKTYlQOM3IPY7C9Bs2TALAlN3xvSOht4e6klAaRMIFOJb7-3fgMW1K5AN0CMGJPnzPiyxwXP2gx4mfQ9oV-8XBkzPRDOzLABFpGoubELWhzPmQ8HD3az71ZyokMx5VrTRK6TL6400v2jX84AT_nba5tGHD83dPsgLGQ-gjcpwLBlgN_EvNAKpxXxRHEabIvnLMS584MuCj5T538PORmrmnRa9MQdl9QmeTz4MjQrnBaP4J-zyiQCPfSlSRg7TnipMTdEmbHYbraGePOPa9TFAyfuZqDz_pPrlgBwof6yQ8UflcHrx1kz4ZjOgBGh3SoMZ6IfesJsoDnuv8gF9kmLKgsxnhp1YO_I6PD3H-EDa63ZZ-1thfgewZ6rOojbtophNBLjsmauwgq91EvT6afip5eU2yOtHHuOnaWpLyeuf0vQ9RaPQM1Gs8BmJ5hmniTxBicHTuMhNdcYhgGiQjG1WgdAhUi-OflPovzIPiZ3ApUtkUKrKR34IGlkiUaQNX4pBR5pc7NBW6pDzuozL9Q7LFAlutZq2E7Ub1pMkdpAzzNFPtA9Oeo0rAXKC_Prfi6CSj_94628_LSKukn4qOezKuv53G8bc45L0i7WXlYhU8QemWEd98_Qb3-q0YwB7OcjNcLgWYvikX91ClGDHT34y8EWv1AJQJq0pAjAXMgjIoqPlcJTzXOLinHzzE-F5gaa5WklGklYu0roiDyYH1W7ZsrdeIlWWEKRi9teQCS_geNKM-VGFB3HCeGSrZK1JrgKVR8O2-N0cmzFsaq8qdipTnkHEKN_94UAMLE8TTgbiasrKe-lbb9kwS5zynAGmItI62FNFuSiQjs89vRbKIK7qYml5Kb7DLMWYBPTZaHNOA_LOlxE3eYqDRrS5NkIOW0c945-xVuzgNLVtH_aagZfJRekfg0GW-2JzZthQqAkM9Tjq9BzWSTUEKtCzl5U0JmNZdC-2W4a0F7Vg-m6ptoDUOPVrVKatjmDW81AJLYCeYqFaOV7IOm1krfffcPY-h67bAlnPFgjI_DDuSGpRUc1BC8B-zWrqpJl8V2-MHZRHL9ppq1GpvarkFgqbjMw31DrJyndbiB59EYs-GG6mJJhqBZZcY8LS9L2jYBjgdkbidpT1rmUjJPmmEOq49mINNSKF4kXEKoWLJhxIjcUnDWXqLZpZRKlvrXGq1d6YOswv7cQ3sk3vqcLP0piKHIgonmCxWNlJt6f5LHIeYo0yYeAQPOvJfJPhmnlkeg8FA2n5tJvtUoN8sDmUeC2CMvlrg6PQvfF1ezYWcaBUfsS8nw-PXp6VFHZ18r-VHxkJRLQ5RjTvuutxprXMjyzaZJH9bgfvxqlkfpubSBkI1ngM9ydCIyQ\",\"kid\":\"D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps\",\"use\":\"sig\"}},{\"id\":\"did:web:localhost%3A3000#r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0\",\"controller\":\"did:web:localhost%3A3000\",\"type\":\"JsonWebKey2020\",\"publicKeyJwk\":{\"kty\":\"OKP\",\"crv\":\"ML-KEM-768\",\"x\":\"6DEfzDJ5AflomZy1zrmcIHJ36pjLartQKeh8WkMB4JtisjRr8BWhcagvFrZgS8o8NqJk0poQ6HJxDfJJgiIICPKKljQTrjcqmNkGn3s97ttE8ldj0djOsEyuh5CeX2qqvRhFZVXEmJAmRLKL-aZG27HJOIyDZvBupAMTeuEuBJgKZ0OGw1RrltJEU8uLKjO0jiwavUbEqBquCBq4rTJ1iEFVvKmaHQN9BDeOHaA9ziHPz9ceTnm6XQQyJwcKE8KeLcNrPJVXnWq7EgwCX0If4HaN0YUQNVOfPbCP5at1yfSnc-aMkJVQcNcHGEvKX0kNzGfF7LJXKbMSkLgce1AbONkZxTiw5EJBIFxPlgxTqiJopderU2acoYJO9VRxHcBMRZYqX1wHkldEtItVJVAtg8yGSRsYDvcgtdIjDexfOkO9d4dbWfnAZUaei5dKkZwsZ7pPGxuke6wZr_MgkIl7aTK_BURpYyZMJKBUsmuXFXFtLJoT0KSKtkl5EvyIecujCNEwMWdwyPUtqxmG8msPfVa4rkpQiCOeIqtjF7yoxKk86tRIADddJfl69_dPkUBoH2oWZquKiWmFSfBt5pltNMCxwEaYKUAXpjY0pVbJ_DE6cazKDiXIthgDwFRk8cey_oGfAGB5QjuQB4AypxWmbCNCJHYmxXS07ZqwOhbJtegOJWJVz2XEI3tlLlEXXsu3M8GpxnAW2Fx6KazE_4qkbDo1MCUUGyyjKNpTmonOQ8sbK1x8DfBwbZI1GHseDEY1B0aEtaKVIHk_GJlnJ0tYTLNmc-gqhvC-6_ObW1ZlePosBoRiKKNUtsKMWAU19aRBlDEteWinlEyYndtkO7KObQekdFGeMgCoXvAOnBJ0eMsKJrmnvhdm3HaqGKtrz_FidotB41KUz9BmGlIaX_wLTOJjr4VVHJJAeqAZIYuh9hUN07O6H1E30beAHYhIQ2i4ezUFcTdC4cWvFSuZs4ik0yuNKaw8utnEdDx3vBc6ZEZ0xAKis9sqpxY992sVoeV4_cYRZLlEyvp3OdSLwZIU4yRYP5QCJ0VX2YaC8LzEVZcUF7kZ6Pt5cSakrzyItji62HEbVdKLB7UtPWpDTFOU6DVY1aeb56QWWgvCgTMwgPKJo4BlYxNpAGS3OKtY70JDLIusqSx67_hn5xi3aEJSVzaqPlR4kbsWIvYP3OUqAUKIARxCCLjBYrc31gZap5WkwyPOx9gH8PcLbzoIqDG1bzO6mntC8WemT5MbV5aY55SG4UJOgxSSjjqo2KoojQY9jHQBgYEOb9Rnqmq1Q5O1EpZ_cUdDg1KdX0kBi3BtT6EDoqmcu3YnMhIxgbwRAyetb3GHZ_iYl4s0sLxZ0meQwZVfaaEeQBJSnpQak-ijAKFlsfqq-utI44cqBdK_hTcHaMWcyKoktVEJ01YRuagwHWRpmRyc3IOsS5VRl2moyoIsILkdzVYl9Pdgj5xPmCEq_ESGZBAkgihT-_s11EO-kxOVTeC3FcQ60dJK--ZnOJGRf6G1Bzey6pOq5ymGTreMQuaQB2AhbXZuaxhhb73obYx0XxPGqvKbJuD18JpWIN0\",\"kid\":\"r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0\",\"use\":\"enc\"}}],\"assertionMethod\":[\"did:web:localhost%3A3000#D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps\"],\"keyAgreement\":[\"did:web:localhost%3A3000#r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0\"],\"service\":[{\"id\":\"did:web:localhost%3A3000#did-document\",\"type\":\"LinkedDomains\",\"serviceEndpoint\":\"http://localhost:3000/.well-known/did.json\"},{\"id\":\"did:web:localhost%3A3000#jwks\",\"type\":\"JsonWebKeyService2020\",\"serviceEndpoint\":\"http://localhost:3000/jwks.json\"},{\"id\":\"did:web:localhost%3A3000#registry:org.schema:organization:_batch\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/registry/org.schema/Organization/_batch\"},{\"id\":\"did:web:localhost%3A3000#registry:org.schema:order:_batch\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/registry/org.schema/Order/_batch\"},{\"id\":\"did:web:localhost%3A3000#identity:firebase:token:_custom\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/identity/firebase/Token/_custom\"},{\"id\":\"did:web:localhost%3A3000#identity:openid:token:_exchange\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/identity/openid/Token/_exchange\"}]}",
         "bodyJson": {
           "@context": "<url>",
           "id": "did:web:localhost%3A3000",
           "alsoKnownAs": [],
           "verificationMethod": [
             {
-              "id": "did:web:localhost%3A3000#Eewj6PU_i8e639a1NbdaqzvyvwihFVzWl9xEiD58yvU",
+              "id": "did:web:localhost%3A3000#D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps",
               "controller": "did:web:localhost%3A3000",
               "type": "JsonWebKey2020",
               "publicKeyJwk": {
                 "kty": "AKP",
                 "alg": "ML-DSA-44",
-                "pub": "5JbWIq1nSEXOR_ujv5QOQwoU8bqP6nqDQd1TZFBULEOjhVBGjhN8QjsOTK_xe82qrTX5W-y-J9wQllSElWFGs8ZgL0x-ZlRhfxdReOdHOVv2S2PRG4ieliyavD9tT63KJBbjzDXT0mk-9MUcVdK2bQSgBxfEsuKEVm_D24Aa3nRdONuHg659IMpDvK_V6uij7IPbyMgBDF_jT1nhpTUv8MUUu5BJSVpKApvvBax-DgvzdrSgZKZB8j6bke_zDsANKuv-OPqqMW5hbNTa7OH9DXgvKhH7Dbuiqf79gxRGcb-bCBhJ-5Ajknz2vw9-Ul8G5zReWn5dMJlu6eYM7apgLyzb_FFP5ccWHytYJgKL1G21HzFZMl6pefZSKGbeE0MNRo9bW065sqU8XMyBinDYqVWYZLbN5q-6OmscceSpkUyug7_BKAIdIdM3i2qJF1IIL7pIRDcoONyEpJsTLYc8ba_9ei-gv5B-kj9wv86-r95mvt_VAY4ipRoBhcmP8CpTRGXES88wCBlbBw9vMnhw-Q9tZCACr4LvGHslVsOWSWdcWWIKujitvIRymhML10GOY8jH7jpspPJVAhA3dpw7Qh1l2xCN2EjJSDnJ9Czhdgg0-3gT9KYe83Fv1FtX3XDOzmJTf8UEKpAZ-kdiJ2Gi3J7EZiFrh1XNQsJakLblfMJ-W30zoilTciMr9zzdrRD2WLFyxVuYFEsCqc1kZwVBelFnm9ZMfAxIa9iUYAzwjDo1eyl1WNBSV-F7jgyOtXf5jmTEG5LJly8fpNV1xt7RbVf7LEXokTaqksNLsElNChrKMtbu1FYzVQqSloMUpAQu41wq-Z-nSPpmm2zaP508viBgestDpgYttyRo6kx2p-txnAmCXIrvEEbaQ0xIYL_WvyJKKV3LcCLl8Pj7X8UXM6iWad9mOrelM-6WpfFTqJGTi-jDzxsv6JjHiUOB3uXcNCTesL8AfyrSOTaxGxrn3SUrpMF7TBKsT741azMLntJ7BnNiaSLLNKq_V0zJIAQdYvM1JYilR64PiKA3jk0XsD_ATubodvdJrELyMPMCD6rU-MEZeChF3daVpH3V8KRPgtDKRGQzr1JPogL_0GDFs131fBZO_sht77l6VXqAtTLtRsFAiAQdko-Gr0XwtenJAhW526IAtieS6KXd924u0qs6YETGQ_7uFpJUl0pc1nHF0tGALpbkhMcqZ88Wei_6T6ckLhfBM3okseYVAv9mV2R7j0zDhNzMlIA_aRETyK-hC4ALkZQ288OLSpUPWJLopqSULzp2NHEBTTrIRkaz6w6r9RKCIubJEtGwg_8Ta1U7hGlAynuVy9qxDEFYrSKQXgPk3jRyJM7aBF66fissGsNh9J1p7wSE-QDpGgq9sAVBcGCFLLXaa3uHz6spm_aklDjMcRjlSfRXkYmkvoooGA7H0GBDTVYky8QC86ghjBgCrArAcomiexVC-21AC_KrcEfoHxGvYQpRcw7pmHz5eiyLCHLoEZ6UdmI8u01lUkOPevkQ9aUfTW0H4mlB7usv9OcAZ75a50C6besGbUqNcgbLbQi_KYuIric2w4NEEJkEPp76MCeusyzo1ykWoLyei3KgPwIg1k1qKKXpfY7BnIxBwHSlo4aH0nUNdpMk3Qh_AU4bahPfjXSbIVyXrIx-TkNCsK-AktuVQC4R4PjbxkBElJEBhTE_L3zh1-n9mpd7W8pg8PbJLJRL7NnUglAdFjeOrNnXdWkapC6KrOe9vQ",
-                "kid": "Eewj6PU_i8e639a1NbdaqzvyvwihFVzWl9xEiD58yvU",
+                "pub": "-QCkuwr1--mlqqPrSWx-OT4LOVQwiy0ZZHBeHrcBRYTVnramC7vbdqPMOQa6X66pFS7NuXEQ_wrOE8LAXGNMvGcT4KRgTtnXvbHkY3mWDMvewEviUeG7kkCYbvG-cz7sSuzw8nIGJK5tvIT3C68i6aNzjZDSLnohVr8N9l2IwFzPUkSh-ZtKjUhtlW9KDBIoGKUpnyFSvRSaTBGJ7u5CRb1VbGeWWlfr7HfqWqdyJsvZn3zZUQpS4KPj9h6vH3QHKoryCrXKtJknzPdO4AMYF1OYZgQBcyf1iT3ChQoc-fPVmJPRU8ede-LJjlTtl1Lkhi-cnI_HJEOuacwd3J-7LoFB885EQvFPKKl-p7czDJrfsF-lTssYPhBMHwU5xmhKTYlQOM3IPY7C9Bs2TALAlN3xvSOht4e6klAaRMIFOJb7-3fgMW1K5AN0CMGJPnzPiyxwXP2gx4mfQ9oV-8XBkzPRDOzLABFpGoubELWhzPmQ8HD3az71ZyokMx5VrTRK6TL6400v2jX84AT_nba5tGHD83dPsgLGQ-gjcpwLBlgN_EvNAKpxXxRHEabIvnLMS584MuCj5T538PORmrmnRa9MQdl9QmeTz4MjQrnBaP4J-zyiQCPfSlSRg7TnipMTdEmbHYbraGePOPa9TFAyfuZqDz_pPrlgBwof6yQ8UflcHrx1kz4ZjOgBGh3SoMZ6IfesJsoDnuv8gF9kmLKgsxnhp1YO_I6PD3H-EDa63ZZ-1thfgewZ6rOojbtophNBLjsmauwgq91EvT6afip5eU2yOtHHuOnaWpLyeuf0vQ9RaPQM1Gs8BmJ5hmniTxBicHTuMhNdcYhgGiQjG1WgdAhUi-OflPovzIPiZ3ApUtkUKrKR34IGlkiUaQNX4pBR5pc7NBW6pDzuozL9Q7LFAlutZq2E7Ub1pMkdpAzzNFPtA9Oeo0rAXKC_Prfi6CSj_94628_LSKukn4qOezKuv53G8bc45L0i7WXlYhU8QemWEd98_Qb3-q0YwB7OcjNcLgWYvikX91ClGDHT34y8EWv1AJQJq0pAjAXMgjIoqPlcJTzXOLinHzzE-F5gaa5WklGklYu0roiDyYH1W7ZsrdeIlWWEKRi9teQCS_geNKM-VGFB3HCeGSrZK1JrgKVR8O2-N0cmzFsaq8qdipTnkHEKN_94UAMLE8TTgbiasrKe-lbb9kwS5zynAGmItI62FNFuSiQjs89vRbKIK7qYml5Kb7DLMWYBPTZaHNOA_LOlxE3eYqDRrS5NkIOW0c945-xVuzgNLVtH_aagZfJRekfg0GW-2JzZthQqAkM9Tjq9BzWSTUEKtCzl5U0JmNZdC-2W4a0F7Vg-m6ptoDUOPVrVKatjmDW81AJLYCeYqFaOV7IOm1krfffcPY-h67bAlnPFgjI_DDuSGpRUc1BC8B-zWrqpJl8V2-MHZRHL9ppq1GpvarkFgqbjMw31DrJyndbiB59EYs-GG6mJJhqBZZcY8LS9L2jYBjgdkbidpT1rmUjJPmmEOq49mINNSKF4kXEKoWLJhxIjcUnDWXqLZpZRKlvrXGq1d6YOswv7cQ3sk3vqcLP0piKHIgonmCxWNlJt6f5LHIeYo0yYeAQPOvJfJPhmnlkeg8FA2n5tJvtUoN8sDmUeC2CMvlrg6PQvfF1ezYWcaBUfsS8nw-PXp6VFHZ18r-VHxkJRLQ5RjTvuutxprXMjyzaZJH9bgfvxqlkfpubSBkI1ngM9ydCIyQ",
+                "kid": "D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps",
                 "use": "sig"
               }
             },
             {
-              "id": "did:web:localhost%3A3000#prbcvAlzB-i1LGD4tk89arqRWAq60nWZ5kRITOQU3q4",
+              "id": "did:web:localhost%3A3000#r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0",
               "controller": "did:web:localhost%3A3000",
               "type": "JsonWebKey2020",
               "publicKeyJwk": {
                 "kty": "OKP",
                 "crv": "ML-KEM-768",
-                "x": "QhO1lFJAfzpKbhOynvtWMjI1hzeUmFkCZCcJKvGXPyoI0EmEqqY13alrR_eEDhrAc6Fa7FST1UIeA6txqxWtoZBScXucbHhuxqcYdVOtv1C5KkzIWigN-9MOnfRHtWSu-rI5zOM607sPaVFs3FWBMbqCrDKncCJdiiwVVjwwgYFDpRa-ONcle3A1b7qWbAO5ZdAwWTYDavqrN7qL_xOdlPqmiBkHg6s_etaC52O-f8t7TUbB8vCmZPlp_ctemtpb7ztWv8lPODVADVBv35ElNFO-wsaCWjM133N5Mru_mbOMKMNOvdOgSYbBqPm4YykhKKuaaXQEtGCsfJWrQogZsOYxDTtk_2imhbFE1WtfFneJ41t080I_GoEAPlYwfbw2KsmNCuyCZ_Kyl3ACHKNVOnZzc4trG7y7sEzBWlUr39jHF1hUU9wQqnKQhaqzlCvH7cKnmJlf2VSGytI97sWrcnGAj_IVwxYoQkYLF7e9rZEwE9NQVZKtHPSvuoWzFFAQf-EQoXMGfhXDlRRGhDVD6NYzB9iIjCIFnvmpb_KuV3gfsiq2ODaOYJmGlCysBgKyZKIenplrOLdjqhPDfiCU2SatjEmHcyC09lfLUakkdXfGgVWq7owUtMoOVNjLwOenttas7pqsdINTEORSzLSOIEl7_iWPWxKmmZa_kvu2lsxwNeTHW6lQS2tqJXqdyCfK6qTO9tbBzfsq2di9tYGEIeyCgvMadUgcb4aWJ0wxS1Y1h1iqUtF0HoGDv4HCpeQu7ECIJXk00Pk8enaTaoBIiyyTY8k74FA4Unt3zoqksYkMsUcenUEud4KeEAhX5cjFINqnkrM_1mGONYMW9jHGgOgOJ5eKMpK_HDhXmGoldvOScNt4Cqta7cOVrqqWQBQ87uBbBfHGbQyRvKkxLjVhm6Nit8VIh8fHYBZcghcvh0USeBETO4qAAPArN7kCcJWafxl0qYM-dQZ6ivixZpueLAipmaupz3BjP0K7sYW1GRaF-QRtHLJGsIJdRnRqQDV8sqHECgoLS0GuZjxXM8SjrXqQblikyjrMelEK2AIuVVQ-bJEh9aVBBqMc3Fid_5dYpVNfCgFl4luvyfSkIkyiB5JnxvijlaZJNbJsJWNSNnMeQmx3l1haTVBAh8mMyFKDLJhVtdlM-yXESnAULTpt4nkhdLEaNnJq_hMDzvAlskWo8Iu6x2NTldzDbHrHlzJszXhcshDCE7af3UQ8aaWzBAFPdvMAOko927RYZqMhsQA6IRa9z7nKQ9qji0VdjyJ57iqDN_uFwMPNOazNTEh3sthK6aus5wm3lIW0UVdisCuitbR2o1en1zAzITdV2XBdolxfQmYi-tdKvlRul8Yd3zi5FRyp8Zkboalz7vGDLMydrkTOVhkHzBYctABR_jtxDzZSD8gzJMiWkJE052OU6_Fvivx13dS_x1EohHmdobyRUciKH6GhqKJrFTqDlFYhQqKxnFg85DKboBVnMXp5KytXz8HD4eyossIm0oy94RcGtrGJ14w8PegwsxdqLYY53SRpnIxV6EHT1cmt41mF1-ZLrSu9X-KjwEwii8G1A4c",
-                "kid": "prbcvAlzB-i1LGD4tk89arqRWAq60nWZ5kRITOQU3q4",
+                "x": "6DEfzDJ5AflomZy1zrmcIHJ36pjLartQKeh8WkMB4JtisjRr8BWhcagvFrZgS8o8NqJk0poQ6HJxDfJJgiIICPKKljQTrjcqmNkGn3s97ttE8ldj0djOsEyuh5CeX2qqvRhFZVXEmJAmRLKL-aZG27HJOIyDZvBupAMTeuEuBJgKZ0OGw1RrltJEU8uLKjO0jiwavUbEqBquCBq4rTJ1iEFVvKmaHQN9BDeOHaA9ziHPz9ceTnm6XQQyJwcKE8KeLcNrPJVXnWq7EgwCX0If4HaN0YUQNVOfPbCP5at1yfSnc-aMkJVQcNcHGEvKX0kNzGfF7LJXKbMSkLgce1AbONkZxTiw5EJBIFxPlgxTqiJopderU2acoYJO9VRxHcBMRZYqX1wHkldEtItVJVAtg8yGSRsYDvcgtdIjDexfOkO9d4dbWfnAZUaei5dKkZwsZ7pPGxuke6wZr_MgkIl7aTK_BURpYyZMJKBUsmuXFXFtLJoT0KSKtkl5EvyIecujCNEwMWdwyPUtqxmG8msPfVa4rkpQiCOeIqtjF7yoxKk86tRIADddJfl69_dPkUBoH2oWZquKiWmFSfBt5pltNMCxwEaYKUAXpjY0pVbJ_DE6cazKDiXIthgDwFRk8cey_oGfAGB5QjuQB4AypxWmbCNCJHYmxXS07ZqwOhbJtegOJWJVz2XEI3tlLlEXXsu3M8GpxnAW2Fx6KazE_4qkbDo1MCUUGyyjKNpTmonOQ8sbK1x8DfBwbZI1GHseDEY1B0aEtaKVIHk_GJlnJ0tYTLNmc-gqhvC-6_ObW1ZlePosBoRiKKNUtsKMWAU19aRBlDEteWinlEyYndtkO7KObQekdFGeMgCoXvAOnBJ0eMsKJrmnvhdm3HaqGKtrz_FidotB41KUz9BmGlIaX_wLTOJjr4VVHJJAeqAZIYuh9hUN07O6H1E30beAHYhIQ2i4ezUFcTdC4cWvFSuZs4ik0yuNKaw8utnEdDx3vBc6ZEZ0xAKis9sqpxY992sVoeV4_cYRZLlEyvp3OdSLwZIU4yRYP5QCJ0VX2YaC8LzEVZcUF7kZ6Pt5cSakrzyItji62HEbVdKLB7UtPWpDTFOU6DVY1aeb56QWWgvCgTMwgPKJo4BlYxNpAGS3OKtY70JDLIusqSx67_hn5xi3aEJSVzaqPlR4kbsWIvYP3OUqAUKIARxCCLjBYrc31gZap5WkwyPOx9gH8PcLbzoIqDG1bzO6mntC8WemT5MbV5aY55SG4UJOgxSSjjqo2KoojQY9jHQBgYEOb9Rnqmq1Q5O1EpZ_cUdDg1KdX0kBi3BtT6EDoqmcu3YnMhIxgbwRAyetb3GHZ_iYl4s0sLxZ0meQwZVfaaEeQBJSnpQak-ijAKFlsfqq-utI44cqBdK_hTcHaMWcyKoktVEJ01YRuagwHWRpmRyc3IOsS5VRl2moyoIsILkdzVYl9Pdgj5xPmCEq_ESGZBAkgihT-_s11EO-kxOVTeC3FcQ60dJK--ZnOJGRf6G1Bzey6pOq5ymGTreMQuaQB2AhbXZuaxhhb73obYx0XxPGqvKbJuD18JpWIN0",
+                "kid": "r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0",
                 "use": "enc"
               }
             }
           ],
           "assertionMethod": [
-            "did:web:localhost%3A3000#Eewj6PU_i8e639a1NbdaqzvyvwihFVzWl9xEiD58yvU"
+            "did:web:localhost%3A3000#D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps"
           ],
           "keyAgreement": [
-            "did:web:localhost%3A3000#prbcvAlzB-i1LGD4tk89arqRWAq60nWZ5kRITOQU3q4"
+            "did:web:localhost%3A3000#r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0"
           ],
           "service": [
             {
@@ -139,21 +139,21 @@
           "access-control-expose-headers": "Location, Retry-After",
           "content-type": "application/json"
         },
-        "bodyText": "{\"keys\":[{\"kty\":\"AKP\",\"alg\":\"ML-DSA-44\",\"pub\":\"5JbWIq1nSEXOR_ujv5QOQwoU8bqP6nqDQd1TZFBULEOjhVBGjhN8QjsOTK_xe82qrTX5W-y-J9wQllSElWFGs8ZgL0x-ZlRhfxdReOdHOVv2S2PRG4ieliyavD9tT63KJBbjzDXT0mk-9MUcVdK2bQSgBxfEsuKEVm_D24Aa3nRdONuHg659IMpDvK_V6uij7IPbyMgBDF_jT1nhpTUv8MUUu5BJSVpKApvvBax-DgvzdrSgZKZB8j6bke_zDsANKuv-OPqqMW5hbNTa7OH9DXgvKhH7Dbuiqf79gxRGcb-bCBhJ-5Ajknz2vw9-Ul8G5zReWn5dMJlu6eYM7apgLyzb_FFP5ccWHytYJgKL1G21HzFZMl6pefZSKGbeE0MNRo9bW065sqU8XMyBinDYqVWYZLbN5q-6OmscceSpkUyug7_BKAIdIdM3i2qJF1IIL7pIRDcoONyEpJsTLYc8ba_9ei-gv5B-kj9wv86-r95mvt_VAY4ipRoBhcmP8CpTRGXES88wCBlbBw9vMnhw-Q9tZCACr4LvGHslVsOWSWdcWWIKujitvIRymhML10GOY8jH7jpspPJVAhA3dpw7Qh1l2xCN2EjJSDnJ9Czhdgg0-3gT9KYe83Fv1FtX3XDOzmJTf8UEKpAZ-kdiJ2Gi3J7EZiFrh1XNQsJakLblfMJ-W30zoilTciMr9zzdrRD2WLFyxVuYFEsCqc1kZwVBelFnm9ZMfAxIa9iUYAzwjDo1eyl1WNBSV-F7jgyOtXf5jmTEG5LJly8fpNV1xt7RbVf7LEXokTaqksNLsElNChrKMtbu1FYzVQqSloMUpAQu41wq-Z-nSPpmm2zaP508viBgestDpgYttyRo6kx2p-txnAmCXIrvEEbaQ0xIYL_WvyJKKV3LcCLl8Pj7X8UXM6iWad9mOrelM-6WpfFTqJGTi-jDzxsv6JjHiUOB3uXcNCTesL8AfyrSOTaxGxrn3SUrpMF7TBKsT741azMLntJ7BnNiaSLLNKq_V0zJIAQdYvM1JYilR64PiKA3jk0XsD_ATubodvdJrELyMPMCD6rU-MEZeChF3daVpH3V8KRPgtDKRGQzr1JPogL_0GDFs131fBZO_sht77l6VXqAtTLtRsFAiAQdko-Gr0XwtenJAhW526IAtieS6KXd924u0qs6YETGQ_7uFpJUl0pc1nHF0tGALpbkhMcqZ88Wei_6T6ckLhfBM3okseYVAv9mV2R7j0zDhNzMlIA_aRETyK-hC4ALkZQ288OLSpUPWJLopqSULzp2NHEBTTrIRkaz6w6r9RKCIubJEtGwg_8Ta1U7hGlAynuVy9qxDEFYrSKQXgPk3jRyJM7aBF66fissGsNh9J1p7wSE-QDpGgq9sAVBcGCFLLXaa3uHz6spm_aklDjMcRjlSfRXkYmkvoooGA7H0GBDTVYky8QC86ghjBgCrArAcomiexVC-21AC_KrcEfoHxGvYQpRcw7pmHz5eiyLCHLoEZ6UdmI8u01lUkOPevkQ9aUfTW0H4mlB7usv9OcAZ75a50C6besGbUqNcgbLbQi_KYuIric2w4NEEJkEPp76MCeusyzo1ykWoLyei3KgPwIg1k1qKKXpfY7BnIxBwHSlo4aH0nUNdpMk3Qh_AU4bahPfjXSbIVyXrIx-TkNCsK-AktuVQC4R4PjbxkBElJEBhTE_L3zh1-n9mpd7W8pg8PbJLJRL7NnUglAdFjeOrNnXdWkapC6KrOe9vQ\",\"kid\":\"Eewj6PU_i8e639a1NbdaqzvyvwihFVzWl9xEiD58yvU\",\"use\":\"sig\"},{\"kty\":\"OKP\",\"crv\":\"ML-KEM-768\",\"x\":\"QhO1lFJAfzpKbhOynvtWMjI1hzeUmFkCZCcJKvGXPyoI0EmEqqY13alrR_eEDhrAc6Fa7FST1UIeA6txqxWtoZBScXucbHhuxqcYdVOtv1C5KkzIWigN-9MOnfRHtWSu-rI5zOM607sPaVFs3FWBMbqCrDKncCJdiiwVVjwwgYFDpRa-ONcle3A1b7qWbAO5ZdAwWTYDavqrN7qL_xOdlPqmiBkHg6s_etaC52O-f8t7TUbB8vCmZPlp_ctemtpb7ztWv8lPODVADVBv35ElNFO-wsaCWjM133N5Mru_mbOMKMNOvdOgSYbBqPm4YykhKKuaaXQEtGCsfJWrQogZsOYxDTtk_2imhbFE1WtfFneJ41t080I_GoEAPlYwfbw2KsmNCuyCZ_Kyl3ACHKNVOnZzc4trG7y7sEzBWlUr39jHF1hUU9wQqnKQhaqzlCvH7cKnmJlf2VSGytI97sWrcnGAj_IVwxYoQkYLF7e9rZEwE9NQVZKtHPSvuoWzFFAQf-EQoXMGfhXDlRRGhDVD6NYzB9iIjCIFnvmpb_KuV3gfsiq2ODaOYJmGlCysBgKyZKIenplrOLdjqhPDfiCU2SatjEmHcyC09lfLUakkdXfGgVWq7owUtMoOVNjLwOenttas7pqsdINTEORSzLSOIEl7_iWPWxKmmZa_kvu2lsxwNeTHW6lQS2tqJXqdyCfK6qTO9tbBzfsq2di9tYGEIeyCgvMadUgcb4aWJ0wxS1Y1h1iqUtF0HoGDv4HCpeQu7ECIJXk00Pk8enaTaoBIiyyTY8k74FA4Unt3zoqksYkMsUcenUEud4KeEAhX5cjFINqnkrM_1mGONYMW9jHGgOgOJ5eKMpK_HDhXmGoldvOScNt4Cqta7cOVrqqWQBQ87uBbBfHGbQyRvKkxLjVhm6Nit8VIh8fHYBZcghcvh0USeBETO4qAAPArN7kCcJWafxl0qYM-dQZ6ivixZpueLAipmaupz3BjP0K7sYW1GRaF-QRtHLJGsIJdRnRqQDV8sqHECgoLS0GuZjxXM8SjrXqQblikyjrMelEK2AIuVVQ-bJEh9aVBBqMc3Fid_5dYpVNfCgFl4luvyfSkIkyiB5JnxvijlaZJNbJsJWNSNnMeQmx3l1haTVBAh8mMyFKDLJhVtdlM-yXESnAULTpt4nkhdLEaNnJq_hMDzvAlskWo8Iu6x2NTldzDbHrHlzJszXhcshDCE7af3UQ8aaWzBAFPdvMAOko927RYZqMhsQA6IRa9z7nKQ9qji0VdjyJ57iqDN_uFwMPNOazNTEh3sthK6aus5wm3lIW0UVdisCuitbR2o1en1zAzITdV2XBdolxfQmYi-tdKvlRul8Yd3zi5FRyp8Zkboalz7vGDLMydrkTOVhkHzBYctABR_jtxDzZSD8gzJMiWkJE052OU6_Fvivx13dS_x1EohHmdobyRUciKH6GhqKJrFTqDlFYhQqKxnFg85DKboBVnMXp5KytXz8HD4eyossIm0oy94RcGtrGJ14w8PegwsxdqLYY53SRpnIxV6EHT1cmt41mF1-ZLrSu9X-KjwEwii8G1A4c\",\"kid\":\"prbcvAlzB-i1LGD4tk89arqRWAq60nWZ5kRITOQU3q4\",\"use\":\"enc\"}]}",
+        "bodyText": "{\"keys\":[{\"kty\":\"AKP\",\"alg\":\"ML-DSA-44\",\"pub\":\"-QCkuwr1--mlqqPrSWx-OT4LOVQwiy0ZZHBeHrcBRYTVnramC7vbdqPMOQa6X66pFS7NuXEQ_wrOE8LAXGNMvGcT4KRgTtnXvbHkY3mWDMvewEviUeG7kkCYbvG-cz7sSuzw8nIGJK5tvIT3C68i6aNzjZDSLnohVr8N9l2IwFzPUkSh-ZtKjUhtlW9KDBIoGKUpnyFSvRSaTBGJ7u5CRb1VbGeWWlfr7HfqWqdyJsvZn3zZUQpS4KPj9h6vH3QHKoryCrXKtJknzPdO4AMYF1OYZgQBcyf1iT3ChQoc-fPVmJPRU8ede-LJjlTtl1Lkhi-cnI_HJEOuacwd3J-7LoFB885EQvFPKKl-p7czDJrfsF-lTssYPhBMHwU5xmhKTYlQOM3IPY7C9Bs2TALAlN3xvSOht4e6klAaRMIFOJb7-3fgMW1K5AN0CMGJPnzPiyxwXP2gx4mfQ9oV-8XBkzPRDOzLABFpGoubELWhzPmQ8HD3az71ZyokMx5VrTRK6TL6400v2jX84AT_nba5tGHD83dPsgLGQ-gjcpwLBlgN_EvNAKpxXxRHEabIvnLMS584MuCj5T538PORmrmnRa9MQdl9QmeTz4MjQrnBaP4J-zyiQCPfSlSRg7TnipMTdEmbHYbraGePOPa9TFAyfuZqDz_pPrlgBwof6yQ8UflcHrx1kz4ZjOgBGh3SoMZ6IfesJsoDnuv8gF9kmLKgsxnhp1YO_I6PD3H-EDa63ZZ-1thfgewZ6rOojbtophNBLjsmauwgq91EvT6afip5eU2yOtHHuOnaWpLyeuf0vQ9RaPQM1Gs8BmJ5hmniTxBicHTuMhNdcYhgGiQjG1WgdAhUi-OflPovzIPiZ3ApUtkUKrKR34IGlkiUaQNX4pBR5pc7NBW6pDzuozL9Q7LFAlutZq2E7Ub1pMkdpAzzNFPtA9Oeo0rAXKC_Prfi6CSj_94628_LSKukn4qOezKuv53G8bc45L0i7WXlYhU8QemWEd98_Qb3-q0YwB7OcjNcLgWYvikX91ClGDHT34y8EWv1AJQJq0pAjAXMgjIoqPlcJTzXOLinHzzE-F5gaa5WklGklYu0roiDyYH1W7ZsrdeIlWWEKRi9teQCS_geNKM-VGFB3HCeGSrZK1JrgKVR8O2-N0cmzFsaq8qdipTnkHEKN_94UAMLE8TTgbiasrKe-lbb9kwS5zynAGmItI62FNFuSiQjs89vRbKIK7qYml5Kb7DLMWYBPTZaHNOA_LOlxE3eYqDRrS5NkIOW0c945-xVuzgNLVtH_aagZfJRekfg0GW-2JzZthQqAkM9Tjq9BzWSTUEKtCzl5U0JmNZdC-2W4a0F7Vg-m6ptoDUOPVrVKatjmDW81AJLYCeYqFaOV7IOm1krfffcPY-h67bAlnPFgjI_DDuSGpRUc1BC8B-zWrqpJl8V2-MHZRHL9ppq1GpvarkFgqbjMw31DrJyndbiB59EYs-GG6mJJhqBZZcY8LS9L2jYBjgdkbidpT1rmUjJPmmEOq49mINNSKF4kXEKoWLJhxIjcUnDWXqLZpZRKlvrXGq1d6YOswv7cQ3sk3vqcLP0piKHIgonmCxWNlJt6f5LHIeYo0yYeAQPOvJfJPhmnlkeg8FA2n5tJvtUoN8sDmUeC2CMvlrg6PQvfF1ezYWcaBUfsS8nw-PXp6VFHZ18r-VHxkJRLQ5RjTvuutxprXMjyzaZJH9bgfvxqlkfpubSBkI1ngM9ydCIyQ\",\"kid\":\"D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps\",\"use\":\"sig\"},{\"kty\":\"OKP\",\"crv\":\"ML-KEM-768\",\"x\":\"6DEfzDJ5AflomZy1zrmcIHJ36pjLartQKeh8WkMB4JtisjRr8BWhcagvFrZgS8o8NqJk0poQ6HJxDfJJgiIICPKKljQTrjcqmNkGn3s97ttE8ldj0djOsEyuh5CeX2qqvRhFZVXEmJAmRLKL-aZG27HJOIyDZvBupAMTeuEuBJgKZ0OGw1RrltJEU8uLKjO0jiwavUbEqBquCBq4rTJ1iEFVvKmaHQN9BDeOHaA9ziHPz9ceTnm6XQQyJwcKE8KeLcNrPJVXnWq7EgwCX0If4HaN0YUQNVOfPbCP5at1yfSnc-aMkJVQcNcHGEvKX0kNzGfF7LJXKbMSkLgce1AbONkZxTiw5EJBIFxPlgxTqiJopderU2acoYJO9VRxHcBMRZYqX1wHkldEtItVJVAtg8yGSRsYDvcgtdIjDexfOkO9d4dbWfnAZUaei5dKkZwsZ7pPGxuke6wZr_MgkIl7aTK_BURpYyZMJKBUsmuXFXFtLJoT0KSKtkl5EvyIecujCNEwMWdwyPUtqxmG8msPfVa4rkpQiCOeIqtjF7yoxKk86tRIADddJfl69_dPkUBoH2oWZquKiWmFSfBt5pltNMCxwEaYKUAXpjY0pVbJ_DE6cazKDiXIthgDwFRk8cey_oGfAGB5QjuQB4AypxWmbCNCJHYmxXS07ZqwOhbJtegOJWJVz2XEI3tlLlEXXsu3M8GpxnAW2Fx6KazE_4qkbDo1MCUUGyyjKNpTmonOQ8sbK1x8DfBwbZI1GHseDEY1B0aEtaKVIHk_GJlnJ0tYTLNmc-gqhvC-6_ObW1ZlePosBoRiKKNUtsKMWAU19aRBlDEteWinlEyYndtkO7KObQekdFGeMgCoXvAOnBJ0eMsKJrmnvhdm3HaqGKtrz_FidotB41KUz9BmGlIaX_wLTOJjr4VVHJJAeqAZIYuh9hUN07O6H1E30beAHYhIQ2i4ezUFcTdC4cWvFSuZs4ik0yuNKaw8utnEdDx3vBc6ZEZ0xAKis9sqpxY992sVoeV4_cYRZLlEyvp3OdSLwZIU4yRYP5QCJ0VX2YaC8LzEVZcUF7kZ6Pt5cSakrzyItji62HEbVdKLB7UtPWpDTFOU6DVY1aeb56QWWgvCgTMwgPKJo4BlYxNpAGS3OKtY70JDLIusqSx67_hn5xi3aEJSVzaqPlR4kbsWIvYP3OUqAUKIARxCCLjBYrc31gZap5WkwyPOx9gH8PcLbzoIqDG1bzO6mntC8WemT5MbV5aY55SG4UJOgxSSjjqo2KoojQY9jHQBgYEOb9Rnqmq1Q5O1EpZ_cUdDg1KdX0kBi3BtT6EDoqmcu3YnMhIxgbwRAyetb3GHZ_iYl4s0sLxZ0meQwZVfaaEeQBJSnpQak-ijAKFlsfqq-utI44cqBdK_hTcHaMWcyKoktVEJ01YRuagwHWRpmRyc3IOsS5VRl2moyoIsILkdzVYl9Pdgj5xPmCEq_ESGZBAkgihT-_s11EO-kxOVTeC3FcQ60dJK--ZnOJGRf6G1Bzey6pOq5ymGTreMQuaQB2AhbXZuaxhhb73obYx0XxPGqvKbJuD18JpWIN0\",\"kid\":\"r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0\",\"use\":\"enc\"}]}",
         "bodyJson": {
           "keys": [
             {
               "kty": "AKP",
               "alg": "ML-DSA-44",
-              "pub": "5JbWIq1nSEXOR_ujv5QOQwoU8bqP6nqDQd1TZFBULEOjhVBGjhN8QjsOTK_xe82qrTX5W-y-J9wQllSElWFGs8ZgL0x-ZlRhfxdReOdHOVv2S2PRG4ieliyavD9tT63KJBbjzDXT0mk-9MUcVdK2bQSgBxfEsuKEVm_D24Aa3nRdONuHg659IMpDvK_V6uij7IPbyMgBDF_jT1nhpTUv8MUUu5BJSVpKApvvBax-DgvzdrSgZKZB8j6bke_zDsANKuv-OPqqMW5hbNTa7OH9DXgvKhH7Dbuiqf79gxRGcb-bCBhJ-5Ajknz2vw9-Ul8G5zReWn5dMJlu6eYM7apgLyzb_FFP5ccWHytYJgKL1G21HzFZMl6pefZSKGbeE0MNRo9bW065sqU8XMyBinDYqVWYZLbN5q-6OmscceSpkUyug7_BKAIdIdM3i2qJF1IIL7pIRDcoONyEpJsTLYc8ba_9ei-gv5B-kj9wv86-r95mvt_VAY4ipRoBhcmP8CpTRGXES88wCBlbBw9vMnhw-Q9tZCACr4LvGHslVsOWSWdcWWIKujitvIRymhML10GOY8jH7jpspPJVAhA3dpw7Qh1l2xCN2EjJSDnJ9Czhdgg0-3gT9KYe83Fv1FtX3XDOzmJTf8UEKpAZ-kdiJ2Gi3J7EZiFrh1XNQsJakLblfMJ-W30zoilTciMr9zzdrRD2WLFyxVuYFEsCqc1kZwVBelFnm9ZMfAxIa9iUYAzwjDo1eyl1WNBSV-F7jgyOtXf5jmTEG5LJly8fpNV1xt7RbVf7LEXokTaqksNLsElNChrKMtbu1FYzVQqSloMUpAQu41wq-Z-nSPpmm2zaP508viBgestDpgYttyRo6kx2p-txnAmCXIrvEEbaQ0xIYL_WvyJKKV3LcCLl8Pj7X8UXM6iWad9mOrelM-6WpfFTqJGTi-jDzxsv6JjHiUOB3uXcNCTesL8AfyrSOTaxGxrn3SUrpMF7TBKsT741azMLntJ7BnNiaSLLNKq_V0zJIAQdYvM1JYilR64PiKA3jk0XsD_ATubodvdJrELyMPMCD6rU-MEZeChF3daVpH3V8KRPgtDKRGQzr1JPogL_0GDFs131fBZO_sht77l6VXqAtTLtRsFAiAQdko-Gr0XwtenJAhW526IAtieS6KXd924u0qs6YETGQ_7uFpJUl0pc1nHF0tGALpbkhMcqZ88Wei_6T6ckLhfBM3okseYVAv9mV2R7j0zDhNzMlIA_aRETyK-hC4ALkZQ288OLSpUPWJLopqSULzp2NHEBTTrIRkaz6w6r9RKCIubJEtGwg_8Ta1U7hGlAynuVy9qxDEFYrSKQXgPk3jRyJM7aBF66fissGsNh9J1p7wSE-QDpGgq9sAVBcGCFLLXaa3uHz6spm_aklDjMcRjlSfRXkYmkvoooGA7H0GBDTVYky8QC86ghjBgCrArAcomiexVC-21AC_KrcEfoHxGvYQpRcw7pmHz5eiyLCHLoEZ6UdmI8u01lUkOPevkQ9aUfTW0H4mlB7usv9OcAZ75a50C6besGbUqNcgbLbQi_KYuIric2w4NEEJkEPp76MCeusyzo1ykWoLyei3KgPwIg1k1qKKXpfY7BnIxBwHSlo4aH0nUNdpMk3Qh_AU4bahPfjXSbIVyXrIx-TkNCsK-AktuVQC4R4PjbxkBElJEBhTE_L3zh1-n9mpd7W8pg8PbJLJRL7NnUglAdFjeOrNnXdWkapC6KrOe9vQ",
-              "kid": "Eewj6PU_i8e639a1NbdaqzvyvwihFVzWl9xEiD58yvU",
+              "pub": "-QCkuwr1--mlqqPrSWx-OT4LOVQwiy0ZZHBeHrcBRYTVnramC7vbdqPMOQa6X66pFS7NuXEQ_wrOE8LAXGNMvGcT4KRgTtnXvbHkY3mWDMvewEviUeG7kkCYbvG-cz7sSuzw8nIGJK5tvIT3C68i6aNzjZDSLnohVr8N9l2IwFzPUkSh-ZtKjUhtlW9KDBIoGKUpnyFSvRSaTBGJ7u5CRb1VbGeWWlfr7HfqWqdyJsvZn3zZUQpS4KPj9h6vH3QHKoryCrXKtJknzPdO4AMYF1OYZgQBcyf1iT3ChQoc-fPVmJPRU8ede-LJjlTtl1Lkhi-cnI_HJEOuacwd3J-7LoFB885EQvFPKKl-p7czDJrfsF-lTssYPhBMHwU5xmhKTYlQOM3IPY7C9Bs2TALAlN3xvSOht4e6klAaRMIFOJb7-3fgMW1K5AN0CMGJPnzPiyxwXP2gx4mfQ9oV-8XBkzPRDOzLABFpGoubELWhzPmQ8HD3az71ZyokMx5VrTRK6TL6400v2jX84AT_nba5tGHD83dPsgLGQ-gjcpwLBlgN_EvNAKpxXxRHEabIvnLMS584MuCj5T538PORmrmnRa9MQdl9QmeTz4MjQrnBaP4J-zyiQCPfSlSRg7TnipMTdEmbHYbraGePOPa9TFAyfuZqDz_pPrlgBwof6yQ8UflcHrx1kz4ZjOgBGh3SoMZ6IfesJsoDnuv8gF9kmLKgsxnhp1YO_I6PD3H-EDa63ZZ-1thfgewZ6rOojbtophNBLjsmauwgq91EvT6afip5eU2yOtHHuOnaWpLyeuf0vQ9RaPQM1Gs8BmJ5hmniTxBicHTuMhNdcYhgGiQjG1WgdAhUi-OflPovzIPiZ3ApUtkUKrKR34IGlkiUaQNX4pBR5pc7NBW6pDzuozL9Q7LFAlutZq2E7Ub1pMkdpAzzNFPtA9Oeo0rAXKC_Prfi6CSj_94628_LSKukn4qOezKuv53G8bc45L0i7WXlYhU8QemWEd98_Qb3-q0YwB7OcjNcLgWYvikX91ClGDHT34y8EWv1AJQJq0pAjAXMgjIoqPlcJTzXOLinHzzE-F5gaa5WklGklYu0roiDyYH1W7ZsrdeIlWWEKRi9teQCS_geNKM-VGFB3HCeGSrZK1JrgKVR8O2-N0cmzFsaq8qdipTnkHEKN_94UAMLE8TTgbiasrKe-lbb9kwS5zynAGmItI62FNFuSiQjs89vRbKIK7qYml5Kb7DLMWYBPTZaHNOA_LOlxE3eYqDRrS5NkIOW0c945-xVuzgNLVtH_aagZfJRekfg0GW-2JzZthQqAkM9Tjq9BzWSTUEKtCzl5U0JmNZdC-2W4a0F7Vg-m6ptoDUOPVrVKatjmDW81AJLYCeYqFaOV7IOm1krfffcPY-h67bAlnPFgjI_DDuSGpRUc1BC8B-zWrqpJl8V2-MHZRHL9ppq1GpvarkFgqbjMw31DrJyndbiB59EYs-GG6mJJhqBZZcY8LS9L2jYBjgdkbidpT1rmUjJPmmEOq49mINNSKF4kXEKoWLJhxIjcUnDWXqLZpZRKlvrXGq1d6YOswv7cQ3sk3vqcLP0piKHIgonmCxWNlJt6f5LHIeYo0yYeAQPOvJfJPhmnlkeg8FA2n5tJvtUoN8sDmUeC2CMvlrg6PQvfF1ezYWcaBUfsS8nw-PXp6VFHZ18r-VHxkJRLQ5RjTvuutxprXMjyzaZJH9bgfvxqlkfpubSBkI1ngM9ydCIyQ",
+              "kid": "D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps",
               "use": "sig"
             },
             {
               "kty": "OKP",
               "crv": "ML-KEM-768",
-              "x": "QhO1lFJAfzpKbhOynvtWMjI1hzeUmFkCZCcJKvGXPyoI0EmEqqY13alrR_eEDhrAc6Fa7FST1UIeA6txqxWtoZBScXucbHhuxqcYdVOtv1C5KkzIWigN-9MOnfRHtWSu-rI5zOM607sPaVFs3FWBMbqCrDKncCJdiiwVVjwwgYFDpRa-ONcle3A1b7qWbAO5ZdAwWTYDavqrN7qL_xOdlPqmiBkHg6s_etaC52O-f8t7TUbB8vCmZPlp_ctemtpb7ztWv8lPODVADVBv35ElNFO-wsaCWjM133N5Mru_mbOMKMNOvdOgSYbBqPm4YykhKKuaaXQEtGCsfJWrQogZsOYxDTtk_2imhbFE1WtfFneJ41t080I_GoEAPlYwfbw2KsmNCuyCZ_Kyl3ACHKNVOnZzc4trG7y7sEzBWlUr39jHF1hUU9wQqnKQhaqzlCvH7cKnmJlf2VSGytI97sWrcnGAj_IVwxYoQkYLF7e9rZEwE9NQVZKtHPSvuoWzFFAQf-EQoXMGfhXDlRRGhDVD6NYzB9iIjCIFnvmpb_KuV3gfsiq2ODaOYJmGlCysBgKyZKIenplrOLdjqhPDfiCU2SatjEmHcyC09lfLUakkdXfGgVWq7owUtMoOVNjLwOenttas7pqsdINTEORSzLSOIEl7_iWPWxKmmZa_kvu2lsxwNeTHW6lQS2tqJXqdyCfK6qTO9tbBzfsq2di9tYGEIeyCgvMadUgcb4aWJ0wxS1Y1h1iqUtF0HoGDv4HCpeQu7ECIJXk00Pk8enaTaoBIiyyTY8k74FA4Unt3zoqksYkMsUcenUEud4KeEAhX5cjFINqnkrM_1mGONYMW9jHGgOgOJ5eKMpK_HDhXmGoldvOScNt4Cqta7cOVrqqWQBQ87uBbBfHGbQyRvKkxLjVhm6Nit8VIh8fHYBZcghcvh0USeBETO4qAAPArN7kCcJWafxl0qYM-dQZ6ivixZpueLAipmaupz3BjP0K7sYW1GRaF-QRtHLJGsIJdRnRqQDV8sqHECgoLS0GuZjxXM8SjrXqQblikyjrMelEK2AIuVVQ-bJEh9aVBBqMc3Fid_5dYpVNfCgFl4luvyfSkIkyiB5JnxvijlaZJNbJsJWNSNnMeQmx3l1haTVBAh8mMyFKDLJhVtdlM-yXESnAULTpt4nkhdLEaNnJq_hMDzvAlskWo8Iu6x2NTldzDbHrHlzJszXhcshDCE7af3UQ8aaWzBAFPdvMAOko927RYZqMhsQA6IRa9z7nKQ9qji0VdjyJ57iqDN_uFwMPNOazNTEh3sthK6aus5wm3lIW0UVdisCuitbR2o1en1zAzITdV2XBdolxfQmYi-tdKvlRul8Yd3zi5FRyp8Zkboalz7vGDLMydrkTOVhkHzBYctABR_jtxDzZSD8gzJMiWkJE052OU6_Fvivx13dS_x1EohHmdobyRUciKH6GhqKJrFTqDlFYhQqKxnFg85DKboBVnMXp5KytXz8HD4eyossIm0oy94RcGtrGJ14w8PegwsxdqLYY53SRpnIxV6EHT1cmt41mF1-ZLrSu9X-KjwEwii8G1A4c",
-              "kid": "prbcvAlzB-i1LGD4tk89arqRWAq60nWZ5kRITOQU3q4",
+              "x": "6DEfzDJ5AflomZy1zrmcIHJ36pjLartQKeh8WkMB4JtisjRr8BWhcagvFrZgS8o8NqJk0poQ6HJxDfJJgiIICPKKljQTrjcqmNkGn3s97ttE8ldj0djOsEyuh5CeX2qqvRhFZVXEmJAmRLKL-aZG27HJOIyDZvBupAMTeuEuBJgKZ0OGw1RrltJEU8uLKjO0jiwavUbEqBquCBq4rTJ1iEFVvKmaHQN9BDeOHaA9ziHPz9ceTnm6XQQyJwcKE8KeLcNrPJVXnWq7EgwCX0If4HaN0YUQNVOfPbCP5at1yfSnc-aMkJVQcNcHGEvKX0kNzGfF7LJXKbMSkLgce1AbONkZxTiw5EJBIFxPlgxTqiJopderU2acoYJO9VRxHcBMRZYqX1wHkldEtItVJVAtg8yGSRsYDvcgtdIjDexfOkO9d4dbWfnAZUaei5dKkZwsZ7pPGxuke6wZr_MgkIl7aTK_BURpYyZMJKBUsmuXFXFtLJoT0KSKtkl5EvyIecujCNEwMWdwyPUtqxmG8msPfVa4rkpQiCOeIqtjF7yoxKk86tRIADddJfl69_dPkUBoH2oWZquKiWmFSfBt5pltNMCxwEaYKUAXpjY0pVbJ_DE6cazKDiXIthgDwFRk8cey_oGfAGB5QjuQB4AypxWmbCNCJHYmxXS07ZqwOhbJtegOJWJVz2XEI3tlLlEXXsu3M8GpxnAW2Fx6KazE_4qkbDo1MCUUGyyjKNpTmonOQ8sbK1x8DfBwbZI1GHseDEY1B0aEtaKVIHk_GJlnJ0tYTLNmc-gqhvC-6_ObW1ZlePosBoRiKKNUtsKMWAU19aRBlDEteWinlEyYndtkO7KObQekdFGeMgCoXvAOnBJ0eMsKJrmnvhdm3HaqGKtrz_FidotB41KUz9BmGlIaX_wLTOJjr4VVHJJAeqAZIYuh9hUN07O6H1E30beAHYhIQ2i4ezUFcTdC4cWvFSuZs4ik0yuNKaw8utnEdDx3vBc6ZEZ0xAKis9sqpxY992sVoeV4_cYRZLlEyvp3OdSLwZIU4yRYP5QCJ0VX2YaC8LzEVZcUF7kZ6Pt5cSakrzyItji62HEbVdKLB7UtPWpDTFOU6DVY1aeb56QWWgvCgTMwgPKJo4BlYxNpAGS3OKtY70JDLIusqSx67_hn5xi3aEJSVzaqPlR4kbsWIvYP3OUqAUKIARxCCLjBYrc31gZap5WkwyPOx9gH8PcLbzoIqDG1bzO6mntC8WemT5MbV5aY55SG4UJOgxSSjjqo2KoojQY9jHQBgYEOb9Rnqmq1Q5O1EpZ_cUdDg1KdX0kBi3BtT6EDoqmcu3YnMhIxgbwRAyetb3GHZ_iYl4s0sLxZ0meQwZVfaaEeQBJSnpQak-ijAKFlsfqq-utI44cqBdK_hTcHaMWcyKoktVEJ01YRuagwHWRpmRyc3IOsS5VRl2moyoIsILkdzVYl9Pdgj5xPmCEq_ESGZBAkgihT-_s11EO-kxOVTeC3FcQ60dJK--ZnOJGRf6G1Bzey6pOq5ymGTreMQuaQB2AhbXZuaxhhb73obYx0XxPGqvKbJuD18JpWIN0",
+              "kid": "r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0",
               "use": "enc"
             }
           ]
@@ -227,25 +227,29 @@
           "meta": {
             "jwe": {
               "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
                 "jwk": {
                   "crv": "ML-KEM-768",
-                  "kid": "thumbprint-public-enc-key-device",
                   "kty": "OKP",
-                  "use": "enc",
                   "x": "base64url-public-enc-key-device"
                 }
               }
             },
             "jws": {
               "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device",
                 "jwk": {
                   "alg": "ML-DSA-44",
-                  "kid": "thumbprint-public-sig-key-device",
                   "kty": "AKP",
-                  "pub": "base64url-public-sig-key-device",
-                  "use": "sig"
+                  "pub": "base64url-public-sig-key-device"
                 }
               }
             }
@@ -276,7 +280,7 @@
             "access-control-expose-headers": "Location, Retry-After",
             "content-type": "application/json"
           },
-          "bodyText": "{\"data\":[{\"type\":\"Organization-registration-offer-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"Service\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.alternateName\":\"acme\",\"org.schema.Organization.identifier.additionalType\":\"TAX\",\"org.schema.Organization.identifier.value\":\"A123456789\",\"org.schema.Organization.legalName\":\"Acme Organization SL\",\"org.schema.Organization.name\":\"Acme Org\",\"org.schema.Organization.numberOfEmployees.value\":2,\"org.schema.Organization.url\":\"api.acme.org\",\"org.schema.Person.email\":\"admin1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|1120\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Organization.identifier\":\"urn:antifraud:test-network:es:v1:health-care:entity:tax:A123456789\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"employee\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:a8192c20-98b4-4204-9b1f-4ff178f2129c\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-cb766616,lic-33018f05\"}},\"resource\":{\"resourceType\":\"Organization\",\"id\":\"6a403a23-40a1-4fee-876a-e27d1dc7bd16\"},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyText": "{\"data\":[{\"type\":\"Organization-registration-offer-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"Service\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.alternateName\":\"acme\",\"org.schema.Organization.identifier.additionalType\":\"TAX\",\"org.schema.Organization.identifier.value\":\"A123456789\",\"org.schema.Organization.legalName\":\"Acme Organization SL\",\"org.schema.Organization.name\":\"Acme Org\",\"org.schema.Organization.numberOfEmployees.value\":2,\"org.schema.Organization.url\":\"api.acme.org\",\"org.schema.Person.email\":\"admin1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|1120\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Organization.identifier\":\"urn:antifraud:test-network:es:v1:health-care:entity:tax:A123456789\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"employee\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:781e40be-69c4-499e-9730-d4a967366ebd\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-d2dc9125,lic-4a088a5f\"}},\"resource\":{\"resourceType\":\"Organization\",\"id\":\"0b2d547a-4516-4ab3-b9a9-38f940519f7a\"},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
           "bodyJson": {
             "data": [
               {
@@ -312,7 +316,7 @@
                     "org.schema.Offer.offeredBy": "did:web:localhost%3A3000",
                     "org.schema.Offer.price": "0.00",
                     "org.schema.Offer.priceCurrency": "EUR",
-                    "org.schema.Offer.serialNumber": "lic-cb766616,lic-33018f05"
+                    "org.schema.Offer.serialNumber": "lic-d2dc9125,lic-4a088a5f"
                   }
                 },
                 "resource": {
@@ -365,11 +369,18 @@
           "meta": {
             "jwe": {
               "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
                 "skid": "thumbprint-public-enc-key-device"
               }
             },
             "jws": {
               "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -468,11 +479,18 @@
           "meta": {
             "jwe": {
               "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
                 "skid": "thumbprint-public-enc-key-device"
               }
             },
             "jws": {
               "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -504,7 +522,7 @@
             "access-control-expose-headers": "Location, Retry-After",
             "content-type": "application/json"
           },
-          "bodyText": "{\"data\":[{\"type\":\"Organization\",\"resource\":{\"id\":\"99cf6092-87b3-409f-8f6f-2e5eb42076b6\",\"type\":\"Organization\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"Service\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.alternateName\":\"acme\",\"org.schema.Organization.identifier.additionalType\":\"TAX\",\"org.schema.Organization.identifier.value\":\"A123456789\",\"org.schema.Organization.legalName\":\"Acme Organization SL\",\"org.schema.Organization.name\":\"Acme Org\",\"org.schema.Organization.numberOfEmployees.value\":2,\"org.schema.Organization.url\":\"api.acme.org\",\"org.schema.Person.email\":\"admin1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|1120\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Organization.identifier\":\"urn:antifraud:test-network:es:v1:health-care:entity:tax:A123456789\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"employee\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:a8192c20-98b4-4204-9b1f-4ff178f2129c\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-cb766616,lic-33018f05\"}},\"resourceType\":\"Organization\",\"contained\":[{\"id\":\"81666d63-5743-4b11-a040-c8f5a834fccf\",\"type\":\"Person\",\"meta\":{\"claims\":{\"@type\":\"Person\",\"org.schema.Person.email\":\"admin1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|1120\"}}},{\"id\":\"2212fd89-dfac-42a4-9f2b-a22a04c39a89\",\"type\":\"Service\",\"meta\":{\"claims\":{\"@type\":\"Service\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\"}}}]},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyText": "{\"data\":[{\"type\":\"Organization\",\"resource\":{\"id\":\"b0fbdee7-3dff-4b01-b282-07397acde909\",\"type\":\"Organization\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"Service\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.alternateName\":\"acme\",\"org.schema.Organization.identifier.additionalType\":\"TAX\",\"org.schema.Organization.identifier.value\":\"A123456789\",\"org.schema.Organization.legalName\":\"Acme Organization SL\",\"org.schema.Organization.name\":\"Acme Org\",\"org.schema.Organization.numberOfEmployees.value\":2,\"org.schema.Organization.url\":\"api.acme.org\",\"org.schema.Person.email\":\"admin1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|1120\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Organization.identifier\":\"urn:antifraud:test-network:es:v1:health-care:entity:tax:A123456789\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"employee\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:781e40be-69c4-499e-9730-d4a967366ebd\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-d2dc9125,lic-4a088a5f\",\"org.schema.IndividualProduct.serialNumber\":\"lic-SwWwr92EHwD1\",\"org.schema.IndividualProduct.category\":\"professional\"}},\"resourceType\":\"Organization\",\"contained\":[{\"id\":\"d8b273ea-64d7-4db6-8bd5-4af6bfb1530a\",\"type\":\"Person\",\"meta\":{\"claims\":{\"@type\":\"Person\",\"org.schema.Person.email\":\"admin1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|1120\"}}},{\"id\":\"96ef6b00-fb73-4b8f-8aaa-617f8b45b097\",\"type\":\"Service\",\"meta\":{\"claims\":{\"@type\":\"Service\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\"}}}]},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
           "bodyJson": {
             "data": [
               {
@@ -543,7 +561,9 @@
                       "org.schema.Offer.offeredBy": "did:web:localhost%3A3000",
                       "org.schema.Offer.price": "0.00",
                       "org.schema.Offer.priceCurrency": "EUR",
-                      "org.schema.Offer.serialNumber": "lic-cb766616,lic-33018f05"
+                      "org.schema.Offer.serialNumber": "lic-d2dc9125,lic-4a088a5f",
+                      "org.schema.IndividualProduct.serialNumber": "lic-SwWwr92EHwD1",
+                      "org.schema.IndividualProduct.category": "professional"
                     }
                   },
                   "resourceType": "Organization",
@@ -611,7 +631,7 @@
         }
       },
       "submit": {
-        "status": 200,
+        "status": 401,
         "headers": {
           "x-powered-by": "Express",
           "access-control-allow-origin": "http://localhost:8081",
@@ -619,23 +639,21 @@
           "access-control-expose-headers": "Location, Retry-After",
           "content-type": "application/json"
         },
-        "bodyText": "{\"jti\":\"c376b6b2-dc77-42cd-ae56-17e9b3e174f8\",\"thid\":\"firebase-custom-token-thread-id\",\"iss\":\"did:web:localhost\",\"aud\":\"urn:ietf:rfc:7638:thumbprint-public-sig-key-device\",\"type\":\"application/json\",\"body\":{\"firebase_custom_token\":\"test-firebase-custom-token:eidas:test-subject\",\"provider\":\"eidas\",\"subject\":\"eidas:test-subject\"}}",
+        "bodyText": "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"security\",\"diagnostics\":\"Missing or invalid Bearer token.\"}]}",
         "bodyJson": {
-          "jti": "<jti>",
-          "thid": "firebase-custom-token-thread-id",
-          "iss": "did:web:localhost",
-          "aud": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
-          "type": "application/json",
-          "body": {
-            "firebase_custom_token": "test-firebase-custom-token:eidas:test-subject",
-            "provider": "eidas",
-            "subject": "eidas:test-subject"
-          }
+          "resourceType": "OperationOutcome",
+          "issue": [
+            {
+              "severity": "error",
+              "code": "security",
+              "diagnostics": "Missing or invalid Bearer token."
+            }
+          ]
         }
       }
     },
     {
-      "name": "2.1.2 Initial Access Token Exchange (missing code)",
+      "name": "2.1.2 Initial Access Token Exchange (invalid code)",
       "request": {
         "method": "POST",
         "url": "/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange",
@@ -645,7 +663,7 @@
         },
         "body": {
           "jti": "<jti>",
-          "thid": "token-exchange-thread-id",
+          "thid": "token-exchange-thread-id-invalid",
           "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
           "aud": "did:web:api.acme.org#identity_openid_token_exchange",
           "exp": "<time>",
@@ -658,24 +676,160 @@
         }
       },
       "submit": {
-        "status": 404,
+        "status": 202,
         "headers": {
           "x-powered-by": "Express",
           "access-control-allow-origin": "http://localhost:8081",
           "vary": "Origin",
           "access-control-expose-headers": "Location, Retry-After",
-          "content-type": "application/json"
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange-response",
+          "retry-after": "5"
         },
-        "bodyText": "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"not-found\",\"diagnostics\":\"Activation code not found or invalid.\"}]}",
-        "bodyJson": {
-          "resourceType": "OperationOutcome",
-          "issue": [
-            {
-              "severity": "error",
-              "code": "not-found",
-              "diagnostics": "Activation code not found or invalid."
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange-response",
+        "tries": 1,
+        "final": {
+          "status": 500,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"thid\":\"token-exchange-thread-id-invalid\",\"iss\":\"did:web:localhost%3A3000\",\"aud\":\"urn:ietf:rfc:7638:thumbprint-public-sig-key-device\",\"exp\":1768104177,\"body\":{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"unknown-error-v1.0\",\"response\":{\"status\":\"500\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"exception\",\"diagnostics\":\"Activation code not found or invalid.\"}]}}}]}}",
+          "bodyJson": {
+            "thid": "token-exchange-thread-id-invalid",
+            "iss": "did:web:localhost%3A3000",
+            "aud": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+            "exp": "<time>",
+            "body": {
+              "resourceType": "Bundle",
+              "type": "batch-response",
+              "data": [
+                {
+                  "type": "unknown-error-v1.0",
+                  "response": {
+                    "status": "500",
+                    "outcome": {
+                      "resourceType": "OperationOutcome",
+                      "issue": [
+                        {
+                          "severity": "error",
+                          "code": "exception",
+                          "diagnostics": "Activation code not found or invalid."
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
             }
-          ]
+          }
+        }
+      }
+    },
+    {
+      "name": "2.1.1 License Issue (invite)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/License/_issue",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "license-issue-thread-id",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org#identity_openid_license_issue",
+          "type": "application/api+json",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "data": [
+              {
+                "type": "EmployeeLicenseInvitation-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "IndividualProduct:Issue",
+                    "org.schema.Person.email": "doctor1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|2211",
+                    "org.schema.IndividualProduct.category": "professional",
+                    "org.schema.IndividualProduct.additionalType": "mobile"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "/acme/cds-ES/v1/health-care/identity/openid/License/_issue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/License/_issue-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/License/_issue-response",
+        "tries": 1,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"License:Issued\",\"response\":{\"status\":\"201\"},\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"IndividualProduct:Issue\",\"org.schema.Person.email\":\"doctor1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|2211\",\"org.schema.IndividualProduct.category\":\"professional\",\"org.schema.IndividualProduct.additionalType\":\"mobile\",\"org.schema.IndividualProduct.serialNumber\":\"lic-vx47ezi2Rf6k\"}},\"resource\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"information\",\"code\":\"informational\",\"diagnostics\":\"License activation code issued.\"}]},\"id\":\"lic-vx47ezi2Rf6k\"}]}",
+          "bodyJson": {
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "data": [
+              {
+                "type": "License:Issued",
+                "response": {
+                  "status": "201"
+                },
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "IndividualProduct:Issue",
+                    "org.schema.Person.email": "doctor1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|2211",
+                    "org.schema.IndividualProduct.category": "professional",
+                    "org.schema.IndividualProduct.additionalType": "mobile",
+                    "org.schema.IndividualProduct.serialNumber": "lic-vx47ezi2Rf6k"
+                  }
+                },
+                "resource": {
+                  "resourceType": "OperationOutcome",
+                  "issue": [
+                    {
+                      "severity": "information",
+                      "code": "informational",
+                      "diagnostics": "License activation code issued."
+                    }
+                  ]
+                },
+                "id": "lic-vx47ezi2Rf6k"
+              }
+            ]
+          }
         }
       }
     },
@@ -690,7 +844,7 @@
         },
         "body": {
           "jti": "<jti>",
-          "thid": "token-exchange-thread-id",
+          "thid": "token-exchange-thread-id-valid",
           "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
           "aud": "did:web:api.acme.org#identity_openid_token_exchange",
           "exp": "<time>",
@@ -698,27 +852,36 @@
           "nbf": "<time>",
           "type": "application/json",
           "body": {
-            "subject_token": "activation-code-demo-1"
+            "subject_token": "lic-vx47ezi2Rf6k"
           }
         }
       },
       "submit": {
-        "status": 200,
+        "status": 202,
         "headers": {
           "x-powered-by": "Express",
           "access-control-allow-origin": "http://localhost:8081",
           "vary": "Origin",
           "access-control-expose-headers": "Location, Retry-After",
-          "content-type": "application/json"
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange-response",
+          "retry-after": "5"
         },
-        "bodyText": "{\"jti\":\"c314d521-51d4-4408-90ad-7da951f0bb08\",\"thid\":\"token-exchange-thread-id\",\"iss\":\"did:web:localhost\",\"aud\":\"urn:ietf:rfc:7638:thumbprint-public-sig-key-device\",\"type\":\"application/json\",\"body\":{\"initial_access_token\":\"eyJhbGciOiJNTC1EU0EtNDQiLCJraWQiOiJFZXdqNlBVX2k4ZTYzOWExTmJkYXF6dnl2d2loRlZ6V2w5eEVpRDU4eXZVIn0.eyJzdWIiOiJ1c2VyMUBleGFtcGxlLmNvbSIsImp0aSI6IjkzNDU3YzM5LWFjNDItNGJhNi1iZTE0LTg4ZjAwYzJkZjU5MyIsImFjdF9jb2RlIjoiYWN0aXZhdGlvbi1jb2RlLWRlbW8tMSIsInRlbmFudF9pZCI6ImFjbWUiLCJzY29wZSI6ImRjcjpyZWdpc3RlciIsImlzcyI6ImRpZDp3ZWI6bG9jYWxob3N0JTNBMzAwMCIsImF1ZCI6InVybjpnYXRld2F5OmRjciIsImV4cCI6MTc2NjUxNDkzNSwibmJmIjoxNzY2NTE0ODc1fQ.UPFfFGGXGnDc0RIf4_dFv2I3HLR0koS4jXUEFYZkaA1dkH0Vcjx5DwXaCkP6ruYrzVBEF68S51_FotBPCCOwaVVBHcLtGlpYaBn0O4iUvDqpg6aLd9eEHwf56cLRMwNQ0RLeczieVndR18f8ERxMxQr68DCcxqfLmD6r6jOB37lRZgIuht6XGGB5mJFTWMVlRdZ77Qj2oiZGRK68fgYCd87lgaJl53_lRPsD-tPoFU_AApje-DVuZla6zqQV1CpMC5Dxv9xoiPyLfVRj8H04AjDJ5Hm5VCsyfHAe3nfApUie3ILLNI0m792DaF_dNiO4B9a4Jf2i8ZEqLl6pYrLG0kiXOpzWN0NWJilw8-781W8Lk6MyGMrvi7xntZ5RcZ4e4Q7INNo5nM3kRtpezvXYSQ5-kvGUqNVmuW34Jb7HhYUmxnnCbdJOFRvgFVsm0s2nt_WoPS4MdMF3lZAC9xAvNebpnz997Fqfw32Iu-vX8VVniyvelK8xf-GhyR97syADjl0GrpX6tImos2GEPOI6QnbQm-tr7hd5iHFZMhqS2rVWW06bddcPddOUtr7p8OQzx3ugp6pibbOujdVlwakkmQKQwBN8uNa7DGty8FHHN2_Glhppa9sLJUqigCwSoiEvHoYwDSqd6oxvoEtMrwxNXnMpGnCUd9zq5qmPa28_y1Rvc0iUT3ZFrChPXcDrbfL-ZUnAA9yYiWTklzbsBHaga8ZkNGeASjXoQpRalLFUapB1v2mv0v2B1pMVHFpEwPa7BTCgL7EqNl-4ECo6dBYWjmcSnTRRzdo20K-dOAHeE7Mp4T9Icju1jGhagJ6LcLgeTLcLiPeP3fAnHlNTaQelg9Cplrc9SYxrJDePHm7T_OSeB88-7SmDWSJrq_VamR3HsSehgvTqnc2DteHV5kvuGZPsZtDYCpaFlpLFPzfiHXSaBweKsekcM2WkAUPSraSMhH57s9s_OsY_esOnSCKtm2xMpxU6Ee0xhhaEIwuVhVbSE7_N1W_0r-BoGTklV-jTFIbnvFGdIMT8Lt8lLyJqa-aO4Qwyq9bVy7dEVIZ8KQXmfjws6RzpZGKeWa7CSu6z1Irv345YXW9rpQ2V1hTEIBU2oO3oF8m3gjx9CPze2VSA3b86RJPPJqfrxZM2mCLSe3F3QieYp3DrYGgwUIEPowKjKeIOAp5cA82uLGXIAG32PQX8LMYuIDt7TcjW3PlrDqJQbvELtMZxraiTGOoJSchdmWaqw50XNsZfvvMBDiltlVlSJ7-8fbyU_mzqDsdDSC9bW5SfPKwGomME_o2NbAlCYlaWfRlogFRUJVTkLQIg6ti0CYb3XXCY08ccS-i3AkkzNOAmRYhgz_ViSZS4pne-uNx4HlY-cEXicL34d5QpmcAi67D-5fstaKR_MABNfbVZnX1YlDRQFXMGQ50ihDx17RbKcBonB5luEr6NvCzE4KJFifXgmAU444cyPDwrYSP4dlOZEUFSjTl43G5peTh9rsN-P5_Ac_abp-P9HBN2x_vybXmhvLfXr9XlPA4jqEpvU10JEBPCJQph-g7iU3uaMFz63q-QRqtm0ezeWi2SgZNDJIBCqsz4LG55dQIz0xwhs3cTLvA8whdzin6wWejSL-VT_eHWrk-bzpzfaRK_tG-fb9AUH2-pDBaUigEOjd3pb_ZYwObhRy9gBGuNC_1o_sB-ObUCe7A3gpiwU3dsYwmln11UNp9JFSs-kplEygGB4Dp7b1mxB_NLPY9Qf2mjHlaiuMEuaiHNLRyXtW-QTP35K1FrAU4iAqqNHN3jvK2nF0MrARtwPbczpvYNewf0dG8Vnmo6b6reHSEEeJt8RFqXimWaPYpQkHqJzVWcsiYOR5qEtmFRaFHeS_MoHczRgToh1s4z5CzvIqvbh8fCKiSRDlDbfWUdlqvXj-oWUrfmAULy9HdaY3XDYS7XIrY1xTwAV5tl6mM0DY99ILbhgHrIEpioLuRwx2T-Cn7k6CCIjo36Q8QE9QsiBVy8Mt-LU9PFJRasQbjjRZh2cYl47vWMI64Q2cWg0W3g3HC1t1kpywFOzH72zBqRyH-sIj23K-1lX6o9B5RoKpJSPZ3sjDt28e2mf54590acLMT8MB35jFiZDBJwM0LbR_lCKflTUC-TwGRWwU4JsuNKq8wkOa3YnKhlK2W8oqXNeFqKOm6RtZfxHdMZWPA73eug6-vJXHuU07-1Sj9alrjgdftCMW6RUTGtOzd_D1t4yAjstjOwln764FfjzxiJjZT9Zt5Nf1ZRKqJ2SBFXRRJ2LoxGglybF2m1RKl9PuKoCP_tAAdz0Rcnl0Fzai2wVbxu8F-OSc6FgKAS4qfngnE_6_XM39KwfU2m-QNNd8TgS3rO8a4AcqxYqkQGrrfyn3awmITpi2RLHbeuoGLDykxiTD5c-hca6zLX1hJdj5W9lU2f1xTM6jLkqcWlSKXviHljKdAiq_Lyl8nF4d3xAc_2Ns8nq1MBSjNEFyn6kPUdoovXkxl3V02ldq3K0nZpLnFjavr9dXYd6JyYc2mc_vfH2kt8QHLatejr3Do-0c2qlhq_jAAblcham3B-AMhG8RuK3Fg9dzkP78L1Vc05k8_8DwH_ZzUk6yU-gvpI8MNRBbVoxqzVTL-v3N7aMOQ3_n55U2xog1U_RVdKXb1i-sBoqU4fzca2tC6crvnDQerfneZDbVW6Oh2GItfltBrZ055ue69U4oSZ3GQCrqyZ2_d-cELPjXCw-tUskSnAtAnM7pCmdvcIU9111k48R5oQphU4I1HQQbXpnf31scISqxqRGnj7yhX6ZHuj2mSetDMJqb6y7kcCMmKauxwDLMgWRSy0mkCBoDprlFyOQ2jFC5O-F9b-ypvG5FKb5afBgzUYMoowPTa3u5WvwuN3YtBK7l8pll14DUt8Ni3hFYsXHkaWTRUgpWKz5cubn3b6yRm7I4xxg_dVf6M6j33X3t8BcG33yVMqXOD2OHxOZ1h0pbD0WwUqPxj2IX8nN7AsOGBTN3AfjsEryFTLAeEbcfLjc-4ohDruiUn0YzNQ-wOjxWBNBf5OUe5i6_Rco0zcfozsjWPFvNP-qEETBfSHf3lHmQ5Nq0-aI3LhZpVC4uEDDjDfdsgIDSUtOENeYKOtsbjpFRg2PUVIW2yCiYuSn6jU19vqAwxfi5Oboaywx9Di9xEsLTE9UmhpanSAiYySmqeovMrR7vn7_wAAAAAAAAAAAAAAAA0fLEQ\",\"token_type\":\"Bearer\",\"expires_in\":60,\"scope\":\"dcr:register\"}}",
-        "bodyJson": {
-          "jti": "<jti>",
-          "thid": "token-exchange-thread-id",
-          "iss": "did:web:localhost",
-          "aud": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
-          "type": "application/json",
-          "body": {
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"initial_access_token\":\"eyJhbGciOiJNTC1EU0EtNDQiLCJraWQiOiJEOHZVLThOQm83Sm9pZzMxdkZ0YTE5VWwyUmFVLWx6Vi1qQlM3OWxFa3BzIn0.eyJzdWIiOiJ1c2VyMUBleGFtcGxlLmNvbSIsImp0aSI6IjgxMzQwMTAyLWZmODQtNGFiMC05NjAzLWVmYjJjOWU0MzgzZSIsImFjdF9jb2RlIjoibGljLXZ4NDdlemkyUmY2ayIsInRlbmFudF9pZCI6ImFjbWUiLCJzY29wZSI6ImRjcjpyZWdpc3RlciIsImlzcyI6ImRpZDp3ZWI6bG9jYWxob3N0JTNBMzAwMCIsImF1ZCI6InVybjpnYXRld2F5OmRjciIsImV4cCI6MTc2ODEwMzkzOCwibmJmIjoxNzY4MTAzODc4fQ.mZHP86F2E2Ijw_KD2NYv8RfGMHAi94iCuHBFubfCI4vfAcmIVddB0sJ_X6lQ3z8kSKe1BPDuWyG3jL0y3a07vXqq-Gey3tuAGGtmIHtBB50XzrLNK2n8Xs_Z1lTVqVv0WvEHmCa-cYNWbZ1xsrQLVbq2kNsGXhZ3cMxK9Elc2ZUhAAkTuXzoKXrjFVwXWPTuucPqb5PEnmLL2BG-u7H_JnyWiVRIWyHSyIsBF8XIYIMV-wcl1kaJ1nswT6o58J5vFsDLHShSlUJ0kYYuNfKSouvSYJRCbInf-Zdj_Fq5ocwRUm6SPOohjDFlxbWnDiF-tFqgc3R9jd_7jxozu52_48QYJ7bW567KPNwEVpDfLJAeItNkUSmsfTk8IJqjCOriLCpo2r1czsmZV3sSGqNUMhxhf5ameb_ODb2ZRimX1_bh5UJzrPlhE3du3XTXiZao2YQj6WR2BbHF8BWq5OrjAJRSBiErQkI3Ksxx9Q12fgoiwm4rDO_WWdrYaU-WdcOZLRh8X4AMpdzgzpuCG2LgSHNPuLhhT7vZ8jNoT82tjtHLK9O4HjdrogDXc5J9M8nQfgmNA_MFiTalxWFU7XGaRr4hgFGNAakpW1XDH1pOBVjICESLuWsMlRteKNJsVTQBsZfHeaZyYzPVfvCQ1NxdIfRfPrEHA8U848BnrLMRIjnuBvw5UodqNOAx3ulNLV-Cl7yiN26hPe_IFq7_0wu8w6H-Aiwz1EYo_BNwkQ3qUj3Y4VD5-cOAMB7jEAl_GfNSbafX93I_CjiF0gO8kDEL0yY1qww2BwP8wScjb3ftge0fQ-qvprcfCF478LDwBnmi0w48YfI6Ttz_GDXEngW-mMXAVYTWAKYWyiVh-BOhUXU__jV0Tq3fmLH6_gXPKG_ajf9uvKJNKY9xU0QCsQP2dM9cZcNVs3YTDAaugHydj02tHqMRpEq4KSywxHo3m-nxGZTkg1PLz_mVU5SxrcA98GIVCQEpVfAXPc4rYz4LQazfLRuiuTToGVE-qHT4E-677Uexuq-_IPH1HuGHJ2RMhORctgYff-nEHcfbBXFzXTAdCk0f5Hc_JfbxwTEoFS_-f73bbL0QFoITKX2Jfh6gV4MHJDIDGQJO2u8wgrgL5ZphAIEihQhB3u1zUqqqWpZeOf_AlYij5LGbwhKZBVR-FTHwEdld3WaBvsE0fCd-QnbWJFynxKCt_91XYEo_k-qD_WfNoU9xZjUMZ_K5OICDcpUmLQCPSwRSJCsjGbST5LBj_E__cmZhfn7DSJH5WJIRZSblEPKe_pDdQDsGLiOYzCY5pWFI3VIeUgZv_hOYIzgsReKXPRKmyTMaRkkhcP-GrK6BOiQxrEraS-7KLK20VYGwr1b7m-J-9PX8RxRKa4BN3FQ0hvLQh7-MzEQwC5UUXX4Lm1IliCKLBxh9oCmkzIlhv0oP4_VGJBU586eCiZG231EP79--WSLkYGkEIl23lh4xd51CpL1z_tPEJTmjL9PfVZ0VWBkDpelJ0FaQSQZ2550Zligv1DDineo3US1WkEWlD2Zu8KG5a7eDUceqRKlUzFSq5K9ufWxgQAnNmZCe-IwIDSVwkD3JDV4UdWItdkPznDJoeMhkqgrdVXe_0nTQq5cSuSejV1oJYECsVk7fVGruXWMAWl4nyPe5OJdvZS-1HtROU6ydwnQMgTUYWq1h7-5UJdduQYX2afyxGphXmoCqrLIkIvG85Dt9-s7i7l2eOtHrhX1r0wQ_Aup92laPfVS8P04Pq1emJdLrsvvxeWuAmnzlnE2BpKaaGNLzf0qJZ61sQ86Fesg94i-I2Cii9pwO_9NlVgDcEPWX8jf4BjxHEMO-lg5xx4VQoKQ7mFUMrkBTtxG3YGPVZPug1hrgbaH62xFIEK0CdsZ8uxBNpMUuC85lMq18tnk1AlcXMHtHuML-9qEtjlxmyn6SUTEH9reQF4AIRRzxZbLTwJkG-fGrCqCjUpDUSrM9FMBJGJJ3svz7Rk3eDYwoYk3fe1Klowc8J17N0aQEcqtTML6tKKoo24FUxvpe78H-fAOtQBE5h9RMTuMssbAdLpimKb1o7HDI3zZNhR1uQ0tLrSULPo_0RAycfNj1D59O3fJ3lO9ZB1Hzun5Gi-t5-NvFICtmeElhg5m_OYxJRMsY1rZVfSzx0_Xs2MobDI81ETAi2JPZds5-XN58twrX0SNzGUL5wFbNUo1wV7wUwQjPTvkKnvPP84wuRjqH09AODpNWOkHpJGmFRwWC6C7lbnC4jN0iRAdkY5_O4-UaSuCpoAXzk8aURM6XEVGDroWFj8GYR02D9LkNZpQK6kFV2uxouAMCairTqnLXEvnRD_uKB_I33Oq401Z5Y0i8OypGUY4kz8PoieN10k8KswfdlnQidr1ajwzotOTDNjf6drMrN-iB8mYB9V4S-K03yR5XsZp-xOcIc3F3eYsRz8CdUNqxHAXro4H-GnPkdMEnX-gemXgpHYueEVaIHIHlF0e6pxo_MIy-hnfQIV-svLlwDeIY0iJv0Uh4tsP_0jtvr_tpWJXDTC89cBAx37gewD4JHZzZokS3eRgsg5iFQKV-KxNEQAArtp6_9jTiT0U2GPhnJAzsYzhv6JFcYlC6MbLYdqwE-uHyWtlxy1CcfhrsJrjokWj2pDdv9iqTT3hsBc1rb7_UHXFchN37xUTuFNK6ar_jJ01QnS6eswUqRD7lxp8vBO1mWrWusDgCwSdPwy13f0GZtwzIMmu5xvVotvuYMviCBNxtRX6nqj5BBm2OpBEuqDpDEt9gYz5EjxjgR30iAgPRfKYf-Siii_qdkPMGOx2qnOvEodnFb1gp7oz2FZRm3f-8GIq7NC7dOjIOrxbbfHBYIV4NlVvQIakyIYKXfr7w5QABp7lQuVMYZnB24T4ffLH3dYCvNEHOgN_ktxilzSYOASwX_6foVzdyVhaNlJ0M-U4RUM7W7EvudZCOWL-Dh7wMP5k9A_bJGnzROQWm4t4VKsrMWMm0qtR2LWF6YO-YStYH11s37QW_ipYdrQ0qrAgkw3nUwMPUdTFd651EvqCGVCzwD9ef2EPO7xz1BH_g1ht4b73_MvihO29vjvIiES7Vacxy7fbLJ-lSKRn1A-cCEBktPV1gd4CEmZqfw9z3_wQNFzU_RoGNlp_F6PQPIjpJaGt5iJWnzNTa4_Dz_AAcL0lUXWh7fIOTnq62uurs8QAAAAAAAAAAAAAAAAAAABEeL0E\",\"token_type\":\"Bearer\",\"expires_in\":60,\"scope\":\"dcr:register\"}",
+          "bodyJson": {
             "initial_access_token": "<initial_access_token>",
             "token_type": "Bearer",
             "expires_in": 60,
@@ -777,17 +940,17 @@
               "keys": [
                 {
                   "alg": "ML-DSA-44",
-                  "kid": "thumbprint-public-sig-key-device",
                   "kty": "AKP",
                   "pub": "base64url-public-sig-key-device",
+                  "kid": "thumbprint-public-sig-key-device",
                   "use": "sig"
                 },
                 {
                   "crv": "ML-KEM-768",
-                  "kid": "thumbprint-public-enc-key-device",
                   "kty": "OKP",
-                  "use": "enc",
-                  "x": "base64url-public-enc-key-device"
+                  "x": "base64url-public-enc-key-device",
+                  "kid": "thumbprint-public-enc-key-device",
+                  "use": "enc"
                 }
               ]
             }
@@ -854,17 +1017,17 @@
               "keys": [
                 {
                   "alg": "ML-DSA-44",
-                  "kid": "thumbprint-public-sig-key-device",
                   "kty": "AKP",
                   "pub": "base64url-public-sig-key-device",
+                  "kid": "thumbprint-public-sig-key-device",
                   "use": "sig"
                 },
                 {
                   "crv": "ML-KEM-768",
-                  "kid": "thumbprint-public-enc-key-device",
                   "kty": "OKP",
-                  "use": "enc",
-                  "x": "base64url-public-enc-key-device"
+                  "x": "base64url-public-enc-key-device",
+                  "kid": "thumbprint-public-enc-key-device",
+                  "use": "enc"
                 }
               ]
             }
@@ -878,13 +1041,13 @@
           "access-control-allow-origin": "http://localhost:8081",
           "vary": "Origin",
           "access-control-expose-headers": "Location, Retry-After",
-          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/Device/_batch-response",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/Device/_dcr-response",
           "retry-after": "5"
         },
         "bodyText": ""
       },
       "poll": {
-        "url": "/acme/cds-ES/v1/health-care/identity/openid/Device/_batch-response",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Device/_dcr-response",
         "tries": 1,
         "final": {
           "status": 200,
@@ -895,19 +1058,28 @@
             "access-control-expose-headers": "Location, Retry-After",
             "content-type": "application/json"
           },
-          "bodyText": "{\"data\":[{\"type\":\"application/json\",\"response\":{\"status\":\"201\"},\"resource\":{\"resourceType\":\"DeviceRegistration\",\"id\":\"8b09672f-3135-4863-a408-65b69835fb51\",\"client_id\":\"8b09672f-3135-4863-a408-65b69835fb51\",\"client_id_issued_at\":1766514876,\"client_secret_expires_at\":0,\"registration_client_uri\":\"http://localhost:3000/clients/8b09672f-3135-4863-a408-65b69835fb51\"}}],\"resourceType\":\"Bundle\",\"total\":1,\"type\":\"transaction-response\"}",
+          "bodyText": "{\"data\":[{\"type\":\"application/json\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"SoftwareApplication\",\"org.schema.SoftwareApplication.identifier\":\"533d7aed-19a4-4022-ad40-e4177fc203c9\",\"org.schema.SoftwareApplication.name\":\"App for [email] as [role] on [iOS, Android, Web]\",\"org.schema.SoftwareApplication.description\":\"Registered on device: User's iPhone 15 Pro\"}},\"response\":{\"status\":\"201\"},\"resource\":{\"resourceType\":\"Device\",\"id\":\"533d7aed-19a4-4022-ad40-e4177fc203c9\",\"client_id\":\"533d7aed-19a4-4022-ad40-e4177fc203c9\",\"client_id_issued_at\":1768103878,\"client_secret_expires_at\":0,\"registration_client_uri\":\"http://localhost:3000/clients/533d7aed-19a4-4022-ad40-e4177fc203c9\"}}],\"resourceType\":\"Bundle\",\"total\":1,\"type\":\"transaction-response\"}",
           "bodyJson": {
             "data": [
               {
                 "type": "application/json",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "SoftwareApplication",
+                    "org.schema.SoftwareApplication.identifier": "<uuid>",
+                    "org.schema.SoftwareApplication.name": "App for [email] as [role] on [iOS, Android, Web]",
+                    "org.schema.SoftwareApplication.description": "Registered on device: User's iPhone 15 Pro"
+                  }
+                },
                 "response": {
                   "status": "201"
                 },
                 "resource": {
-                  "resourceType": "DeviceRegistration",
+                  "resourceType": "Device",
                   "id": "<uuid>",
                   "client_id": "<uuid>",
-                  "client_id_issued_at": 1766514876,
+                  "client_id_issued_at": 1768103878,
                   "client_secret_expires_at": 0,
                   "registration_client_uri": "<url>"
                 }
@@ -941,18 +1113,25 @@
           "body": {
             "expires_in": 300,
             "token_type": "Bearer",
-            "sub": "did:web:api.acme.org:employee:doctor1@acme.org:role:ISCO-08|2211",
+            "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
             "purpose": "TREAT",
             "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2 patient/Consent.cruds"
           },
           "meta": {
             "jwe": {
               "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
                 "skid": "thumbprint-public-enc-key-device"
               }
             },
             "jws": {
               "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -967,14 +1146,14 @@
           "access-control-allow-origin": "http://localhost:8081",
           "vary": "Origin",
           "access-control-expose-headers": "Location, Retry-After",
-          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/smart/_batch-response",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/smart/token-response",
           "retry-after": "5"
         },
         "bodyText": ""
       },
       "poll": {
-        "url": "/acme/cds-ES/v1/health-care/identity/openid/smart/_batch-response",
-        "tries": 1,
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/smart/token-response",
+        "tries": 2,
         "final": {
           "status": 500,
           "headers": {
@@ -984,7 +1163,7 @@
             "access-control-expose-headers": "Location, Retry-After",
             "content-type": "application/json"
           },
-          "bodyText": "{\"thid\":\"smart-token-thread-id\",\"iss\":\"did:web:localhost%3A3000\",\"aud\":\"did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>\",\"exp\":1766515176,\"body\":{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"unknown-error-v1.0\",\"response\":{\"status\":\"500\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"exception\",\"diagnostics\":\"Individual vault not found for subject: did:web:api.acme.org:individual:123\"}]}}}]}}",
+          "bodyText": "{\"thid\":\"smart-token-thread-id\",\"iss\":\"did:web:localhost%3A3000\",\"aud\":\"did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>\",\"exp\":1768104178,\"body\":{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"unknown-error-v1.0\",\"response\":{\"status\":\"500\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"exception\",\"diagnostics\":\"No matching consent rule found for requested scope.\"}]}}}]}}",
           "bodyJson": {
             "thid": "smart-token-thread-id",
             "iss": "did:web:localhost%3A3000",
@@ -1004,7 +1183,7 @@
                         {
                           "severity": "error",
                           "code": "exception",
-                          "diagnostics": "Individual vault not found for subject: did:web:api.acme.org:individual:123"
+                          "diagnostics": "No matching consent rule found for requested scope."
                         }
                       ]
                     }
@@ -1037,18 +1216,25 @@
           "body": {
             "expires_in": 300,
             "token_type": "Bearer",
-            "sub": "did:web:api.acme.org:employee:doctor1@acme.org:role:ISCO-08|2211",
+            "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
             "purpose": "TREAT",
             "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2 patient/Consent.cruds"
           },
           "meta": {
             "jwe": {
               "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
                 "skid": "thumbprint-public-enc-key-device"
               }
             },
             "jws": {
               "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -1063,16 +1249,16 @@
           "access-control-allow-origin": "http://localhost:8081",
           "vary": "Origin",
           "access-control-expose-headers": "Location, Retry-After",
-          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/smart/_batch-response",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/smart/token-response",
           "retry-after": "5"
         },
         "bodyText": ""
       },
       "poll": {
-        "url": "/acme/cds-ES/v1/health-care/identity/openid/smart/_batch-response",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/smart/token-response",
         "tries": 2,
         "final": {
-          "status": 200,
+          "status": 500,
           "headers": {
             "x-powered-by": "Express",
             "access-control-allow-origin": "http://localhost:8081",
@@ -1080,13 +1266,34 @@
             "access-control-expose-headers": "Location, Retry-After",
             "content-type": "application/json"
           },
-          "bodyText": "{\"access_token\":\"eyJhbGciOiJNTC1EU0EtNDQiLCJ0eXAiOiJKV1QiLCJraWQiOiJOTnc1cUkwTFl5dWZRQW5sd2k3U3JXYUpDUDZfQ1Z2WG1XRENoZlZpRE9VIn0=.eyJpc3MiOiJkaWQ6d2ViOmxvY2FsaG9zdCUzQTMwMDA6YWNtZTpjZHMtRVM6djE6aGVhbHRoLWNhcmUiLCJzdWIiOiJkaWQ6d2ViOmFwaS5hY21lLm9yZzplbXBsb3llZTpkb2N0b3IxQGFjbWUub3JnOnJvbGU6SVNDTy0wOHwyMjExIiwiYXVkIjoiZGlkOndlYjpsb2NhbGhvc3QlM0EzMDAwOmFjbWU6Y2RzLUVTOnYxOmhlYWx0aC1jYXJlIiwic2NvcGUiOiJwYXRpZW50L0NvbXBvc2l0aW9uLnJzP3N1YmplY3Q9ZGlkOndlYjphcGkuYWNtZS5vcmc6aW5kaXZpZHVhbDoxMjMmc2VjdGlvbj1MT0lOQ3w0ODc2NS0yIHBhdGllbnQvQ29uc2VudC5jcnVkcyIsImlhdCI6MTc2NjUxNDg3NiwibmJmIjoxNzY2NTE0ODc2LCJleHAiOjE3NjY1MTUxNzZ9.UjRLDjvWhP_cVCzl1TrelSCz2hCLILrnfdEm9RRYZFN_KoP3-ZiNXp5uFXY7soMhwEnVoxLFbi19kfC4hu7pKq4HM8jhVXLO9IMfnE3bqvXG5cpyCTr0_4RbwxNcRqGBd5W_gJQzC2rNSG1I_Vkr7kXeyTGPgXDUfmIO0RRhcMf54D3l15VBq7rAXM1j99ZJHMyvAM5E2vJy4QPiAjNNgvJcJFodIgYnBlSAPZrUlZPdlNICNiabHMZammoQOGmTZpTTsN7r51kF68aW9I3IBTZU73jQI8i71_N35gVkz8PW4IkKzhgEw_MD-wI7yVZLysUsYx7-Z_oVuKjxi06Rdk7-8ycFOiwuSz-7vrgTR-b7F3FS1siHyYNJY8cAEhsi_6Jp5uIQRv82gt4F0VV-ng4FLxpn2h4KlJog0cVALzRyPnV8Hh1sXxo_FdlYaZTWsqkeUX-7KCeVNkrSPeCM9PvjeCHB_z4vaNi2f4EDVdA_dWawMhRKYSfmSkI27iRBrL4-DWjISf1BhRTLinChZWumk3oY7lZMVfV4mXdChtRKd8_kWBti5-vflnoCfxa54XNjBWJVlbKMT6nvEuM8AbDngm2GgFu7qi4GwFYsogrqt44ahnpehpmOIeLV7f-IGxlTgUBNP31KIjpbiR-TQBmpOaCeVgfzwdVhOvRM_ZpNoXtSqvp6PbPooovznjikFB5g77krEjHCHDdkN5VHXqiXecOTho_pMtor1NEQnGJdrtjUjmYlWqcNI87sRYLRQgAQg5khrsB128RUmM78a1yzYX97TWPS630Qaj05d6B-l6C498i3DSJmOaoQ2U70SNUN7gJnZ3EPYsRD2duuDSs9KVZ5iDqu3XNX_Jtv-Csm21nTeNRoIHzgNx5wJkeYSrcqIAkaGDzl-Bj2UbHC7d5UrT4HQTDL0iISuJOmfPIRO7bqYWe1-9kcDIWJK2dDI8wsWXbgE7DVvFyDj45nX9Lcj9MmUDFouAd7_OQcWmevqtPjQbFhJVD2lsupC0gVRglejRBHntIJD24GEFc2Z8ddyCdVyWbODcwFHMfrZET_2ACW1qN945t8KvCoCDAACB0YuCtzNE47ikzdd09zcM6DceJik-mAdunm5llAyyyKo7zCyYebUfy8HC8_yVUGXjWMIcYlFFdUs06uuhR6n6CtRFHmAqdigs9QOWLzIZ9eZjBgmHMSjZn9mPNP66hWUslCDZcOf9jwD5TZm0KGdF6exfK9VQ9zga3fsumNIblS9GA8-r-JAb-ojsqwpR-4sNK0eD5q362ihxSZOuyOhxi9Hrhd7TXVvFQDda4yfUJRtgk6NiY95qbeEkgsyuhVktSGmzkpzQ1lghTWJ9EVHBEjayvVIk_bUELOuZIMC-S4YsZh5FtWECqRLJ9sSkoJ-GEUXohsPuwMAhUWElYV6COz0PjiCPP7O1gqLyStUSAeCNKfy1zhTRJRDgqa0sMN1NFuz7D7AX0taqrJ6Q7vAgjIDRKAMzTN-tvsTntTxMLghClRMnqkJvfAYcuXu3OiIeFgQYSkLVbmFC0aJ1icLA_rNG92qMqBV7qD15X26BwBGyUhdF9FmPOr6LyI1BSsL_KpAelufoRnTa2Ycn-5Yrpe-KyBH0HofkwcJQUlfVluMxNS9SRJEXr5YJlSDIrvdiyRwHoF042QWoCGVhPoBlds4fotPwqxyzePp8Itv-pSOqQh4tKQVCXjz09XoEIvpCSQTGFevZ_DO01dxTtypRwhkZk8KMAt26j3Le3zBVCjYD7TgI9po8jti3nt6hGzZ-mo61pJv6AFTKFve1cRSCLJ7pLB_VPT72SWkOWxin3FFXVT4cj3qj9HLtJtc7GamQW9C8L_5LLJdNiQC2VnmLIqjrrRL3DvoOf329L2GKuYYRMzrptnsR9Q4sk_dU6YPPoMR8a8Kj-axQEOSA8O9yEMoYefq7P7hdGqMAg__CQpRr233FRXCbyc2hc-k6cwIQkYpB9oOXi51pvw8T5H1WrXr0_MgRtgbkodUU2-tkYQkDZcJ28qGu1GfkLtfbDvrKYNpr0_OR5efnuzLvE5CLmjE1pW-8odwwqvoIA4KJhbIcZZqYsWtwzWvpbjHYYq4D2EJr8_5z90mZgMvWMAZS2kVW-TmQl9WF4OBSDjAy7v1V1LNuP9w-XcbuzyVbOsovNBpsRuMvPp7Tm5gkEoVxqn7ykdQMBbsI45W45iLXeUXufsX1q-B58pM2Kl9o7gWMeGa98hEgxyyQKf7-_QNfkNR5tJqr5i0ntNp3qQoQ4Z0FqZ5oyxy2YKreAIT7RCG2AqmCHqaaa35vp_FJIHb6PXzcSaJb4pniNoig--tQSTk1U5ptkGRED3_z2JOqtKORAsRnz0-6YhTT-0k1PEMCreQIrNI_3tgUobaQzeiNEbTLyTeftb9IJeHdNU1d9EM3NHFobF-RoXs4Zh1vgf9tL1Sq-SitIoJZ24kpk7ObMtLD5QppdOqm6kUxTtzgzA22U41oDQROn42IPb_Te62oM1D_C9fOtC8nn3jVb-7nXq3LHzkM7rbBr-hB5gZMWNeFKresHHksOnXl9d_Q0dlXtzDwJIdQnPL9ssGNz7lryXpPtxrmbTp_ZhlUnPECL7xEmWLlF88DEijK2IUKk_U6GUkxtYOMqQipWd5JZ6qkEYmhzq5CX4jsMnoe5qpblHH7ujvOo39JjXTGwTv9oz2nxIg1eXGStgRzMm_OZNbcInVY7gv7tiIGzcE2OTnMVMgvtv0oXEUAmfM9JvuZAkj-2UPiK6xVaC4FZs6i7nehSraJxI3bJtXCpTGt575os-0iQzqVU5Ag6-4-zyAhmL3QNpQx8H9A2UyttGAnjyKH5Ek1nYywR1f8goAyIb8Bv19gYCU-5zxjV9G7ir3MPZIkALmjBC4gH-znD5s24ZcBKmkrwaf_3S0uGG1C8kd_vzhqlW9DwDr2fTi7OSB7M1Onwc1PMo4J3l3p8PfAz6bBMolUp1Qb1BeA8OpEocHvo3LgS_NNa5spwGP4_3YZbOTW4Q89orCWyfqEDl1KcUqKsnOsvLElyIe8fz_MBtWybhCFk8QBDn_fPcBopyajd6Re9xHn7HU15MAHmJT48u8g0DCA4TFSIrUVRfbnB-lJ6ht7q7xMzu-v0JFCM2QFdYdqa6w8nO1Nfb8_X5CQsNQkRTeay-7PoGBxofJjc8UHh7g4yiw8fd6On5AAAAAAAAABgrNkk\",\"token_type\":\"Bearer\",\"expires_in\":300,\"scope\":\"patient/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2 patient/Consent.cruds\",\"subject\":\"did:web:api.acme.org:individual:123\"}",
+          "bodyText": "{\"thid\":\"smart-token-thread-id\",\"iss\":\"did:web:localhost%3A3000\",\"aud\":\"did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>\",\"exp\":1768104178,\"body\":{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"unknown-error-v1.0\",\"response\":{\"status\":\"500\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"exception\",\"diagnostics\":\"No matching consent rule found for requested scope.\"}]}}}]}}",
           "bodyJson": {
-            "access_token": "<access_token>",
-            "token_type": "Bearer",
-            "expires_in": 300,
-            "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2 patient/Consent.cruds",
-            "subject": "did:web:api.acme.org:individual:123"
+            "thid": "smart-token-thread-id",
+            "iss": "did:web:localhost%3A3000",
+            "aud": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+            "exp": "<time>",
+            "body": {
+              "resourceType": "Bundle",
+              "type": "batch-response",
+              "data": [
+                {
+                  "type": "unknown-error-v1.0",
+                  "response": {
+                    "status": "500",
+                    "outcome": {
+                      "resourceType": "OperationOutcome",
+                      "issue": [
+                        {
+                          "severity": "error",
+                          "code": "exception",
+                          "diagnostics": "No matching consent rule found for requested scope."
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
           }
         }
       }
@@ -1126,11 +1333,18 @@
           "meta": {
             "jwe": {
               "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
                 "skid": "thumbprint-public-enc-key-device"
               }
             },
             "jws": {
               "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -1152,7 +1366,7 @@
       },
       "poll": {
         "url": "/acme/cds-ES/v1/health-care/entity/org.schema/Employee/_batch-response",
-        "tries": 1,
+        "tries": 2,
         "final": {
           "status": 200,
           "headers": {
@@ -1239,25 +1453,29 @@
           "meta": {
             "jwe": {
               "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
                 "jwk": {
                   "crv": "ML-KEM-768",
-                  "kid": "thumbprint-public-enc-key-device",
                   "kty": "OKP",
-                  "use": "enc",
                   "x": "base64url-public-enc-key-device"
                 }
               }
             },
             "jws": {
               "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device",
                 "jwk": {
                   "alg": "ML-DSA-44",
-                  "kid": "thumbprint-public-sig-key-device",
                   "kty": "AKP",
-                  "pub": "base64url-public-sig-key-device",
-                  "use": "sig"
+                  "pub": "base64url-public-sig-key-device"
                 }
               }
             }
@@ -1288,7 +1506,7 @@
             "access-control-expose-headers": "Location, Retry-After",
             "content-type": "application/json"
           },
-          "bodyText": "{\"data\":[{\"type\":\"Family-registration-offer-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"receipt\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.identifier.additionalType\":\"UUID\",\"org.schema.Organization.identifier.value\":\"<UUID>\",\"org.schema.Organization.owner.email\":\"adult1@example.com\",\"org.schema.Organization.owner.identifier.value\":\"adult1@example.com\",\"org.schema.Person.email\":\"child1@example.com\",\"org.schema.Person.identifier.additionalType\":\"UUID\",\"org.schema.Person.identifier.value\":\"<child1-ID>\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"individual\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:8b199205-5976-43ae-ab7a-eb47eb660529\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000:acme:cds-ES:v1:health-care\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-11c80d17,lic-70e3181d\"}},\"resource\":{\"resourceType\":\"Organization\",\"id\":\"d1564609-cb74-4e4f-9e04-8d0df0ef9221\"},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyText": "{\"data\":[{\"type\":\"Family-registration-offer-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"receipt\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.identifier.additionalType\":\"UUID\",\"org.schema.Organization.identifier.value\":\"<UUID>\",\"org.schema.Organization.owner.email\":\"adult1@example.com\",\"org.schema.Organization.owner.identifier.value\":\"adult1@example.com\",\"org.schema.Person.email\":\"child1@example.com\",\"org.schema.Person.identifier.additionalType\":\"UUID\",\"org.schema.Person.identifier.value\":\"<child1-ID>\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"individual\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:1a26a06d-e02e-4f67-8ef4-5a407e648748\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000:acme:cds-ES:v1:health-care\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-0190a11f,lic-b4c2dd4b\"}},\"resource\":{\"resourceType\":\"Organization\",\"id\":\"66ca13e6-9ce6-4ebf-965f-123aae37c114\"},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
           "bodyJson": {
             "data": [
               {
@@ -1321,7 +1539,7 @@
                     "org.schema.Offer.offeredBy": "did:web:localhost%3A3000:acme:cds-ES:v1:health-care",
                     "org.schema.Offer.price": "0.00",
                     "org.schema.Offer.priceCurrency": "EUR",
-                    "org.schema.Offer.serialNumber": "lic-11c80d17,lic-70e3181d"
+                    "org.schema.Offer.serialNumber": "lic-0190a11f,lic-b4c2dd4b"
                   }
                 },
                 "resource": {
@@ -1371,11 +1589,18 @@
           "meta": {
             "jwe": {
               "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
                 "skid": "thumbprint-public-enc-key-device"
               }
             },
             "jws": {
               "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -1471,11 +1696,18 @@
           "meta": {
             "jwe": {
               "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
                 "skid": "thumbprint-public-enc-key-device"
               }
             },
             "jws": {
               "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -1507,7 +1739,7 @@
             "access-control-expose-headers": "Location, Retry-After",
             "content-type": "application/json"
           },
-          "bodyText": "{\"data\":[{\"type\":\"Organization\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"receipt\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.identifier.additionalType\":\"UUID\",\"org.schema.Organization.identifier.value\":\"<UUID>\",\"org.schema.Organization.owner.email\":\"adult1@example.com\",\"org.schema.Organization.owner.identifier.value\":\"adult1@example.com\",\"org.schema.Person.email\":\"child1@example.com\",\"org.schema.Person.identifier.additionalType\":\"UUID\",\"org.schema.Person.identifier.value\":\"<child1-ID>\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"individual\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:8b199205-5976-43ae-ab7a-eb47eb660529\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000:acme:cds-ES:v1:health-care\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-11c80d17,lic-70e3181d\"}},\"resource\":{\"resourceType\":\"Organization\",\"id\":\"<UUID>\"},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyText": "{\"data\":[{\"type\":\"Organization\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"receipt\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.identifier.additionalType\":\"UUID\",\"org.schema.Organization.identifier.value\":\"<UUID>\",\"org.schema.Organization.owner.email\":\"adult1@example.com\",\"org.schema.Organization.owner.identifier.value\":\"adult1@example.com\",\"org.schema.Person.email\":\"child1@example.com\",\"org.schema.Person.identifier.additionalType\":\"UUID\",\"org.schema.Person.identifier.value\":\"<child1-ID>\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"individual\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:1a26a06d-e02e-4f67-8ef4-5a407e648748\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000:acme:cds-ES:v1:health-care\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-0190a11f,lic-b4c2dd4b\",\"org.schema.IndividualProduct.serialNumber\":\"lic-n-gZIltnFZiH\",\"org.schema.IndividualProduct.category\":\"individual\"}},\"resource\":{\"resourceType\":\"Organization\",\"id\":\"<UUID>\"},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
           "bodyJson": {
             "data": [
               {
@@ -1540,7 +1772,9 @@
                     "org.schema.Offer.offeredBy": "did:web:localhost%3A3000:acme:cds-ES:v1:health-care",
                     "org.schema.Offer.price": "0.00",
                     "org.schema.Offer.priceCurrency": "EUR",
-                    "org.schema.Offer.serialNumber": "lic-11c80d17,lic-70e3181d"
+                    "org.schema.Offer.serialNumber": "lic-0190a11f,lic-b4c2dd4b",
+                    "org.schema.IndividualProduct.serialNumber": "lic-n-gZIltnFZiH",
+                    "org.schema.IndividualProduct.category": "individual"
                   }
                 },
                 "resource": {
@@ -1645,24 +1879,43 @@
         }
       },
       "submit": {
-        "status": 404,
+        "status": 202,
         "headers": {
           "x-powered-by": "Express",
           "access-control-allow-origin": "http://localhost:8081",
           "vary": "Origin",
           "access-control-expose-headers": "Location, Retry-After",
-          "content-type": "application/json"
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response",
+          "retry-after": "5"
         },
-        "bodyText": "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"not-found\",\"diagnostics\":\"The requested tenant or endpoint path does not exist.\"}]}",
-        "bodyJson": {
-          "resourceType": "OperationOutcome",
-          "issue": [
-            {
-              "severity": "error",
-              "code": "not-found",
-              "diagnostics": "The requested tenant or endpoint path does not exist."
-            }
-          ]
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"response\":{\"status\":\"201\",\"location\":\"/health-care/individual/org.hl7.fhir.api/Consent/6dbf8c851e2f3b0b02875d56e27c54595ac16d2bb57228787db6129824a53cc6d2c34e1b71df32ad56aa5b7f6329f375\"},\"type\":\"Consent\"}]}",
+          "bodyJson": {
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "data": [
+              {
+                "response": {
+                  "status": "201",
+                  "location": "/health-care/individual/org.hl7.fhir.api/Consent/6dbf8c851e2f3b0b02875d56e27c54595ac16d2bb57228787db6129824a53cc6d2c34e1b71df32ad56aa5b7f6329f375"
+                },
+                "type": "Consent"
+              }
+            ]
+          }
         }
       }
     },
@@ -1761,24 +2014,55 @@
         }
       },
       "submit": {
-        "status": 404,
+        "status": 202,
         "headers": {
           "x-powered-by": "Express",
           "access-control-allow-origin": "http://localhost:8081",
           "vary": "Origin",
           "access-control-expose-headers": "Location, Retry-After",
-          "content-type": "application/json"
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response",
+          "retry-after": "5"
         },
-        "bodyText": "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"not-found\",\"diagnostics\":\"The requested tenant or endpoint path does not exist.\"}]}",
-        "bodyJson": {
-          "resourceType": "OperationOutcome",
-          "issue": [
-            {
-              "severity": "error",
-              "code": "not-found",
-              "diagnostics": "The requested tenant or endpoint path does not exist."
-            }
-          ]
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response",
+        "tries": 1,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"resourceType\":\"Bundle\",\"type\":\"_batch-response\",\"data\":[{\"response\":{\"status\":\"500\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"processing\",\"details\":{\"text\":\"Malformed entry: missing resource and missing meta.claims\"}}]}},\"id\":\"7a49757b-34cd-45b7-8941-f9180c67b8cb\",\"type\":\"OperationOutcome\"}]}",
+          "bodyJson": {
+            "resourceType": "Bundle",
+            "type": "_batch-response",
+            "data": [
+              {
+                "response": {
+                  "status": "500",
+                  "outcome": {
+                    "resourceType": "OperationOutcome",
+                    "issue": [
+                      {
+                        "severity": "error",
+                        "code": "processing",
+                        "details": {
+                          "text": "Malformed entry: missing resource and missing meta.claims"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "id": "<uuid>",
+                "type": "OperationOutcome"
+              }
+            ]
+          }
         }
       }
     },
@@ -1872,24 +2156,43 @@
         }
       },
       "submit": {
-        "status": 404,
+        "status": 202,
         "headers": {
           "x-powered-by": "Express",
           "access-control-allow-origin": "http://localhost:8081",
           "vary": "Origin",
           "access-control-expose-headers": "Location, Retry-After",
-          "content-type": "application/json"
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch-response",
+          "retry-after": "5"
         },
-        "bodyText": "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"not-found\",\"diagnostics\":\"The requested tenant or endpoint path does not exist.\"}]}",
-        "bodyJson": {
-          "resourceType": "OperationOutcome",
-          "issue": [
-            {
-              "severity": "error",
-              "code": "not-found",
-              "diagnostics": "The requested tenant or endpoint path does not exist."
-            }
-          ]
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"Composition\",\"response\":{\"status\":\"201\",\"location\":\"/health-care/individual/org.hl7.fhir.api/Composition/9379d10b28f6784606ed51d24cf2d99acb1ff79fc3bb7d38f8b5485e6726b0e4\"}}]}",
+          "bodyJson": {
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "data": [
+              {
+                "type": "Composition",
+                "response": {
+                  "status": "201",
+                  "location": "/health-care/individual/org.hl7.fhir.api/Composition/9379d10b28f6784606ed51d24cf2d99acb1ff79fc3bb7d38f8b5485e6726b0e4"
+                }
+              }
+            ]
+          }
         }
       }
     }

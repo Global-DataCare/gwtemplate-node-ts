@@ -21,7 +21,7 @@ export function getConnectionTlsCertPemByMspId(mspId: string): string {
     );
   }
 
-  return resultString;
+  return resultString.replace(/\\n/g, '\n');
 }
 
 export function getConnectionPeerByMspId(mspId: string): string {
@@ -53,7 +53,7 @@ export function getPublicCertByMspId(mspId: string): string {
     );
   }
 
-  return resultString;
+  return resultString.replace(/\\n/g, '\n');
 }
 
 export function getPrivatePemKeyByMspId(mspId: string): string {
@@ -69,7 +69,7 @@ export function getPrivatePemKeyByMspId(mspId: string): string {
     );
   }
 
-  return resultString;
+  return resultString.replace(/\\n/g, '\n');
 }
 
 export function getConnectionProfileOldByMspId(

@@ -80,6 +80,9 @@ To ensure everything is working correctly, run the test suite:
 ```bash
 npm test
 ```
+For test tiers and E2E setup details, see:
+- `TESTING.md`
+- `TESTING-GUIDE.md`
 
 ## Next Steps: Exploring the API
 
@@ -97,3 +100,16 @@ For more advanced testing and scripting, the project includes a comprehensive co
 
 *   **Location**: You can find these examples in the [cURL Tests Documentation](docs/02-API-AND-ENDPOINTS/02.C-CURL-TESTS.md).
 
+## Useful Commands
+
+- `npm run dev`: Run the server locally with hot reload and regenerate `swagger-spec.json`.
+- `npm run build:swagger`: Generate `swagger-spec.json` (served by `/api-docs`).
+- `npm run docs:flow-report`: Run the onboarding journey against the in-memory app and write `artifacts/api-integrators-guide.flow-report.json` (docs QA).
+- `npm test`: Run the full test suite.
+- `npm run test:unit` / `npm run test:integration` / `npm run test:e2e`: Run specific test tiers.
+- `npm run seed:dev`: Generate deterministic dev CA material (used by Fabric CA containers).
+
+## Fabric Devnet (Optional)
+
+For a deterministic Fabric v3 devnet (DEMO single-host or multi-org), see:
+- `devnet/fabric-v3/README.md`

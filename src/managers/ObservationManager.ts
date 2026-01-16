@@ -11,6 +11,8 @@ import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
 import { createOperationOutcome } from '../utils/outcome';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { determineResourceId } from '../utils/resource';
+import { getTenantVaultId } from '../utils/tenant';
+import { getIndividualSectionId } from '../utils/individual-sections';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -147,18 +149,17 @@ export class ObservationManager implements IJobProcessor {
           claims[canonicalKey] = dateWhen;
         }
 
-        const individualVaultId = `${job.tenantId}/${job.jurisdiction}/${job.sector}/individual/${subject}`;
-        const vaultExists = await this.vaultRepository.vaultExists(individualVaultId);
-        if (!vaultExists) {
-          throw new ManagerError(`Individual vault not found for subject: ${subject}`, IssueType.NotFound);
-        }
+        const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
+        const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+        if (!tenantExists) throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
 
         const identifierClaim =
           getClaimValue<string>(claims, 'Observation.identifier') ||
           getClaimValue<string>(claims, 'Observation.identifier.value');
         const id = determineResourceId(identifierClaim, process.env.NODE_ENV);
 
-        await this.vaultRepository.put(individualVaultId, [{ id, ...claims } as any], 'observations');
+        const sectionId = getIndividualSectionId(subject, 'observations');
+        await this.vaultRepository.put(tenantVaultId, [{ id, ...claims } as any], sectionId);
 
         responseEntries.push({
           type: 'Observation',

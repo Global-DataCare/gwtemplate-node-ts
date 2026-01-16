@@ -31,6 +31,7 @@ export interface ManagerRegistry {
   familyManager?: IJobProcessor;
   employeeManager?: IJobProcessor;
   individualManager?: IJobProcessor;
+  consentManager?: IJobProcessor;
   compositionManager?: IJobProcessor;
   communicationManager?: IJobProcessor;
   deviceRegistrationManager?: IJobProcessor;

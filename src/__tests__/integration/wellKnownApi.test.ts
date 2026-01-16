@@ -145,6 +145,42 @@ describe('Well-Known JWKS Discovery API', () => {
   });
 });
 
+describe('Well-Known Tenant Artifacts API', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return the stored governance VC (vc.json) for a hosted tenant', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const tenantId = testTenant1AlternateName;
+    const expectedUrl = `/${tenantId}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/vc.json`;
+
+    const expectedVc = { '@context': ['https://www.w3.org/2018/credentials/v1'], type: ['VerifiableCredential'], issuer: 'did:web:host' };
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({ governanceVc: expectedVc } as any);
+
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.text)).toEqual(expectedVc);
+    expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith(testTenant1VaultId);
+  });
+
+  it('should return the stored self-description (self-description.json) for a hosted tenant', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const tenantId = testTenant1AlternateName;
+    const expectedUrl = `/${tenantId}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/self-description.json`;
+
+    const expectedSelfDesc = { type: ['VerifiableCredential'], credentialSubject: { id: testTenant1IdentifierUrn } };
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({ selfDescriptionVc: expectedSelfDesc } as any);
+
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.text)).toEqual(expectedSelfDesc);
+    expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith(testTenant1VaultId);
+  });
+});
+
 describe('Well-Known Legal Participant VC API', () => {
 
   afterEach(() => {

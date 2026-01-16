@@ -35,7 +35,7 @@ interface MockLicenseJobOptions {
   targetTenantId: string;
   quantity: number;
   orderId: string;
-  userClass: 'employee' | 'customer';
+  userClass: 'employee' | 'individual';
   type: 'mobile' | 'web';
   userCategory?: string;
   deviceRestrictions?: DeviceRestrictions;
@@ -120,7 +120,7 @@ describe('LicenseManager', () => {
 
     it('should correctly save the tenantId on the license', async () => {
       // Arrange
-      const job = createMockLicenseJob({ targetTenantId: TEST_TENANT_ID, quantity: 1, orderId: 'inv_123', userClass: 'customer', type: 'web' });
+      const job = createMockLicenseJob({ targetTenantId: TEST_TENANT_ID, quantity: 1, orderId: 'inv_123', userClass: 'individual', type: 'web' });
   
       // Act
       await manager.process(job);
@@ -148,7 +148,7 @@ describe('LicenseManager', () => {
 
     it('should not assign a userCategory to a customer license', async () => {
       // Arrange
-      const job = createMockLicenseJob({ targetTenantId: TEST_TENANT_ID, quantity: 1, orderId: 'inv_789', userClass: 'customer', type: 'web', userCategory: 'medicalStaff' });
+      const job = createMockLicenseJob({ targetTenantId: TEST_TENANT_ID, quantity: 1, orderId: 'inv_789', userClass: 'individual', type: 'web', userCategory: 'medicalStaff' });
 
       // Act
       await manager.process(job);
@@ -157,7 +157,7 @@ describe('LicenseManager', () => {
       const [, documents] = (mockVaultRepository.put as jest.Mock).mock.calls[0];
       const license = (documents[0] as ConfidentialStorageDoc).content as DeviceLicense;
 
-      expect(license.userClass).toBe('customer');
+      expect(license.userClass).toBe('individual');
       expect(license.userCategory).toBeUndefined();
     });
 

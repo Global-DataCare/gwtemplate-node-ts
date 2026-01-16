@@ -11,6 +11,9 @@ import { IssueLevel, IssueType } from 'gdc-sdk-client-ts/src/models/issue';
 import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { buildConsentRuleKey, hashConsentRuleId } from '../utils/consent';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
+import { getTenantVaultId } from '../utils/tenant';
+import { getIndividualSectionId } from '../utils/individual-sections';
+import { IJobProcessor } from './registry';
 
 export interface ConsentManagerDeps {
   vaultRepository: IVaultRepository;
@@ -28,7 +31,7 @@ const requiredClaims = [
   ClaimConsent.attachmentData,
 ];
 
-export class ConsentManager {
+export class ConsentManager implements IJobProcessor {
   private readonly vaultRepository: IVaultRepository;
 
   constructor(deps: ConsentManagerDeps) {
@@ -36,11 +39,19 @@ export class ConsentManager {
   }
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
-    const bundle = job.content?.body as BundleJsonApi<BundleEntryRequest>;
+    const body = job.content?.body as any;
+    const bundle = body as BundleJsonApi<BundleEntryRequest>;
     const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
 
-    for (const entry of bundle.data) {
-        const rawClaims = entry.resource?.meta?.claims as Record<string, any> | undefined;
+    const entries: any[] =
+      (bundle && Array.isArray((bundle as any).data) && (bundle as any).data) ||
+      (body && Array.isArray(body.entry) && body.entry) ||
+      [];
+
+    for (const entry of entries) {
+        const rawClaims =
+          ((entry as any)?.meta?.claims as Record<string, any> | undefined) ??
+          ((entry as any)?.resource?.meta?.claims as Record<string, any> | undefined);
 
         try {
             if (!rawClaims) {
@@ -88,12 +99,11 @@ export class ConsentManager {
               purpose: getClaimValue<string>(claims, ClaimConsent.purpose) as string,
             });
             const ruleId = hashConsentRuleId(ruleKey);
-            const individualVaultId = `${job.tenantId}/${job.jurisdiction}/${job.sector}/individual/${subjectId}`;
+            const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+            const individualRulesSectionId = getIndividualSectionId(subjectId, 'rules');
 
-            const vaultExists = await this.vaultRepository.vaultExists(individualVaultId);
-            if (!vaultExists) {
-                throw new Error(`Individual vault not found for subject: ${subjectId}`);
-            }
+            const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+            if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
             // 1. Handle the attachment
             const attachmentDataBase64 = getClaimValue<string>(claims, ClaimConsent.attachmentData);
@@ -108,9 +118,9 @@ export class ConsentManager {
             };
 
             await this.vaultRepository.put(
-                individualVaultId,
+                tenantVaultId,
                 [attachmentRecord],
-                'attachments'
+                getIndividualSectionId(subjectId, 'attachments')
             );
 
             // 2. Create and store the rule
@@ -131,7 +141,7 @@ export class ConsentManager {
               id: ruleId,
             };
 
-            await this.vaultRepository.put(individualVaultId, [consentRule], 'rules');
+            await this.vaultRepository.put(tenantVaultId, [consentRule], individualRulesSectionId);
 
             responseEntries.push({
                 response: {

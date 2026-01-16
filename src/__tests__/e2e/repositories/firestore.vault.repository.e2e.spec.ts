@@ -1,12 +1,26 @@
 import admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { FirestoreVaultRepository } from '../../../database/repositories/firestore/firestore.vault.repository';
 
 // IMPORTANT: This E2E test is configured via the .env.test file.
 // See TESTING-FIRESTORE.md for instructions.
+const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const hasCredentialsFile = credentialsPath
+  ? fs.existsSync(path.resolve(credentialsPath))
+  : false;
+const hasFirestoreConfig = Boolean(
+  process.env.FIRESTORE_EMULATOR_HOST ||
+  hasCredentialsFile ||
+  process.env.FIREBASE_PRIVATE_KEY
+);
+const shouldRun = process.env.FIRESTORE_E2E === 'true' && hasFirestoreConfig;
+const describeIfConfigured = shouldRun ? describe : describe.skip;
 
 const TEST_CONFIDENTIAL_DOC: ConfidentialStorageDoc = {
   id: 'e2e-doc-1',
+  status: 'active',
   sequence: 0,
   indexed: {
     attributes: [
@@ -17,7 +31,7 @@ const TEST_CONFIDENTIAL_DOC: ConfidentialStorageDoc = {
   jwe: { data: 'e2e-test' },
 };
 
-describe('FirestoreVaultRepository (E2E)', () => {
+describeIfConfigured('FirestoreVaultRepository (E2E)', () => {
   let repository: FirestoreVaultRepository;
   const vaultId = `e2e-test-vault-${Date.now()}`;
 

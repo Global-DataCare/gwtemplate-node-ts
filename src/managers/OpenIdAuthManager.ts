@@ -13,6 +13,7 @@ import { getTenantVaultId } from '../utils/tenant';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { getClaimValue } from '../utils/claims';
 import { parseActorFromSub } from 'gdc-common-utils-ts/utils/actor';
+import { getIndividualSectionId } from '../utils/individual-sections';
 
 type TokenRequestBody = {
   scope?: string;
@@ -56,11 +57,9 @@ export class OpenIdAuthManager implements IJobProcessor {
     // Require a root scope item of the form:
     //   patient/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=...]
     const { subject, sections } = this.extractPinnedSubjectAndSections(scope);
-    const individualVaultId = `${job.tenantId}/${job.jurisdiction}/${job.sector}/individual/${subject}`;
-    const vaultConfig = await this.vaultRepository.getVaultConfig(individualVaultId);
-    if (!vaultConfig) {
-      throw new ManagerError(`Individual vault not found for subject: ${subject}`, IssueType.NotFound);
-    }
+    const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
+    const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+    if (!tenantExists) throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
 
     // --- Consent Rule Check (MVP) ---
     // This is a minimal permission gate to support unit/integration tests.
@@ -81,7 +80,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       jurisdictionActorIds.push(`urn:iso:3166-2:${jurisdiction}`);
     }
 
-    const rules = await this.vaultRepository.getContainersInSection<any>(individualVaultId, 'rules');
+    const rules = await this.vaultRepository.getContainersInSection<any>(tenantVaultId, getIndividualSectionId(subject, 'rules'));
     const matchingRule = rules.find((rule) => {
       const decision = getClaimValue<string>(rule as any, 'Consent.decision');
       if (decision !== 'permit') return false;

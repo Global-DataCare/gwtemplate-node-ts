@@ -11,36 +11,40 @@ export type EntryWithMetaAndTags = {
 
 export type DerivationResult = {
   anonymizedText: string;
-  observations: EntryWithMetaAndTags[];
+  /**
+   * JSON:API Primary Document entries (canonical internal form).
+   * When representing this as FHIR Bundle, these become `Bundle.entry[]`.
+   */
+  data: EntryWithMetaAndTags[];
   meta?: {
     tag?: any[];
   };
 };
 
-export type ConversationDerivationParams = {
+export type UserInputDerivationParams = {
   model: string;
-  text: string;
+  inputText: string;
   policyPrompt?: string;
   ledgerSafe?: boolean;
 };
 
-export class ConversationDerivationService {
+export class UserInputDerivationService {
   constructor(private readonly llm: LLMProvider) {}
 
-  async derive(params: ConversationDerivationParams): Promise<DerivationResult> {
+  async derive(params: UserInputDerivationParams): Promise<DerivationResult> {
     const prompt =
       `${params.policyPrompt ? `${params.policyPrompt.trim()}\n\n` : ''}` +
-      `Task: Anonymize the user text and derive a JSON bundle of Observation entries.\n` +
+      `Task: Anonymize the user text and derive a JSON:API Primary Document with data entries.\n` +
       `Return ONLY valid JSON with this shape:\n` +
       `{\n` +
       `  "anonymizedText": string,\n` +
       `  "meta": { "tag": [{ "id": string, "system"?: string, "code"?: string, "version"?: string, "display"?: string, "userSelected"?: boolean }] },\n` +
-      `  "observations": [{ "type": string, "meta": { "claims": object }, "resource"?: object }]\n` +
+      `  "data": [{ "type": string, "meta": { "claims": object }, "resource"?: object }]\n` +
       `}\n\n` +
       `Rules:\n` +
-      `- "meta.tag[].id" MUST be unique and SHOULD use an index per resource type, e.g. "Observation[0].code", "Observation[1].date-when".\n\n` +
+      `- "meta.tag[].id" MUST be unique and SHOULD use an index per resource type, e.g. "Observation[0].code", "MedicationStatement[0].medication".\n\n` +
       `User text:\n` +
-      `${params.text}`;
+      `${params.inputText}`;
 
     const raw = await this.llm.generateJson<DerivationResult>({
       model: params.model,
@@ -50,16 +54,22 @@ export class ConversationDerivationService {
     });
 
     const anonymizedText = typeof raw?.anonymizedText === 'string' ? raw.anonymizedText : '';
-    const observations = Array.isArray(raw?.observations) ? raw.observations : [];
+    const data = Array.isArray((raw as any)?.data)
+      ? (raw as any).data
+      : Array.isArray((raw as any)?.entry)
+        ? (raw as any).entry
+        : Array.isArray((raw as any)?.observations)
+          ? (raw as any).observations
+          : [];
     const meta = raw?.meta && typeof raw.meta === 'object' ? raw.meta : undefined;
 
     if (!params.ledgerSafe) {
-      return { anonymizedText, observations, meta };
+      return { anonymizedText, data, meta };
     }
 
     const tag = toLedgerSafeMetaTags((meta as any)?.tag);
     const ledgerSafeMeta = meta ? { ...(meta as any), tag } : { tag };
 
-    return { anonymizedText, observations, meta: ledgerSafeMeta };
+    return { anonymizedText, data, meta: ledgerSafeMeta };
   }
 }

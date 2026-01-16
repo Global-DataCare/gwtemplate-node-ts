@@ -231,7 +231,7 @@ describe('Network Enrollment API', () => {
       (tenantsCacheManager.getDidServiceConfig as jest.Mock).mockReturnValue(mockTenantServices);
 
       // We simulate a job signed by a legitimate but non-privileged employee.
-      const employeeDid = `did:web:${tenantId}:employee:analyst@${tenantId}.org:role:analyst`;
+      const employeeDid = `did:web:${tenantId}:employee:analyst@${tenantId}.org:analyst`;
       const employeeKid = `urn:ietf:rfc:7638:thumbprint-of-analyst-key`;
       
       const jobFromNonControllerEmployee: IDecodedDidcommPayload = {

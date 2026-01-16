@@ -173,6 +173,11 @@ export class VaultMemRepository implements IVaultRepository {
   }
 
   public async getHistory(collectionName: string, containerId: string): Promise<any[]> { return []; }
-  public async delete(collectionName: string, containerId: string, sectionId?: string): Promise<boolean> { return false; }
+  public async delete(collectionName: string, containerId: string, sectionId: string = 'default'): Promise<boolean> {
+    const vault = this.dataVaults.get(collectionName);
+    const section = vault?.sections.get(sectionId);
+    if (!vault || !section) return false;
+    return section.delete(containerId);
+  }
   public async purge(collectionName: string): Promise<boolean> { return this.dataVaults.delete(collectionName); }
 }

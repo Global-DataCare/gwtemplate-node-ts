@@ -364,7 +364,7 @@ export class IndividualManager {
     }
     if (!resources.person || !resources.service) {
       throw new ManagerError(
-        'Incomplete claims: Person and Service resources are required for customer creation.',
+        'Incomplete claims: Person and Service resources are required for individual creation.',
         IssueType.Required,
       );
     }
@@ -383,13 +383,17 @@ export class IndividualManager {
         DEVICE_LICENSE_SECTION,
       )) || [];
 
-    const customerLicenseDocs = licenseDocs.filter((doc) => (doc.content as DeviceLicense | undefined)?.userClass === 'customer');
-    if (customerLicenseDocs.length === 0) {
-      // No customer licenses in the vault => licensing not configured; do not gate.
+    const individualLicenseDocs = licenseDocs.filter((doc) => {
+      const cls = (doc.content as any)?.userClass;
+      // Backward compatibility: old stored licenses used `customer`.
+      return cls === 'individual' || cls === 'customer';
+    });
+    if (individualLicenseDocs.length === 0) {
+      // No individual licenses in the vault => licensing not configured; do not gate.
       return undefined;
     }
 
-    const availableDoc = customerLicenseDocs.find((doc) => (doc.content as DeviceLicense).status === 'available');
+    const availableDoc = individualLicenseDocs.find((doc) => (doc.content as DeviceLicense).status === 'available');
     if (!availableDoc) {
       const hostDid = (await this.tenantsCacheManager.getTenantDid('host')) || 'did:web:host';
       const allowedPaymentMethods = (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(',').map(s => s.trim()).filter(Boolean);
@@ -434,7 +438,7 @@ export class IndividualManager {
         },
       };
     } else {
-      console.error('Unexpected error during customer processing:', error);
+      console.error('Unexpected error during individual processing:', error);
       return {
         type: entryType,
         meta: meta,

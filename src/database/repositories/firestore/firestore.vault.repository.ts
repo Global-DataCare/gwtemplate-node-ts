@@ -27,6 +27,24 @@ export class FirestoreVaultRepository extends IVaultRepository {
     this.hostCollectionName = hostCollectionName;
   }
 
+  private sectionDocRef(collectionName: string, sectionId: string): admin.firestore.DocumentReference {
+    return this.db.collection(collectionName).doc(sectionId);
+  }
+
+  private documentsCollectionRef(collectionName: string, sectionId: string): admin.firestore.CollectionReference {
+    return this.sectionDocRef(collectionName, sectionId).collection('documents');
+  }
+
+  private async ensureSectionExists(collectionName: string, sectionId: string): Promise<void> {
+    // Create/update the parent section doc so that:
+    // - sections are discoverable via listDocuments()
+    // - sectionExists() is meaningful
+    await this.sectionDocRef(collectionName, sectionId).set(
+      { id: sectionId, updatedAt: new Date().toISOString() },
+      { merge: true },
+    );
+  }
+
   /**
    * In the Firestore implementation, this is a no-op that returns true.
    * The actual creation of a tenant's registration record is handled by a `put`
@@ -50,9 +68,10 @@ export class FirestoreVaultRepository extends IVaultRepository {
 
   async put<T extends RecordBase>(collectionName: string, documents: T[], sectionId: string = DEFAULT_SECTION): Promise<boolean> {
     try {
+      await this.ensureSectionExists(collectionName, sectionId);
       const batch = this.db.batch();
       // Firestore path: {collectionName}/{sectionId}/documents/{documentId}
-      const sectionCollectionRef = this.db.collection(collectionName).doc(sectionId).collection('documents');
+      const sectionCollectionRef = this.documentsCollectionRef(collectionName, sectionId);
       documents.forEach((document) => {
         const docRef = sectionCollectionRef.doc(document.id);
         batch.set(docRef, { ...document });
@@ -66,21 +85,21 @@ export class FirestoreVaultRepository extends IVaultRepository {
   }
 
   async get<T extends RecordBase>(collectionName: string, docId: string, sectionId: string = DEFAULT_SECTION): Promise<T | undefined> {
-    const docRef = this.db.collection(collectionName).doc(sectionId).collection('documents').doc(docId);
+    const docRef = this.documentsCollectionRef(collectionName, sectionId).doc(docId);
     console.log(`[FirestoreVaultRepository DEBUG] GET path: ${docRef.path}`); // <-- DEBUG LOG
     const docSnap = await docRef.get();
     return docSnap.exists ? (docSnap.data() as T) : undefined;
   }
 
   async getContainersInSection<T extends RecordBase>(collectionName: string, sectionId: string): Promise<T[]> {
-    const sectionCollectionRef = this.db.collection(collectionName).doc(sectionId).collection('documents');
+    const sectionCollectionRef = this.documentsCollectionRef(collectionName, sectionId);
     const querySnapshot = await sectionCollectionRef.get();
     return querySnapshot.docs.map((doc) => doc.data() as T);
   }
 
   async query<T extends RecordBase>(collectionName: string, q: any): Promise<T[]> {
     const sectionId = q.section || DEFAULT_SECTION;
-    let queryChain: admin.firestore.Query = this.db.collection(collectionName).doc(sectionId).collection('documents');
+    let queryChain: admin.firestore.Query = this.documentsCollectionRef(collectionName, sectionId);
 
     if (q.equals && q.equals['indexed.attributes']) {
       const attributeToFind = q.equals['indexed.attributes'];
@@ -93,14 +112,65 @@ export class FirestoreVaultRepository extends IVaultRepository {
     return snapshot.docs.map((doc) => doc.data() as T);
   }
 
-  // --- Stubbed Methods (Not Implemented) ---
-  getVaultConfig(vaultId: string): Promise<VaultConfig | undefined> { throw new Error('Method not implemented.'); }
-  createNewSection(collectionName: string, sectionId: string): Promise<boolean> { throw new Error('Method not implemented.'); }
-  updateSection(collectionName: string, sectionId: string, containers?: any[] | undefined): Promise<boolean> { throw new Error('Method not implemented.'); }
-  getAllSections(collectionName: string): Promise<string[]> { throw new Error('Method not implemented.'); }
-  sectionExists(collectionName: string, sectionId: string): Promise<boolean> { throw new Error('Method not implemented.'); }
-  getContainersListInSection(collectionName: string, sectionId: string): Promise<string[]> { throw new Error('Method not implemented.'); }
-  getHistory(collectionName: string, containerId: string): Promise<any[]> { throw new Error('Method not implemented.'); }
-  delete(collectionName: string, containerId: string, sectionId?: string | undefined): Promise<boolean> { throw new Error('Method not implemented.'); }
-  purge(collectionName: string): Promise<boolean> { throw new Error('Method not implemented.'); }
+  async getVaultConfig(vaultId: string): Promise<VaultConfig | undefined> {
+    // Firestore BYOD variant can store vault configs in a well-known section inside the vault itself.
+    // For now, return undefined unless explicitly stored by managers.
+    return undefined;
+  }
+
+  async createNewSection(collectionName: string, sectionId: string): Promise<boolean> {
+    try {
+      await this.ensureSectionExists(collectionName, sectionId);
+      return true;
+    } catch (error) {
+      console.error(`[FirestoreVaultRepository] createNewSection failed for '${collectionName}/${sectionId}':`, error);
+      return false;
+    }
+  }
+
+  async updateSection(collectionName: string, sectionId: string, containers: any[] = []): Promise<boolean> {
+    // Note: this does not delete containers that are no longer present. It only upserts.
+    try {
+      await this.put(collectionName, containers, sectionId);
+      return true;
+    } catch (error) {
+      console.error(`[FirestoreVaultRepository] updateSection failed for '${collectionName}/${sectionId}':`, error);
+      return false;
+    }
+  }
+
+  async getAllSections(collectionName: string): Promise<string[]> {
+    const docs = await this.db.collection(collectionName).listDocuments();
+    return docs.map((d) => d.id);
+  }
+
+  async sectionExists(collectionName: string, sectionId: string): Promise<boolean> {
+    const snap = await this.sectionDocRef(collectionName, sectionId).get();
+    return snap.exists;
+  }
+
+  async getContainersListInSection(collectionName: string, sectionId: string): Promise<string[]> {
+    const docs = await this.documentsCollectionRef(collectionName, sectionId).listDocuments();
+    return docs.map((d) => d.id);
+  }
+
+  async getHistory(collectionName: string, containerId: string): Promise<any[]> {
+    // Firestore does not provide version history by default (unless we implement it explicitly).
+    return [];
+  }
+
+  async delete(collectionName: string, containerId: string, sectionId: string = DEFAULT_SECTION): Promise<boolean> {
+    try {
+      await this.documentsCollectionRef(collectionName, sectionId).doc(containerId).delete();
+      return true;
+    } catch (error) {
+      console.error(`[FirestoreVaultRepository] delete failed for '${collectionName}/${sectionId}/${containerId}':`, error);
+      return false;
+    }
+  }
+
+  async purge(collectionName: string): Promise<boolean> {
+    // Dangerous operation; not implemented for Firestore in this repo.
+    throw new Error('Method not implemented.');
+  }
 }

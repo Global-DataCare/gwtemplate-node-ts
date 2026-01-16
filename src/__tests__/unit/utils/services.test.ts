@@ -59,7 +59,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServicesConfig(tenantConfig.provider!.service.sectorCategory as Sector);
 
       // ASSERT
-      expect(services).toHaveLength(8); // 2 business + 2 network + 4 identity (OIDC/Firebase)
+      expect(services).toHaveLength(10); // 2 business + 2 network + 6 identity (OIDC/Firebase + License/_issue + Device/_search)
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -80,7 +80,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServicesConfig(tenantConfig.provider!.service.sectorCategory as Sector);
       
       // ASSERT
-      expect(services).toHaveLength(8); // 2 business + 2 network + 4 identity (OIDC/Firebase)
+      expect(services).toHaveLength(12); // + org.hl7.fhir.* individual services + License/_issue + Device/_search identity endpoints
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();

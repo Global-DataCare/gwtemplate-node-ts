@@ -8,6 +8,7 @@ import { testConsentRulePermitOrgDid } from '../../data/consent-rules.data';
 import { generateTenantCollectionNameFromClaims } from '../../../utils/tenant';
 import { initializeTenantServicesConfig } from '../../../utils/services';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { getIndividualSectionId } from '../../../utils/individual-sections';
 
 describe('SMART token issuance (integration)', () => {
   it('should issue token when subject exists and rules match', async () => {
@@ -64,11 +65,10 @@ describe('SMART token issuance (integration)', () => {
 
       // Create the individual's physical vault and rules
       const subject = 'did:web:api.acme.org:individual:123';
-      const individualVaultId = `acme/ES/health-care/individual/${subject}`;
-      await vaultRepository.createNewVault({ id: individualVaultId } as any);
-      await vaultRepository.put(individualVaultId, [{
+      const individualRulesSectionId = getIndividualSectionId(subject, 'rules');
+      await vaultRepository.put(tenantVaultId, [{
         ...testConsentRulePermitOrgDid,
-      } as any], 'rules');
+      } as any], individualRulesSectionId);
 
       // Submit token request (legacy/plaintext)
       const tokenUrl = `/acme/cds-ES/v1/health-care/identity/openid/smart/token`;

@@ -206,7 +206,7 @@ describe('IndividualManager', () => {
         id: 'lic-1',
         tenantId: 'acme',
         orderId: 'order-1',
-        userClass: 'customer',
+        userClass: 'individual',
         type: 'mobile',
         status: 'issued',
         plan: 'default',

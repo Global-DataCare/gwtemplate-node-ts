@@ -312,7 +312,7 @@ export const SMART_TOKEN_REQUEST = {
   "body": {
     "expires_in": 300,
     "token_type": "Bearer",
-    "sub": "did:web:api.acme.org:employee:doctor1@acme.org:role:ISCO-08|2211",
+    "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
     "purpose": "TREAT",
     "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=LOINC|48765-2 patient/Consent.cruds"
   },
@@ -338,6 +338,42 @@ export const INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST = {
     "subject_token": "<license-activation-code>"
   }
 };
+
+/**
+ * @see API_INTEGRATORS_GUIDE.md section 7.1.1 (tenant admin step)
+ * Issue (reserve) a single employee activation code from the tenant license pool.
+ *
+ * Notes:
+ * - This is a tenant-admin / IT operation (not done by the employee device).
+ * - The response will return a `batch-response` entry with `id = <activationCode>` for copy/paste.
+ */
+export const LICENSE_ISSUE_REQUEST = {
+  jti: 'license-issue-request-id',
+  thid: 'license-issue-thread-id',
+  iss: 'did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>',
+  aud: 'did:web:api.acme.org#identity_openid_license_issue',
+  type: 'application/api+json',
+  body: {
+    resourceType: 'Bundle',
+    type: 'batch',
+    data: [
+      {
+        type: 'EmployeeLicenseInvitation-v1.0',
+        meta: {
+          claims: {
+            '@context': 'org.schema',
+            '@type': 'IndividualProduct:Issue',
+            'org.schema.Person.email': 'doctor1@acme.org',
+            'org.schema.Person.hasOccupation': 'ISCO-08|2211',
+            'org.schema.IndividualProduct.category': 'professional',
+            'org.schema.IndividualProduct.additionalType': 'mobile',
+          },
+        },
+        request: { method: 'POST', url: '/acme/cds-ES/v1/health-care/identity/openid/License/_issue' },
+      },
+    ],
+  },
+} as const;
 
 /**
  * @see API_INTEGRATORS_GUIDE.md section 7.1.1

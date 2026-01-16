@@ -30,7 +30,7 @@ describe('normalizeCodeSystemAndValue', () => {
 
   it('should normalize a non-URL code system with a pipe separator', () => {
     const input = 'ISCO-08|4226';
-    const expected = 'isco-08|4226';
+    const expected = 'isco-08:4226';
     expect(normalizeCodeSystemAndValue(input)).toBe(expected);
   });
 

@@ -120,8 +120,21 @@ describe('HostingManager - Offer/Order Flow', () => {
     );
 
     mockKmsService.getPublicJwks.mockResolvedValue({
-      keys: [{ kid: 'sig-key-1', use: 'sig', alg: 'ML-DSA-44' } as any],
+      keys: [
+        { kid: 'sig-key-1', use: 'sig', alg: 'ML-DSA-44' } as any,
+        { kid: 'enc-key-1', use: 'enc', crv: 'ML-KEM-768' } as any,
+      ],
     });
+
+    // HostingManager expects provisioning to return at least one signing key (kty=AKP)
+    // and one encryption key (kty=OKP), each with a `kid`, when it needs to build
+    // an admin employee DID document during order finalization.
+    mockKmsService.provisionKeys.mockResolvedValue({
+      keys: [
+        { kty: 'AKP', kid: 'sig-key-1', use: 'sig', alg: 'ML-DSA-44' },
+        { kty: 'OKP', kid: 'enc-key-1', use: 'enc', crv: 'ML-KEM-768' },
+      ],
+    } as any);
 
     // Bootstrap the host. This will teach the mock repository the host's collection name.
     await hostingManager.bootstrapHost(testClaimsHostInitialization);

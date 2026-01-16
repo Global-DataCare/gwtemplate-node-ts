@@ -232,6 +232,26 @@ export function createDiscoveryRouter(
     }
   });
 
+  // Legacy/dev-friendly: return the tenant's stored governance VC and self-description (if present).
+  // Some clients (e.g. app templates) rely on these documents being downloadable from well-known endpoints.
+  router.get([`${hostWellKnownPrefix}/vc.json`, `${tenantWellKnownPrefix}/vc.json`], resolveTenant, async (req, res) => {
+    const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    const vc = entityConfig?.governanceVc;
+    if (!vc) return res.status(404).type('text').send('Not Found');
+    res.json(vc);
+  });
+
+  router.get(
+    [`${hostWellKnownPrefix}/self-description.json`, `${tenantWellKnownPrefix}/self-description.json`],
+    resolveTenant,
+    async (req, res) => {
+      const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+      const selfDescription = entityConfig?.selfDescriptionVc;
+      if (!selfDescription) return res.status(404).type('text').send('Not Found');
+      res.json(selfDescription);
+    },
+  );
+
   router.get([`${hostWellKnownPrefix}/legal-participant.vc.json`, `${tenantWellKnownPrefix}/legal-participant.vc.json`], resolveTenant, async (req, res) => {
     try {
       const vaultId = res.locals.vaultId;

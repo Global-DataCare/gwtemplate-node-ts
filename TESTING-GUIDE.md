@@ -1,6 +1,7 @@
 # End-to-End (E2E) Testing Guide
 
 This guide provides instructions for setting up and running the End-to-End (E2E) test suite, which validates the application's integration with live Google Cloud Platform (GCP) services.
+For general testing strategy and tiers, see `TESTING.md`.
 
 ## 1. Overview
 
@@ -105,4 +106,3 @@ npm run test:e2e
 ```
 
 This command will execute all test files in the `src/__tests__/e2e` directory. If the environment is configured correctly, all tests should pass.
-

@@ -67,6 +67,9 @@ export class Worker {
         case 'Composition':
           manager = this.managers.compositionManager;
           break;
+        case 'Consent':
+          manager = this.managers.consentManager;
+          break;
         case 'Communication':
           manager = this.managers.communicationManager;
           break;

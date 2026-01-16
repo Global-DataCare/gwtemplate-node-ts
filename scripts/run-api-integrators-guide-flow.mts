@@ -7,6 +7,7 @@ import {
   ORGANIZATION_ORDER_REQUEST,
   FIREBASE_CUSTOM_TOKEN_REQUEST,
   INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST,
+  LICENSE_ISSUE_REQUEST,
   DEVICE_REGISTRATION_REQUEST,
   SMART_TOKEN_REQUEST,
   EMPLOYEE_REGISTRATION_REQUEST,
@@ -19,6 +20,7 @@ import {
 import { AppAuthorizationManager } from '../src/managers/AppAuthorizationManager';
 import { testConsentRulePermitOrgDid } from '../src/__tests__/data/consent-rules.data';
 import { getTenantVaultId } from '../src/utils/tenant';
+import { getIndividualSectionId } from '../src/utils/individual-sections';
 import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { resolveHostRegistrySector } from '../src/utils/services';
 
@@ -232,51 +234,80 @@ async function main() {
     const idToken = makeDemoJwt({ sub: 'user1@example.com', tenant_id: 'acme' });
     const activationCode = 'activation-code-demo-1';
     {
+      const invalidReqBody = deepClone(INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST);
+      invalidReqBody.thid = 'token-exchange-thread-id-invalid';
+      invalidReqBody.jti = 'token-exchange-request-id-invalid';
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange',
         headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: `Bearer ${idToken}` },
-        body: { ...deepClone(INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST), body: { subject_token: activationCode } },
+        body: { ...invalidReqBody, body: { subject_token: activationCode } },
       };
-      const resp = await invokeExpress(app, req);
-      report.steps.push({
-        name: '2.1.2 Initial Access Token Exchange (missing code)',
-        request: req,
-        submit: { status: resp.status, headers: resp.headers, bodyText: resp.text, ...(safeJsonParse(resp.text) ? { bodyJson: safeJsonParse(resp.text) } : {}) },
-      });
+      const { submit, poll } = await submitAndMaybePoll(app, req);
+      report.steps.push({ name: '2.1.2 Initial Access Token Exchange (invalid code)', request: req, submit, ...(poll ? { poll } : {}) });
     }
 
-    // Seed an issued license with an activationCode for a successful exchange.
-    await vaultRepository.put(tenantVaultId, [{
-      id: 'license-issued-1',
-      status: 'issued',
-      sequence: 0,
-      content: {
-        id: 'license-issued-1',
-        tenantId: 'acme',
-        userClass: 'employee',
-        type: 'mobile',
-        status: 'issued',
-        activationCode,
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      },
-    } as any], 'device-licenses');
+    // Seed one AVAILABLE license (the pool created after purchase), then issue an activation code via the API.
+    // This simulates the tenant admin "invite" step.
+    await vaultRepository.put(
+      tenantVaultId,
+      [
+        {
+          id: 'license-available-1',
+          status: 'available',
+          sequence: 0,
+          content: {
+            id: 'license-available-1',
+            tenantId: 'acme',
+            userClass: 'employee',
+            type: 'mobile',
+            status: 'available',
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          },
+        } as any,
+      ],
+      'device-licenses',
+    );
 
-    let initialAccessToken: string | undefined;
     {
       const req = {
         method: 'POST',
+        url: '/acme/cds-ES/v1/health-care/identity/openid/License/_issue',
+        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        body: deepClone(LICENSE_ISSUE_REQUEST),
+      };
+      const { submit, poll } = await submitAndMaybePoll(app, req);
+      const finalJson = poll?.final?.bodyJson || submit.bodyJson;
+      const issuedCode =
+        finalJson?.body?.data?.[0]?.id ||
+        finalJson?.data?.[0]?.id;
+      if (typeof issuedCode === 'string' && issuedCode.startsWith('lic-')) {
+        // Use the issued code for the subsequent token exchange.
+        (globalThis as any).__issuedActivationCode = issuedCode;
+      }
+      report.steps.push({ name: '2.1.1 License Issue (invite)', request: req, submit, ...(poll ? { poll } : {}) });
+    }
+
+    let initialAccessToken: string | undefined;
+    {
+      const issuedCode = (globalThis as any).__issuedActivationCode;
+      const validReqBody = deepClone(INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST);
+      validReqBody.thid = 'token-exchange-thread-id-valid';
+      validReqBody.jti = 'token-exchange-request-id-valid';
+      const req = {
+        method: 'POST',
         url: '/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange',
         headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: `Bearer ${idToken}` },
-        body: { ...deepClone(INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST), body: { subject_token: activationCode } },
+        body: { ...validReqBody, body: { subject_token: issuedCode || activationCode } },
       };
-      const resp = await invokeExpress(app, req);
-      const bodyJson = safeJsonParse(resp.text);
-      initialAccessToken = bodyJson?.body?.initial_access_token;
+      const { submit, poll } = await submitAndMaybePoll(app, req);
+      const bodyJson = poll?.final?.bodyJson || submit.bodyJson;
+      initialAccessToken = bodyJson?.initial_access_token || bodyJson?.body?.initial_access_token;
       report.steps.push({
         name: '2.1.2 Initial Access Token Exchange (valid)',
         request: req,
-        submit: { status: resp.status, headers: resp.headers, bodyText: resp.text, ...(bodyJson ? { bodyJson } : {}) },
+        submit,
+        ...(poll ? { poll } : {}),
       });
     }
 
@@ -358,9 +389,14 @@ async function main() {
       report.steps.push({ name: '2.2 SMART Token (missing subject vault)', request: req, submit, ...(poll ? { poll } : {}) });
     }
 
-    const individualVaultId = `acme/ES/health-care/individual/${subject}`;
-    await vaultRepository.createNewVault({ id: individualVaultId } as any);
-    await vaultRepository.put(individualVaultId, [{ ...testConsentRulePermitOrgDid } as any], 'rules');
+    // Seed consent rule in the TENANT vault, under the per-individual rules section,
+    // matching where ConsentManager persists rules in production.
+    const acmeTenantVaultId = getTenantVaultId('health-care', 'acme');
+    await vaultRepository.put(
+      acmeTenantVaultId,
+      [{ ...testConsentRulePermitOrgDid } as any],
+      getIndividualSectionId(subject, 'rules'),
+    );
 
     {
       const reqBody = deepClone(SMART_TOKEN_REQUEST);

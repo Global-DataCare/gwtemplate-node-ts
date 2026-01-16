@@ -136,7 +136,7 @@ describe('AppAuthorizationManager', () => {
         // Arrange
         const mockLicense: DeviceLicense = { 
           id: 'license-2', tenantId: 'acme', status: 'active', plan: 'annual',
-          orderId: 'order-456', userClass: 'customer', type: 'web',
+          orderId: 'order-456', userClass: 'individual', type: 'web',
           renewalCycle: null, reactivationEnabled: false, exp: now + 3600,
           activationCode: 'used-code',
         };

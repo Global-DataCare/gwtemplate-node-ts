@@ -61,6 +61,7 @@ import { OpenIdAuthManager } from './managers/OpenIdAuthManager';
 import { IdentityTokenManager } from './managers/IdentityTokenManager';
 import { ObservationManager } from './managers/ObservationManager';
 import { RelatedPersonManager } from './managers/RelatedPersonManager';
+import { ConsentManager } from './managers/ConsentManager';
 import { SmartAuthorizationManager } from './managers/auth/SmartAuthorizationManager';
 import { AppAuthorizationManager } from './managers/AppAuthorizationManager';
 import { FamilyManager } from './managers/FamilyManager';
@@ -323,10 +324,10 @@ async function startServer(options?: StartServerOptions) {
     config,
   );
 
-  const compositionManager = new CompositionManager();
+  const compositionManager = new CompositionManager(vaultRepository);
   const communicationManager = new CommunicationManager({ tenantsCacheManager: tenantManager });
-  const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl);
-  const licenseManager = new LicenseManager(vaultRepository);
+  const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService);
+  const licenseManager = new LicenseManager(vaultRepository, kmsService);
 
   // --- Auth Flow Dependencies ---
   const tokenVerifier =
@@ -344,6 +345,7 @@ async function startServer(options?: StartServerOptions) {
   const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository);
   const observationManager = new ObservationManager(vaultRepository);
   const relatedPersonManager = new RelatedPersonManager(vaultRepository);
+  const consentManager = new ConsentManager({ vaultRepository });
 
   const discoveryService = new DiscoveryService(tenantManager);
 
@@ -367,6 +369,7 @@ async function startServer(options?: StartServerOptions) {
     familyManager,
     employeeManager,
     individualManager,
+    consentManager,
     compositionManager,
     communicationManager,
     deviceRegistrationManager,

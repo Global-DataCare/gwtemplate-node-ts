@@ -41,7 +41,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
       createNewVault: jest.fn(),
-      vaultExists: jest.fn(),
+      vaultExists: jest.fn().mockResolvedValue(true),
       getVaultConfig: jest.fn().mockResolvedValue({ id: 'vault' } as any),
       createNewSection: jest.fn(),
       updateSection: jest.fn(),
@@ -79,7 +79,7 @@ describe('OpenIdAuthManager', () => {
         iss: 'did:web:device.example',
         aud: 'did:web:api.acme.org',
         body: {
-          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:role:ISCO-08|2211',
+          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
           scope: 'patient/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2',
           purpose: 'TREAT',
           expires_in: 300,
@@ -119,7 +119,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
       createNewVault: jest.fn(),
-      vaultExists: jest.fn(),
+      vaultExists: jest.fn().mockResolvedValue(true),
       getVaultConfig: jest.fn().mockResolvedValue({ id: 'vault' } as any),
       createNewSection: jest.fn(),
       updateSection: jest.fn(),
@@ -153,7 +153,7 @@ describe('OpenIdAuthManager', () => {
         iss: 'did:web:device.example',
         aud: 'did:web:api.acme.org',
         body: {
-          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:role:ISCO-08|2211',
+          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
           scope: 'patient/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2',
           purpose: 'TREAT',
         },
@@ -188,7 +188,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
       createNewVault: jest.fn(),
-      vaultExists: jest.fn(),
+      vaultExists: jest.fn().mockResolvedValue(true),
       getVaultConfig: jest.fn().mockResolvedValue({ id: 'vault' } as any),
       createNewSection: jest.fn(),
       updateSection: jest.fn(),
@@ -222,7 +222,7 @@ describe('OpenIdAuthManager', () => {
         iss: 'did:web:device.example',
         aud: 'did:web:api.acme.org',
         body: {
-          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:role:ISCO-08|2211',
+          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
           scope: 'patient/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2',
           purpose: 'TREAT',
         },

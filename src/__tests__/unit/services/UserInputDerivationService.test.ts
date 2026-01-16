@@ -1,8 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LLMProvider } from '../../../services/llm/LLMProvider';
-import { ConversationDerivationService } from '../../../services/ai/ConversationDerivationService';
+import { UserInputDerivationService } from '../../../services/ai/UserInputDerivationService';
 
-describe('ConversationDerivationService', () => {
+describe('UserInputDerivationService', () => {
   it('strips display from meta.tag when ledgerSafe=true', async () => {
     const mockProvider: LLMProvider = {
       generateJson: async <T>() =>
@@ -14,7 +14,7 @@ describe('ConversationDerivationService', () => {
             { id: 'Observation[0].date-when', system: 'http://hl7.org/fhir/event-timing', code: 'NIGHT', display: 'Night' },
           ],
         },
-        observations: [
+        data: [
           {
             type: 'Observation-form-v1.0',
             meta: {
@@ -25,14 +25,14 @@ describe('ConversationDerivationService', () => {
         } as unknown as T),
     };
 
-    const service = new ConversationDerivationService(mockProvider);
+    const service = new UserInputDerivationService(mockProvider);
     const result = await service.derive({
       model: 'gemma2:latest',
-      text: 'hello',
+      inputText: 'hello',
       ledgerSafe: true,
     });
 
-    expect(result.observations).toHaveLength(1);
+    expect(result.data).toHaveLength(1);
     const tags = result.meta?.tag!;
     expect(tags).toEqual([
       { id: 'Observation[0].code', system: 'SNOMED', code: '48694002', userSelected: true },

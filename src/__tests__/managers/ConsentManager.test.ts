@@ -11,6 +11,8 @@ import { CONSENT_CREATION_MESSAGE } from '../data/example-payloads';
 import { buildConsentRuleKey, hashConsentRuleId } from '../../utils/consent';
 import { getClaimValue } from '../../utils/claims';
 import { knownDomainsReversed, knownDomainsReversedEnum } from 'gdc-common-utils-ts/models/urlPath';
+import { getTenantVaultId } from '../../utils/tenant';
+import { getIndividualSectionId } from '../../utils/individual-sections';
 
 /**
  * @fileoverview This test suite verifies the functionality of the ConsentManager.
@@ -45,8 +47,9 @@ describe('ConsentManager', () => {
   const mockIdentifier = CONSENT_CREATION_MESSAGE.body.entry[0].meta.claims['Consent.identifier'];
   const mockGrantee = 'did:web:hospital.example.com';
   const mockAttachmentData = CONSENT_CREATION_MESSAGE.body.entry[0].meta.claims['Consent.attachment-data'];
-  const mockAttachmentDecoded = Buffer.from(mockAttachmentData, 'base64').toString('utf-8');
-  const mockAttachmentHash = createHash('sha3-384').update(mockAttachmentDecoded).digest('hex');
+  const mockAttachmentHash = createHash('sha3-384')
+    .update(Buffer.from(mockAttachmentData, 'base64'))
+    .digest('hex');
   const mockAttachmentDataBase64 = mockAttachmentData;
 
   const mockClaims: ConsentRule = {
@@ -59,7 +62,8 @@ describe('ConsentManager', () => {
   const mockMeta: BundleEntryMeta = { claims: mockClaims };
   const mockEntry: BundleEntryRequest = {
     type: 'Consent',
-    resource: { resourceType: 'Consent', meta: mockMeta },
+    meta: mockMeta,
+    resource: { resourceType: 'Consent' },
     request: { method: 'POST', url: `/${mockSector}/individual/org.hl7.fhir.api/Consent`},
   };
   const mockBundleJsonApi: BundleJsonApi<BundleEntryRequest> = {
@@ -110,15 +114,15 @@ describe('ConsentManager', () => {
     const responseEntry = responseBody.data[0] as BundleEntryResponse;
     expect(responseEntry.response.status).toEqual('201');
 
-    const individualVaultId = `${mockTenantId}/${mockJurisdiction}/${mockSector}/individual/${mockSubjectId}`;
-    expect(mockVaultRepository.vaultExists).toHaveBeenCalledWith(individualVaultId);
+    const tenantVaultId = getTenantVaultId(mockSector, mockTenantId);
+    expect(mockVaultRepository.vaultExists).toHaveBeenCalledWith(tenantVaultId);
     expect(mockVaultRepository.put).toHaveBeenCalledTimes(2);
 
     // Assert the attachment was stored correctly
     const [attachmentVaultId, attachmentDocs, attachmentSection] = mockVaultRepository.put.mock.calls[0];
     const storedAttachment = attachmentDocs[0];
-    expect(attachmentVaultId).toEqual(individualVaultId);
-    expect(attachmentSection).toEqual('attachments');
+    expect(attachmentVaultId).toEqual(tenantVaultId);
+    expect(attachmentSection).toEqual(getIndividualSectionId(mockSubjectId, 'attachments'));
     expect(storedAttachment.id).toEqual(mockAttachmentHash);
     expect((storedAttachment as any).data).toEqual(mockAttachmentDataBase64);
 
@@ -133,8 +137,8 @@ describe('ConsentManager', () => {
       purpose: mockClaims[ClaimConsent.purpose] as string,
     });
     const expectedRuleId = hashConsentRuleId(expectedRuleKey);
-    expect(ruleVaultId).toEqual(individualVaultId);
-    expect(ruleSection).toEqual('rules');
+    expect(ruleVaultId).toEqual(tenantVaultId);
+    expect(ruleSection).toEqual(getIndividualSectionId(mockSubjectId, 'rules'));
     expect(storedRule.id).toEqual(expectedRuleId);
     expect(getClaimValue(storedRule, ClaimConsent.attachmentId)).toEqual(mockAttachmentHash);
     expect(getClaimValue(storedRule, ClaimConsent.attachmentData)).toBeUndefined();
@@ -144,7 +148,7 @@ describe('ConsentManager', () => {
     // Arrange
     mockVaultRepository.vaultExists.mockResolvedValue(true);
     const invalidJob = JSON.parse(JSON.stringify(mockJobRequest));
-    delete invalidJob.content.body.data[0].resource.meta.claims[ClaimConsent.decision];
+    delete invalidJob.content.body.data[0].meta.claims[ClaimConsent.decision];
 
     // Act
     const jobResponse = await consentManager.process(invalidJob);
@@ -168,7 +172,7 @@ describe('ConsentManager', () => {
     const responseEntry = (jobResponse.body as BundleJsonApi).data[0] as ErrorEntry;
     expect(responseEntry.response.status).toEqual('404');
     const outcome = responseEntry.response.outcome as OperationOutcome;
-    expect(outcome.issue[0].diagnostics).toContain(`Individual vault not found for subject: ${mockSubjectId}`);
+    expect(outcome.issue[0].diagnostics).toContain(`Tenant vault not found: ${getTenantVaultId(mockSector, mockTenantId)}`);
     expect(mockVaultRepository.put).not.toHaveBeenCalled();
   });
 });
