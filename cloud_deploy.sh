@@ -41,6 +41,8 @@ echo "  External Domain:    $HOST_EXTERNAL_DOMAIN"
 echo "  External Port:      $HOST_EXTERNAL_PORT"
 echo "  Database Provider:  $DB_PROVIDER"
 echo "  Queue Provider:     $QUEUE_PROVIDER"
+echo "  Storage Provider:   $STORAGE_PROVIDER"
+echo "  GCS Bucket Name:    $GCS_BUCKET_NAME"
 echo "--------------------------------------------------"
 read -p "Are you sure you want to proceed with the deployment? (y/n): " -n 1 -r
 echo "" # move to a new line
@@ -115,14 +117,18 @@ fi
 echo "⚙️  Configuring Docker to authenticate with GCP..."
 gcloud auth configure-docker "${DEPLOY_REGION}-docker.pkg.dev"
 
-# Build the Docker image, passing NPM_TOKEN if it exists
+# Build the Docker image, passing NPM_TOKEN if it exists.
+# Use the workspace root as build context so sibling repos are available.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
+
 echo "⚙️  Building the Docker image: $IMAGE_PATH"
 if [ -n "$NPM_TOKEN" ]; then
   echo "(NPM_TOKEN found, passing it as a build argument)"
-  docker build --build-arg NPM_TOKEN="$NPM_TOKEN" -t "$IMAGE_PATH" .
+  docker build --build-arg NPM_TOKEN="$NPM_TOKEN" -t "$IMAGE_PATH" -f "$SCRIPT_DIR/Dockerfile" "$WORKSPACE_ROOT"
 else
   echo "(NPM_TOKEN not found, building without it)"
-  docker build -t "$IMAGE_PATH" .
+  docker build -t "$IMAGE_PATH" -f "$SCRIPT_DIR/Dockerfile" "$WORKSPACE_ROOT"
 fi
 
 # Push the Docker image to Artifact Registry

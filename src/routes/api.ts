@@ -22,6 +22,17 @@ import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 
 // As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
+const FORWARDED_HEADER_SEPARATOR = ',';
+
+function getRequestBaseUrl(req: express.Request, fallback: string): string {
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)
+    ?.split(FORWARDED_HEADER_SEPARATOR)[0]
+    ?.trim() || req.protocol;
+  const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
+  return host ? `${protocol}://${host}` : fallback;
+}
 
 /**
  * Creates the main, dynamic API router according to the patterns defined in ARCHITECTURE_PATTERNS.md.
@@ -1441,7 +1452,8 @@ export function createApiRouter(
     // --- 5. Success Response ---
     // According to FHIR Async, the Location header MUST be an absolute URL.
     const relativeUrl = `${req.originalUrl}-response`;
-    const pollingUrl = new URL(relativeUrl, apiBaseUrl).href;
+    const requestBaseUrl = getRequestBaseUrl(req, apiBaseUrl);
+    const pollingUrl = new URL(relativeUrl, requestBaseUrl).href;
     res.location(pollingUrl);
     res.set('Retry-After', '5');
     res.status(202).send();

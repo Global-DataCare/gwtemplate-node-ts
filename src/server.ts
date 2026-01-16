@@ -212,7 +212,7 @@ interface StartServerOptions {
 async function startServer(options?: StartServerOptions) {
   const config = getConfig();
 
-  // Initialize the Swagger server URL once; /api-docs will refine it per-request.
+  // Initialize a baseline Swagger server URL; /swagger-spec.json will refine it per-request.
   if (swaggerSpec.info.title !== 'Swagger Spec Not Found') {
     swaggerSpec.servers = [{
       url: config.apiBaseUrl,
@@ -222,7 +222,7 @@ async function startServer(options?: StartServerOptions) {
 
   // const app = express.default();
   app.use(express.urlencoded({ extended: true }));
-  app.use(express.json({ type: ['application/json', 'application/fhir+json'] }));
+  app.use(express.json({ type: ['application/json', 'application/fhir+json', 'application/didcomm-plaintext+json'] }));
 
   if (options?.testMiddlewares) {
     options.testMiddlewares.forEach((mw) => app.use(mw));
@@ -398,21 +398,33 @@ async function startServer(options?: StartServerOptions) {
   // --- Global Error Handling Middleware (MUST be the LAST middleware) ---
   app.use(createGlobalErrorHandler(logger));
 
-  app.use('/api-docs', (req: express.Request, _res: express.Response, next: express.NextFunction) => {
-    if (swaggerSpec.info.title !== 'Swagger Spec Not Found') {
-      const forwardedProto = req.headers['x-forwarded-proto'];
-      const forwardedHost = req.headers['x-forwarded-host'];
-      const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)?.split(',')[0]?.trim()
-        || req.protocol;
-      const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
-      const baseUrl = host ? `${protocol}://${host}` : config.apiBaseUrl;
-      swaggerSpec.servers = [{
+  app.get('/swagger-spec.json', (req: express.Request, res: express.Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if (swaggerSpec.info.title === 'Swagger Spec Not Found') {
+      res.json(swaggerSpec);
+      return;
+    }
+
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const forwardedHost = req.headers['x-forwarded-host'];
+    const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)
+      ?.split(',')[0]
+      ?.trim() || req.protocol;
+    const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
+    const baseUrl = host ? `${protocol}://${host}` : config.apiBaseUrl;
+
+    res.json({
+      ...swaggerSpec,
+      servers: [{
         url: baseUrl,
         description: `Server URL for ${config.nodeEnv} environment`,
-      }];
-    }
-    next();
-  }, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+      }],
+    });
+  });
+
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, {
+    swaggerOptions: { url: '/swagger-spec.json' },
+  }));
 
   const server =
     options?.listen === false

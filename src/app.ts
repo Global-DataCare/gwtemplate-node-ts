@@ -38,6 +38,8 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(cors(corsOptions));
 }
 
-app.use(express.json());
+app.use(express.json({
+  type: ['application/json', 'application/fhir+json', 'application/didcomm-plaintext+json'],
+}));
 
 export default app;
