@@ -856,7 +856,7 @@ export class HostingManager {
   }
 
   private extractResources(claims: ClaimsRecord, environment?: string) {
-    console.log('--- DEBUG: Input claims for extractResources ---', JSON.stringify(claims, null, 2));
+    // console.log('--- DEBUG: Input claims for extractResources ---', JSON.stringify(claims, null, 2));
     const resourceTypes = ['Organization', 'Person', 'Service'];
     const resources: Record<string, any> = {};
 
@@ -879,7 +879,7 @@ export class HostingManager {
         };
       }
     }
-    console.log('--- DEBUG: Extracted resources ---', JSON.stringify(resources, null, 2));
+    // console.log('--- DEBUG: Extracted resources ---', JSON.stringify(resources, null, 2));
     if (!resources.organization || !resources.person || !resources.service) {
       throw new ManagerError('Incomplete claims: Organization, Person, and Service resources are required.', IssueType.Required);
     }

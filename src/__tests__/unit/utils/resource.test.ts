@@ -1,10 +1,17 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/utils/resource.test.ts
 
-import { determineResourceId } from '../../../utils/resource'; // Corrected import path
-import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
+import { jest } from '@jest/globals';
 
-jest.mock('uuid');
+const uuidMock = {
+    v4: jest.fn(),
+    validate: jest.fn(),
+};
+
+jest.unstable_mockModule('uuid', () => uuidMock);
+
+const { determineResourceId } = await import('../../../utils/resource'); // Corrected import path
+const { v4: uuidv4, validate: uuidValidate } = await import('uuid');
 
 describe('determineResourceId', () => {
     const validUuid = 'a1b2c3d4-e5f6-7890-1234-567890abcdef';

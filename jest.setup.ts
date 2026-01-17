@@ -1,6 +1,10 @@
 // jest.setup.ts
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables based on the test script being run.
 // `npm run test:e2e` will set `process.env.TEST_ENV` to `e2e`.

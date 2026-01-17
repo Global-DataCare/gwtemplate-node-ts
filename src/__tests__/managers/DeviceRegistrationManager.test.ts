@@ -63,7 +63,7 @@ describe('DeviceRegistrationManager', () => {
       expect(responseEntry.response.status).toEqual('201');
       
       const resource = responseEntry.resource as any;
-      expect(resource.resourceType).toEqual('DeviceRegistration');
+      expect(resource.resourceType).toEqual('Device');
       expect(uuidValidate(resource.client_id)).toBe(true);
       expect(resource.client_id_issued_at).toBeCloseTo(Math.floor(Date.now() / 1000), -1);
       expect(resource.registration_client_uri).toBe(`${TEST_API_BASE_URL}/clients/${resource.client_id}`);

@@ -1,13 +1,19 @@
 // src/__tests__/unit/database/storage/gcs.storage.adapter.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { GcsStorageAdapter } from '../../../../database/storage/gcs.storage.adapter';
-import { Storage } from '@google-cloud/storage';
+import { jest } from '@jest/globals';
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 
+const storageMock = {
+  Storage: jest.fn(),
+};
+
 // Mock the entire @google-cloud/storage library
-jest.mock('@google-cloud/storage');
+jest.unstable_mockModule('@google-cloud/storage', () => storageMock);
+
+const { GcsStorageAdapter } = await import('../../../../database/storage/gcs.storage.adapter');
+const { Storage } = await import('@google-cloud/storage');
 
 // Get a reference to the mocked Storage class
 const mockedStorage = Storage as jest.MockedClass<typeof Storage>;
@@ -17,8 +23,9 @@ describe('GcsStorageAdapter', () => {
   const testPdfBytes = new Uint8Array(Buffer.from('dummy pdf content'));
   const testContentType = 'application/pdf';
 
-  let mockFileSave: jest.Mock;
-  let mockMakePublic: jest.Mock;
+  type AsyncVoidFn = (...args: any[]) => Promise<void>;
+  let mockFileSave: jest.MockedFunction<AsyncVoidFn>;
+  let mockMakePublic: jest.MockedFunction<AsyncVoidFn>;
   let mockFile: jest.Mock;
   let mockBucket: jest.Mock;
 
@@ -27,8 +34,10 @@ describe('GcsStorageAdapter', () => {
     jest.clearAllMocks();
 
     // Recreate mocks for each test to ensure complete isolation
-    mockFileSave = jest.fn().mockResolvedValue(undefined);
-    mockMakePublic = jest.fn().mockResolvedValue(undefined);
+    mockFileSave = jest.fn() as unknown as jest.MockedFunction<AsyncVoidFn>;
+    mockFileSave.mockResolvedValue(undefined);
+    mockMakePublic = jest.fn() as unknown as jest.MockedFunction<AsyncVoidFn>;
+    mockMakePublic.mockResolvedValue(undefined);
     mockFile = jest.fn().mockReturnValue({
       save: mockFileSave,
       makePublic: mockMakePublic,

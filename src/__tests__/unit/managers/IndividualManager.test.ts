@@ -3,10 +3,8 @@
 
 import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
-import { v4 as uuidv4 } from 'uuid';
-import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
-import { IndividualManager } from '../../../managers/IndividualManager';
-import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
+import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
@@ -26,24 +24,17 @@ import { BundleEntry, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-t
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 
 
-// Mock the uuidv4 function to return a predictable value for tests
-jest.mock('uuid', () => ({
+const uuidMock = {
   v4: jest.fn(),
   validate: jest.fn(() => true), // Mock the validate function
-}));
+};
 
-// Mock the jurisdiction mapping utility
-jest.mock('../../../utils/jurisdiction', () => ({
-    getJurisdictionGroup: (countryCode: string) => {
-      if (['ES', 'FR', 'DE'].includes(countryCode.toUpperCase())) {
-        return 'eu';
-      }
-      return 'global';
-    },
-  }));
+jest.unstable_mockModule('uuid', () => uuidMock);
+const { IndividualManager } = await import('../../../managers/IndividualManager');
+const { v4: uuidv4 } = await import('uuid');
   
 describe('IndividualManager', () => {
-  let individualManager: IndividualManager;
+  let individualManager: InstanceType<typeof IndividualManager>;
   let mockVaultRepository: MockProxy<IVaultRepository>;
   let mockKmsService: MockProxy<IKmsService>;
   let mockTenantsCacheManager: MockProxy<TenantsCacheManager>;

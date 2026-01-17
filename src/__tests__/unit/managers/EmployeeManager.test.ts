@@ -2,27 +2,32 @@
 // File: src/__tests__/unit/managers/EmployeeManager.test.ts
 
 import { jest } from '@jest/globals';
-import { v4 as uuidv4 } from 'uuid';
 import { mock, MockProxy } from 'jest-mock-extended';
-import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
-import { EmployeeManager } from '../../../managers/EmployeeManager';
-import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
+import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { RecordBase, ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { JwkSet } from '../../../gdc-backend-utils-node/models/jwk';
 import { testBaseJobForEmployeeClaims as testBaseJobForEmployeeClaims, testClaimsTenant1Receptionist1 } from '../../data/employee.data';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
-import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import type { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
 import { normalizeCodeSystemAndValue } from '../../../utils/normalize-codeAndSystem';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 
-// Tell Jest what will be mocked
-jest.mock('uuid');
+const uuidMock = {
+  v4: jest.fn(),
+  validate: jest.fn(),
+};
+
+jest.unstable_mockModule('uuid', () => uuidMock);
+
+const { v4: uuidv4 } = await import('uuid');
+const { EmployeeManager } = await import('../../../managers/EmployeeManager');
 
 describe('EmployeeManager', () => {
-  let employeeManager: EmployeeManager;
+  let employeeManager: InstanceType<typeof EmployeeManager>;
   let mockVaultRepository: MockProxy<IVaultRepository>;
   let mockKmsService: MockProxy<IKmsService>;
   let mockTenantsCacheManager: MockProxy<TenantsCacheManager>;

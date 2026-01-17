@@ -1,7 +1,9 @@
 // src/__tests__/unit/crypto/jwk-thumbprint.test.ts
 
 // WebCrypto is available in Node 18+. This line makes it available to the test runner.
-global.crypto = require("node:crypto").webcrypto as any;
+import { webcrypto } from 'node:crypto';
+
+globalThis.crypto = webcrypto as any;
 
 import { MlkemPublicJwk, MldsaPublicJwk } from "gdc-common-utils-ts/interfaces/Cryptography.types";
 import {

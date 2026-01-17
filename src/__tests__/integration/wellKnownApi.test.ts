@@ -1,25 +1,25 @@
 // src/__tests__/integration/wellKnownApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+import { jest } from '@jest/globals';
 import express from 'express';
 import { createDiscoveryRouter } from '../../routes/discovery';
-import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { DiscoveryService } from '../../services/DiscoveryService';
+import type { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { testTenant1AlternateName, testTenant1DidWebHosted, testTenant1IdentifierUrn, testTenant1VaultId } from '../data/organization.data';
 import { DidDocument } from '../../gdc-backend-utils-node/models/did';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
+import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { parseTenantUrn } from '../../utils/urn';
 import { ILogger } from '../../loggers/ILogger';
 import { invokeExpress } from './helpers/invokeExpress';
 
-jest.mock('../../managers/TenantsCacheManager');
-
-const mockTenantsCacheManager = new TenantsCacheManager(
-  {} as any,
-  {} as any,
-  'test-host-collection',
-) as jest.Mocked<TenantsCacheManager>;
+const mockTenantsCacheManager = {
+  getDidDocument: jest.fn(),
+  getTenant: jest.fn(),
+  getTenantDomainUrl: jest.fn(async () => 'https://host.example.com'),
+} as unknown as jest.Mocked<TenantsCacheManager>;
 
 // Create a fully typed mock of the IKmsService to satisfy the interface
 const mockKmsService: jest.Mocked<IKmsService> = {
@@ -36,7 +36,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
   createCompactJws: jest.fn(),
   encodeResponse: jest.fn(),
   protectConfidentialData: jest.fn(),
-  unprotectConfidentialData: jest.fn(),
+  unprotectConfidentialData: jest.fn(async (doc: ConfidentialStorageDoc) => doc.content as any),
   getHmacBase64Url: jest.fn(),
   protectAttributesNameAndValue: jest.fn(),
 };

@@ -90,7 +90,7 @@ try {
 
 let configInstance: IServerConfig;
 
-function determineApiBaseUrl(port: number): string {
+function determineApiBaseUrl(port: number, apiHostname: string): string {
   // 1. Highest Priority: Use the canonical external domain if it's provided.
   if (process.env.HOST_EXTERNAL_DOMAIN) {
     // Ensure it's a clean domain without protocol, then add https.
@@ -103,8 +103,7 @@ function determineApiBaseUrl(port: number): string {
   }
   // 3. Fallback for Local Development: Construct from internal binding info.
   const protocol = 'http'; // Local is always http
-  const hostname = process.env.HOST_INTERNAL_NAME || 'localhost';
-  return `${protocol}://${hostname}:${port}`;
+  return `${protocol}://${apiHostname}:${port}`;
 }
 
 function parseAndValidateSectors(csv: string | undefined): Sector[] {
@@ -128,13 +127,15 @@ function parseAndValidateSectors(csv: string | undefined): Sector[] {
  */
 function getConfig(): IServerConfig {
   if (!configInstance) {
-    const port = parseInt(process.env.HOST_INTERNAL_PORT || '3000', 10);
-    const apiBaseUrl = determineApiBaseUrl(port);
+    const port = parseInt(process.env.PORT || process.env.HOST_INTERNAL_PORT || '3000', 10);
+    const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION || process.env.K_CONFIGURATION);
+    const apiHostname = isCloudRun ? '0.0.0.0' : (process.env.HOST_INTERNAL_IP || 'localhost');
+    const apiBaseUrl = determineApiBaseUrl(port, apiHostname);
 
     configInstance = {
       nodeEnv: process.env.NODE_ENV || 'development',
       port: port,
-      apiHostname: process.env.HOST_INTERNAL_NAME || 'localhost', // Internal binding hostname
+      apiHostname, // Internal binding hostname
       hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || new URL(apiBaseUrl).host, // Use .host to include the port
       apiBaseUrl: apiBaseUrl, // Use the definitive URL here
       namespace: process.env.URN_NAMESPACE || 'antifraud',
@@ -429,8 +430,8 @@ async function startServer(options?: StartServerOptions) {
   const server =
     options?.listen === false
       ? undefined
-      : app.listen(config.port, () => {
-          // console.log(`[GW-API ${config.nodeEnv} Server running on ${config.apiBaseUrl}`);
+      : app.listen(config.port, config.apiHostname, () => {
+          console.log(`[GW-API] Listening on ${config.apiHostname}:${config.port}`);
         });
 
   return { app, server, queueAdapter, tenantManager, vaultRepository, cryptographyService, blockchainAdapter, kmsService };

@@ -2,8 +2,6 @@
 // File: src/__tests__/unit/managers/HostingManager.test.ts
 
 import { jest } from '@jest/globals';
-import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
-import { HostingManager } from '../../../managers/HostingManager';
 import {
   ORGANIZATION_ORDER_JOB,
   ORGANIZATION_REGISTRATION_JOB,
@@ -17,12 +15,12 @@ import {
 } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
-import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
+import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
-import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { IServerConfig } from '../../../config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
@@ -33,8 +31,15 @@ import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
 import { ILogger } from '../../../loggers/ILogger';
 import { testTenant1LegalName } from '../../data/organization.data';
 
-// Mock external dependencies
-jest.mock('uuid');
+const uuidMock = {
+  v4: jest.fn(),
+  validate: jest.fn(),
+};
+
+jest.unstable_mockModule('uuid', () => uuidMock);
+
+const { v4: uuidv4, validate: uuidValidate } = await import('uuid');
+const { HostingManager } = await import('../../../managers/HostingManager');
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
   upload: jest.fn(),
@@ -114,7 +119,7 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
 });
 
 describe('HostingManager', () => {
-  let hostingManager: HostingManager;
+  let hostingManager: InstanceType<typeof HostingManager>;
   let vaultRepository: IVaultRepository;
   let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
   let mockConfig: IServerConfig;
@@ -255,15 +260,12 @@ describe('HostingManager', () => {
   });
 
   it("[6] TENANT: should produce an error entry for an invalid alternateName format", async () => {
-    const isValidSpy = jest.spyOn(tenantUtils, 'isValidTenantAlternateName').mockReturnValue(false);
     const job = testBaseJobForClaims(testClaimsTenant1AlternateNameInvalidPrefix);
 
     const responsePayload = await hostingManager.process(job);
     const errorEntry = responsePayload.body.data[0];
     expect(errorEntry.response.status).toBe('400');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('Invalid alternateName');
-    
-    isValidSpy.mockRestore();
   });
 
   it("[7] TENANT: should produce an error entry if vaultId already exists", async () => {

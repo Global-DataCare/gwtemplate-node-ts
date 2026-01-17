@@ -10,57 +10,31 @@ process.env.QUEUE_PROVIDER = 'mem';
 process.env.SECTORS_ALLOWED = 'health-care,test';
 process.env.HOST_EXTERNAL_DOMAIN = 'provider.com';
 
-// This mock now includes Stripe keys to prevent startup failure.
-// It also mocks dbProvider to use 'mem' for this test suite.
-const TEST_API_BASE_URL = 'http://localhost:3001';
-jest.mock('../../config', () => ({
-  getConfig: jest.fn(() => ({
-    nodeEnv: 'development',
-    port: 3001,
-    apiHostname: 'localhost',
-    hostExternalDomain: 'localhost',
-    apiBaseUrl: TEST_API_BASE_URL,
-    sectorsAllowed: ['health-care', 'test'],
-    dbProvider: 'mem', // IMPORTANT: Force in-memory DB for this test
-    queueProvider: 'mem',
-    kekSecret: 'test-kek-secret-dd-key-256-bits',
-    host: {
-      legalName: 'Gateway Test Host',
-      jurisdiction: 'ES',
-      idType: 'vat',
-      idValue: 'B12345678',
-      adminEmail: 'admin@host.com',
-      adminUid: 'host-admin-uid',
-    },
-    mongo: { dbName: 'test-db' },
-    firebase: {},
-    STRIPE_SECRET_KEY: 'sk_test_mock_key',
-    STRIPE_WEBHOOK_SIGNING_SECRET: 'whsec_mock_secret'
-  })),
-}));
+import { jest } from '@jest/globals';
+import type * as express from 'express';
+import type { Server } from 'http';
+import type { MldsaPrivateJwk, MlkemPrivateJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import type { QueueAdapter } from '../../adapters/queue';
+import type { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
+import type { TenantsCacheManager } from '../../managers/TenantsCacheManager';
+import type { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import type { IVaultRepository } from '../../database/repositories/vault/vault.repository';
+import type { IBlockchainAdapter } from '../../adapters/IBlockchainAdapter';
 
-import * as express from 'express';
-import { Server } from 'http';
-import { startServer } from '../../server';
-import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
-import { MldsaPrivateJwk, MlkemPrivateJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
-import { Content } from 'gdc-common-utils-ts/utils/content';
-import { QueueAdapter } from '../../adapters/queue';
-import { QueueAdapterMem } from '../../adapters/queue-mem';
-import { testPayloadCreateTenant1, testTenant1Data } from '../data/end-to-end.data';
-import { testClaimsTenant1Receptionist1, testTenant1Receptionist1DidExternal, testTenant1Receptionist1Urn } from '../data/employee.data';
-import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
-import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
-import { testTenant1AlternateName } from '../data/organization.data';
-import { testIndividualOnboardingBatchEntries } from '../data/customer-onboarding.data';
-import {IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
-import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
-import { generateUrnHash } from '../../utils/urn-hash';
-import { createHash } from 'crypto';
-import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
-import { IBlockchainAdapter } from '../../adapters/IBlockchainAdapter';
-import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
-import { invokeExpress } from './helpers/invokeExpress';
+// Config is derived from process.env in server.ts for this suite.
+const { startServer } = await import('../../server');
+const { CryptographyService } = await import('gdc-common-utils-ts/CryptographyService');
+const { Content } = await import('gdc-common-utils-ts/utils/content');
+const { QueueAdapterMem } = await import('../../adapters/queue-mem');
+const { testPayloadCreateTenant1, testTenant1Data } = await import('../data/end-to-end.data');
+const { testClaimsTenant1Receptionist1, testTenant1Receptionist1DidExternal, testTenant1Receptionist1Urn } = await import('../data/employee.data');
+const { testTenant1AlternateName } = await import('../data/organization.data');
+const { testIndividualOnboardingBatchEntries } = await import('../data/customer-onboarding.data');
+const { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } = await import('gdc-common-utils-ts/constants/schemaorg');
+const { generateUrnHash } = await import('../../utils/urn-hash');
+const { createHash } = await import('crypto');
+const { BlockchainAdapterMem } = await import('../../adapters/BlockchainAdapterMem');
+const { invokeExpress } = await import('./helpers/invokeExpress');
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -72,8 +46,8 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
   let app: express.Express;
   let server: Server | undefined;
   let queueAdapter: QueueAdapter;
-  let addJobSpy: jest.SpyInstance;
-  let cryptoService: CryptographyService;
+  let addJobSpy: ReturnType<typeof jest.spyOn>;
+  let cryptoService: InstanceType<typeof CryptographyService>;
   let hostEncryptionKey: MlkemPublicJwk;
   let externalSigner: MldsaPrivateJwk;
   let externalEncrypter: MlkemPrivateJwk;
@@ -129,7 +103,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       addJobSpy.mockRestore();
     }
     if (queueAdapter instanceof QueueAdapterMem) {
-      (queueAdapter as QueueAdapterMem).stop();
+      (queueAdapter as InstanceType<typeof QueueAdapterMem>).stop();
     }
     const serverToClose = server;
     if (serverToClose) {
@@ -205,7 +179,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     // 3. ACT (Phase 2): Wait for job completion and poll for the result
     if (queueAdapter instanceof QueueAdapterMem) {
-      await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
+      await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
     } else {
       await delay(200);
     }
@@ -302,7 +276,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     let orderPollResponse: { status: number; headers: any; text: string } | undefined;
     for (let attempt = 0; attempt < 30; attempt++) {
       if (queueAdapter instanceof QueueAdapterMem) {
-        await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
+        await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
       } else {
         await delay(50);
       }
@@ -394,7 +368,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     // This is the critical fix: wait for the async job to complete
     // before allowing the test suite to proceed to Part 2.
     if (queueAdapter instanceof QueueAdapterMem) {
-      await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
+      await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
     } else {
       await delay(200); // Fallback for other queue types
     }
@@ -454,7 +428,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     // 4. ACT (Phase 2): Wait for the job to process and then poll for the result
     if (queueAdapter instanceof QueueAdapterMem) {
-      await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
+      await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
     } else {
       await delay(200);
     }
@@ -661,7 +635,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     // Manually replicate the URN generation logic from the manager to get the correct hash
     const expectedUrn = `urn:antifraud:eu:identifier:${discoveryClaimType}:${discoveryClaimValue}`;
     const expectedHash = generateUrnHash(expectedUrn);
-    (blockchainAdapter as BlockchainAdapterMem).addMapping(expectedHash, targetDid);
+    (blockchainAdapter as InstanceType<typeof BlockchainAdapterMem>).addMapping(expectedHash, targetDid);
     
     // 2. ARRANGE: Construct the discovery request payload
     const thid = `thid-e2e-discovery-${Date.now()}`;
@@ -716,7 +690,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     let pollResponse: { status: number; headers: any; text: string } | undefined;
     for (let attempt = 0; attempt < 30; attempt++) {
       if (queueAdapter instanceof QueueAdapterMem) {
-        await (queueAdapter as QueueAdapterMem).waitForEmptyQueue();
+        await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
       } else {
         await delay(50);
       }

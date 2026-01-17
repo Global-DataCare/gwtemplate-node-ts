@@ -78,10 +78,10 @@ describe('SMART token issuance (integration)', () => {
         headers: { 'content-type': 'application/json', authorization: 'Bearer mock' },
         body: {
           thid: 'smart-token-thread-id',
-          iss: 'did:web:api.acme.org:employee:admin1@acme.org:device:uuid',
+          iss: 'did:web:api.acme.org:employee:admin1@acme.org:ISCO-08|2211:uuid',
           aud: 'did:web:api.acme.org',
           body: {
-            sub: 'did:web:api.acme.org:employee:doctor1@acme.org:role:ISCO-08|2211',
+            sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
             purpose: 'TREAT',
             scope: `patient/Composition.rs?subject=${subject}&section=LOINC|48765-2`,
             expires_in: 60,

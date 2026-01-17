@@ -1,19 +1,22 @@
 // src/__tests__/unit/crypto/CryptographyService.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
-import { AdapterCryptoSdkNode } from '../../../gdc-backend-utils-node/adapters/node/crypto';
-import { AesManager } from 'gdc-common-utils-ts';
-import { ml_kem768 } from '@noble/post-quantum/ml-kem';
-import { MlkemPrivateJwk, MlkemPublicJwk, MldsaPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { jest } from '@jest/globals';
+import type { MlkemPrivateJwk, MlkemPublicJwk, MldsaPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { randomBytes } from 'crypto';
-import { JweObject, RecipientDataJWE } from 'gdc-common-utils-ts/models/jwe';
-import * as mlDsa from '@noble/post-quantum/ml-dsa';
-import { ProtectedDataAES } from 'gdc-common-utils-ts/models/aes';
+import type { JweObject, RecipientDataJWE } from 'gdc-common-utils-ts/models/jwe';
+import type { ProtectedDataAES } from 'gdc-common-utils-ts/models/aes';
 
-jest.mock('@noble/post-quantum/ml-kem');
-jest.mock('@noble/post-quantum/ml-dsa', () => ({
+const mlKemMock = {
+  ml_kem768: {
+    encapsulate: jest.fn(),
+    decapsulate: jest.fn(),
+    keygen: jest.fn(),
+  },
+};
+
+const mlDsaMock = {
   // Make sure to mock all levels you might test against
   ml_dsa44: {
     sign: jest.fn(),
@@ -30,14 +33,23 @@ jest.mock('@noble/post-quantum/ml-dsa', () => ({
     verify: jest.fn(),
     keygen: jest.fn(),
   },
-}));
+};
+
+jest.unstable_mockModule('@noble/post-quantum/ml-kem.js', () => mlKemMock);
+jest.unstable_mockModule('@noble/post-quantum/ml-dsa.js', () => mlDsaMock);
+
+const { ml_kem768 } = await import('@noble/post-quantum/ml-kem.js');
+const mlDsa = await import('@noble/post-quantum/ml-dsa.js');
+const { CryptographyService } = await import('gdc-common-utils-ts/CryptographyService');
+const { AdapterCryptoSdkNode } = await import('../../../gdc-backend-utils-node/adapters/node/crypto');
+const { AesManager } = await import('gdc-common-utils-ts');
 
 const mockMlKem768 = ml_kem768 as jest.Mocked<typeof ml_kem768>;
 // Point the primary mock to the dsa44 variant, as it's our default
 const mockMlDsa = mlDsa.ml_dsa44 as jest.Mocked<typeof mlDsa.ml_dsa44>;
 
 describe('CryptographyService', () => {
-  let cryptoService: CryptographyService;
+  let cryptoService: InstanceType<typeof CryptographyService>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -229,8 +241,7 @@ describe('CryptographyService', () => {
         sharedSecret: new Uint8Array(randomBytes(32)), 
         cipherText: new Uint8Array(randomBytes(1088))
       };
-      // FIX: Cast the mock to jest.Mock to allow use of mockResolvedValue
-      (mockMlKem768.encapsulate as jest.Mock).mockResolvedValue(mockReturn);
+      (mockMlKem768.encapsulate as jest.Mock).mockReturnValue(mockReturn);
       
       // Act
       await cryptoService.encapsulate(data, randomBytes(64), pubKey);

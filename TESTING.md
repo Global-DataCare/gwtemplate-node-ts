@@ -19,6 +19,8 @@ The project uses Jest as its test runner, configured via `jest.config.ts`. A key
 
 This setup file is responsible for loading the correct environment variables (`.env` or `.env.test`) based on the test script being executed. This ensures that tests run in the correct, isolated environment.
 
+Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-client-ts`) ship ESM TypeScript sources. Tests run with `NODE_OPTIONS=--experimental-vm-modules`, and `ts-jest` is configured to transform those packages from `node_modules`.
+
 ## 3. Running Tests
 
 -   **Unit & Fast Integration Tests:**

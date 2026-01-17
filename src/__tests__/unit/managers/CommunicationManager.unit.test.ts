@@ -2,16 +2,14 @@
 // File: src/__tests__/unit/CommunicationManager.unit.test.ts
 // Description: Unit tests for the CommunicationManager.
 
+import { jest } from '@jest/globals';
 import { CommunicationManager } from '../../../managers/CommunicationManager';
+import type { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { testCommunicationAppointmentFhirR4, testCommMsgExtAppointmentRequest, testAppointmentRequestText } from '../../data/appointment.data';
-import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { DataEntry } from 'gdc-common-utils-ts/models/comm';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { randomUUID } from 'crypto';
-
-// Mock the TenantsCacheManager
-jest.mock('../../../managers/TenantsCacheManager');
 
 describe('CommunicationManager Unit Tests', () => {
   let communicationManager: CommunicationManager;
@@ -20,7 +18,9 @@ describe('CommunicationManager Unit Tests', () => {
 
   beforeEach(() => {
     // Create a new mock instance for each test
-    mockTenantsCacheManager = new (TenantsCacheManager as jest.Mock<TenantsCacheManager>)() as jest.Mocked<TenantsCacheManager>;
+    mockTenantsCacheManager = {
+      getTenantDid: jest.fn(),
+    } as unknown as jest.Mocked<TenantsCacheManager>;
     
     communicationManager = new CommunicationManager({
       tenantsCacheManager: mockTenantsCacheManager,

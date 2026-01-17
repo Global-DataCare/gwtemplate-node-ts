@@ -2,24 +2,30 @@
 // File: src/__tests__/unit/managers/FamilyManager.OfferOrder.test.ts
 
 import { jest } from '@jest/globals';
-import { v4 as uuidv4 } from 'uuid';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { IServerConfig } from '../../../config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
-import { HostingManager } from '../../../managers/HostingManager';
-import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
-import { FamilyManager } from '../../../managers/FamilyManager';
 import { ORGANIZATION_ORDER_JOB, ORGANIZATION_REGISTRATION_JOB } from '../../data/example-jobs';
 import { FAMILY_ORDER_REQUEST, FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
 import * as tenantUtils from '../../../utils/tenant';
 import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 
-jest.mock('uuid');
+const uuidMock = {
+  v4: jest.fn(),
+  validate: jest.fn(),
+};
+
+jest.unstable_mockModule('uuid', () => uuidMock);
+
+const { v4: uuidv4 } = await import('uuid');
+const { HostingManager } = await import('../../../managers/HostingManager');
+const { FamilyManager } = await import('../../../managers/FamilyManager');
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
   upload: jest.fn(),
@@ -57,8 +63,8 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 describe('FamilyManager - Offer/Order Flow', () => {
   let vaultRepository: VaultMemRepository;
   let tenantsCacheManager: TenantsCacheManager;
-  let hostingManager: HostingManager;
-  let familyManager: FamilyManager;
+  let hostingManager: InstanceType<typeof HostingManager>;
+  let familyManager: InstanceType<typeof FamilyManager>;
   let hostCollectionName: string;
   let config: IServerConfig;
 

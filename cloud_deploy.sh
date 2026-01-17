@@ -150,7 +150,7 @@ trap 'rm -f "$TEMP_ENV_FILE"' EXIT
 # List of runtime variables from .env to pass to the Cloud Run instance.
 # CRITICAL: For production, sensitive values should be moved to Google Secret Manager.
 RUNTIME_VARS=(
-  "NODE_ENV" "HOST_INTERNAL_NAME" "HOST_INTERNAL_PORT"
+  "NODE_ENV"
   "HOST_EXTERNAL_DOMAIN" "HOST_EXTERNAL_PORT"
   "DEV_SEED" "SECTORS_ALLOWED"
   "ORG_HOST_LEGAL_NAME" "ORG_HOST_JURISDICTION" "ORG_HOST_ID_TYPE" "ORG_HOST_ID_VALUE"

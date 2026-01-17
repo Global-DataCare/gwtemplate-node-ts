@@ -6,6 +6,23 @@ const isE2E = process.env.TEST_ENV === 'e2e';
 const includeArtifacts = process.env.TEST_ARTIFACTS === '1';
 const collectCoverage = process.env.COVERAGE === '1';
 
+const esmNodeModules = [
+  'gdc-common-utils-ts',
+  'gdc-sdk-client-ts',
+  '@noble/ciphers',
+  '@noble/hashes',
+  '@noble/post-quantum',
+  '@noble/post-quantum/ml-dsa',
+  '@noble/post-quantum/ml-kem',
+  '@noble/curves',
+  '@stablelib/utf8',
+  '@stablelib/base64',
+  'pkijs',
+  'asn1js',
+  'uuid',
+  '@peculiar/webcrypto',
+];
+
 const config: JestConfigWithTsJest = {
   testEnvironment: 'node',
   injectGlobals: true,   // make describe/it/expect/jest global
@@ -32,43 +49,29 @@ const config: JestConfigWithTsJest = {
       'ts-jest',
       {
         useESM: true,
-        tsconfig: {
-          module: 'ESNext',
-          moduleResolution: 'bundler',
-          allowSyntheticDefaultImports: true,
-          esModuleInterop: true,
-        },
-      }
+        tsconfig: '<rootDir>/tsconfig.jest.json',
+      },
     ],
-    '^.+\\.(mjs|js)$': 'babel-jest'
+    '^.+\\.(mjs|js)$': 'babel-jest',
   },
 
   
   // By default, Jest ignores node_modules. This robust pattern uses a negative
   // lookahead to tell Jest to NOT ignore the specified ESM modules.
   transformIgnorePatterns: [
-    `[/\\\\]node_modules[/\\\\](?!(${
-      [
-        '@noble/ciphers',
-        '@noble/hashes',
-        '@noble/post-quantum',
-        '@noble/post-quantum/ml-dsa', // More specific path
-        '@noble/post-quantum/ml-kem',  // More specific path        
-        '@noble/curves',
-        '@stablelib/utf8',
-        '@stablelib/base64',        
-        'pkijs',
-        'asn1js',
-        'uuid',
-        '@peculiar/webcrypto'
-      ].join('|')
-    }))`
+    `[/\\\\]node_modules[/\\\\](?!(${esmNodeModules.join('|')})([/\\\\]|$))`,
   ],
 
   // Allow TS ESM source files to import with .js specifiers (NodeNext style).
   // Jest/ts-jest resolves TS sources directly, so we strip the .js extension for relative imports.
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^gdc-common-utils-ts$': '<rootDir>/node_modules/gdc-common-utils-ts/dist/index.js',
+    '^gdc-common-utils-ts/(.*)$': '<rootDir>/node_modules/gdc-common-utils-ts/dist/$1.js',
+    '^gdc-sdk-client-ts$': '<rootDir>/node_modules/gdc-sdk-client-ts/dist/index.js',
+    '^gdc-sdk-client-ts/(.*)$': '<rootDir>/node_modules/gdc-sdk-client-ts/dist/$1.js',
+    '^@noble/post-quantum/ml-dsa$': '@noble/post-quantum/ml-dsa.js',
+    '^@noble/post-quantum/ml-kem$': '@noble/post-quantum/ml-kem.js',
   },
  
 

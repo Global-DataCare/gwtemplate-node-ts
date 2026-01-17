@@ -1,10 +1,11 @@
 // src/__tests__/unit/managers/TenantsCacheManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
-import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
-import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import { jest } from '@jest/globals';
+import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
+import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
+import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../../utils/tenant';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { DidService } from '../../../gdc-backend-utils-node/models/did';
@@ -14,15 +15,8 @@ import { testConfigDataHost, testConfigTenant1 } from '../../data/organization.d
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
 
-// Mock the entire module. We are not using the actual implementation.
-jest.mock('../../../database/repositories/vault/vault.repository');
-jest.mock('../../../utils/tenant', () => ({
-  ...jest.requireActual('../../../utils/tenant') as any,
-  generateTenantCollectionNameFromClaims: jest.fn(),
-}));
-
 describe('TenantsCacheManager', () => {
-  let tenantsCacheManager: TenantsCacheManager;
+  let tenantsCacheManager: InstanceType<typeof TenantsCacheManager>;
   let mockVaultRepository: jest.Mocked<IVaultRepository>;
   let mockKmsService: jest.Mocked<IKmsService>;
   const hostCollectionName = 'test-host-collection'; // Define for the whole suite
@@ -67,10 +61,6 @@ describe('TenantsCacheManager', () => {
     } as any;
 
     tenantsCacheManager = new TenantsCacheManager(mockVaultRepository, () => mockKmsService, hostCollectionName);
-    (generateTenantCollectionNameFromClaims as jest.Mock).mockImplementation((claims: ClaimsRecord) => {
-      const value = claims[ClaimsOrganizationSchemaorg.identifierValue];
-      return `_${value}_`;
-    });
   });
 
   afterEach(() => {

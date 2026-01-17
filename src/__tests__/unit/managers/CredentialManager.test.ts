@@ -2,10 +2,8 @@
 // File: src/__tests__/unit/managers/CredentialManager.test.ts
 
 import { jest } from '@jest/globals';
-import { v4 as uuidv4 } from 'uuid';
-import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
-import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
-import { CredentialManager } from '../../../managers/CredentialManager';
+import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
+import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
@@ -18,8 +16,15 @@ import { testHostDidWeb, testHostDomain, testTenant1IdentifierUrn, testTenant1Va
 import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 
-// Mock external dependencies
-jest.mock('uuid');
+const uuidMock = {
+  v4: jest.fn(),
+  validate: jest.fn(),
+};
+
+jest.unstable_mockModule('uuid', () => uuidMock);
+
+const { v4: uuidv4 } = await import('uuid');
+const { CredentialManager } = await import('../../../managers/CredentialManager');
 
 const mockSignResult: JwsMultiSign = {
   payload: 'base64payload',
@@ -62,7 +67,7 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 };
 
 describe('CredentialManager', () => {
-  let credentialManager: CredentialManager;
+  let credentialManager: InstanceType<typeof CredentialManager>;
   let vaultRepository: IVaultRepository;
   let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
   let mockConfig: IServerConfig;

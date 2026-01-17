@@ -27,9 +27,11 @@ const FORWARDED_HEADER_SEPARATOR = ',';
 function getRequestBaseUrl(req: express.Request, fallback: string): string {
   const forwardedProto = req.headers['x-forwarded-proto'];
   const forwardedHost = req.headers['x-forwarded-host'];
-  const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)
+  const forwardedProtocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)
     ?.split(FORWARDED_HEADER_SEPARATOR)[0]
-    ?.trim() || req.protocol;
+    ?.trim();
+  const socketEncrypted = (req.socket as { encrypted?: boolean } | undefined)?.encrypted;
+  const protocol = forwardedProtocol || (socketEncrypted ? 'https' : 'http');
   const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
   return host ? `${protocol}://${host}` : fallback;
 }

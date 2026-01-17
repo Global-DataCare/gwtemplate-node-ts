@@ -2,14 +2,12 @@
 // File: src/__tests__/unit/managers/HostingManager.OfferOrder.test.ts
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { v4 as uuidv4 } from 'uuid';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { IServerConfig } from '../../../config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
-import { HostingManager } from '../../../managers/HostingManager';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 
@@ -52,8 +50,15 @@ import {
 import * as tenantUtils from '../../../utils/tenant';
 import { testTenant1LegalName } from '../../data/organization.data';
 
-// Mock external dependencies
-jest.mock('uuid');
+const uuidMock = {
+  v4: jest.fn(),
+  validate: jest.fn(),
+};
+
+jest.unstable_mockModule('uuid', () => uuidMock);
+
+const { v4: uuidv4 } = await import('uuid');
+const { HostingManager } = await import('../../../managers/HostingManager');
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
   upload: jest.fn(),
@@ -67,7 +72,7 @@ const mockLogger: jest.Mocked<ILogger> = {
 };
 
 describe('HostingManager - Offer/Order Flow', () => {
-  let hostingManager: HostingManager;
+  let hostingManager: InstanceType<typeof HostingManager>;
   let vaultRepository: VaultMemRepository;
   let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
   let mockConfig: IServerConfig;

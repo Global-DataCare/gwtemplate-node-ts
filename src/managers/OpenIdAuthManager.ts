@@ -106,7 +106,9 @@ export class OpenIdAuthManager implements IJobProcessor {
           return false;
         }
       } else if (isRuleEmail) {
-        const actorEmail = actor.email;
+        const actorEmail = actor.identifier && actor.identifier.includes('@')
+          ? actor.identifier.toLowerCase()
+          : undefined;
         if (!actorEmail) return false;
         if (normalizedRuleActor.toLowerCase() !== actorEmail) return false;
       } else {
