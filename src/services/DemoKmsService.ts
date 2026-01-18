@@ -9,7 +9,7 @@ import { JwsHeader, JwsMultiSign } from 'gdc-common-utils-ts/models/jws';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { JwkSet, JWK } from '../gdc-backend-utils-node/models/jwk';
 import { Content } from 'gdc-common-utils-ts/utils/content';
-import { MldsaPublicJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { MlkemPublicJwk, PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { ParameterData } from 'gdc-common-utils-ts/models/params';
 
 /**
@@ -51,7 +51,7 @@ export class DemoKmsService implements IKmsService {
     return this._realKmsService.getPublicJwks(entityId);
   }
 
-  async getPublicVerificationKey(entityId: string, alg?: string): Promise<MldsaPublicJwk | undefined> {
+  async getPublicVerificationKey(entityId: string, alg?: string): Promise<PublicJwk | undefined> {
     return this._realKmsService.getPublicVerificationKey(entityId, alg);
   }
 
@@ -63,9 +63,9 @@ export class DemoKmsService implements IKmsService {
     return this._realKmsService.getHostPublicJwkSet();
   }
   
-  async signWithManagedKey(payload: Uint8Array, entityId: string): Promise<JwsMultiSign> {
+  async signWithManagedKey(payload: Uint8Array, entityId: string, alg?: string): Promise<JwsMultiSign> {
     console.warn(`[DemoKmsService] Delegating real signing for entity: ${entityId}`);
-    return this._realKmsService.signWithManagedKey(payload, entityId);
+    return this._realKmsService.signWithManagedKey(payload, entityId, alg);
   }
   
   async signWithReconstructedKey(

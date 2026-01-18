@@ -159,13 +159,24 @@ export class OpenIdAuthManager implements IJobProcessor {
       throw new ManagerError('Could not resolve token issuer DID.', IssueType.Exception);
     }
 
-    const signingKey = await this.kmsService.getPublicVerificationKey(issuerVaultId);
+    const legacyEnabled = process.env.SMART_TOKEN_LEGACY !== 'false';
+    const legacyAlgCandidate = (process.env.LEGACY_SIGN_ALG === 'ES256' || process.env.LEGACY_SIGN_ALG === 'ES384')
+      ? process.env.LEGACY_SIGN_ALG
+      : 'ES384';
+    let signingKey = await this.kmsService.getPublicVerificationKey(issuerVaultId);
+    if (legacyEnabled) {
+      const legacyKey = await this.kmsService.getPublicVerificationKey(issuerVaultId, legacyAlgCandidate);
+      if (legacyKey?.kid) {
+        signingKey = legacyKey;
+      }
+    }
     if (!signingKey?.kid) {
       throw new ManagerError('Could not resolve issuer signing key.', IssueType.Exception);
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const jwtHeader = { alg: 'ML-DSA-44', typ: 'JWT', kid: signingKey.kid };
+    const signingAlg = (signingKey as { alg?: string }).alg || 'ML-DSA-44';
+    const jwtHeader = { alg: signingAlg, typ: 'JWT', kid: signingKey.kid };
     const jwtPayload = {
       iss: issuerDid,
       sub,
@@ -179,7 +190,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     const encodedHeader = Content.stringToBase64Url(JSON.stringify(jwtHeader));
     const encodedPayload = Content.stringToBase64Url(JSON.stringify(jwtPayload));
     const bytesToSign = Content.stringToBytesUTF8(`${encodedHeader}.${encodedPayload}`);
-    const jwsObject = await this.kmsService.signWithManagedKey(bytesToSign, issuerVaultId);
+    const jwsObject = await this.kmsService.signWithManagedKey(bytesToSign, issuerVaultId, signingAlg);
     const signature = jwsObject.signatures[0]?.signature;
     if (!signature) {
       throw new ManagerError('Failed to sign access token.', IssueType.Exception);

@@ -9,8 +9,8 @@ import { createGaiaXLegalParticipantCredential } from './credential-generators';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomBytes } from '@noble/hashes/utils.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { p256 } from '@noble/curves/nist.js';
+import { sha256, sha384 } from '@noble/hashes/sha2.js';
+import { p256, p384 } from '@noble/curves/nist.js';
 import { calculateJwkThumbprint } from 'jose';
 import * as pkijs from 'pkijs';
 import * as asn1js from 'asn1js';
@@ -51,7 +51,8 @@ export async function saveJwkDidAndCredential(
   outputDir: string
 ) {
   const didID = `did:web:${entity.domain}`;
-  const jwks = { keys: [{ ...pubJwk, kid }] };
+  const resolvedAlg = pubJwk.alg || (pubJwk.crv === 'P-384' ? 'ES384' : 'ES256');
+  const jwks = { keys: [{ ...pubJwk, kid, alg: resolvedAlg, use: pubJwk.use || 'sig' }] };
   const did = {
     '@context': 'https://www.w3.org/ns/did/v1',
     id: didID,
@@ -59,7 +60,7 @@ export async function saveJwkDidAndCredential(
       id: `${didID}#${kid}`,
       type: 'JsonWebKey2020',
       controller: didID,
-      publicKeyJwk: { ...pubJwk, kid }
+      publicKeyJwk: { ...pubJwk, kid, alg: resolvedAlg, use: pubJwk.use || 'sig' }
     }],
     authentication: [`${didID}#${kid}`]
   };
@@ -95,7 +96,7 @@ export function bigintToBytes(bn: bigint): Uint8Array {
   return Uint8Array.from(Buffer.from(hex, 'hex'));
 }
 
-export async function deriveKeyPair(seedInput?: string | Uint8Array): Promise<{
+export async function deriveKeyPair(seedInput?: string | Uint8Array, curve: 'P-256' | 'P-384' = 'P-256'): Promise<{
   pub: Uint8Array;
   jwk: {
     kty: string;
@@ -117,15 +118,17 @@ export async function deriveKeyPair(seedInput?: string | Uint8Array): Promise<{
   }
 
   const seed = Buffer.from(seedBuf).toString('hex');
-  const privateKey = sha256(seedBuf);
-  const pub = p256.getPublicKey(privateKey, false); // 0x04 | X | Y
+  const privateKey = curve === 'P-384' ? sha384(seedBuf) : sha256(seedBuf);
+  const pub = curve === 'P-384'
+    ? p384.getPublicKey(privateKey, false)
+    : p256.getPublicKey(privateKey, false); // 0x04 | X | Y
 
   const coordLen = (pub.length - 1) / 2;
   const x = Buffer.from(pub.slice(1, 1 + coordLen)).toString('base64url');
   const y = Buffer.from(pub.slice(1 + coordLen)).toString('base64url');
   const d = Buffer.from(privateKey).toString('base64url');
 
-  const jwk = { kty: 'EC', crv: 'P-256', x, y, d };
+  const jwk = { kty: 'EC', crv: curve, x, y, d };
   const { d: _, ...pubJwk } = jwk;
   const thumb = await calculateJwkThumbprint(pubJwk, 'sha256');
   const kid = Buffer.from(thumb).toString('base64url');
@@ -143,7 +146,8 @@ export async function createCertificate(
   issuerKey: CryptoKey,
   publicKeyBytes: Uint8Array,
   years: number,
-  legalRegistrationNumber: string
+  legalRegistrationNumber: string,
+  curve: 'P-256' | 'P-384' = 'P-256'
 ): Promise<Buffer> {
   const cert = new pkijs.Certificate();
   cert.serialNumber = new asn1js.Integer({ value: Math.floor(Date.now() / 1000) });
@@ -169,7 +173,7 @@ export async function createCertificate(
   const cryptoPub = await crypto.subtle.importKey(
     'raw',
     rawPublicKey,
-    { name: 'ECDSA', namedCurve: 'P-256' },
+    { name: 'ECDSA', namedCurve: curve },
     true,
     ['verify']
   );

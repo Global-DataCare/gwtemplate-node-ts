@@ -53,9 +53,45 @@ export class DiscoveryService {
     const jwksBaseUrl = getBaseUrlFromDidWeb(didDoc.id);
     const jwks_uri = new URL('/.well-known/jwks.json', jwksBaseUrl).toString();
     
+    const credentialIssuer = new URL('/.well-known/openid-credential-issuer', tenantUrl).toString();
     return {
       issuer: tenantUrl,
       jwks_uri: jwks_uri,
+      credential_issuer: credentialIssuer,
+      authorization_endpoint: new URL('/identity/oidc/authorize', tenantUrl).toString(),
+      token_endpoint: new URL('/identity/oidc/token', tenantUrl).toString(),
+      response_types_supported: ['code', 'vp_token'],
+      grant_types_supported: ['authorization_code'],
+      request_object_signing_alg_values_supported: ['ES256', 'ES384', 'ML-DSA-44'],
+      subject_types_supported: ['public'],
+      id_token_signing_alg_values_supported: ['ES256', 'ES384', 'ML-DSA-44'],
+    };
+  }
+
+  /**
+   * Generates OIDC4VCI metadata for issuance.
+   * @param vaultId The unique vault identifier of the tenant.
+   * @returns The OpenID Credential Issuer metadata, or undefined if not found.
+   */
+  public async getOpenIdCredentialIssuerMetadata(vaultId: string): Promise<object | undefined> {
+    const tenantUrl = await this.tenantsCacheManager.getTenantDomainUrl(vaultId);
+    const tenantConfig = await this.tenantsCacheManager.getTenant(vaultId);
+    if (!tenantUrl) return undefined;
+
+    const legacyAlg = tenantConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG;
+    const algValues = ['ML-DSA-44', ...(legacyAlg ? [legacyAlg] : [])];
+
+    return {
+      credential_issuer: tenantUrl,
+      credential_endpoint: new URL('/identity/oidc/credential', tenantUrl).toString(),
+      deferred_credential_endpoint: new URL('/identity/oidc/credential/deferred', tenantUrl).toString(),
+      credential_signing_alg_values_supported: algValues,
+      credentials_supported: [
+        {
+          format: 'jwt_vc_json',
+          types: ['VerifiableCredential', 'gx:LegalParticipant'],
+        },
+      ],
     };
   }
 

@@ -27,6 +27,7 @@
     "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --coverage src/__tests__/integration",
     "test:e2e": "NODE_OPTIONS=--experimental-vm-modules TEST_ENV=e2e jest --no-coverage src/__tests__/e2e",
     "seed:dev": "ts-node --esm scripts/seed-dev-cas.ts",
+    "pki:generate": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"NodeNext\",\"moduleResolution\":\"NodeNext\",\"allowImportingTsExtensions\":true}' node --loader ts-node/esm --experimental-specifier-resolution=node scripts/generate-pki-chain.ts",
     "update-deps": "node update-deps.js",
     "docker:build": "./docker_build.sh",
     "docker:run": "./docker_run.sh"

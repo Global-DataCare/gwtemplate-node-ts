@@ -132,7 +132,7 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
             // as a fallback if 'use' or 'key_ops' are not present.
             const isSignatureKey = key.use === 'sig' 
                 || (key.key_ops && key.key_ops.includes('sign'))
-                || ('alg' in key && key.alg?.startsWith('ML-DSA'));
+                || ('alg' in key && (key.alg?.startsWith('ML-DSA') || key.alg?.startsWith('ES')));
 
             const isEncryptionKey = key.use === 'enc' 
                 || (key.key_ops && key.key_ops.includes('encrypt'))
@@ -159,6 +159,25 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
         }
     }
     return newDidDoc;
+}
+
+export function applyLegacyX509Metadata(
+  didDocument: DidDocument,
+  legacyAlg: string | undefined,
+  x5u: string | undefined,
+  x5c?: string[]
+): DidDocument {
+  if (!legacyAlg || !didDocument.verificationMethod) {
+    return didDocument;
+  }
+  for (const method of didDocument.verificationMethod) {
+    const jwk = method.publicKeyJwk as any;
+    if (jwk?.alg === legacyAlg) {
+      if (x5u) jwk.x5u = x5u;
+      if (x5c && x5c.length > 0) jwk.x5c = x5c;
+    }
+  }
+  return didDocument;
 }
 
 /**

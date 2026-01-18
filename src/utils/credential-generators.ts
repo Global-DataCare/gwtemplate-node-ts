@@ -1,4 +1,7 @@
+import { createHash } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 
 export interface GaiaXLegalParticipantCredentialOptions {
   webDomain: string;              // e.g. "https://example.com"
@@ -28,13 +31,13 @@ export function createGaiaXLegalParticipantCredential(options: GaiaXLegalPartici
 
   return {
     "@context": [
-      "https://www.w3.org/2018/credentials/v1",
+      "https://www.w3.org/ns/credentials/v2",
       "https://w3id.org/gaia-x/context/v2206"
     ],
     "id": credentialId,
     "type": ["VerifiableCredential", "gx:LegalParticipant"],
     "issuer": issuerDid,
-    "issuanceDate": new Date().toISOString(),
+    "validFrom": new Date().toISOString(),
     "credentialSubject": {
       "id": did,
       "type": "gx:LegalParticipant",
@@ -62,5 +65,39 @@ export function createGaiaXLegalParticipantCredential(options: GaiaXLegalPartici
       }
     }
     // Note: add the "proof" property after signing with a compatible tool.
+  };
+}
+
+export function buildGaiaXLegalParticipantOptionsFromClaims(params: {
+  claims: ClaimsRecord;
+  webDomain: string;
+  did: string;
+  issuerDid: string;
+}): GaiaXLegalParticipantCredentialOptions {
+  const { claims, webDomain, did, issuerDid } = params;
+  const officialName = claims[ClaimsOrganizationSchemaorg.legalName] as string | undefined;
+  const vatId = claims[ClaimsOrganizationSchemaorg.identifierValue] as string | undefined;
+  const countryCode = claims[ClaimsOrganizationSchemaorg.addressCountry] as string | undefined;
+  const termsAndConditionsUrl = claims[ClaimsServiceSchemaorg.termsOfService] as string | undefined;
+  const termsHashClaim = claims[`${ClaimsServiceSchemaorg.termsOfService}#hash`] as string | undefined;
+
+  if (!officialName || !vatId || !countryCode || !termsAndConditionsUrl) {
+    throw new Error('Missing required claims to build Gaia-X Legal Participant credential.');
+  }
+
+  const termsAndConditionsHashHex = termsHashClaim
+    ? termsHashClaim
+    : createHash('sha384').update(termsAndConditionsUrl).digest('hex');
+
+  return {
+    webDomain,
+    officialName,
+    did,
+    issuerDid,
+    vatId,
+    countryCode,
+    termsAndConditionsUrl,
+    termsAndConditionsHashHex,
+    termsAndConditionsHashAlg: 'SHA-384',
   };
 }

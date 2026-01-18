@@ -8,7 +8,6 @@ import { DiscoveryService } from '../../services/DiscoveryService';
 import type { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { testTenant1AlternateName, testTenant1DidWebHosted, testTenant1IdentifierUrn, testTenant1VaultId } from '../data/organization.data';
 import { DidDocument } from '../../gdc-backend-utils-node/models/did';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { parseTenantUrn } from '../../utils/urn';
@@ -150,7 +149,22 @@ describe('Well-Known Tenant Artifacts API', () => {
     jest.clearAllMocks();
   });
 
-  it('should return the stored governance VC (vc.json) for a hosted tenant', async () => {
+  it('should return the stored legal participant VC (legal-participant.vc.json) for a hosted tenant', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const tenantId = testTenant1AlternateName;
+    const expectedUrl = `/${tenantId}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/legal-participant.vc.json`;
+
+    const expectedVc = { '@context': ['https://www.w3.org/2018/credentials/v1'], type: ['VerifiableCredential'], issuer: 'did:web:host' };
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({ governanceVc: expectedVc } as any);
+
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.text)).toEqual(expectedVc);
+    expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith(testTenant1VaultId);
+  });
+
+  it('should return the stored legal participant VC via the legacy vc.json alias', async () => {
     const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
     const tenantId = testTenant1AlternateName;
     const expectedUrl = `/${tenantId}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/vc.json`;
@@ -187,48 +201,21 @@ describe('Well-Known Legal Participant VC API', () => {
     jest.clearAllMocks();
   });
 
-  it('should return a signed Legal Participant VC for the host', async () => {
-    // --- Arrange ---
-    const hostClaims = {
-      [ClaimsOrganizationSchemaorg.legalName]: 'Test Host',
-      [ClaimsOrganizationSchemaorg.identifierValue]: 'VAT123456',
-      [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
-      [ClaimsServiceSchemaorg.termsOfService]: 'http://example.com/terms',
-      'org.schema.Service.termsOfService#hash': 'somehash',
+  it('should return the stored Legal Participant VC for the host', async () => {
+    const hostDidDoc = { id: 'did:web:host' };
+    const hostEntityConfig = {
+      didDocument: hostDidDoc,
+      governanceVc: { id: 'urn:uuid:host-legal-participant', issuer: 'did:web:host' },
     };
-    const hostDidDoc = { 
-      id: 'did:web:host',
-      // This is the critical missing piece. The handler needs this to find the signing key.
-      assertionMethod: ['did:web:host#key-pqc-sig-1'], 
-    };
-    const hostEntityConfig = { claims: hostClaims, didDocument: hostDidDoc, hostExternalDomain: 'host.com' };
 
     mockTenantsCacheManager.getTenant.mockResolvedValue(hostEntityConfig);
-    mockTenantsCacheManager.getDidDocument.mockResolvedValue(hostDidDoc as any); // For middleware
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue(hostDidDoc as any);
 
-    // Mock the signing method from the real KMS service
-    mockKmsService.signWithManagedKey.mockResolvedValue({
-      payload: 'dummyPayload',
-      signatures: [{ protected: 'dummyProtected', signature: 'dummySignature' }],
-    });
-
-    // --- Act ---
     const response = await invokeExpress(app, { method: 'GET', url: '/host/.well-known/legal-participant.vc.json' });
 
-    // --- Assert ---
     expect(response.status).toBe(200);
     const parsed = JSON.parse(response.text);
-    expect(parsed).toBeInstanceOf(Object);
-    expect(parsed.type).toContain('gx:LegalParticipant');
-    expect(parsed.issuer).toBe('did:web:host');
-    expect(parsed.credentialSubject.id).toBe('did:web:host');
-    
-    // Check for the presence of a valid-looking proof
-    expect(parsed.proof).toBeDefined();
-    expect(parsed.proof.type).toBe('JsonWebSignature2020');
-    expect(parsed.proof.proofValue).toContain('dummySignature');
-    
+    expect(parsed).toEqual(hostEntityConfig.governanceVc);
     expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith('host');
-    expect(mockKmsService.signWithManagedKey).toHaveBeenCalled();
   });
 });

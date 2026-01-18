@@ -1,0 +1,23 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:host.example.com",
+  "verificationMethod": [
+    {
+      "id": "did:web:host.example.com#TUpzS0pNbzVBR2RaczF1VGc4WXhvbjQ1X0NFcGpqYllOQXBfSC1RYndqbw",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:host.example.com",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-384",
+        "x": "1ly1IhAuEr0lQFo8szmMFnw4_6F791eFK5T5jfb58r1lQY_jgzHvFjTMIpEeZjoP",
+        "y": "ZyvwmTqHsw4plLU3Ok6GoyT3egmD9CanGYgq3nn4WFhRtqQcbOWsmHbischU2Bxb",
+        "kid": "TUpzS0pNbzVBR2RaczF1VGc4WXhvbjQ1X0NFcGpqYllOQXBfSC1RYndqbw",
+        "alg": "ES256",
+        "use": "sig"
+      }
+    }
+  ],
+  "authentication": [
+    "did:web:host.example.com#TUpzS0pNbzVBR2RaczF1VGc4WXhvbjQ1X0NFcGpqYllOQXBfSC1RYndqbw"
+  ]
+}

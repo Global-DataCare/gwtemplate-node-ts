@@ -15,7 +15,7 @@ export interface NetworkActivationStatus {
   networkName: string;
   status: NetworkAccessStatus;
   activationDate?: string;
-  /** e.g., URL to the vc.json or a blockchain transaction ID */
+  /** e.g., URL to legal-participant.vc.json or a blockchain transaction ID */
   verificationEvidence?: string;
 }
 
@@ -67,7 +67,7 @@ export interface OrganizationConfig extends EntityConfig {
   selfDescriptionVc?: VerifiableCredentialV2;
 
   /**
-   * The Verifiable Credential issued by an external authority (vc.json).
+   * The Verifiable Credential issued by an external authority (legal-participant.vc.json).
    * For the test network, this is signed by the host. For production,
    * it will be replaced with one signed by the Governing Body/ICA.
    * Stored as the final JSON object.
@@ -79,4 +79,20 @@ export interface OrganizationConfig extends EntityConfig {
    * network interactions in the future (vp.json).
    */
   verifiablePresentation?: any; // Define this type later
+
+  /**
+   * Optional legacy signing configuration for VC issuance (e.g., ES256).
+   * When unset, the host-level default may apply.
+   */
+  legacySignAlg?: string;
+
+  /**
+   * DER-encoded X.509 certificate (Base64) for legacy signing key exposure.
+   */
+  legacyX509DerBase64?: string;
+
+  /**
+   * Base64-encoded X.509 chain entries (for x5c).
+   */
+  legacyX509ChainBase64?: string[];
 }

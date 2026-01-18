@@ -22,6 +22,7 @@ import { IServerConfig } from './config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { createApiRouter } from './routes/api';
 import { createDiscoveryRouter } from './routes/discovery';
+import { createAuthorityRouter } from './routes/authority';
 import { DiscoveryService } from './services/DiscoveryService';
 import { IKmsService } from './gdc-backend-utils-node/models/IKmsService';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
@@ -30,6 +31,7 @@ import { KmsService } from './services/KmsService';
 import { DemoKmsService } from './services/DemoKmsService';
 import { QueueAdapterMem } from './adapters/queue-mem';
 import { AsyncResponseStoreMem } from './adapters/async-response-store.mem';
+import { loadAuthorityArtifacts } from './utils/authority-artifacts';
 import { IVaultRepository } from './database/repositories/vault/vault.repository';
 import { VaultMemRepository } from './database/repositories/vault/vault.mem.repository';
 import { FirestoreVaultRepository } from './database/repositories/firestore/firestore.vault.repository';
@@ -38,6 +40,7 @@ import { HostingManager } from './managers/HostingManager';
 import { TenantsCacheManager } from './managers/TenantsCacheManager';
 import { EmployeeManager } from './managers/EmployeeManager';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { IndividualManager } from './managers/IndividualManager';
 import { CredentialManager } from './managers/CredentialManager';
 import { CompositionManager } from './managers/CompositionManager';
@@ -103,7 +106,10 @@ function determineApiBaseUrl(port: number, apiHostname: string): string {
   }
   // 3. Fallback for Local Development: Construct from internal binding info.
   const protocol = 'http'; // Local is always http
-  return `${protocol}://${apiHostname}:${port}`;
+  const publicHost = (apiHostname === '0.0.0.0' || apiHostname === '127.0.0.1')
+    ? 'localhost'
+    : apiHostname;
+  return `${protocol}://${publicHost}:${port}`;
 }
 
 function parseAndValidateSectors(csv: string | undefined): Sector[] {
@@ -131,6 +137,11 @@ function getConfig(): IServerConfig {
     const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION || process.env.K_CONFIGURATION);
     const apiHostname = isCloudRun ? '0.0.0.0' : (process.env.HOST_INTERNAL_IP || 'localhost');
     const apiBaseUrl = determineApiBaseUrl(port, apiHostname);
+
+    const localServiceRoles = (process.env.LOCAL_SERVICE_ROLE || 'HOST')
+      .split(',')
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
 
     configInstance = {
       nodeEnv: process.env.NODE_ENV || 'development',
@@ -165,6 +176,14 @@ function getConfig(): IServerConfig {
         privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       },
       googleClientId: process.env.GOOGLE_CLIENT_ID,
+      legacySignAlg: (process.env.LEGACY_SIGN_ALG === 'ES256' || process.env.LEGACY_SIGN_ALG === 'ES384')
+        ? process.env.LEGACY_SIGN_ALG
+        : 'ES384',
+      legacyX509DerBase64: process.env.LEGACY_X509_DER_BASE64,
+      legacyX509ChainBase64: process.env.LEGACY_X509_CHAIN_BASE64
+        ? process.env.LEGACY_X509_CHAIN_BASE64.split(',').map((value) => value.trim()).filter(Boolean)
+        : undefined,
+      localServiceRoles,
     };
   }
   return configInstance;
@@ -179,7 +198,7 @@ function getConfig(): IServerConfig {
  */
 async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServerConfig) {
   // console.log('[GW-API] Bootstrapping host tenant...');
-  const hostClaims = {
+  const hostClaims: ClaimsRecord = {
     [ClaimsOrganizationSchemaorg.identifierType]: bootConfig.host.idType,
     [ClaimsOrganizationSchemaorg.identifierValue]: bootConfig.host.idValue,
     [ClaimsOrganizationSchemaorg.addressCountry]: bootConfig.host.jurisdiction,
@@ -191,6 +210,9 @@ async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServer
     [ClaimsServiceSchemaorg.category]: 'system', 
     [ClaimsServiceSchemaorg.identifier]: `urn:uuid:${bootConfig.host.idValue}-service`,
   };
+  if (process.env.ORG_HOST_TERMS_URL) {
+    hostClaims[ClaimsServiceSchemaorg.termsOfService] = process.env.ORG_HOST_TERMS_URL;
+  }
 
   try {
     await hostingManager.bootstrapHost(hostClaims);
@@ -384,12 +406,33 @@ async function startServer(options?: StartServerOptions) {
   const authManager: IAuthorizationManager = options?.authManager || new SmartAuthorizationManager();
 
   const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService, kmsService, logger);
+
+  const authorityArtifacts: Record<string, ReturnType<typeof loadAuthorityArtifacts>> = {};
+  const roles = new Set(config.localServiceRoles || []);
+  if (roles.has('CA') || roles.has('ICA')) {
+    const artifactsRoot = path.join(process.cwd(), 'artifacts');
+    const rootDir = process.env.LOCAL_CA_ARTIFACTS_DIR || path.join(artifactsRoot, 'full-pki-chain-root-ca');
+    const icaDir = process.env.LOCAL_ICA_ARTIFACTS_DIR || path.join(artifactsRoot, 'full-pki-chain-ica');
+    if (roles.has('CA')) {
+      authorityArtifacts.CA = loadAuthorityArtifacts('CA', rootDir);
+    }
+    if (roles.has('ICA')) {
+      const rootDerPath = path.join(rootDir, 'root-cert.der');
+      authorityArtifacts.ICA = loadAuthorityArtifacts('ICA', icaDir, rootDerPath);
+    }
+  }
+  const authorityRouter = Object.keys(authorityArtifacts).length
+    ? createAuthorityRouter(authorityArtifacts, asyncResponseStore)
+    : undefined;
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService, config.apiBaseUrl, appAuthManager);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);
   const webhooksRouter = createWebhooksRouter(queueAdapter);
   const authRouter = createAuthRouter(appAuthManager, tokenManager);
   app.use('/', discoveryRouter);
+  if (authorityRouter) {
+    app.use('/', authorityRouter);
+  }
   app.use('/', apiRouter);
   app.use('/', networkRouter);
   app.use('/', fhirRouter);

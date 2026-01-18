@@ -6,7 +6,7 @@ import { JwsMultiSign } from 'gdc-common-utils-ts/models/jws';
 import { ParameterData } from 'gdc-common-utils-ts/models/params'; // extends ParamAttribute with `type` and others.
 import { ConfidentialStorageDoc, IndexedAttribute } from 'gdc-common-utils-ts/models/confidential-storage';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
-import { MldsaPublicJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { MlkemPublicJwk, PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 
 /**
  * Defines the Key Management Service (KMS).
@@ -61,7 +61,7 @@ export interface IKmsService {
    * Retrieves the public signing key for an entity, optionally filtering by algorithm.
    * If no algorithm is specified, it defaults to the preferred modern algorithm (e.g., ML-DSA-44).
    */
-  getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<MldsaPublicJwk | undefined>;
+  getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<PublicJwk | undefined>;
   
   /** 
    * Retrieves the public encryption key for an entity, optionally filtering by curve.
@@ -96,7 +96,7 @@ export interface IKmsService {
    * @param entityId The ID of the internal entity that is signing.
    * @returns The signed data as a JwsObject.
    */
-  signWithManagedKey(payload: Uint8Array, entityVaultId: string): Promise<JwsMultiSign>;
+  signWithManagedKey(payload: Uint8Array, entityVaultId: string, alg?: string): Promise<JwsMultiSign>;
 
   /**
    * Signs a payload by reconstructing a key from its components (e.g., for an Employee's cloud key).

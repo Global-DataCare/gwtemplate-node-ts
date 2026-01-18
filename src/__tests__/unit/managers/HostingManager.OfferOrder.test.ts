@@ -223,12 +223,12 @@ describe('HostingManager - Offer/Order Flow', () => {
     // Assert that the tenant's own vault and resources were created
     const tenantCollectionName =
       tenantUtils.generateTenantCollectionNameFromClaims(regClaims);
-    const vcDoc = await vaultRepository.get(
+    const legalParticipantDoc = await vaultRepository.get(
       tenantCollectionName,
-      'vc.json',
+      'legal-participant.vc.json',
       '.well-known',
     );
-    expect(vcDoc).toBeDefined();
+    expect(legalParticipantDoc).toBeDefined();
   });
 
   it('should return a 404 Not Found for an Order with an invalid offerId', async () => {

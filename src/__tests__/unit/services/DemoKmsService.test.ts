@@ -37,11 +37,14 @@ describe('DemoKmsService', () => {
             // This now calls the *real* provisionKeys method
             const jwks = await devKmsService.provisionKeys(entityId);
             
-            expect(jwks.keys).toHaveLength(2);
-            // Check for real crypto properties, not just placeholders
-            expect(jwks.keys[0].kty).toBe('AKP');
-            expect(jwks.keys[0].alg).toBe('ML-DSA-44');
-            expect(jwks.keys[0].pub).toBeDefined();
+            expect(jwks.keys).toHaveLength(3);
+            const dsaKey = jwks.keys.find((key) => key.alg === 'ML-DSA-44');
+            const kemKey = jwks.keys.find((key) => key.crv === 'ML-KEM-768');
+            const legacyKey = jwks.keys.find((key) => key.alg?.startsWith('ES'));
+            expect(dsaKey?.kty).toBe('AKP');
+            expect(dsaKey?.pub).toBeDefined();
+            expect(kemKey?.kty).toBe('OKP');
+            expect(legacyKey?.kty).toBe('EC');
 
             const retrievedJwks = await devKmsService.getPublicJwks(entityId);
             expect(retrievedJwks).toEqual(jwks);

@@ -10,7 +10,7 @@ import { TenantsCacheManager } from './TenantsCacheManager';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { generateVcId } from '../utils/vc-id';
-import { MldsaPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ParameterData } from 'gdc-common-utils-ts/models/params';
 import { parseValidityPeriod } from '../utils/time';
@@ -198,7 +198,7 @@ export class CredentialManager {
     const proof: ProofEBSIv2 = {
       type: 'JsonWebSignature2020',
       proofPurpose: 'assertionMethod',
-      verificationMethod: `${issuer}#${(signingKey as MldsaPublicJwk).kid}`,
+      verificationMethod: `${issuer}#${(signingKey as PublicJwk).kid}`,
       created: now.toISOString(),
       jws: jws,
     };

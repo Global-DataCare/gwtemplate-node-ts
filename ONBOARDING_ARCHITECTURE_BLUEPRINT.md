@@ -23,7 +23,7 @@ To support this clear separation, we use an inherited data model.
       networkName: string; // e.g., 'test', 'test-network', 'production'
       status: 'pending_verification' | 'active' | 'revoked';
       activationDate?: string;
-      verificationEvidence?: string; // e.g., URL to the vc.json or a transaction ID
+      verificationEvidence?: string; // e.g., URL to legal-participant.vc.json or a transaction ID
     }
 
     /**
@@ -62,7 +62,7 @@ This is a separate, more rigorous flow that begins only after Phase 1 is complet
 1.  **Trigger (`POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch` for Production):** An authorized controller for the now `test`-active organization submits a new `Order`. This `Order` accepts an `Offer` for the "Production Network Verification and Enrollment Service". The payment for this order triggers the real-world verification process.
 2.  **Out-of-Band Verification:** The payment confirmation initiates an internal workflow for a regional Intermediary Certification Authority (ICA). This may involve manual checks of legal documents.
 3.  **Issuance of Credentials:** Upon successful verification:
-    *   The Governing Body or ICA signs a `vc.json` credential for the organization. This credential may be published to a public repository (e.g., GitHub) for discovery.
+    *   The Governing Body or ICA signs a `legal-participant.vc.json` credential for the organization. This credential may be published to a public repository (e.g., GitHub) for discovery. `vc.json` is a legacy alias.
     *   A one-time `ActivationCode` is generated and sent to the organization's physical address via postal mail as a final security step.
 4.  **Activation (`POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`):** The organization's controller receives the physical `ActivationCode` and submits it to a dedicated activation endpoint.
 5.  **Final State (Phase 2):** The `FabricActivationManager` validates the code. On success, it finds the organization's `OrganizationConfig` document and **pushes a new entry** into its `networkStatus` array:

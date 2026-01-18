@@ -21,7 +21,7 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { validateNewOrganizationClaims } from '../utils/claims-validator';
-import { composeHostDidWebId, createHostedDidWeb, populateDidDocumentFromJwks } from '../utils/did-backend';
+import { applyLegacyX509Metadata, composeHostDidWebId, createHostedDidWeb, populateDidDocumentFromJwks } from '../utils/did-backend';
 import { populateDidDocumentServices } from '../utils/did-document';
 import { createOperationOutcome } from '../utils/outcome';
 import { determineResourceId } from '../utils/resource';
@@ -29,10 +29,11 @@ import { initializeHostServicesConfig, initializeTenantServicesConfig } from '..
 import { generateTenantCollectionNameFromClaims, getTenantVaultId, isValidTenantAlternateName } from '../utils/tenant';
 import { AllowedIndexableClaims } from '../gdc-backend-utils-node/models/indexing';
 import { createOrganizationUrn } from '../utils/urn';
+import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { ILogger } from '../loggers/ILogger';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { generateLicenseOffer } from '../utils/offer';
-import { VC_CONTEXT_V2, VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
+import { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
 import { EntityLifecycleStatus, EntityType, NetworkAccessStatus, NetworkName, BundleEntryType } from '../gdc-backend-utils-node/models/enums';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { ParameterData } from 'gdc-common-utils-ts/models/params';
@@ -52,7 +53,7 @@ import { issueActivationCodeFromPool } from '../utils/license-issuance';
  * It follows a two-step Offer/Order pattern:
  * 1.  `processOrganizationRegistration`: Creates a provisional (`pending`) tenant record and returns an `Offer`.
  * 2.  `processOrder`: Finalizes the registration upon `Order` confirmation, activates the tenant for the `test`
- *     network, and creates a provisional, host-signed `vc.json` to facilitate frontend development and testing.
+ *     network, and creates a provisional, host-signed `legal-participant.vc.json` to facilitate frontend development and testing.
  *
  * The subsequent, more complex process of onboarding to the `production` network is handled by a separate
  * set of managers (e.g., `NetworkEnrollmentManager`) and is initiated by a separate user action.
@@ -280,11 +281,13 @@ export class HostingManager {
     await this.vaultRepository.put(hostCollectionName!, [secureFinalDoc], 'tenants');
     
     // Save VCs and other resources into the TENANT's own vault
-    const vcDoc: ConfidentialStorageDoc = { id: 'vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
+    const legalParticipantDoc: ConfidentialStorageDoc = { id: 'legal-participant.vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
+    const legacyVcDoc: ConfidentialStorageDoc = { id: 'vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
     const selfDescDoc: ConfidentialStorageDoc = { id: 'self-description.json', status: 'active', sequence: 0, content: finalTenantConfig.selfDescriptionVc };
-    const secureVcDoc = await this.kmsService.protectConfidentialData(vcDoc, vaultId);
+    const secureLegalParticipantDoc = await this.kmsService.protectConfidentialData(legalParticipantDoc, vaultId);
+    const secureLegacyVcDoc = await this.kmsService.protectConfidentialData(legacyVcDoc, vaultId);
     const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, vaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureVcDoc, secureSelfDescDoc], '.well-known');
+    await this.vaultRepository.put(tenantCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], '.well-known');
 
     const [legalRep, processedService] = [person, service];
     if (legalRep) {
@@ -617,6 +620,14 @@ export class HostingManager {
     const didConfigServices = initializeHostServicesConfig(this.config.sectorsAllowed, this.config.nodeEnv);
     const baseUrl = this.config.apiBaseUrl;
     const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
+    const legacySignAlg = this.config.legacySignAlg;
+    const legacyX5u = legacySignAlg && this.config.legacyX509DerBase64
+      ? `${baseUrl}/host/.well-known/x509.der`
+      : undefined;
+    const legacyChain = this.config.legacyX509DerBase64
+      ? [this.config.legacyX509DerBase64, ...(this.config.legacyX509ChainBase64 || [])]
+      : this.config.legacyX509ChainBase64;
+    applyLegacyX509Metadata(didDocument, legacySignAlg, legacyX5u, legacyChain);
     didDocument.service = populateDidDocumentServices(didId, baseUrl, didConfigServices, false, {} as any);
 
     const hostConfig: OrganizationConfig = {
@@ -627,8 +638,51 @@ export class HostingManager {
       didConfig: { service: didConfigServices },
       didDocument: didDocument,
       networkStatus: [], // Host does not participate in networks as a tenant.
+      legacySignAlg: legacySignAlg,
+      legacyX509DerBase64: this.config.legacyX509DerBase64,
+      legacyX509ChainBase64: this.config.legacyX509ChainBase64,
       meta: { lastUpdated: new Date().toISOString() },
     };
+
+    // Create host self-description and legal participant VCs for well-known endpoints.
+    const hostSignerKid = publicKeys.keys.find((key) => key.use === 'sig')?.kid;
+    if (!hostSignerKid) {
+      throw new ManagerError('Host signing key not found, cannot issue host VCs.', IssueType.Exception);
+    }
+    const legalParticipantOptions = buildGaiaXLegalParticipantOptionsFromClaims({
+      claims: allClaims,
+      webDomain: baseUrl,
+      did: didId,
+      issuerDid: didId,
+    });
+    const governanceVcPayload = createGaiaXLegalParticipantCredential(legalParticipantOptions) as Omit<VerifiableCredentialV2, 'proof'>;
+    const govDetachedJws = await this.kmsService.createDetachedJws(governanceVcPayload, hostSignerKid, logicalVaultId);
+    const governanceVc: VerifiableCredentialV2 = {
+      ...governanceVcPayload,
+      proof: [{
+        type: 'JsonWebSignature2020',
+        created: new Date().toISOString(),
+        proofPurpose: 'assertionMethod',
+        verificationMethod: `${didId}#${hostSignerKid}`,
+        jws: govDetachedJws,
+      }],
+    };
+
+    const selfDescriptionPayload = { ...governanceVcPayload, issuer: didId } as Omit<VerifiableCredentialV2, 'proof'>;
+    const selfDescDetachedJws = await this.kmsService.createDetachedJws(selfDescriptionPayload, hostSignerKid, logicalVaultId);
+    const selfDescriptionVc: VerifiableCredentialV2 = {
+      ...selfDescriptionPayload,
+      proof: [{
+        type: 'JsonWebSignature2020',
+        created: new Date().toISOString(),
+        proofPurpose: 'assertionMethod',
+        verificationMethod: `${didId}#${hostSignerKid}`,
+        jws: selfDescDetachedJws,
+      }],
+    };
+
+    hostConfig.governanceVc = governanceVc;
+    hostConfig.selfDescriptionVc = selfDescriptionVc;
 
     const docToProtect: ConfidentialStorageDoc = {
       id: logicalVaultId,
@@ -639,6 +693,14 @@ export class HostingManager {
 
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, logicalVaultId);
     await this.vaultRepository.put(hostCollectionName, [secureDoc], 'tenants');
+
+    const legalParticipantDoc: ConfidentialStorageDoc = { id: 'legal-participant.vc.json', status: 'active', sequence: 0, content: governanceVc };
+    const legacyVcDoc: ConfidentialStorageDoc = { id: 'vc.json', status: 'active', sequence: 0, content: governanceVc };
+    const selfDescDoc: ConfidentialStorageDoc = { id: 'self-description.json', status: 'active', sequence: 0, content: selfDescriptionVc };
+    const secureLegalParticipantDoc = await this.kmsService.protectConfidentialData(legalParticipantDoc, logicalVaultId);
+    const secureLegacyVcDoc = await this.kmsService.protectConfidentialData(legacyVcDoc, logicalVaultId);
+    const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, logicalVaultId);
+    await this.vaultRepository.put(hostCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], '.well-known');
     
     const [adminPerson, processedService] = contained;
     if (adminPerson) {
@@ -689,11 +751,13 @@ export class HostingManager {
     await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], 'tenants');
 
     // Save VCs and other resources into the TENANT's own vault
-    const vcDoc: ConfidentialStorageDoc = { id: 'vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
+    const legalParticipantDoc: ConfidentialStorageDoc = { id: 'legal-participant.vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
+    const legacyVcDoc: ConfidentialStorageDoc = { id: 'vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
     const selfDescDoc: ConfidentialStorageDoc = { id: 'self-description.json', status: 'active', sequence: 0, content: finalTenantConfig.selfDescriptionVc };
-    const secureVcDoc = await this.kmsService.protectConfidentialData(vcDoc, vaultId);
+    const secureLegalParticipantDoc = await this.kmsService.protectConfidentialData(legalParticipantDoc, vaultId);
+    const secureLegacyVcDoc = await this.kmsService.protectConfidentialData(legacyVcDoc, vaultId);
     const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, vaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureVcDoc, secureSelfDescDoc], '.well-known');
+    await this.vaultRepository.put(tenantCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], '.well-known');
 
     const [legalRep, processedService] = contained;
     if (legalRep) {
@@ -756,33 +820,37 @@ export class HostingManager {
     const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
     const tenantContext = { alternateName: altName, jurisdiction: allClaims[ClaimsOrganizationSchemaorg.addressCountry] as string, version: 'v1', sector };
     didDocument.service = populateDidDocumentServices(primaryDid, baseUrl, didConfigServices, isHosted, tenantContext);
+    const legacySignAlg = this.config.legacySignAlg;
+    const legacyX5u = legacySignAlg && this.config.legacyX509DerBase64
+      ? `${baseUrl}/.well-known/x509.der`
+      : undefined;
+    const legacyChain = this.config.legacyX509DerBase64
+      ? [this.config.legacyX509DerBase64, ...(this.config.legacyX509ChainBase64 || [])]
+      : this.config.legacyX509ChainBase64;
+    applyLegacyX509Metadata(didDocument, legacySignAlg, legacyX5u, legacyChain);
     
-    // 3. Create provisional, host-signed vc.json for test/demo purposes
+    // 3. Create provisional, host-signed legal-participant.vc.json for test/demo purposes
     const hostSignerKid = (await this.kmsService.getPublicJwks('host')).keys.find(k => k.use === 'sig')?.kid;
     if (!hostSignerKid) {
       throw new ManagerError('Host signing key not found, cannot issue provisional VC.', IssueType.Exception);
     }
-    const governanceVcPayload: Omit<VerifiableCredentialV2, 'proof'> = {
-      '@context': [VC_CONTEXT_V2],
-      type: ['VerifiableCredential', 'GaiaxCredential'],
-      id: `urn:uuid:${uuidv4()}`,
-      issuer: hostDid,
-      validFrom: new Date().toISOString(),
-      credentialSubject: {
-        id: primaryDid,
-        ...allClaims,
-      },
-    };
+    const legalParticipantOptions = buildGaiaXLegalParticipantOptionsFromClaims({
+      claims: allClaims,
+      webDomain: baseUrl,
+      did: primaryDid,
+      issuerDid: hostDid,
+    });
+    const governanceVcPayload = createGaiaXLegalParticipantCredential(legalParticipantOptions) as Omit<VerifiableCredentialV2, 'proof'>;
     const govDetachedJws = await this.kmsService.createDetachedJws(governanceVcPayload, hostSignerKid, 'host');
     const governanceVc: VerifiableCredentialV2 = {
-        ...governanceVcPayload,
-        proof: [{
-            type: 'JsonWebSignature2020',
-            created: new Date().toISOString(),
-            proofPurpose: 'assertionMethod',
-            verificationMethod: `${hostDid}#${hostSignerKid}`,
-            jws: govDetachedJws,
-        }]
+      ...governanceVcPayload,
+      proof: [{
+        type: 'JsonWebSignature2020',
+        created: new Date().toISOString(),
+        proofPurpose: 'assertionMethod',
+        verificationMethod: `${hostDid}#${hostSignerKid}`,
+        jws: govDetachedJws,
+      }],
     };
 
     // 4. Create self-signed self-description.json
@@ -790,7 +858,13 @@ export class HostingManager {
     if (!tenantSignerKid) {
       throw new ManagerError('Tenant signing key not found, cannot issue self-description.', IssueType.Exception);
     }
-    const selfDescriptionPayload: Omit<VerifiableCredentialV2, 'proof'> = { ...governanceVcPayload, issuer: primaryDid };
+    const selfDescriptionOptions = buildGaiaXLegalParticipantOptionsFromClaims({
+      claims: allClaims,
+      webDomain: baseUrl,
+      did: primaryDid,
+      issuerDid: primaryDid,
+    });
+    const selfDescriptionPayload = createGaiaXLegalParticipantCredential(selfDescriptionOptions) as Omit<VerifiableCredentialV2, 'proof'>;
     const selfDescDetachedJws = await this.kmsService.createDetachedJws(selfDescriptionPayload, tenantSignerKid, vaultId);
     const selfDescriptionVc: VerifiableCredentialV2 = {
         ...selfDescriptionPayload,
@@ -823,6 +897,9 @@ export class HostingManager {
       didDocument: didDocument,
       governanceVc: governanceVc,
       selfDescriptionVc: selfDescriptionVc,
+      legacySignAlg: legacySignAlg,
+      legacyX509DerBase64: this.config.legacyX509DerBase64,
+      legacyX509ChainBase64: this.config.legacyX509ChainBase64,
       meta: { lastUpdated: new Date().toISOString() },
     };
     

@@ -41,4 +41,8 @@ export interface IServerConfig {
     privateKey?: string;
   };
   googleClientId?: string;
+  legacySignAlg?: string;
+  legacyX509DerBase64?: string;
+  legacyX509ChainBase64?: string[];
+  localServiceRoles?: string[];
 }

@@ -119,6 +119,9 @@ For a client to trust the gateway, it must first discover its capabilities and p
 -   `/.well-known/smart-configuration`: The discovery document for SMART on FHIR.
 -   `/.well-known/fhir/capabilitystatement`: The standard discovery document for HL7 FHIR API capabilities.
 -   `/.well-known/self-description.json`: The entity's GAIA-X Self-Description Verifiable Credential.
+-   `/.well-known/legal-participant.vc.json`: The GAIA-X Legal Participant VC (ICA-attested when available).
+-   `/.well-known/vc.json`: Legacy alias for the legal participant VC.
+-   `/.well-known/openid-credential-issuer`: OIDC4VCI metadata (compliance VC issuance).
 
 
 ## 4. Interaction Modes

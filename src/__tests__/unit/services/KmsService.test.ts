@@ -65,9 +65,10 @@ describe('KmsService', () => {
       
       expect(mockCryptoService.generateKeyPairMlDsa).toHaveBeenCalledTimes(1);
       expect(mockCryptoService.generateKeyPairMlKem).toHaveBeenCalledTimes(1);
-      expect(jwks.keys).toHaveLength(2);
+      expect(jwks.keys).toHaveLength(3);
       expect(jwks.keys).toContainEqual(mockMldsaPublicKey);
       expect(jwks.keys).toContainEqual(mockMlkemPublicKey);
+      expect(jwks.keys.find((key) => key.alg?.startsWith('ES'))).toBeDefined();
       // Also check that internal storage contains the keys
       const storedKeys = await kmsService.getPublicJwks('tenant-123');
       expect(storedKeys).toEqual(jwks);
@@ -87,7 +88,7 @@ describe('KmsService', () => {
       // Verify the host keys are actually available
       const hostKeys = await kmsService.getPublicJwks('host');
       expect(hostKeys).toBeDefined();
-      expect(hostKeys.keys).toHaveLength(2);
+      expect(hostKeys.keys).toHaveLength(3);
 
       provisionSpy.mockRestore();
     });

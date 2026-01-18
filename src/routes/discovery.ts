@@ -5,16 +5,19 @@ import * as express from 'express';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { DiscoveryService } from '../services/DiscoveryService';
 import { getTenantVaultId } from '../utils/tenant';
-import { createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { pingHandler } from './handlers/discovery/ping.handler';
 import { signVerifiableCredential } from '../utils/vc-signer';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { findSigningMethod } from '../utils/did-backend';
+import { buildStatusListCredential, buildStatusListEntry, createStatusListEncodedList } from '../utils/status-list';
 
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ILogger } from '../loggers/ILogger';
 
 // List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
+const STATUS_LIST_BITS = 16384;
+const STATUS_LIST_PURPOSE = 'revocation' as const;
+const STATUS_LIST_INDEX = 0;
 
 /**
  * Creates the router for synchronous, public discovery endpoints.
@@ -223,7 +226,32 @@ export function createDiscoveryRouter(
 
   router.get([`${hostWellKnownPrefix}/jwks.json`, `${tenantWellKnownPrefix}/jwks.json`], resolveTenant, async (req, res) => {
     try {
-      const jwks = await kmsService.getPublicJwks(res.locals.vaultId);
+      const vaultId = res.locals.vaultId;
+      const jwks = await kmsService.getPublicJwks(vaultId);
+      const entityConfig = await tenantsCacheManager.getTenant(vaultId);
+      const legacySignAlg = (entityConfig?.legacyX509DerBase64 || entityConfig?.legacyX509ChainBase64?.length)
+        ? (entityConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG)
+        : undefined;
+      const legacyX5c = entityConfig?.legacyX509ChainBase64;
+      const legacyDerBase64 = entityConfig?.legacyX509DerBase64;
+      if (legacySignAlg && legacyDerBase64 && jwks?.keys?.length) {
+        const wellKnownBase = vaultId === 'host'
+          ? hostWellKnownPrefix
+          : `/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/.well-known`;
+        const legacyX5u = `${req.protocol}://${req.get('host')}${wellKnownBase}/x509.der`;
+        const combinedChain = legacyDerBase64
+          ? [legacyDerBase64, ...(legacyX5c || [])]
+          : (legacyX5c || []);
+        const uniqueChain = combinedChain.filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
+        for (const key of jwks.keys) {
+          if ((key as any).alg === legacySignAlg) {
+            (key as any).x5u = legacyX5u;
+            if (uniqueChain.length) {
+              (key as any).x5c = uniqueChain;
+            }
+          }
+        }
+      }
       res.json(jwks);
     } catch (error) {
       // If keys are not found for the entity, it's a server-side issue.
@@ -232,8 +260,23 @@ export function createDiscoveryRouter(
     }
   });
 
-  // Legacy/dev-friendly: return the tenant's stored governance VC and self-description (if present).
-  // Some clients (e.g. app templates) rely on these documents being downloadable from well-known endpoints.
+  router.get([`${hostWellKnownPrefix}/x509.der`, `${tenantWellKnownPrefix}/x509.der`], resolveTenant, async (req, res) => {
+    const vaultId = res.locals.vaultId;
+    const entityConfig = await tenantsCacheManager.getTenant(vaultId);
+    const derBase64 = entityConfig?.legacyX509DerBase64;
+    const chainBase64 = entityConfig?.legacyX509ChainBase64 || [];
+    const combined = derBase64 ? [derBase64, ...chainBase64] : chainBase64;
+    const uniqueChain = combined.filter((value: string, index: number, self: string[]) => self.indexOf(value) === index);
+    if (!uniqueChain.length) {
+      return res.status(404).type('text').send('Not Found');
+    }
+    const derBuffers = uniqueChain.map((entry: string) => Buffer.from(entry, 'base64'));
+    const derBytes = Buffer.concat(derBuffers);
+    res.type('application/pkix-cert').send(derBytes);
+  });
+
+  // Legacy/dev-friendly: return the tenant's stored legal-participant VC and self-description (if present).
+  // Some clients rely on vc.json; serve it as a deprecated alias.
   router.get([`${hostWellKnownPrefix}/vc.json`, `${tenantWellKnownPrefix}/vc.json`], resolveTenant, async (req, res) => {
     const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     const vc = entityConfig?.governanceVc;
@@ -252,52 +295,85 @@ export function createDiscoveryRouter(
     },
   );
 
-  router.get([`${hostWellKnownPrefix}/legal-participant.vc.json`, `${tenantWellKnownPrefix}/legal-participant.vc.json`], resolveTenant, async (req, res) => {
+  router.get([`${hostWellKnownPrefix}/status-list.json`, `${tenantWellKnownPrefix}/status-list.json`], resolveTenant, async (req, res) => {
     try {
       const vaultId = res.locals.vaultId;
       const entityConfig = await tenantsCacheManager.getTenant(vaultId);
-      
-      if (!entityConfig || !entityConfig.claims || !entityConfig.didDocument) {
-        return res.status(404).type('text').send('Not Found: Entity configuration is incomplete.');
-      }
-      
-      const claims = entityConfig.claims;
-      const didDoc = entityConfig.didDocument;
-      const domain = await tenantsCacheManager.getTenantDomainUrl(vaultId);
-
-      const vcOptions = {
-        webDomain: domain!,
-        officialName: claims[ClaimsOrganizationSchemaorg.legalName],
-        did: didDoc.id,
-        issuerDid: didDoc.id, // Self-signed
-        vatId: claims[ClaimsOrganizationSchemaorg.identifierValue],
-        countryCode: claims[ClaimsOrganizationSchemaorg.addressCountry],
-        termsAndConditionsUrl: claims[ClaimsServiceSchemaorg.termsOfService],
-        termsAndConditionsHashHex: claims[`${ClaimsServiceSchemaorg.termsOfService}#hash`],
-      };
-
-      // Create the unsigned credential body
-      const unsignedVc = createGaiaXLegalParticipantCredential(vcOptions);
-      
-      // The verification method is the first assertion method in the DID document.
-      const verificationMethodId = didDoc.assertionMethod?.[0] as string;
-      if (!verificationMethodId) {
-        throw new Error('No assertionMethod found in DID document to sign the credential.');
+      const didDoc = entityConfig?.didDocument;
+      if (!entityConfig || !didDoc) {
+        return res.status(404).type('text').send('Not Found');
       }
 
-      // Sign the credential
-      const signedVc = await signVerifiableCredential(unsignedVc, verificationMethodId, kmsService, vaultId);
+      const legacySignAlg = (entityConfig?.legacyX509DerBase64 || entityConfig?.legacyX509ChainBase64?.length)
+        ? (entityConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG)
+        : undefined;
+      const verificationMethodId = findSigningMethod(didDoc, legacySignAlg) || (didDoc.assertionMethod?.[0] as string);
+      const pqcSignMethod = didDoc.verificationMethod?.find((method: any) => (method.publicKeyJwk as any)?.alg?.startsWith('ML-DSA'))?.id as string | undefined;
+      const pqcSignAlg = pqcSignMethod
+        ? (didDoc.verificationMethod?.find((method: any) => method.id === pqcSignMethod)?.publicKeyJwk as any)?.alg
+        : undefined;
+      if (!verificationMethodId && !pqcSignMethod) {
+        throw new Error('No assertionMethod found in DID document to sign the status list.');
+      }
 
-      res.json(signedVc);
+      const wellKnownBase = vaultId === 'host'
+        ? hostWellKnownPrefix
+        : `/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/.well-known`;
+      const listUrl = `${req.protocol}://${req.get('host')}${wellKnownBase}/status-list.json`;
+      const encodedList = createStatusListEncodedList(STATUS_LIST_BITS);
 
+      const unsignedStatusListVc = buildStatusListCredential({
+        issuerDid: didDoc.id,
+        listUrl,
+        statusPurpose: STATUS_LIST_PURPOSE,
+        encodedList,
+      });
+
+      let signedStatusListVc = unsignedStatusListVc;
+      if (verificationMethodId) {
+        signedStatusListVc = await signVerifiableCredential(
+          signedStatusListVc,
+          verificationMethodId,
+          kmsService,
+          vaultId,
+          { signerAlg: legacySignAlg },
+        );
+      }
+      if (pqcSignMethod && pqcSignMethod !== verificationMethodId) {
+        signedStatusListVc = await signVerifiableCredential(
+          signedStatusListVc,
+          pqcSignMethod,
+          kmsService,
+          vaultId,
+          { signerAlg: pqcSignAlg },
+        );
+      }
+
+      res.json(signedStatusListVc);
     } catch (error: any) {
-      console.error(`[DiscoveryRouter] Failed to generate Legal Participant VC for vaultId '${res.locals.vaultId}':`, error);
+      console.error(`[DiscoveryRouter] Failed to generate Status List VC for vaultId '${res.locals.vaultId}':`, error);
       res.status(500).type('text').send('Internal Server Error: ' + error.message);
     }
   });
 
+  router.get([`${hostWellKnownPrefix}/legal-participant.vc.json`, `${tenantWellKnownPrefix}/legal-participant.vc.json`], resolveTenant, async (req, res) => {
+    const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    const vc = entityConfig?.governanceVc;
+    if (!vc) return res.status(404).type('text').send('Not Found');
+    res.json(vc);
+  });
+
   router.get([`${hostWellKnownPrefix}/openid-configuration`, `${tenantWellKnownPrefix}/openid-configuration`], resolveTenant, (req, res) => {
     const config = discoveryService.getOpenIdConfiguration(res.locals.vaultId);
+    if (config) {
+      res.json(config);
+    } else {
+      res.status(404).type('text').send('Not Found');
+    }
+  });
+
+  router.get([`${hostWellKnownPrefix}/openid-credential-issuer`, `${tenantWellKnownPrefix}/openid-credential-issuer`], resolveTenant, async (req, res) => {
+    const config = await discoveryService.getOpenIdCredentialIssuerMetadata(res.locals.vaultId);
     if (config) {
       res.json(config);
     } else {

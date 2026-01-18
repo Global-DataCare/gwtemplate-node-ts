@@ -9,9 +9,11 @@ import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { v4 as uuidv4 } from 'uuid';
-import { MldsaPublicJwk, MlkemPrivateJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { MldsaPublicJwk, MlkemPrivateJwk, MlkemPublicJwk, PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { createHash, randomBytes } from 'crypto';
+import { p256, p384 } from '@noble/curves/nist.js';
+import { deriveKeyPair } from '../utils/pki';
 import { computeHmacSha256Base64Url } from 'gdc-common-utils-ts/hmac';
 import { ProtectedDataAES } from 'gdc-common-utils-ts/models/aes';
 import { ParameterData } from 'gdc-common-utils-ts/models/params';
@@ -46,6 +48,10 @@ import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 type EntityKeysSet = {
   verificationKeyPair: {
     publicJWKey: MldsaPublicJwk & { kid: string; };
+    secretKeyBytes: Uint8Array;
+  };
+  legacySigningKeyPair?: {
+    publicJWKey: JWK & { kid: string; };
     secretKeyBytes: Uint8Array;
   };
   encryptionKeyPair: {
@@ -146,16 +152,23 @@ export class KmsService implements IKmsService {
     (verificationKeyPair.publicJWKey as any).use = 'sig';
     (encryptionKeyPair.publicJWKey as any).use = 'enc';
 
+    const legacySigningKeyPair = await this.provisionLegacySigningKey(entityVaultId, process.env.LEGACY_SIGN_ALG);
+
     // In a production vault, the `dataEncryptionKey` would be encrypted with the Host KEK here before storage.
     this._managedKeys.set(entityVaultId, { 
       verificationKeyPair: { publicJWKey: verificationKeyPair.publicJWKey, secretKeyBytes: verificationKeyPair.secretKeyBytes },
+      ...(legacySigningKeyPair ? { legacySigningKeyPair } : {}),
       encryptionKeyPair: { publicJWKey: encryptionKeyPair.publicJWKey, secretKeyBytes: encryptionKeyPair.secretKeyBytes },
       dataEncryptionKey: dataEncryptionKey,
       hmacKey: hmacKey
     });
     
     const publicJwkSet = {
-      keys: [verificationKeyPair.publicJWKey as JWK, encryptionKeyPair.publicJWKey as JWK]
+      keys: [
+        verificationKeyPair.publicJWKey as JWK,
+        ...(legacySigningKeyPair ? [legacySigningKeyPair.publicJWKey as JWK] : []),
+        encryptionKeyPair.publicJWKey as JWK,
+      ],
     };
 
     //     // console.log(`[KmsService] Provisioned new JWKSet for entity: ${entityVaultId}`, publicJwkSet);
@@ -174,11 +187,15 @@ export class KmsService implements IKmsService {
       throw new Error(`Keys not found for entity: ${entityVaultId}`);
     }
     return {
-      keys: [keyPairSet.verificationKeyPair.publicJWKey as JWK, keyPairSet.encryptionKeyPair.publicJWKey as JWK]
+      keys: [
+        keyPairSet.verificationKeyPair.publicJWKey as JWK,
+        ...(keyPairSet.legacySigningKeyPair ? [keyPairSet.legacySigningKeyPair.publicJWKey as JWK] : []),
+        keyPairSet.encryptionKeyPair.publicJWKey as JWK
+      ]
     };
   }
 
-  async getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<MldsaPublicJwk | undefined> {
+  async getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<PublicJwk | undefined> {
     const keySet = this._managedKeys.get(entityVaultId);
     if (!keySet) return undefined;
 
@@ -189,7 +206,9 @@ export class KmsService implements IKmsService {
       return keySet.verificationKeyPair.publicJWKey;
     }
     
-    // Placeholder for legacy ECDSA key lookup
+    if (keySet.legacySigningKeyPair && keySet.legacySigningKeyPair.publicJWKey.alg === alg) {
+      return keySet.legacySigningKeyPair.publicJWKey as PublicJwk;
+    }
     return undefined;
   }
 
@@ -218,6 +237,7 @@ export class KmsService implements IKmsService {
     return {
       keys: [
         hostKeys.verificationKeyPair.publicJWKey as JWK,
+        ...(hostKeys.legacySigningKeyPair ? [hostKeys.legacySigningKeyPair.publicJWKey as JWK] : []),
         hostKeys.encryptionKeyPair.publicJWKey as JWK,
       ],
     };
@@ -306,15 +326,16 @@ export class KmsService implements IKmsService {
    * @param entityId The identifier of the signing entity.
    * @returns A `JwsMultiSign` object containing the signature.
    */
-  async signWithManagedKey(payload: Uint8Array, entityVaultId: string): Promise<JwsMultiSign> {
+  async signWithManagedKey(payload: Uint8Array, entityVaultId: string, alg?: string): Promise<JwsMultiSign> {
     const keyPairSet = this._managedKeys.get(entityVaultId);
     if (!keyPairSet) {
       throw new Error(`Verification key not found for entity: ${entityVaultId}`);
     }
-    const { publicJWKey, secretKeyBytes } = keyPairSet.verificationKeyPair;
-    const protectedHeader = { alg: publicJWKey.alg, kid: publicJWKey.kid };
-    const jwsParts = await this.crypto.signDataJws({ data: Content.bytesToRawBase64UrlSafe(payload) }, protectedHeader, secretKeyBytes);
-    
+    const signingKey = this.resolveSigningKey(keyPairSet, alg);
+    if (!signingKey) {
+      throw new Error(`Signing key not found for entity: ${entityVaultId} (alg=${alg || 'default'})`);
+    }
+    const jwsParts = await this.signJwsPayload(payload, signingKey);
     return {
       payload: jwsParts.payload,
       signatures: [{ protected: jwsParts.protected, signature: jwsParts.signature }],
@@ -365,13 +386,11 @@ export class KmsService implements IKmsService {
   async createDetachedJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
     this.checkInitialized();
     const keyPairSet = this._managedKeys.get(signerVaultId);
-    if (!keyPairSet || keyPairSet.verificationKeyPair.publicJWKey.kid !== signerKid) {
+    const signingKey = this.resolveSigningKeyByKid(keyPairSet, signerKid);
+    if (!signingKey) {
       throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);
     }
-    const { publicJWKey, secretKeyBytes } = keyPairSet.verificationKeyPair;
-
-    const protectedHeader = { alg: publicJWKey.alg, kid: publicJWKey.kid };
-    const jwsParts = await this.crypto.signDataJws(payload, protectedHeader, secretKeyBytes);
+    const jwsParts = await this.signJwsObject(payload, signingKey);
     
     // Format as detached JWS: HEADER..SIGNATURE
     return `${jwsParts.protected}..${jwsParts.signature}`;
@@ -380,13 +399,89 @@ export class KmsService implements IKmsService {
   async createCompactJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
     this.checkInitialized();
     const keyPairSet = this._managedKeys.get(signerVaultId);
-    if (!keyPairSet || keyPairSet.verificationKeyPair.publicJWKey.kid !== signerKid) {
+    const signingKey = this.resolveSigningKeyByKid(keyPairSet, signerKid);
+    if (!signingKey) {
       throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);
     }
-    const { publicJWKey, secretKeyBytes } = keyPairSet.verificationKeyPair;
-    const protectedHeader = { alg: publicJWKey.alg, kid: publicJWKey.kid };
-    const jwsParts = await this.crypto.signDataJws(payload, protectedHeader, secretKeyBytes);
+    const jwsParts = await this.signJwsObject(payload, signingKey);
     return `${jwsParts.protected}.${jwsParts.payload}.${jwsParts.signature}`;
+  }
+
+  private async provisionLegacySigningKey(entityVaultId: string, alg?: string): Promise<EntityKeysSet['legacySigningKeyPair'] | undefined> {
+    const legacyAlg = (alg === 'ES256' || alg === 'ES384') ? alg : 'ES384';
+    if (!legacyAlg.startsWith('ES')) {
+      return undefined;
+    }
+    const seedHex = (process.env.NODE_ENV === 'development' && process.env.DEV_SEED === 'true')
+      ? createHash('sha256').update(`${entityVaultId}-legacy`).digest('hex')
+      : undefined;
+    const curve = legacyAlg === 'ES384' ? 'P-384' : 'P-256';
+    const { jwk, kid } = await deriveKeyPair(seedHex, curve);
+    const publicJwk = {
+      kty: jwk.kty,
+      crv: jwk.crv,
+      x: jwk.x,
+      y: jwk.y,
+      kid: kid,
+      alg: legacyAlg,
+      use: 'sig',
+    } as JWK & { kid: string };
+    const secretKeyBytes = Buffer.from(jwk.d, 'base64url');
+    return { publicJWKey: publicJwk, secretKeyBytes };
+  }
+
+  private resolveSigningKey(keySet: EntityKeysSet, alg?: string) {
+    if (!alg || alg === keySet.verificationKeyPair.publicJWKey.alg) {
+      return { publicJwk: keySet.verificationKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.verificationKeyPair.secretKeyBytes };
+    }
+    if (keySet.legacySigningKeyPair && keySet.legacySigningKeyPair.publicJWKey.alg === alg) {
+      return { publicJwk: keySet.legacySigningKeyPair.publicJWKey, secretKeyBytes: keySet.legacySigningKeyPair.secretKeyBytes };
+    }
+    return undefined;
+  }
+
+  private resolveSigningKeyByKid(keySet: EntityKeysSet | undefined, kid: string) {
+    if (!keySet) return undefined;
+    if (keySet.verificationKeyPair.publicJWKey.kid === kid) {
+      return { publicJwk: keySet.verificationKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.verificationKeyPair.secretKeyBytes };
+    }
+    if (keySet.legacySigningKeyPair?.publicJWKey.kid === kid) {
+      return { publicJwk: keySet.legacySigningKeyPair.publicJWKey, secretKeyBytes: keySet.legacySigningKeyPair.secretKeyBytes };
+    }
+    return undefined;
+  }
+
+  private async signJwsPayload(payload: Uint8Array, signingKey: { publicJwk: JWK & { kid: string }; secretKeyBytes: Uint8Array; }) {
+    const protectedHeader = { alg: signingKey.publicJwk.alg, kid: signingKey.publicJwk.kid };
+    const payloadObject = { data: Content.bytesToRawBase64UrlSafe(payload) };
+    return await this.signJwsObject(payloadObject, signingKey, protectedHeader);
+  }
+
+  private async signJwsObject(
+    payload: object,
+    signingKey: { publicJwk: JWK & { kid: string }; secretKeyBytes: Uint8Array; },
+    protectedHeader?: { alg?: string; kid?: string },
+  ) {
+    const resolvedHeader = protectedHeader || { alg: signingKey.publicJwk.alg, kid: signingKey.publicJwk.kid };
+    if (resolvedHeader.alg && resolvedHeader.alg.startsWith('ES')) {
+      return await this.signJwsWithEcdsa(payload, resolvedHeader, signingKey.secretKeyBytes);
+    }
+    return await this.crypto.signDataJws(payload, resolvedHeader, signingKey.secretKeyBytes);
+  }
+
+  private async signJwsWithEcdsa(payload: object, protectedHeader: { alg?: string; kid?: string }, secretKeyBytes: Uint8Array) {
+    const protectedHeaderB64Url = Content.objectToRawBase64UrlSafe(protectedHeader);
+    const payloadB64Url = Content.objectToRawBase64UrlSafe(payload);
+    const signingInput = `${protectedHeaderB64Url}.${payloadB64Url}`;
+    const signingInputBytes = Content.stringToBytesUTF8(signingInput);
+    const signatureBytes = (protectedHeader.alg === 'ES384'
+      ? p384.sign(signingInputBytes, secretKeyBytes, { format: 'compact' } as any)
+      : p256.sign(signingInputBytes, secretKeyBytes, { format: 'compact' } as any)) as Uint8Array;
+    return {
+      protected: protectedHeaderB64Url,
+      payload: payloadB64Url,
+      signature: Content.bytesToRawBase64UrlSafe(signatureBytes),
+    };
   }
 
   // --- Outbound Encryption ---
