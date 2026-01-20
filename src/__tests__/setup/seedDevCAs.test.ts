@@ -26,18 +26,43 @@ function getEnv(key: string): string {
   return value;
 }
 
+function buildLegalNumber(options: {
+  region?: string;
+  jurisdiction: string;
+  idType: string;
+  idValue: string;
+}): string {
+  const region = (options.region || '').toUpperCase();
+  const jurisdiction = options.jurisdiction.toUpperCase();
+  const idType = options.idType.toUpperCase();
+  const idValue = options.idValue;
+  const normalizedType = region === 'EU' && idType === 'TAX' ? 'VAT' : idType;
+
+  if (region === 'EU' && normalizedType === 'VAT') {
+    return `VAT${jurisdiction}-${idValue}`;
+  }
+  return `${normalizedType}-${idValue}`;
+}
+
 const REQUIRED_ENV_VARS = [
   'ROOT_CA_SEED',
   'ICA_SEED',
-  'BASE_DOMAIN',
-  'ROOT_CA_LEGAL_NUMBER',
-  'ROOT_CA_ORG_NAME',
-  'ICA_LEGAL_NUMBER',
-  'ICA_ORG_NAME',
-  'ORG_JURISDICTION',
-  'ORG_CITY',
-  'ORG_STREET',
-  'ORG_POSTAL_CODE',
+  'ROOT_CA_DOMAIN',
+  'ICA_DOMAIN',
+  'ROOT_CA_LEGAL_ID_TYPE',
+  'ROOT_CA_LEGAL_ID_NUMBER',
+  'ROOT_CA_LEGAL_NAME',
+  'ICA_LEGAL_ID_TYPE',
+  'ICA_LEGAL_ID_NUMBER',
+  'ICA_LEGAL_NAME',
+  'ROOT_CA_JURISDICTION',
+  'ROOT_CA_CITY',
+  'ROOT_CA_STREET',
+  'ROOT_CA_POSTAL_CODE',
+  'ICA_JURISDICTION',
+  'ICA_CITY',
+  'ICA_STREET',
+  'ICA_POSTAL_CODE',
 ] as const;
 
 const missingEnv = REQUIRED_ENV_VARS.filter((k) => !process.env[k]);
@@ -45,28 +70,41 @@ const describeIfEnv = missingEnv.length === 0 ? describe : describe.skip;
 
 const ROOT_CA_SEED = process.env.ROOT_CA_SEED ? getEnv('ROOT_CA_SEED') : '';
 const ICA_SEED = process.env.ICA_SEED ? getEnv('ICA_SEED') : '';
-const BASE_DOMAIN = process.env.BASE_DOMAIN ? getEnv('BASE_DOMAIN') : '';
+const ROOT_CA_DOMAIN = process.env.ROOT_CA_DOMAIN ? getEnv('ROOT_CA_DOMAIN') : '';
+const ICA_DOMAIN = process.env.ICA_DOMAIN ? getEnv('ICA_DOMAIN') : '';
+const ROOT_CA_REGION = process.env.ROOT_CA_REGION;
+const ICA_REGION = process.env.ICA_REGION;
 
 function buildRootCAConfig(): AuthorityConfig {
   return {
-    legalRegistrationNumber: getEnv('ROOT_CA_LEGAL_NUMBER'),
-    domain: `root-ca.${BASE_DOMAIN}`,
-    subjectCN: `root-ca.${BASE_DOMAIN}`,
-    officialName: getEnv('ROOT_CA_ORG_NAME'),
-    countryCode: getEnv('ORG_JURISDICTION'),
-    location: { city: getEnv('ORG_CITY'), street: getEnv('ORG_STREET'), postalCode: getEnv('ORG_POSTAL_CODE') },
+    legalRegistrationNumber: buildLegalNumber({
+      region: ROOT_CA_REGION,
+      jurisdiction: getEnv('ROOT_CA_JURISDICTION'),
+      idType: getEnv('ROOT_CA_LEGAL_ID_TYPE'),
+      idValue: getEnv('ROOT_CA_LEGAL_ID_NUMBER'),
+    }),
+    domain: ROOT_CA_DOMAIN,
+    subjectCN: ROOT_CA_DOMAIN,
+    officialName: getEnv('ROOT_CA_LEGAL_NAME'),
+    countryCode: getEnv('ROOT_CA_JURISDICTION'),
+    location: { city: getEnv('ROOT_CA_CITY'), street: getEnv('ROOT_CA_STREET'), postalCode: getEnv('ROOT_CA_POSTAL_CODE') },
     seed: ROOT_CA_SEED,
   };
 }
 
 function buildIcaConfig(): AuthorityConfig {
   return {
-    legalRegistrationNumber: getEnv('ICA_LEGAL_NUMBER'),
-    domain: `ica.${BASE_DOMAIN}`,
-    subjectCN: `ica.${BASE_DOMAIN}`,
-    officialName: getEnv('ICA_ORG_NAME'),
-    countryCode: getEnv('ORG_JURISDICTION'),
-    location: { city: getEnv('ORG_CITY'), street: getEnv('ORG_STREET'), postalCode: getEnv('ORG_POSTAL_CODE') },
+    legalRegistrationNumber: buildLegalNumber({
+      region: ICA_REGION,
+      jurisdiction: getEnv('ICA_JURISDICTION'),
+      idType: getEnv('ICA_LEGAL_ID_TYPE'),
+      idValue: getEnv('ICA_LEGAL_ID_NUMBER'),
+    }),
+    domain: ICA_DOMAIN,
+    subjectCN: ICA_DOMAIN,
+    officialName: getEnv('ICA_LEGAL_NAME'),
+    countryCode: getEnv('ICA_JURISDICTION'),
+    location: { city: getEnv('ICA_CITY'), street: getEnv('ICA_STREET'), postalCode: getEnv('ICA_POSTAL_CODE') },
     seed: ICA_SEED,
   };
 }

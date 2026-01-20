@@ -8,8 +8,8 @@ import { createHostedDidWeb, getPrimaryDidWeb, findSigningMethod, populateDidDoc
 // --- Test Data ---
 const HOST_DID = 'did:web:host.com';
 const TENANT_ALT_NAME = 'acme';
-const TENANT_CONTEXT = { jurisdiction: 'us', version: 'v1', sector: 'health-care' };
-const HOSTED_DID = 'did:web:host.com:acme:cds-us:v1:health-care'; // Full hosted DID
+const TENANT_CONTEXT = { jurisdiction: 'es', version: 'v1', sector: 'health-care' };
+const HOSTED_DID = 'did:web:host.com:acme:cds-es:v1:health-care'; // Full hosted DID
 const EXTERNAL_DID = 'did:web:acme.org';
 
 const tenantDidDocWithExternal: DidDocument & { alternateName: string } = {

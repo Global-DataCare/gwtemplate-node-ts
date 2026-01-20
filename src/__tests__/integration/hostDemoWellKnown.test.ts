@@ -50,6 +50,16 @@ describe('Host well-known endpoints (demo, mem)', () => {
       expect(openidIssuer.status).toBe(200);
       const openidIssuerJson = JSON.parse(openidIssuer.text);
       expect(openidIssuerJson.credential_issuer).toContain('http://localhost:3000');
+
+      const issuedVc = await invokeExpress(app, {
+        method: 'POST',
+        url: '/host/cds-ES/v1/health-care/identity/oidc/credential',
+        headers: { authorization: 'Bearer demo', 'content-type': 'application/json' },
+        body: { format: 'jwt_vc_json', type: 'gx:LegalParticipant' },
+      });
+      expect(issuedVc.status).toBe(200);
+      const issuedVcJson = JSON.parse(issuedVc.text);
+      expect(issuedVcJson.issuer).toBe(HOST_DID);
     } finally {
       queueAdapter.stop();
     }

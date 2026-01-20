@@ -176,6 +176,7 @@ export const ORGANIZATION_REGISTRATION_RESPONSE = {
 /**
  * @see API_INTEGRATORS_GUIDE.md section 6.2
  * Request to accept the registration offer and create an order.
+ * Use the Offer identifier returned by the Organization registration _batch-response.
  */
 export const ORGANIZATION_ORDER_REQUEST = {
   "jti": "org-order-request-id",
@@ -192,7 +193,7 @@ export const ORGANIZATION_ORDER_REQUEST = {
       "meta": {
         "claims": {
           "@context": "org.schema",
-          "Order.acceptedOffer.identifier": "urn:cds-<jurisdiction>:v1:<sector>:product:org.schema:Offer:<offer-uuid>",
+          "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:3391176c-e2fa-4ec3-98c0-e945f82b8a42",
         }
       }
     }]
@@ -221,12 +222,52 @@ export const ORGANIZATION_ORDER_RESPONSE = {
 // --- Async Polling (HTTP-level payloads) ---
 
 export const ASYNC_POLL_REQUEST = {
-  "thid": "org-registration-thread-id",
+  "thid": "action-thread-id",
 };
 
 export const ASYNC_POLL_PENDING_RESPONSE = {
-  "thid": "org-registration-thread-id",
+  "thid": "action-thread-id",
   "status": "PENDING",
+};
+
+export const ORGANIZATION_REGISTRATION_POLL_REQUEST = {
+  "thid": "org-registration-thread-id",
+};
+
+export const ORGANIZATION_ORDER_POLL_REQUEST = {
+  "thid": "org-order-thread-id",
+};
+
+export const EMPLOYEE_POLL_REQUEST = {
+  "thid": "employee-thread-id",
+};
+
+export const CONSENT_POLL_REQUEST = {
+  "thid": "consent-thread-id",
+};
+
+export const COMMUNICATION_POLL_REQUEST = {
+  "thid": "communication-thread-id",
+};
+
+export const COMPOSITION_POLL_REQUEST = {
+  "thid": "composition-thread-id",
+};
+
+export const RELATED_PERSON_POLL_REQUEST = {
+  "thid": "relatedperson-thread-id",
+};
+
+export const OBSERVATION_POLL_REQUEST = {
+  "thid": "observation-thread-id",
+};
+
+export const TENANT_ORGANIZATION_POLL_REQUEST = {
+  "thid": "tenant-organization-thread-id",
+};
+
+export const TENANT_ORDER_POLL_REQUEST = {
+  "thid": "tenant-order-thread-id",
 };
 
 // For legacy/plaintext submissions, the polling endpoint returns the decoded business `body` only.
@@ -454,6 +495,7 @@ export const FAMILY_REGISTRATION_REQUEST = {
 /**
  * @see API_INTEGRATORS_GUIDE.md section 8.2.1
  * Request to confirm the family registration via an Order.
+ * Use the Offer identifier returned by the Family registration _batch-response.
  */
 export const FAMILY_ORDER_REQUEST = {
   "jti": "family-order-request-id",
@@ -467,7 +509,7 @@ export const FAMILY_ORDER_REQUEST = {
       "meta": {
         "claims": {
           "@context": "org.schema",
-          "Order.acceptedOffer.identifier": "urn:cds-<jurisdiction>:v1:health-care:product:org.schema:Offer:<family-offer-uuid>"
+          "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:7f0b6e9c-2e1d-4d85-94f2-1459f5a57bd7"
         }
       }
     }]

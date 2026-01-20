@@ -36,3 +36,8 @@ To make the flow discoverable without Gaia-X jargon, the service exposes standar
 ### Notes
 - The metadata describes standard OIDC4VCI/OIDC4VP endpoints. Implementation of the full issuance/verification flow may be added later.
 - The issued VC replaces an `id_token` only as **compliance evidence**, not as a login/authorization token.
+
+### Current issuance endpoint (MVP)
+- `POST /:tenantId/cds-:jurisdiction/v1/:sector/identity/oidc/credential`
+- Requires `Authorization: Bearer <access_token>` (in demo, any Bearer token is accepted).
+- Signs with legacy ES when available; add `?pqc=true` or header `X-PQC-Signature: true` to force ML-DSA.

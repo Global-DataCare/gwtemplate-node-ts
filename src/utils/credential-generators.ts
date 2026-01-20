@@ -81,13 +81,22 @@ export function buildGaiaXLegalParticipantOptionsFromClaims(params: {
   const termsAndConditionsUrl = claims[ClaimsServiceSchemaorg.termsOfService] as string | undefined;
   const termsHashClaim = claims[`${ClaimsServiceSchemaorg.termsOfService}#hash`] as string | undefined;
 
-  if (!officialName || !vatId || !countryCode || !termsAndConditionsUrl) {
+  if (!officialName || !vatId || !countryCode) {
+    throw new Error('Missing required claims to build Gaia-X Legal Participant credential.');
+  }
+
+  const normalizedTermsUrl = termsAndConditionsUrl || (
+    ['demo', 'test', 'development'].includes(process.env.NODE_ENV || '')
+      ? 'https://example.org/terms'
+      : undefined
+  );
+  if (!normalizedTermsUrl) {
     throw new Error('Missing required claims to build Gaia-X Legal Participant credential.');
   }
 
   const termsAndConditionsHashHex = termsHashClaim
     ? termsHashClaim
-    : createHash('sha384').update(termsAndConditionsUrl).digest('hex');
+    : createHash('sha384').update(normalizedTermsUrl).digest('hex');
 
   return {
     webDomain,
@@ -96,7 +105,7 @@ export function buildGaiaXLegalParticipantOptionsFromClaims(params: {
     issuerDid,
     vatId,
     countryCode,
-    termsAndConditionsUrl,
+    termsAndConditionsUrl: normalizedTermsUrl,
     termsAndConditionsHashHex,
     termsAndConditionsHashAlg: 'SHA-384',
   };

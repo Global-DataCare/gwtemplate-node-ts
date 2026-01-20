@@ -22,7 +22,6 @@ import { IServerConfig } from './config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { createApiRouter } from './routes/api';
 import { createDiscoveryRouter } from './routes/discovery';
-import { createAuthorityRouter } from './routes/authority';
 import { DiscoveryService } from './services/DiscoveryService';
 import { IKmsService } from './gdc-backend-utils-node/models/IKmsService';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
@@ -31,7 +30,6 @@ import { KmsService } from './services/KmsService';
 import { DemoKmsService } from './services/DemoKmsService';
 import { QueueAdapterMem } from './adapters/queue-mem';
 import { AsyncResponseStoreMem } from './adapters/async-response-store.mem';
-import { loadAuthorityArtifacts } from './utils/authority-artifacts';
 import { IVaultRepository } from './database/repositories/vault/vault.repository';
 import { VaultMemRepository } from './database/repositories/vault/vault.mem.repository';
 import { FirestoreVaultRepository } from './database/repositories/firestore/firestore.vault.repository';
@@ -45,6 +43,7 @@ import { IndividualManager } from './managers/IndividualManager';
 import { CredentialManager } from './managers/CredentialManager';
 import { CompositionManager } from './managers/CompositionManager';
 import { BlockchainAdapterMem } from './adapters/BlockchainAdapterMem';
+import { CredentialLedgerAdapterMem } from './adapters/CredentialLedgerAdapterMem';
 import { createNetworkRouter } from './routes/network';
 import { createWebhooksRouter } from './routes/webhooks';
 import { IBlockchainAdapter } from './adapters/IBlockchainAdapter';
@@ -70,6 +69,14 @@ import { AppAuthorizationManager } from './managers/AppAuthorizationManager';
 import { FamilyManager } from './managers/FamilyManager';
 import { FirebaseTokenVerifier } from './auth/FirebaseTokenVerifier';
 import * as fs from 'fs';
+import { createCredentialLedgerRouter } from './routes/ledger';
+import { ICredentialLedgerAdapter } from './adapters/ICredentialLedgerAdapter';
+import { CredentialLedgerAdapterMulti } from './adapters/CredentialLedgerAdapterMulti';
+import { CredentialLedgerResolver, parseLedgerProviderMap } from './adapters/credential-ledger-resolver';
+import { CredentialLedgerAdapterFabric } from './adapters/CredentialLedgerAdapterFabric';
+import { createAuthorityRouter } from './routes/authority';
+import { loadAuthorityArtifacts } from './utils/authority-artifacts';
+import { generatePkiChainFromEnv } from './utils/pki-chain';
 
 // Load the pre-generated swagger spec. This is the static base.
 let swaggerSpec: any;
@@ -110,6 +117,12 @@ function determineApiBaseUrl(port: number, apiHostname: string): string {
     ? 'localhost'
     : apiHostname;
   return `${protocol}://${publicHost}:${port}`;
+}
+
+function getHostEnv(key: string): string | undefined {
+  const newKey = `HOST_${key}`;
+  const legacyKey = `ORG_HOST_${key}`;
+  return process.env[newKey] ?? process.env[legacyKey];
 }
 
 function parseAndValidateSectors(csv: string | undefined): Sector[] {
@@ -158,13 +171,13 @@ function getConfig(): IServerConfig {
       gcsBucketName: process.env.GCS_BUCKET_NAME,
       kekSecret: process.env.KEK_SECRET,
       host: {
-        legalName: process.env.ORG_HOST_LEGAL_NAME,
-        jurisdiction: process.env.ORG_HOST_JURISDICTION,
-        idType: process.env.ORG_HOST_ID_TYPE,
-        idValue: process.env.ORG_HOST_ID_VALUE,
-        adminEmail: process.env.ORG_HOST_ADMIN_EMAIL,
-        adminUid: process.env.ORG_HOST_ADMIN_UID,
-        adminRole: process.env.ORG_HOST_ADMIN_ROLE,
+        legalName: getHostEnv('LEGAL_NAME'),
+        jurisdiction: getHostEnv('JURISDICTION'),
+        idType: getHostEnv('ID_TYPE'),
+        idValue: getHostEnv('ID_VALUE'),
+        adminEmail: getHostEnv('ADMIN_EMAIL'),
+        adminUid: getHostEnv('ADMIN_UID'),
+        adminRole: getHostEnv('ADMIN_ROLE'),
       },
       mongo: {
         uri: process.env.MONGO_URI,
@@ -210,8 +223,9 @@ async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServer
     [ClaimsServiceSchemaorg.category]: 'system', 
     [ClaimsServiceSchemaorg.identifier]: `urn:uuid:${bootConfig.host.idValue}-service`,
   };
-  if (process.env.ORG_HOST_TERMS_URL) {
-    hostClaims[ClaimsServiceSchemaorg.termsOfService] = process.env.ORG_HOST_TERMS_URL;
+  const termsUrl = getHostEnv('TERMS_URL');
+  if (termsUrl) {
+    hostClaims[ClaimsServiceSchemaorg.termsOfService] = termsUrl;
   }
 
   try {
@@ -327,6 +341,20 @@ async function startServer(options?: StartServerOptions) {
   );
 
   const blockchainAdapter: IBlockchainAdapter = new BlockchainAdapterMem();
+  const credentialLedgerMem = new CredentialLedgerAdapterMem();
+  const credentialLedgerFabric = new CredentialLedgerAdapterFabric();
+  const ledgerProviderMap = parseLedgerProviderMap(process.env.LEDGER_PROVIDER_MAP);
+  const ledgerDefaultProvider = process.env.LEDGER_PROVIDER_DEFAULT || 'mem';
+  const ledgerProviders: Record<string, ICredentialLedgerAdapter> = {
+    mem: credentialLedgerMem,
+    fabric: credentialLedgerFabric,
+    multi: new CredentialLedgerAdapterMulti([credentialLedgerMem, credentialLedgerFabric]),
+  };
+  const credentialLedgerAdapter: ICredentialLedgerAdapter = new CredentialLedgerResolver({
+    defaultProvider: ledgerDefaultProvider,
+    providerMap: ledgerProviderMap,
+    providers: ledgerProviders,
+  });
 
   const individualManager = new IndividualManager(
     vaultRepository,
@@ -413,6 +441,19 @@ async function startServer(options?: StartServerOptions) {
     const artifactsRoot = path.join(process.cwd(), 'artifacts');
     const rootDir = process.env.LOCAL_CA_ARTIFACTS_DIR || path.join(artifactsRoot, 'full-pki-chain-root-ca');
     const icaDir = process.env.LOCAL_ICA_ARTIFACTS_DIR || path.join(artifactsRoot, 'full-pki-chain-ica');
+    const needsRoot = roles.has('CA') && !fs.existsSync(rootDir);
+    const needsIca = roles.has('ICA') && !fs.existsSync(icaDir);
+
+    if (needsRoot || needsIca) {
+      const isDemo = config.nodeEnv === 'demo' || process.env.DEV_SEED === 'true';
+      if (isDemo) {
+        console.log('[GW-API] Missing authority artifacts. Generating demo PKI chain from env...');
+        await generatePkiChainFromEnv({ cleanOutput: true });
+      } else {
+        throw new Error(`[GW-API] Missing authority artifacts. Expected ${rootDir} and ${icaDir}`);
+      }
+    }
+
     if (roles.has('CA')) {
       authorityArtifacts.CA = loadAuthorityArtifacts('CA', rootDir);
     }
@@ -427,12 +468,14 @@ async function startServer(options?: StartServerOptions) {
   const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService, config.apiBaseUrl, appAuthManager);
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);
+  const ledgerRouter = createCredentialLedgerRouter(credentialLedgerAdapter, asyncResponseStore, tenantManager);
   const webhooksRouter = createWebhooksRouter(queueAdapter);
   const authRouter = createAuthRouter(appAuthManager, tokenManager);
   app.use('/', discoveryRouter);
   if (authorityRouter) {
     app.use('/', authorityRouter);
   }
+  app.use('/', ledgerRouter);
   app.use('/', apiRouter);
   app.use('/', networkRouter);
   app.use('/', fhirRouter);
@@ -477,7 +520,7 @@ async function startServer(options?: StartServerOptions) {
           console.log(`[GW-API] Listening on ${config.apiHostname}:${config.port}`);
         });
 
-  return { app, server, queueAdapter, tenantManager, vaultRepository, cryptographyService, blockchainAdapter, kmsService };
+  return { app, server, queueAdapter, tenantManager, vaultRepository, cryptographyService, blockchainAdapter, credentialLedgerAdapter, kmsService };
 }
 
 export { startServer };

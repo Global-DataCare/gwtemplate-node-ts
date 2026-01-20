@@ -68,6 +68,9 @@ This method runs the application inside a Docker container, which is a great way
     ```bash
     ./docker_build_local.sh
     ```
+    Notes:
+    - It automatically uses `--no-cache` when `package.json` or `package-lock.json` changes.
+    - You can force it with `./docker_build_local.sh --no-cache` (or `-n`).
 
 2.  **Run the container:**
     *(This script maps port 8080 on your host to port 3000 in the container)*

@@ -29,6 +29,13 @@ export async function invokeExpress(
     socket: {},
   };
 
+  try {
+    const parsed = new URL(options.url, 'http://localhost');
+    req.query = Object.fromEntries(parsed.searchParams.entries());
+  } catch {
+    // Ignore malformed URLs in tests.
+  }
+
   let resolveFinished: (() => void) | undefined;
   let rejectFinished: ((err: any) => void) | undefined;
   const finished = new Promise<void>((resolve, reject) => {

@@ -18,6 +18,8 @@ import { VerificationMethod } from '../gdc-backend-utils-node/models/did';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { getTenantVaultIdFromIss, getTenantVaultId } from '../utils/tenant';
+import { composeHostDidWebId } from '../utils/did-backend';
+import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 
 // As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
@@ -156,6 +158,93 @@ export function createApiRouter(
 
   /**
    * @openapi
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/oidc/credential:
+   *   post:
+   *     tags:
+   *       - 2.2 OIDC4VCI
+   *     summary: Issue a Gaia-X compliance VC (OIDC4VCI)
+   *     description: |
+   *       Issues a Gaia-X Legal Participant VC. This endpoint expects a Bearer access_token.
+   *       In demo/non-production, any Bearer token is accepted for now.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               format: { type: string }
+   *               type: { type: string }
+   *               pqc: { type: boolean }
+   *     responses:
+   *       '200': { description: Issued VC }
+   *       '401': { description: Missing or invalid Bearer token }
+   *       '404': { description: Tenant not found }
+   */
+  router.post('/:tenantId/cds-:jurisdiction/v1/:sector/identity/oidc/credential', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Missing or invalid Bearer token.');
+      return res.status(401).json(outcome);
+    }
+
+    const { tenantId, sector } = req.params;
+    const vaultId = tenantId === 'host' ? 'host' : getTenantVaultId(sector, tenantId);
+    const tenantConfig = await tenantsCacheManager.getTenant(vaultId);
+    if (!tenantConfig?.claims || !tenantConfig?.didDocument) {
+      return res.status(404).type('text').send('Not Found');
+    }
+
+    const hostConfig = await tenantsCacheManager.getTenant('host');
+    const issuerVaultId = 'host';
+    const issuerDid = hostConfig?.didDocument?.id || composeHostDidWebId(apiBaseUrl, process.env.HOST_EXTERNAL_DOMAIN);
+    const subjectDid = tenantConfig.didDocument.id;
+    const tenantUrl = await tenantsCacheManager.getTenantDomainUrl(vaultId);
+    if (!tenantUrl) {
+      return res.status(404).type('text').send('Not Found');
+    }
+
+    const forcePqc = String(req.query.pqc || req.headers['x-pqc-signature'] || '').toLowerCase() === 'true';
+    const legacyAlgCandidate = hostConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG;
+    const preferredAlg = (!forcePqc && legacyAlgCandidate) ? legacyAlgCandidate : 'ML-DSA-44';
+    const signingKey = await kmsService.getPublicVerificationKey(issuerVaultId, preferredAlg);
+    if (!signingKey?.kid) {
+      throw new Error('Signing key not available for credential issuance.');
+    }
+
+    const credentialOptions = buildGaiaXLegalParticipantOptionsFromClaims({
+      claims: tenantConfig.claims,
+      webDomain: tenantUrl,
+      did: subjectDid,
+      issuerDid: issuerDid,
+    });
+    const unsignedVc = createGaiaXLegalParticipantCredential(credentialOptions);
+    const detachedJws = await kmsService.createDetachedJws(unsignedVc, signingKey.kid, issuerVaultId);
+
+    const signedVc = {
+      ...unsignedVc,
+      proof: [{
+        type: 'JsonWebSignature2020',
+        created: new Date().toISOString(),
+        proofPurpose: 'assertionMethod',
+        verificationMethod: `${issuerDid}#${signingKey.kid}`,
+        jws: detachedJws,
+      }],
+    };
+
+    res.json(signedVc);
+  });
+
+  /**
+   * @openapi
    * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch:
    *   post:
    *     tags:
@@ -274,7 +363,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 3.1 Employee Role
-   *       - Async Polling
    *     summary: Poll the employee creation job result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -289,8 +377,12 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/EmployeePollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/EmployeePollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
    *       '200': { description: Completed. }
@@ -336,7 +428,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 2.1.1 Identity Federation
-   *       - Async Polling
    *     summary: Poll the federation result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -349,8 +440,12 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/ConsentPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/ConsentPollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
    *       '200': { description: Completed. }
@@ -397,7 +492,7 @@ export function createApiRouter(
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/License/_issue:
    *   post:
    *     tags:
-   *       - 2.1.1 License Issuance (Invite)
+   *       - 2.1.4 License Issuance (Invite)
    *     summary: Issue (reserve) an activation code from the tenant license pool (async)
    *     description: |
    *       Tenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role
@@ -426,7 +521,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 2.1.2 Initial Access Token Exchange
-   *       - Async Polling
    *     summary: Poll the initial_access_token exchange result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -441,8 +535,12 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/CommunicationPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/CommunicationPollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
    *       '200': { description: Completed. }
@@ -534,7 +632,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 5. Consent
-   *       - Async Polling
    *     summary: Poll the Consent job result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -549,8 +646,12 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/CompositionPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/CompositionPollRequest' }
    *     responses:
    *       '202':
    *         description: Pending. Retry later.
@@ -615,7 +716,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 6. Communication
-   *       - Async Polling
    *     summary: Poll the Communication job result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -630,8 +730,12 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/RelatedPersonPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/RelatedPersonPollRequest' }
    *     responses:
    *       '202':
    *         description: Pending. Retry later.
@@ -698,7 +802,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 7. Composition
-   *       - Async Polling
    *     summary: Poll the Composition job result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -713,8 +816,12 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/ObservationPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/ObservationPollRequest' }
    *     responses:
    *       '202':
    *         description: Pending. Retry later.
@@ -767,7 +874,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 4.3 Family Member Relationship
-   *       - Async Polling
    *     summary: Poll the relationship registration result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -780,8 +886,12 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/TenantOrganizationPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/TenantOrganizationPollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
    *       '200': { description: Completed. }
@@ -820,7 +930,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 8.4 Personal Observations
-   *       - Async Polling
    *     summary: Poll the observation collection result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -833,8 +942,12 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/TenantOrderPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/TenantOrderPollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
    *       '200': { description: Completed. }
@@ -846,6 +959,8 @@ export function createApiRouter(
    *     summary: Confirm the organization registration order (host)
    *     description: |
    *       Step 2 of onboarding. Submits an Order that accepts a prior Offer from Step 1 (tenant registration).
+   *       The Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the
+   *       Offer returned by the Organization registration _batch-response.
    *       The final polled result typically contains a payment/checkout URL.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -879,7 +994,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 1.1 Organization Registration
-   *       - Async Polling
    *     summary: Poll the organization registration result (host)
    *     description: |
    *       Polls the asynchronous job submitted to `.../Organization/_batch`.
@@ -904,9 +1018,11 @@ export function createApiRouter(
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
    *           examples:
-   *             message: { $ref: '#/components/examples/AsyncPollRequest' }
+   *             message: { $ref: '#/components/examples/OrganizationRegistrationPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/OrganizationRegistrationPollRequest' }
    *     responses:
    *       '202':
    *         description: Pending. Retry later.
@@ -935,9 +1051,8 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 1.2 Organization Order
-   *       - Async Polling
    *     summary: Poll the organization order result (host)
-   *     description: Polls the asynchronous job submitted to `.../Order/_batch`.
+   *     description: Polls the asynchronous job submitted to `.../Order/_batch`. The `jurisdiction` and `sector` are path routing parameters for the host registry.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -950,8 +1065,12 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/OrganizationOrderPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/OrganizationOrderPollRequest' }
    *     responses:
    *       '202':
    *         description: Pending. Retry later.
@@ -1012,7 +1131,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 4.1 Family Registration
-   *       - Async Polling
    *     summary: Poll the family registration result (Offer)
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -1043,6 +1161,8 @@ export function createApiRouter(
    *     summary: Confirm the Family Organization order (accept Offer)
    *     description: |
    *       Submits an Order that accepts a Family registration Offer to complete onboarding and move into payment/activation.
+   *       The Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the
+   *       Offer returned by the family registration _batch-response.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1076,7 +1196,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 4.2 Family Order
-   *       - Async Polling
    *     summary: Poll the family order result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -1141,7 +1260,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 2.1.3 Device Registration (DCR)
-   *       - Async Polling
    *     summary: Poll the device registration (DCR) result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -1208,7 +1326,6 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 2.2 SMART Token
-   *       - Async Polling
    *     summary: Poll the SMART token issuance result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'

@@ -36,6 +36,9 @@ From `gwtemplate-node-ts/devnet/fabric-v3`:
 4) Deploy a chaincode (parameterize `CHAINCODE_PATH`, `CHAINCODE_NAME`, etc.):
 `./scripts/03-deploy-chaincode.sh`
 
+To deploy the identity-ledger chaincodes in one go:
+`./scripts/05-deploy-identity-chaincodes.sh`
+
 5) Generate backend env (`HLF_CONNECTION_PROFILE_*`, `HLF_CERTIFICATE_*`, `HLF_PRIVATE_KEY_*`):
 `./scripts/04-generate-backend-env.sh`
 

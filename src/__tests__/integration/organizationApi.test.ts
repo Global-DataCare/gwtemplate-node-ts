@@ -230,17 +230,6 @@ describe('Organization Registration API', () => {
     (vaultRepository as VaultMemRepository).clear();
 
     // Re-bootstrap the host before each test to ensure a clean state
-    hostingManager = new HostingManager(
-      vaultRepository,
-      mockKmsService,
-      tenantsCacheManager,
-      mockStorageAdapter,
-      mockLogger,
-      mockConfig,
-    );
-    await hostingManager.bootstrapHost(testClaimsHostInitialization);
-    await tenantsCacheManager.loadHost();
-
     // Mocks for dependencies used by HostingManager
     mockStorageAdapter.upload.mockResolvedValue({
       publicUrl: 'https://storage.example.com/terms.pdf',
@@ -258,6 +247,17 @@ describe('Organization Registration API', () => {
     mockKmsService.encodeResponse.mockImplementation(async (payload) =>
       cryptoService.encryptJweToCompact(payload, { cty: 'application/api+json' }, externalEncrypter, externalEncrypter),
     );
+
+    hostingManager = new HostingManager(
+      vaultRepository,
+      mockKmsService,
+      tenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      mockConfig,
+    );
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await tenantsCacheManager.loadHost();
   });
 
   afterAll(async () => {

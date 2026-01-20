@@ -123,6 +123,11 @@ For a client to trust the gateway, it must first discover its capabilities and p
 -   `/.well-known/vc.json`: Legacy alias for the legal participant VC.
 -   `/.well-known/openid-credential-issuer`: OIDC4VCI metadata (compliance VC issuance).
 
+### 3.6. OIDC4VCI Compliance VC Issuance
+
+-   **Endpoint:** `POST /:tenantId/cds-:jurisdiction/v1/:sector/identity/oidc/credential`
+-   **Description:** Issues a Gaia-X Legal Participant VC as a compliance credential (OIDC4VCI-style). Requires a Bearer access_token.
+
 
 ## 4. Interaction Modes
 
@@ -223,6 +228,11 @@ This is the first step for any new organization. A legally authorized representa
 
 **Endpoint:** `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch`
 
+**Routing note:** `jurisdiction` and `sector` are part of the host routing path.  
+- `jurisdiction` is used to resolve channel/ledger routing and tenant namespace.  
+- `sector` selects the onboarding network environment (`test`, `test-network`, `network`).  
+These are path parameters, not headers. Claims still carry the organization address country and identifiers.
+
 **`curl` Example:**
 ```bash
 # -X POST: Specifies the HTTP POST method.
@@ -318,7 +328,7 @@ Retry-After: 5
 
 To retrieve the result of the asynchronous registration job, the client sends a `POST` request to the `Location` URL provided in the `202 Accepted` response. This polling mechanism is a core part of the FAPI security profile, preventing long-held connections and improving system resilience.
 
-The polling request body contains the `thid` (thread ID) from the original request, allowing the server to correlate the poll with the correct job.
+The polling request body contains the `thid` (thread ID) from the original request, allowing the server to correlate the poll with the correct job. For the order step, this is the order thread ID (not the registration one).
 
 ```bash
 # Use the 'thid' from the original request body in the polling request.
@@ -376,7 +386,7 @@ The `aud` (audience) of the backend's response is the public encryption key of t
             "org.schema.Offer.checkoutPageURLTemplate": "<payment-url>",
             "org.schema.Offer.eligibleCustomerType": "employee",
             "org.schema.Offer.eligibleQuantity.value": 2,
-            "org.schema.Offer.identifier": "urn:cds-<jurisdiction>:v1:<sector>:product:org.schema:Offer:<offer-uuid>",
+            "org.schema.Offer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:3391176c-e2fa-4ec3-98c0-e945f82b8a42",
             "org.schema.Offer.itemOffered.name": "License Tier XS",
             "org.schema.Offer.itemOffered.sku": "web-or-app-identifier",
             "org.schema.Offer.offeredBy": "did:web:host.example.com",
@@ -390,6 +400,10 @@ The `aud` (audience) of the backend's response is the public encryption key of t
   }
 }
 ```
+
+Save `org.schema.Offer.identifier` from this response. You must reuse that exact value in Step 2 as
+`Order.acceptedOffer.identifier` (replace any placeholders in examples with the real Offer ID you
+received).
 
 ### 6.2. Step 2: Confirm the Order for Registration
 
@@ -429,7 +443,7 @@ curl -X POST 'http://localhost:3000/host/cds-es/v1/test/registry/org.schema/Orde
             // - Claims are stored in a canonical (alphabetical) key order to support future deterministic hashing.
             //
             // This identifier MUST match the Offer identifier from the previous response.
-            "Order.acceptedOffer.identifier": "urn:cds-<jurisdiction>:v1:<sector>:product:org.schema:Offer:<offer-uuid>"
+            "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:3391176c-e2fa-4ec3-98c0-e945f82b8a42"
           }
         }
       }
@@ -489,7 +503,7 @@ Operationally (target architecture), the host maintains a dedicated **`licenses`
 Polling the new `-response` endpoint retrieves the outcome of the order submission.
 ```bash
 # Use the 'thid' from the order request body in the polling request.
-curl -X POST 'http://localhost:3000/host/cds-es/v1/test/registry/org.schema/Organization/_batch-response' \
+curl -X POST 'http://localhost:3000/host/cds-es/v1/test/registry/org.schema/Order/_batch-response' \
 --header 'App-ID: [APP-ID]' \
 --header 'App-Version: [APP-VERSION]' \
 --header 'Authorization: Bearer [OIDC_ID_TOKEN_OF_LEGAL_REP]' \
@@ -1156,13 +1170,15 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.sc
       "meta": {
         "claims": {
           "@context": "org.schema",
-          "Order.acceptedOffer.identifier": "urn:cds-<jurisdiction>:v1:health-care:product:org.schema:Offer:<family-offer-uuid>"
+          "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:7f0b6e9c-2e1d-4d85-94f2-1459f5a57bd7"
         }
       }
     }]
   }
 }' -i
 ```
+Use the exact Offer identifier returned by the family registration polling response (replace any
+placeholders in examples with the real Offer ID you received).
 After polling, the final response will contain the payment URL to finalize the purchase of the family license(s). Once paid, the Family Organization is active.
 
 #### 8.2.2. Step 6b: Register Family Member Relationships (Emergency Contacts)

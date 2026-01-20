@@ -4,7 +4,7 @@ const swaggerDefinition = {
   openapi: '3.0.0',
   info: {
     title: 'Gateway API',
-    version: '1.0.0',
+    version: '1.0.3',
     description:
       'API documentation for the secure gateway, covering both legacy (JSON) and secure (JWE) flows.',
   },
@@ -20,6 +20,10 @@ const swaggerDefinition = {
       description: 'Step 2 (Order): accept the registration offer and obtain payment/checkout.',
     },
     {
+      name: '2.1.4 License Issuance (Invite)',
+      description: 'Issue an invite for license activation (host or tenant licensing flow).',
+    },
+    {
       name: '2.1.1 Identity Federation',
       description:
         'Federate an external OIDC id_token (e.g. eIDAS) into Firebase. This is only needed if you do NOT already have a Firebase id_token (e.g. your app uses another IdP and is not signed into Firebase).',
@@ -31,6 +35,10 @@ const swaggerDefinition = {
     {
       name: '2.1.3 Device Registration (DCR)',
       description: 'Register device keys / client_id using OpenID Dynamic Client Registration.',
+    },
+    {
+      name: '2.2 OIDC4VCI',
+      description: 'Issue Gaia-X compliance credentials via OIDC4VCI.',
     },
     {
       name: '2.2 SMART Token',
@@ -90,9 +98,11 @@ const swaggerDefinition = {
     {
       name: '2. Device and Identity Registration',
       tags: [
+        '2.1.4 License Issuance (Invite)',
         '2.1.1 Identity Federation',
         '2.1.2 Initial Access Token Exchange',
         '2.1.3 Device Registration (DCR)',
+        '2.2 OIDC4VCI',
         '2.2 SMART Token',
       ],
     },
@@ -116,7 +126,7 @@ const swaggerDefinition = {
     },
     {
       name: 'Other',
-      tags: ['Discovery', 'Async Polling', '99. Legacy / Internal'],
+      tags: ['Discovery', '99. Legacy / Internal'],
     },
   ],
   components: {
@@ -199,7 +209,8 @@ const swaggerDefinition = {
       },
       OrganizationOrderPlaintextMessage: {
         summary: 'Plaintext Message for Organization Order',
-        description: 'A DIDComm-like message wrapper accepting an Offer via an Order.',
+        description:
+          'A DIDComm-like message wrapper accepting an Offer via an Order. Order.acceptedOffer.identifier is required and must match the Offer ID returned by the Organization registration _batch-response.',
         value: {},
       },
       InitialAccessTokenExchangePlaintextMessage: {
@@ -234,7 +245,8 @@ const swaggerDefinition = {
       },
       FamilyOrderPlaintextMessage: {
         summary: 'Plaintext Message for Family Order',
-        description: 'A DIDComm-like message wrapper accepting the family registration Offer.',
+        description:
+          'A DIDComm-like message wrapper accepting the family registration Offer. Order.acceptedOffer.identifier is required and must match the Offer ID returned by the family registration _batch-response.',
         value: {},
       },
       ConsentCreationPlaintextMessage: {
@@ -275,12 +287,67 @@ const swaggerDefinition = {
       AsyncPollRequest: {
         summary: 'Async Poll Request',
         description: 'HTTP polling request body (JSON) containing the `thid` from the original submission.',
-        value: {},
+        value: { thid: 'request-thid' },
+      },
+      OrganizationRegistrationPollRequest: {
+        summary: 'Organization Registration Poll Request',
+        description: 'Polls the Organization registration job using the same `thid` from the Organization _batch request.',
+        value: { thid: 'org-registration-thread-id' },
+      },
+      OrganizationOrderPollRequest: {
+        summary: 'Organization Order Poll Request',
+        description: 'Polls the Order job using the same `thid` from the Order _batch request.',
+        value: { thid: 'org-order-thread-id' },
+      },
+      EmployeePollRequest: {
+        summary: 'Employee Poll Request',
+        description: 'Polls the Employee job using the same `thid` from the Employee _batch request.',
+        value: { thid: 'employee-thread-id' },
+      },
+      PersonPollRequest: {
+        summary: 'Person Poll Request',
+        description: 'Polls the Person job using the same `thid` from the Person _batch request.',
+        value: { thid: 'person-thread-id' },
+      },
+      ConsentPollRequest: {
+        summary: 'Consent Poll Request',
+        description: 'Polls the Consent job using the same `thid` from the Consent _batch request.',
+        value: { thid: 'consent-thread-id' },
+      },
+      CommunicationPollRequest: {
+        summary: 'Communication Poll Request',
+        description: 'Polls the Communication job using the same `thid` from the Communication _batch request.',
+        value: { thid: 'communication-thread-id' },
+      },
+      CompositionPollRequest: {
+        summary: 'Composition Poll Request',
+        description: 'Polls the Composition job using the same `thid` from the Composition _batch request.',
+        value: { thid: 'composition-thread-id' },
+      },
+      RelatedPersonPollRequest: {
+        summary: 'RelatedPerson Poll Request',
+        description: 'Polls the RelatedPerson job using the same `thid` from the RelatedPerson _batch request.',
+        value: { thid: 'relatedperson-thread-id' },
+      },
+      ObservationPollRequest: {
+        summary: 'Observation Poll Request',
+        description: 'Polls the Observation job using the same `thid` from the Observation _batch request.',
+        value: { thid: 'observation-thread-id' },
+      },
+      TenantOrganizationPollRequest: {
+        summary: 'Tenant Organization Poll Request',
+        description: 'Polls the tenant Organization job using the same `thid` from the Organization _batch request.',
+        value: { thid: 'tenant-organization-thread-id' },
+      },
+      TenantOrderPollRequest: {
+        summary: 'Tenant Order Poll Request',
+        description: 'Polls the tenant Order job using the same `thid` from the Order _batch request.',
+        value: { thid: 'tenant-order-thread-id' },
       },
       AsyncPollPending: {
         summary: 'Async Poll Pending Response',
         description: 'HTTP polling response while the job is still running (`202 Accepted`).',
-        value: {},
+        value: { thid: 'request-thid', status: 'PENDING' },
       },
       AsyncPollSecureResponse: {
         summary: 'Async Poll Secure Response',
@@ -365,17 +432,17 @@ const swaggerDefinition = {
         type: 'object',
         required: ['thid'],
         description:
-          'Polling request body for asynchronous jobs. The `thid` (thread id) correlates to the original submission.',
+          'Polling request body for asynchronous jobs. The `thid` must match the thread id from the corresponding request (e.g., registration vs order).',
         properties: {
-          thid: { type: 'string', example: 'org-registration-thread-id' },
+          thid: { type: 'string', example: 'request-thid' },
         },
-        example: { thid: 'org-registration-thread-id' },
+        example: { thid: 'request-thid' },
       },
       AsyncPollPending: {
         type: 'object',
         required: ['thid', 'status'],
         properties: {
-          thid: { type: 'string', example: 'org-registration-thread-id' },
+          thid: { type: 'string', example: 'request-thid' },
           status: { type: 'string', enum: ['PENDING'], example: 'PENDING' },
         },
       },
