@@ -3,6 +3,7 @@
 
 import { VaultMemRepository } from '../../../../../database/repositories/vault/vault.mem.repository';
 import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
+import { getEnvSectionId } from '../../../../../utils/section-env';
 
 describe('VaultMemRepository', () => {
   let repository: VaultMemRepository;
@@ -57,7 +58,7 @@ describe('VaultMemRepository', () => {
 
     it('should correctly add a document to a specific section and allow it to be retrieved', async () => {
       // Arrange
-      const sectionId = 'tenants';
+      const sectionId = getEnvSectionId('tenants');
 
       // Act: This is the exact operation that fails in the integration test.
       await repository.put(vaultId, [testDoc], sectionId);

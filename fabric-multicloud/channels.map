@@ -1,0 +1,17 @@
+global-identity-person=GlobalIdentityPerson
+global-identity-organization=GlobalIdentityOrganization
+global-index-dog=GlobalIndexDog
+global-index-cat=GlobalIndexCat
+global-health-twins=GlobalHealthTwins
+eu-identity-dog=EUIdentityDog
+eu-identity-cat=EUIdentityCat
+na-health-dog=NAHealthDog
+na-health-cat=NAHealthCat
+eu-health-care=EUHealthCare
+na-health-care=NAHealthCare
+sa-health-care=SAHealthCare
+eu-vet-dog=EUVetDog
+eu-vet-cat=EUVetCat
+na-vet-dog=NAVetDog
+na-vet-cat=NAVetCat
+eu-health-thing=EUHealthThing

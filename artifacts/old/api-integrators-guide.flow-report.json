@@ -1,0 +1,2200 @@
+{
+  "generatedAt": "2026-01-11T03:57:57.728Z",
+  "steps": [
+    {
+      "name": "Discovery: /host/.well-known/ping",
+      "request": {
+        "method": "GET",
+        "url": "/host/.well-known/ping"
+      },
+      "submit": {
+        "status": 200,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "content-type": "application/json"
+        },
+        "bodyText": "{\"type\":\"batch-response\",\"meta\":{\"timestamp\":\"2026-01-11T03:57:57.731Z\"},\"data\":[{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"information\",\"code\":\"throttled\",\"diagnostics\":\"Ping successful\"}]}]}",
+        "bodyJson": {
+          "type": "batch-response",
+          "meta": {
+            "timestamp": "2026-01-11T03:57:57.731Z"
+          },
+          "data": [
+            {
+              "resourceType": "OperationOutcome",
+              "issue": [
+                {
+                  "severity": "information",
+                  "code": "throttled",
+                  "diagnostics": "Ping successful"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Discovery: /host/.well-known/did.json",
+      "request": {
+        "method": "GET",
+        "url": "/host/.well-known/did.json"
+      },
+      "submit": {
+        "status": 200,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "content-type": "application/json"
+        },
+        "bodyText": "{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:web:localhost%3A3000\",\"alsoKnownAs\":[],\"verificationMethod\":[{\"id\":\"did:web:localhost%3A3000#D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps\",\"controller\":\"did:web:localhost%3A3000\",\"type\":\"JsonWebKey2020\",\"publicKeyJwk\":{\"kty\":\"AKP\",\"alg\":\"ML-DSA-44\",\"pub\":\"-QCkuwr1--mlqqPrSWx-OT4LOVQwiy0ZZHBeHrcBRYTVnramC7vbdqPMOQa6X66pFS7NuXEQ_wrOE8LAXGNMvGcT4KRgTtnXvbHkY3mWDMvewEviUeG7kkCYbvG-cz7sSuzw8nIGJK5tvIT3C68i6aNzjZDSLnohVr8N9l2IwFzPUkSh-ZtKjUhtlW9KDBIoGKUpnyFSvRSaTBGJ7u5CRb1VbGeWWlfr7HfqWqdyJsvZn3zZUQpS4KPj9h6vH3QHKoryCrXKtJknzPdO4AMYF1OYZgQBcyf1iT3ChQoc-fPVmJPRU8ede-LJjlTtl1Lkhi-cnI_HJEOuacwd3J-7LoFB885EQvFPKKl-p7czDJrfsF-lTssYPhBMHwU5xmhKTYlQOM3IPY7C9Bs2TALAlN3xvSOht4e6klAaRMIFOJb7-3fgMW1K5AN0CMGJPnzPiyxwXP2gx4mfQ9oV-8XBkzPRDOzLABFpGoubELWhzPmQ8HD3az71ZyokMx5VrTRK6TL6400v2jX84AT_nba5tGHD83dPsgLGQ-gjcpwLBlgN_EvNAKpxXxRHEabIvnLMS584MuCj5T538PORmrmnRa9MQdl9QmeTz4MjQrnBaP4J-zyiQCPfSlSRg7TnipMTdEmbHYbraGePOPa9TFAyfuZqDz_pPrlgBwof6yQ8UflcHrx1kz4ZjOgBGh3SoMZ6IfesJsoDnuv8gF9kmLKgsxnhp1YO_I6PD3H-EDa63ZZ-1thfgewZ6rOojbtophNBLjsmauwgq91EvT6afip5eU2yOtHHuOnaWpLyeuf0vQ9RaPQM1Gs8BmJ5hmniTxBicHTuMhNdcYhgGiQjG1WgdAhUi-OflPovzIPiZ3ApUtkUKrKR34IGlkiUaQNX4pBR5pc7NBW6pDzuozL9Q7LFAlutZq2E7Ub1pMkdpAzzNFPtA9Oeo0rAXKC_Prfi6CSj_94628_LSKukn4qOezKuv53G8bc45L0i7WXlYhU8QemWEd98_Qb3-q0YwB7OcjNcLgWYvikX91ClGDHT34y8EWv1AJQJq0pAjAXMgjIoqPlcJTzXOLinHzzE-F5gaa5WklGklYu0roiDyYH1W7ZsrdeIlWWEKRi9teQCS_geNKM-VGFB3HCeGSrZK1JrgKVR8O2-N0cmzFsaq8qdipTnkHEKN_94UAMLE8TTgbiasrKe-lbb9kwS5zynAGmItI62FNFuSiQjs89vRbKIK7qYml5Kb7DLMWYBPTZaHNOA_LOlxE3eYqDRrS5NkIOW0c945-xVuzgNLVtH_aagZfJRekfg0GW-2JzZthQqAkM9Tjq9BzWSTUEKtCzl5U0JmNZdC-2W4a0F7Vg-m6ptoDUOPVrVKatjmDW81AJLYCeYqFaOV7IOm1krfffcPY-h67bAlnPFgjI_DDuSGpRUc1BC8B-zWrqpJl8V2-MHZRHL9ppq1GpvarkFgqbjMw31DrJyndbiB59EYs-GG6mJJhqBZZcY8LS9L2jYBjgdkbidpT1rmUjJPmmEOq49mINNSKF4kXEKoWLJhxIjcUnDWXqLZpZRKlvrXGq1d6YOswv7cQ3sk3vqcLP0piKHIgonmCxWNlJt6f5LHIeYo0yYeAQPOvJfJPhmnlkeg8FA2n5tJvtUoN8sDmUeC2CMvlrg6PQvfF1ezYWcaBUfsS8nw-PXp6VFHZ18r-VHxkJRLQ5RjTvuutxprXMjyzaZJH9bgfvxqlkfpubSBkI1ngM9ydCIyQ\",\"kid\":\"D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps\",\"use\":\"sig\"}},{\"id\":\"did:web:localhost%3A3000#r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0\",\"controller\":\"did:web:localhost%3A3000\",\"type\":\"JsonWebKey2020\",\"publicKeyJwk\":{\"kty\":\"OKP\",\"crv\":\"ML-KEM-768\",\"x\":\"6DEfzDJ5AflomZy1zrmcIHJ36pjLartQKeh8WkMB4JtisjRr8BWhcagvFrZgS8o8NqJk0poQ6HJxDfJJgiIICPKKljQTrjcqmNkGn3s97ttE8ldj0djOsEyuh5CeX2qqvRhFZVXEmJAmRLKL-aZG27HJOIyDZvBupAMTeuEuBJgKZ0OGw1RrltJEU8uLKjO0jiwavUbEqBquCBq4rTJ1iEFVvKmaHQN9BDeOHaA9ziHPz9ceTnm6XQQyJwcKE8KeLcNrPJVXnWq7EgwCX0If4HaN0YUQNVOfPbCP5at1yfSnc-aMkJVQcNcHGEvKX0kNzGfF7LJXKbMSkLgce1AbONkZxTiw5EJBIFxPlgxTqiJopderU2acoYJO9VRxHcBMRZYqX1wHkldEtItVJVAtg8yGSRsYDvcgtdIjDexfOkO9d4dbWfnAZUaei5dKkZwsZ7pPGxuke6wZr_MgkIl7aTK_BURpYyZMJKBUsmuXFXFtLJoT0KSKtkl5EvyIecujCNEwMWdwyPUtqxmG8msPfVa4rkpQiCOeIqtjF7yoxKk86tRIADddJfl69_dPkUBoH2oWZquKiWmFSfBt5pltNMCxwEaYKUAXpjY0pVbJ_DE6cazKDiXIthgDwFRk8cey_oGfAGB5QjuQB4AypxWmbCNCJHYmxXS07ZqwOhbJtegOJWJVz2XEI3tlLlEXXsu3M8GpxnAW2Fx6KazE_4qkbDo1MCUUGyyjKNpTmonOQ8sbK1x8DfBwbZI1GHseDEY1B0aEtaKVIHk_GJlnJ0tYTLNmc-gqhvC-6_ObW1ZlePosBoRiKKNUtsKMWAU19aRBlDEteWinlEyYndtkO7KObQekdFGeMgCoXvAOnBJ0eMsKJrmnvhdm3HaqGKtrz_FidotB41KUz9BmGlIaX_wLTOJjr4VVHJJAeqAZIYuh9hUN07O6H1E30beAHYhIQ2i4ezUFcTdC4cWvFSuZs4ik0yuNKaw8utnEdDx3vBc6ZEZ0xAKis9sqpxY992sVoeV4_cYRZLlEyvp3OdSLwZIU4yRYP5QCJ0VX2YaC8LzEVZcUF7kZ6Pt5cSakrzyItji62HEbVdKLB7UtPWpDTFOU6DVY1aeb56QWWgvCgTMwgPKJo4BlYxNpAGS3OKtY70JDLIusqSx67_hn5xi3aEJSVzaqPlR4kbsWIvYP3OUqAUKIARxCCLjBYrc31gZap5WkwyPOx9gH8PcLbzoIqDG1bzO6mntC8WemT5MbV5aY55SG4UJOgxSSjjqo2KoojQY9jHQBgYEOb9Rnqmq1Q5O1EpZ_cUdDg1KdX0kBi3BtT6EDoqmcu3YnMhIxgbwRAyetb3GHZ_iYl4s0sLxZ0meQwZVfaaEeQBJSnpQak-ijAKFlsfqq-utI44cqBdK_hTcHaMWcyKoktVEJ01YRuagwHWRpmRyc3IOsS5VRl2moyoIsILkdzVYl9Pdgj5xPmCEq_ESGZBAkgihT-_s11EO-kxOVTeC3FcQ60dJK--ZnOJGRf6G1Bzey6pOq5ymGTreMQuaQB2AhbXZuaxhhb73obYx0XxPGqvKbJuD18JpWIN0\",\"kid\":\"r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0\",\"use\":\"enc\"}}],\"assertionMethod\":[\"did:web:localhost%3A3000#D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps\"],\"keyAgreement\":[\"did:web:localhost%3A3000#r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0\"],\"service\":[{\"id\":\"did:web:localhost%3A3000#did-document\",\"type\":\"LinkedDomains\",\"serviceEndpoint\":\"http://localhost:3000/.well-known/did.json\"},{\"id\":\"did:web:localhost%3A3000#jwks\",\"type\":\"JsonWebKeyService2020\",\"serviceEndpoint\":\"http://localhost:3000/jwks.json\"},{\"id\":\"did:web:localhost%3A3000#registry:org.schema:organization:_batch\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/registry/org.schema/Organization/_batch\"},{\"id\":\"did:web:localhost%3A3000#registry:org.schema:order:_batch\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/registry/org.schema/Order/_batch\"},{\"id\":\"did:web:localhost%3A3000#identity:firebase:token:_custom\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/identity/firebase/Token/_custom\"},{\"id\":\"did:web:localhost%3A3000#identity:openid:token:_exchange\",\"type\":\"ApiService\",\"serviceEndpoint\":\"http://localhost:3000/identity/openid/Token/_exchange\"}]}",
+        "bodyJson": {
+          "@context": "<url>",
+          "id": "did:web:localhost%3A3000",
+          "alsoKnownAs": [],
+          "verificationMethod": [
+            {
+              "id": "did:web:localhost%3A3000#D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps",
+              "controller": "did:web:localhost%3A3000",
+              "type": "JsonWebKey2020",
+              "publicKeyJwk": {
+                "kty": "AKP",
+                "alg": "ML-DSA-44",
+                "pub": "-QCkuwr1--mlqqPrSWx-OT4LOVQwiy0ZZHBeHrcBRYTVnramC7vbdqPMOQa6X66pFS7NuXEQ_wrOE8LAXGNMvGcT4KRgTtnXvbHkY3mWDMvewEviUeG7kkCYbvG-cz7sSuzw8nIGJK5tvIT3C68i6aNzjZDSLnohVr8N9l2IwFzPUkSh-ZtKjUhtlW9KDBIoGKUpnyFSvRSaTBGJ7u5CRb1VbGeWWlfr7HfqWqdyJsvZn3zZUQpS4KPj9h6vH3QHKoryCrXKtJknzPdO4AMYF1OYZgQBcyf1iT3ChQoc-fPVmJPRU8ede-LJjlTtl1Lkhi-cnI_HJEOuacwd3J-7LoFB885EQvFPKKl-p7czDJrfsF-lTssYPhBMHwU5xmhKTYlQOM3IPY7C9Bs2TALAlN3xvSOht4e6klAaRMIFOJb7-3fgMW1K5AN0CMGJPnzPiyxwXP2gx4mfQ9oV-8XBkzPRDOzLABFpGoubELWhzPmQ8HD3az71ZyokMx5VrTRK6TL6400v2jX84AT_nba5tGHD83dPsgLGQ-gjcpwLBlgN_EvNAKpxXxRHEabIvnLMS584MuCj5T538PORmrmnRa9MQdl9QmeTz4MjQrnBaP4J-zyiQCPfSlSRg7TnipMTdEmbHYbraGePOPa9TFAyfuZqDz_pPrlgBwof6yQ8UflcHrx1kz4ZjOgBGh3SoMZ6IfesJsoDnuv8gF9kmLKgsxnhp1YO_I6PD3H-EDa63ZZ-1thfgewZ6rOojbtophNBLjsmauwgq91EvT6afip5eU2yOtHHuOnaWpLyeuf0vQ9RaPQM1Gs8BmJ5hmniTxBicHTuMhNdcYhgGiQjG1WgdAhUi-OflPovzIPiZ3ApUtkUKrKR34IGlkiUaQNX4pBR5pc7NBW6pDzuozL9Q7LFAlutZq2E7Ub1pMkdpAzzNFPtA9Oeo0rAXKC_Prfi6CSj_94628_LSKukn4qOezKuv53G8bc45L0i7WXlYhU8QemWEd98_Qb3-q0YwB7OcjNcLgWYvikX91ClGDHT34y8EWv1AJQJq0pAjAXMgjIoqPlcJTzXOLinHzzE-F5gaa5WklGklYu0roiDyYH1W7ZsrdeIlWWEKRi9teQCS_geNKM-VGFB3HCeGSrZK1JrgKVR8O2-N0cmzFsaq8qdipTnkHEKN_94UAMLE8TTgbiasrKe-lbb9kwS5zynAGmItI62FNFuSiQjs89vRbKIK7qYml5Kb7DLMWYBPTZaHNOA_LOlxE3eYqDRrS5NkIOW0c945-xVuzgNLVtH_aagZfJRekfg0GW-2JzZthQqAkM9Tjq9BzWSTUEKtCzl5U0JmNZdC-2W4a0F7Vg-m6ptoDUOPVrVKatjmDW81AJLYCeYqFaOV7IOm1krfffcPY-h67bAlnPFgjI_DDuSGpRUc1BC8B-zWrqpJl8V2-MHZRHL9ppq1GpvarkFgqbjMw31DrJyndbiB59EYs-GG6mJJhqBZZcY8LS9L2jYBjgdkbidpT1rmUjJPmmEOq49mINNSKF4kXEKoWLJhxIjcUnDWXqLZpZRKlvrXGq1d6YOswv7cQ3sk3vqcLP0piKHIgonmCxWNlJt6f5LHIeYo0yYeAQPOvJfJPhmnlkeg8FA2n5tJvtUoN8sDmUeC2CMvlrg6PQvfF1ezYWcaBUfsS8nw-PXp6VFHZ18r-VHxkJRLQ5RjTvuutxprXMjyzaZJH9bgfvxqlkfpubSBkI1ngM9ydCIyQ",
+                "kid": "D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps",
+                "use": "sig"
+              }
+            },
+            {
+              "id": "did:web:localhost%3A3000#r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0",
+              "controller": "did:web:localhost%3A3000",
+              "type": "JsonWebKey2020",
+              "publicKeyJwk": {
+                "kty": "OKP",
+                "crv": "ML-KEM-768",
+                "x": "6DEfzDJ5AflomZy1zrmcIHJ36pjLartQKeh8WkMB4JtisjRr8BWhcagvFrZgS8o8NqJk0poQ6HJxDfJJgiIICPKKljQTrjcqmNkGn3s97ttE8ldj0djOsEyuh5CeX2qqvRhFZVXEmJAmRLKL-aZG27HJOIyDZvBupAMTeuEuBJgKZ0OGw1RrltJEU8uLKjO0jiwavUbEqBquCBq4rTJ1iEFVvKmaHQN9BDeOHaA9ziHPz9ceTnm6XQQyJwcKE8KeLcNrPJVXnWq7EgwCX0If4HaN0YUQNVOfPbCP5at1yfSnc-aMkJVQcNcHGEvKX0kNzGfF7LJXKbMSkLgce1AbONkZxTiw5EJBIFxPlgxTqiJopderU2acoYJO9VRxHcBMRZYqX1wHkldEtItVJVAtg8yGSRsYDvcgtdIjDexfOkO9d4dbWfnAZUaei5dKkZwsZ7pPGxuke6wZr_MgkIl7aTK_BURpYyZMJKBUsmuXFXFtLJoT0KSKtkl5EvyIecujCNEwMWdwyPUtqxmG8msPfVa4rkpQiCOeIqtjF7yoxKk86tRIADddJfl69_dPkUBoH2oWZquKiWmFSfBt5pltNMCxwEaYKUAXpjY0pVbJ_DE6cazKDiXIthgDwFRk8cey_oGfAGB5QjuQB4AypxWmbCNCJHYmxXS07ZqwOhbJtegOJWJVz2XEI3tlLlEXXsu3M8GpxnAW2Fx6KazE_4qkbDo1MCUUGyyjKNpTmonOQ8sbK1x8DfBwbZI1GHseDEY1B0aEtaKVIHk_GJlnJ0tYTLNmc-gqhvC-6_ObW1ZlePosBoRiKKNUtsKMWAU19aRBlDEteWinlEyYndtkO7KObQekdFGeMgCoXvAOnBJ0eMsKJrmnvhdm3HaqGKtrz_FidotB41KUz9BmGlIaX_wLTOJjr4VVHJJAeqAZIYuh9hUN07O6H1E30beAHYhIQ2i4ezUFcTdC4cWvFSuZs4ik0yuNKaw8utnEdDx3vBc6ZEZ0xAKis9sqpxY992sVoeV4_cYRZLlEyvp3OdSLwZIU4yRYP5QCJ0VX2YaC8LzEVZcUF7kZ6Pt5cSakrzyItji62HEbVdKLB7UtPWpDTFOU6DVY1aeb56QWWgvCgTMwgPKJo4BlYxNpAGS3OKtY70JDLIusqSx67_hn5xi3aEJSVzaqPlR4kbsWIvYP3OUqAUKIARxCCLjBYrc31gZap5WkwyPOx9gH8PcLbzoIqDG1bzO6mntC8WemT5MbV5aY55SG4UJOgxSSjjqo2KoojQY9jHQBgYEOb9Rnqmq1Q5O1EpZ_cUdDg1KdX0kBi3BtT6EDoqmcu3YnMhIxgbwRAyetb3GHZ_iYl4s0sLxZ0meQwZVfaaEeQBJSnpQak-ijAKFlsfqq-utI44cqBdK_hTcHaMWcyKoktVEJ01YRuagwHWRpmRyc3IOsS5VRl2moyoIsILkdzVYl9Pdgj5xPmCEq_ESGZBAkgihT-_s11EO-kxOVTeC3FcQ60dJK--ZnOJGRf6G1Bzey6pOq5ymGTreMQuaQB2AhbXZuaxhhb73obYx0XxPGqvKbJuD18JpWIN0",
+                "kid": "r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0",
+                "use": "enc"
+              }
+            }
+          ],
+          "assertionMethod": [
+            "did:web:localhost%3A3000#D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps"
+          ],
+          "keyAgreement": [
+            "did:web:localhost%3A3000#r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0"
+          ],
+          "service": [
+            {
+              "id": "did:web:localhost%3A3000#did-document",
+              "type": "LinkedDomains",
+              "serviceEndpoint": "<url>"
+            },
+            {
+              "id": "did:web:localhost%3A3000#jwks",
+              "type": "JsonWebKeyService2020",
+              "serviceEndpoint": "<url>"
+            },
+            {
+              "id": "did:web:localhost%3A3000#registry:org.schema:organization:_batch",
+              "type": "ApiService",
+              "serviceEndpoint": "<url>"
+            },
+            {
+              "id": "did:web:localhost%3A3000#registry:org.schema:order:_batch",
+              "type": "ApiService",
+              "serviceEndpoint": "<url>"
+            },
+            {
+              "id": "did:web:localhost%3A3000#identity:firebase:token:_custom",
+              "type": "ApiService",
+              "serviceEndpoint": "<url>"
+            },
+            {
+              "id": "did:web:localhost%3A3000#identity:openid:token:_exchange",
+              "type": "ApiService",
+              "serviceEndpoint": "<url>"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Discovery: /host/.well-known/jwks.json",
+      "request": {
+        "method": "GET",
+        "url": "/host/.well-known/jwks.json"
+      },
+      "submit": {
+        "status": 200,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "content-type": "application/json"
+        },
+        "bodyText": "{\"keys\":[{\"kty\":\"AKP\",\"alg\":\"ML-DSA-44\",\"pub\":\"-QCkuwr1--mlqqPrSWx-OT4LOVQwiy0ZZHBeHrcBRYTVnramC7vbdqPMOQa6X66pFS7NuXEQ_wrOE8LAXGNMvGcT4KRgTtnXvbHkY3mWDMvewEviUeG7kkCYbvG-cz7sSuzw8nIGJK5tvIT3C68i6aNzjZDSLnohVr8N9l2IwFzPUkSh-ZtKjUhtlW9KDBIoGKUpnyFSvRSaTBGJ7u5CRb1VbGeWWlfr7HfqWqdyJsvZn3zZUQpS4KPj9h6vH3QHKoryCrXKtJknzPdO4AMYF1OYZgQBcyf1iT3ChQoc-fPVmJPRU8ede-LJjlTtl1Lkhi-cnI_HJEOuacwd3J-7LoFB885EQvFPKKl-p7czDJrfsF-lTssYPhBMHwU5xmhKTYlQOM3IPY7C9Bs2TALAlN3xvSOht4e6klAaRMIFOJb7-3fgMW1K5AN0CMGJPnzPiyxwXP2gx4mfQ9oV-8XBkzPRDOzLABFpGoubELWhzPmQ8HD3az71ZyokMx5VrTRK6TL6400v2jX84AT_nba5tGHD83dPsgLGQ-gjcpwLBlgN_EvNAKpxXxRHEabIvnLMS584MuCj5T538PORmrmnRa9MQdl9QmeTz4MjQrnBaP4J-zyiQCPfSlSRg7TnipMTdEmbHYbraGePOPa9TFAyfuZqDz_pPrlgBwof6yQ8UflcHrx1kz4ZjOgBGh3SoMZ6IfesJsoDnuv8gF9kmLKgsxnhp1YO_I6PD3H-EDa63ZZ-1thfgewZ6rOojbtophNBLjsmauwgq91EvT6afip5eU2yOtHHuOnaWpLyeuf0vQ9RaPQM1Gs8BmJ5hmniTxBicHTuMhNdcYhgGiQjG1WgdAhUi-OflPovzIPiZ3ApUtkUKrKR34IGlkiUaQNX4pBR5pc7NBW6pDzuozL9Q7LFAlutZq2E7Ub1pMkdpAzzNFPtA9Oeo0rAXKC_Prfi6CSj_94628_LSKukn4qOezKuv53G8bc45L0i7WXlYhU8QemWEd98_Qb3-q0YwB7OcjNcLgWYvikX91ClGDHT34y8EWv1AJQJq0pAjAXMgjIoqPlcJTzXOLinHzzE-F5gaa5WklGklYu0roiDyYH1W7ZsrdeIlWWEKRi9teQCS_geNKM-VGFB3HCeGSrZK1JrgKVR8O2-N0cmzFsaq8qdipTnkHEKN_94UAMLE8TTgbiasrKe-lbb9kwS5zynAGmItI62FNFuSiQjs89vRbKIK7qYml5Kb7DLMWYBPTZaHNOA_LOlxE3eYqDRrS5NkIOW0c945-xVuzgNLVtH_aagZfJRekfg0GW-2JzZthQqAkM9Tjq9BzWSTUEKtCzl5U0JmNZdC-2W4a0F7Vg-m6ptoDUOPVrVKatjmDW81AJLYCeYqFaOV7IOm1krfffcPY-h67bAlnPFgjI_DDuSGpRUc1BC8B-zWrqpJl8V2-MHZRHL9ppq1GpvarkFgqbjMw31DrJyndbiB59EYs-GG6mJJhqBZZcY8LS9L2jYBjgdkbidpT1rmUjJPmmEOq49mINNSKF4kXEKoWLJhxIjcUnDWXqLZpZRKlvrXGq1d6YOswv7cQ3sk3vqcLP0piKHIgonmCxWNlJt6f5LHIeYo0yYeAQPOvJfJPhmnlkeg8FA2n5tJvtUoN8sDmUeC2CMvlrg6PQvfF1ezYWcaBUfsS8nw-PXp6VFHZ18r-VHxkJRLQ5RjTvuutxprXMjyzaZJH9bgfvxqlkfpubSBkI1ngM9ydCIyQ\",\"kid\":\"D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps\",\"use\":\"sig\"},{\"kty\":\"OKP\",\"crv\":\"ML-KEM-768\",\"x\":\"6DEfzDJ5AflomZy1zrmcIHJ36pjLartQKeh8WkMB4JtisjRr8BWhcagvFrZgS8o8NqJk0poQ6HJxDfJJgiIICPKKljQTrjcqmNkGn3s97ttE8ldj0djOsEyuh5CeX2qqvRhFZVXEmJAmRLKL-aZG27HJOIyDZvBupAMTeuEuBJgKZ0OGw1RrltJEU8uLKjO0jiwavUbEqBquCBq4rTJ1iEFVvKmaHQN9BDeOHaA9ziHPz9ceTnm6XQQyJwcKE8KeLcNrPJVXnWq7EgwCX0If4HaN0YUQNVOfPbCP5at1yfSnc-aMkJVQcNcHGEvKX0kNzGfF7LJXKbMSkLgce1AbONkZxTiw5EJBIFxPlgxTqiJopderU2acoYJO9VRxHcBMRZYqX1wHkldEtItVJVAtg8yGSRsYDvcgtdIjDexfOkO9d4dbWfnAZUaei5dKkZwsZ7pPGxuke6wZr_MgkIl7aTK_BURpYyZMJKBUsmuXFXFtLJoT0KSKtkl5EvyIecujCNEwMWdwyPUtqxmG8msPfVa4rkpQiCOeIqtjF7yoxKk86tRIADddJfl69_dPkUBoH2oWZquKiWmFSfBt5pltNMCxwEaYKUAXpjY0pVbJ_DE6cazKDiXIthgDwFRk8cey_oGfAGB5QjuQB4AypxWmbCNCJHYmxXS07ZqwOhbJtegOJWJVz2XEI3tlLlEXXsu3M8GpxnAW2Fx6KazE_4qkbDo1MCUUGyyjKNpTmonOQ8sbK1x8DfBwbZI1GHseDEY1B0aEtaKVIHk_GJlnJ0tYTLNmc-gqhvC-6_ObW1ZlePosBoRiKKNUtsKMWAU19aRBlDEteWinlEyYndtkO7KObQekdFGeMgCoXvAOnBJ0eMsKJrmnvhdm3HaqGKtrz_FidotB41KUz9BmGlIaX_wLTOJjr4VVHJJAeqAZIYuh9hUN07O6H1E30beAHYhIQ2i4ezUFcTdC4cWvFSuZs4ik0yuNKaw8utnEdDx3vBc6ZEZ0xAKis9sqpxY992sVoeV4_cYRZLlEyvp3OdSLwZIU4yRYP5QCJ0VX2YaC8LzEVZcUF7kZ6Pt5cSakrzyItji62HEbVdKLB7UtPWpDTFOU6DVY1aeb56QWWgvCgTMwgPKJo4BlYxNpAGS3OKtY70JDLIusqSx67_hn5xi3aEJSVzaqPlR4kbsWIvYP3OUqAUKIARxCCLjBYrc31gZap5WkwyPOx9gH8PcLbzoIqDG1bzO6mntC8WemT5MbV5aY55SG4UJOgxSSjjqo2KoojQY9jHQBgYEOb9Rnqmq1Q5O1EpZ_cUdDg1KdX0kBi3BtT6EDoqmcu3YnMhIxgbwRAyetb3GHZ_iYl4s0sLxZ0meQwZVfaaEeQBJSnpQak-ijAKFlsfqq-utI44cqBdK_hTcHaMWcyKoktVEJ01YRuagwHWRpmRyc3IOsS5VRl2moyoIsILkdzVYl9Pdgj5xPmCEq_ESGZBAkgihT-_s11EO-kxOVTeC3FcQ60dJK--ZnOJGRf6G1Bzey6pOq5ymGTreMQuaQB2AhbXZuaxhhb73obYx0XxPGqvKbJuD18JpWIN0\",\"kid\":\"r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0\",\"use\":\"enc\"}]}",
+        "bodyJson": {
+          "keys": [
+            {
+              "kty": "AKP",
+              "alg": "ML-DSA-44",
+              "pub": "-QCkuwr1--mlqqPrSWx-OT4LOVQwiy0ZZHBeHrcBRYTVnramC7vbdqPMOQa6X66pFS7NuXEQ_wrOE8LAXGNMvGcT4KRgTtnXvbHkY3mWDMvewEviUeG7kkCYbvG-cz7sSuzw8nIGJK5tvIT3C68i6aNzjZDSLnohVr8N9l2IwFzPUkSh-ZtKjUhtlW9KDBIoGKUpnyFSvRSaTBGJ7u5CRb1VbGeWWlfr7HfqWqdyJsvZn3zZUQpS4KPj9h6vH3QHKoryCrXKtJknzPdO4AMYF1OYZgQBcyf1iT3ChQoc-fPVmJPRU8ede-LJjlTtl1Lkhi-cnI_HJEOuacwd3J-7LoFB885EQvFPKKl-p7czDJrfsF-lTssYPhBMHwU5xmhKTYlQOM3IPY7C9Bs2TALAlN3xvSOht4e6klAaRMIFOJb7-3fgMW1K5AN0CMGJPnzPiyxwXP2gx4mfQ9oV-8XBkzPRDOzLABFpGoubELWhzPmQ8HD3az71ZyokMx5VrTRK6TL6400v2jX84AT_nba5tGHD83dPsgLGQ-gjcpwLBlgN_EvNAKpxXxRHEabIvnLMS584MuCj5T538PORmrmnRa9MQdl9QmeTz4MjQrnBaP4J-zyiQCPfSlSRg7TnipMTdEmbHYbraGePOPa9TFAyfuZqDz_pPrlgBwof6yQ8UflcHrx1kz4ZjOgBGh3SoMZ6IfesJsoDnuv8gF9kmLKgsxnhp1YO_I6PD3H-EDa63ZZ-1thfgewZ6rOojbtophNBLjsmauwgq91EvT6afip5eU2yOtHHuOnaWpLyeuf0vQ9RaPQM1Gs8BmJ5hmniTxBicHTuMhNdcYhgGiQjG1WgdAhUi-OflPovzIPiZ3ApUtkUKrKR34IGlkiUaQNX4pBR5pc7NBW6pDzuozL9Q7LFAlutZq2E7Ub1pMkdpAzzNFPtA9Oeo0rAXKC_Prfi6CSj_94628_LSKukn4qOezKuv53G8bc45L0i7WXlYhU8QemWEd98_Qb3-q0YwB7OcjNcLgWYvikX91ClGDHT34y8EWv1AJQJq0pAjAXMgjIoqPlcJTzXOLinHzzE-F5gaa5WklGklYu0roiDyYH1W7ZsrdeIlWWEKRi9teQCS_geNKM-VGFB3HCeGSrZK1JrgKVR8O2-N0cmzFsaq8qdipTnkHEKN_94UAMLE8TTgbiasrKe-lbb9kwS5zynAGmItI62FNFuSiQjs89vRbKIK7qYml5Kb7DLMWYBPTZaHNOA_LOlxE3eYqDRrS5NkIOW0c945-xVuzgNLVtH_aagZfJRekfg0GW-2JzZthQqAkM9Tjq9BzWSTUEKtCzl5U0JmNZdC-2W4a0F7Vg-m6ptoDUOPVrVKatjmDW81AJLYCeYqFaOV7IOm1krfffcPY-h67bAlnPFgjI_DDuSGpRUc1BC8B-zWrqpJl8V2-MHZRHL9ppq1GpvarkFgqbjMw31DrJyndbiB59EYs-GG6mJJhqBZZcY8LS9L2jYBjgdkbidpT1rmUjJPmmEOq49mINNSKF4kXEKoWLJhxIjcUnDWXqLZpZRKlvrXGq1d6YOswv7cQ3sk3vqcLP0piKHIgonmCxWNlJt6f5LHIeYo0yYeAQPOvJfJPhmnlkeg8FA2n5tJvtUoN8sDmUeC2CMvlrg6PQvfF1ezYWcaBUfsS8nw-PXp6VFHZ18r-VHxkJRLQ5RjTvuutxprXMjyzaZJH9bgfvxqlkfpubSBkI1ngM9ydCIyQ",
+              "kid": "D8vU-8NBo7Joig31vFta19Ul2RaU-lzV-jBS79lEkps",
+              "use": "sig"
+            },
+            {
+              "kty": "OKP",
+              "crv": "ML-KEM-768",
+              "x": "6DEfzDJ5AflomZy1zrmcIHJ36pjLartQKeh8WkMB4JtisjRr8BWhcagvFrZgS8o8NqJk0poQ6HJxDfJJgiIICPKKljQTrjcqmNkGn3s97ttE8ldj0djOsEyuh5CeX2qqvRhFZVXEmJAmRLKL-aZG27HJOIyDZvBupAMTeuEuBJgKZ0OGw1RrltJEU8uLKjO0jiwavUbEqBquCBq4rTJ1iEFVvKmaHQN9BDeOHaA9ziHPz9ceTnm6XQQyJwcKE8KeLcNrPJVXnWq7EgwCX0If4HaN0YUQNVOfPbCP5at1yfSnc-aMkJVQcNcHGEvKX0kNzGfF7LJXKbMSkLgce1AbONkZxTiw5EJBIFxPlgxTqiJopderU2acoYJO9VRxHcBMRZYqX1wHkldEtItVJVAtg8yGSRsYDvcgtdIjDexfOkO9d4dbWfnAZUaei5dKkZwsZ7pPGxuke6wZr_MgkIl7aTK_BURpYyZMJKBUsmuXFXFtLJoT0KSKtkl5EvyIecujCNEwMWdwyPUtqxmG8msPfVa4rkpQiCOeIqtjF7yoxKk86tRIADddJfl69_dPkUBoH2oWZquKiWmFSfBt5pltNMCxwEaYKUAXpjY0pVbJ_DE6cazKDiXIthgDwFRk8cey_oGfAGB5QjuQB4AypxWmbCNCJHYmxXS07ZqwOhbJtegOJWJVz2XEI3tlLlEXXsu3M8GpxnAW2Fx6KazE_4qkbDo1MCUUGyyjKNpTmonOQ8sbK1x8DfBwbZI1GHseDEY1B0aEtaKVIHk_GJlnJ0tYTLNmc-gqhvC-6_ObW1ZlePosBoRiKKNUtsKMWAU19aRBlDEteWinlEyYndtkO7KObQekdFGeMgCoXvAOnBJ0eMsKJrmnvhdm3HaqGKtrz_FidotB41KUz9BmGlIaX_wLTOJjr4VVHJJAeqAZIYuh9hUN07O6H1E30beAHYhIQ2i4ezUFcTdC4cWvFSuZs4ik0yuNKaw8utnEdDx3vBc6ZEZ0xAKis9sqpxY992sVoeV4_cYRZLlEyvp3OdSLwZIU4yRYP5QCJ0VX2YaC8LzEVZcUF7kZ6Pt5cSakrzyItji62HEbVdKLB7UtPWpDTFOU6DVY1aeb56QWWgvCgTMwgPKJo4BlYxNpAGS3OKtY70JDLIusqSx67_hn5xi3aEJSVzaqPlR4kbsWIvYP3OUqAUKIARxCCLjBYrc31gZap5WkwyPOx9gH8PcLbzoIqDG1bzO6mntC8WemT5MbV5aY55SG4UJOgxSSjjqo2KoojQY9jHQBgYEOb9Rnqmq1Q5O1EpZ_cUdDg1KdX0kBi3BtT6EDoqmcu3YnMhIxgbwRAyetb3GHZ_iYl4s0sLxZ0meQwZVfaaEeQBJSnpQak-ijAKFlsfqq-utI44cqBdK_hTcHaMWcyKoktVEJ01YRuagwHWRpmRyc3IOsS5VRl2moyoIsILkdzVYl9Pdgj5xPmCEq_ESGZBAkgihT-_s11EO-kxOVTeC3FcQ60dJK--ZnOJGRf6G1Bzey6pOq5ymGTreMQuaQB2AhbXZuaxhhb73obYx0XxPGqvKbJuD18JpWIN0",
+              "kid": "r1Mkar9D8CTf-g_gniJujeo2YRjE2m7DxJbMMt1SWe0",
+              "use": "enc"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Discovery: /host/.well-known/openid-configuration",
+      "request": {
+        "method": "GET",
+        "url": "/host/.well-known/openid-configuration"
+      },
+      "submit": {
+        "status": 200,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "content-type": "application/json"
+        },
+        "bodyText": "{}",
+        "bodyJson": {}
+      }
+    },
+    {
+      "name": "1.1 Organization Registration",
+      "request": {
+        "method": "POST",
+        "url": "/host/cds-ES/v1/test/registry/org.schema/Organization/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "org-registration-thread-id",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:host.example.com",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Organization-registration-form-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "template",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.alternateName": "acme",
+                    "org.schema.Organization.identifier.additionalType": "TAX",
+                    "org.schema.Organization.identifier.value": "A123456789",
+                    "org.schema.Organization.legalName": "Acme Organization SL",
+                    "org.schema.Organization.name": "Acme Org",
+                    "org.schema.Organization.numberOfEmployees.value": 2,
+                    "org.schema.Organization.url": "api.acme.org",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "<url>",
+                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
+                "jwk": {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device"
+                }
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device",
+                "jwk": {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device"
+                }
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/host/cds-ES/v1/test/registry/org.schema/Organization/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/host/cds-ES/v1/test/registry/org.schema/Organization/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"data\":[{\"type\":\"Organization-registration-offer-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"Service\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.alternateName\":\"acme\",\"org.schema.Organization.identifier.additionalType\":\"TAX\",\"org.schema.Organization.identifier.value\":\"A123456789\",\"org.schema.Organization.legalName\":\"Acme Organization SL\",\"org.schema.Organization.name\":\"Acme Org\",\"org.schema.Organization.numberOfEmployees.value\":2,\"org.schema.Organization.url\":\"api.acme.org\",\"org.schema.Person.email\":\"admin1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|1120\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Organization.identifier\":\"urn:antifraud:test-network:es:v1:health-care:entity:tax:A123456789\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"employee\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:781e40be-69c4-499e-9730-d4a967366ebd\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-d2dc9125,lic-4a088a5f\"}},\"resource\":{\"resourceType\":\"Organization\",\"id\":\"0b2d547a-4516-4ab3-b9a9-38f940519f7a\"},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyJson": {
+            "data": [
+              {
+                "type": "Organization-registration-offer-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "Service",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.alternateName": "acme",
+                    "org.schema.Organization.identifier.additionalType": "TAX",
+                    "org.schema.Organization.identifier.value": "A123456789",
+                    "org.schema.Organization.legalName": "Acme Organization SL",
+                    "org.schema.Organization.name": "Acme Org",
+                    "org.schema.Organization.numberOfEmployees.value": 2,
+                    "org.schema.Organization.url": "api.acme.org",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "<url>",
+                    "org.schema.Service.termsOfService": "<url>",
+                    "org.schema.Service.termsOfService#hash": "zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy",
+                    "org.schema.Organization.identifier": "urn:antifraud:test-network:es:v1:health-care:entity:tax:A123456789",
+                    "org.schema.Offer.acceptedPaymentMethod": "Stripe",
+                    "org.schema.Offer.category": "health-care",
+                    "org.schema.Offer.checkoutPageURLTemplate": "<payment-url>",
+                    "org.schema.Offer.eligibleCustomerType": "employee",
+                    "org.schema.Offer.eligibleQuantity.value": 2,
+                    "org.schema.Offer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<uuid>",
+                    "org.schema.Offer.itemOffered.name": "License Tier XS",
+                    "org.schema.Offer.itemOffered.sku": "web-or-app-identifier",
+                    "org.schema.Offer.offeredBy": "did:web:localhost%3A3000",
+                    "org.schema.Offer.price": "0.00",
+                    "org.schema.Offer.priceCurrency": "EUR",
+                    "org.schema.Offer.serialNumber": "lic-d2dc9125,lic-4a088a5f"
+                  }
+                },
+                "resource": {
+                  "resourceType": "Organization",
+                  "id": "<uuid>"
+                },
+                "response": {
+                  "status": "201"
+                }
+              }
+            ],
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "total": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "1.2 Organization Order (invalid offer)",
+      "request": {
+        "method": "POST",
+        "url": "/host/cds-ES/v1/test/registry/org.schema/Order/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "org-order-thread-id",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:host.example.com",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Organization-order-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "Order.acceptedOffer.identifier": "urn:cds:invalid:Offer:<uuid>"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/host/cds-ES/v1/test/registry/org.schema/Order/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/host/cds-ES/v1/test/registry/org.schema/Order/_batch-response",
+        "tries": 1,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"data\":[{\"type\":\"Organization-order-request-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"Order.acceptedOffer.identifier\":\"urn:cds:invalid:Offer:<uuid>\"}},\"response\":{\"status\":\"404\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"not-found\",\"diagnostics\":\"No pending registration found for offerId: 'urn:cds:invalid:Offer:<uuid>'\"}]}}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyJson": {
+            "data": [
+              {
+                "type": "Organization-order-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "Order.acceptedOffer.identifier": "urn:cds:invalid:Offer:<uuid>"
+                  }
+                },
+                "response": {
+                  "status": "404",
+                  "outcome": {
+                    "resourceType": "OperationOutcome",
+                    "issue": [
+                      {
+                        "severity": "error",
+                        "code": "not-found",
+                        "diagnostics": "No pending registration found for offerId: 'urn:cds:invalid:Offer:<uuid>'"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "total": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "1.2 Organization Order (valid)",
+      "request": {
+        "method": "POST",
+        "url": "/host/cds-ES/v1/test/registry/org.schema/Order/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "org-order-thread-id",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:host.example.com",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Organization-order-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<uuid>"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/host/cds-ES/v1/test/registry/org.schema/Order/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/host/cds-ES/v1/test/registry/org.schema/Order/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"data\":[{\"type\":\"Organization\",\"resource\":{\"id\":\"b0fbdee7-3dff-4b01-b282-07397acde909\",\"type\":\"Organization\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"Service\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.alternateName\":\"acme\",\"org.schema.Organization.identifier.additionalType\":\"TAX\",\"org.schema.Organization.identifier.value\":\"A123456789\",\"org.schema.Organization.legalName\":\"Acme Organization SL\",\"org.schema.Organization.name\":\"Acme Org\",\"org.schema.Organization.numberOfEmployees.value\":2,\"org.schema.Organization.url\":\"api.acme.org\",\"org.schema.Person.email\":\"admin1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|1120\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Organization.identifier\":\"urn:antifraud:test-network:es:v1:health-care:entity:tax:A123456789\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"employee\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:781e40be-69c4-499e-9730-d4a967366ebd\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-d2dc9125,lic-4a088a5f\",\"org.schema.IndividualProduct.serialNumber\":\"lic-SwWwr92EHwD1\",\"org.schema.IndividualProduct.category\":\"professional\"}},\"resourceType\":\"Organization\",\"contained\":[{\"id\":\"d8b273ea-64d7-4db6-8bd5-4af6bfb1530a\",\"type\":\"Person\",\"meta\":{\"claims\":{\"@type\":\"Person\",\"org.schema.Person.email\":\"admin1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|1120\"}}},{\"id\":\"96ef6b00-fb73-4b8f-8aaa-617f8b45b097\",\"type\":\"Service\",\"meta\":{\"claims\":{\"@type\":\"Service\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\"}}}]},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyJson": {
+            "data": [
+              {
+                "type": "Organization",
+                "resource": {
+                  "id": "<uuid>",
+                  "type": "Organization",
+                  "meta": {
+                    "claims": {
+                      "@context": "org.schema",
+                      "@type": "Service",
+                      "org.schema.Organization.address.addressCountry": "ES",
+                      "org.schema.Organization.alternateName": "acme",
+                      "org.schema.Organization.identifier.additionalType": "TAX",
+                      "org.schema.Organization.identifier.value": "A123456789",
+                      "org.schema.Organization.legalName": "Acme Organization SL",
+                      "org.schema.Organization.name": "Acme Org",
+                      "org.schema.Organization.numberOfEmployees.value": 2,
+                      "org.schema.Organization.url": "api.acme.org",
+                      "org.schema.Person.email": "admin1@acme.org",
+                      "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                      "org.schema.Service.category": "health-care",
+                      "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                      "org.schema.Service.serviceType": "<url>",
+                      "org.schema.Service.termsOfService": "<url>",
+                      "org.schema.Service.termsOfService#hash": "zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy",
+                      "org.schema.Organization.identifier": "urn:antifraud:test-network:es:v1:health-care:entity:tax:A123456789",
+                      "org.schema.Offer.acceptedPaymentMethod": "Stripe",
+                      "org.schema.Offer.category": "health-care",
+                      "org.schema.Offer.checkoutPageURLTemplate": "<payment-url>",
+                      "org.schema.Offer.eligibleCustomerType": "employee",
+                      "org.schema.Offer.eligibleQuantity.value": 2,
+                      "org.schema.Offer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<uuid>",
+                      "org.schema.Offer.itemOffered.name": "License Tier XS",
+                      "org.schema.Offer.itemOffered.sku": "web-or-app-identifier",
+                      "org.schema.Offer.offeredBy": "did:web:localhost%3A3000",
+                      "org.schema.Offer.price": "0.00",
+                      "org.schema.Offer.priceCurrency": "EUR",
+                      "org.schema.Offer.serialNumber": "lic-d2dc9125,lic-4a088a5f",
+                      "org.schema.IndividualProduct.serialNumber": "lic-SwWwr92EHwD1",
+                      "org.schema.IndividualProduct.category": "professional"
+                    }
+                  },
+                  "resourceType": "Organization",
+                  "contained": [
+                    {
+                      "id": "<uuid>",
+                      "type": "Person",
+                      "meta": {
+                        "claims": {
+                          "@type": "Person",
+                          "org.schema.Person.email": "admin1@acme.org",
+                          "org.schema.Person.hasOccupation": "ISCO-08|1120"
+                        }
+                      }
+                    },
+                    {
+                      "id": "<uuid>",
+                      "type": "Service",
+                      "meta": {
+                        "claims": {
+                          "@type": "Service",
+                          "org.schema.Service.category": "health-care",
+                          "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                          "org.schema.Service.serviceType": "<url>",
+                          "org.schema.Service.termsOfService": "<url>",
+                          "org.schema.Service.termsOfService#hash": "zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "response": {
+                  "status": "201"
+                }
+              }
+            ],
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "total": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "2.1.1 Firebase custom token (demo call)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/identity/firebase/Token/_custom",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "firebase-custom-token-thread-id",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:api.acme.org#identity_firebase_token_custom",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/json",
+          "body": {
+            "provider": "eidas",
+            "id_token": "<external-oidc-id-token>"
+          }
+        }
+      },
+      "submit": {
+        "status": 401,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "content-type": "application/json"
+        },
+        "bodyText": "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"security\",\"diagnostics\":\"Missing or invalid Bearer token.\"}]}",
+        "bodyJson": {
+          "resourceType": "OperationOutcome",
+          "issue": [
+            {
+              "severity": "error",
+              "code": "security",
+              "diagnostics": "Missing or invalid Bearer token."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "2.1.2 Initial Access Token Exchange (invalid code)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer <jwt>"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "token-exchange-thread-id-invalid",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:api.acme.org#identity_openid_token_exchange",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/json",
+          "body": {
+            "subject_token": "activation-code-demo-1"
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange-response",
+        "tries": 1,
+        "final": {
+          "status": 500,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"thid\":\"token-exchange-thread-id-invalid\",\"iss\":\"did:web:localhost%3A3000\",\"aud\":\"urn:ietf:rfc:7638:thumbprint-public-sig-key-device\",\"exp\":1768104177,\"body\":{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"unknown-error-v1.0\",\"response\":{\"status\":\"500\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"exception\",\"diagnostics\":\"Activation code not found or invalid.\"}]}}}]}}",
+          "bodyJson": {
+            "thid": "token-exchange-thread-id-invalid",
+            "iss": "did:web:localhost%3A3000",
+            "aud": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+            "exp": "<time>",
+            "body": {
+              "resourceType": "Bundle",
+              "type": "batch-response",
+              "data": [
+                {
+                  "type": "unknown-error-v1.0",
+                  "response": {
+                    "status": "500",
+                    "outcome": {
+                      "resourceType": "OperationOutcome",
+                      "issue": [
+                        {
+                          "severity": "error",
+                          "code": "exception",
+                          "diagnostics": "Activation code not found or invalid."
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "2.1.1 License Issue (invite)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/License/_issue",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "license-issue-thread-id",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org#identity_openid_license_issue",
+          "type": "application/api+json",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "data": [
+              {
+                "type": "EmployeeLicenseInvitation-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "IndividualProduct:Issue",
+                    "org.schema.Person.email": "doctor1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|2211",
+                    "org.schema.IndividualProduct.category": "professional",
+                    "org.schema.IndividualProduct.additionalType": "mobile"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "/acme/cds-ES/v1/health-care/identity/openid/License/_issue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/License/_issue-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/License/_issue-response",
+        "tries": 1,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"License:Issued\",\"response\":{\"status\":\"201\"},\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"IndividualProduct:Issue\",\"org.schema.Person.email\":\"doctor1@acme.org\",\"org.schema.Person.hasOccupation\":\"ISCO-08|2211\",\"org.schema.IndividualProduct.category\":\"professional\",\"org.schema.IndividualProduct.additionalType\":\"mobile\",\"org.schema.IndividualProduct.serialNumber\":\"lic-vx47ezi2Rf6k\"}},\"resource\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"information\",\"code\":\"informational\",\"diagnostics\":\"License activation code issued.\"}]},\"id\":\"lic-vx47ezi2Rf6k\"}]}",
+          "bodyJson": {
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "data": [
+              {
+                "type": "License:Issued",
+                "response": {
+                  "status": "201"
+                },
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "IndividualProduct:Issue",
+                    "org.schema.Person.email": "doctor1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|2211",
+                    "org.schema.IndividualProduct.category": "professional",
+                    "org.schema.IndividualProduct.additionalType": "mobile",
+                    "org.schema.IndividualProduct.serialNumber": "lic-vx47ezi2Rf6k"
+                  }
+                },
+                "resource": {
+                  "resourceType": "OperationOutcome",
+                  "issue": [
+                    {
+                      "severity": "information",
+                      "code": "informational",
+                      "diagnostics": "License activation code issued."
+                    }
+                  ]
+                },
+                "id": "lic-vx47ezi2Rf6k"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "2.1.2 Initial Access Token Exchange (valid)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer <jwt>"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "token-exchange-thread-id-valid",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:api.acme.org#identity_openid_token_exchange",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/json",
+          "body": {
+            "subject_token": "lic-vx47ezi2Rf6k"
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"initial_access_token\":\"eyJhbGciOiJNTC1EU0EtNDQiLCJraWQiOiJEOHZVLThOQm83Sm9pZzMxdkZ0YTE5VWwyUmFVLWx6Vi1qQlM3OWxFa3BzIn0.eyJzdWIiOiJ1c2VyMUBleGFtcGxlLmNvbSIsImp0aSI6IjgxMzQwMTAyLWZmODQtNGFiMC05NjAzLWVmYjJjOWU0MzgzZSIsImFjdF9jb2RlIjoibGljLXZ4NDdlemkyUmY2ayIsInRlbmFudF9pZCI6ImFjbWUiLCJzY29wZSI6ImRjcjpyZWdpc3RlciIsImlzcyI6ImRpZDp3ZWI6bG9jYWxob3N0JTNBMzAwMCIsImF1ZCI6InVybjpnYXRld2F5OmRjciIsImV4cCI6MTc2ODEwMzkzOCwibmJmIjoxNzY4MTAzODc4fQ.mZHP86F2E2Ijw_KD2NYv8RfGMHAi94iCuHBFubfCI4vfAcmIVddB0sJ_X6lQ3z8kSKe1BPDuWyG3jL0y3a07vXqq-Gey3tuAGGtmIHtBB50XzrLNK2n8Xs_Z1lTVqVv0WvEHmCa-cYNWbZ1xsrQLVbq2kNsGXhZ3cMxK9Elc2ZUhAAkTuXzoKXrjFVwXWPTuucPqb5PEnmLL2BG-u7H_JnyWiVRIWyHSyIsBF8XIYIMV-wcl1kaJ1nswT6o58J5vFsDLHShSlUJ0kYYuNfKSouvSYJRCbInf-Zdj_Fq5ocwRUm6SPOohjDFlxbWnDiF-tFqgc3R9jd_7jxozu52_48QYJ7bW567KPNwEVpDfLJAeItNkUSmsfTk8IJqjCOriLCpo2r1czsmZV3sSGqNUMhxhf5ameb_ODb2ZRimX1_bh5UJzrPlhE3du3XTXiZao2YQj6WR2BbHF8BWq5OrjAJRSBiErQkI3Ksxx9Q12fgoiwm4rDO_WWdrYaU-WdcOZLRh8X4AMpdzgzpuCG2LgSHNPuLhhT7vZ8jNoT82tjtHLK9O4HjdrogDXc5J9M8nQfgmNA_MFiTalxWFU7XGaRr4hgFGNAakpW1XDH1pOBVjICESLuWsMlRteKNJsVTQBsZfHeaZyYzPVfvCQ1NxdIfRfPrEHA8U848BnrLMRIjnuBvw5UodqNOAx3ulNLV-Cl7yiN26hPe_IFq7_0wu8w6H-Aiwz1EYo_BNwkQ3qUj3Y4VD5-cOAMB7jEAl_GfNSbafX93I_CjiF0gO8kDEL0yY1qww2BwP8wScjb3ftge0fQ-qvprcfCF478LDwBnmi0w48YfI6Ttz_GDXEngW-mMXAVYTWAKYWyiVh-BOhUXU__jV0Tq3fmLH6_gXPKG_ajf9uvKJNKY9xU0QCsQP2dM9cZcNVs3YTDAaugHydj02tHqMRpEq4KSywxHo3m-nxGZTkg1PLz_mVU5SxrcA98GIVCQEpVfAXPc4rYz4LQazfLRuiuTToGVE-qHT4E-677Uexuq-_IPH1HuGHJ2RMhORctgYff-nEHcfbBXFzXTAdCk0f5Hc_JfbxwTEoFS_-f73bbL0QFoITKX2Jfh6gV4MHJDIDGQJO2u8wgrgL5ZphAIEihQhB3u1zUqqqWpZeOf_AlYij5LGbwhKZBVR-FTHwEdld3WaBvsE0fCd-QnbWJFynxKCt_91XYEo_k-qD_WfNoU9xZjUMZ_K5OICDcpUmLQCPSwRSJCsjGbST5LBj_E__cmZhfn7DSJH5WJIRZSblEPKe_pDdQDsGLiOYzCY5pWFI3VIeUgZv_hOYIzgsReKXPRKmyTMaRkkhcP-GrK6BOiQxrEraS-7KLK20VYGwr1b7m-J-9PX8RxRKa4BN3FQ0hvLQh7-MzEQwC5UUXX4Lm1IliCKLBxh9oCmkzIlhv0oP4_VGJBU586eCiZG231EP79--WSLkYGkEIl23lh4xd51CpL1z_tPEJTmjL9PfVZ0VWBkDpelJ0FaQSQZ2550Zligv1DDineo3US1WkEWlD2Zu8KG5a7eDUceqRKlUzFSq5K9ufWxgQAnNmZCe-IwIDSVwkD3JDV4UdWItdkPznDJoeMhkqgrdVXe_0nTQq5cSuSejV1oJYECsVk7fVGruXWMAWl4nyPe5OJdvZS-1HtROU6ydwnQMgTUYWq1h7-5UJdduQYX2afyxGphXmoCqrLIkIvG85Dt9-s7i7l2eOtHrhX1r0wQ_Aup92laPfVS8P04Pq1emJdLrsvvxeWuAmnzlnE2BpKaaGNLzf0qJZ61sQ86Fesg94i-I2Cii9pwO_9NlVgDcEPWX8jf4BjxHEMO-lg5xx4VQoKQ7mFUMrkBTtxG3YGPVZPug1hrgbaH62xFIEK0CdsZ8uxBNpMUuC85lMq18tnk1AlcXMHtHuML-9qEtjlxmyn6SUTEH9reQF4AIRRzxZbLTwJkG-fGrCqCjUpDUSrM9FMBJGJJ3svz7Rk3eDYwoYk3fe1Klowc8J17N0aQEcqtTML6tKKoo24FUxvpe78H-fAOtQBE5h9RMTuMssbAdLpimKb1o7HDI3zZNhR1uQ0tLrSULPo_0RAycfNj1D59O3fJ3lO9ZB1Hzun5Gi-t5-NvFICtmeElhg5m_OYxJRMsY1rZVfSzx0_Xs2MobDI81ETAi2JPZds5-XN58twrX0SNzGUL5wFbNUo1wV7wUwQjPTvkKnvPP84wuRjqH09AODpNWOkHpJGmFRwWC6C7lbnC4jN0iRAdkY5_O4-UaSuCpoAXzk8aURM6XEVGDroWFj8GYR02D9LkNZpQK6kFV2uxouAMCairTqnLXEvnRD_uKB_I33Oq401Z5Y0i8OypGUY4kz8PoieN10k8KswfdlnQidr1ajwzotOTDNjf6drMrN-iB8mYB9V4S-K03yR5XsZp-xOcIc3F3eYsRz8CdUNqxHAXro4H-GnPkdMEnX-gemXgpHYueEVaIHIHlF0e6pxo_MIy-hnfQIV-svLlwDeIY0iJv0Uh4tsP_0jtvr_tpWJXDTC89cBAx37gewD4JHZzZokS3eRgsg5iFQKV-KxNEQAArtp6_9jTiT0U2GPhnJAzsYzhv6JFcYlC6MbLYdqwE-uHyWtlxy1CcfhrsJrjokWj2pDdv9iqTT3hsBc1rb7_UHXFchN37xUTuFNK6ar_jJ01QnS6eswUqRD7lxp8vBO1mWrWusDgCwSdPwy13f0GZtwzIMmu5xvVotvuYMviCBNxtRX6nqj5BBm2OpBEuqDpDEt9gYz5EjxjgR30iAgPRfKYf-Siii_qdkPMGOx2qnOvEodnFb1gp7oz2FZRm3f-8GIq7NC7dOjIOrxbbfHBYIV4NlVvQIakyIYKXfr7w5QABp7lQuVMYZnB24T4ffLH3dYCvNEHOgN_ktxilzSYOASwX_6foVzdyVhaNlJ0M-U4RUM7W7EvudZCOWL-Dh7wMP5k9A_bJGnzROQWm4t4VKsrMWMm0qtR2LWF6YO-YStYH11s37QW_ipYdrQ0qrAgkw3nUwMPUdTFd651EvqCGVCzwD9ef2EPO7xz1BH_g1ht4b73_MvihO29vjvIiES7Vacxy7fbLJ-lSKRn1A-cCEBktPV1gd4CEmZqfw9z3_wQNFzU_RoGNlp_F6PQPIjpJaGt5iJWnzNTa4_Dz_AAcL0lUXWh7fIOTnq62uurs8QAAAAAAAAAAAAAAAAAAABEeL0E\",\"token_type\":\"Bearer\",\"expires_in\":60,\"scope\":\"dcr:register\"}",
+          "bodyJson": {
+            "initial_access_token": "<initial_access_token>",
+            "token_type": "Bearer",
+            "expires_in": 60,
+            "scope": "dcr:register"
+          }
+        }
+      }
+    },
+    {
+      "name": "2.1.2 Initial Access Token Exchange (signature check)",
+      "request": {
+        "method": "LOCAL",
+        "url": "verifyJws(host, initial_access_token)"
+      },
+      "submit": {
+        "status": 200,
+        "headers": {},
+        "bodyText": "{\"ok\":true,\"okViaManager\":true}"
+      }
+    },
+    {
+      "name": "2.1.3 DCR (invalid initial_access_token)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Device/_dcr",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer <jwt>"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "device-registration-thread-id",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:api.acme.org#identity_openid_device_dcr",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/json",
+          "body": {
+            "application_type": "native",
+            "client_name": "App for [email] as [role] on [iOS, Android, Web]",
+            "code": "00000000-0000-0000-0000-000000000000",
+            "redirect_uris": [
+              "myapp://callback"
+            ],
+            "token_endpoint_auth_method": "private_key_jwt",
+            "ext_device_info": {
+              "device_id": "iOS-17.1.2-ABC-123",
+              "device_name": "User's iPhone 15 Pro",
+              "os": "iOS",
+              "os_version": "17.1.2",
+              "push_provider": "expo",
+              "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+            },
+            "jwks": {
+              "keys": [
+                {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device",
+                  "kid": "thumbprint-public-sig-key-device",
+                  "use": "sig"
+                },
+                {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device",
+                  "kid": "thumbprint-public-enc-key-device",
+                  "use": "enc"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 401,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "content-type": "application/json"
+        },
+        "bodyText": "{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"security\",\"diagnostics\":\"Failed to process secure request: Invalid signature for initial_access_token.\"}]}",
+        "bodyJson": {
+          "resourceType": "OperationOutcome",
+          "issue": [
+            {
+              "severity": "error",
+              "code": "security",
+              "diagnostics": "Failed to process secure request: Invalid signature for initial_access_token."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "2.1.3 DCR (valid)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Device/_dcr",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer <jwt>"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "device-registration-thread-id",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:api.acme.org#identity_openid_device_dcr",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/json",
+          "body": {
+            "application_type": "native",
+            "client_name": "App for [email] as [role] on [iOS, Android, Web]",
+            "code": "00000000-0000-0000-0000-000000000000",
+            "redirect_uris": [
+              "myapp://callback"
+            ],
+            "token_endpoint_auth_method": "private_key_jwt",
+            "ext_device_info": {
+              "device_id": "iOS-17.1.2-ABC-123",
+              "device_name": "User's iPhone 15 Pro",
+              "os": "iOS",
+              "os_version": "17.1.2",
+              "push_provider": "expo",
+              "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+            },
+            "jwks": {
+              "keys": [
+                {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device",
+                  "kid": "thumbprint-public-sig-key-device",
+                  "use": "sig"
+                },
+                {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device",
+                  "kid": "thumbprint-public-enc-key-device",
+                  "use": "enc"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/Device/_dcr-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/Device/_dcr-response",
+        "tries": 1,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"data\":[{\"type\":\"application/json\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"SoftwareApplication\",\"org.schema.SoftwareApplication.identifier\":\"533d7aed-19a4-4022-ad40-e4177fc203c9\",\"org.schema.SoftwareApplication.name\":\"App for [email] as [role] on [iOS, Android, Web]\",\"org.schema.SoftwareApplication.description\":\"Registered on device: User's iPhone 15 Pro\"}},\"response\":{\"status\":\"201\"},\"resource\":{\"resourceType\":\"Device\",\"id\":\"533d7aed-19a4-4022-ad40-e4177fc203c9\",\"client_id\":\"533d7aed-19a4-4022-ad40-e4177fc203c9\",\"client_id_issued_at\":1768103878,\"client_secret_expires_at\":0,\"registration_client_uri\":\"http://localhost:3000/clients/533d7aed-19a4-4022-ad40-e4177fc203c9\"}}],\"resourceType\":\"Bundle\",\"total\":1,\"type\":\"transaction-response\"}",
+          "bodyJson": {
+            "data": [
+              {
+                "type": "application/json",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "SoftwareApplication",
+                    "org.schema.SoftwareApplication.identifier": "<uuid>",
+                    "org.schema.SoftwareApplication.name": "App for [email] as [role] on [iOS, Android, Web]",
+                    "org.schema.SoftwareApplication.description": "Registered on device: User's iPhone 15 Pro"
+                  }
+                },
+                "response": {
+                  "status": "201"
+                },
+                "resource": {
+                  "resourceType": "Device",
+                  "id": "<uuid>",
+                  "client_id": "<uuid>",
+                  "client_id_issued_at": 1768103878,
+                  "client_secret_expires_at": 0,
+                  "registration_client_uri": "<url>"
+                }
+              }
+            ],
+            "resourceType": "Bundle",
+            "total": 1,
+            "type": "transaction-response"
+          }
+        }
+      }
+    },
+    {
+      "name": "2.2 SMART Token (missing subject vault)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/smart/token",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "smart-token-thread-id",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/json",
+          "body": {
+            "expires_in": 300,
+            "token_type": "Bearer",
+            "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
+            "purpose": "TREAT",
+            "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2 patient/Consent.cruds"
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/smart/token-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/smart/token-response",
+        "tries": 2,
+        "final": {
+          "status": 500,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"thid\":\"smart-token-thread-id\",\"iss\":\"did:web:localhost%3A3000\",\"aud\":\"did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>\",\"exp\":1768104178,\"body\":{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"unknown-error-v1.0\",\"response\":{\"status\":\"500\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"exception\",\"diagnostics\":\"No matching consent rule found for requested scope.\"}]}}}]}}",
+          "bodyJson": {
+            "thid": "smart-token-thread-id",
+            "iss": "did:web:localhost%3A3000",
+            "aud": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+            "exp": "<time>",
+            "body": {
+              "resourceType": "Bundle",
+              "type": "batch-response",
+              "data": [
+                {
+                  "type": "unknown-error-v1.0",
+                  "response": {
+                    "status": "500",
+                    "outcome": {
+                      "resourceType": "OperationOutcome",
+                      "issue": [
+                        {
+                          "severity": "error",
+                          "code": "exception",
+                          "diagnostics": "No matching consent rule found for requested scope."
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "2.2 SMART Token (valid)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/smart/token",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "smart-token-thread-id",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/json",
+          "body": {
+            "expires_in": 300,
+            "token_type": "Bearer",
+            "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
+            "purpose": "TREAT",
+            "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2 patient/Consent.cruds"
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/identity/openid/smart/token-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/identity/openid/smart/token-response",
+        "tries": 2,
+        "final": {
+          "status": 500,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"thid\":\"smart-token-thread-id\",\"iss\":\"did:web:localhost%3A3000\",\"aud\":\"did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>\",\"exp\":1768104178,\"body\":{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"unknown-error-v1.0\",\"response\":{\"status\":\"500\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"exception\",\"diagnostics\":\"No matching consent rule found for requested scope.\"}]}}}]}}",
+          "bodyJson": {
+            "thid": "smart-token-thread-id",
+            "iss": "did:web:localhost%3A3000",
+            "aud": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+            "exp": "<time>",
+            "body": {
+              "resourceType": "Bundle",
+              "type": "batch-response",
+              "data": [
+                {
+                  "type": "unknown-error-v1.0",
+                  "response": {
+                    "status": "500",
+                    "outcome": {
+                      "resourceType": "OperationOutcome",
+                      "issue": [
+                        {
+                          "severity": "error",
+                          "code": "exception",
+                          "diagnostics": "No matching consent rule found for requested scope."
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "3.1 Employee Role",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/entity/org.schema/Employee/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "employeerole-registration-thread-id",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Employee-form-v1.0",
+                "meta": {
+                  "claims": {
+                    "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
+                    "org.schema.Person.hasOccupation": "ISCO-08|4226",
+                    "org.schema.Person.email": "receptionist1@acme.org"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/entity/org.schema/Employee/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/entity/org.schema/Employee/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"data\":[{\"type\":\"Employee-form-v1.0\",\"meta\":{\"claims\":{\"org.schema.Person.identifier\":\"urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef\",\"org.schema.Person.hasOccupation\":\"ISCO-08|4226\",\"org.schema.Person.email\":\"receptionist1@acme.org\"}},\"response\":{\"status\":\"400\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"required\",\"diagnostics\":\"Entry requires a request object and meta.claims.\"}]}}}],\"resourceType\":\"Bundle\",\"total\":1,\"type\":\"batch-response\"}",
+          "bodyJson": {
+            "data": [
+              {
+                "type": "Employee-form-v1.0",
+                "meta": {
+                  "claims": {
+                    "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
+                    "org.schema.Person.hasOccupation": "ISCO-08|4226",
+                    "org.schema.Person.email": "receptionist1@acme.org"
+                  }
+                },
+                "response": {
+                  "status": "400",
+                  "outcome": {
+                    "resourceType": "OperationOutcome",
+                    "issue": [
+                      {
+                        "severity": "error",
+                        "code": "required",
+                        "diagnostics": "Entry requires a request object and meta.claims."
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "resourceType": "Bundle",
+            "total": 1,
+            "type": "batch-response"
+          }
+        }
+      }
+    },
+    {
+      "name": "4.1 Family Registration",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/individual/org.schema/Organization/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "family-registration-thread-id",
+          "iss": "adult1@example.com",
+          "aud": "did:web:api.acme.org",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Family-registration-form-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "template",
+                    "Organization.address.addressCountry": "ES",
+                    "Organization.identifier.additionalType": "UUID",
+                    "Organization.identifier.value": "<UUID>",
+                    "Organization.owner.email": "adult1@example.com",
+                    "Organization.owner.identifier.value": "adult1@example.com",
+                    "Person.email": "child1@example.com",
+                    "Person.identifier.additionalType": "UUID",
+                    "Person.identifier.value": "<child1-ID>",
+                    "Service.category": "health-care",
+                    "Service.identifier": "did:web:api-provider.example.com",
+                    "Service.serviceType": "<url>",
+                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
+                "jwk": {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device"
+                }
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device",
+                "jwk": {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device"
+                }
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/individual/org.schema/Organization/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/individual/org.schema/Organization/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"data\":[{\"type\":\"Family-registration-offer-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"receipt\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.identifier.additionalType\":\"UUID\",\"org.schema.Organization.identifier.value\":\"<UUID>\",\"org.schema.Organization.owner.email\":\"adult1@example.com\",\"org.schema.Organization.owner.identifier.value\":\"adult1@example.com\",\"org.schema.Person.email\":\"child1@example.com\",\"org.schema.Person.identifier.additionalType\":\"UUID\",\"org.schema.Person.identifier.value\":\"<child1-ID>\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"individual\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:1a26a06d-e02e-4f67-8ef4-5a407e648748\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000:acme:cds-ES:v1:health-care\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-0190a11f,lic-b4c2dd4b\"}},\"resource\":{\"resourceType\":\"Organization\",\"id\":\"66ca13e6-9ce6-4ebf-965f-123aae37c114\"},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyJson": {
+            "data": [
+              {
+                "type": "Family-registration-offer-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "receipt",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.identifier.additionalType": "UUID",
+                    "org.schema.Organization.identifier.value": "<UUID>",
+                    "org.schema.Organization.owner.email": "adult1@example.com",
+                    "org.schema.Organization.owner.identifier.value": "adult1@example.com",
+                    "org.schema.Person.email": "child1@example.com",
+                    "org.schema.Person.identifier.additionalType": "UUID",
+                    "org.schema.Person.identifier.value": "<child1-ID>",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "<url>",
+                    "org.schema.Service.termsOfService": "<url>",
+                    "org.schema.Service.termsOfService#hash": "zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy",
+                    "org.schema.Offer.acceptedPaymentMethod": "Stripe",
+                    "org.schema.Offer.category": "health-care",
+                    "org.schema.Offer.checkoutPageURLTemplate": "<payment-url>",
+                    "org.schema.Offer.eligibleCustomerType": "individual",
+                    "org.schema.Offer.eligibleQuantity.value": 2,
+                    "org.schema.Offer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<uuid>",
+                    "org.schema.Offer.itemOffered.name": "License Tier XS",
+                    "org.schema.Offer.itemOffered.sku": "web-or-app-identifier",
+                    "org.schema.Offer.offeredBy": "did:web:localhost%3A3000:acme:cds-ES:v1:health-care",
+                    "org.schema.Offer.price": "0.00",
+                    "org.schema.Offer.priceCurrency": "EUR",
+                    "org.schema.Offer.serialNumber": "lic-0190a11f,lic-b4c2dd4b"
+                  }
+                },
+                "resource": {
+                  "resourceType": "Organization",
+                  "id": "<uuid>"
+                },
+                "response": {
+                  "status": "201"
+                }
+              }
+            ],
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "total": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "4.2 Family Order (invalid offer)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "family-order-thread-id",
+          "iss": "adult1@example.com",
+          "aud": "did:web:api.acme.org",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Family-order-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "Order.acceptedOffer.identifier": "urn:cds:invalid:Offer:<uuid>"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"data\":[{\"type\":\"Family-order-request-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"Order.acceptedOffer.identifier\":\"urn:cds:invalid:Offer:<uuid>\"}},\"response\":{\"status\":\"404\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"not-found\",\"diagnostics\":\"No pending family registration found for offerId: 'urn:cds:invalid:Offer:<uuid>'\"}]}}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyJson": {
+            "data": [
+              {
+                "type": "Family-order-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "Order.acceptedOffer.identifier": "urn:cds:invalid:Offer:<uuid>"
+                  }
+                },
+                "response": {
+                  "status": "404",
+                  "outcome": {
+                    "resourceType": "OperationOutcome",
+                    "issue": [
+                      {
+                        "severity": "error",
+                        "code": "not-found",
+                        "diagnostics": "No pending family registration found for offerId: 'urn:cds:invalid:Offer:<uuid>'"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "total": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "4.2 Family Order (valid)",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "family-order-thread-id",
+          "iss": "adult1@example.com",
+          "aud": "did:web:api.acme.org",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Family-order-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<uuid>"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"data\":[{\"type\":\"Organization\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"@type\":\"receipt\",\"org.schema.Organization.address.addressCountry\":\"ES\",\"org.schema.Organization.identifier.additionalType\":\"UUID\",\"org.schema.Organization.identifier.value\":\"<UUID>\",\"org.schema.Organization.owner.email\":\"adult1@example.com\",\"org.schema.Organization.owner.identifier.value\":\"adult1@example.com\",\"org.schema.Person.email\":\"child1@example.com\",\"org.schema.Person.identifier.additionalType\":\"UUID\",\"org.schema.Person.identifier.value\":\"<child1-ID>\",\"org.schema.Service.category\":\"health-care\",\"org.schema.Service.identifier\":\"did:web:api-provider.example.com\",\"org.schema.Service.serviceType\":\"http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC\",\"org.schema.Service.termsOfService\":\"http://localhost:3000/local-storage/zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Service.termsOfService#hash\":\"zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy\",\"org.schema.Offer.acceptedPaymentMethod\":\"Stripe\",\"org.schema.Offer.category\":\"health-care\",\"org.schema.Offer.checkoutPageURLTemplate\":\"<payment-url>\",\"org.schema.Offer.eligibleCustomerType\":\"individual\",\"org.schema.Offer.eligibleQuantity.value\":2,\"org.schema.Offer.identifier\":\"urn:cds:ES:v1:health-care:product:org.schema:Offer:1a26a06d-e02e-4f67-8ef4-5a407e648748\",\"org.schema.Offer.itemOffered.name\":\"License Tier XS\",\"org.schema.Offer.itemOffered.sku\":\"web-or-app-identifier\",\"org.schema.Offer.offeredBy\":\"did:web:localhost%3A3000:acme:cds-ES:v1:health-care\",\"org.schema.Offer.price\":\"0.00\",\"org.schema.Offer.priceCurrency\":\"EUR\",\"org.schema.Offer.serialNumber\":\"lic-0190a11f,lic-b4c2dd4b\",\"org.schema.IndividualProduct.serialNumber\":\"lic-n-gZIltnFZiH\",\"org.schema.IndividualProduct.category\":\"individual\"}},\"resource\":{\"resourceType\":\"Organization\",\"id\":\"<UUID>\"},\"response\":{\"status\":\"201\"}}],\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"total\":1}",
+          "bodyJson": {
+            "data": [
+              {
+                "type": "Organization",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "receipt",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.identifier.additionalType": "UUID",
+                    "org.schema.Organization.identifier.value": "<UUID>",
+                    "org.schema.Organization.owner.email": "adult1@example.com",
+                    "org.schema.Organization.owner.identifier.value": "adult1@example.com",
+                    "org.schema.Person.email": "child1@example.com",
+                    "org.schema.Person.identifier.additionalType": "UUID",
+                    "org.schema.Person.identifier.value": "<child1-ID>",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "<url>",
+                    "org.schema.Service.termsOfService": "<url>",
+                    "org.schema.Service.termsOfService#hash": "zG9G8CxRsTVZ2GahCdr3vHA2YBT9vUrrVv5gajQfFGYyCmFkEN9V9XVQ14eLNTYA2FzCy",
+                    "org.schema.Offer.acceptedPaymentMethod": "Stripe",
+                    "org.schema.Offer.category": "health-care",
+                    "org.schema.Offer.checkoutPageURLTemplate": "<payment-url>",
+                    "org.schema.Offer.eligibleCustomerType": "individual",
+                    "org.schema.Offer.eligibleQuantity.value": 2,
+                    "org.schema.Offer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<uuid>",
+                    "org.schema.Offer.itemOffered.name": "License Tier XS",
+                    "org.schema.Offer.itemOffered.sku": "web-or-app-identifier",
+                    "org.schema.Offer.offeredBy": "did:web:localhost%3A3000:acme:cds-ES:v1:health-care",
+                    "org.schema.Offer.price": "0.00",
+                    "org.schema.Offer.priceCurrency": "EUR",
+                    "org.schema.Offer.serialNumber": "lic-0190a11f,lic-b4c2dd4b",
+                    "org.schema.IndividualProduct.serialNumber": "lic-n-gZIltnFZiH",
+                    "org.schema.IndividualProduct.category": "individual"
+                  }
+                },
+                "resource": {
+                  "resourceType": "Organization",
+                  "id": "<UUID>"
+                },
+                "response": {
+                  "status": "201"
+                }
+              }
+            ],
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "total": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "5. Consent",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "thread-consent-fhir-batch-id",
+          "iss": "did:web:ehr-system.example.com",
+          "aud": "did:web:gateway.example.com",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "url": "<url>",
+                "type": "Consent",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "Consent.decision": "permit",
+                    "Consent.subject": "unified-health-id",
+                    "Consent.identifier": "urn:uuid:patient-consent-uuid",
+                    "Consent.grantee": "did:web:hospital.example.com",
+                    "Consent.date": "2025-11-25",
+                    "Consent.purpose": "TREAT",
+                    "Consent.action": "LOINC|48765-2",
+                    "Consent.actor-identifier": "did:web:hospital.example.com",
+                    "Consent.actor-role": "ISCO-08|2211",
+                    "Consent.attachment-contentType": "application/odrl+json",
+                    "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "/health-care/individual/org.hl7.fhir.api/Consent"
+                },
+                "resource": {
+                  "identifier": "urn:uuid:patient-consent-uuid",
+                  "resourceType": "Consent",
+                  "status": "active",
+                  "scope": {
+                    "coding": [
+                      {
+                        "system": "<url>",
+                        "code": "patient-privacy"
+                      }
+                    ]
+                  },
+                  "category": [
+                    {
+                      "coding": [
+                        {
+                          "system": "<url>",
+                          "code": "TREAT"
+                        }
+                      ]
+                    }
+                  ],
+                  "patient": {
+                    "reference": "unified-health-id"
+                  },
+                  "performer": [
+                    {
+                      "reference": "did:web:hospital.example.com"
+                    }
+                  ],
+                  "provision": {
+                    "type": "permit"
+                  },
+                  "sourceAttachment": {
+                    "contentType": "application/odrl+json",
+                    "data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"response\":{\"status\":\"201\",\"location\":\"/health-care/individual/org.hl7.fhir.api/Consent/6dbf8c851e2f3b0b02875d56e27c54595ac16d2bb57228787db6129824a53cc6d2c34e1b71df32ad56aa5b7f6329f375\"},\"type\":\"Consent\"}]}",
+          "bodyJson": {
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "data": [
+              {
+                "response": {
+                  "status": "201",
+                  "location": "/health-care/individual/org.hl7.fhir.api/Consent/6dbf8c851e2f3b0b02875d56e27c54595ac16d2bb57228787db6129824a53cc6d2c34e1b71df32ad56aa5b7f6329f375"
+                },
+                "type": "Consent"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "6. Communication",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "thread-communication-id",
+          "iss": "did:web:ehr-system.example.com",
+          "aud": "did:web:gateway.acme.org",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "type": "Communication",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "@type": "Communication:Appointment",
+                    "Communication.category": "<url>",
+                    "Communication.content-attachment-data": "QkVHSU4...5EQVI=",
+                    "Communication.content-attachment-title": "appointment-details.ics",
+                    "Communication.content-attachment-type": "text/calendar",
+                    "Communication.content-reference": "<url>",
+                    "Communication.partOf": "urn:uuid:communication-channel-id",
+                    "Communication.recipient": "{CUSTOMER_DID_WEB}",
+                    "Communication.sender": "{ORGANIZATION_DID_WEB}",
+                    "Communication.sent": "2025-10-15T14:30:00Z",
+                    "Communication.subject": "{CUSTOMER_DID_WEB}",
+                    "Communication.text": "This is your new appointment. Best regards."
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.hl7.fhir.r4/Communication"
+                },
+                "resource": {
+                  "resourceType": "Communication",
+                  "status": "completed",
+                  "partOf": [
+                    {
+                      "reference": "urn:uuid:communication-channel-id"
+                    }
+                  ],
+                  "category": [
+                    {
+                      "coding": [
+                        {
+                          "code": "appointment-reminder",
+                          "system": "<url>"
+                        }
+                      ]
+                    }
+                  ],
+                  "recipient": [
+                    {
+                      "reference": "{CUSTOMER_DID_WEB}"
+                    }
+                  ],
+                  "sender": {
+                    "reference": "{ORGANIZATION_DID_WEB}"
+                  },
+                  "sent": "2025-10-15T14:30:00Z",
+                  "note": [
+                    {
+                      "text": "This is your new appointment. Best regards."
+                    }
+                  ],
+                  "payload": [
+                    {
+                      "contentReference": {
+                        "reference": "<url>"
+                      }
+                    },
+                    {
+                      "contentAttachment": {
+                        "contentType": "text/calendar",
+                        "data": "QkVHSU46VkNBTEVOREFSCgpWRVJTSU9OOjIuMApQUk9ESUQ6LS8vQWNtZS8vZGlkOndlYjphcGkuYWNtZS5vcmcvL0VTCkJFR0lOOlZFVkVOVApVSUQ6PHV1aWQtdjQ+CkRUU1BTVA6MjAyNTEwMTZUMTIwMDAwWgpEVFNUQVJUOjIwMjUxMDE3VDE1MDAwMFoKRF RFTkQ6MjAyNTEwMTdUMTYwMDAwWgpTVU1NQVJZOlJlc3VtZW4gZGUgY2l0YS4KREVTQ1JJUFRJT046RW5jdWVudHJvIHZpcnR1YWwuCkxPQ0FUSU9OOk9ubGluZQpFTkQ6VkVWRU5UCkVORDpWQ0FMRU5EQVI=",
+                        "title": "appointment-details.ics"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response",
+        "tries": 1,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"resourceType\":\"Bundle\",\"type\":\"_batch-response\",\"data\":[{\"response\":{\"status\":\"500\",\"outcome\":{\"resourceType\":\"OperationOutcome\",\"issue\":[{\"severity\":\"error\",\"code\":\"processing\",\"details\":{\"text\":\"Malformed entry: missing resource and missing meta.claims\"}}]}},\"id\":\"7a49757b-34cd-45b7-8941-f9180c67b8cb\",\"type\":\"OperationOutcome\"}]}",
+          "bodyJson": {
+            "resourceType": "Bundle",
+            "type": "_batch-response",
+            "data": [
+              {
+                "response": {
+                  "status": "500",
+                  "outcome": {
+                    "resourceType": "OperationOutcome",
+                    "issue": [
+                      {
+                        "severity": "error",
+                        "code": "processing",
+                        "details": {
+                          "text": "Malformed entry: missing resource and missing meta.claims"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "id": "<uuid>",
+                "type": "OperationOutcome"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "7. Composition",
+      "request": {
+        "method": "POST",
+        "url": "/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch",
+        "headers": {
+          "content-type": "application/didcomm-plaintext+json",
+          "authorization": "Bearer mock"
+        },
+        "body": {
+          "jti": "<jti>",
+          "thid": "composition-update-thread-id",
+          "iss": "did:web:hospital.example.com",
+          "aud": "did:web:api.acme.org",
+          "exp": "<time>",
+          "iat": "<time>",
+          "nbf": "<time>",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "type": "Composition",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "@type": "Composition:IndexEntry",
+                    "Composition.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "Composition.section": "LOINC|48765-2",
+                    "Composition.entry": "<url>",
+                    "Composition.date": "2025-11-26T10:00:00Z",
+                    "Composition.author": "did:web:hospital.example.com",
+                    "Composition.title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
+                    "Composition.type": "LOINC|60591-5"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.hl7.fhir.r4/Composition"
+                },
+                "resource": {
+                  "resourceType": "Composition",
+                  "status": "final",
+                  "subject": {
+                    "reference": "did:web:api.acme.org:individual:<unified-health-identifier>"
+                  },
+                  "date": "2025-11-26T10:00:00Z",
+                  "author": [
+                    {
+                      "reference": "did:web:hospital.example.com"
+                    }
+                  ],
+                  "title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
+                  "type": {
+                    "coding": [
+                      {
+                        "system": "<url>",
+                        "code": "60591-5"
+                      }
+                    ]
+                  },
+                  "section": [
+                    {
+                      "title": "Allergies and Intolerances",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "<url>",
+                            "code": "48765-2"
+                          }
+                        ]
+                      },
+                      "entry": [
+                        {
+                          "reference": "<url>"
+                        },
+                        {
+                          "reference": "<url>"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "submit": {
+        "status": 202,
+        "headers": {
+          "x-powered-by": "Express",
+          "access-control-allow-origin": "http://localhost:8081",
+          "vary": "Origin",
+          "access-control-expose-headers": "Location, Retry-After",
+          "location": "http://localhost:3000/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch-response",
+          "retry-after": "5"
+        },
+        "bodyText": ""
+      },
+      "poll": {
+        "url": "/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch-response",
+        "tries": 2,
+        "final": {
+          "status": 200,
+          "headers": {
+            "x-powered-by": "Express",
+            "access-control-allow-origin": "http://localhost:8081",
+            "vary": "Origin",
+            "access-control-expose-headers": "Location, Retry-After",
+            "content-type": "application/json"
+          },
+          "bodyText": "{\"resourceType\":\"Bundle\",\"type\":\"batch-response\",\"data\":[{\"type\":\"Composition\",\"response\":{\"status\":\"201\",\"location\":\"/health-care/individual/org.hl7.fhir.api/Composition/9379d10b28f6784606ed51d24cf2d99acb1ff79fc3bb7d38f8b5485e6726b0e4\"}}]}",
+          "bodyJson": {
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "data": [
+              {
+                "type": "Composition",
+                "response": {
+                  "status": "201",
+                  "location": "/health-care/individual/org.hl7.fhir.api/Composition/9379d10b28f6784606ed51d24cf2d99acb1ff79fc3bb7d38f8b5485e6726b0e4"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

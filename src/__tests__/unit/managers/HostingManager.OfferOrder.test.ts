@@ -48,6 +48,7 @@ import {
   ClaimsServiceSchemaorg,
 } from 'gdc-common-utils-ts/constants/schemaorg';
 import * as tenantUtils from '../../../utils/tenant';
+import { getEnvSectionId } from '../../../utils/section-env';
 import { testTenant1LegalName } from '../../data/organization.data';
 
 const uuidMock = {
@@ -170,7 +171,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     const provisionalDoc = (await vaultRepository.get(
       hostCollectionName,
       tenantVaultId,
-      'tenants',
+      getEnvSectionId('tenants'),
     )) as ConfidentialStorageDoc;
     expect(provisionalDoc).toBeDefined();
     expect(provisionalDoc.content).toBeDefined();
@@ -200,7 +201,8 @@ describe('HostingManager - Offer/Order Flow', () => {
     // Assert the final response
     const finalEntry = finalResponse.body.data[0];
     expect(finalEntry.response.status).toBe('201');
-    expect(finalEntry.type).toBe('Organization');
+    expect(finalEntry.type).toBe('Organization-order-response-v1.0');
+    expect(finalEntry.meta.claims['Order.acceptedOffer.identifier']).toBe(offerId);
 
     // Assert the state of the finalized tenant record in the host's vault
     const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;
@@ -211,7 +213,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     const finalDoc = (await vaultRepository.get(
       hostCollectionName,
       tenantVaultId,
-      'tenants',
+      getEnvSectionId('tenants'),
     )) as ConfidentialStorageDoc;
     expect(finalDoc).toBeDefined();
     expect(finalDoc.content).toBeDefined();
@@ -226,9 +228,15 @@ describe('HostingManager - Offer/Order Flow', () => {
     const legalParticipantDoc = await vaultRepository.get(
       tenantCollectionName,
       'legal-participant.vc.json',
-      '.well-known',
+      getEnvSectionId('.well-known'),
     );
     expect(legalParticipantDoc).toBeDefined();
+
+    const communications = await vaultRepository.getContainersInSection(
+      hostCollectionName,
+      getEnvSectionId('communications'),
+    );
+    expect(communications.length).toBeGreaterThan(0);
   });
 
   it('should return a 404 Not Found for an Order with an invalid offerId', async () => {

@@ -67,6 +67,9 @@ export class Worker {
         case 'Composition':
           manager = this.managers.compositionManager;
           break;
+        case 'DocumentReference':
+          manager = this.managers.documentReferenceManager;
+          break;
         case 'Consent':
           manager = this.managers.consentManager;
           break;
@@ -91,6 +94,14 @@ export class Worker {
           break;
         case 'License':
           manager = this.managers.licenseManager;
+          break;
+        case 'csr':
+          manager = this.managers.icaManager;
+          break;
+        case 'didcomm-plaintext':
+        case 'didcomm-signed':
+        case 'didcomm-encrypted':
+          manager = this.managers.messagingManager;
           break;
         default:
           throw new Error(`No manager configured for resourceType '${resourceType}'`);

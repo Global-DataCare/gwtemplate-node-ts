@@ -1,0 +1,23 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:test-root.unid.online",
+  "verificationMethod": [
+    {
+      "id": "did:web:test-root.unid.online#dnBtLW1XYm5SWVN1aFpSVEljZGx0TkFPRWZqLVRVWWJibmkzSE1NWDZRUQ",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:test-root.unid.online",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-384",
+        "x": "tJFDoUQ0Zar3JVmsgf0YL2u4kiaaoa7Hbo1FeuXbqBUqaGbw3Ea696LxK-RYBS5l",
+        "y": "HOPWj9_EYjB_Zylq8vjHE2G8d350h9hUD7Okvus1WSALRsugc0VrsU9Nxcn4Qy-v",
+        "kid": "dnBtLW1XYm5SWVN1aFpSVEljZGx0TkFPRWZqLVRVWWJibmkzSE1NWDZRUQ",
+        "alg": "ES384",
+        "use": "sig"
+      }
+    }
+  ],
+  "authentication": [
+    "did:web:test-root.unid.online#dnBtLW1XYm5SWVN1aFpSVEljZGx0TkFPRWZqLVRVWWJibmkzSE1NWDZRUQ"
+  ]
+}

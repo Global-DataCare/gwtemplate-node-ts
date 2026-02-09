@@ -375,7 +375,7 @@ describe('Organization Registration API', () => {
       expect(responseClaims[ClaimsOfferSchemaorg.offeredBy]).toBe('did:web:host.example.com');
     });
 
-    it('should process an Order and return the final Organization VC', async () => {
+    it('should process an Order and return a payment Communication', async () => {
       // --- ARRANGE (Phase 1: Initial Registration & Offer) ---
       const orgCreationPayload = { ...ORGANIZATION_REGISTRATION_REQUEST };
       const { thid: regThid } = orgCreationPayload;
@@ -504,11 +504,9 @@ describe('Organization Registration API', () => {
       const finalVcResponse = JSON.parse(Content.bytesToStringUTF8(decryptedVcBytes)) as IDecodedDidcommPayload;
 
       const responseEntry = finalVcResponse.body.data[0];
-      expect(responseEntry.type).toBe('Organization');
-      expect(responseEntry.resource).toBeDefined();
-      expect(responseEntry.resource!.id).toBeDefined();
+      expect(responseEntry.type).toBe('Organization-order-response-v1.0');
       expect(responseEntry.response.status).toBe('201');
-      expect(responseEntry.resource?.meta?.claims['org.schema.Organization.legalName']).toBe('Acme Organization SL');
+      expect(responseEntry.meta?.claims['Order.acceptedOffer.identifier']).toBe(offerId);
     });
   });
 });

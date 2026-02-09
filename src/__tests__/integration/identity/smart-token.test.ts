@@ -9,6 +9,8 @@ import { generateTenantCollectionNameFromClaims } from '../../../utils/tenant';
 import { initializeTenantServicesConfig } from '../../../utils/services';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getIndividualSectionId } from '../../../utils/individual-sections';
+import { startServer, resetServerConfig } from '../../../server';
+import { getEnvSectionId } from '../../../utils/section-env';
 
 describe('SMART token issuance (integration)', () => {
   it('should issue token when subject exists and rules match', async () => {
@@ -27,8 +29,7 @@ describe('SMART token issuance (integration)', () => {
     process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
 
-    jest.resetModules();
-    const { startServer } = await import('../../../server');
+    resetServerConfig();
 
     const { app, queueAdapter, tenantManager, vaultRepository, kmsService } = await startServer({ listen: false });
     try {
@@ -60,7 +61,7 @@ describe('SMART token issuance (integration)', () => {
         { id: tenantVaultId, sequence: 0, content: tenantConfig } as any,
         'host',
       );
-      await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], 'tenants');
+      await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
       await tenantManager.getTenant(tenantVaultId);
 
       // Create the individual's physical vault and rules
@@ -80,14 +81,16 @@ describe('SMART token issuance (integration)', () => {
           thid: 'smart-token-thread-id',
           iss: 'did:web:api.acme.org:employee:admin1@acme.org:ISCO-08|2211:uuid',
           aud: 'did:web:api.acme.org',
-          body: {
-            sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
-            purpose: 'TREAT',
-            scope: `patient/Composition.rs?subject=${subject}&section=LOINC|48765-2`,
-            expires_in: 60,
-          },
+        body: {
+          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
+          purpose: 'TREAT',
+          scope: `patient/Composition.rs?subject=${subject}&section=LOINC|48765-2`,
+          expires_in: 60,
+          vp_token: '---VP---',
+          acr_values: 'urn:antifraud:acr:openid4vp:employee',
         },
-      });
+      },
+    });
       expect(submitResp.status).toBe(202);
 
       // Poll for decrypted response

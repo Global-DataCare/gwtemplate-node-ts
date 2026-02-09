@@ -6,7 +6,7 @@
       "x": "drb-vUY94Zt9UFzbKIdgVDpjx2kG8z8-tRVPuYywd5lK06ISVy2yOWHuCQ-thGGe",
       "y": "1PzmKsfyxh33fpWLfhSwWSYm4w1eUGgbUwJlQNu_v0UsOaVKDlhnxesHUN0Fi1fY",
       "kid": "Qy02b1drVGxiYTlmaG45M2lGaDZ1a1c1TlNnTDNCTWhUUjgxRDVQYW04MA",
-      "alg": "ES256",
+      "alg": "ES384",
       "use": "sig"
     }
   ]

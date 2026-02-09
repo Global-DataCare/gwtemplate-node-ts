@@ -4,6 +4,7 @@
 import { IVaultRepository } from './vault.repository';
 import { RecordBase, VaultConfig } from 'gdc-common-utils-ts/models/resource-document';
 import { InMemoryVault } from '../../../gdc-backend-utils-node/models/repository';
+import { getEnvSectionId } from '../../../utils/section-env';
 
 /**
  * An in-memory implementation of the Vault Repository.
@@ -59,7 +60,7 @@ export class VaultMemRepository implements IVaultRepository {
       return false;
     }
     const hostVault = this.dataVaults.get(this.hostCollectionName);
-    const tenantsSection = hostVault?.sections.get('tenants');
+    const tenantsSection = hostVault?.sections.get(getEnvSectionId('tenants'));
     return tenantsSection?.has(vaultId) ?? false;
   }
 

@@ -15,6 +15,7 @@ import { FAMILY_ORDER_REQUEST, FAMILY_REGISTRATION_REQUEST } from '../../data/ex
 import * as tenantUtils from '../../../utils/tenant';
 import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
+import { getEnvSectionId } from '../../../utils/section-env';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -213,6 +214,16 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const finalPayload = await familyManager.process(familyOrderJob);
     const entry = finalPayload.body.data[0];
     expect(entry.response.status).toBe('201');
-    expect(entry.type).toBe('Organization');
+    expect(entry.type).toBe('Family-order-response-v1.0');
+    expect(entry.meta.claims['Order.acceptedOffer.identifier']).toBe(offerId);
+
+    const tenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, tenantId);
+    const tenantCollectionName = await tenantsCacheManager.getCollectionName(tenantVaultId);
+    expect(tenantCollectionName).toBeDefined();
+    const communications = await vaultRepository.getContainersInSection(
+      tenantCollectionName!,
+      getEnvSectionId('communications'),
+    );
+    expect(communications.length).toBeGreaterThan(0);
   });
 });

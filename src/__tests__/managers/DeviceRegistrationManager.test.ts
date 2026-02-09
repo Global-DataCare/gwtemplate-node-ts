@@ -9,6 +9,7 @@ import { DCR_REGISTRATION_JOB } from '../data/example-jobs';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { mockKmsService } from '../mocks/kms.mock';
 import { getTenantVaultId } from '../../utils/tenant';
+import { getEnvSectionId } from '../../utils/section-env';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 
@@ -52,7 +53,7 @@ describe('DeviceRegistrationManager', () => {
         sequence: 0,
         content: license,
       };
-      await vaultRepository.put(vaultId, [licenseDoc], 'device-licenses');
+      await vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
 
       // Act
       const result = await manager.process(job);
@@ -71,7 +72,7 @@ describe('DeviceRegistrationManager', () => {
       const deviceProfileDoc = await vaultRepository.get<ConfidentialStorageDoc>(
         vaultId,
         resource.client_id,
-        'device-profiles'
+        getEnvSectionId('device-profiles')
       );
       expect(deviceProfileDoc).toBeDefined();
       expect(deviceProfileDoc?.jwe).toBeDefined();
@@ -79,7 +80,7 @@ describe('DeviceRegistrationManager', () => {
       const updatedLicense = await vaultRepository.get<ConfidentialStorageDoc>(
         vaultId,
         license.id,
-        'device-licenses'
+        getEnvSectionId('device-licenses')
       );
       const updatedContent = (updatedLicense?.content || {}) as DeviceLicense;
       expect(updatedContent.deviceId).toBe(resource.client_id);

@@ -22,11 +22,13 @@ import { createOperationOutcome } from '../utils/outcome';
 import { determineResourceId } from '../utils/resource';
 import { getTenantVaultId } from '../utils/tenant';
 import { generateLicenseOffer } from '../utils/offer';
+import { getEnvSectionId } from '../utils/section-env';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
+import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 
 type FamilyRegistrationContent = {
   status: EntityLifecycleStatus;
@@ -156,7 +158,7 @@ export class FamilyManager {
     };
 
     const secureDoc = await this.kmsService.protectConfidentialData(registrationDoc, tenantVaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureDoc], 'families');
+    await this.vaultRepository.put(tenantCollectionName, [secureDoc], getEnvSectionId('families'));
 
     return {
       type: 'Family-registration-offer-v1.0',
@@ -192,7 +194,7 @@ export class FamilyManager {
     }
 
     const results = await this.vaultRepository.query(tenantCollectionName, {
-      sectionId: 'families',
+      sectionId: getEnvSectionId('families'),
       where: [{ name: ClaimsOfferSchemaorg.identifier, value: offerId }],
     });
 
@@ -223,7 +225,7 @@ export class FamilyManager {
       content: finalizedContent,
     };
     const secureUpdatedDoc = await this.kmsService.protectConfidentialData(updatedDoc, tenantVaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], 'families');
+    await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], getEnvSectionId('families'));
 
     // Create individual (family member) license seats purchased via the family registration Offer and auto-issue one for the controller.
     const familySeats = finalizedContent.claims[ClaimsOfferSchemaorg.eligibleQuantityValue] as number | undefined;
@@ -251,7 +253,7 @@ export class FamilyManager {
         } as any;
         licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
       }
-      await this.vaultRepository.put(tenantVaultId, licenseDocs, 'device-licenses');
+      await this.vaultRepository.put(tenantVaultId, licenseDocs, getEnvSectionId('device-licenses'));
 
       const controllerEmail = finalizedContent.claims[ClaimsPersonSchemaorg.email] as string | undefined;
       const controllerRole =
@@ -275,10 +277,41 @@ export class FamilyManager {
       }
     }
 
+    const tenantDid = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
+    if (!tenantDid) {
+      throw new ManagerError(`Tenant DID not found for '${tenantVaultId}'`, IssueType.NotFound);
+    }
+    const recipientDid = job.content?.iss || tenantDid;
+    const paymentContext = {
+      offerId,
+      tenantId,
+      tenantDid: recipientDid,
+      senderDid: tenantDid,
+      email: finalizedContent.claims[ClaimsPersonSchemaorg.email] as string | undefined,
+      legalName: finalizedContent.claims[ClaimsOrganizationSchemaorg.legalName] as string | undefined,
+      addressCountry: finalizedContent.claims[ClaimsOrganizationSchemaorg.addressCountry] as string | undefined,
+      addressRegion: finalizedContent.claims[ClaimsOrganizationSchemaorg.addressRegion] as string | undefined,
+      addressLocality: finalizedContent.claims[ClaimsOrganizationSchemaorg.addressLocality] as string | undefined,
+      postalCode: finalizedContent.claims[ClaimsOrganizationSchemaorg.postalCode] as string | undefined,
+      streetAddress: finalizedContent.claims[ClaimsOrganizationSchemaorg.streetAddress] as string | undefined,
+      activationCode: (finalizedContent.claims as any)['org.schema.IndividualProduct.serialNumber'] as string | undefined,
+      activationCategory: (finalizedContent.claims as any)['org.schema.IndividualProduct.category'] as string | undefined,
+      ...readOfferPaymentContext(finalizedContent.claims),
+    };
+    const paymentCommunication = await buildPaymentCommunication(paymentContext);
+
+    const communicationDoc: ConfidentialStorageDoc = {
+      id: paymentCommunication.communicationId,
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      content: { claims: paymentCommunication.claims },
+    };
+    const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, tenantVaultId);
+    await this.vaultRepository.put(tenantCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
+
     return {
-      type: 'Organization',
-      meta: { claims: finalizedContent.claims },
-      resource: { resourceType: 'Organization', id: updatedDoc.id },
+      type: 'Family-order-response-v1.0',
+      meta: { claims: paymentCommunication.claims },
       response: { status: '201' },
     };
   }

@@ -21,6 +21,7 @@ docs/
 
 - **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
 - **Docs QA (Flow Report)**: `artifacts/api-integrators-guide.flow-report.json` is generated via `npm run docs:flow-report` and captures the onboarding journey requests/responses.
+- **Flow Coverage Note**: `docs:flow-report` also validates ICA status messaging for the legal representative (`/_messages` and `/_get`). If ICA connectivity is not configured, the report records that check as informational.
 
 ### 📂 01-OVERVIEW-AND-GUIDES
 *   **[01.A-ARCHITECTURE-OVERVIEW.md](01-OVERVIEW-AND-GUIDES/01.A-ARCHITECTURE-OVERVIEW.md)**: **(START HERE)** The main document outlining the core architectural patterns, data flows, and principles.
@@ -37,6 +38,7 @@ docs/
 *   **[02.B-ROUTING.md](02-API-AND-ENDPOINTS/02.B-ROUTING.md)**: Explanation of how API requests are routed to the appropriate controllers.
 *   **[02.C-CURL-TESTS.md](02-API-AND-ENDPOINTS/02.C-CURL-TESTS.md)**: A collection of `curl` commands for manual API testing.
 *   **[02.D-USE-CASE-CURL-EXAMPLES.md](02-API-AND-ENDPOINTS/02.D-USE-CASE-CURL-EXAMPLES.md)**: `curl` commands organized by specific use cases.
+*   **[02.E-DATASPACE-DID-SERVICES.md](02-API-AND-ENDPOINTS/02.E-DATASPACE-DID-SERVICES.md)**: DSP/DCP DID `service` publication profile and conformance targets.
 
 ### 📂 03-IDENTITY-AND-TRUST
 *   **[03.A-CUSTOMER-IDENTITY-MODEL.md](03-IDENTITY-AND-TRUST/03.A-CUSTOMER-IDENTITY-MODEL.md)**: Describes the data model for representing user and organization identities.
@@ -56,6 +58,7 @@ docs/
 *   **[04.F-PERSISTENCE-PATTERNS.md](04-DEEP-DIVES/04.F-PERSISTENCE-PATTERNS.md)**: Describes patterns for data persistence and storage.
 *   **[04.G-CONVERSATIONAL-AI-ANONYMIZATION-PIPELINE.md](04-DEEP-DIVES/04.G-CONVERSATIONAL-AI-ANONYMIZATION-PIPELINE.md)**: Design for conversation storage, anonymization, and derivation of Observations with ledger-safe tags.
 *   **[04.H-DATASPACE-PUBLICATION-ATTESTATION.md](04-DEEP-DIVES/04.H-DATASPACE-PUBLICATION-ATTESTATION.md)**: Clarifies what is published by link vs anchored on-ledger (hashes/tags), and how attestation/provenance fits.
+*   **[04.I-FABRIC-MULTICLOUD-BLUEPRINT.md](04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md)**: Multi-cloud Fabric deployment plan and channel governance.
 
 ### 📂 scenarios
 *   **[appointment-notification-flow.md](scenarios/appointment-notification-flow.md)**: E2E description of an appointment notification use case.

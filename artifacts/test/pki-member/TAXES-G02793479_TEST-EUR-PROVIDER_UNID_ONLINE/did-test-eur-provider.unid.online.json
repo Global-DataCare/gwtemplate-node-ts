@@ -1,0 +1,23 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:test-eur-provider.unid.online",
+  "verificationMethod": [
+    {
+      "id": "did:web:test-eur-provider.unid.online#dWszY0Jyek5fNUJHbEZGYkh3U2xJQU5PMmFDSk1BUFJ2UHI2WGFhMFJhZw",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:test-eur-provider.unid.online",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-384",
+        "x": "qidlA2YSnj-YCdvAdfSn5jDLlLzyaZVR1iuy_XvBRsdqJHsiE7ZqArRRwwCn0yi6",
+        "y": "8c2-edoB89sEeB-IEqCKr2AOnAUFu8t_d6R7fh98y9nUGbpKV8VlmhN0K_mBNmou",
+        "kid": "dWszY0Jyek5fNUJHbEZGYkh3U2xJQU5PMmFDSk1BUFJ2UHI2WGFhMFJhZw",
+        "alg": "ES384",
+        "use": "sig"
+      }
+    }
+  ],
+  "authentication": [
+    "did:web:test-eur-provider.unid.online#dWszY0Jyek5fNUJHbEZGYkh3U2xJQU5PMmFDSk1BUFJ2UHI2WGFhMFJhZw"
+  ]
+}

@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { normalizeInteroperableClaims } from '../utils/claims';
 import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
+import { getEnvSectionId } from '../utils/section-env';
 
 export interface ListInput {
   vaultId: string; // The patient's vault where this List will be stored
@@ -40,13 +41,13 @@ export class ListManager {
       },
     };
 
-    await this.vaultRepository.put(input.vaultId, [listDocument], 'lists');
+    await this.vaultRepository.put(input.vaultId, [listDocument], getEnvSectionId('lists'));
 
     return listDocument;
   }
 
   async addGroup(listId: string, listVaultId: string, groupReference: Record<string, any>): Promise<any> {
-    const list = await this.vaultRepository.get<any>(listVaultId, listId, 'lists');
+    const list = await this.vaultRepository.get<any>(listVaultId, listId, getEnvSectionId('lists'));
 
     if (!list) {
       throw new Error(`List with id ${listId} not found in vault ${listVaultId}.`);
@@ -61,7 +62,7 @@ export class ListManager {
       date: new Date().toISOString(),
     });
 
-    await this.vaultRepository.put(listVaultId, [list], 'lists');
+    await this.vaultRepository.put(listVaultId, [list], getEnvSectionId('lists'));
     
     return list;
   }

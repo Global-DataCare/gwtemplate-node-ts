@@ -33,10 +33,13 @@ export interface ManagerRegistry {
   individualManager?: IJobProcessor;
   consentManager?: IJobProcessor;
   compositionManager?: IJobProcessor;
+  documentReferenceManager?: IJobProcessor;
   communicationManager?: IJobProcessor;
   deviceRegistrationManager?: IJobProcessor;
   licenseManager?: IJobProcessor;
   openIdAuthManager?: IJobProcessor;
+  icaManager?: IJobProcessor;
+  messagingManager?: IJobProcessor;
   // groupManager?: IJobProcessor;
   // listManager?: IJobProcessor;
 }

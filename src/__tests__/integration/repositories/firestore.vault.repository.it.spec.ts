@@ -1,6 +1,7 @@
 import { RulesTestEnvironment, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { FirestoreVaultRepository } from '../../../database/repositories/firestore/firestore.vault.repository';
+import { getEnvSectionId } from '../../../utils/section-env';
 
 // A realistic test document that simulates a document with HMAC'd indexed attributes.
 const TEST_CONFIDENTIAL_DOC: ConfidentialStorageDoc = {
@@ -56,7 +57,7 @@ describe('FirestoreVaultRepository (Integration)', () => {
   describe('put and get operations', () => {
     it('should put a ConfidentialStorageDoc into a specific section and get it back by id', async () => {
       // Arrange
-      const sectionId = 'employees';
+      const sectionId = getEnvSectionId('employees');
 
       // Act
       await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC], sectionId);
@@ -88,7 +89,7 @@ describe('FirestoreVaultRepository (Integration)', () => {
   describe('query operations', () => {
     it('should find a document by a unique indexed attribute using the query method', async () => {
       // Arrange
-      const sectionId = 'employees';
+      const sectionId = getEnvSectionId('employees');
       await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC], sectionId);
       const queryObj = {
         section: sectionId,
@@ -111,7 +112,7 @@ describe('FirestoreVaultRepository (Integration)', () => {
 
     it('should return an empty array if no document matches the query', async () => {
       // Arrange
-      const sectionId = 'employees';
+      const sectionId = getEnvSectionId('employees');
       await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC], sectionId);
       const queryObj = {
         section: sectionId,
@@ -132,7 +133,7 @@ describe('FirestoreVaultRepository (Integration)', () => {
 
     it('should find multiple documents by a non-unique indexed attribute using the query method', async () => {
       // Arrange
-      const sectionId = 'employees';
+      const sectionId = getEnvSectionId('employees');
       const anotherAdminDoc: ConfidentialStorageDoc = {
         ...TEST_CONFIDENTIAL_DOC,
         id: 'doc-2',

@@ -4,6 +4,7 @@
 import { invokeExpress } from './helpers/invokeExpress';
 import { CredentialLedgerAdapterMem } from '../../adapters/CredentialLedgerAdapterMem';
 import { CredentialLedgerResolver } from '../../adapters/credential-ledger-resolver';
+import { startServer, resetServerConfig } from '../../server';
 
 describe('Credential ledger endpoints (demo, mem)', () => {
   it('should return sync and async status/history from the ledger', async () => {
@@ -22,8 +23,7 @@ describe('Credential ledger endpoints (demo, mem)', () => {
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
     process.env.ORG_HOST_TERMS_URL = 'https://example.org/terms.pdf';
 
-    jest.resetModules();
-    const { startServer } = await import('../../server');
+    resetServerConfig();
 
     const network = 'test';
     const { app, queueAdapter, credentialLedgerAdapter } = await startServer({ listen: false });

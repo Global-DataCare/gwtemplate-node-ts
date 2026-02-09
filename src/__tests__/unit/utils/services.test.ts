@@ -59,7 +59,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServicesConfig(tenantConfig.provider!.service.sectorCategory as Sector);
 
       // ASSERT
-      expect(services).toHaveLength(10); // 2 business + 2 network + 6 identity (OIDC/Firebase + License/_issue + Device/_search)
+      expect(services).toHaveLength(14); // + messaging + DSP/DCP discovery explicit services
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -70,6 +70,21 @@ describe('Service Initialization Utilities', () => {
       expect(individualService).toBeDefined();
       expect(individualService!.serviceEndpoint).toContain('Person');
       expect(individualService!.serviceEndpoint).not.toContain('Patient');
+
+      const messagingService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'messaging' &&
+          (s as any).selector?.format === 'post-quantum',
+      );
+      expect(messagingService).toBeDefined();
+      expect(messagingService!.serviceEndpoint).toContain('didcomm-plaintext');
+
+      const dataService = services.find((s: DidService) => s.type === 'DataService');
+      const catalogService = services.find((s: DidService) => s.type === 'CatalogService');
+      const issuerService = services.find((s: DidService) => s.type === 'IssuerService');
+      expect(dataService).toBeDefined();
+      expect(catalogService).toBeDefined();
+      expect(issuerService).toBeDefined();
     });
 
     it('should ADD FHIR resources for a FHIR-enabled tenant', () => {
@@ -80,7 +95,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServicesConfig(tenantConfig.provider!.service.sectorCategory as Sector);
       
       // ASSERT
-      expect(services).toHaveLength(12); // + org.hl7.fhir.* individual services + License/_issue + Device/_search identity endpoints
+      expect(services).toHaveLength(16); // + FHIR R4/API + messaging + DSP/DCP discovery explicit services
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -91,6 +106,14 @@ describe('Service Initialization Utilities', () => {
       expect(individualService).toBeDefined();
       expect(individualService!.serviceEndpoint).toContain('Person');
       expect(individualService!.serviceEndpoint).toContain('Patient');
+
+      const fhirR4Service = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'individual' &&
+          (s as any).selector?.format === 'org.hl7.fhir.r4',
+      );
+      expect(fhirR4Service).toBeDefined();
+      expect(fhirR4Service!.serviceEndpoint).toContain('DocumentReference');
     });
 
     it('should not include standard discovery endpoints', () => {

@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { normalizeInteroperableClaims } from '../utils/claims';
 import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
+import { getEnvSectionId } from '../utils/section-env';
 
 export interface GroupInput {
   vaultId: string; // The vault where this group definition will be stored
@@ -39,7 +40,7 @@ export class GroupManager {
       }
     };
 
-    await this.vaultRepository.put(input.vaultId, [groupDocument], 'groups');
+    await this.vaultRepository.put(input.vaultId, [groupDocument], getEnvSectionId('groups'));
 
     return groupDocument;
   }

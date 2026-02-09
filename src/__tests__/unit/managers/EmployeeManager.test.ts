@@ -15,6 +15,7 @@ import type { TenantsCacheManager } from '../../../managers/TenantsCacheManager'
 import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
 import { normalizeCodeSystemAndValue } from '../../../utils/normalize-codeAndSystem';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { getEnvSectionId } from '../../../utils/section-env';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -176,7 +177,7 @@ describe('EmployeeManager', () => {
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(2);
       const consumeCall = mockVaultRepository.put.mock.calls[0];
       expect(consumeCall[0]).toBe(TENANT_VAULT_ID);
-      expect(consumeCall[2]).toBe('device-licenses');
+      expect(consumeCall[2]).toBe(getEnvSectionId('device-licenses'));
 
       expect(response.body.data[0].response.status).toBe('201');
     });

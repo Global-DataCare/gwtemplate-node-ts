@@ -21,6 +21,7 @@ import { AppAuthorizationManager } from '../src/managers/AppAuthorizationManager
 import { testConsentRulePermitOrgDid } from '../src/__tests__/data/consent-rules.data';
 import { getTenantVaultId } from '../src/utils/tenant';
 import { getIndividualSectionId } from '../src/utils/individual-sections';
+import { getEnvSectionId } from '../src/utils/section-env';
 import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { resolveHostRegistrySector } from '../src/utils/services';
 
@@ -214,6 +215,67 @@ async function main() {
     const tenantVaultId = getTenantVaultId('health-care', 'acme');
     await tenantManager.getTenant(tenantVaultId);
 
+    // --- 1.3 ICA status message (legal representative) ---
+    {
+      const req = {
+        method: 'POST',
+        url: '/acme/cds-ES/v1/health-care/messaging/post-quantum/didcomm-plaintext/_messages',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo' },
+        body: { thid: 'thid-ica-status-messages' },
+      };
+      const { submit, poll } = await submitAndMaybePoll(app, req);
+      report.steps.push({ name: '1.3 ICA Status Messages (list)', request: req, submit, ...(poll ? { poll } : {}) });
+    }
+
+    try {
+      const messagingDocs = await vaultRepository.getContainersInSection<any>(
+        tenantVaultId,
+        getEnvSectionId('messaging'),
+      );
+
+      let icaMessageId: string | undefined;
+      for (const secureDoc of messagingDocs) {
+        try {
+          const content = await kmsService.unprotectConfidentialData<any>(secureDoc, tenantVaultId);
+          if (content?.type === 'IcaEnrollResponse-v1.0' && typeof secureDoc?.id === 'string') {
+            icaMessageId = secureDoc.id;
+            break;
+          }
+        } catch {
+          // Ignore unrelated or malformed docs while searching for ICA status message.
+        }
+      }
+
+      if (icaMessageId) {
+        const req = {
+          method: 'POST',
+          url: '/acme/cds-ES/v1/health-care/messaging/post-quantum/didcomm-plaintext/_get',
+          headers: { 'content-type': 'application/json', authorization: 'Bearer demo' },
+          body: { id: icaMessageId },
+        };
+        const { submit, poll } = await submitAndMaybePoll(app, req);
+        report.steps.push({ name: '1.3 ICA Status Message (get)', request: req, submit, ...(poll ? { poll } : {}) });
+      } else {
+        report.steps.push({
+          name: '1.3 ICA Status Message (get)',
+          request: { method: 'LOCAL', url: 'vault search: IcaEnrollResponse-v1.0' },
+          submit: {
+            status: 204,
+            headers: {},
+            bodyText: JSON.stringify({
+              info: 'ICA status message not available. Set ICA_EXTERNAL_DOMAIN (and ICA endpoint) to validate automatic ICA message persistence.',
+            }),
+          },
+        });
+      }
+    } catch (e: any) {
+      report.steps.push({
+        name: '1.3 ICA Status Message (get)',
+        request: { method: 'LOCAL', url: 'vault search: IcaEnrollResponse-v1.0' },
+        submit: { status: 500, headers: {}, bodyText: JSON.stringify({ error: String(e?.message || e) }) },
+      });
+    }
+
     // --- 2.1.1 Firebase custom token (optional; likely fails without real eIDAS) ---
     {
       const req = {
@@ -266,7 +328,7 @@ async function main() {
           },
         } as any,
       ],
-      'device-licenses',
+      getEnvSectionId('device-licenses'),
     );
 
     {

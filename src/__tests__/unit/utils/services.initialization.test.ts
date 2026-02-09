@@ -20,5 +20,14 @@ describe('initializeTenantServicesConfig', () => {
     expect(enrollmentService?.type).toBe('NetworkEnrollmentService');
     expect(enrollmentService?.serviceEndpoint).toBe('Action');
     expect(enrollmentService?.actions).toEqual(['_batch']);
+
+    const messagingService = services.find(
+      (s) =>
+        s.selector?.section === 'messaging' &&
+        s.selector?.format === 'post-quantum' &&
+        s.actions?.includes('_messages') &&
+        s.actions?.includes('_get'),
+    );
+    expect(messagingService).toBeDefined();
   });
 });

@@ -11,6 +11,7 @@ import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { getTenantVaultId } from '../utils/tenant';
 import { Content } from 'gdc-common-utils-ts/utils/content';
+import { getEnvSectionId } from '../utils/section-env';
 
 /**
  * Manages application-specific authorization logic, such as validating tokens and codes.
@@ -70,7 +71,7 @@ export class AppAuthorizationManager {
     let licenseDocs: ConfidentialStorageDoc[] = [];
     try {
       licenseDocs = (await this.vaultRepository.query(vaultId, {
-        sectionId: 'device-licenses',
+        sectionId: getEnvSectionId('device-licenses'),
         where: [{ name: protectedName, value: protectedValue }],
       })) as unknown as ConfidentialStorageDoc[];
     } catch {
@@ -80,7 +81,7 @@ export class AppAuthorizationManager {
 
     if (!licenseDocs || licenseDocs.length === 0) {
       // Fallback scan (works for in-memory/dev repositories).
-      const all = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(vaultId, 'device-licenses');
+      const all = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(vaultId, getEnvSectionId('device-licenses'));
       licenseDocs = all.filter((doc) => (doc.content as any)?.activationCode === code);
     }
 
@@ -106,7 +107,7 @@ export class AppAuthorizationManager {
     license.status = 'active';
     license.activatedAt = now;
     licenseDoc.sequence++;
-    await this.vaultRepository.put(vaultId, [licenseDoc], 'device-licenses');
+    await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
 
     return { valid: true, license };
   }

@@ -166,7 +166,7 @@ export async function generatePkiChainFromEnv(options?: PkiChainOptions): Promis
   // Root CA
   const rootKeyPair = await deriveKeyPair(rootCA.seed as string, LEGACY_CURVE);
   const rootKey = await crypto.subtle.importKey('jwk', rootKeyPair.jwk, { name: 'ECDSA', namedCurve: LEGACY_CURVE }, true, ['sign']);
-  const rootCert = await createCertificate(rootCA.subjectCN, rootCA.subjectCN, rootKey, rootKey, rootKeyPair.pub, 10, rootCA.legalRegistrationNumber, LEGACY_CURVE);
+  const rootCert = await createCertificate(rootCA.subjectCN, rootCA.subjectCN, rootKey, rootKey, rootKeyPair.pub, 10, rootCA.legalRegistrationNumber, LEGACY_CURVE, true);
 
   writeFileSync('fabric-ca-server-root/ca-cert.pem', bufferToPem(rootCert, 'CERTIFICATE'));
   writeFileSync('fabric-ca-server-root/ca-key.pem', bufferToPem(Buffer.from(await crypto.subtle.exportKey('pkcs8', rootKey)), 'PRIVATE KEY'));
@@ -181,7 +181,7 @@ export async function generatePkiChainFromEnv(options?: PkiChainOptions): Promis
   // ICA
   const icaKeyPair = await deriveKeyPair(ica.seed as string, LEGACY_CURVE);
   const icaKey = await crypto.subtle.importKey('jwk', icaKeyPair.jwk, { name: 'ECDSA', namedCurve: LEGACY_CURVE }, true, ['sign']);
-  const icaCert = await createCertificate(ica.subjectCN, rootCA.subjectCN, icaKey, rootKey, icaKeyPair.pub, 5, ica.legalRegistrationNumber, LEGACY_CURVE);
+  const icaCert = await createCertificate(ica.subjectCN, rootCA.subjectCN, icaKey, rootKey, icaKeyPair.pub, 5, ica.legalRegistrationNumber, LEGACY_CURVE, true);
 
   writeFileSync('fabric-ca-server-ica/ca-cert.pem', bufferToPem(icaCert, 'CERTIFICATE'));
   writeFileSync('fabric-ca-server-ica/ca-key.pem', bufferToPem(Buffer.from(await crypto.subtle.exportKey('pkcs8', icaKey)), 'PRIVATE KEY'));
@@ -197,7 +197,7 @@ export async function generatePkiChainFromEnv(options?: PkiChainOptions): Promis
   // Host / MSP
   const hostKeyPair = await deriveKeyPair(hostCert.seed as string, LEGACY_CURVE);
   const hostKey = await crypto.subtle.importKey('jwk', hostKeyPair.jwk, { name: 'ECDSA', namedCurve: LEGACY_CURVE }, true, ['sign']);
-  const hostCertBuffer = await createCertificate(hostCert.subjectCN, ica.subjectCN, hostKey, icaKey, hostKeyPair.pub, 2, hostCert.legalRegistrationNumber, LEGACY_CURVE);
+  const hostCertBuffer = await createCertificate(hostCert.subjectCN, ica.subjectCN, hostKey, icaKey, hostKeyPair.pub, 2, hostCert.legalRegistrationNumber, LEGACY_CURVE, false);
 
   const hostMspId = generateMSPID(hostCert);
   const hostOut = resolveOutputDir(`full-pki-chain-msp-${hostMspId}`);

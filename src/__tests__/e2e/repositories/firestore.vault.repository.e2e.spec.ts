@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { FirestoreVaultRepository } from '../../../database/repositories/firestore/firestore.vault.repository';
+import { getEnvSectionId } from '../../../utils/section-env';
 
 // IMPORTANT: This E2E test is configured via the .env.test file.
 // See TESTING-FIRESTORE.md for instructions.
@@ -46,9 +47,9 @@ describeIfConfigured('FirestoreVaultRepository (E2E)', () => {
   afterAll(async () => {
     const db = admin.firestore();
     // Clean up the test document from the test vault itself
-    await db.collection(vaultId).doc('employees').collection('documents').doc(TEST_CONFIDENTIAL_DOC.id).delete().catch(() => {});
+    await db.collection(vaultId).doc(getEnvSectionId('employees')).collection('documents').doc(TEST_CONFIDENTIAL_DOC.id).delete().catch(() => {});
     // Clean up the vault registration document from the host's collection
-    await db.collection('host').doc('tenants').collection('documents').doc(vaultId).delete().catch(() => {});
+    await db.collection('host').doc(getEnvSectionId('tenants')).collection('documents').doc(vaultId).delete().catch(() => {});
 
     const app = admin.apps[0];
     if (app) {
@@ -60,7 +61,7 @@ describeIfConfigured('FirestoreVaultRepository (E2E)', () => {
   beforeEach(async () => {
     const db = admin.firestore();
     const vaultRegDoc = { id: vaultId, registered: new Date().toISOString() };
-    await db.collection('host').doc('tenants').collection('documents').doc(vaultId).set(vaultRegDoc);
+    await db.collection('host').doc(getEnvSectionId('tenants')).collection('documents').doc(vaultId).set(vaultRegDoc);
   }, 10000);
 
   describe('vaultExists', () => {
@@ -74,7 +75,7 @@ describeIfConfigured('FirestoreVaultRepository (E2E)', () => {
 
   describe('put and get operations', () => {
     it('should put a document and get it back by id', async () => {
-      const sectionId = 'employees';
+      const sectionId = getEnvSectionId('employees');
       await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC], sectionId);
       const retrieved = await repository.get(vaultId, TEST_CONFIDENTIAL_DOC.id, sectionId);
       expect(retrieved).toEqual(expect.objectContaining({ id: 'e2e-doc-1' }));
@@ -83,7 +84,7 @@ describeIfConfigured('FirestoreVaultRepository (E2E)', () => {
 
   describe('query operations', () => {
     it('should find a document by a unique indexed attribute', async () => {
-      const sectionId = 'employees';
+      const sectionId = getEnvSectionId('employees');
       await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC], sectionId);
       
       const queryObj = {

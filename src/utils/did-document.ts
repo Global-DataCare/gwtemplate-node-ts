@@ -76,8 +76,22 @@ export function populateDidDocumentServices(
       }
     }
 
+    // Explicit service entries (no selector/actions multiplexing):
+    // keep the provided type and resolve endpoint as absolute URL or path relative to tenant base URL.
     if (!section || !format) {
-      return [];
+      const rawEndpoint = String(configService.serviceEndpoint || '').trim();
+      if (!rawEndpoint) return [];
+      let resolvedEndpoint = rawEndpoint;
+      if (!/^https?:\/\//i.test(rawEndpoint)) {
+        const relativePath = rawEndpoint.startsWith('/') ? rawEndpoint : `/${rawEndpoint}`;
+        resolvedEndpoint = `${wellKnownBaseUrl}${relativePath}`;
+      }
+      const serviceId = String(configService.id || '').startsWith('#') ? `${did}${configService.id}` : String(configService.id || `${did}#service`);
+      return [{
+        id: serviceId,
+        type: configService.type,
+        serviceEndpoint: resolvedEndpoint,
+      }];
     }
 
     const resourceTypes = (configService.serviceEndpoint as string).split(',').map((s) => s.trim()).filter(Boolean);

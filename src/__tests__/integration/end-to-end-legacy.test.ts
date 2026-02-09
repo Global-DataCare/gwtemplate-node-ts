@@ -48,6 +48,7 @@ import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node
 import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
 import { StorageMemAdapter } from '../../database/storage/mem.storage.adapter';
 import { ConsoleLogger } from '../../loggers/ConsoleLogger';
+import { getEnvSectionId } from '../../utils/section-env';
 import { IServerConfig } from '../../config';
 import { IAuthorizationManager } from '../../managers/auth/IAuthorizationManager';
 import { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
@@ -201,7 +202,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     const vaultId = getTenantVaultId(claims[ClaimsServiceSchemaorg.category], claims['org.schema.Organization.alternateName']);
     const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
 
-    const secureTenantRecord = await vaultRepository.get<any>(hostCollectionName, vaultId, 'tenants');
+    const secureTenantRecord = await vaultRepository.get<any>(hostCollectionName, vaultId, getEnvSectionId('tenants'));
     expect(secureTenantRecord).toBeDefined();
 
     const decryptedProvisional = await kmsService.unprotectConfidentialData<any>(secureTenantRecord, 'host');

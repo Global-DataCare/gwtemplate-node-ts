@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configtxgen
+spec:
+  restartPolicy: Never
+  containers:
+    - name: configtxgen
+      image: ubuntu:24.04
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: configtx
+          mountPath: /configtx
+        - name: channel-artifacts
+          mountPath: /channel-artifacts
+        - name: admin
+          mountPath: /admin
+        - name: tools
+          mountPath: /tools
+        - name: orderer-tls-cert
+          mountPath: /certs
+  volumes:
+    - name: configtx
+      configMap:
+        name: configtx
+    - name: channel-artifacts
+      emptyDir: {}
+    - name: admin
+      emptyDir: {}
+    - name: tools
+      emptyDir: {}
+    - name: orderer-tls-cert
+      configMap:
+        name: orderer-tls-cert

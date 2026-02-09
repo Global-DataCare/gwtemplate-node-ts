@@ -203,7 +203,7 @@ export const ORGANIZATION_ORDER_REQUEST = {
 
 /**
  * @see API_INTEGRATORS_GUIDE.md section 6.2
- * Response to a successful order request, containing the payment URL.
+ * Response to a successful order request, containing the payment communication bundle.
  */
 export const ORGANIZATION_ORDER_RESPONSE = {
   "jti": "org-order-response-id",
@@ -215,7 +215,29 @@ export const ORGANIZATION_ORDER_RESPONSE = {
   "nbf": 1678886400,
   "type": "application/json",
   "body": {
-    "url": "<payment-url>"
+    "resourceType": "Bundle",
+    "type": "batch-response",
+    "total": 1,
+    "data": [
+      {
+        "type": "Organization-order-response-v1.0",
+        "meta": {
+          "claims": {
+            "@context": "org.schema",
+            "@type": "Order:Invoice",
+            "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>",
+            "Order.partOfInvoice": "<invoice-id-or-url>",
+            "Order.paymentMethod": "Stripe",
+            "Order.paymentDueDate": "2025-10-22T14:30:00Z",
+            "Order.paymentUrl": "<payment-url>",
+            "Order.invoiceIssuedAt": "2025-10-15T14:30:00Z",
+            "Order.activationCode": "lic-activation-code-001",
+            "Order.activationCategory": "professional"
+          }
+        },
+        "response": { "status": "201" }
+      }
+    ]
   }
 };
 
@@ -351,6 +373,23 @@ export const SMART_TOKEN_REQUEST = {
   "nbf": 1678886400,
   "type": "application/json",
   "body": {
+    "client_id": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+    "redirect_uri": "https://app.acme.org/callback",
+    "code_challenge": "b2MtY2hhbGxlbmdlLWJhc2U2NA",
+    "code_challenge_method": "S256",
+    "acr_values": "urn:antifraud:acr:openid4vp:employee",
+    "vp_token": "<vp-jws-or-jsonld>",
+    "presentation_submission": {
+      "id": "ps-001",
+      "definition_id": "pd-001",
+      "descriptor_map": [
+        {
+          "id": "vp-credential",
+          "format": "jwt_vp",
+          "path": "$.vp_token"
+        }
+      ]
+    },
     "expires_in": 300,
     "token_type": "Bearer",
     "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",

@@ -31,8 +31,12 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
     examples.ORGANIZATION_REGISTRATION_REQUEST;
   swaggerDefinition.components.examples.OrganizationOrderPlaintextMessage.value =
     examples.ORGANIZATION_ORDER_REQUEST;
+  swaggerDefinition.components.examples.OrganizationOrderResponseBundle.value =
+    examples.ORGANIZATION_ORDER_RESPONSE;
   swaggerDefinition.components.examples.InitialAccessTokenExchangePlaintextMessage.value =
     examples.INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST;
+  swaggerDefinition.components.examples.LicenseIssuePlaintextMessage.value =
+    examples.LICENSE_ISSUE_REQUEST;
   swaggerDefinition.components.examples.FirebaseCustomTokenPlaintextMessage.value =
     examples.FIREBASE_CUSTOM_TOKEN_REQUEST;
   swaggerDefinition.components.examples.DeviceRegistrationPlaintextMessage.value =

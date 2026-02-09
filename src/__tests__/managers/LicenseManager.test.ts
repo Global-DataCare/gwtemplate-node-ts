@@ -8,6 +8,7 @@ import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-
 import { LicenseManager } from '../../managers/LicenseManager';
 import { DeviceLicense, DeviceRestrictions } from 'gdc-common-utils-ts/models/device-license';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { getEnvSectionId } from '../../utils/section-env';
 
 // --- Mocks ---
 
@@ -114,7 +115,7 @@ describe('LicenseManager', () => {
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
       const [vaultId, documents, collection] = (mockVaultRepository.put as jest.Mock).mock.calls[0];
       expect(vaultId).toBe(TEST_VAULT_ID);
-      expect(collection).toBe('device-licenses');
+      expect(collection).toBe(getEnvSectionId('device-licenses'));
       expect(documents).toHaveLength(5);
     });
 

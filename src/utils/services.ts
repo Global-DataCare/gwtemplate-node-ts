@@ -90,7 +90,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'individual', format: 'org.hl7.fhir.r4' },
-        ['Consent', 'Communication', 'Composition', 'RelatedPerson', 'Bundle'],
+        ['Consent', 'Communication', 'Composition', 'DocumentReference', 'RelatedPerson', 'Bundle'],
         ['_batch'],
       ),
     );
@@ -172,9 +172,41 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
       ['License'],
       ['_issue'],
     ),
+    // Tenant-level DIDComm messaging (used to deliver ICA status and other async notices to tenant controllers).
+    createDidEndpointConfigFromSelector(
+      { sector, section: 'messaging', format: 'post-quantum' },
+      ['didcomm-plaintext', 'didcomm-signed', 'didcomm-encrypted'],
+      ['_send', '_receive', '_messages', '_get', '_delete'],
+    ),
   ];
 
-  const allServices = [...defaultBusinessServices, ...defaultNetworkServices, ...defaultOidcServices, ...customServices];
+  // DSP/DCP discovery service entries published in the tenant DID document.
+  // These are explicit endpoint entries (not selector-multiplexed API templates).
+  const defaultDataspaceDiscoveryServices: DidService[] = [
+    {
+      id: '#dsp-data-service',
+      type: 'DataService',
+      serviceEndpoint: '/.well-known/dspace-version',
+    } as DidService,
+    {
+      id: '#dsp-catalog-service',
+      type: 'CatalogService',
+      serviceEndpoint: '/catalog/request',
+    } as DidService,
+    {
+      id: '#dcp-issuer-service',
+      type: 'IssuerService',
+      serviceEndpoint: '/presentations/query',
+    } as DidService,
+  ];
+
+  const allServices = [
+    ...defaultBusinessServices,
+    ...defaultNetworkServices,
+    ...defaultOidcServices,
+    ...defaultDataspaceDiscoveryServices,
+    ...customServices,
+  ];
   const serviceMap = new Map<string, DidService>();
   for (const service of allServices) {
     const selectorSector = ((service as any).selector as { sector?: string } | undefined)?.sector || '';
@@ -198,6 +230,24 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
       { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
       ['Organization', 'Order'],
       ['_batch'],
+    ),
+  );
+
+  // ICA enrollment endpoint (system + test-network).
+  services.push(
+    createDidEndpointConfigFromSelector(
+      { sector: Sector.SYSTEM as any, section: 'test-network', format: 'ica' },
+      ['csr'],
+      ['_enroll'],
+    ),
+  );
+
+  // DIDComm messaging (general, non-FHIR)
+  services.push(
+    createDidEndpointConfigFromSelector(
+      { sector: Sector.SYSTEM as any, section: 'messaging', format: 'post-quantum' },
+      ['didcomm-plaintext', 'didcomm-signed', 'didcomm-encrypted'],
+      ['_send', '_receive', '_messages', '_get', '_delete'],
     ),
   );
 

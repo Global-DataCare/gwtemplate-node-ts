@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fabric-ca
+  namespace: test-fabric-v3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fabric-ca
+  template:
+    metadata:
+      labels:
+        app: fabric-ca
+    spec:
+      containers:
+        - name: fabric-ca
+          image: hyperledger/fabric-ca:latest
+          args:
+            - sh
+            - -c
+            - "fabric-ca-server start -b admin:adminpw -d"
+          ports:
+            - containerPort: 7054
+          volumeMounts:
+            - name: ca-data
+              mountPath: /etc/hyperledger/fabric-ca-server
+      volumes:
+        - name: ca-data
+          secret:
+            secretName: fabric-ca-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fabric-ca
+  namespace: test-fabric-v3
+spec:
+  selector:
+    app: fabric-ca
+  ports:
+    - port: 7054
+      targetPort: 7054

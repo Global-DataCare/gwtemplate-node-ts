@@ -9,6 +9,7 @@ import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { getTenantVaultId } from '../../utils/tenant';
+import { getEnvSectionId } from '../../utils/section-env';
 
 // --- Mocks ---
 
@@ -111,7 +112,7 @@ describe('AppAuthorizationManager', () => {
         }
         expect(mockVaultRepository.query).toHaveBeenCalledWith(
           vaultId,
-          expect.objectContaining({ sectionId: 'device-licenses' }),
+          expect.objectContaining({ sectionId: getEnvSectionId('device-licenses') }),
         );
         
         // Verify it updated the license status to 'active'

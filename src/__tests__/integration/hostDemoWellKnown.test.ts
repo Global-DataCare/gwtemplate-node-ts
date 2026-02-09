@@ -2,6 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { invokeExpress } from './helpers/invokeExpress';
+import { startServer, resetServerConfig } from '../../server';
 
 const HOST_DID = 'did:web:localhost%3A3000';
 
@@ -26,8 +27,7 @@ describe('Host well-known endpoints (demo, mem)', () => {
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
     process.env.ORG_HOST_TERMS_URL = 'https://example.org/terms.pdf';
 
-    jest.resetModules();
-    const { startServer } = await import('../../server');
+    resetServerConfig();
 
     const { app, queueAdapter } = await startServer({ listen: false });
     try {

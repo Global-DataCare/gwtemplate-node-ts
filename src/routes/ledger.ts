@@ -11,6 +11,7 @@ import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getTenantVaultId } from '../utils/tenant';
 import { resolveHostRegistrySector } from '../utils/services';
+import { resolveIdentityChannel } from '../utils/ledger';
 
 type AsyncResult = { status: number; body: unknown };
 
@@ -22,20 +23,10 @@ function getIdFromRequest(input: { query?: any; body?: any }): string | undefine
   return undefined;
 }
 
-function normalizeSegment(input: string): string {
-  return input.trim().toLowerCase();
-}
-
-function getIdentityChannelName(jurisdiction?: string): string {
-  const normalized = jurisdiction ? normalizeSegment(jurisdiction) : '';
-  if (normalized) return `${normalized}-identity`;
-  return process.env.LEDGER_IDENTITY_CHANNEL_DEFAULT || 'eu-identity';
-}
-
 function resolveChannelName(query: Record<string, any>, jurisdiction?: string): string {
   const directChannel = typeof query.channel === 'string' ? query.channel.trim() : '';
   if (directChannel) return directChannel;
-  return getIdentityChannelName(jurisdiction);
+  return resolveIdentityChannel(jurisdiction);
 }
 
 function buildLedgerContext(query: Record<string, any>, jurisdiction?: string): CredentialLedgerContext {

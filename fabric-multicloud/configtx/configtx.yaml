@@ -1,0 +1,297 @@
+---
+# Fabric multicloud configtx template (v3 compatible)
+# Replace MSPDir placeholders with the environment-specific paths.
+
+Organizations:
+  - &UNID
+    Name: UNIDMSP
+    ID: UNIDMSP
+    MSPDir: artifacts/<env>/pki-host/UNIDMSP/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('UNIDMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('UNIDMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('UNIDMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('UNIDMSP.member')"
+
+  - &ACCURO
+    Name: ACCUROMSP
+    ID: ACCUROMSP
+    MSPDir: artifacts/<env>/pki-host/ACCUROMSP/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('ACCUROMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('ACCUROMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('ACCUROMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('ACCUROMSP.member')"
+
+  - &CONNECTECH
+    Name: CONNECTECHMSP
+    ID: CONNECTECHMSP
+    MSPDir: artifacts/<env>/pki-host/CONNECTECHMSP/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('CONNECTECHMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('CONNECTECHMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('CONNECTECHMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('CONNECTECHMSP.member')"
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V3_0: true
+  Orderer: &OrdererCapabilities
+    V3_0: true
+  Application: &ApplicationCapabilities
+    V3_0: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.unid.example:7050
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.unid.example
+        Port: 7050
+        ClientTLSCert: artifacts/<env>/pki-host/UNIDMSP/orderer/client.crt
+        ServerTLSCert: artifacts/<env>/pki-host/UNIDMSP/orderer/server.crt
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  GDCOrdererGenesis:
+    Policies:
+      Readers:
+        Type: ImplicitMeta
+        Rule: "ANY Readers"
+      Writers:
+        Type: ImplicitMeta
+        Rule: "ANY Writers"
+      Admins:
+        Type: ImplicitMeta
+        Rule: "MAJORITY Admins"
+    Capabilities:
+      <<: *ChannelCapabilities
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *UNID
+    Consortiums:
+      GDCConsortium:
+        Organizations:
+          - *UNID
+          - *ACCURO
+          - *CONNECTECH
+
+  GlobalIdentityPerson:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+        - *CONNECTECH
+
+  GlobalIdentityOrganization:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+        - *CONNECTECH
+
+  GlobalIndexDog:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+        - *CONNECTECH
+
+  GlobalIndexCat:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+        - *CONNECTECH
+
+  GlobalHealthTwins:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+        - *CONNECTECH
+
+  EUIdentityDog:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+
+  EUIdentityCat:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+
+  NAHealthDog:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *CONNECTECH
+
+  NAHealthCat:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *CONNECTECH
+
+  EUHealthCare:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+
+  NAHealthCare:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *CONNECTECH
+
+  SAHealthCare:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *CONNECTECH
+
+  EUVetDog:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+
+  EUVetCat:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO
+
+  NAVetDog:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *CONNECTECH
+
+  NAVetCat:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *CONNECTECH
+
+  EUHealthThing:
+    Consortium: GDCConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *UNID
+        - *ACCURO

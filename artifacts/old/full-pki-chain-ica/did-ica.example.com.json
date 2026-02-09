@@ -1,0 +1,23 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:ica.example.com",
+  "verificationMethod": [
+    {
+      "id": "did:web:ica.example.com#Qy02b1drVGxiYTlmaG45M2lGaDZ1a1c1TlNnTDNCTWhUUjgxRDVQYW04MA",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:ica.example.com",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-384",
+        "x": "drb-vUY94Zt9UFzbKIdgVDpjx2kG8z8-tRVPuYywd5lK06ISVy2yOWHuCQ-thGGe",
+        "y": "1PzmKsfyxh33fpWLfhSwWSYm4w1eUGgbUwJlQNu_v0UsOaVKDlhnxesHUN0Fi1fY",
+        "kid": "Qy02b1drVGxiYTlmaG45M2lGaDZ1a1c1TlNnTDNCTWhUUjgxRDVQYW04MA",
+        "alg": "ES256",
+        "use": "sig"
+      }
+    }
+  ],
+  "authentication": [
+    "did:web:ica.example.com#Qy02b1drVGxiYTlmaG45M2lGaDZ1a1c1TlNnTDNCTWhUUjgxRDVQYW04MA"
+  ]
+}

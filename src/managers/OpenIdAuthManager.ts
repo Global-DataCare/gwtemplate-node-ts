@@ -14,6 +14,7 @@ import { IVaultRepository } from '../database/repositories/vault/vault.repositor
 import { getClaimValue } from '../utils/claims';
 import { parseActorFromSub } from 'gdc-common-utils-ts/utils/actor';
 import { getIndividualSectionId } from '../utils/individual-sections';
+import { IClearingHouseService } from '../services/ClearingHouseService';
 
 type TokenRequestBody = {
   scope?: string;
@@ -21,6 +22,9 @@ type TokenRequestBody = {
   expires_in?: number;
   token_type?: string;
   purpose?: string;
+  vp_token?: string;
+  presentation_submission?: any;
+  acr_values?: string | string[];
 };
 
 export class OpenIdAuthManager implements IJobProcessor {
@@ -28,6 +32,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     private readonly kmsService: IKmsService,
     private readonly tenantsCacheManager: TenantsCacheManager,
     private readonly vaultRepository: IVaultRepository,
+    private readonly clearingHouseService: IClearingHouseService,
   ) {}
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
@@ -51,6 +56,26 @@ export class OpenIdAuthManager implements IJobProcessor {
     const sub = body.sub?.trim();
     if (!sub) {
       throw new ManagerError("Missing 'sub' in token request body.", IssueType.Required);
+    }
+
+    const vpToken = body.vp_token?.trim();
+    if (!vpToken) {
+      throw new ManagerError("Missing 'vp_token' in token request body.", IssueType.Required);
+    }
+
+    const acrValues = this.normalizeAcrValues(body.acr_values);
+    if (acrValues.length === 0) {
+      throw new ManagerError("Missing 'acr_values' in token request body.", IssueType.Required);
+    }
+
+    const clearingResult = await this.clearingHouseService.verifyVpToken({
+      vpToken,
+      presentationSubmission: body.presentation_submission,
+      acrValues,
+    });
+
+    if (!acrValues.includes(clearingResult.acr)) {
+      throw new ManagerError('Clearing House returned an unexpected acr value.', IssueType.Forbidden);
     }
 
     // --- Gateway SMART Scope Extension: Context Pinning ---
@@ -185,6 +210,10 @@ export class OpenIdAuthManager implements IJobProcessor {
       iat: now,
       nbf: now,
       exp: now + lifetimeSeconds,
+      acr: clearingResult.acr,
+      amr: clearingResult.amr,
+      vp_hash: clearingResult.vpHash,
+      ledger_verified: clearingResult.ledgerVerified,
     };
 
     const encodedHeader = Content.stringToBase64Url(JSON.stringify(jwtHeader));
@@ -211,6 +240,7 @@ export class OpenIdAuthManager implements IJobProcessor {
         expires_in: lifetimeSeconds,
         scope,
         subject,
+        ledger_verified: clearingResult.ledgerVerified,
       },
     };
   }
@@ -247,5 +277,16 @@ export class OpenIdAuthManager implements IJobProcessor {
 
     const mergedSections = Array.from(new Set(parsed.flatMap((p) => p.sections)));
     return { subject, sections: mergedSections };
+  }
+
+  private normalizeAcrValues(acrValues?: string | string[]): string[] {
+    if (!acrValues) return [];
+    if (Array.isArray(acrValues)) {
+      return acrValues.map((value) => value.trim()).filter(Boolean);
+    }
+    return acrValues
+      .split(/\s+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
   }
 }

@@ -1,4 +1,4 @@
-# Deployment Guide: Google Cloud Run
+si# Deployment Guide: Google Cloud Run
 
 This guide provides instructions for deploying the application to Google Cloud Run using the provided automation script.
 
@@ -73,3 +73,18 @@ The script will perform the following steps automatically:
 
 Upon successful completion, the script will print the public **Service URL** of your newly deployed application.
 
+## PKI Generation (Fabric CA / ICA / Host / Member)
+
+The PKI scripts and JSON schema requirements are documented in `README.md`
+under **"PKI generation (CA / ICA / Host / Member)"**. Use that section as
+the source of truth for:
+- required `Organization` JSON fields
+- commands and flags (`--env`, `--kdf`, `--kdf-config`)
+- output locations and overwrite behavior
+
+If you are deploying a Fabric network, generate CA/ICA/Host/Member materials
+first and place the public artifacts into the environment-specific directories
+under `artifacts/<env>/`. Keep all private material out of Git.
+
+For the multi-cloud Fabric deployment blueprint, see:
+`docs/04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md`.

@@ -4,6 +4,7 @@
 import type { Contract, Gateway } from '@hyperledger/fabric-gateway';
 import type * as grpc from '@grpc/grpc-js';
 import { newGatewayConnection, newGrpcConnection } from './connect';
+import { resolveIdentityChannel } from '../../../utils/ledger';
 
 type ContractSession = {
   contract: Contract;
@@ -40,7 +41,7 @@ export class ManageAsset {
     const client = await newGrpcConnection(mspId);
     const gateway = await newGatewayConnection(client, mspId);
     try {
-      const channelName = this.channel || process.env.LEDGER_IDENTITY_CHANNEL_DEFAULT || 'eu-identity';
+      const channelName = this.channel || resolveIdentityChannel(process.env.HOST_JURISDICTION || process.env.JURISDICTION);
       const network = await gateway.getNetwork(channelName);
       const contract = network.getContract(this.getContractName());
       return await handler({ contract, gateway, client });
@@ -53,6 +54,13 @@ export class ManageAsset {
   protected parseJson<T>(payload: Uint8Array): T {
     const text = Buffer.from(payload).toString('utf8');
     return JSON.parse(text) as T;
+  }
+
+  public async submit(mspId: string, fnName: string, ...args: string[]): Promise<object> {
+    const result = await this.withContract(mspId, async ({ contract }) => {
+      return contract.submitTransaction(fnName, ...args);
+    });
+    return this.parseJson<object>(result);
   }
 
   public async read(mspId: string, assetId: string): Promise<object> {

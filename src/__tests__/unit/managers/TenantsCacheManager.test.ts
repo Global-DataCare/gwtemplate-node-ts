@@ -7,6 +7,7 @@ import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsSer
 import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../../utils/tenant';
+import { getEnvSectionId } from '../../../utils/section-env';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { DidService } from '../../../gdc-backend-utils-node/models/did';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
@@ -85,7 +86,7 @@ describe('TenantsCacheManager', () => {
       expect(mockVaultRepository.get).toHaveBeenCalledTimes(1);
 
              // The manager should now use the PHYSICAL host collection name to find the tenant record.
-       expect(mockVaultRepository.get).toHaveBeenCalledWith(hostCollectionName, acmeVaultId, 'tenants');
+       expect(mockVaultRepository.get).toHaveBeenCalledWith(hostCollectionName, acmeVaultId, getEnvSectionId('tenants'));
       expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledTimes(1);
 
       // --- Second Call (Cache Hit) ---

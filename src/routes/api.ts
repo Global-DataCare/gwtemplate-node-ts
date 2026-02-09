@@ -21,6 +21,7 @@ import { getTenantVaultIdFromIss, getTenantVaultId } from '../utils/tenant';
 import { composeHostDidWebId } from '../utils/did-backend';
 import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
+import { getEnvSectionId } from '../utils/section-env';
 
 // As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
 const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
@@ -497,6 +498,8 @@ export function createApiRouter(
    *     description: |
    *       Tenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role
    *       and returns a single-use activation code for subsequent `Token/_exchange`.
+   *       User licenses can issue multiple activation codes for different device profiles (mobile/web).
+   *       Device licenses only issue a single activation code per seat.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -510,6 +513,8 @@ export function createApiRouter(
    *       content:
    *         application/didcomm-plaintext+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/LicenseIssuePlaintextMessage' }
    *         application/json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *         application/x-www-form-urlencoded:
@@ -1052,7 +1057,12 @@ export function createApiRouter(
    *     tags:
    *       - 1.2 Organization Order
    *     summary: Poll the organization order result (host)
-   *     description: Polls the asynchronous job submitted to `.../Order/_batch`. The `jurisdiction` and `sector` are path routing parameters for the host registry.
+   *     description: |
+   *       Polls the asynchronous job submitted to `.../Order/_batch`. The `jurisdiction` and `sector` are path routing parameters for the host registry.
+   *       The completed response returns a Bundle entry with order invoice claims, including an optional payment
+   *       link (`Order.paymentUrl`) and the accepted Offer reference (`Order.acceptedOffer.identifier`). When using
+   *       Stripe (INVOICE_PROVIDER=stripe, INVOICE_FLOW=pre), `Order.partOfInvoice` and `Order.paymentUrl` refer to
+   *       the Stripe invoice/checkout URL. UBL/PDF/VeriFactu invoices are not emitted yet.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1085,6 +1095,8 @@ export function createApiRouter(
    *         content:
    *           application/json:
    *             schema: { type: object }
+   *             examples:
+   *               message: { $ref: '#/components/examples/OrganizationOrderResponseBundle' }
    *           application/x-www-form-urlencoded:
    *             schema: { $ref: '#/components/schemas/AsyncPollSecureResponse' }
    *       '400': { description: Missing or invalid thid. }
@@ -1197,6 +1209,10 @@ export function createApiRouter(
    *     tags:
    *       - 4.2 Family Order
    *     summary: Poll the family order result
+   *     description: |
+   *       Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.
+   *       The completed response returns a Bundle entry with order invoice claims, including an
+   *       optional payment link (`Order.paymentUrl`) and the accepted Offer reference (`Order.acceptedOffer.identifier`).
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1291,6 +1307,19 @@ export function createApiRouter(
    *     description: |
    *       Requests a SMART access token. The request MUST include the gateway context-pinning scope item:
    *       `patient/Composition.<cruds>?subject=<did:web:...:individual:<id>>`.
+   *
+   *       OpenID4VP binding: the request MUST include `acr_values` from the prior verification event, using
+   *       one of: `urn:antifraud:acr:openid4vp:employee` or `urn:antifraud:acr:openid4vp:individual`. The issued
+   *       SMART token includes the matching `acr` and SHOULD include `amr` entries like `openid4vp`, `vc`, and
+   *       `device_bound`.
+   *
+   *       VP requirement: the SMART authorization request MUST include a verifiable presentation (VP) inside
+   *       the JAR (request object) or the DIDComm payload (demo flow). This VP is validated via the Gaia-X
+   *       Clearing House to enforce non-revocation before issuing the token.
+   *
+   *       Demo payload note: in this endpoint the DIDComm `body` represents the JAR (authorize request object),
+   *       including PKCE parameters (`code_challenge`, `code_challenge_method`), `client_id`, `redirect_uri`,
+   *       `vp_token`, optional `presentation_submission`, and `acr_values`.
    *
    *       The worker will validate the target subject exists and that at least one consent rule matches the actor.
    *     parameters:
@@ -1412,12 +1441,12 @@ export function createApiRouter(
           // 3. Query the vault for the sender's encrypted document.
           // Prefer the tenant's physical collectionName, but fall back to legacy vaultId storage.
           let queryResult = await vaultRepository.query(collectionName, {
-            sectionId: 'employees', // Employees are the primary actors who can sign.
+            sectionId: getEnvSectionId('employees'), // Employees are the primary actors who can sign.
             where: [{ name: protectedAttrName, value: protectedAttrValue }],
           });
           if (!queryResult || queryResult.length === 0) {
             queryResult = await vaultRepository.query(vaultId, {
-              sectionId: 'employees',
+              sectionId: getEnvSectionId('employees'),
               where: [{ name: protectedAttrName, value: protectedAttrValue }],
             });
           }

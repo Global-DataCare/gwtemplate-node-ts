@@ -11,7 +11,7 @@ import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-j
 import { v4 as uuidv4 } from 'uuid';
 import { MldsaPublicJwk, MlkemPrivateJwk, MlkemPublicJwk, PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { Content } from 'gdc-common-utils-ts/utils/content';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, createPrivateKey } from 'crypto';
 import { p256, p384 } from '@noble/curves/nist.js';
 import { deriveKeyPair } from '../utils/pki';
 import { computeHmacSha256Base64Url } from 'gdc-common-utils-ts/hmac';
@@ -225,6 +225,21 @@ export class KmsService implements IKmsService {
     
     // Placeholder for legacy P-256 key lookup
     return undefined;
+  }
+
+  /**
+   * Exports the legacy (ES256/ES384) signing private key as PEM (PKCS8).
+   * Used for mTLS when reusing the legacy X.509 keypair.
+   */
+  async getLegacyPrivateKeyPem(entityVaultId: string): Promise<string | undefined> {
+    const keySet = this._managedKeys.get(entityVaultId);
+    if (!keySet?.legacySigningKeyPair) return undefined;
+    const publicJwk = keySet.legacySigningKeyPair.publicJWKey as any;
+    if (!publicJwk?.x || !publicJwk?.y) return undefined;
+    const d = Buffer.from(keySet.legacySigningKeyPair.secretKeyBytes).toString('base64url');
+    const jwk = { ...publicJwk, d };
+    const keyObj = createPrivateKey({ key: jwk, format: 'jwk' });
+    return keyObj.export({ format: 'pem', type: 'pkcs8' }).toString();
   }
 
   async getHostPublicJwkSet(): Promise<JwkSet> {

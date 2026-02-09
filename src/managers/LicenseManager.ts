@@ -18,6 +18,7 @@ import type { BundleEntryResponse, BundleJsonApi, ErrorEntry } from 'gdc-common-
 import { createOperationOutcome } from '../utils/outcome';
 import { IssueLevel } from 'gdc-common-utils-ts/models/issue';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
+import { getEnvSectionId } from '../utils/section-env';
 
 /**
  * Manages the business logic for creating device activation licenses.
@@ -114,7 +115,7 @@ export class LicenseManager implements IJobProcessor {
 
     // 4. Persist to the repository
     const vaultId = getTenantVaultId('health-care', targetTenantId); // Assume sector for now
-    await this.vaultRepository.put(vaultId, licenseDocs, 'device-licenses');
+    await this.vaultRepository.put(vaultId, licenseDocs, getEnvSectionId('device-licenses'));
 
     // 5. Return success response
     const responseThid = job.content?.thid as string;

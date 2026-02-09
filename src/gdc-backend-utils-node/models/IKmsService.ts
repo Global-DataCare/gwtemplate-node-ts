@@ -70,6 +70,12 @@ export interface IKmsService {
   getPublicEncryptionKey(entityVaultId: string, crv?: string): Promise<MlkemPublicJwk | undefined>;
 
   /**
+   * Returns the legacy signing private key as PEM (PKCS8).
+   * Used for mTLS when reusing the legacy X.509 keypair.
+   */
+  getLegacyPrivateKeyPem?(entityVaultId: string): Promise<string | undefined>;
+
+  /**
    * A dedicated method to get the host's public keys as a standard JWKSet.
    * This is crucial for bootstrap and discovery endpoints (e.g., jwks.json)
    * and for end-to-end testing scenarios.

@@ -15,6 +15,7 @@ import {
 } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { getEnvSectionId } from '../../../utils/section-env';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
@@ -207,7 +208,7 @@ describe('HostingManager', () => {
     const provisionalDoc = await vaultRepository.get(
       await mockTenantsCacheManager.getCollectionName('host') as string,
       tenantVaultId,
-      'tenants'
+      getEnvSectionId('tenants')
     ) as ConfidentialStorageDoc;
     expect(provisionalDoc).toBeDefined();
     expect(provisionalDoc.content).toBeDefined();

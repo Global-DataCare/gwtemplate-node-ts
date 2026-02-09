@@ -213,9 +213,21 @@ const swaggerDefinition = {
           'A DIDComm-like message wrapper accepting an Offer via an Order. Order.acceptedOffer.identifier is required and must match the Offer ID returned by the Organization registration _batch-response.',
         value: {},
       },
+      OrganizationOrderResponseBundle: {
+        summary: 'Organization Order Response Bundle',
+        description:
+          'Async Order response bundle with Organization-order-response-v1.0 and Order.* invoice/payment claims.',
+        value: {},
+      },
       InitialAccessTokenExchangePlaintextMessage: {
         summary: 'Plaintext Message for Initial Access Token Exchange',
         description: 'A DIDComm-like message wrapper containing `subject_token` (activation code).',
+        value: {},
+      },
+      LicenseIssuePlaintextMessage: {
+        summary: 'Plaintext Message for License Issue',
+        description:
+          'A DIDComm-like message wrapper reserving a seat and issuing an activation code. User licenses can issue multiple device-profile codes; device licenses only issue one.',
         value: {},
       },
       FirebaseCustomTokenPlaintextMessage: {

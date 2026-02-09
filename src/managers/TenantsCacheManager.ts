@@ -11,6 +11,7 @@ import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schem
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 import { parseTenantUrn } from '../utils/urn';
+import { getEnvSectionId } from '../utils/section-env';
 
 /**
  * An in-memory cache implementation of the Tenant Manager.
@@ -66,7 +67,7 @@ export class TenantsCacheManager implements ITenantsManager {
     }
 
     // 2. If not in cache, fetch the tenant's registration record from the HOST'S PHYSICAL collection.
-    const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>(this.hostCollectionName, vaultId, 'tenants');
+    const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>(this.hostCollectionName, vaultId, getEnvSectionId('tenants'));
     
     // 3. If not in the repository, it doesn't exist.
     if (!secureTenantRecord) {

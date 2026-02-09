@@ -16,6 +16,7 @@ import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { getTenantVaultId } from '../utils/tenant';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { DeviceLicense, DeviceInfo } from 'gdc-common-utils-ts/models/device-license';
+import { getEnvSectionId } from '../utils/section-env';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -133,7 +134,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
         ? await this.kmsService.protectConfidentialData(deviceProfileDoc, vaultId)
         : deviceProfileDoc;
 
-      await this.vaultRepository.put(vaultId, [protectedDeviceProfile], 'device-profiles');
+      await this.vaultRepository.put(vaultId, [protectedDeviceProfile], getEnvSectionId('device-profiles'));
 
       // Bind the activated license seat to this client_id and capture a minimal device fingerprint.
       const licenseDoc = await this.resolveLicenseByActivationCode(code as string, vaultId);
@@ -152,7 +153,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
         license.activatedAt = license.activatedAt || Math.floor(Date.now() / 1000);
 
         licenseDoc.sequence = (licenseDoc.sequence || 0) + 1;
-        await this.vaultRepository.put(vaultId, [licenseDoc], 'device-licenses');
+        await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
       }
 
       // --- Response Formatting Step ---
@@ -255,7 +256,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
       if (protectedName && protectedValue) {
         try {
           licenseDocs = (await this.vaultRepository.query(vaultId, {
-            sectionId: 'device-licenses',
+            sectionId: getEnvSectionId('device-licenses'),
             where: [{ name: protectedName, value: protectedValue }],
           })) as unknown as ConfidentialStorageDoc[];
         } catch {
@@ -265,7 +266,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
     }
 
     if (!licenseDocs || licenseDocs.length === 0) {
-      const all = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(vaultId, 'device-licenses');
+      const all = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(vaultId, getEnvSectionId('device-licenses'));
       licenseDocs = all.filter((doc) => (doc.content as any)?.activationCode === code);
     }
 
@@ -286,7 +287,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
     const deviceDocs = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
       vaultId,
-      'device-profiles'
+      getEnvSectionId('device-profiles')
     );
 
     const entries: BundleEntry[] = [];

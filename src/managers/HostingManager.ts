@@ -42,6 +42,12 @@ import { VerificationMethod } from 'gdc-common-utils-ts/models/did';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
+import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
+import { buildPdfSignatureEvidence, PdfSignatureEvidence } from '../utils/pdf-evidence';
+import { ManageAssetOrganization } from '../blockchain/fabric/v3/manageAssetOrganization';
+import { resolveIdentityChannel } from '../utils/ledger';
+import { slugFromDomain } from '../utils/slug';
+import { getEnvSectionId } from '../utils/section-env';
 
 /**
  * Manages the initial onboarding of new tenants onto the Gateway.
@@ -213,7 +219,7 @@ export class HostingManager {
     const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
     
     const query = {
-      sectionId: 'tenants',
+      sectionId: getEnvSectionId('tenants'),
       where: [{ name: ClaimsOfferSchemaorg.identifier, value: offerId }],
     };
     
@@ -237,7 +243,7 @@ export class HostingManager {
       throw new ManagerError(`Found registration for offerId '${offerId}', but it is not in 'pending' state.`, IssueType.Conflict);
     }
 
-    const { claims: processedClaims } = decryptedContent;
+    const { claims: processedClaims, contained } = decryptedContent as any;
     const alternateName = processedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
     const sector = processedClaims[ClaimsServiceSchemaorg.category] as Sector;
     // Ensure the canonical tenant identifier URN exists for downstream managers (e.g., EmployeeManager issuer).
@@ -252,6 +258,7 @@ export class HostingManager {
     (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = tenantUrn;
 
     const { organization, person, service } = this.extractResources(processedClaims, environment);
+    const containedService = this.extractContainedService(contained);
 
     // Finalize the registration and grant test network access.
     const vaultId = getTenantVaultId(sector, alternateName);
@@ -278,7 +285,20 @@ export class HostingManager {
     };
     
     const secureFinalDoc = await this.kmsService.protectConfidentialData(finalTenantRegistrationDoc, 'host');
-    await this.vaultRepository.put(hostCollectionName!, [secureFinalDoc], 'tenants');
+    await this.vaultRepository.put(hostCollectionName!, [secureFinalDoc], getEnvSectionId('tenants'));
+
+    if (this.isLedgerRegistrationEnabled()) {
+      const serviceEvidence = this.extractServiceEvidence(containedService || service);
+      await this.registerOrganizationOnLedger({
+        orgId: tenantUrn,
+        organization,
+        config: finalTenantConfig,
+        evidence: serviceEvidence,
+        role: 'tenant',
+        sector,
+        jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+      });
+    }
     
     // Save VCs and other resources into the TENANT's own vault
     const legalParticipantDoc: ConfidentialStorageDoc = { id: 'legal-participant.vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
@@ -287,7 +307,16 @@ export class HostingManager {
     const secureLegalParticipantDoc = await this.kmsService.protectConfidentialData(legalParticipantDoc, vaultId);
     const secureLegacyVcDoc = await this.kmsService.protectConfidentialData(legacyVcDoc, vaultId);
     const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, vaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], '.well-known');
+    await this.vaultRepository.put(tenantCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], getEnvSectionId('.well-known'));
+
+    if (String(this.config.nodeEnv || '').toLowerCase() === 'demo') {
+      const serviceEvidence = this.extractServiceEvidence(containedService || service);
+      await this.requestIcaEnrollment({
+        organizationClaims: processedClaims,
+        evidence: serviceEvidence,
+        tenantVaultId: vaultId,
+      });
+    }
 
     const [legalRep, processedService] = [person, service];
     if (legalRep) {
@@ -362,12 +391,12 @@ export class HostingManager {
         indexed: { attributes: protectedAttributes },
       };
       const secureEmployeeDoc = await this.kmsService.protectConfidentialData(employeeDoc, vaultId);
-      await this.vaultRepository.put(tenantCollectionName, [secureEmployeeDoc], 'employees');
+      await this.vaultRepository.put(tenantCollectionName, [secureEmployeeDoc], getEnvSectionId('employees'));
     }
 	    if (processedService) {
 	      const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, status: 'active', sequence: 0, content: processedService };
 	      const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, vaultId);
-	      await this.vaultRepository.put(tenantCollectionName, [secureServiceDoc], 'services');
+	      await this.vaultRepository.put(tenantCollectionName, [secureServiceDoc], getEnvSectionId('services'));
 	    }
 	    
 	    // Create the initial employee device licenses purchased via the registration Offer.
@@ -397,7 +426,7 @@ export class HostingManager {
 	        };
 	        licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
 	      }
-	      await this.vaultRepository.put(vaultId, licenseDocs, 'device-licenses');
+	      await this.vaultRepository.put(vaultId, licenseDocs, getEnvSectionId('device-licenses'));
 
         // Auto-issue the first activation code for the legal representative so they can register their first device
         // right after accepting/paying the Order (no manual "invite" step needed for the first controller).
@@ -427,14 +456,41 @@ export class HostingManager {
         }
 	    }
 
-	    return {
-	      type: 'Organization',
-	      resource: {
-        ...organization,
-        resourceType: 'Organization',
-        meta: { ...organization.meta, claims: processedClaims },
-        contained: [person, service],
-      },
+    const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const tenantDid = finalTenantConfig.didDocument?.id || tenantUrn;
+    const paymentContext = {
+      offerId,
+      tenantId: alternateName,
+      tenantDid,
+      senderDid: hostDid,
+      email: processedClaims[ClaimsPersonSchemaorg.email] as string | undefined,
+      legalName: processedClaims[ClaimsOrganizationSchemaorg.legalName] as string | undefined,
+      addressCountry: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string | undefined,
+      addressRegion: processedClaims[ClaimsOrganizationSchemaorg.addressRegion] as string | undefined,
+      addressLocality: processedClaims[ClaimsOrganizationSchemaorg.addressLocality] as string | undefined,
+      postalCode: processedClaims[ClaimsOrganizationSchemaorg.postalCode] as string | undefined,
+      streetAddress: processedClaims[ClaimsOrganizationSchemaorg.streetAddress] as string | undefined,
+      activationCode: (processedClaims as any)['org.schema.IndividualProduct.serialNumber'] as string | undefined,
+      activationCategory: (processedClaims as any)['org.schema.IndividualProduct.category'] as string | undefined,
+      ...readOfferPaymentContext(processedClaims),
+    };
+    const paymentCommunication = await buildPaymentCommunication(paymentContext);
+
+    if (!hostCollectionName) {
+      throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
+    }
+    const communicationDoc: ConfidentialStorageDoc = {
+      id: paymentCommunication.communicationId,
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      content: { claims: paymentCommunication.claims },
+    };
+    const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, 'host');
+    await this.vaultRepository.put(hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
+
+    return {
+      type: 'Organization-order-response-v1.0',
+      meta: { claims: paymentCommunication.claims },
       response: { status: '201' },
     };
   }
@@ -565,7 +621,7 @@ export class HostingManager {
 
         const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
         const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
-        await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], 'tenants');
+        await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], getEnvSectionId('tenants'));
       }
 
       return {
@@ -684,6 +740,21 @@ export class HostingManager {
     hostConfig.governanceVc = governanceVc;
     hostConfig.selfDescriptionVc = selfDescriptionVc;
 
+    if (this.isLedgerRegistrationEnabled()) {
+      const containedService = this.extractContainedService(contained);
+      const serviceEvidence = this.extractServiceEvidence(containedService);
+      const orgId = (allClaims as any)[ClaimsOrganizationSchemaorg.identifier] || org.id;
+      await this.registerOrganizationOnLedger({
+        orgId,
+        organization: org,
+        config: hostConfig,
+        evidence: serviceEvidence,
+        role: 'host',
+        sector: 'system' as Sector,
+        jurisdiction: this.config.host.jurisdiction,
+      });
+    }
+
     const docToProtect: ConfidentialStorageDoc = {
       id: logicalVaultId,
       status: hostConfig.status,
@@ -692,7 +763,21 @@ export class HostingManager {
     };
 
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, logicalVaultId);
-    await this.vaultRepository.put(hostCollectionName, [secureDoc], 'tenants');
+    await this.vaultRepository.put(hostCollectionName, [secureDoc], getEnvSectionId('tenants'));
+
+    const mtlsCertPem = process.env.ICA_MTLS_CERT_PEM;
+    const mtlsKeyPem = process.env.ICA_MTLS_KEY_PEM;
+    const mtlsCaPem = process.env.ICA_MTLS_CA_PEM;
+    if (mtlsCertPem && mtlsKeyPem) {
+      const mtlsDoc: ConfidentialStorageDoc = {
+        id: 'ica-mtls',
+        status: EntityLifecycleStatus.Active,
+        sequence: 0,
+        content: { certPem: mtlsCertPem, keyPem: mtlsKeyPem, caPem: mtlsCaPem },
+      };
+      const secureMtlsDoc = await this.kmsService.protectConfidentialData(mtlsDoc, logicalVaultId);
+      await this.vaultRepository.put(hostCollectionName, [secureMtlsDoc], getEnvSectionId('pki'));
+    }
 
     const legalParticipantDoc: ConfidentialStorageDoc = { id: 'legal-participant.vc.json', status: 'active', sequence: 0, content: governanceVc };
     const legacyVcDoc: ConfidentialStorageDoc = { id: 'vc.json', status: 'active', sequence: 0, content: governanceVc };
@@ -700,19 +785,116 @@ export class HostingManager {
     const secureLegalParticipantDoc = await this.kmsService.protectConfidentialData(legalParticipantDoc, logicalVaultId);
     const secureLegacyVcDoc = await this.kmsService.protectConfidentialData(legacyVcDoc, logicalVaultId);
     const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, logicalVaultId);
-    await this.vaultRepository.put(hostCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], '.well-known');
+    await this.vaultRepository.put(hostCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], getEnvSectionId('.well-known'));
     
     const [adminPerson, processedService] = contained;
     if (adminPerson) {
       const adminDoc: ConfidentialStorageDoc = { id: adminPerson.id, status: 'active', sequence: 0, content: adminPerson };
       const secureAdminDoc = await this.kmsService.protectConfidentialData(adminDoc, logicalVaultId);
-      await this.vaultRepository.put(hostCollectionName, [secureAdminDoc], 'employees');
+      await this.vaultRepository.put(hostCollectionName, [secureAdminDoc], getEnvSectionId('employees'));
     }
     if (processedService) {
       const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, status: 'active', sequence: 0, content: processedService };
       const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, logicalVaultId);
-      await this.vaultRepository.put(hostCollectionName, [secureServiceDoc], 'services');
+      await this.vaultRepository.put(hostCollectionName, [secureServiceDoc], getEnvSectionId('services'));
     }
+  }
+
+  public async ensureAuthorityTenant(params: {
+    alternateName: string;
+    role: 'ica' | 'ca';
+    externalDomain?: string;
+  }): Promise<void> {
+    const { alternateName, role, externalDomain } = params;
+    const sector = Sector.SYSTEM;
+    const vaultId = getTenantVaultId(sector, alternateName);
+    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    if (!hostCollectionName) {
+      throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
+    }
+
+    const existing = await this.vaultRepository.get<ConfidentialStorageDoc>(hostCollectionName, vaultId, getEnvSectionId('tenants'));
+    if (existing) return;
+
+    await this.kmsService.provisionKeys(vaultId);
+    const publicKeys = await this.kmsService.getPublicJwks(vaultId);
+
+    const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const didId = createHostedDidWeb(hostDid, alternateName, {
+      jurisdiction: this.config.host.jurisdiction || 'es',
+      version: 'v1',
+      sector,
+    });
+
+    const didConfigServices = role === 'ica'
+      ? [{
+          id: '#test-network:ica',
+          type: 'ApiService',
+          serviceEndpoint: 'csr',
+          actions: ['_enroll'],
+          selector: { section: 'test-network', format: 'ica', sector },
+        }]
+      : [];
+
+    const didDocument = populateDidDocumentFromJwks({ '@context': 'https://www.w3.org/ns/did/v1', id: didId, alsoKnownAs: [] }, publicKeys);
+    didDocument.service = populateDidDocumentServices(
+      didId,
+      this.config.apiBaseUrl,
+      didConfigServices,
+      true,
+      { alternateName, jurisdiction: this.config.host.jurisdiction || 'es', version: 'v1', sector },
+    );
+    if (externalDomain) {
+      didDocument.alsoKnownAs = didDocument.alsoKnownAs || [];
+      didDocument.alsoKnownAs.push(`did:web:${externalDomain}`);
+    }
+
+    const idType = this.config.host.idType || 'TAX';
+    const idValueRaw = `${this.config.host.idValue || 'UNID'}-${role.toUpperCase()}`;
+    const idValue = idValueRaw.replace(/[^a-zA-Z0-9]/g, '');
+
+    const claims: ClaimsRecord = {
+      [ClaimsOrganizationSchemaorg.legalName]: this.config.host.legalName || 'UNID',
+      [ClaimsOrganizationSchemaorg.alternateName]: alternateName,
+      [ClaimsOrganizationSchemaorg.addressCountry]: this.config.host.jurisdiction || 'es',
+      [ClaimsOrganizationSchemaorg.identifierType]: idType,
+      [ClaimsOrganizationSchemaorg.identifierValue]: idValue,
+      [ClaimsServiceSchemaorg.category]: sector,
+      ...(externalDomain ? { [ClaimsOrganizationSchemaorg.url]: `https://${externalDomain}` } : {}),
+    };
+
+    const orgUrn = createOrganizationUrn({
+      namespace: this.config.namespace,
+      network: 'test-network',
+      jurisdiction: claims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+      sector,
+      idType,
+      idValue,
+    });
+    (claims as any)[ClaimsOrganizationSchemaorg.identifier] = orgUrn;
+
+    const authorityConfig: OrganizationConfig = {
+      id: determineResourceId(orgUrn, this.config.nodeEnv),
+      type: EntityType.Organization,
+      status: EntityLifecycleStatus.Active,
+      claims,
+      didConfig: { service: didConfigServices },
+      didDocument,
+      networkStatus: [],
+      legacySignAlg: this.config.legacySignAlg,
+      legacyX509DerBase64: this.config.legacyX509DerBase64,
+      legacyX509ChainBase64: this.config.legacyX509ChainBase64,
+      meta: { lastUpdated: new Date().toISOString(), role },
+    };
+
+    const docToProtect: ConfidentialStorageDoc = {
+      id: vaultId,
+      status: authorityConfig.status,
+      sequence: 0,
+      content: authorityConfig,
+    };
+    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, 'host');
+    await this.vaultRepository.put(hostCollectionName, [secureDoc], getEnvSectionId('tenants'));
   }
 
   /**
@@ -748,7 +930,7 @@ export class HostingManager {
     };
     const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
     const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
-    await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], 'tenants');
+    await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], getEnvSectionId('tenants'));
 
     // Save VCs and other resources into the TENANT's own vault
     const legalParticipantDoc: ConfidentialStorageDoc = { id: 'legal-participant.vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
@@ -757,18 +939,18 @@ export class HostingManager {
     const secureLegalParticipantDoc = await this.kmsService.protectConfidentialData(legalParticipantDoc, vaultId);
     const secureLegacyVcDoc = await this.kmsService.protectConfidentialData(legacyVcDoc, vaultId);
     const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, vaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], '.well-known');
+    await this.vaultRepository.put(tenantCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], getEnvSectionId('.well-known'));
 
     const [legalRep, processedService] = contained;
     if (legalRep) {
       const legalRepDoc: ConfidentialStorageDoc = { id: legalRep.id, status: 'active', sequence: 0, content: legalRep };
       const secureLegalRepDoc = await this.kmsService.protectConfidentialData(legalRepDoc, vaultId);
-      await this.vaultRepository.put(tenantCollectionName, [secureLegalRepDoc], 'employees');
+      await this.vaultRepository.put(tenantCollectionName, [secureLegalRepDoc], getEnvSectionId('employees'));
     }
     if (processedService) {
       const serviceDoc: ConfidentialStorageDoc = { id: processedService.id, status: 'active', sequence: 0, content: processedService };
       const secureServiceDoc = await this.kmsService.protectConfidentialData(serviceDoc, vaultId);
-      await this.vaultRepository.put(tenantCollectionName, [secureServiceDoc], 'services');
+      await this.vaultRepository.put(tenantCollectionName, [secureServiceDoc], getEnvSectionId('services'));
     }
 
     // Handoff: The tenant may now initiate a separate request for production network onboarding.
@@ -909,7 +1091,11 @@ export class HostingManager {
 
   private async _handleServiceAttachment(service?: IncludedResource): Promise<IncludedResource | undefined> {
     if (!service) return undefined;
-    let termsOfService = service.meta.claims[ClaimsServiceSchemaorg.termsOfService] as string | undefined;
+    const claims = service.meta?.claims as Record<string, unknown> | undefined;
+    if (!claims) return service;
+    const termsRaw = claims[ClaimsServiceSchemaorg.termsOfService];
+    if (typeof termsRaw !== 'string') return service;
+    let termsOfService = termsRaw as string | undefined;
 
     if (termsOfService && !termsOfService.startsWith('http')) {
       try {
@@ -919,6 +1105,21 @@ export class HostingManager {
           termsOfService = parts[1];
         }
         const pdfBytes = Buffer.from(termsOfService, 'base64');
+        const serviceMeta = service.meta as any;
+        const verification = serviceMeta.verification || {};
+        const evidenceList = Array.isArray(verification.evidence) ? verification.evidence : [];
+
+        // Evidence extraction is best-effort: unsigned or malformed PDFs should still upload.
+        try {
+          if (pdfBytes.includes(Buffer.from('/ByteRange'))) {
+            const { evidence } = buildPdfSignatureEvidence(pdfBytes, 'sha256');
+            evidenceList.push(evidence);
+          }
+        } catch (e) {
+          this.logger?.warn?.(`[HostingManager] Skipping PDF signature evidence: ${(e as Error).message}`);
+        }
+
+        serviceMeta.verification = { ...verification, evidence: evidenceList };
         const uploadResult = await this.storageAdapter.upload(pdfBytes, 'application/pdf');
         if (!uploadResult) { throw new Error('Storage adapter returned undefined result.'); }
         const { publicUrl, encodedMultiHash } = uploadResult;
@@ -930,6 +1131,149 @@ export class HostingManager {
       }
     }
     return service;
+  }
+
+  private async requestIcaEnrollment(params: { organizationClaims: ClaimsRecord; evidence?: PdfSignatureEvidence[]; tenantVaultId: string }) {
+    const icaDomain = process.env.ICA_EXTERNAL_DOMAIN;
+    const icaSlug = slugFromDomain(icaDomain);
+    if (!icaSlug) return;
+
+    const jurisdiction = String(this.config.host.jurisdiction || 'es').toLowerCase();
+    const baseUrl = icaDomain ? `https://${icaDomain}` : this.config.apiBaseUrl;
+    const url = `${baseUrl}/${icaSlug}/cds-${jurisdiction}/v1/system/test-network/ica/csr/_enroll`;
+
+    const payload = {
+      csr: 'DEMO-CSR',
+      organization: params.organizationClaims,
+      evidence: params.evidence,
+      metadata: { environment: 'test-network' },
+    };
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo' },
+        body: JSON.stringify(payload),
+      });
+      const location = res.headers.get('location') || res.headers.get('Location') || '';
+      let resultResource: any | undefined;
+
+      if (res.ok) {
+        const data = await res.json().catch(() => undefined);
+        resultResource = data?.data?.[0]?.resource;
+      } else if (res.status === 202 && location) {
+        resultResource = await this.pollIcaResult(location);
+      } else {
+        const text = await res.text();
+        this.logger.warn?.(`[HostingManager] ICA enroll request failed: ${res.status} ${text}`);
+      }
+
+      if (resultResource) {
+        await this.storeIcaMessage(params.tenantVaultId, resultResource);
+      }
+    } catch (error: any) {
+      this.logger.warn?.(`[HostingManager] ICA enroll request failed: ${String(error?.message || error)}`);
+    }
+  }
+
+  private async pollIcaResult(url: string): Promise<any | undefined> {
+    const attempts = 5;
+    const delayMs = 2000;
+    for (let i = 0; i < attempts; i++) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer demo' } });
+      if (res.status === 202) continue;
+      if (!res.ok) return undefined;
+      const data = await res.json().catch(() => undefined);
+      return data?.data?.[0]?.resource;
+    }
+    return undefined;
+  }
+
+  private async storeIcaMessage(tenantVaultId: string, resultResource: any): Promise<void> {
+    const message = {
+      type: 'IcaEnrollResponse-v1.0',
+      id: resultResource?.id || `urn:uuid:${uuidv4()}`,
+      resource: resultResource,
+    };
+
+    const doc: ConfidentialStorageDoc = {
+      id: message.id,
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      content: message,
+    };
+    const secureDoc = await this.kmsService.protectConfidentialData(doc, tenantVaultId);
+    await this.vaultRepository.put(tenantVaultId, [secureDoc], getEnvSectionId('messaging'));
+  }
+
+  private isLedgerRegistrationEnabled(): boolean {
+    if (typeof this.config.ledger?.enabled === 'boolean') {
+      return this.config.ledger.enabled;
+    }
+    const env = String(this.config.nodeEnv || '').toLowerCase();
+    return env !== 'demo' && env !== 'test';
+  }
+
+  private extractContainedService(contained?: IncludedResource[] | undefined): IncludedResource | undefined {
+    if (!contained || !Array.isArray(contained)) return undefined;
+    return contained.find((resource) => resource?.type === 'Service');
+  }
+
+  private extractServiceEvidence(service?: IncludedResource): PdfSignatureEvidence[] | undefined {
+    if (!service) return undefined;
+    const verification = (service.meta as any)?.verification;
+    const evidence = verification?.evidence;
+    if (!evidence) return undefined;
+    return Array.isArray(evidence) ? evidence : [evidence];
+  }
+
+  private async registerOrganizationOnLedger(params: {
+    orgId: string;
+    organization: IncludedResource;
+    config: OrganizationConfig;
+    evidence?: PdfSignatureEvidence[];
+    role: 'host' | 'tenant';
+    sector: Sector;
+    jurisdiction?: string;
+  }): Promise<void> {
+    const mspId = this.config.ledger?.mspId || process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_ORG1;
+    if (!mspId) {
+      throw new ManagerError('Ledger MSP ID is missing. Set LEDGER_MSP_ID.', IssueType.Exception);
+    }
+    const chaincodeName = this.config.ledger?.chaincodeName || process.env.LEDGER_ORG_CHAINCODE;
+    const channelName = this.config.ledger?.channelName
+      || resolveIdentityChannel(params.jurisdiction || this.config.host.jurisdiction);
+    const manager = new ManageAssetOrganization({ chaincodeName, channelName });
+
+    const payload = {
+      orgId: params.orgId,
+      schemaUrl: this.config.ledger?.schemaUrl,
+      governanceVc: params.config.governanceVc,
+      selfDescriptionVc: params.config.selfDescriptionVc,
+      evidence: params.evidence,
+      keys: params.config.didDocument?.verificationMethod,
+      metadata: {
+        role: params.role,
+        sector: params.sector,
+        namespace: this.config.namespace,
+        host: this.config.hostExternalDomain,
+        organization: params.organization?.meta?.claims?.[ClaimsOrganizationSchemaorg.alternateName],
+      },
+    };
+
+    try {
+      await manager.createOrganization(mspId, params.orgId, payload);
+    } catch (error: any) {
+      const message = String(error?.message || error);
+      if (message.includes('EvidenceAlreadyRegistered')) {
+        throw new ManagerError('Evidence already registered for another organization.', IssueType.Conflict);
+      }
+      if (message.includes('already exists')) {
+        throw new ManagerError('Organization already registered on ledger.', IssueType.Conflict);
+      }
+      throw new ManagerError(`Ledger registration failed: ${message}`, IssueType.Exception);
+    }
   }
 
   private extractResources(claims: ClaimsRecord, environment?: string) {

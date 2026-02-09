@@ -34,10 +34,11 @@ import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { EntityLifecycleStatus, EntityType } from '../gdc-backend-utils-node/models/enums';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { generateLicenseOffer } from '../utils/offer';
+import { getEnvSectionId } from '../utils/section-env';
 
 
-const INDIVIDUAL_SECTION = 'individual';
-const DEVICE_LICENSE_SECTION = 'device-licenses';
+const INDIVIDUAL_SECTION = getEnvSectionId('individual');
+const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
 
 export class IndividualManager {
   private vaultRepository: IVaultRepository;

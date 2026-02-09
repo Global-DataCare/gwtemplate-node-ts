@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fabric-ca-root
+  namespace: test-fabric-v3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fabric-ca-root
+  template:
+    metadata:
+      labels:
+        app: fabric-ca-root
+    spec:
+      containers:
+        - name: fabric-ca-root
+          image: hyperledger/fabric-ca:latest
+          env:
+            - name: FABRIC_CA_HOME
+              value: /etc/hyperledger/fabric-ca-server
+            - name: FABRIC_CA_SERVER_HOME
+              value: /etc/hyperledger/fabric-ca-server
+            - name: FABRIC_CA_SERVER_CA_CERTFILE
+              value: /var/ca-secrets/ca-cert.pem
+            - name: FABRIC_CA_SERVER_CA_KEYFILE
+              value: /var/ca-secrets/ca-key.pem
+            - name: FABRIC_CA_SERVER_CA_NAME
+              value: ca-root
+            - name: FABRIC_CA_SERVER_PORT
+              value: "7054"
+            - name: FABRIC_CA_SERVER_TLS_ENABLED
+              value: "false"
+            - name: FABRIC_CA_SERVER_DEBUG
+              value: "true"
+            - name: FABRIC_CA_SERVER_BOOTSTRAP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: fabric-ca-root-admin
+                  key: user
+            - name: FABRIC_CA_SERVER_BOOTSTRAP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fabric-ca-root-admin
+                  key: password
+          args:
+            - sh
+            - -c
+            - "fabric-ca-server start -b ${FABRIC_CA_SERVER_BOOTSTRAP_USER}:${FABRIC_CA_SERVER_BOOTSTRAP_PASSWORD}"
+          ports:
+            - containerPort: 7054
+          volumeMounts:
+            - name: ca-data
+              mountPath: /var/ca-secrets
+              readOnly: true
+            - name: ca-home
+              mountPath: /etc/hyperledger/fabric-ca-server
+      volumes:
+        - name: ca-data
+          secret:
+            secretName: fabric-ca-root-data
+        - name: ca-home
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fabric-ca-root
+  namespace: test-fabric-v3
+spec:
+  selector:
+    app: fabric-ca-root
+  ports:
+    - port: 7054
+      targetPort: 7054

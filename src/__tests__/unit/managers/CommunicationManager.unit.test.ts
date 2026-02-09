@@ -138,5 +138,60 @@ describe('CommunicationManager Unit Tests', () => {
       expect(data[0].type).toBe('CommMsgExtended');
       expect(data[0].resource?.body?.data?.some((d: DataEntry) => d.type === 'Annotation')).toBe(true);
     });
+
+    it('should accept a FHIR Bundle entry[] payload with meta.claims and no resource', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'emergency-intake-thread-id-entry',
+        iss: 'did:web:api.acme.org:individual:abc:device:xyz',
+        aud: 'did:web:api.acme.org',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          entry: [
+            {
+              type: 'Communication',
+              meta: {
+                claims: {
+                  '@context': 'org.hl7.fhir.api',
+                  '@type': 'Communication:EmergencyIntake',
+                  'Communication.subject': 'did:web:api.acme.org:individual:abc',
+                  'Communication.recipient': 'did:web:api.acme.org:individual:abc',
+                  'Communication.sent': '2025-11-27T20:00:00Z',
+                  'Communication.text': 'Alergias: soy alérgico al látex.',
+                },
+              },
+              request: { method: 'POST', url: 'individual/org.hl7.fhir.api/Communication' },
+            },
+          ],
+        } as any,
+      };
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'emergency',
+        section: 'individual',
+        format: 'org.hl7.fhir.api' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      const response = await communicationManager.process(job);
+      expect(response.body?.resourceType).toBe('Bundle');
+      const data = (response.body as any).data;
+      expect(Array.isArray(data)).toBe(true);
+      expect(data[0].type).toBe('CommMsgExtended');
+      expect(data[0].resource?.body?.data?.some((d: DataEntry) => d.type === 'Annotation')).toBe(true);
+    });
   });
 });

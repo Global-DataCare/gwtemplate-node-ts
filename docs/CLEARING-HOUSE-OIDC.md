@@ -41,3 +41,23 @@ To make the flow discoverable without Gaia-X jargon, the service exposes standar
 - `POST /:tenantId/cds-:jurisdiction/v1/:sector/identity/oidc/credential`
 - Requires `Authorization: Bearer <access_token>` (in demo, any Bearer token is accepted).
 - Signs with legacy ES when available; add `?pqc=true` or header `X-PQC-Signature: true` to force ML-DSA.
+
+### Relationship with Observability
+Clearing House and Observability are related but distinct responsibilities:
+- **Clearing House**: compliance verification (VP/VC checks, policy, credential/status/revocation validation).
+- **Observability service**: operational/security traces for API and messaging events.
+
+Some deployments integrate both services behind one provider, but the API domains should remain separate.
+
+Routing convention:
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/{section}/{format}/{resourceType}/{action}`
+- For observability: `section=audit`
+
+Recommended Observability API family (target architecture):
+- `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/audit/didcomm/message/_search`
+- `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/audit/didcomm/message/_get`
+- `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/audit/didcomm/message/_export`
+- `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/audit/fhir/communication/_search`
+
+These endpoints are intended for user-visible, non-repudiable traces of message handling events
+(`stored`, `delivered_encrypted`, `decrypted_server_side`, `reencrypted`, `deleted`).

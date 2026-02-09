@@ -41,7 +41,11 @@ export class CommunicationManager implements IJobProcessor {
       throw new Error('Job content is missing');
     }
 
-    const entries = job.content.body.data || [job.content.body];
+    const body = job.content.body as any;
+    const entries: any[] =
+      (Array.isArray(body?.data) && body.data) ||
+      (Array.isArray(body?.entry) && body.entry) ||
+      [body];
 
     for (const entry of entries) {
       try {

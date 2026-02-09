@@ -9,8 +9,11 @@ import { createGaiaXLegalParticipantCredential } from './credential-generators';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomBytes } from '@noble/hashes/utils.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
+import { scryptSync } from 'node:crypto';
 import { sha256, sha384 } from '@noble/hashes/sha2.js';
 import { p256, p384 } from '@noble/curves/nist.js';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { calculateJwkThumbprint } from 'jose';
 import * as pkijs from 'pkijs';
 import * as asn1js from 'asn1js';
@@ -40,6 +43,12 @@ export function generateMSPID(entity: AuthorityConfig): string {
 
 export function resolveOutputDir(...segments: string[]) {
   const dir = path.join('artifacts', ...segments);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function resolveOutputDirWithBase(baseDir: string, ...segments: string[]) {
+  const dir = path.join(baseDir, ...segments);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -96,7 +105,147 @@ export function bigintToBytes(bn: bigint): Uint8Array {
   return Uint8Array.from(Buffer.from(hex, 'hex'));
 }
 
-export async function deriveKeyPair(seedInput?: string | Uint8Array, curve: 'P-256' | 'P-384' = 'P-256'): Promise<{
+type DeriveKeyPairOptions = {
+  kdf?: 'hash' | 'scrypt' | 'auto' | 'context';
+  context?: string;
+  env?: 'test' | 'prod';
+  saltPrefix?: string;
+  infoPrefix?: string;
+  minSeedBytes?: number;
+  forceScrypt?: boolean;
+  scrypt?: {
+    N: number;
+    r: number;
+    p: number;
+    dkLen: number;
+    salt: string;
+  };
+};
+
+const DEFAULT_SCRYPT = {
+  N: 16384,
+  r: 8,
+  p: 1,
+  dkLen: 32,
+  salt: 'gdc-pki-v1',
+};
+
+const DEFAULT_KDF_CONTEXT = {
+  saltPrefix: 'gdc-kdf:v1',
+  infoPrefix: 'gdc-kdf:v1',
+  minSeedBytes: 32,
+  env: 'test' as 'test' | 'prod',
+};
+
+function isHex32(seed: string): boolean {
+  const trimmed = seed.trim().replace(/^0x/i, '');
+  return trimmed.length === 64 && /^[0-9a-fA-F]+$/.test(trimmed);
+}
+
+function deriveSeedBytes(
+  seedInput?: string | Uint8Array,
+  options?: DeriveKeyPairOptions
+): Buffer {
+  if (seedInput instanceof Uint8Array) {
+    return Buffer.from(seedInput.subarray(0, 32));
+  }
+
+  const seed = seedInput?.trim() ?? '';
+  if (!seed) {
+    return Buffer.from(randomBytes(32));
+  }
+
+  const mode = options?.kdf ?? 'hash';
+  const scryptConfig = options?.scrypt ?? DEFAULT_SCRYPT;
+
+  if (mode === 'hash') {
+    return Buffer.from(seed.replace(/^0x/i, ''), 'hex').subarray(0, 32);
+  }
+
+  if (mode === 'auto' && isHex32(seed)) {
+    return Buffer.from(seed.replace(/^0x/i, ''), 'hex').subarray(0, 32);
+  }
+
+  const salt = Buffer.from(scryptConfig.salt, 'utf8');
+  return scryptSync(seed, salt, scryptConfig.dkLen, {
+    N: scryptConfig.N,
+    r: scryptConfig.r,
+    p: scryptConfig.p,
+    maxmem: 128 * scryptConfig.N * scryptConfig.r * 2,
+  });
+}
+
+function toSeedBytes(seedInput?: string | Uint8Array): Buffer {
+  if (seedInput instanceof Uint8Array) {
+    return Buffer.from(seedInput);
+  }
+  const seed = seedInput?.trim() ?? '';
+  if (!seed) return Buffer.alloc(0);
+  if (isHex32(seed)) {
+    return Buffer.from(seed.replace(/^0x/i, ''), 'hex');
+  }
+  return Buffer.from(seed, 'utf8');
+}
+
+function resolveContextSalt(options: DeriveKeyPairOptions, context: string): string {
+  const saltPrefix = options.saltPrefix ?? DEFAULT_KDF_CONTEXT.saltPrefix;
+  const env = options.env ?? DEFAULT_KDF_CONTEXT.env;
+  const base = `${saltPrefix}:${env}:${context}`;
+  if (options.scrypt?.salt) return `${base}:${options.scrypt.salt}`;
+  return base;
+}
+
+function resolveContextInfo(options: DeriveKeyPairOptions, context: string, curve: string): string {
+  const infoPrefix = options.infoPrefix ?? DEFAULT_KDF_CONTEXT.infoPrefix;
+  return `${infoPrefix}:${context}:${curve}`;
+}
+
+function deriveSeedBytesContext(
+  seedInput: string | Uint8Array | undefined,
+  curve: 'P-256' | 'P-384' | 'secp256k1',
+  options: DeriveKeyPairOptions
+): Buffer {
+  const context = options.context?.trim();
+  if (!context) {
+    throw new Error('KDF context is required when kdf="context".');
+  }
+
+  const seedBytes = toSeedBytes(seedInput);
+  const minSeedBytes = options.minSeedBytes ?? DEFAULT_KDF_CONTEXT.minSeedBytes;
+  const forceScrypt = options.forceScrypt === true;
+  const seedIsStrong = seedInput instanceof Uint8Array
+    ? seedBytes.length >= minSeedBytes
+    : isHex32((seedInput ?? '').toString());
+  const useScrypt = forceScrypt || seedBytes.length < minSeedBytes || !seedIsStrong;
+  const outLen = curve === 'P-384' ? 48 : 32;
+
+  let ikm: Buffer;
+  if (!seedBytes.length) {
+    ikm = Buffer.from(randomBytes(outLen));
+  } else if (useScrypt) {
+    const scryptConfig = options.scrypt ?? DEFAULT_SCRYPT;
+    const salt = Buffer.from(resolveContextSalt(options, context), 'utf8');
+    const dkLen = Math.max(scryptConfig.dkLen, outLen);
+    ikm = scryptSync(seedBytes, salt, dkLen, {
+      N: scryptConfig.N,
+      r: scryptConfig.r,
+      p: scryptConfig.p,
+      maxmem: 128 * scryptConfig.N * scryptConfig.r * 2,
+    });
+  } else {
+    ikm = Buffer.from(seedBytes.subarray(0, outLen));
+  }
+
+  const salt = Buffer.from(resolveContextSalt(options, context), 'utf8');
+  const info = Buffer.from(resolveContextInfo(options, context, curve), 'utf8');
+  return Buffer.from(hkdf(sha256, ikm, salt, info, outLen));
+}
+
+export async function deriveKeyPair(
+  seedInput?: string | Uint8Array,
+  curve: 'P-256' | 'P-384' | 'secp256k1' = 'P-256',
+  options?: DeriveKeyPairOptions
+): Promise<{
   pub: Uint8Array;
   jwk: {
     kty: string;
@@ -108,20 +257,19 @@ export async function deriveKeyPair(seedInput?: string | Uint8Array, curve: 'P-2
   seed: string;
   kid: string;
 }> {
-  let seedBuf: Buffer;
-  if (seedInput instanceof Uint8Array) {
-    seedBuf = Buffer.from(seedInput.subarray(0, 32));
-  } else if (seedInput?.trim()) {
-    seedBuf = Buffer.from(seedInput.replace(/^0x/, ''), 'hex').subarray(0, 32);
-  } else {
-    seedBuf = Buffer.from(randomBytes(32));
-  }
-
+  const mode = options?.kdf ?? 'hash';
+  const seedBuf = mode === 'context'
+    ? deriveSeedBytesContext(seedInput, curve, options ?? {})
+    : deriveSeedBytes(seedInput, options);
   const seed = Buffer.from(seedBuf).toString('hex');
-  const privateKey = curve === 'P-384' ? sha384(seedBuf) : sha256(seedBuf);
+  const privateKey = mode === 'context'
+    ? seedBuf
+    : (curve === 'P-384' ? sha384(seedBuf) : sha256(seedBuf));
   const pub = curve === 'P-384'
     ? p384.getPublicKey(privateKey, false)
-    : p256.getPublicKey(privateKey, false); // 0x04 | X | Y
+    : (curve === 'secp256k1'
+      ? secp256k1.getPublicKey(privateKey, false)
+      : p256.getPublicKey(privateKey, false)); // 0x04 | X | Y
 
   const coordLen = (pub.length - 1) / 2;
   const x = Buffer.from(pub.slice(1, 1 + coordLen)).toString('base64url');
@@ -147,14 +295,20 @@ export async function createCertificate(
   publicKeyBytes: Uint8Array,
   years: number,
   legalRegistrationNumber: string,
-  curve: 'P-256' | 'P-384' = 'P-256'
+  curve: 'P-256' | 'P-384' = 'P-256',
+  isCA = false
 ): Promise<Buffer> {
   const cert = new pkijs.Certificate();
+  cert.version = 2; // v3
   cert.serialNumber = new asn1js.Integer({ value: Math.floor(Date.now() / 1000) });
 
   cert.issuer.typesAndValues.push(new pkijs.AttributeTypeAndValue({
     type: '2.5.4.3',
     value: new asn1js.PrintableString({ value: issuerCN })
+  }));
+  cert.issuer.typesAndValues.push(new pkijs.AttributeTypeAndValue({
+    type: '2.5.4.97', // organizationIdentifier
+    value: new asn1js.PrintableString({ value: legalRegistrationNumber })
   }));
   cert.subject.typesAndValues.push(new pkijs.AttributeTypeAndValue({
     type: '2.5.4.3',
@@ -179,13 +333,39 @@ export async function createCertificate(
   );
   await cert.subjectPublicKeyInfo.importKey(cryptoPub);
 
-  cert.extensions = [
-    new pkijs.Extension({
-      extnID: '2.5.29.19',
-      critical: true,
-      extnValue: new pkijs.BasicConstraints({ cA: true }).toSchema().toBER(false)
-    })
-  ];
+  const basicConstraints = new pkijs.Extension({
+    extnID: '2.5.29.19',
+    critical: true,
+    extnValue: new pkijs.BasicConstraints({ cA: isCA }).toSchema().toBER(false),
+  });
+
+  const keyUsageBits = new Uint8Array(2);
+  if (!isCA) {
+    keyUsageBits[0] |= 0x80; // digitalSignature
+    keyUsageBits[0] |= 0x20; // keyEncipherment
+  } else {
+    keyUsageBits[0] |= 0x80; // digitalSignature
+    keyUsageBits[0] |= 0x04; // keyCertSign
+    keyUsageBits[0] |= 0x02; // cRLSign
+  }
+
+  const keyUsage = new pkijs.Extension({
+    extnID: '2.5.29.15',
+    critical: true,
+    extnValue: new asn1js.BitString({ valueHex: keyUsageBits.buffer }).toBER(false),
+  });
+
+  const skiValue = await crypto.subtle.digest(
+    'SHA-1',
+    cert.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHex
+  );
+  const subjectKeyIdentifier = new pkijs.Extension({
+    extnID: '2.5.29.14',
+    critical: false,
+    extnValue: new asn1js.OctetString({ valueHex: skiValue }).toBER(false),
+  });
+
+  cert.extensions = [basicConstraints, keyUsage, subjectKeyIdentifier];
 
   await cert.sign(issuerKey, 'SHA-256');
   return Buffer.from(cert.toSchema(true).toBER(false));

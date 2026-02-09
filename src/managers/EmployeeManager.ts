@@ -27,9 +27,10 @@ import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { EntityLifecycleStatus, EntityType } from '../gdc-backend-utils-node/models/enums';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { generateLicenseOffer } from '../utils/offer';
+import { getEnvSectionId } from '../utils/section-env';
 
-const EMPLOYEE_SECTION = 'employees';
-const DEVICE_LICENSE_SECTION = 'device-licenses';
+const EMPLOYEE_SECTION = getEnvSectionId('employees');
+const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
 
 export class EmployeeManager {
   private vaultRepository: IVaultRepository;

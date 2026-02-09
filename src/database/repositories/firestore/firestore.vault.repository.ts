@@ -1,6 +1,7 @@
 import admin from 'firebase-admin';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { RecordBase, VaultConfig } from 'gdc-common-utils-ts/models/resource-document';
+import { getEnvSectionId } from '../../../utils/section-env';
 
 const DEFAULT_SECTION = 'default';
 
@@ -62,7 +63,7 @@ export class FirestoreVaultRepository extends IVaultRepository {
    * @param vaultId The logical vaultId of the tenant (e.g., 'health-care_acme').
    */
   async vaultExists(vaultId: string): Promise<boolean> {
-    const doc = await this.get(this.hostCollectionName, vaultId, 'tenants');
+    const doc = await this.get(this.hostCollectionName, vaultId, getEnvSectionId('tenants'));
     return doc !== undefined;
   }
 

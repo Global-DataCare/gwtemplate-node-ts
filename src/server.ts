@@ -1,6 +1,6 @@
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
 
-import app from './app';
+import { createApp } from './app';
 import * as express from 'express';
 import admin from 'firebase-admin';
 
@@ -37,7 +37,10 @@ import { ManagerRegistry } from './managers/registry';
 import { HostingManager } from './managers/HostingManager';
 import { TenantsCacheManager } from './managers/TenantsCacheManager';
 import { EmployeeManager } from './managers/EmployeeManager';
+import { IcaManager } from './managers/IcaManager';
+import { MessagingManager } from './managers/MessagingManager';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { slugFromDomain } from './utils/slug';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { IndividualManager } from './managers/IndividualManager';
 import { CredentialManager } from './managers/CredentialManager';
@@ -48,6 +51,7 @@ import { createNetworkRouter } from './routes/network';
 import { createWebhooksRouter } from './routes/webhooks';
 import { IBlockchainAdapter } from './adapters/IBlockchainAdapter';
 import { CommunicationManager } from './managers/CommunicationManager';
+import { DocumentReferenceManager } from './managers/DocumentReferenceManager';
 import { DeviceRegistrationManager } from './managers/DeviceRegistrationManager';
 import { IAuthorizationManager } from './managers/auth/IAuthorizationManager';
 import { createFhirRouter } from './routes/fhir';
@@ -60,6 +64,7 @@ import { TokenManager } from './managers/TokenManager';
 import { DemoTokenVerifier } from './auth/DemoTokenVerifier';
 import { createAuthRouter } from './routes/auth';
 import { OpenIdAuthManager } from './managers/OpenIdAuthManager';
+import { ClearingHouseService } from './services/ClearingHouseService';
 import { IdentityTokenManager } from './managers/IdentityTokenManager';
 import { ObservationManager } from './managers/ObservationManager';
 import { RelatedPersonManager } from './managers/RelatedPersonManager';
@@ -99,6 +104,10 @@ try {
 // ===================================================================================
 
 let configInstance: IServerConfig;
+
+export function resetServerConfig(): void {
+  configInstance = undefined as unknown as IServerConfig;
+}
 
 function determineApiBaseUrl(port: number, apiHostname: string): string {
   // 1. Highest Priority: Use the canonical external domain if it's provided.
@@ -196,6 +205,21 @@ function getConfig(): IServerConfig {
       legacyX509ChainBase64: process.env.LEGACY_X509_CHAIN_BASE64
         ? process.env.LEGACY_X509_CHAIN_BASE64.split(',').map((value) => value.trim()).filter(Boolean)
         : undefined,
+      ica: {
+        mode: (process.env.ICA_MODE === 'internal' || process.env.ICA_MODE === 'external')
+          ? process.env.ICA_MODE
+          : undefined,
+        internalUrl: process.env.ICA_URL_INTERNAL,
+        externalUrl: process.env.ICA_URL_EXTERNAL,
+        tlsCaPem: process.env.ICA_TLS_CA_PEM,
+      },
+      ledger: {
+        enabled: process.env.LEDGER_ENABLED ? process.env.LEDGER_ENABLED === 'true' : undefined,
+        mspId: process.env.LEDGER_MSP_ID,
+        channelName: process.env.LEDGER_IDENTITY_CHANNEL_DEFAULT,
+        chaincodeName: process.env.LEDGER_ORG_CHAINCODE,
+        schemaUrl: process.env.GOVERNANCE_SCHEMA_URL,
+      },
       localServiceRoles,
     };
   }
@@ -236,6 +260,7 @@ async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServer
   }
 }
 
+
 interface StartServerOptions {
   testMiddlewares?: express.RequestHandler[];
   authManager?: IAuthorizationManager;
@@ -257,9 +282,8 @@ async function startServer(options?: StartServerOptions) {
     }];
   }
 
-  // const app = express.default();
+  const app = createApp();
   app.use(express.urlencoded({ extended: true }));
-  app.use(express.json({ type: ['application/json', 'application/fhir+json', 'application/didcomm-plaintext+json'] }));
 
   if (options?.testMiddlewares) {
     options.testMiddlewares.forEach((mw) => app.use(mw));
@@ -331,6 +355,8 @@ async function startServer(options?: StartServerOptions) {
     logger, // Inject logger
     config,
   );
+  const icaManager = new IcaManager(vaultRepository, kmsService);
+  const messagingManager = new MessagingManager(vaultRepository, kmsService);
   const employeeManager = new EmployeeManager(vaultRepository, kmsService, tenantManager);
   
   const credentialManager = new CredentialManager(
@@ -375,6 +401,7 @@ async function startServer(options?: StartServerOptions) {
   );
 
   const compositionManager = new CompositionManager(vaultRepository);
+  const documentReferenceManager = new DocumentReferenceManager(vaultRepository);
   const communicationManager = new CommunicationManager({ tenantsCacheManager: tenantManager });
   const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService);
   const licenseManager = new LicenseManager(vaultRepository, kmsService);
@@ -392,7 +419,8 @@ async function startServer(options?: StartServerOptions) {
   );
   const tokenManager = new TokenManager(kmsService, tenantManager);
   const identityTokenManager = new IdentityTokenManager(appAuthManager, tokenManager);
-  const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository);
+  const clearingHouseService = new ClearingHouseService();
+  const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository, clearingHouseService);
   const observationManager = new ObservationManager(vaultRepository);
   const relatedPersonManager = new RelatedPersonManager(vaultRepository);
   const consentManager = new ConsentManager({ vaultRepository });
@@ -410,9 +438,24 @@ async function startServer(options?: StartServerOptions) {
     await tenantManager.getTenant('host');
   }
 
+  const icaDomain = process.env.ICA_EXTERNAL_DOMAIN;
+  const caDomain = process.env.CA_EXTERNAL_DOMAIN;
+  if (config.nodeEnv === 'demo' && (icaDomain || caDomain)) {
+    const icaSlug = slugFromDomain(icaDomain);
+    const caSlug = slugFromDomain(caDomain);
+    if (icaSlug) {
+      await hostingManager.ensureAuthorityTenant({ alternateName: icaSlug, role: 'ica', externalDomain: icaDomain });
+    }
+    if (caSlug) {
+      await hostingManager.ensureAuthorityTenant({ alternateName: caSlug, role: 'ca', externalDomain: caDomain });
+    }
+  }
+
   const managerRegistry: ManagerRegistry = {
     hostingManager,
     tenantManager,
+    icaManager,
+    messagingManager,
     identityTokenManager,
     observationManager,
     relatedPersonManager,
@@ -421,6 +464,7 @@ async function startServer(options?: StartServerOptions) {
     individualManager,
     consentManager,
     compositionManager,
+    documentReferenceManager,
     communicationManager,
     deviceRegistrationManager,
     licenseManager,

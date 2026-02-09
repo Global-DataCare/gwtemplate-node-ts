@@ -114,7 +114,116 @@ For more advanced testing and scripting, the project includes a comprehensive co
 - `npm run test:unit` / `npm run test:integration` / `npm run test:e2e`: Run specific test tiers.
 - `npm run seed:dev`: Generate deterministic dev CA material (used by Fabric CA containers).
 
+## API Integrators Flow Runner
+
+Use this runner to validate the journey documented in `docs/API_INTEGRATORS_GUIDE.md` against the current code:
+
+- Command: `npm run docs:flow-report`
+- Output: `artifacts/api-integrators-guide.flow-report.json`
+- Scope:
+  - Host discovery + organization onboarding (Offer/Order)
+  - ICA status message checks for legal representative (`messaging/_messages` and `messaging/_get`)
+  - Initial access token, DCR, SMART token, employee/family, consent, communication, composition
+
+Notes:
+- The report includes both expected success and intentional negative-path checks.
+- ICA automatic message persistence requires ICA connectivity (`ICA_EXTERNAL_DOMAIN` + reachable ICA endpoint). If not configured, the runner records the ICA message fetch step as informational (`204`) instead of failing the full report.
+
+## PKI generation (CA / ICA / Host / Member)
+
+This project includes scripts to generate a deterministic PKI chain from schema.org
+`Organization` JSON files. Each step is separated so CA/ICA are created once and
+hosts/members can be generated as needed.
+
+Required JSON fields:
+- `legalName` (original legal name; can be non-ASCII)
+- `name` (ICAO9303 transliteration in ASCII)
+- `alternateName` (optional commercial name)
+- `taxID`
+- `url` (used to derive domain)
+- `address.addressCountry` (ISO-2 country code)
+
+Optional:
+- `address.addressLocality`, `address.streetAddress`, `address.postalCode`
+
+Example inputs live in `pki-inputs/test` and `pki-inputs/prod`.
+
+Commands (run from repo root):
+
+```bash
+# Root CA
+npm run pki:root -- --json pki-inputs/test/ca-organization.json --env test
+
+# Intermediate CA (signed by Root CA)
+npm run pki:ica -- \
+  --json pki-inputs/test/ica-organization.json \
+  --ca-json pki-inputs/test/ca-organization.json \
+  --ca-dir artifacts/test/pki-root-ca \
+  --env test
+
+# Host certificate (signed by ICA)
+npm run pki:host -- \
+  --json pki-inputs/test/host-organization.json \
+  --ica-json pki-inputs/test/ica-organization.json \
+  --ica-dir artifacts/test/pki-ica/<ICA_MSP_ID> \
+  --ca-dir artifacts/test/pki-root-ca \
+  --env test
+
+# Member certificate (signed by ICA)
+npm run pki:member -- \
+  --json pki-inputs/test/member-organization.json \
+  --ica-json pki-inputs/test/ica-organization.json \
+  --ica-dir artifacts/test/pki-ica/<ICA_MSP_ID> \
+  --ca-dir artifacts/test/pki-root-ca \
+  --env test
+```
+
+Seeds can be passed with `--seed <hex>` or entered interactively.
+Environment output defaults to `test` and writes under `artifacts/<env>/`.
+If the target output directory already exists, the script will prompt before overwriting.
+Key derivation (KDF) defaults to:
+- `auto`: if the seed is a 32-byte hex string, it is used directly; otherwise scrypt is used.
+- `scrypt`: always use scrypt.
+- `hash`: legacy mode (hash-only).
+- `context`: derives context-specific keys via `scrypt + HKDF` (recommended for multi-ecosystem keys).
+
+You can force the mode and override scrypt params:
+
+```bash
+npm run pki:member -- --json pki-inputs/test/member-organization.json \
+  --ica-json pki-inputs/test/ica-organization.json \
+  --ica-dir artifacts/test/pki-ica \
+  --ca-dir artifacts/test/pki-root-ca \
+  --env test \
+  --kdf scrypt \
+  --kdf-config pki-kdf.json
+```
+
+Context KDF example (multi-ecosystem):
+
+```bash
+npm run pki:member -- --json pki-inputs/test/member-organization.json \
+  --ica-json pki-inputs/test/ica-organization.json \
+  --ica-dir artifacts/test/pki-ica \
+  --ca-dir artifacts/test/pki-root-ca \
+  --env test \
+  --kdf context \
+  --context fabric \
+  --kdf-config pki-kdf.json
+```
+
+Leaf certificates are named with:
+- `HOST_<country>_TAX_<taxId>.pem` for hosts
+- `MEMBER_<country>_TAX_<taxId>.pem` for members
+
 ## Fabric Devnet (Optional)
 
 For a deterministic Fabric v3 devnet (DEMO single-host or multi-org), see:
 - `devnet/fabric-v3/README.md`
+
+For the multi-cloud Fabric deployment plan and scripts, see:
+- `fabric-multicloud/README.md`
+- `docs/04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md`
+
+Local (minikube/k3s) is test-only and documented in:
+- `private-deploy.local.config`

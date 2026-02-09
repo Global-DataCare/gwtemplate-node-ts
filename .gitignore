@@ -91,8 +91,25 @@ build
 
 # Ignore all .json files in the root, like service account keys
 /*.json
+!pki-kdf.json
 
 # Ignore all .env files...
 .env*
 # ...except for the example template.
 !.env.example
+
+# Local deploy config / secrets (never commit)
+private-deploy.config
+secrets/
+*.secrets
+
+# PKI private material (public certs can be committed)
+artifacts/**/private-jwk.json
+artifacts/**/keystore/**
+artifacts/**/ca-key.pem
+artifacts/**/ca-key.der
+artifacts/**/fabric-ca-server-root/ca-key.pem
+artifacts/**/fabric-ca-server-ica/ca-key.pem
+
+# Local Fabric toolchain downloads
+tools/

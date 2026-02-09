@@ -15,6 +15,19 @@ export interface IServerConfig {
   hostExternalDomain: string;
   apiBaseUrl: string;
   namespace: string;
+  ica?: {
+    mode?: 'internal' | 'external';
+    internalUrl?: string;
+    externalUrl?: string;
+    tlsCaPem?: string;
+  };
+  ledger?: {
+    enabled?: boolean;
+    mspId?: string;
+    channelName?: string;
+    chaincodeName?: string;
+    schemaUrl?: string;
+  };
   sectorsAllowed: Sector[];
   allowedPaymentMethods: string[];
   dbProvider: string;

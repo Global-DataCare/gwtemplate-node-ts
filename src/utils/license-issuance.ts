@@ -6,6 +6,7 @@ import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confiden
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import { getEnvSectionId } from './section-env';
 
 export type IssueActivationCodeParams = {
   vaultRepository: IVaultRepository;
@@ -31,7 +32,7 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
 }> {
   const { vaultRepository, kmsService, tenantVaultId, userClass, type, email, role } = params;
 
-  const all = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(tenantVaultId, 'device-licenses');
+  const all = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(tenantVaultId, getEnvSectionId('device-licenses'));
   const match = all.find((doc) => {
     const license = doc?.content as any;
     const status = String((license && license.status) || doc.status || '');
@@ -69,7 +70,7 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
     match.indexed = { ...(match.indexed || {}), attributes: attrs };
   }
 
-  await vaultRepository.put(tenantVaultId, [match], 'device-licenses');
+  await vaultRepository.put(tenantVaultId, [match], getEnvSectionId('device-licenses'));
 
   return { activationCode, licenseId: match.id };
 }
