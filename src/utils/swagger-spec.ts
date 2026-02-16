@@ -37,6 +37,8 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
     examples.INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST;
   swaggerDefinition.components.examples.LicenseIssuePlaintextMessage.value =
     examples.LICENSE_ISSUE_REQUEST;
+  swaggerDefinition.components.examples.LicenseIssueExistingEmployeePlaintextMessage.value =
+    examples.LICENSE_ISSUE_EXISTING_EMPLOYEE_REQUEST;
   swaggerDefinition.components.examples.FirebaseCustomTokenPlaintextMessage.value =
     examples.FIREBASE_CUSTOM_TOKEN_REQUEST;
   swaggerDefinition.components.examples.DeviceRegistrationPlaintextMessage.value =
@@ -62,6 +64,9 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
   swaggerDefinition.components.examples.FamilyMemberRelationshipPlaintextMessage.value =
     examples.FAMILY_MEMBER_RELATIONSHIP_MESSAGE;
   swaggerDefinition.components.examples.AsyncPollRequest.value = examples.ASYNC_POLL_REQUEST;
+  if (swaggerDefinition.components.examples.TokenExchangePollRequest) {
+    swaggerDefinition.components.examples.TokenExchangePollRequest.value = examples.TOKEN_EXCHANGE_POLL_REQUEST;
+  }
   swaggerDefinition.components.examples.AsyncPollPending.value = examples.ASYNC_POLL_PENDING_RESPONSE;
   swaggerDefinition.components.examples.AsyncPollSecureResponse.value = examples.ASYNC_POLL_SECURE_RESPONSE_FORM;
 

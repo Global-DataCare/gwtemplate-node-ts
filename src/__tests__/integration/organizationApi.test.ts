@@ -506,7 +506,7 @@ describe('Organization Registration API', () => {
       const responseEntry = finalVcResponse.body.data[0];
       expect(responseEntry.type).toBe('Organization-order-response-v1.0');
       expect(responseEntry.response.status).toBe('201');
-      expect(responseEntry.meta?.claims['Order.acceptedOffer.identifier']).toBe(offerId);
+      expect(responseEntry.meta?.claims['org.schema.Order.acceptedOffer.identifier']).toBe(offerId);
     });
   });
 });

@@ -215,7 +215,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const entry = finalPayload.body.data[0];
     expect(entry.response.status).toBe('201');
     expect(entry.type).toBe('Family-order-response-v1.0');
-    expect(entry.meta.claims['Order.acceptedOffer.identifier']).toBe(offerId);
+    expect(entry.meta.claims['org.schema.Order.acceptedOffer.identifier']).toBe(offerId);
 
     const tenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, tenantId);
     const tenantCollectionName = await tenantsCacheManager.getCollectionName(tenantVaultId);

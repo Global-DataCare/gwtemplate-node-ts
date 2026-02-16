@@ -121,8 +121,8 @@ const metaRequestBodyOnlyKidHeader = {
  * Initial request to register a new tenant organization.
  */
 export const ORGANIZATION_REGISTRATION_REQUEST = {
-  "jti": "org-registration-request-id",
-  "thid": "org-registration-thread-id",
+  "jti": "org-registration-request-<test-id>",
+  "thid": "org-registration-thread-<test-id>",
   "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
   "aud": "did:web:host.example.com",
   "exp": 1678886460,
@@ -150,8 +150,8 @@ export const ORGANIZATION_REGISTRATION_REQUEST = {
  * The response to a successful registration request, containing the Offer.
  */
 export const ORGANIZATION_REGISTRATION_RESPONSE = {
-  "jti": "org-registration-response-id",
-  "thid": "org-registration-thread-id",
+  "jti": "org-registration-response-<test-id>",
+  "thid": "org-registration-thread-<test-id>",
   "aud": "urn:ietf:rfc:7638:thumbprint-public-enc-key-device",
   "iss": "did:web:host.example.com#v1_<network>_registry_org.schema_organization_batch",
   "exp": 1678886460,
@@ -179,8 +179,8 @@ export const ORGANIZATION_REGISTRATION_RESPONSE = {
  * Use the Offer identifier returned by the Organization registration _batch-response.
  */
 export const ORGANIZATION_ORDER_REQUEST = {
-  "jti": "org-order-request-id",
-  "thid": "org-order-thread-id",
+  "jti": "org-order-request-<test-id>",
+  "thid": "org-order-thread-<test-id>",
   "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
   "aud": "did:web:host.example.com",
   "exp": 1678886460,
@@ -193,7 +193,7 @@ export const ORGANIZATION_ORDER_REQUEST = {
       "meta": {
         "claims": {
           "@context": "org.schema",
-          "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:3391176c-e2fa-4ec3-98c0-e945f82b8a42",
+          "Order.acceptedOffer.identifier": "{{offerId}}",
         }
       }
     }]
@@ -206,8 +206,8 @@ export const ORGANIZATION_ORDER_REQUEST = {
  * Response to a successful order request, containing the payment communication bundle.
  */
 export const ORGANIZATION_ORDER_RESPONSE = {
-  "jti": "org-order-response-id",
-  "thid": "org-order-thread-id",
+  "jti": "org-order-response-<test-id>",
+  "thid": "org-order-thread-<test-id>",
   "aud": "urn:ietf:rfc:7638:thumbprint-public-enc-key-device",
   "iss": "did:web:host.example.com",
   "exp": 1678886460,
@@ -225,14 +225,14 @@ export const ORGANIZATION_ORDER_RESPONSE = {
           "claims": {
             "@context": "org.schema",
             "@type": "Order:Invoice",
-            "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>",
-            "Order.partOfInvoice": "<invoice-id-or-url>",
-            "Order.paymentMethod": "Stripe",
-            "Order.paymentDueDate": "2025-10-22T14:30:00Z",
-            "Order.paymentUrl": "<payment-url>",
-            "Order.invoiceIssuedAt": "2025-10-15T14:30:00Z",
-            "Order.activationCode": "lic-activation-code-001",
-            "Order.activationCategory": "professional"
+            "org.schema.Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>",
+            "org.schema.Order.partOfInvoice": "<invoice-id-or-url>",
+            "org.schema.Order.paymentMethod": "Stripe",
+            "org.schema.Order.paymentDueDate": "2025-10-22T14:30:00Z",
+            "org.schema.Order.paymentUrl": "<payment-url>",
+            "org.schema.Order.invoiceIssuedAt": "2025-10-15T14:30:00Z",
+            "org.schema.IndividualProduct.serialNumber": "lic-activation-code-001",
+            "org.schema.IndividualProduct.category": "professional"
           }
         },
         "response": { "status": "201" }
@@ -244,52 +244,56 @@ export const ORGANIZATION_ORDER_RESPONSE = {
 // --- Async Polling (HTTP-level payloads) ---
 
 export const ASYNC_POLL_REQUEST = {
-  "thid": "action-thread-id",
+  "thid": "action-thread-<test-id>",
 };
 
 export const ASYNC_POLL_PENDING_RESPONSE = {
-  "thid": "action-thread-id",
+  "thid": "action-thread-<test-id>",
   "status": "PENDING",
 };
 
 export const ORGANIZATION_REGISTRATION_POLL_REQUEST = {
-  "thid": "org-registration-thread-id",
+  "thid": "org-registration-thread-<test-id>",
 };
 
 export const ORGANIZATION_ORDER_POLL_REQUEST = {
-  "thid": "org-order-thread-id",
+  "thid": "org-order-thread-<test-id>",
 };
 
 export const EMPLOYEE_POLL_REQUEST = {
-  "thid": "employee-thread-id",
+  "thid": "employee-thread-<test-id>",
 };
 
 export const CONSENT_POLL_REQUEST = {
-  "thid": "consent-thread-id",
+  "thid": "consent-thread-<test-id>",
 };
 
 export const COMMUNICATION_POLL_REQUEST = {
-  "thid": "communication-thread-id",
+  "thid": "communication-thread-<test-id>",
 };
 
 export const COMPOSITION_POLL_REQUEST = {
-  "thid": "composition-thread-id",
+  "thid": "composition-thread-<test-id>",
 };
 
 export const RELATED_PERSON_POLL_REQUEST = {
-  "thid": "relatedperson-thread-id",
+  "thid": "relatedperson-thread-<test-id>",
 };
 
 export const OBSERVATION_POLL_REQUEST = {
-  "thid": "observation-thread-id",
+  "thid": "observation-thread-<test-id>",
+};
+
+export const TOKEN_EXCHANGE_POLL_REQUEST = {
+  "thid": "token-exchange-thread-<test-id>",
 };
 
 export const TENANT_ORGANIZATION_POLL_REQUEST = {
-  "thid": "tenant-organization-thread-id",
+  "thid": "tenant-organization-thread-<test-id>",
 };
 
 export const TENANT_ORDER_POLL_REQUEST = {
-  "thid": "tenant-order-thread-id",
+  "thid": "tenant-order-thread-<test-id>",
 };
 
 // For legacy/plaintext submissions, the polling endpoint returns the decoded business `body` only.
@@ -330,8 +334,8 @@ export const DCR_REQUEST_BODY = {
  * The full DIDComm message for a Device Registration (DCR) request.
  */
 export const DEVICE_REGISTRATION_REQUEST = {
-  "jti": "device-registration-request-id",
-  "thid": "device-registration-thread-id",
+  "jti": "device-registration-request-<test-id>",
+  "thid": "device-registration-thread-<test-id>",
   "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
   "aud": "did:web:api.acme.org#identity_openid_device_dcr",
   "exp": 1678886460,
@@ -346,8 +350,8 @@ export const DEVICE_REGISTRATION_REQUEST = {
  * The final response to a DCR request, containing the new client_id.
  */
 export const DEVICE_REGISTRATION_RESPONSE = {
-  "jti": "device-registration-response-id",
-  "thid": "device-registration-thread-id",
+  "jti": "device-registration-response-<test-id>",
+  "thid": "device-registration-thread-<test-id>",
   "aud": "urn:ietf:rfc:7638:thumbprint-public-enc-key-device",
   "iss": "did:web:api.acme.org",
   "exp": 1678886460,
@@ -364,8 +368,8 @@ export const DEVICE_REGISTRATION_RESPONSE = {
  * A request for a scoped SMART access token.
  */
 export const SMART_TOKEN_REQUEST = {
-  "jti": "smart-token-request-id",
-  "thid": "smart-token-thread-id",
+  "jti": "smart-token-request-<test-id>",
+  "thid": "smart-token-thread-<test-id>",
   "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
   "aud": "did:web:api.acme.org",
   "exp": 1678886460,
@@ -406,8 +410,8 @@ export const SMART_TOKEN_REQUEST = {
  * Note: Authorization header carries the Firebase id_token; body carries `subject_token`.
  */
 export const INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST = {
-  "jti": "token-exchange-request-id",
-  "thid": "token-exchange-thread-id",
+  "jti": "token-exchange-request-<test-id>",
+  "thid": "token-exchange-thread-<test-id>",
   "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
   "aud": "did:web:api.acme.org#identity_openid_token_exchange",
   "exp": 1678886460,
@@ -415,7 +419,7 @@ export const INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST = {
   "nbf": 1678886400,
   "type": "application/json",
   "body": {
-    "subject_token": "<license-activation-code>"
+    "subject_token": "{{activationCode}}"
   }
 };
 
@@ -428,8 +432,8 @@ export const INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST = {
  * - The response will return a `batch-response` entry with `id = <activationCode>` for copy/paste.
  */
 export const LICENSE_ISSUE_REQUEST = {
-  jti: 'license-issue-request-id',
-  thid: 'license-issue-thread-id',
+  jti: 'license-issue-request-<test-id>',
+  thid: 'license-issue-thread-<test-id>',
   iss: 'did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>',
   aud: 'did:web:api.acme.org#identity_openid_license_issue',
   type: 'application/api+json',
@@ -457,11 +461,39 @@ export const LICENSE_ISSUE_REQUEST = {
 
 /**
  * @see API_INTEGRATORS_GUIDE.md section 7.1.1
+ * Issue an activation code for an employee that already exists in the tenant.
+ */
+export const LICENSE_ISSUE_EXISTING_EMPLOYEE_REQUEST = {
+  ...LICENSE_ISSUE_REQUEST,
+  thid: 'license-issue-thread-<test-id>-existing-employee',
+  jti: 'license-issue-request-<test-id>-existing-employee',
+  body: {
+    ...LICENSE_ISSUE_REQUEST.body,
+    data: [
+      {
+        ...LICENSE_ISSUE_REQUEST.body.data[0],
+        meta: {
+          claims: {
+            '@context': 'org.schema',
+            '@type': 'IndividualProduct:Issue',
+            'org.schema.Person.email': 'admin1@acme.org',
+            'org.schema.Person.hasOccupation': 'ISCO-08|1120',
+            'org.schema.IndividualProduct.category': 'professional',
+            'org.schema.IndividualProduct.additionalType': 'mobile',
+          },
+        },
+      },
+    ],
+  },
+} as const;
+
+/**
+ * @see API_INTEGRATORS_GUIDE.md section 7.1.1
  * Federate external OIDC id_token into Firebase custom token.
  */
 export const FIREBASE_CUSTOM_TOKEN_REQUEST = {
-  "jti": "firebase-custom-token-request-id",
-  "thid": "firebase-custom-token-thread-id",
+  "jti": "firebase-custom-token-request-<test-id>",
+  "thid": "firebase-custom-token-thread-<test-id>",
   "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
   "aud": "did:web:api.acme.org#identity_firebase_token_custom",
   "exp": 1678886460,
@@ -482,8 +514,8 @@ export const FIREBASE_CUSTOM_TOKEN_REQUEST = {
  * Request to create a new employee role.
  */
 export const EMPLOYEE_REGISTRATION_REQUEST = {
-  "jti": "employeerole-registration-request-id",
-  "thid": "employeerole-registration-thread-id",
+  "jti": "employeerole-registration-request-<test-id>",
+  "thid": "employeerole-registration-thread-<test-id>",
   "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
   "aud": "did:web:api.acme.org",
   "exp": 1678886460,
@@ -510,8 +542,8 @@ export const EMPLOYEE_REGISTRATION_REQUEST = {
  * Initial request to register a new family organization.
  */
 export const FAMILY_REGISTRATION_REQUEST = {
-  "jti": "family-registration-request-id",
-  "thid": "family-registration-thread-id",
+  "jti": "family-registration-request-<test-id>",
+  "thid": "family-registration-thread-<test-id>",
   "iss": "adult1@example.com",
   "aud": "did:web:api.acme.org",
   "type": "application/api+json",
@@ -537,8 +569,8 @@ export const FAMILY_REGISTRATION_REQUEST = {
  * Use the Offer identifier returned by the Family registration _batch-response.
  */
 export const FAMILY_ORDER_REQUEST = {
-  "jti": "family-order-request-id",
-  "thid": "family-order-thread-id",
+  "jti": "family-order-request-<test-id>",
+  "thid": "family-order-thread-<test-id>",
   "iss": "adult1@example.com",
   "aud": "did:web:api.acme.org",
   "type": "application/api+json",
@@ -548,7 +580,7 @@ export const FAMILY_ORDER_REQUEST = {
       "meta": {
         "claims": {
           "@context": "org.schema",
-          "Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:7f0b6e9c-2e1d-4d85-94f2-1459f5a57bd7"
+          "Order.acceptedOffer.identifier": "{{offerId}}"
         }
       }
     }]
@@ -560,7 +592,7 @@ export const FAMILY_ORDER_REQUEST = {
 // --- Other Payloads (Retained for existing tests) ---
 
 export const CUSTOMER_ONBOARDING_MESSAGE = {
-  jti: "unique-customer-onboard-message-id",
+  jti: "unique-customer-onboard-message-<test-id>",
   thid: "thread-onboarding-customer-id",
   iss: "did:web:acme.org:employee:...",
   aud: "did:web:acme.org",
@@ -601,8 +633,8 @@ export const CUSTOMER_ONBOARDING_MESSAGE = {
 };
 
 export const CONSENT_CREATION_MESSAGE = {
-  jti: "unique-consent-fhir-message-id",
-  thid: "thread-consent-fhir-batch-id",
+  jti: "unique-consent-fhir-message-<test-id>",
+  thid: "thread-consent-fhir-batch-<test-id>",
   iss: "did:web:ehr-system.example.com",
   aud: "did:web:gateway.example.com",
   type: "org.hl7.fhir.r4.Bundle",
@@ -661,7 +693,7 @@ export const CONSENT_CREATION_MESSAGE = {
 }
 
 export const COMMUNICATION_CREATION_MESSAGE = {
-  jti: "unique-communication-message-id",
+  jti: "unique-communication-message-<test-id>",
   thid: "thread-communication-id",
   iss: "did:web:ehr-system.example.com",
   aud: "did:web:gateway.acme.org",
@@ -730,8 +762,8 @@ export const COMMUNICATION_CREATION_MESSAGE = {
  * Update the Unified Health Index (FHIR Composition) with a single entry.
  */
 export const COMPOSITION_UPDATE_MESSAGE = {
-  "jti": "composition-update-request-id",
-  "thid": "composition-update-thread-id",
+  "jti": "composition-update-request-<test-id>",
+  "thid": "composition-update-thread-<test-id>",
   "iss": "did:web:hospital.example.com",
   "aud": "did:web:api.acme.org",
   "exp": 1678886460,
@@ -784,7 +816,7 @@ export const COMPOSITION_UPDATE_MESSAGE = {
 // --- 8. Personal Observations (non-clinical) ---
 
 export const PERSONAL_OBSERVATION_MESSAGE = {
-  jti: "personal-observation-message-id",
+  jti: "personal-observation-message-<test-id>",
   thid: "thid-personal-observation",
   iss: "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
   aud: "did:web:api.acme.org",
@@ -826,7 +858,7 @@ export const PERSONAL_OBSERVATION_MESSAGE = {
 };
 
 export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
-  jti: "personal-preferences-mds-message-id",
+  jti: "personal-preferences-mds-message-<test-id>",
   thid: "thid-personal-preferences-mds",
   iss: "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
   aud: "did:web:api.acme.org",
@@ -874,7 +906,7 @@ export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
 };
 
 export const FAMILY_MEMBER_RELATIONSHIP_MESSAGE = {
-  jti: "family-relationship-message-id",
+  jti: "family-relationship-message-<test-id>",
   thid: "thid-family-relationship",
   iss: "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
   aud: "did:web:api.acme.org",

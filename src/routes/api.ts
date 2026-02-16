@@ -22,9 +22,10 @@ import { composeHostDidWebId } from '../utils/did-backend';
 import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 import { getEnvSectionId } from '../utils/section-env';
+import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/replay-protection-store';
 
 // As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
-const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
+const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance', 'health-tech', 'health-it'];
 const FORWARDED_HEADER_SEPARATOR = ',';
 
 function getRequestBaseUrl(req: express.Request, fallback: string): string {
@@ -55,8 +56,20 @@ export function createApiRouter(
   cryptographyService: ICryptography,
   apiBaseUrl: string,
   appAuthManager?: AppAuthorizationManager,
+  replayProtectionStore: IReplayProtectionStore = new ReplayProtectionStoreNoop(),
 ): express.Router {
   const router = express.Router();
+
+  const getReplayTtlSeconds = (payload: any): number => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const exp = Number(payload?.exp);
+    if (Number.isFinite(exp)) {
+      const delta = Math.floor(exp - nowSeconds);
+      // Keep bounded TTL to avoid pathological cache growth.
+      return Math.max(60, Math.min(86400, delta));
+    }
+    return 900;
+  };
 
   const cdsRoutePrefix = '/:tenantId/cds-:jurisdiction/v1/:sector/:section/:format/:resourceType';
 
@@ -394,7 +407,7 @@ export function createApiRouter(
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom:
    *   post:
    *     tags:
-   *       - 2.1.1 Identity Federation
+   *       - 2.1.1 Frontend Identity Federation (Optional)
    *     summary: Federate external OIDC id_token to Firebase custom token (async)
    *     description: |
    *       Submits an async job that verifies a provider id_token (e.g. eIDAS) and returns a Firebase custom_token.
@@ -428,7 +441,7 @@ export function createApiRouter(
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom-response:
    *   post:
    *     tags:
-   *       - 2.1.1 Identity Federation
+   *       - 2.1.1 Frontend Identity Federation (Optional)
    *     summary: Poll the federation result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -457,7 +470,10 @@ export function createApiRouter(
    *       - 2.1.2 Initial Access Token Exchange
    *     summary: Exchange activation code for initial_access_token (async)
    *     description: |
-   *       Submits an async job that exchanges activation code + Firebase id_token for an initial_access_token.
+   *       Submits an async job that exchanges:
+   *       - Authorization Bearer token: Firebase `id_token` (JWT format), and
+   *       - request body `subject_token`: single-use activation code (opaque string, not JWT).
+   *       for an `initial_access_token`.
    *
    *       Submit-time errors are returned immediately if the request cannot be accepted/enqueued.
    *       Processing/business errors are returned when polling.
@@ -514,9 +530,13 @@ export function createApiRouter(
    *         application/didcomm-plaintext+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *           examples:
-   *             message: { $ref: '#/components/examples/LicenseIssuePlaintextMessage' }
+   *             newEmployee: { $ref: '#/components/examples/LicenseIssuePlaintextMessage' }
+   *             existingEmployee: { $ref: '#/components/examples/LicenseIssueExistingEmployeePlaintextMessage' }
    *         application/json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *           examples:
+   *             newEmployeeJson: { $ref: '#/components/examples/LicenseIssuePlaintextMessage' }
+   *             existingEmployeeJson: { $ref: '#/components/examples/LicenseIssueExistingEmployeePlaintextMessage' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/SecureRequest' }
    *     responses:
@@ -541,11 +561,11 @@ export function createApiRouter(
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
    *           examples:
-   *             message: { $ref: '#/components/examples/CommunicationPollRequest' }
+   *             message: { $ref: '#/components/examples/TokenExchangePollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
    *           examples:
-   *             message: { $ref: '#/components/examples/CommunicationPollRequest' }
+   *             message: { $ref: '#/components/examples/TokenExchangePollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
    *       '200': { description: Completed. }
@@ -1060,8 +1080,8 @@ export function createApiRouter(
    *     description: |
    *       Polls the asynchronous job submitted to `.../Order/_batch`. The `jurisdiction` and `sector` are path routing parameters for the host registry.
    *       The completed response returns a Bundle entry with order invoice claims, including an optional payment
-   *       link (`Order.paymentUrl`) and the accepted Offer reference (`Order.acceptedOffer.identifier`). When using
-   *       Stripe (INVOICE_PROVIDER=stripe, INVOICE_FLOW=pre), `Order.partOfInvoice` and `Order.paymentUrl` refer to
+   *       link (`org.schema.Order.paymentUrl`) and the accepted Offer reference (`org.schema.Order.acceptedOffer.identifier`). When using
+   *       Stripe (INVOICE_PROVIDER=stripe, INVOICE_FLOW=pre), `org.schema.Order.partOfInvoice` and `org.schema.Order.paymentUrl` refer to
    *       the Stripe invoice/checkout URL. UBL/PDF/VeriFactu invoices are not emitted yet.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -1212,7 +1232,7 @@ export function createApiRouter(
    *     description: |
    *       Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.
    *       The completed response returns a Bundle entry with order invoice claims, including an
-   *       optional payment link (`Order.paymentUrl`) and the accepted Offer reference (`Order.acceptedOffer.identifier`).
+   *       optional payment link (`org.schema.Order.paymentUrl`) and the accepted Offer reference (`org.schema.Order.acceptedOffer.identifier`).
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1591,13 +1611,34 @@ export function createApiRouter(
       return res.status(404).json(outcome);
     }
 
-    // --- 4. Enqueue Job ---
+    // --- 4. Replay Protection (best-effort) ---
+    // We only enforce when both `iss` and `jti` are present. This preserves compatibility
+    // with older/plaintext payloads that may omit `jti` in development flows.
+    const iss = String(jobRequest.content?.iss || '').trim();
+    const jti = String(jobRequest.content?.jti || '').trim();
+    if (iss && jti) {
+      const replayKey = `${vaultId}:${iss}:${jti}`;
+      const reserved = await replayProtectionStore.reserveIfNotExists(
+        replayKey,
+        getReplayTtlSeconds(jobRequest.content),
+      );
+      if (!reserved) {
+        const outcome = createOperationOutcome(
+          IssueLevel.Error,
+          IssueType.Conflict,
+          'Duplicate jti detected for this issuer (possible replay).',
+        );
+        return res.status(409).json(outcome);
+      }
+    }
+
+    // --- 5. Enqueue Job ---
     const jobName = createJobName(vaultId, resourceType, action);
     jobRequest.action = action; // Ensure action is part of the job request for the worker
     await queueAdapter.addJob(jobName, jobRequest);
     asyncResponseStore.set(thid, { status: 'PENDING', vaultId: vaultId });
 
-    // --- 5. Success Response ---
+    // --- 6. Success Response ---
     // According to FHIR Async, the Location header MUST be an absolute URL.
     const relativeUrl = `${req.originalUrl}-response`;
     const requestBaseUrl = getRequestBaseUrl(req, apiBaseUrl);

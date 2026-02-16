@@ -111,4 +111,3 @@ export class DocumentReferenceManager implements IJobProcessor {
     };
   }
 }
-

@@ -18,7 +18,6 @@ if (!isTestEnv && (process.env.DB_PROVIDER === 'firestore' || process.env.STORAG
 }
 
 import { Worker } from './worker';
-import { IServerConfig } from './config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { createApiRouter } from './routes/api';
 import { createDiscoveryRouter } from './routes/discovery';
@@ -39,9 +38,8 @@ import { TenantsCacheManager } from './managers/TenantsCacheManager';
 import { EmployeeManager } from './managers/EmployeeManager';
 import { IcaManager } from './managers/IcaManager';
 import { MessagingManager } from './managers/MessagingManager';
-import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { slugFromDomain } from './utils/slug';
-import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { IndividualManager } from './managers/IndividualManager';
 import { CredentialManager } from './managers/CredentialManager';
 import { CompositionManager } from './managers/CompositionManager';
@@ -69,6 +67,7 @@ import { IdentityTokenManager } from './managers/IdentityTokenManager';
 import { ObservationManager } from './managers/ObservationManager';
 import { RelatedPersonManager } from './managers/RelatedPersonManager';
 import { ConsentManager } from './managers/ConsentManager';
+import { createApiDocsSetupOptions } from './managers/ApiDocsManager';
 import { SmartAuthorizationManager } from './managers/auth/SmartAuthorizationManager';
 import { AppAuthorizationManager } from './managers/AppAuthorizationManager';
 import { FamilyManager } from './managers/FamilyManager';
@@ -82,183 +81,32 @@ import { CredentialLedgerAdapterFabric } from './adapters/CredentialLedgerAdapte
 import { createAuthorityRouter } from './routes/authority';
 import { loadAuthorityArtifacts } from './utils/authority-artifacts';
 import { generatePkiChainFromEnv } from './utils/pki-chain';
+import {
+  IReplayProtectionStore,
+  ReplayProtectionStoreMem,
+  ReplayProtectionStoreNoop,
+  ReplayProtectionStoreRedis,
+} from './adapters/replay-protection-store';
+import { getConfig, resetServerConfig } from './config/server-config';
+import { bootstrapHost } from './bootstrap/host-bootstrap';
 
-// Load the pre-generated swagger spec. This is the static base.
-let swaggerSpec: any;
-try {
-  const swaggerSpecPath = path.resolve(process.cwd(), 'swagger-spec.json');
-  swaggerSpec = JSON.parse(fs.readFileSync(swaggerSpecPath, 'utf8'));
-} catch (error) {
-  console.warn(`WARN: Could not load swagger-spec.json. Did you run \`npm run build\`? Error: ${error}`);
-  swaggerSpec = {
-    openapi: '3.0.0',
-    info: { title: 'Swagger Spec Not Found', version: '0.0.0' },
-    paths: {},
-  };
-}
-
-
-
-// ===================================================================================
-// CONFIGURATION LOGIC - INTERNAL TO SERVER.TS
-// ===================================================================================
-
-let configInstance: IServerConfig;
-
-export function resetServerConfig(): void {
-  configInstance = undefined as unknown as IServerConfig;
-}
-
-function determineApiBaseUrl(port: number, apiHostname: string): string {
-  // 1. Highest Priority: Use the canonical external domain if it's provided.
-  if (process.env.HOST_EXTERNAL_DOMAIN) {
-    // Ensure it's a clean domain without protocol, then add https.
-    const domain = process.env.HOST_EXTERNAL_DOMAIN.replace(/^(https?:\/\/)/, '').replace(/\/$/, '');
-    return `https://${domain}`;
-  }
-  // 2. Second Priority: Use the specific Cloud Run deployment URL if provided.
-  if (process.env.HOST_DEPLOY_URL) {
-    return process.env.HOST_DEPLOY_URL.replace(/\/$/, ''); // Remove trailing slash
-  }
-  // 3. Fallback for Local Development: Construct from internal binding info.
-  const protocol = 'http'; // Local is always http
-  const publicHost = (apiHostname === '0.0.0.0' || apiHostname === '127.0.0.1')
-    ? 'localhost'
-    : apiHostname;
-  return `${protocol}://${publicHost}:${port}`;
-}
-
-function getHostEnv(key: string): string | undefined {
-  const newKey = `HOST_${key}`;
-  const legacyKey = `ORG_HOST_${key}`;
-  return process.env[newKey] ?? process.env[legacyKey];
-}
-
-function parseAndValidateSectors(csv: string | undefined): Sector[] {
-  if (!csv) return [];
-  const allSectors = Object.values(Sector) as string[];
-  const requestedSectors = csv.split(',').map((s) => s.trim());
-  for (const sector of requestedSectors) {
-    if (sector === Sector.SYSTEM) {
-      throw new Error(`Config Error: The '${Sector.SYSTEM}' sector is reserved and cannot be set in SECTORS_ALLOWED.`);
-    }
-    if (!allSectors.includes(sector)) {
-      throw new Error(`Config Error: Invalid sector '${sector}'. Allowed: ${allSectors.join(', ')}`);
-    }
-  }
-  return requestedSectors as Sector[];
-}
-
-/**
- * Gets the application configuration. Reads from process.env on the first call
- * and caches the result. This function is now internal to server.ts.
- */
-function getConfig(): IServerConfig {
-  if (!configInstance) {
-    const port = parseInt(process.env.PORT || process.env.HOST_INTERNAL_PORT || '3000', 10);
-    const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION || process.env.K_CONFIGURATION);
-    const apiHostname = isCloudRun ? '0.0.0.0' : (process.env.HOST_INTERNAL_IP || 'localhost');
-    const apiBaseUrl = determineApiBaseUrl(port, apiHostname);
-
-    const localServiceRoles = (process.env.LOCAL_SERVICE_ROLE || 'HOST')
-      .split(',')
-      .map((value) => value.trim().toUpperCase())
-      .filter(Boolean);
-
-    configInstance = {
-      nodeEnv: process.env.NODE_ENV || 'development',
-      port: port,
-      apiHostname, // Internal binding hostname
-      hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || new URL(apiBaseUrl).host, // Use .host to include the port
-      apiBaseUrl: apiBaseUrl, // Use the definitive URL here
-      namespace: process.env.URN_NAMESPACE || 'antifraud',
-      sectorsAllowed: parseAndValidateSectors(process.env.SECTORS_ALLOWED),
-  allowedPaymentMethods: (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(','),
-      dbProvider: process.env.DB_PROVIDER || 'mem',
-      storageProvider: process.env.STORAGE_PROVIDER || 'mem',
-      queueProvider: process.env.QUEUE_PROVIDER || 'mem',
-      gcsBucketName: process.env.GCS_BUCKET_NAME,
-      kekSecret: process.env.KEK_SECRET,
-      host: {
-        legalName: getHostEnv('LEGAL_NAME'),
-        jurisdiction: getHostEnv('JURISDICTION'),
-        idType: getHostEnv('ID_TYPE'),
-        idValue: getHostEnv('ID_VALUE'),
-        adminEmail: getHostEnv('ADMIN_EMAIL'),
-        adminUid: getHostEnv('ADMIN_UID'),
-        adminRole: getHostEnv('ADMIN_ROLE'),
-      },
-      mongo: {
-        uri: process.env.MONGO_URI,
-        dbName: process.env.MONGO_DB_NAME || 'default',
-      },
-      firebase: {
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
-      googleClientId: process.env.GOOGLE_CLIENT_ID,
-      legacySignAlg: (process.env.LEGACY_SIGN_ALG === 'ES256' || process.env.LEGACY_SIGN_ALG === 'ES384')
-        ? process.env.LEGACY_SIGN_ALG
-        : 'ES384',
-      legacyX509DerBase64: process.env.LEGACY_X509_DER_BASE64,
-      legacyX509ChainBase64: process.env.LEGACY_X509_CHAIN_BASE64
-        ? process.env.LEGACY_X509_CHAIN_BASE64.split(',').map((value) => value.trim()).filter(Boolean)
-        : undefined,
-      ica: {
-        mode: (process.env.ICA_MODE === 'internal' || process.env.ICA_MODE === 'external')
-          ? process.env.ICA_MODE
-          : undefined,
-        internalUrl: process.env.ICA_URL_INTERNAL,
-        externalUrl: process.env.ICA_URL_EXTERNAL,
-        tlsCaPem: process.env.ICA_TLS_CA_PEM,
-      },
-      ledger: {
-        enabled: process.env.LEDGER_ENABLED ? process.env.LEDGER_ENABLED === 'true' : undefined,
-        mspId: process.env.LEDGER_MSP_ID,
-        channelName: process.env.LEDGER_IDENTITY_CHANNEL_DEFAULT,
-        chaincodeName: process.env.LEDGER_ORG_CHAINCODE,
-        schemaUrl: process.env.GOVERNANCE_SCHEMA_URL,
-      },
-      localServiceRoles,
+function loadSwaggerSpecFromDisk(): any {
+  try {
+    const swaggerSpecPath = path.resolve(process.cwd(), 'swagger-spec.json');
+    return JSON.parse(fs.readFileSync(swaggerSpecPath, 'utf8'));
+  } catch (error) {
+    console.warn(`WARN: Could not load swagger-spec.json. Did you run \`npm run build\`? Error: ${error}`);
+    return {
+      openapi: '3.0.0',
+      info: { title: 'Swagger Spec Not Found', version: '0.0.0' },
+      paths: {},
     };
   }
-  return configInstance;
 }
 
-// ===================================================================================
-// SERVER INITIALIZATION
-// ===================================================================================
+// Load pre-generated swagger spec once; /swagger-spec.json refreshes from disk on each request.
+let swaggerSpec: any = loadSwaggerSpecFromDisk();
 
-/**
- * Bootstraps the host tenant using a direct method, reading all values from config.
- */
-async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServerConfig) {
-  // console.log('[GW-API] Bootstrapping host tenant...');
-  const hostClaims: ClaimsRecord = {
-    [ClaimsOrganizationSchemaorg.identifierType]: bootConfig.host.idType,
-    [ClaimsOrganizationSchemaorg.identifierValue]: bootConfig.host.idValue,
-    [ClaimsOrganizationSchemaorg.addressCountry]: bootConfig.host.jurisdiction,
-    [ClaimsOrganizationSchemaorg.legalName]: bootConfig.host.legalName,
-    [ClaimsOrganizationSchemaorg.alternateName]: 'host',
-    [ClaimsPersonSchemaorg.email]: bootConfig.host.adminEmail,
-    [ClaimsPersonSchemaorg.identifier]: `urn:uuid:${bootConfig.host.adminUid}`,
-    [ClaimsPersonSchemaorg.hasOccupation]: bootConfig.host.adminRole,
-    [ClaimsServiceSchemaorg.category]: 'system', 
-    [ClaimsServiceSchemaorg.identifier]: `urn:uuid:${bootConfig.host.idValue}-service`,
-  };
-  const termsUrl = getHostEnv('TERMS_URL');
-  if (termsUrl) {
-    hostClaims[ClaimsServiceSchemaorg.termsOfService] = termsUrl;
-  }
-
-  try {
-    await hostingManager.bootstrapHost(hostClaims);
-  } catch (error) {
-    console.error('[GW-API] FATAL: Host tenant bootstrapping failed.', error);
-    throw error;
-  }
-}
 
 
 interface StartServerOptions {
@@ -473,6 +321,16 @@ async function startServer(options?: StartServerOptions) {
   const worker = new Worker(managerRegistry, config.apiBaseUrl, kmsService);
   const asyncResponseStore = new AsyncResponseStoreMem();
   const queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
+  const replayProvider = (process.env.REPLAY_PROTECTION_PROVIDER || 'none').toLowerCase();
+  const replayProtectionStore: IReplayProtectionStore =
+    replayProvider === 'mem'
+      ? new ReplayProtectionStoreMem()
+      : replayProvider === 'redis'
+        ? new ReplayProtectionStoreRedis({
+            redisUrl: process.env.REDIS_URL,
+            keyPrefix: process.env.REPLAY_REDIS_KEY_PREFIX || 'replay:jti',
+          })
+        : new ReplayProtectionStoreNoop();
   
   // This is the FHIR-specific AuthorizationManager, not our AppAuthorizationManager.
   const authManager: IAuthorizationManager = options?.authManager || new SmartAuthorizationManager();
@@ -509,7 +367,17 @@ async function startServer(options?: StartServerOptions) {
   const authorityRouter = Object.keys(authorityArtifacts).length
     ? createAuthorityRouter(authorityArtifacts, asyncResponseStore)
     : undefined;
-  const apiRouter = createApiRouter(queueAdapter, tenantManager, kmsService, asyncResponseStore, vaultRepository, cryptographyService, config.apiBaseUrl, appAuthManager);
+  const apiRouter = createApiRouter(
+    queueAdapter,
+    tenantManager,
+    kmsService,
+    asyncResponseStore,
+    vaultRepository,
+    cryptographyService,
+    config.apiBaseUrl,
+    appAuthManager,
+    replayProtectionStore,
+  );
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);
   const ledgerRouter = createCredentialLedgerRouter(credentialLedgerAdapter, asyncResponseStore, tenantManager);
@@ -530,9 +398,10 @@ async function startServer(options?: StartServerOptions) {
   app.use(createGlobalErrorHandler(logger));
 
   app.get('/swagger-spec.json', (req: express.Request, res: express.Response) => {
+    const runtimeSwaggerSpec = loadSwaggerSpecFromDisk();
     res.setHeader('Cache-Control', 'no-store');
-    if (swaggerSpec.info.title === 'Swagger Spec Not Found') {
-      res.json(swaggerSpec);
+    if (runtimeSwaggerSpec.info.title === 'Swagger Spec Not Found') {
+      res.json(runtimeSwaggerSpec);
       return;
     }
 
@@ -545,7 +414,7 @@ async function startServer(options?: StartServerOptions) {
     const baseUrl = host ? `${protocol}://${host}` : config.apiBaseUrl;
 
     res.json({
-      ...swaggerSpec,
+      ...runtimeSwaggerSpec,
       servers: [{
         url: baseUrl,
         description: `Server URL for ${config.nodeEnv} environment`,
@@ -553,9 +422,7 @@ async function startServer(options?: StartServerOptions) {
     });
   });
 
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, {
-    swaggerOptions: { url: '/swagger-spec.json' },
-  }));
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(undefined, createApiDocsSetupOptions('/swagger-spec.json') as any));
 
   const server =
     options?.listen === false
@@ -567,4 +434,4 @@ async function startServer(options?: StartServerOptions) {
   return { app, server, queueAdapter, tenantManager, vaultRepository, cryptographyService, blockchainAdapter, credentialLedgerAdapter, kmsService };
 }
 
-export { startServer };
+export { startServer, resetServerConfig };

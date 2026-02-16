@@ -202,7 +202,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     const finalEntry = finalResponse.body.data[0];
     expect(finalEntry.response.status).toBe('201');
     expect(finalEntry.type).toBe('Organization-order-response-v1.0');
-    expect(finalEntry.meta.claims['Order.acceptedOffer.identifier']).toBe(offerId);
+    expect(finalEntry.meta.claims['org.schema.Order.acceptedOffer.identifier']).toBe(offerId);
 
     // Assert the state of the finalized tenant record in the host's vault
     const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;

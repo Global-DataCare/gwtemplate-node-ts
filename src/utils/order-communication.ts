@@ -182,18 +182,20 @@ export async function buildPaymentCommunication(
   const claims: Record<string, any> = {
     '@context': 'org.schema',
     '@type': 'Order:Invoice',
-    'Order.acceptedOffer.identifier': context.offerId,
-    'Order.partOfInvoice': paymentUrl || invoiceId || undefined,
-    'Order.paymentMethod': paymentUrl ? 'Stripe' : undefined,
-    'Order.paymentDueDate': paymentDueDate,
-    'Order.paymentUrl': paymentUrl || undefined,
-    'Order.invoiceIssuedAt': now.toISOString(),
+    'org.schema.Order.acceptedOffer.identifier': context.offerId,
+    'org.schema.Order.partOfInvoice': paymentUrl || invoiceId || undefined,
+    'org.schema.Order.paymentMethod': paymentUrl ? 'Stripe' : undefined,
+    'org.schema.Order.paymentDueDate': paymentDueDate,
+    'org.schema.Order.paymentUrl': paymentUrl || undefined,
+    'org.schema.Order.invoiceIssuedAt': now.toISOString(),
   };
+  // Activation details are encoded as org.schema IndividualProduct claims to stay
+  // aligned with the schema vocabulary used across Organization/Family flows.
   if (context.activationCode) {
-    (claims as any)['Order.activationCode'] = context.activationCode;
+    (claims as any)['org.schema.IndividualProduct.serialNumber'] = context.activationCode;
   }
   if (context.activationCategory) {
-    (claims as any)['Order.activationCategory'] = context.activationCategory;
+    (claims as any)['org.schema.IndividualProduct.category'] = context.activationCategory;
   }
   Object.keys(claims).forEach((key) => {
     if (claims[key] === undefined) delete claims[key];

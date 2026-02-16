@@ -191,7 +191,7 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
     {
       id: '#dsp-catalog-service',
       type: 'CatalogService',
-      serviceEndpoint: '/catalog/request',
+      serviceEndpoint: '/dcat3/catalog/request',
     } as DidService,
     {
       id: '#dcp-issuer-service',
@@ -271,6 +271,25 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
       ),
     );
   }
+
+  // DSP/DCP discovery entries for operator/host DID.
+  services.push(
+    {
+      id: '#dsp-data-service',
+      type: 'DataService',
+      serviceEndpoint: '/.well-known/dspace-version',
+    } as DidService,
+    {
+      id: '#dsp-catalog-service',
+      type: 'CatalogService',
+      serviceEndpoint: '/dcat3/catalog/request',
+    } as DidService,
+    {
+      id: '#dcp-issuer-service',
+      type: 'IssuerService',
+      serviceEndpoint: '/presentations/query',
+    } as DidService,
+  );
   return services;
 }
 

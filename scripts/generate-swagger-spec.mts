@@ -30,8 +30,14 @@ swaggerDefinition.components.examples.OrganizationRegistrationPlaintextMessage.v
   examples.ORGANIZATION_REGISTRATION_REQUEST;
 swaggerDefinition.components.examples.OrganizationOrderPlaintextMessage.value =
   examples.ORGANIZATION_ORDER_REQUEST;
+swaggerDefinition.components.examples.OrganizationOrderResponseBundle.value =
+  examples.ORGANIZATION_ORDER_RESPONSE;
 swaggerDefinition.components.examples.InitialAccessTokenExchangePlaintextMessage.value =
   examples.INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST;
+swaggerDefinition.components.examples.LicenseIssuePlaintextMessage.value =
+  examples.LICENSE_ISSUE_REQUEST;
+swaggerDefinition.components.examples.LicenseIssueExistingEmployeePlaintextMessage.value =
+  examples.LICENSE_ISSUE_EXISTING_EMPLOYEE_REQUEST;
 swaggerDefinition.components.examples.FirebaseCustomTokenPlaintextMessage.value =
   examples.FIREBASE_CUSTOM_TOKEN_REQUEST;
 swaggerDefinition.components.examples.DeviceRegistrationPlaintextMessage.value =
@@ -58,6 +64,10 @@ swaggerDefinition.components.examples.FamilyMemberRelationshipPlaintextMessage.v
   examples.FAMILY_MEMBER_RELATIONSHIP_MESSAGE;
 
 swaggerDefinition.components.examples.AsyncPollRequest.value = examples.ASYNC_POLL_REQUEST;
+if (swaggerDefinition.components.examples.TokenExchangePollRequest) {
+  swaggerDefinition.components.examples.TokenExchangePollRequest.value =
+    examples.TOKEN_EXCHANGE_POLL_REQUEST;
+}
 swaggerDefinition.components.examples.AsyncPollPending.value = examples.ASYNC_POLL_PENDING_RESPONSE;
 swaggerDefinition.components.examples.AsyncPollSecureResponse.value = examples.ASYNC_POLL_SECURE_RESPONSE_FORM;
 

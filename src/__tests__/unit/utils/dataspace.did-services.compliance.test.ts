@@ -22,7 +22,7 @@ describe('Dataspace DID Service Compliance (DSP/DCP)', () => {
     const catalogService = services.find((s) => s.id === `${did}#dsp-catalog-service`);
     expect(catalogService).toBeDefined();
     expect(catalogService?.type).toBe('CatalogService');
-    expect(catalogService?.serviceEndpoint).toBe('https://gateway.example.com/acme/cds-es/v1/health-care/catalog/request');
+    expect(catalogService?.serviceEndpoint).toBe('https://gateway.example.com/acme/cds-es/v1/health-care/dcat3/catalog/request');
 
     const issuerService = services.find((s) => s.id === `${did}#dcp-issuer-service`);
     expect(issuerService).toBeDefined();

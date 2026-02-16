@@ -107,6 +107,31 @@ export class TenantsCacheManager implements ITenantsManager {
   }
 
   /**
+   * Returns all tenant configurations currently registered in the host tenant registry.
+   * This is intended for operator-level discovery/catalog publication flows.
+   */
+  public async listRegisteredTenants(): Promise<any[]> {
+    const tenantsSection = getEnvSectionId('tenants');
+    const records = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(this.hostCollectionName, tenantsSection);
+    const tenants: any[] = [];
+
+    for (const record of records) {
+      try {
+        const config = await this.kmsService.unprotectConfidentialData<any>(record, 'host');
+        if (!config?.claims || !config?.didDocument?.id) continue;
+        const collectionName = generateTenantCollectionNameFromClaims(config.claims);
+        config.collectionName = collectionName;
+        const vaultId = record.id;
+        this.tenantCacheByVaultId.set(vaultId, config);
+        tenants.push(config);
+      } catch {
+        // Skip malformed/unreadable tenant records in discovery output.
+      }
+    }
+    return tenants;
+  }
+
+  /**
    * Retrieves the physical collection name for a given logical vaultId.
    * This is the primary method for business managers to resolve the storage location for a tenant.
    * @param vaultId The unique vault identifier for the tenant (e.g., 'host', 'health-care_acme').

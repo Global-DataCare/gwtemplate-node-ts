@@ -143,7 +143,8 @@ export class CommunicationManager implements IJobProcessor {
 
     // Process `note` into `Annotation` objects
     if (fhirResource.note) {
-      fhirResource.note.forEach((note: { text: string }) => {
+      fhirResource.note.forEach((note) => {
+        if (!note?.text) return;
         bodyData.push({
           type: 'Annotation',
           id: uuidv4(),
@@ -154,8 +155,8 @@ export class CommunicationManager implements IJobProcessor {
 
     // Process `payload` into `Reference` and `Attachment` objects
     if (fhirResource.payload) {
-      fhirResource.payload.forEach((pld: { contentReference?: { reference: string }; contentAttachment?: { contentType: string; data: string; title:string; } }) => {
-        if (pld.contentReference) {
+      fhirResource.payload.forEach((pld) => {
+        if (pld.contentReference?.reference) {
           bodyData.push({
             type: 'Reference',
             id: uuidv4(),
@@ -164,7 +165,7 @@ export class CommunicationManager implements IJobProcessor {
               type: 'Appointment', // This could be made dynamic if needed
             },
           });
-        } else if (pld.contentAttachment) {
+        } else if (pld.contentAttachment?.contentType || pld.contentAttachment?.data || pld.contentAttachment?.title) {
           bodyData.push({
             type: 'Attachment',
             id: uuidv4(),
@@ -197,7 +198,7 @@ export class CommunicationManager implements IJobProcessor {
       id: uuidv4(),
       type: 'https://didcomm.org/v2/communication', // Standard DIDComm message type for basic communication
       thid: thid,
-      to: fhirResource.recipient?.map((ref: { reference: string }) => ref.reference),
+      to: fhirResource.recipient?.map((ref) => ref.reference).filter((v): v is string => typeof v === 'string' && v.length > 0),
       from: fromDid,
       created_time: fhirResource.sent ? Math.floor(new Date(fhirResource.sent).getTime() / 1000) : undefined,
       body: {

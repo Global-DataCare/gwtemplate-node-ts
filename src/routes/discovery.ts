@@ -9,12 +9,14 @@ import { pingHandler } from './handlers/discovery/ping.handler';
 import { signVerifiableCredential } from '../utils/vc-signer';
 import { findSigningMethod } from '../utils/did-backend';
 import { buildStatusListCredential, buildStatusListEntry, createStatusListEncodedList } from '../utils/status-list';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ILogger } from '../loggers/ILogger';
 
 // List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
-const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
+const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance', 'health-tech', 'health-it'];
 const STATUS_LIST_BITS = 16384;
 const STATUS_LIST_PURPOSE = 'revocation' as const;
 const STATUS_LIST_INDEX = 0;
@@ -34,6 +36,87 @@ export function createDiscoveryRouter(
   logger: ILogger,
 ): express.Router {
   const router = express.Router();
+  const toDatasetId = (publisherDid: string): string => encodeURIComponent(publisherDid);
+
+  type ProviderDataset = {
+    datasetId: string;
+    publisherDid: string;
+    title: string;
+    baseUrl: string;
+    sector?: string;
+    jurisdiction?: string;
+  };
+
+  const parseCategory = (value: unknown): string => {
+    if (typeof value !== 'string') return '';
+    const first = value.split(',')[0]?.trim() || '';
+    return first;
+  };
+
+  const parseJurisdiction = (value: unknown): string => {
+    if (typeof value !== 'string') return '';
+    return value.trim().toUpperCase();
+  };
+
+  const toProviderDataset = (tenantConfig: any): ProviderDataset | null => {
+    const publisherDid = tenantConfig?.didDocument?.id as string | undefined;
+    if (!publisherDid) return null;
+    const title =
+      (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.legalName] as string | undefined) ||
+      (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.name] as string | undefined) ||
+      (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.alternateName] as string | undefined) ||
+      publisherDid;
+    const baseUrl = getBaseUrlFromDidWeb(publisherDid);
+    const sector = parseCategory(tenantConfig?.claims?.[ClaimsServiceSchemaorg.category]);
+    const jurisdiction = parseJurisdiction(tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.addressCountry]);
+    return {
+      datasetId: toDatasetId(publisherDid),
+      publisherDid,
+      title,
+      baseUrl,
+      sector,
+      jurisdiction,
+    };
+  };
+
+  const buildCatalog = (catalogBaseUrl: string, datasets: ProviderDataset[]) => ({
+    '@context': {
+      dcat: 'https://www.w3.org/ns/dcat#',
+      dcterms: 'http://purl.org/dc/terms/',
+      odrl: 'http://www.w3.org/ns/odrl/2/',
+    },
+    '@id': `${catalogBaseUrl}`,
+    '@type': 'dcat:Catalog',
+    'dcat:dataset': datasets.map((dataset) => ({
+      '@id': `${catalogBaseUrl}/datasets/${dataset.datasetId}`,
+      '@type': 'dcat:Dataset',
+      'dcterms:title': dataset.title,
+      'dcterms:identifier': dataset.datasetId,
+      'dcterms:publisher': { '@id': dataset.publisherDid },
+      'dcat:theme': dataset.sector || undefined,
+      'dcterms:spatial': dataset.jurisdiction || undefined,
+      'dcat:distribution': [
+        {
+          '@type': 'dcat:Distribution',
+          'dcat:accessURL': `${dataset.baseUrl}/.well-known/did.json`,
+        },
+      ],
+      'odrl:hasPolicy': {
+        '@type': 'odrl:Set',
+      },
+    })),
+  });
+
+  const filterDatasets = (datasets: ProviderDataset[], filters: any): ProviderDataset[] => {
+    if (!filters || typeof filters !== 'object') return datasets;
+    const sectorFilter = typeof filters.sector === 'string' ? filters.sector.toLowerCase() : '';
+    const jurisdictionFilter = typeof filters.jurisdiction === 'string' ? filters.jurisdiction.toUpperCase() : '';
+    return datasets.filter((dataset) => {
+      if (sectorFilter && (dataset.sector || '').toLowerCase() !== sectorFilter) return false;
+      if (jurisdictionFilter && (dataset.jurisdiction || '').toUpperCase() !== jurisdictionFilter) return false;
+      return true;
+    });
+  };
 
   /**
    * @openapi
@@ -379,6 +462,127 @@ export function createDiscoveryRouter(
     } else {
       res.status(404).type('text').send('Not Found');
     }
+  });
+
+  /**
+   * @openapi
+   * /dcat3/catalog/request:
+   *   post:
+   *     tags: [Data Catalog Discovery]
+   *     summary: Operator catalog request (DSP/DCAT-3)
+   *     description: Returns a `dcat:Catalog` with provider datasets discoverable by client apps.
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               filters:
+   *                 type: object
+   *                 properties:
+   *                   sector: { type: string }
+   *                   jurisdiction: { type: string }
+   *     responses:
+   *       '200': { description: DSP catalog response }
+   *       '503': { description: Host not available }
+   *
+   * /dcat3/catalog/datasets/{id}:
+   *   get:
+   *     tags: [Data Catalog Discovery]
+   *     summary: Read one provider dataset from operator catalog
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: string }
+   *     responses:
+   *       '200': { description: Dataset found }
+   *       '404': { description: Dataset not found }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/request:
+   *   post:
+   *     tags: [Data Catalog Discovery]
+   *     summary: Hosted provider catalog request (tenant scoped)
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: DSP catalog response }
+   *       '404': { description: Tenant not found }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/datasets/{id}:
+   *   get:
+   *     tags: [Data Catalog Discovery]
+   *     summary: Read one provider dataset from hosted tenant catalog
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: string }
+   *     responses:
+   *       '200': { description: Dataset found }
+   *       '404': { description: Not found }
+   */
+  // --- DSP DCAT-3 Catalog Endpoints (synchronous/public discovery) ---
+  router.post('/dcat3/catalog/request', async (req, res) => {
+    const hostDid = await tenantsCacheManager.getDidDocument('host');
+    if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
+
+    const allTenants = await tenantsCacheManager.listRegisteredTenants();
+    const datasets = allTenants
+      .map(toProviderDataset)
+      .filter((d): d is ProviderDataset => !!d);
+
+    const filtered = filterDatasets(datasets, req.body?.filters);
+    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
+    res.json(buildCatalog(catalogBaseUrl, filtered));
+  });
+
+  router.get('/dcat3/catalog/datasets/:id', async (req, res) => {
+    const hostDid = await tenantsCacheManager.getDidDocument('host');
+    if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
+
+    const allTenants = await tenantsCacheManager.listRegisteredTenants();
+    const datasets = allTenants
+      .map(toProviderDataset)
+      .filter((d): d is ProviderDataset => !!d);
+    const dataset = datasets.find((d) => d.datasetId === req.params.id);
+    if (!dataset) return res.status(404).type('text').send('Not Found');
+
+    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
+    const [single] = buildCatalog(catalogBaseUrl, [dataset])['dcat:dataset'];
+    res.json(single);
+  });
+
+  router.post('/:tenantId/cds-:jurisdiction/:version/:sector/dcat3/catalog/request', resolveTenant, async (req, res) => {
+    const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
+
+    const dataset = toProviderDataset(tenantConfig);
+    if (!dataset) return res.status(404).type('text').send('Not Found');
+    const filtered = filterDatasets([dataset], req.body?.filters);
+
+    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/dcat3/catalog`;
+    res.json(buildCatalog(catalogBaseUrl, filtered));
+  });
+
+  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/dcat3/catalog/datasets/:id', resolveTenant, async (req, res) => {
+    const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
+
+    const dataset = toProviderDataset(tenantConfig);
+    if (!dataset || dataset.datasetId !== req.params.id) return res.status(404).type('text').send('Not Found');
+
+    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/dcat3/catalog`;
+    const [single] = buildCatalog(catalogBaseUrl, [dataset])['dcat:dataset'];
+    res.json(single);
   });
 
   // --- FHIR-Specific Endpoints ---

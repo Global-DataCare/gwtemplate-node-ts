@@ -24,11 +24,6 @@ const swaggerDefinition = {
       description: 'Issue an invite for license activation (host or tenant licensing flow).',
     },
     {
-      name: '2.1.1 Identity Federation',
-      description:
-        'Federate an external OIDC id_token (e.g. eIDAS) into Firebase. This is only needed if you do NOT already have a Firebase id_token (e.g. your app uses another IdP and is not signed into Firebase).',
-    },
-    {
       name: '2.1.2 Initial Access Token Exchange',
       description: 'Exchange activation code + Firebase id_token for initial_access_token (DCR).',
     },
@@ -81,9 +76,18 @@ const swaggerDefinition = {
       description: 'Well-known and discovery endpoints.',
     },
     {
+      name: 'Data Catalog Discovery',
+      description: 'DCAT-3 catalog discovery endpoints (`/dcat3/catalog/...`) for operator/provider dataset lookup.',
+    },
+    {
       name: 'Async Polling',
       description:
         'Polling endpoints (`_batch-response`) used to retrieve the final result of asynchronous jobs.',
+    },
+    {
+      name: '2.1.1 Frontend Identity Federation (Optional)',
+      description:
+        'Optional pre-step: federate an external OIDC id_token (e.g. eIDAS) into Firebase when the frontend does not already have a Firebase id_token.',
     },
     {
       name: '99. Legacy / Internal',
@@ -99,7 +103,6 @@ const swaggerDefinition = {
       name: '2. Device and Identity Registration',
       tags: [
         '2.1.4 License Issuance (Invite)',
-        '2.1.1 Identity Federation',
         '2.1.2 Initial Access Token Exchange',
         '2.1.3 Device Registration (DCR)',
         '2.2 OIDC4VCI',
@@ -126,7 +129,12 @@ const swaggerDefinition = {
     },
     {
       name: 'Other',
-      tags: ['Discovery', '99. Legacy / Internal'],
+      tags: [
+        'Discovery',
+        'Data Catalog Discovery',
+        '2.1.1 Frontend Identity Federation (Optional)',
+        '99. Legacy / Internal',
+      ],
     },
   ],
   components: {
@@ -139,8 +147,8 @@ const swaggerDefinition = {
           [
             'Bearer token used by legacy (JSON) flows and some onboarding steps.',
             '',
-            'Demo/Test-Network note: in non-production environments the backend may accept any non-empty token for convenience.',
-            'Example token you can paste in Swagger "Authorize": `demo-id-token`.',
+            'Demo/Test-Network note: in non-production environments signature checks may be bypassed, but token format must still be JWT-like (`header.payload.signature`).',
+            'Example token you can paste in Swagger "Authorize": `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJkZW1vLXVzZXIiLCJlbWFpbCI6ImRlbW9AZXhhbXBsZS5vcmcifQ.demo`.',
             '',
             'Production note: token validation is environment-dependent and typically expects a Firebase id_token for end-user identity.',
           ].join('\n'),
@@ -210,24 +218,31 @@ const swaggerDefinition = {
       OrganizationOrderPlaintextMessage: {
         summary: 'Plaintext Message for Organization Order',
         description:
-          'A DIDComm-like message wrapper accepting an Offer via an Order. Order.acceptedOffer.identifier is required and must match the Offer ID returned by the Organization registration _batch-response.',
+          'A DIDComm-like message wrapper accepting an Offer via an Order. Order.acceptedOffer.identifier is required and must match the full Offer identifier URN returned by the Organization registration _batch-response (use {{offerId}} placeholder in Swagger UI).',
         value: {},
       },
       OrganizationOrderResponseBundle: {
         summary: 'Organization Order Response Bundle',
         description:
-          'Async Order response bundle with Organization-order-response-v1.0 and Order.* invoice/payment claims.',
+          'Async Order response bundle with Organization-order-response-v1.0, org.schema.Order.* invoice/payment claims and org.schema.IndividualProduct.* activation claims.',
         value: {},
       },
       InitialAccessTokenExchangePlaintextMessage: {
         summary: 'Plaintext Message for Initial Access Token Exchange',
-        description: 'A DIDComm-like message wrapper containing `subject_token` (activation code).',
+        description:
+          'A DIDComm-like message wrapper containing `subject_token` (activation code). `subject_token` must be a JSON string (quoted); use {{activationCode}} placeholder in Swagger UI.',
         value: {},
       },
       LicenseIssuePlaintextMessage: {
         summary: 'Plaintext Message for License Issue',
         description:
           'A DIDComm-like message wrapper reserving a seat and issuing an activation code. User licenses can issue multiple device-profile codes; device licenses only issue one.',
+        value: {},
+      },
+      LicenseIssueExistingEmployeePlaintextMessage: {
+        summary: 'Plaintext Message for License Issue (Existing Employee)',
+        description:
+          'Reserves a seat and issues an activation code for an employee already registered in the tenant (e.g., admin/legal representative adding another device).',
         value: {},
       },
       FirebaseCustomTokenPlaintextMessage: {
@@ -304,57 +319,62 @@ const swaggerDefinition = {
       OrganizationRegistrationPollRequest: {
         summary: 'Organization Registration Poll Request',
         description: 'Polls the Organization registration job using the same `thid` from the Organization _batch request.',
-        value: { thid: 'org-registration-thread-id' },
+        value: { thid: 'org-registration-thread-<test-id>' },
       },
       OrganizationOrderPollRequest: {
         summary: 'Organization Order Poll Request',
         description: 'Polls the Order job using the same `thid` from the Order _batch request.',
-        value: { thid: 'org-order-thread-id' },
+        value: { thid: 'org-order-thread-<test-id>' },
       },
       EmployeePollRequest: {
         summary: 'Employee Poll Request',
         description: 'Polls the Employee job using the same `thid` from the Employee _batch request.',
-        value: { thid: 'employee-thread-id' },
+        value: { thid: 'employee-thread-<test-id>' },
       },
       PersonPollRequest: {
         summary: 'Person Poll Request',
         description: 'Polls the Person job using the same `thid` from the Person _batch request.',
-        value: { thid: 'person-thread-id' },
+        value: { thid: 'person-thread-<test-id>' },
       },
       ConsentPollRequest: {
         summary: 'Consent Poll Request',
         description: 'Polls the Consent job using the same `thid` from the Consent _batch request.',
-        value: { thid: 'consent-thread-id' },
+        value: { thid: 'consent-thread-<test-id>' },
       },
       CommunicationPollRequest: {
         summary: 'Communication Poll Request',
         description: 'Polls the Communication job using the same `thid` from the Communication _batch request.',
-        value: { thid: 'communication-thread-id' },
+        value: { thid: 'communication-thread-<test-id>' },
+      },
+      TokenExchangePollRequest: {
+        summary: 'Token Exchange Poll Request',
+        description: 'Polls the initial access token exchange job using the same `thid` from Token/_exchange.',
+        value: { thid: 'token-exchange-thread-<test-id>' },
       },
       CompositionPollRequest: {
         summary: 'Composition Poll Request',
         description: 'Polls the Composition job using the same `thid` from the Composition _batch request.',
-        value: { thid: 'composition-thread-id' },
+        value: { thid: 'composition-thread-<test-id>' },
       },
       RelatedPersonPollRequest: {
         summary: 'RelatedPerson Poll Request',
         description: 'Polls the RelatedPerson job using the same `thid` from the RelatedPerson _batch request.',
-        value: { thid: 'relatedperson-thread-id' },
+        value: { thid: 'relatedperson-thread-<test-id>' },
       },
       ObservationPollRequest: {
         summary: 'Observation Poll Request',
         description: 'Polls the Observation job using the same `thid` from the Observation _batch request.',
-        value: { thid: 'observation-thread-id' },
+        value: { thid: 'observation-thread-<test-id>' },
       },
       TenantOrganizationPollRequest: {
         summary: 'Tenant Organization Poll Request',
         description: 'Polls the tenant Organization job using the same `thid` from the Organization _batch request.',
-        value: { thid: 'tenant-organization-thread-id' },
+        value: { thid: 'tenant-organization-thread-<test-id>' },
       },
       TenantOrderPollRequest: {
         summary: 'Tenant Order Poll Request',
         description: 'Polls the tenant Order job using the same `thid` from the Order _batch request.',
-        value: { thid: 'tenant-order-thread-id' },
+        value: { thid: 'tenant-order-thread-<test-id>' },
       },
       AsyncPollPending: {
         summary: 'Async Poll Pending Response',
