@@ -4,7 +4,7 @@
 import crypto from 'crypto';
 import forge from 'node-forge';
 import { Buffer } from 'buffer';
-import { VerifyPdf } from './verifyPdf.class';
+import { VerifyPdf } from './verifyPdf.class.js';
 
 type PdfEvidenceHashes = {
   hashAlg: string;

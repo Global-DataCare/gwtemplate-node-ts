@@ -49,7 +49,6 @@ EU:
 - `eu-health-thing`
 
 NA/APAC:
-- `na-health-dog`, `na-health-cat`
 - `na-health-care`
 - `na-vet-dog`, `na-vet-cat`
 
