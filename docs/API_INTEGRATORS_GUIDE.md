@@ -3,6 +3,7 @@
 This guide provides a comprehensive, step-by-step walkthrough for the complete API integration flow, from registering a new organization to onboarding its first customer.
 
 **Interactive Documentation:** All endpoints are documented and can be tested interactively via the Swagger UI at the `/api-docs` endpoint of the running service.
+**Online test deployment:** https://globaldatacare-test-961105121121.europe-southwest1.run.app/api-docs
 
 ## 1. Vision: The Unified Health ID and Index
 
