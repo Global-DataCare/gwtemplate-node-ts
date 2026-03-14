@@ -3,6 +3,15 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 
 let configInstance: IServerConfig;
 
+const MAIN_SECTORS = ['animal', 'health'] as const;
+const SUBSECTORS = ['research', 'care', 'index', 'tech'] as const;
+
+type MainSector = typeof MAIN_SECTORS[number];
+type Subsector = typeof SUBSECTORS[number];
+
+const DEFAULT_MAIN_SECTOR: MainSector = 'health';
+const DEFAULT_SUBSECTORS: Subsector[] = ['research', 'care', 'index'];
+
 export function resetServerConfig(): void {
   configInstance = undefined as unknown as IServerConfig;
 }
@@ -24,17 +33,72 @@ export function determineApiBaseUrl(port: number, apiHostname: string): string {
 
 export function parseAndValidateSectors(csv: string | undefined): Sector[] {
   if (!csv) return [];
-  const allSectors = Object.values(Sector) as string[];
+  const legacySectors = new Set(Object.values(Sector) as string[]);
   const requestedSectors = csv.split(',').map((s) => s.trim());
+  const syntheticSectorPattern = /^(animal|health)-(research|care|index|tech)$/;
   for (const sector of requestedSectors) {
     if (sector === Sector.SYSTEM) {
       throw new Error(`Config Error: The '${Sector.SYSTEM}' sector is reserved and cannot be set in SECTORS_ALLOWED.`);
     }
-    if (!allSectors.includes(sector)) {
-      throw new Error(`Config Error: Invalid sector '${sector}'. Allowed: ${allSectors.join(', ')}`);
+    if (!legacySectors.has(sector) && !syntheticSectorPattern.test(sector)) {
+      throw new Error(
+          `Config Error: Invalid sector '${sector}'. Allowed legacy sectors (${Array.from(legacySectors).join(', ')}) ` +
+          "or synthetic sectors '<animal|health>-<research|care|index|tech>'."
+      );
     }
   }
   return requestedSectors as Sector[];
+}
+
+export function parseAndValidateMainSector(value: string | undefined): MainSector {
+  const normalized = String(value || DEFAULT_MAIN_SECTOR).trim().toLowerCase();
+  if (!MAIN_SECTORS.includes(normalized as MainSector)) {
+    throw new Error(
+      `Config Error: Invalid MAINSECTOR '${value}'. Allowed: ${MAIN_SECTORS.join(', ')}`
+    );
+  }
+  return normalized as MainSector;
+}
+
+export function parseAndValidateSubsectors(csv: string | undefined): Subsector[] {
+  const values = String(csv || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (values.length === 0) {
+    return [...DEFAULT_SUBSECTORS];
+  }
+
+  const deduped: Subsector[] = [];
+  for (const value of values) {
+    if (!SUBSECTORS.includes(value as Subsector)) {
+      throw new Error(
+        `Config Error: Invalid SUBSECTORSALLOWED value '${value}'. Allowed: ${SUBSECTORS.join(', ')}`
+      );
+    }
+    const typed = value as Subsector;
+    if (!deduped.includes(typed)) {
+      deduped.push(typed);
+    }
+  }
+  return deduped;
+}
+
+export function buildSectorsFromMainAndSubsectors(main: MainSector, subsectors: Subsector[]): Sector[] {
+  return subsectors.map((sub) => `${main}-${sub}` as Sector);
+}
+
+export function resolveAllowedSectorsFromEnv(env: NodeJS.ProcessEnv): Sector[] {
+  const legacyCsv = String(env.SECTORS_ALLOWED || '').trim();
+  if (legacyCsv) {
+    console.warn('[Config] SECTORS_ALLOWED is deprecated. Use MAINSECTOR + SUBSECTORSALLOWED.');
+    return parseAndValidateSectors(legacyCsv);
+  }
+
+  const main = parseAndValidateMainSector(env.MAINSECTOR);
+  const subsectors = parseAndValidateSubsectors(env.SUBSECTORSALLOWED);
+  return buildSectorsFromMainAndSubsectors(main, subsectors);
 }
 
 function getHostEnv(key: string): string | undefined {
@@ -62,7 +126,7 @@ export function getConfig(): IServerConfig {
       hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || new URL(apiBaseUrl).host,
       apiBaseUrl,
       namespace: process.env.URN_NAMESPACE || 'antifraud',
-      sectorsAllowed: parseAndValidateSectors(process.env.SECTORS_ALLOWED),
+      sectorsAllowed: resolveAllowedSectorsFromEnv(process.env),
       allowedPaymentMethods: (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(','),
       dbProvider: process.env.DB_PROVIDER || 'mem',
       storageProvider: process.env.STORAGE_PROVIDER || 'mem',
@@ -115,4 +179,3 @@ export function getConfig(): IServerConfig {
   }
   return configInstance;
 }
-

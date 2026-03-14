@@ -1,10 +1,10 @@
 import * as express from 'express';
 import { randomUUID } from 'crypto';
 import { TokenManager } from '../managers/TokenManager';
-import { createOperationOutcome } from '../utils/outcome';
-import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
+import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
 
 /**
  * Creates a router for authentication-related endpoints, like the token exchange.
@@ -100,13 +100,23 @@ export function createAuthRouter(
 
     } catch (error) {
       if (error instanceof ManagerError) {
-        const outcome = createOperationOutcome(IssueLevel.Error, error.code, error.message);
-        return res.status(parseInt(error.status, 10) || 400).json(outcome);
+        return sendDidcommEarlyError(
+          req,
+          res,
+          parseInt(error.status, 10) || 400,
+          error.code,
+          error.message,
+        );
       }
       // Generic error for unexpected issues
       console.error('[AuthRouter] Unexpected error:', error);
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'An unexpected internal server error occurred.');
-      res.status(500).json(outcome);
+      return sendDidcommEarlyError(
+        req,
+        res,
+        500,
+        IssueType.Exception,
+        'An unexpected internal server error occurred.',
+      );
     }
   });
 

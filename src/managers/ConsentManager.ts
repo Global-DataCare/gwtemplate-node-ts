@@ -13,6 +13,11 @@ import { buildConsentRuleKey, hashConsentRuleId } from '../utils/consent';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { getTenantVaultId } from '../utils/tenant';
 import { getIndividualSectionId } from '../utils/individual-sections';
+import {
+  extractLedgerSafeResearchTags,
+  normalizeFhirIngestionFormat,
+  validateFhirPayloadByVersion,
+} from '../utils/fhir-ingestion';
 import { IJobProcessor } from './registry';
 
 export interface ConsentManagerDeps {
@@ -39,6 +44,18 @@ export class ConsentManager implements IJobProcessor {
   }
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const normalizedSection = String(job.section || '').trim().toLowerCase();
+    const normalizedFormatRaw = String(job.format || '').trim();
+    const normalizedAction = String(job.action || '').trim();
+    const jurisdiction = String(job.jurisdiction || '').trim();
+    if (!job.tenantId || !job.sector) {
+      throw new Error('Missing tenantId or sector.');
+    }
+    if (!jurisdiction || !normalizedSection || !normalizedFormatRaw || !normalizedAction) {
+      throw new Error('Missing jurisdiction, section, format, or action.');
+    }
+    const normalizedFormat = normalizeFhirIngestionFormat(normalizedFormatRaw);
+
     const body = job.content?.body as any;
     const bundle = body as BundleJsonApi<BundleEntryRequest>;
     const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
@@ -57,11 +74,13 @@ export class ConsentManager implements IJobProcessor {
             if (!rawClaims) {
                 throw new Error('Missing claims object in resource meta');
             }
+            validateFhirPayloadByVersion(normalizedFormat, 'Consent', entry);
 
             // Normalize contextualized claims:
             // - If `@context` is set (e.g. `org.hl7.fhir.r4`) and keys are sent without that prefix,
             //   prepend `${@context}.` and sort keys alphabetically (canonical form).
             const claims = normalizeContextualizedClaims(rawClaims) as Record<string, any>;
+            const researchTags = extractLedgerSafeResearchTags(entry);
 
             // Backward/forward compatibility:
             // - Support `Consent.actor-reference` as an alias of `Consent.actor-identifier`.
@@ -140,16 +159,22 @@ export class ConsentManager implements IJobProcessor {
               ...(ruleToStore as any),
               id: ruleId,
             };
+            if (researchTags && researchTags.length > 0) {
+              (consentRule as any).meta = { tag: researchTags };
+              (consentRule as any).tag = researchTags;
+            }
 
             await this.vaultRepository.put(tenantVaultId, [consentRule], individualRulesSectionId);
 
+            const responseAction = `${normalizedAction}-response`;
             responseEntries.push({
                 response: {
                     status: '201',
-                    location: `/${job.sector}/individual/org.hl7.fhir.api/Consent/${ruleId}`,
+                    location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/Consent/${responseAction}`,
                 },
+                ...(researchTags && researchTags.length > 0 ? { meta: { tag: researchTags } } : {}),
                 type: 'Consent'
-            });
+            } as any);
 
         } catch (e: any) {
             const status = e.message.includes('not found') ? '404' : '400';
@@ -167,7 +192,7 @@ export class ConsentManager implements IJobProcessor {
 
     const responseBundle: BundleJsonApi = {
       resourceType: 'Bundle',
-      type: 'batch-response',
+      type: `${normalizedAction}-response`,
       data: responseEntries,
     };
 

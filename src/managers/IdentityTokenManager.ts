@@ -30,7 +30,10 @@ export class IdentityTokenManager implements IJobProcessor {
     const thid = job.content?.thid;
     if (!thid) throw new ManagerError('Missing thid.', IssueType.Required);
 
-    const action = String(job.action || '');
+    const action = String(job.action || '').trim();
+    if (!action) {
+      throw new ManagerError('Missing action.', IssueType.Required);
+    }
     if (action === '_exchange') return this.processInitialAccessTokenExchange(job);
     if (action === '_custom') return this.processFirebaseCustomToken(job);
 
@@ -117,4 +120,3 @@ export class IdentityTokenManager implements IJobProcessor {
     };
   }
 }
-

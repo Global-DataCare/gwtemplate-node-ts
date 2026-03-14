@@ -31,10 +31,13 @@ describe('Server Robustness', () => {
 
       expect(statusCode).toBe(400);
       expect(jsonBody).toBeDefined();
-      expect(jsonBody.resourceType).toBe('OperationOutcome');
-      expect(jsonBody.issue[0].severity).toBe('error');
-      expect(jsonBody.issue[0].code).toBe('invalid');
-      expect(jsonBody.issue[0].diagnostics).toContain('Malformed JSON in request body');
+      expect(jsonBody.type).toBe('application/bundle-api+json');
+      expect(jsonBody.body.resourceType).toBe('Bundle');
+      expect(jsonBody.body.data).toEqual([]);
+      expect(jsonBody.body.total).toBe(0);
+      expect(jsonBody.body.issues.issue[0].severity).toBe('error');
+      expect(jsonBody.body.issues.issue[0].code).toBe('invalid');
+      expect(jsonBody.body.issues.issue[0].diagnostics).toContain('Malformed JSON in request body');
     });
   });
 });

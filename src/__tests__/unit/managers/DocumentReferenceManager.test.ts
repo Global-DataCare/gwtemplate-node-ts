@@ -43,7 +43,7 @@ describe('DocumentReferenceManager', () => {
       body: {
         resourceType: 'Bundle',
         type: 'batch',
-        entry: [{ type: 'DocumentReference', meta: { claims } }],
+        entry: [{ type: 'DocumentReference', meta: { claims }, resource: { resourceType: 'DocumentReference' } }],
       } as any,
     } as any,
   });
@@ -63,6 +63,10 @@ describe('DocumentReferenceManager', () => {
     expect(response.body?.resourceType).toBe('Bundle');
     const data = (response.body as any).data;
     expect(data[0].response.status).toBe('201');
+    expect(data[0].response.location).toBe(
+      '/acme/cds-es/v1/health-care/individual/org.hl7.fhir.r4/DocumentReference/_batch-response'
+    );
+    expect(data[0].response.location).not.toMatch(/\/DocumentReference\/[0-9a-f]{8,}/i);
 
     const sectionId = getIndividualSectionId(subject, 'document-references');
     expect(mockVaultRepository.put).toHaveBeenCalled();
@@ -84,4 +88,3 @@ describe('DocumentReferenceManager', () => {
     expect(mockVaultRepository.put).not.toHaveBeenCalled();
   });
 });
-

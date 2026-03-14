@@ -101,6 +101,9 @@ export class HostingManager {
     try {
       switch (job.resourceType) {
         case 'Organization':
+          if (job.action === '_activate') {
+            return await this.processOrganizationActivation(job, environment);
+          }
           return await this.processOrganizationRegistration(job, environment, isBootstrap);
         case 'Order':
           return await this.processOrder(job, environment);
@@ -124,6 +127,54 @@ export class HostingManager {
         },
       };
     }
+  }
+
+  /**
+   * Handles activation of an organization backend/connector from ICA-issued proof.
+   *
+   * TODO(ica-activation):
+   * Replace this placeholder with the real flow:
+   * 1. Validate the controller-submitted vp_token / ICA proof.
+   * 2. Verify organization + representative credentials issued by ICA.
+   * 3. Verify that the submitted backend/conector DID document matches the ICA-issued organization DID.
+   * 4. Activate/provision the tenant backend in the selected host network.
+   */
+  private async processOrganizationActivation(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
+    const jobEntries = job?.content?.body?.data || [];
+    const responseEntries: ErrorEntry[] = [];
+
+    for (const entry of jobEntries) {
+      responseEntries.push(
+        this.handleError(
+          new ManagerError(
+            'Organization activation from ICA proof is not implemented yet. ' +
+            'Expected future flow: submit ICA-derived proof (for example vp_token) plus connector activation material.',
+            IssueType.NotSupported
+          ),
+          entry?.type || 'Organization',
+          entry?.meta
+        )
+      );
+    }
+
+    const responseBundle: BundleJsonApi = {
+      data: responseEntries,
+      resourceType: 'Bundle',
+      type: getBundleResponseTypeForAction(job.action),
+      total: responseEntries.length,
+    };
+
+    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+
+    return {
+      jti: uuidv4(),
+      type: 'hosting-response',
+      thid: job.content?.thid as string,
+      iss: issuerDid,
+      aud: job.content?.iss as string,
+      exp: Math.floor(Date.now() / 1000) + 300,
+      body: responseBundle,
+    };
   }
 
   /**

@@ -44,7 +44,10 @@ export class DeviceRegistrationManager implements IJobProcessor {
     const entryType = job.content?.type || 'openid-dcr-request';
 
     try {
-      const action = String(job.action || '');
+      const action = String(job.action || '').trim();
+      if (!action) {
+        throw new ManagerError('Missing action.', IssueType.Required);
+      }
       if (action === '_search') {
         return this.handleSearch(job);
       }

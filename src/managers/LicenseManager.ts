@@ -41,7 +41,10 @@ export class LicenseManager implements IJobProcessor {
    * @throws {ManagerError} If the input is invalid or incomplete.
    */
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
-    const action = String(job.action || '');
+    const action = String(job.action || '').trim();
+    if (!action) {
+      throw new ManagerError('Missing action.', IssueType.Required);
+    }
     if (action === '_issue') return this.issueActivationCodes(job);
     // Keep legacy/internal semantics where the action might be `create`.
     const {

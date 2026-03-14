@@ -4,9 +4,7 @@
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { DidService, ServiceEndpointSelector } from 'gdc-common-utils-ts/models/did';
-
-// As per SYSTEM_DESIGN.md, these sectors are FHIR-enabled.
-const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance'];
+import { isFhirSector, isResearchSector } from './sector';
 
 export type HostRegistrySector = 'test' | 'test-network' | 'network';
 
@@ -60,7 +58,8 @@ const createDidEndpointConfigFromSelector = (
  */
 function generateDefaultBusinessServices(sector: Sector): DidService[] {
   const services: DidService[] = [];
-  const isFhir = FHIR_SECTORS.includes(sector);
+  const isFhir = isFhirSector(sector);
+  const isResearch = isResearchSector(sector);
 
   const entityResources = ['Employee', 'EmployeeRole', 'Place', 'Organization', 'Bundle'];
   // NOTE: `Organization`/`Order` under `individual/org.schema` is used for the Family onboarding flow
@@ -90,7 +89,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'individual', format: 'org.hl7.fhir.r4' },
-        ['Consent', 'Communication', 'Composition', 'DocumentReference', 'RelatedPerson', 'Bundle'],
+        ['Consent', 'Communication', 'Composition', 'DocumentReference', 'Observation', 'RelatedPerson', 'Bundle'],
         ['_batch'],
       ),
     );
@@ -98,7 +97,26 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'individual', format: 'org.hl7.fhir.api' },
-        ['Observation', 'RelatedPerson'],
+        ['Consent', 'Communication', 'Composition', 'DocumentReference', 'Observation', 'RelatedPerson', 'Bundle'],
+        ['_batch'],
+      ),
+    );
+  }
+
+  // Digital twin ingestion for research sectors uses flat interoperable claims (`org.hl7.fhir.api`)
+  // wrapped in Composition resources.
+  if (isResearch) {
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
+        ['Composition'],
+        ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
+        ['Composition'],
         ['_batch'],
       ),
     );
@@ -229,7 +247,7 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
     createDidEndpointConfigFromSelector(
       { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
       ['Organization', 'Order'],
-      ['_batch'],
+      ['_batch', '_activate'],
     ),
   );
 
@@ -347,7 +365,7 @@ export function initializeCustomerServices(customerConfig: EntityConfig, sector:
     },
   ];
 
-  const isFhir = FHIR_SECTORS.includes(sector);
+  const isFhir = isFhirSector(sector);
   const individualResources = ['Customer', 'RelatedPerson', 'Bundle', 'Person'];
   if (isFhir) {
     individualResources.push('Patient');

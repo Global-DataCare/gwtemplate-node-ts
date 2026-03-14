@@ -215,7 +215,13 @@ This mode is available for basic interoperability testing on the test network. *
 
 -   **`Content-Type`:** `application/fhir+json`
 -   **`Body`:** A standard, unprotected FHIR resource.
--   **Response:** A synchronous `application/fhir+json` response.
+-   **Response model:** **Asynchronous** (same `_batch` + `_batch-response` polling pattern as other transactional endpoints).
+-   **Completed poll response:** `application/fhir+json` (raw FHIR JSON, no DIDComm envelope).
+-   **Early errors (4xx/5xx before enqueue):** returned as a raw FHIR `Bundle` body (no DIDComm envelope), with:
+    - `resourceType: "Bundle"`
+    - `entry: []`
+    - `total: 0`
+    - `issues.issue[]`
 
 ### 4.2. Secure JWE/DIDComm Mode
 
@@ -234,6 +240,32 @@ The `request` parameter is a JWE constructed with the following nested structure
 3.  **JWE Layer (Encryption):** The entire JWS is then encrypted as a JWE. The JWE Protected Header **must** include a `typ` (Type) header with the value `"application/didcomm-encrypted+json"`. This header signals to the recipient that the object is an encrypted DIDComm message before decryption begins.
 
 -   **Response:** The response is delivered asynchronously via the FAPI polling flow.
+
+For submit-time/poll-time early errors (for example malformed request, missing `thid`, unsupported content type),
+the gateway returns a DIDComm-compatible error envelope:
+
+```json
+{
+  "type": "application/bundle-api+json",
+  "body": {
+    "resourceType": "Bundle",
+    "data": [],
+    "total": 0,
+    "issues": {
+      "issue": [
+        {
+          "severity": "error",
+          "code": "required",
+          "diagnostics": "Missing or invalid \"thid\" parameter."
+        }
+      ]
+    }
+  }
+}
+```
+
+When the request targets FHIR-compatible endpoints in DIDComm mode, the envelope `type` may be `application/fhir+json`
+and `body` uses `entry: []` instead of `data: []`.
 
 
 ## 5. The DIDComm Message Payload
@@ -302,9 +334,25 @@ Troubleshooting:
 
 ## 6. Onboarding a New Organization
 
-This section details the secure workflow for registering a new organization. The process is built on OpenID Connect (OIDC), Dynamic Client Registration (DCR), and the Financial-grade API (FAPI) Security Profile.
+This section details the secure workflow for onboarding a new organization. The process is evolving from the legacy host-side registration flow toward an ICA-driven activation flow. The transport profile remains based on OpenID Connect (OIDC), Dynamic Client Registration (DCR), DIDComm plaintext in non-production, and the Financial-grade API (FAPI) Security Profile in production.
 
-Onboarding a new organization involves registering its legal information, creating a self-issued verifiable credential, generating a DID Document for its API connector, and verifying the legal information to obtain a verifiable presentation signed by a government entity. This final step is required for production network access.
+There are currently two host onboarding modes:
+
+- Legacy: host-side organization registration via `Organization/_batch` plus `Order/_batch`.
+- ICA-driven activation: host-side organization activation via `Organization/_activate`, where the organization identity already comes from ICA-issued credentials and the host activates the tenant connector/backend from that proof.
+
+For the ICA-driven activation target model:
+
+- ICA verification returns organization and legal representative credentials.
+- The organization `did:web` already appears in the organization credential (`credentialSubject.id`).
+- The host does not invent the organization DID. It activates the connector/backend from ICA proof.
+- The connector/backend generates and owns its own organization signing key.
+- The controller contributes a separate controller key and proof.
+- ICA `entity/did/document/_create` requires both keys and they must be different:
+  - `organization.publicKeyJwk`
+  - `controller.publicKeyJwk`
+
+Licensing for employees remains a later, separate flow.
 
 -   For `host-level` onboarding operations (registering a new tenant on the host), the `:sector` is a **network environment selector**:
     - `demo` / `test` → `test` (no blockchain integration; MVP/in-memory)
@@ -355,11 +403,15 @@ Most business endpoints in this gateway are **asynchronous**:
 The following documentation explains the flow for demonstration purposes.
 
 
-### 6.1. Step 1: Register a New Tenant (Organization)
+### 6.1. Legacy Step 1: Register a New Tenant (Organization)
 
-This is the first step for any new organization. A legally authorized representative submits an asynchronous job to the `host`, proving their identity via an OIDC `id_token` from a trusted provider (e.g., Google, Apple, eIDAS). The `id_token` serves as a verifiable assertion of the representative's identity, which is crucial for establishing the initial trust anchor for the new tenant.
+This is the original host-managed onboarding flow. A legally authorized representative submits an asynchronous job to the `host`, proving their identity via an OIDC `id_token` from a trusted provider (e.g., Google, Apple, eIDAS). The `id_token` serves as a verifiable assertion of the representative's identity, which is crucial for establishing the initial trust anchor for the new tenant.
 
 **Endpoint:** `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch`
+
+Legacy note:
+- This flow remains supported for backward compatibility.
+- New ICA-first onboarding should prefer `Organization/_activate` (see next section).
 
 **Routing note:** `jurisdiction` and `sector` are part of the host routing path.  
 - `jurisdiction` is used to resolve channel/ledger routing and tenant namespace.  
@@ -543,7 +595,47 @@ Save `org.schema.Offer.identifier` from this response. You must reuse that exact
 `Order.acceptedOffer.identifier` (replace any placeholders in examples with the real Offer ID you
 received). Use the full URN returned in `org.schema.Offer.identifier`; UUID-only values are rejected.
 
-### 6.2. Step 2: Confirm the Order for Registration
+### 6.2. Recommended Step 1: Activate a New Tenant from ICA Proof
+
+This is the recommended target flow for organizations that have already completed ICA verification.
+
+The legal representative first obtains ICA-issued credentials outside the host registration flow. The controller then submits a host activation request derived from that ICA proof. The host activates the connector/backend for the selected network environment.
+
+**Endpoint:** `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
+
+Where `{sector}` is still the host onboarding network selector:
+- `test`
+- `test-network`
+- `network`
+
+Conceptually, this activation flow is expected to carry:
+- proof derived from ICA verification, for example a `vp_token`
+- the ICA-issued organization credential
+- the ICA-issued legal representative credential
+- connector activation material for the organization backend
+
+Important architecture notes:
+- The organization `did:web` is expected to come from ICA-issued proof, not to be invented by the host.
+- The connector/backend owns the organization signing keypair.
+- The controller contributes a different controller keypair and controller proof.
+- When the host calls ICA `entity/did/document/_create`, ICA expects both:
+  - `organization.publicKeyJwk`
+  - `controller.publicKeyJwk`
+- Those two keys must be different.
+
+Current implementation note:
+- The `_activate` endpoint path exists in the API and in service discovery.
+- The worker-side business logic is still a placeholder and returns `NotSupported` until the ICA proof validation and connector activation flow is fully implemented.
+
+Planned backend behavior for `_activate`:
+1. Validate the controller-submitted ICA proof (`vp_token` or equivalent).
+2. Extract and validate the ICA-issued organization and legal representative credentials.
+3. Validate connector activation material.
+4. Call ICA DID document creation using both organization and controller keys.
+5. Activate/provision the tenant backend in the selected network.
+6. Leave employee/device licensing for later flows.
+
+### 6.3. Legacy Step 2: Confirm the Order for Registration
 
 Once the registration `Offer` is received, the legal representative must formally accept it by submitting an order request. This step is crucial as it represents the contractual acceptance of the terms and conditions for the new tenant.
 
@@ -630,7 +722,7 @@ If Stripe is not configured or the price is zero, the payment URL may be an empt
 anti-fraud system (AEAT) and is **not** based on UBL; it requires a separate compliant implementation. UBL/Peppol
 output will be added in a future invoice module.
 
-### 6.3. Step 3: Retrieve ICA Enrollment Status (Message)
+### 6.4. Legacy Step 3: Retrieve ICA Enrollment Status (Message)
 
 After the Order is accepted, the ICA may return an **asynchronous** enrollment response.
 In demo mode (`ICA_AUTO_APPROVE=true`) the message can appear immediately. Otherwise,
@@ -653,7 +745,7 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/messaging/post-qu
   --data '{"thid":"thid-ica-status"}'
 ```
 
-### 6.4. Licensing and Settlement Model (Conceptual)
+### 6.5. Licensing and Settlement Model (Conceptual)
 
 The onboarding `Offer/Order` in Section 6 is strictly about creating the **tenant account** on the host (registry entry + DID + initial test-network enablement). After the tenant account exists, **license purchases** become a separate business flow.
 
@@ -2277,6 +2369,78 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.hl
 ```
 
 **Expected Response:** `202 Accepted`. After polling, a successful response confirms that the patient's Unified Health Index has been updated with the new entry, allowing any other authorized provider to discover this new piece of health information.
+
+#### 9.A Research ingestion from pre-conversion adapters (digital twin)
+
+For research pipelines (for example veterinary claims pre-converted from Qvet/Wakyma exports), use the `digitaltwin` section and `org.hl7.fhir.api` format.
+
+- Example pre-conversion source file:
+  - `/Users/fernando/GITS/gdc-workspace/adapter-ingestion-py/examples/input/exampleQvetES.xlsx`
+- Expected adapter output shape:
+  - DIDComm plaintext message
+  - `body.data[]` (array of Composition resource objects)
+  - each item contains `resource.meta.claims` (Composition claims)
+  - optional `resource.contained[].meta.claims` (DocumentReference now; Encounter/Patient in future phases)
+
+**Endpoint:** `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch`
+
+**Strict FHIR mode (same route, versioned format):**
+- `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch`
+- In `org.hl7.fhir.r4`, each entry must include `resource.resourceType = "Composition"` and pass version-aware validation.
+
+**Polling:** `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch-response` with the same `thid`.
+
+**`curl` Example:**
+```bash
+curl -X POST 'http://localhost:3000/acme/cds-es/v1/animal-research/digitaltwin/org.hl7.fhir.api/Composition/_batch' \
+--header 'App-ID: [APP-ID]' \
+--header 'App-Version: [APP-VERSION]' \
+--header 'Authorization: Bearer [SMART_TOKEN_FOR_RESEARCH_INGESTION]' \
+--header 'Content-Type: application/didcomm-plaintext+json' \
+--data '{
+  "jti": "research-composition-request-<test-id>",
+  "thid": "research-composition-thread-<test-id>",
+  "iss": "did:web:clinic.example.com:employee:data-loader",
+  "aud": "did:web:api.acme.org",
+  "type": "org.hl7.fhir.api.Bundle",
+  "body": {
+    "resourceType": "Bundle",
+    "type": "batch",
+    "data": [{
+      "type": "Composition",
+      "resource": {
+        "resourceType": "Composition",
+        "meta": {
+          "claims": {
+            "@context": "org.hl7.fhir.api",
+            "@type": "Composition:ResearchDigitalTwin",
+            "Composition.subject": "did:web:connector.example.com:animal:chip:z3vYh7w9q2p1k4m8n6a5b4c3d2e1f0",
+            "Composition.section": "LOINC|26436-6",
+            "Composition.type": "LOINC|60591-5",
+            "Composition.date": "2026-01-31T10:45:00Z",
+            "Composition.entry": "urn:uuid:c2b1f9ee-90d4-4f1d-8dc6-4c3f0b29621b"
+          }
+        },
+        "contained": [{
+          "resourceType": "DocumentReference",
+          "id": "urn:uuid:c2b1f9ee-90d4-4f1d-8dc6-4c3f0b29621b",
+          "meta": {
+            "claims": {
+              "@context": "org.hl7.fhir.api",
+              "DocumentReference.identifier": "urn:uuid:c2b1f9ee-90d4-4f1d-8dc6-4c3f0b29621b",
+              "DocumentReference.subject": "did:web:connector.example.com:animal:chip:z3vYh7w9q2p1k4m8n6a5b4c3d2e1f0",
+              "DocumentReference.type": "http://loinc.org|26436-6"
+            }
+          }
+        }]
+      },
+      "request": { "method": "POST", "url": "digitaltwin/org.hl7.fhir.api/Composition" }
+    }]
+  }
+}' -i
+```
+
+Current scope note: the gateway persists Composition-level claims for digital twin indexing. `contained[].meta.claims` are accepted in the request shape for compatibility with pre-conversion output, but `Encounter`/`Patient` persistence is not active yet in this flow.
 
 ---
 

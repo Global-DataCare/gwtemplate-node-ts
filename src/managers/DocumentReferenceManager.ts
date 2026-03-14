@@ -12,7 +12,12 @@ import { createOperationOutcome } from '../utils/outcome';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { determineResourceId } from '../utils/resource';
 import { getTenantVaultId } from '../utils/tenant';
-import { getIndividualSectionId } from '../utils/individual-sections';
+import { getSubjectScopedSectionId, SubjectSectionScope } from '../utils/individual-sections';
+import {
+  extractLedgerSafeResearchTags,
+  normalizeFhirIngestionFormat,
+  validateFhirPayloadByVersion,
+} from '../utils/fhir-ingestion';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -40,9 +45,21 @@ export class DocumentReferenceManager implements IJobProcessor {
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const thid = job.content?.thid as string | undefined;
     if (!thid) throw new ManagerError('Missing thid.', IssueType.Required);
-    if (!job.tenantId || !job.sector || !job.jurisdiction) {
-      throw new ManagerError('Missing tenantId, sector, or jurisdiction.', IssueType.Required);
+    const normalizedSection = String(job.section || '').trim().toLowerCase();
+    const normalizedFormatRaw = String(job.format || '').trim();
+    const normalizedAction = String(job.action || '').trim();
+    const jurisdiction = String(job.jurisdiction || '').trim();
+    if (!job.tenantId || !job.sector) {
+      throw new ManagerError('Missing tenantId or sector.', IssueType.Required);
     }
+    if (!jurisdiction || !normalizedSection || !normalizedFormatRaw || !normalizedAction) {
+      throw new ManagerError('Missing jurisdiction, section, format, or action.', IssueType.Required);
+    }
+    if (normalizedSection !== 'individual' && normalizedSection !== 'digitaltwin') {
+      throw new ManagerError(`Unsupported section '${normalizedSection}'.`, IssueType.NotSupported);
+    }
+    const normalizedFormat = normalizeFhirIngestionFormat(normalizedFormatRaw);
+    const scope: SubjectSectionScope = normalizedSection === 'digitaltwin' ? 'digitaltwin' : 'individual';
 
     const bundle = (job.content?.body || {}) as any;
     const entries: FhirBundleEntryLike[] =
@@ -58,8 +75,10 @@ export class DocumentReferenceManager implements IJobProcessor {
         if (!rawClaims || typeof rawClaims !== 'object') {
           throw new ManagerError('Missing meta.claims in DocumentReference entry.', IssueType.Required);
         }
+        validateFhirPayloadByVersion(normalizedFormat, 'DocumentReference', entry);
 
         const claims = normalizeContextualizedClaims(rawClaims);
+        const researchTags = extractLedgerSafeResearchTags(entry);
         const subject = getClaimValue<string>(claims, 'DocumentReference.subject');
         if (!subject) {
           throw new ManagerError('Missing DocumentReference.subject claim.', IssueType.Required);
@@ -74,13 +93,25 @@ export class DocumentReferenceManager implements IJobProcessor {
           getClaimValue<string>(claims, 'DocumentReference.identifier.value');
         const id = determineResourceId(identifierClaim, process.env.NODE_ENV);
 
-        const sectionId = getIndividualSectionId(subject, 'document-references');
-        await this.vaultRepository.put(tenantVaultId, [{ id, ...claims } as any], sectionId);
+        const sectionId = getSubjectScopedSectionId(subject, scope, 'document-references');
+        const record: Record<string, any> = { id, ...claims };
+        if (researchTags && researchTags.length > 0) {
+          record.meta = { tag: researchTags };
+          record.tag = researchTags;
+        }
+        await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
 
+        const responseAction = `${normalizedAction}-response`;
         responseEntries.push({
           type: 'DocumentReference',
-          response: { status: '201', location: `/${job.sector}/individual/${job.format}/DocumentReference/${id}` },
-          meta: { claims },
+          response: {
+            status: '201',
+            location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/DocumentReference/${responseAction}`,
+          },
+          meta: {
+            claims,
+            ...(researchTags && researchTags.length > 0 ? { tag: researchTags } : {}),
+          },
         });
       } catch (e: any) {
         const status = e instanceof ManagerError ? e.status : '400';
@@ -105,7 +136,7 @@ export class DocumentReferenceManager implements IJobProcessor {
       exp: Math.floor(Date.now() / 1000) + 300,
       body: {
         resourceType: 'Bundle',
-        type: `${String(job.action || '')}-response`,
+        type: `${normalizedAction}-response`,
         data: responseEntries,
       },
     };

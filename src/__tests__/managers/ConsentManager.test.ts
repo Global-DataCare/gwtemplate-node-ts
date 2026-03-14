@@ -113,6 +113,11 @@ describe('ConsentManager', () => {
     const responseBody = jobResponse.body as BundleJsonApi;
     const responseEntry = responseBody.data[0] as BundleEntryResponse;
     expect(responseEntry.response.status).toEqual('201');
+    expect(responseBody.type).toEqual('_batch-response');
+    expect(responseEntry.response.location).toEqual(
+      '/test-tenant/cds-au-nsw/v1/test-sector/individual/org.hl7.fhir.api/Consent/_batch-response'
+    );
+    expect(responseEntry.response.location).not.toMatch(/\/Consent\/[0-9a-f]{8,}/i);
 
     const tenantVaultId = getTenantVaultId(mockSector, mockTenantId);
     expect(mockVaultRepository.vaultExists).toHaveBeenCalledWith(tenantVaultId);

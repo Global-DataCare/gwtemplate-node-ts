@@ -11,12 +11,18 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom-response']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response']).toBeDefined();
+    expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate']).toBeDefined();
+    expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch-response']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch-response']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response']).toBeDefined();
@@ -36,9 +42,11 @@ describe('Swagger Spec Generation', () => {
       expect.arrayContaining([
         '1.1 Organization Registration',
         '1.2 Organization Order',
-        '2.1.1 Identity Federation',
+        '2.1.1 Frontend Identity Federation (Optional)',
+        '2.1.4 License Issuance (Invite)',
         '2.1.2 Initial Access Token Exchange',
         '2.1.3 Device Registration (DCR)',
+        '2.2 OIDC4VCI',
         '2.2 SMART Token',
         '3.1 Employee Role',
         '4.1 Family Registration',
@@ -48,6 +56,7 @@ describe('Swagger Spec Generation', () => {
         '7. Composition',
         '4.3 Family Member Relationship',
         '8.4 Personal Observations',
+        '9. Research Digital Twin',
       ]),
     );
     expect(spec['x-tagGroups']).toBeDefined();
@@ -74,6 +83,7 @@ describe('Swagger Spec Generation', () => {
         'ConsentCreationPlaintextMessage',
         'CommunicationCreationPlaintextMessage',
         'CompositionUpdatePlaintextMessage',
+        'ResearchCompositionIngestionPlaintextMessage',
         'FamilyMemberRelationshipPlaintextMessage',
         'PersonalObservationPlaintextMessage',
         'AsyncPollRequest',
@@ -94,6 +104,7 @@ describe('Swagger Spec Generation', () => {
       'ConsentCreationPlaintextMessage',
       'CommunicationCreationPlaintextMessage',
       'CompositionUpdatePlaintextMessage',
+      'ResearchCompositionIngestionPlaintextMessage',
       'FamilyMemberRelationshipPlaintextMessage',
       'PersonalObservationPlaintextMessage',
       'AsyncPollRequest',

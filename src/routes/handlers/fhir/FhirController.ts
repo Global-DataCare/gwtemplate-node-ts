@@ -6,10 +6,10 @@ import { IAuthorizationManager } from '../../../managers/auth/IAuthorizationMana
 import { QueueAdapter } from '../../../adapters/queue';
 import { IAccessTokenClaims } from 'gdc-common-utils-ts/models/auth';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
-import { createOperationOutcome } from '../../../utils/outcome';
-import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { validOrNewUuidv4 } from '../../../utils/uuid';
 import { v4 as uuidv4 } from 'uuid';
+import { sendDidcommEarlyError } from '../../../utils/didcomm-error-response';
 
 export class FhirController {
   constructor(
@@ -28,12 +28,13 @@ export class FhirController {
     // 1. Validate 'partOf' exists
     const partOf = resource.partOf?.[0]?.reference;
     if (!partOf) {
-      const outcome = createOperationOutcome(
-        IssueLevel.Error,
+      return sendDidcommEarlyError(
+        req,
+        res,
+        400,
         IssueType.Required,
         "The 'partOf' field is required to link this communication to a consent.",
       );
-      return res.status(400).json(outcome);
     }
 
     const consentId = partOf;
@@ -41,12 +42,13 @@ export class FhirController {
     // 2. Perform authorization check
     const isAuthorized = await this.authManager.canAccess(accessTokenClaims, { resource: resource } as any, 'create', consentId);
     if (!isAuthorized) {
-      const outcome = createOperationOutcome(
-        IssueLevel.Error,
+      return sendDidcommEarlyError(
+        req,
+        res,
+        403,
         IssueType.Forbidden,
         'The provided credentials do not grant permission to perform this action.',
       );
-      return res.status(403).json(outcome);
     }
 
     // 3. If authorized, create and enqueue the job

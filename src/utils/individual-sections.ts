@@ -10,8 +10,15 @@ import { getEnvSectionId } from './section-env';
  * - We want stable, deterministic section ids without leaking the full subject identifier.
  */
 export function getIndividualSectionId(subjectDid: string, section: string): string {
+  return getSubjectScopedSectionId(subjectDid, 'individual', section);
+}
+
+export type SubjectSectionScope = 'individual' | 'digitaltwin';
+
+export function getSubjectScopedSectionId(subjectDid: string, scope: SubjectSectionScope, section: string): string {
   const normalized = (subjectDid || '').trim();
   if (!normalized) throw new Error('subjectDid is required');
+  if (!scope || !scope.trim()) throw new Error('scope is required');
   if (!section || !section.trim()) throw new Error('section is required');
 
   const subjectHash = createHash('sha256').update(normalized, 'utf8').digest('hex');
@@ -20,7 +27,7 @@ export function getIndividualSectionId(subjectDid: string, section: string): str
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
-  return getEnvSectionId(`individual_${normalizedSection}_${subjectHash}`);
+  return getEnvSectionId(`${scope.toLowerCase()}_${normalizedSection}_${subjectHash}`);
 }
 
 /**

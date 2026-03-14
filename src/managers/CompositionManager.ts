@@ -10,7 +10,12 @@ import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { createOperationOutcome } from '../utils/outcome';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { getTenantVaultId } from '../utils/tenant';
-import { getIndividualSectionId } from '../utils/individual-sections';
+import { getSubjectScopedSectionId, SubjectSectionScope } from '../utils/individual-sections';
+import {
+  extractLedgerSafeResearchTags,
+  normalizeFhirIngestionFormat,
+  validateFhirPayloadByVersion,
+} from '../utils/fhir-ingestion';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IJobProcessor } from './registry';
 
@@ -28,20 +33,70 @@ export class CompositionManager implements IJobProcessor {
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const body = job.content?.body as any;
     const entries: any[] = (Array.isArray(body?.data) && body.data) || (Array.isArray(body?.entry) && body.entry) || [];
+    const normalizedSection = String(job.section || '').trim().toLowerCase();
+    const normalizedFormatRaw = String(job.format || '').trim();
+    const normalizedAction = String(job.action || '').trim();
+    const jurisdiction = String(job.jurisdiction || '').trim();
+
+    if (!job.tenantId || !job.sector) {
+      throw new Error('Missing tenantId or sector.');
+    }
+    if (!jurisdiction) {
+      throw new Error('Missing required job.jurisdiction.');
+    }
+    if (!normalizedSection) {
+      throw new Error('Missing required job.section.');
+    }
+    if (!normalizedFormatRaw) {
+      throw new Error('Missing required job.format.');
+    }
+    if (!normalizedAction) {
+      throw new Error('Missing required job.action.');
+    }
+    if (normalizedSection !== 'individual' && normalizedSection !== 'digitaltwin') {
+      throw new Error(`Unsupported section '${normalizedSection}' for CompositionManager.`);
+    }
+    const normalizedFormat = normalizeFhirIngestionFormat(normalizedFormatRaw);
+
+    const scope: SubjectSectionScope =
+      normalizedSection === 'digitaltwin' ? 'digitaltwin' : 'individual';
 
     const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
 
     for (const entry of entries) {
-      const rawClaims =
-        (entry?.meta?.claims as Record<string, any> | undefined) ??
-        (entry?.resource?.meta?.claims as Record<string, any> | undefined);
-
+      let rawClaims: Record<string, any> | undefined;
       try {
+        const resourceType = String(entry?.resource?.resourceType || entry?.type || '').trim();
+        const responseAction = `${normalizedAction}-response`;
+        if (resourceType === 'OperationOutcome') {
+          // Preconversion may include row-level OperationOutcome entries as warnings.
+          // They are informational and should not be persisted as Composition claims.
+          responseEntries.push({
+            type: 'OperationOutcome',
+            response: {
+              status: '200',
+              location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/Composition/${responseAction}`,
+              outcome: createOperationOutcome(
+                IssueLevel.Information,
+                IssueType.Value,
+                'Skipped OperationOutcome entry from preconversion payload.',
+              ),
+            },
+          } as any);
+          continue;
+        }
+
+        rawClaims =
+          (entry?.meta?.claims as Record<string, any> | undefined) ??
+          (entry?.resource?.meta?.claims as Record<string, any> | undefined);
+
         if (!rawClaims || typeof rawClaims !== 'object') {
           throw new Error('Missing meta.claims for Composition entry.');
         }
+        validateFhirPayloadByVersion(normalizedFormat, 'Composition', entry);
 
         const claims = normalizeContextualizedClaims(rawClaims) as Record<string, any>;
+        const researchTags = extractLedgerSafeResearchTags(entry);
 
         const subject = getClaimValue<string>(claims, 'Composition.subject');
         if (!subject) throw new Error('Missing required claim: Composition.subject');
@@ -56,7 +111,6 @@ export class CompositionManager implements IJobProcessor {
         const entryRefs = getClaimValue<string>(claims, 'Composition.entry') || '';
         const type = getClaimValue<string>(claims, 'Composition.type') || 'LOINC|60591-5';
 
-        if (!job.tenantId || !job.sector) throw new Error('Missing tenantId or sector.');
         const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
         const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
         if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
@@ -65,20 +119,25 @@ export class CompositionManager implements IJobProcessor {
         const idInput = `${subject}|${section}|${author}|${date}|${type}|${entryRefs}`;
         const id = createHash('sha3-256').update(idInput, 'utf8').digest('hex');
 
-        const record: RecordBase = {
+        const record: RecordBase & { meta?: { tag?: any[] }; tag?: any[] } = {
           id,
           ...(claims as any),
         };
+        if (researchTags && researchTags.length > 0) {
+          record.meta = { tag: researchTags };
+          record.tag = researchTags;
+        }
 
-        const sectionId = getIndividualSectionId(subject, 'composition');
+        const sectionId = getSubjectScopedSectionId(subject, scope, 'composition');
         await this.vaultRepository.put(tenantVaultId, [record], sectionId);
 
         responseEntries.push({
           type: 'Composition',
           response: {
             status: '201',
-            location: `/${job.sector}/individual/org.hl7.fhir.api/Composition/${id}`,
+            location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/Composition/${responseAction}`,
           },
+          ...(researchTags && researchTags.length > 0 ? { meta: { tag: researchTags } } : {}),
         } as any);
       } catch (e: any) {
         responseEntries.push({

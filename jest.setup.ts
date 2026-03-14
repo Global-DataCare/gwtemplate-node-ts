@@ -35,7 +35,8 @@ process.env.NODE_ENV ??= 'test';
 process.env.DB_PROVIDER ??= 'mem';
 process.env.STORAGE_PROVIDER ??= 'mem';
 process.env.QUEUE_PROVIDER ??= 'mem';
-process.env.SECTORS_ALLOWED ??= 'health-care,emergency,health-insurance,test';
+process.env.MAINSECTOR ??= 'health';
+process.env.SUBSECTORSALLOWED ??= 'research,care,index';
 
 process.env.ORG_HOST_LEGAL_NAME ??= 'Gateway Host Services';
 process.env.ORG_HOST_JURISDICTION ??= 'ES';

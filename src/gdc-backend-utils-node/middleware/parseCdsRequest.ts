@@ -4,6 +4,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { extractHttpRequestDataAsJson } from '../../utils/http-parser';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
+import { sendDidcommEarlyError } from '../../utils/didcomm-error-response';
 
 // Extend the Express Request type to include our custom property
 declare global {
@@ -42,10 +44,12 @@ export const parseCdsRequest = (req: Request, res: Response, next: NextFunction)
 
     next();
   } catch (error: any) {
-    return res.status(400).json({
-      error: 'Bad Request',
-      message: `Failed to parse CDS request URL: ${error.message}`
-    });
+    return sendDidcommEarlyError(
+      req,
+      res,
+      400,
+      IssueType.Invalid,
+      `Failed to parse CDS request URL: ${error.message}`,
+    );
   }
 };
-

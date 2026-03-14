@@ -59,7 +59,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServicesConfig(tenantConfig.provider!.service.sectorCategory as Sector);
 
       // ASSERT
-      expect(services).toHaveLength(14); // + messaging + DSP/DCP discovery explicit services
+      expect(services).toHaveLength(16); // + digitaltwin(api+r4) + messaging + DSP/DCP discovery explicit services
 
       const entityService = services.find((s: DidService) => s.id.includes('entity'));
       expect(entityService).toBeDefined();
@@ -70,6 +70,22 @@ describe('Service Initialization Utilities', () => {
       expect(individualService).toBeDefined();
       expect(individualService!.serviceEndpoint).toContain('Person');
       expect(individualService!.serviceEndpoint).not.toContain('Patient');
+
+      const digitalTwinService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.api',
+      );
+      expect(digitalTwinService).toBeDefined();
+      expect(digitalTwinService!.serviceEndpoint).toContain('Composition');
+
+      const digitalTwinR4Service = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.r4',
+      );
+      expect(digitalTwinR4Service).toBeDefined();
+      expect(digitalTwinR4Service!.serviceEndpoint).toContain('Composition');
 
       const messagingService = services.find(
         (s: DidService) =>
@@ -114,6 +130,56 @@ describe('Service Initialization Utilities', () => {
       );
       expect(fhirR4Service).toBeDefined();
       expect(fhirR4Service!.serviceEndpoint).toContain('DocumentReference');
+      expect(fhirR4Service!.serviceEndpoint).toContain('Observation');
+
+      const fhirApiService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'individual' &&
+          (s as any).selector?.format === 'org.hl7.fhir.api',
+      );
+      expect(fhirApiService).toBeDefined();
+      expect(fhirApiService!.serviceEndpoint).toContain('Consent');
+      expect(fhirApiService!.serviceEndpoint).toContain('DocumentReference');
+    });
+
+    it('should treat synthetic animal-tech as FHIR-enabled', () => {
+      const services = initializeTenantServicesConfig('animal-tech' as Sector);
+
+      expect(services).toHaveLength(16);
+
+      const individualService = services.find((s: DidService) => s.id.includes('individual'));
+      expect(individualService).toBeDefined();
+      expect(individualService!.serviceEndpoint).toContain('Patient');
+
+      const fhirR4Service = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'individual' &&
+          (s as any).selector?.format === 'org.hl7.fhir.r4',
+      );
+      expect(fhirR4Service).toBeDefined();
+    });
+
+    it('should expose digital twin ingestion for synthetic animal-research', () => {
+      const services = initializeTenantServicesConfig('animal-research' as Sector);
+
+      const digitalTwinService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.api',
+      );
+
+      expect(digitalTwinService).toBeDefined();
+      expect(digitalTwinService!.serviceEndpoint).toContain('Composition');
+      expect(digitalTwinService!.actions).toEqual(['_batch']);
+
+      const digitalTwinR4Service = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.r4',
+      );
+      expect(digitalTwinR4Service).toBeDefined();
+      expect(digitalTwinR4Service!.serviceEndpoint).toContain('Composition');
+      expect(digitalTwinR4Service!.actions).toEqual(['_batch']);
     });
 
     it('should not include standard discovery endpoints', () => {
@@ -147,6 +213,7 @@ describe('Service Initialization Utilities', () => {
       const registryServices = services.filter((s: DidService) => (s as any).selector?.section === 'registry');
       expect(registryServices).toHaveLength(1);
       expect((registryServices[0] as any).selector?.sector).toBe('test');
+      expect(registryServices[0].actions).toEqual(['_batch', '_activate']);
 
       const identityServices = services.filter((s: DidService) => (s as any).selector?.section === 'identity');
       expect(identityServices).toHaveLength(4); // (research + health-care) × (firebase + openid)

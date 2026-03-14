@@ -8,7 +8,6 @@ import { QueueAdapter } from '../adapters/queue';
 import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 import { createJobName } from '../utils/naming';
 import { isRequestValid } from '../utils/request-validator';
-import { createOperationOutcome } from '../utils/outcome';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { Content } from 'gdc-common-utils-ts/utils/content';
@@ -23,9 +22,8 @@ import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipan
 import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 import { getEnvSectionId } from '../utils/section-env';
 import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/replay-protection-store';
+import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
 
-// As per SYSTEM_DESIGN.md, these sectors enable FHIR-specific features.
-const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance', 'health-tech', 'health-it'];
 const FORWARDED_HEADER_SEPARATOR = ',';
 
 function getRequestBaseUrl(req: express.Request, fallback: string): string {
@@ -79,15 +77,22 @@ export function createApiRouter(
     const thid = (req.method === 'POST' ? req.body.thid : req.query.thid) as string | undefined;
 
     if (!thid) {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing or invalid "thid" parameter.');
-      return res.status(400).json(outcome);
+      return sendDidcommEarlyError(
+        req,
+        res,
+        400,
+        IssueType.Required,
+        'Missing or invalid "thid" parameter.',
+      );
     }
 
     const job = asyncResponseStore.get(thid);
     if (!job) {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound);
-      return res.status(404).json(outcome);
+      return sendDidcommEarlyError(req, res, 404, IssueType.NotFound);
     }
+    // TODO(contract-unification): polling status model here is `PENDING|COMPLETED|FAILED`.
+    // Preconversion API currently exposes `queued|running|succeeded|failed` for upload polls.
+    // Define one canonical async public status vocabulary across services.
     if (job.status === 'PENDING') {
       res.set('Retry-After', '5');
       return res.status(202).json({ thid, status: 'PENDING' });
@@ -135,12 +140,22 @@ export function createApiRouter(
         asyncResponseStore.delete(thid);
       } catch (error: any) {
         console.log('[Polling Handler] Error caught:', error); // Using console.log for visibility in Jest
-        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'Failed to decode the stored job result: ' + error.message);
-        res.status(500).json(outcome);
+        return sendDidcommEarlyError(
+          req,
+          res,
+          500,
+          IssueType.Exception,
+          'Failed to decode the stored job result: ' + error.message,
+        );
       }
     } else {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'Job failed to process or result was invalid.');
-      res.status(500).json(outcome);
+      return sendDidcommEarlyError(
+        req,
+        res,
+        500,
+        IssueType.Exception,
+        'Job failed to process or result was invalid.',
+      );
     }
   };
 
@@ -206,8 +221,7 @@ export function createApiRouter(
   router.post('/:tenantId/cds-:jurisdiction/v1/:sector/identity/oidc/credential', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Missing or invalid Bearer token.');
-      return res.status(401).json(outcome);
+      return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
     }
 
     const { tenantId, sector } = req.params;
@@ -330,6 +344,61 @@ export function createApiRouter(
    *           application/json:
    *             schema:
    *               $ref: '#/components/schemas/Error'
+   *
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate:
+   *   post:
+   *     tags:
+   *       - 1.1 Organization Activation
+   *     summary: Activate a new Tenant (Organization) from ICA-issued proof
+   *     description: |
+   *       Submits an asynchronous job to activate a new tenant on the platform from
+   *       ICA-issued proof. This is a distinct flow from the legacy `_batch`
+   *       registration endpoint.
+   *
+   *       The `{sector}` segment is a host onboarding network selector:
+   *       - demo/test: `test`
+   *       - development/staging: `test-network`
+   *       - production: `network`
+   *
+   *       Expected semantics:
+   *       - the controller submits ICA-derived proof, for example through a `vp_token`
+   *       - the host validates the ICA proof and activates the tenant backend/connector
+   *       - employee licensing and later device onboarding remain separate steps
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted
+   *         (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical,
+   *         and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: |
+   *           Accepted. The activation job has been queued. The client should poll
+   *           the URL provided in the `Location` header to get the result.
+   *       '400':
+   *         description: Bad Request. The payload is malformed.
+   *       '401':
+   *         description: Unauthorized. Invalid or missing Bearer token for legacy flow, or failed JWE decryption/JWS verification for secure flow.
+   *       '404':
+   *         description: Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or network selector).
    *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch:
    *   post:
@@ -649,6 +718,7 @@ export function createApiRouter(
    *             type: object
    *           description: |
    *             Legacy FHIR JSON (raw Bundle without DIDComm envelope). Allowed only in non-production environments and only for `org.hl7.fhir.*` endpoints.
+   *             This mode is still asynchronous: submit with `_batch` and poll `_batch-response`.
    *     responses:
    *       '202':
    *         description: Accepted.
@@ -733,6 +803,7 @@ export function createApiRouter(
    *             type: object
    *           description: |
    *             Legacy FHIR JSON (raw Bundle without DIDComm envelope). Allowed only in non-production environments and only for `org.hl7.fhir.*` endpoints.
+   *             This mode is still asynchronous: submit with `_batch` and poll `_batch-response`.
    *     responses:
    *       '202':
    *         description: Accepted.
@@ -817,6 +888,7 @@ export function createApiRouter(
    *             type: object
    *           description: |
    *             Legacy FHIR JSON (raw Bundle without DIDComm envelope). Allowed only in non-production environments and only for `org.hl7.fhir.*` endpoints.
+   *             This mode is still asynchronous: submit with `_batch` and poll `_batch-response`.
    *     security:
    *       - BearerAuth: []
    *     responses:
@@ -866,6 +938,128 @@ export function createApiRouter(
    *       '400': { description: Missing or invalid thid. }
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch:
+   *   post:
+   *     tags:
+   *       - 9. Research Digital Twin
+   *     summary: Ingest pre-converted research claims (digital twin)
+   *     description: |
+   *       Submits an async research ingestion job for digital twin indexing.
+   *       This endpoint is intended for research sectors (e.g., `animal-research`, `health-research`).
+   *
+   *       Expected payload shape (adapter-ingestion-py output):
+   *       - DIDComm plaintext message
+   *       - `body.data[]` array
+   *       - each item is a Composition resource object with:
+   *         - `resource.meta.claims` for Composition claims
+   *         - optional `resource.contained[].meta.claims` for source resources
+   *           (`DocumentReference`, and future `Encounter` / `Patient`)
+   *
+   *       Current gateway behavior:
+   *       - validates/stores Composition-level claims (`Composition.*`)
+   *       - does not yet persist contained `Encounter`/`Patient` claims as independent resources.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/ResearchCompositionIngestionPlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch:
+   *   post:
+   *     tags:
+   *       - 9. Research Digital Twin
+   *     summary: Ingest research digital twin payload in strict FHIR R4 mode
+   *     description: |
+   *       Same research ingestion flow as `org.hl7.fhir.api`, but with version-aware validation.
+   *       Each item must include `resource.resourceType = "Composition"`.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response:
+   *   post:
+   *     tags:
+   *       - 9. Research Digital Twin
+   *     summary: Poll strict FHIR R4 research digital twin ingestion result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/CompositionPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/CompositionPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch-response:
+   *   post:
+   *     tags:
+   *       - 9. Research Digital Twin
+   *     summary: Poll research digital twin ingestion result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/CompositionPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/CompositionPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
    *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch:
    *   post:
@@ -1068,6 +1262,42 @@ export function createApiRouter(
    *             schema: { $ref: '#/components/schemas/AsyncPollSecureResponse' }
    *             examples:
    *               message: { $ref: '#/components/examples/AsyncPollSecureResponse' }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response:
+   *   post:
+   *     tags:
+   *       - 1.1 Organization Activation
+   *     summary: Poll the organization activation result (host)
+   *     description: |
+   *       Polls the asynchronous job submitted to `.../Organization/_activate`.
+   *
+   *       Submit vs poll behavior:
+   *       - Submit (`_activate`) returns immediate errors if the request cannot be accepted/enqueued.
+   *       - Poll (`_activate-response`) returns `202` while pending, then `200` (success) or `500` (processing error).
+   *
+   *       Response format depends on the original submission flow:
+   *       - Plaintext: returns JSON.
+   *       - Secure (form-encoded JWE): returns `application/x-www-form-urlencoded` with `response=<jwe>`.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. Returns either JSON (plaintext) or `response=<jwe>` (secure). }
    *       '400': { description: Missing or invalid thid. }
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }
@@ -1409,8 +1639,13 @@ export function createApiRouter(
       if (contentType.startsWith('application/x-www-form-urlencoded')) {
         // ENCRYPTED FLOW (FAPI/JAR-style)
         if (!req.body.request) {
-          const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, "Missing 'request' parameter in form-encoded body.");
-          return res.status(400).json(outcome);
+          return sendDidcommEarlyError(
+            req,
+            res,
+            400,
+            IssueType.Required,
+            "Missing 'request' parameter in form-encoded body.",
+          );
         }
         // The KMS decrypts the JWE using the HOST's key and returns the inner JWS, but does not verify it.
         const decodedJob = await kmsService.decodeRequest(req.body.request);
@@ -1533,8 +1768,7 @@ export function createApiRouter(
         const authToken = req.headers.authorization;
         // The 'ping' endpoint is a public health check and does not require authentication for legacy requests.
         if (section !== 'ping' && (!authToken || !authToken.startsWith('Bearer '))) {
-          const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Missing or invalid Bearer token.');
-          return res.status(401).json(outcome);
+          return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
         }
 
         // TODO: Implement actual token validation (e.g., call a verifier like GoogleTokenVerifier).
@@ -1577,13 +1811,23 @@ export function createApiRouter(
           contentType: contentType,
         };
       } else {
-        const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotSupported, `Unsupported Content-Type: ${contentType}`);
-        return res.status(415).json(outcome);
+        return sendDidcommEarlyError(
+          req,
+          res,
+          415,
+          IssueType.NotSupported,
+          `Unsupported Content-Type: ${contentType}`,
+        );
       }
     } catch (error: any) {
       console.error('[API] Error during request processing/decoding:', error);
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Security, 'Failed to process secure request: ' + error.message);
-      return res.status(401).json(outcome);
+      return sendDidcommEarlyError(
+        req,
+        res,
+        401,
+        IssueType.Security,
+        'Failed to process secure request: ' + error.message,
+      );
     }
 
     // --- 2. Transaction ID Validation ---
@@ -1592,14 +1836,24 @@ export function createApiRouter(
 
     const thid = jobRequest.content?.thid;
     if (!thid) {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Request body must contain a "thid" or "id" property.');
-      return res.status(400).json(outcome);
+      return sendDidcommEarlyError(
+        req,
+        res,
+        400,
+        IssueType.Required,
+        'Request body must contain a "thid" or "id" property.',
+      );
     }
 
     // --- 3. Path and Role Validation ---
     if (section === 'registry' && tenantId !== 'host') {
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Forbidden, 'The "registry" section is reserved for the "host" entity.');
-      return res.status(403).json(outcome);
+      return sendDidcommEarlyError(
+        req,
+        res,
+        403,
+        IssueType.Forbidden,
+        'The "registry" section is reserved for the "host" entity.',
+      );
     }
     
     const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
@@ -1607,8 +1861,13 @@ export function createApiRouter(
 
     if (!isRequestValid(tenantServices, { ...req.params, action })) {
       console.error(`[API] Path/Role validation failed for ${req.originalUrl}. Tenant services found: ${!!tenantServices}.`);
-      const outcome = createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'The requested tenant or endpoint path does not exist.');
-      return res.status(404).json(outcome);
+      return sendDidcommEarlyError(
+        req,
+        res,
+        404,
+        IssueType.NotFound,
+        'The requested tenant or endpoint path does not exist.',
+      );
     }
 
     // --- 4. Replay Protection (best-effort) ---
@@ -1623,12 +1882,14 @@ export function createApiRouter(
         getReplayTtlSeconds(jobRequest.content),
       );
       if (!reserved) {
-        const outcome = createOperationOutcome(
-          IssueLevel.Error,
+        return sendDidcommEarlyError(
+          req,
+          res,
+          409,
           IssueType.Conflict,
           'Duplicate jti detected for this issuer (possible replay).',
+          IssueLevel.Error,
         );
-        return res.status(409).json(outcome);
       }
     }
 

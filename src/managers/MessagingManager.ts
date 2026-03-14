@@ -28,7 +28,10 @@ export class MessagingManager {
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const issuerDid = job.content?.iss || 'did:web:messaging.local';
-    const action = (job.action || '_send') as MessagingAction;
+    const action = String(job.action || '').trim() as MessagingAction;
+    if (!action) {
+      throw new ManagerError('Missing action.', IssueType.Required);
+    }
 
     try {
       const resultEntry = await this.handleAction(job, action);

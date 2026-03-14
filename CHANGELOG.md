@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [UNRELEASED]
 
+## [1.2.0] - 2026-03-14
+
+### Added
+
+- OneHealth sector model based on `MAINSECTOR` + `SUBSECTORSALLOWED`, with synthetic sectors for `animal-*` and `health-*`.
+- OneHealth FHIR and research routing for care, index, tech, and digital twin ingestion use cases.
+- Research digital twin ingestion endpoints for `Composition/_batch` in `digitaltwin/org.hl7.fhir.api` and `digitaltwin/org.hl7.fhir.r4`.
+- Host onboarding contract for `Organization/_activate` and `_activate-response` in API docs, swagger, and service discovery.
+- Error helpers to keep early 4xx/5xx responses compatible with DIDComm/FHIR clients.
+
+### Changed
+
+- Host and tenant service generation now derives capabilities from sector semantics instead of a fixed legacy FHIR sector list.
+- OneHealth docs and examples now cover animal and human health channels, research ingestion, and the ICA-first activation target flow.
+- OIDC/SMART discovery and legacy signing defaults remain aligned on ES384 / P-384 for compatibility with the current backend.
+
+### Fixed
+
+- FHIR ingestion and polling behavior for legacy raw FHIR mode now stays asynchronous while preserving raw FHIR poll responses.
+- Request validation, swagger generation, and manager coverage were extended for the new OneHealth routes and sectors.
+
+### Known limitations
+
+- `Organization/_activate` is published as an exposed contract, but worker-side activation is still a placeholder and returns `NotSupported`.
+
 ### Added
 
 - Secure Key Resolution for Standard Crypto Flow: When a protected request arrives without an embedded `jwk` in the JWE and JWS protected header, KmsService now follows a secure query pattern:

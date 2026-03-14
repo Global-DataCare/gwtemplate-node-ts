@@ -212,8 +212,10 @@ describe('Ping API Endpoint', () => {
         });
 
         expect(response.status).toBe(404);
-        const outcome = JSON.parse(response.text);
-        expect(outcome.issue[0].code).toBe(IssueType.NotFound);
+        const outcomeEnvelope = JSON.parse(response.text);
+        expect(outcomeEnvelope.type).toBe('application/bundle-api+json');
+        expect(outcomeEnvelope.body.resourceType).toBe('Bundle');
+        expect(outcomeEnvelope.body.issues.issue[0].code).toBe(IssueType.NotFound);
         expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
       });
 
@@ -273,6 +275,47 @@ describe('Ping API Endpoint', () => {
   describe('Job Polling (`/_batch-response`)', () => {
     const pollingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch-response';
     const thid = decodedPingMessage.thid;
+
+    it('should return FHIR-compatible early errors for FHIR routes', async () => {
+      const asyncResponseStore = new AsyncResponseStoreMem();
+      const { app } = setupApp(asyncResponseStore);
+      const fhirPollingUrl = '/host/cds-xx/v1/test/individual/org.hl7.fhir.r4/Consent/_batch-response';
+
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: fhirPollingUrl,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: {},
+      });
+
+      expect(response.status).toBe(400);
+      const payload = JSON.parse(response.text);
+      expect(payload.type).toBe('application/fhir+json');
+      expect(payload.body.resourceType).toBe('Bundle');
+      expect(payload.body.entry).toEqual([]);
+      expect(payload.body.issues.issue[0].code).toBe(IssueType.Required);
+    });
+
+    it('should return raw FHIR JSON early errors in LEGACY_FHIR mode', async () => {
+      const asyncResponseStore = new AsyncResponseStoreMem();
+      const { app } = setupApp(asyncResponseStore);
+      const fhirPollingUrl = '/host/cds-xx/v1/test/individual/org.hl7.fhir.r4/Consent/_batch-response';
+
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: fhirPollingUrl,
+        headers: { 'content-type': 'application/fhir+json' },
+        body: {},
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.headers['content-type']).toMatch(/application\/fhir\+json/);
+      const payload = JSON.parse(response.text);
+      expect(payload.resourceType).toBe('Bundle');
+      expect(payload.entry).toEqual([]);
+      expect(payload.total).toBe(0);
+      expect(payload.issues.issue[0].code).toBe(IssueType.Required);
+    });
 
     it('should return 200 OK with the result if the job is complete', async () => {
       const asyncResponseStore = new AsyncResponseStoreMem();

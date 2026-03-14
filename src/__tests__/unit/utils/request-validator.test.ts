@@ -25,7 +25,7 @@ describe('isRequestValid', () => {
       id: '#registry:org.schema',
       type: 'ApiService',
       serviceEndpoint: 'Organization',
-      actions: ['_batch'],
+      actions: ['_batch', '_activate'],
       selector: { section: 'registry', format: 'org.schema' },
     }
   ];
@@ -59,6 +59,17 @@ describe('isRequestValid', () => {
       format: 'org.schema',
       resourceType: 'organization', // Lowercase
       action: '_batch',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for the new host organization activation action', () => {
+    const params = {
+      sector: 'test',
+      section: 'registry',
+      format: 'org.schema',
+      resourceType: 'Organization',
+      action: '_activate',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
   });

@@ -11,12 +11,10 @@ import { findSigningMethod } from '../utils/did-backend';
 import { buildStatusListCredential, buildStatusListEntry, createStatusListEncodedList } from '../utils/status-list';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getBaseUrlFromDidWeb } from '../utils/did-backend';
+import { isFhirSector } from '../utils/sector';
 
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ILogger } from '../loggers/ILogger';
-
-// List of sectors that enable FHIR-specific discovery endpoints, as per SYSTEM_DESIGN.md.
-const FHIR_SECTORS = ['health-care', 'emergency', 'health-insurance', 'health-tech', 'health-it'];
 const STATUS_LIST_BITS = 16384;
 const STATUS_LIST_PURPOSE = 'revocation' as const;
 const STATUS_LIST_INDEX = 0;
@@ -586,15 +584,15 @@ export function createDiscoveryRouter(
   });
 
   // --- FHIR-Specific Endpoints ---
-  const isFhirSector = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const checkFhirSector = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const sector = await tenantsCacheManager.getTenantSector(res.locals.vaultId);
-    if (sector && FHIR_SECTORS.includes(sector)) {
+    if (isFhirSector(sector)) {
       return next();
     }
     res.status(404).type('text').send('Not Found');
   };
 
-  router.get([`${hostWellKnownPrefix}/smart-configuration`, `${tenantWellKnownPrefix}/smart-configuration`], resolveTenant, isFhirSector, (req, res) => {
+  router.get([`${hostWellKnownPrefix}/smart-configuration`, `${tenantWellKnownPrefix}/smart-configuration`], resolveTenant, checkFhirSector, (req, res) => {
     const config = discoveryService.getSmartConfiguration(res.locals.vaultId);
     if (config) {
       res.json(config);
@@ -604,7 +602,7 @@ export function createDiscoveryRouter(
   });
   
   // Note: The FHIR metadata endpoint uses the full structured path.
-  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/fhir/metadata', resolveTenant, isFhirSector, (req, res) => {
+  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/fhir/metadata', resolveTenant, checkFhirSector, (req, res) => {
     const statement = discoveryService.getCapabilityStatement(res.locals.vaultId);
     if (statement) {
       res.json(statement);
