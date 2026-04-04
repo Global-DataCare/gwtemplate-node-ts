@@ -116,11 +116,37 @@ interface StartServerOptions {
   listen?: boolean;
 }
 
+function assertSecurityModeGuardrails(config: ReturnType<typeof getConfig>): void {
+  const isProduction = String(config.nodeEnv || '').toLowerCase() === 'production';
+  if (isProduction && config.securityMode === 'demo') {
+    throw new Error("SECURITY_MODE=demo is not allowed when NODE_ENV=production.");
+  }
+}
+
+function logSecurityModeCapabilities(config: ReturnType<typeof getConfig>): void {
+  const acceptsDidcommEncrypted = true;
+  const acceptsDidcommPlain = config.securityMode === 'demo' || config.didcommPlainEnabled;
+  const acceptsLegacyJson = config.securityMode === 'demo' || config.jsonLegacy;
+  const acceptsLegacyFhir = config.securityMode === 'demo' || config.fhirLegacy;
+  const allowsInsecureBearer = config.securityMode === 'demo' && config.demoAllowInsecureBearer;
+
+  console.log(
+    `[GW-API] Security mode=${config.securityMode} capabilities: `
+      + `didcomm-encrypted=${acceptsDidcommEncrypted}, `
+      + `didcomm-plain=${acceptsDidcommPlain}, `
+      + `json-legacy=${acceptsLegacyJson}, `
+      + `fhir-legacy=${acceptsLegacyFhir}, `
+      + `insecure-bearer=${allowsInsecureBearer}`,
+  );
+}
+
 /**
  * Initializes and starts the Express server.
  */
 async function startServer(options?: StartServerOptions) {
   const config = getConfig();
+  assertSecurityModeGuardrails(config);
+  logSecurityModeCapabilities(config);
 
   // Initialize a baseline Swagger server URL; /swagger-spec.json will refine it per-request.
   if (swaggerSpec.info.title !== 'Swagger Spec Not Found') {
@@ -194,6 +220,7 @@ async function startServer(options?: StartServerOptions) {
   }
   
   await kmsService.init();
+  const clearingHouseService = new ClearingHouseService();
 
   const hostingManager = new HostingManager(
     vaultRepository,
@@ -202,6 +229,7 @@ async function startServer(options?: StartServerOptions) {
     storageAdapter,
     logger, // Inject logger
     config,
+    clearingHouseService,
   );
   const icaManager = new IcaManager(vaultRepository, kmsService);
   const messagingManager = new MessagingManager(vaultRepository, kmsService);
@@ -267,7 +295,6 @@ async function startServer(options?: StartServerOptions) {
   );
   const tokenManager = new TokenManager(kmsService, tenantManager);
   const identityTokenManager = new IdentityTokenManager(appAuthManager, tokenManager);
-  const clearingHouseService = new ClearingHouseService();
   const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository, clearingHouseService);
   const observationManager = new ObservationManager(vaultRepository);
   const relatedPersonManager = new RelatedPersonManager(vaultRepository);
