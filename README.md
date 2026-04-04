@@ -218,6 +218,35 @@ Leaf certificates are named with:
 
 ## Fabric Devnet (Optional)
 
+## Security Modes
+
+GW supports a unified inbound security policy controlled by `SECURITY_MODE`:
+
+- `strict`: only secure form-encoded requests (`application/x-www-form-urlencoded` with `request=<jwe>`).
+- `compat`: secure requests plus optional legacy types enabled by flags.
+- `demo`: plaintext/demo behavior for local testing only.
+
+Compatibility flags:
+
+- `FHIR_LEGACY=true|false`: allows `application/fhir+json` in `compat`.
+- `JSON_LEGACY=true|false`: allows `application/json` in `compat`.
+- `DIDCOMM_PLAIN=true|false|enabled|disabled`: allows `application/didcomm-plaintext+json` in `compat`.
+- `DEMO_ALLOW_INSECURE_BEARER=true|false`: in `demo`, allows invalid/unverified bearer tokens in API routes.
+
+Guardrail:
+
+- `SECURITY_MODE=demo` is blocked when `NODE_ENV=production`.
+
+Recommended staging profile:
+
+```bash
+SECURITY_MODE=compat
+FHIR_LEGACY=true
+JSON_LEGACY=true
+DIDCOMM_PLAIN=disabled
+DEMO_ALLOW_INSECURE_BEARER=false
+```
+
 For a deterministic Fabric v3 devnet (DEMO single-host or multi-org), see:
 - `devnet/fabric-v3/README.md`
 

@@ -2856,3 +2856,35 @@ curl -i -X POST "${BASE_URL}/${TENANT}/cds-${JUR}/v1/${SECTOR}/blockchain/org.hl
   ]
 }
 ```
+
+## Security Mode Matrix
+
+Inbound policy is controlled by `SECURITY_MODE`:
+
+- `strict`
+  - Accepts: `application/x-www-form-urlencoded` (`request=<jwe>`)
+  - Rejects: legacy/plain JSON content types
+  - Bearer must be present and valid when required by route
+- `compat`
+  - Accepts secure form requests
+  - Accepts `application/json` only when `JSON_LEGACY=true`
+  - Accepts `application/fhir+json` only when `FHIR_LEGACY=true`
+  - Accepts `application/didcomm-plaintext+json` only when `DIDCOMM_PLAIN=enabled|true`
+  - Bearer must be present and valid when required by route
+- `demo`
+  - Accepts secure + plaintext/legacy types
+  - Can allow invalid bearer in API routes only if `DEMO_ALLOW_INSECURE_BEARER=true`
+
+Operational guardrail:
+
+- `SECURITY_MODE=demo` is not allowed with `NODE_ENV=production`.
+
+Recommended staging profile:
+
+```bash
+SECURITY_MODE=compat
+FHIR_LEGACY=true
+JSON_LEGACY=true
+DIDCOMM_PLAIN=disabled
+DEMO_ALLOW_INSECURE_BEARER=false
+```
