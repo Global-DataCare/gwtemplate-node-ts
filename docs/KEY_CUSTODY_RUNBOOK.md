@@ -5,6 +5,7 @@
 This runbook defines operational rules for tenant key custody in GW:
 
 - `comm_enc_key`
+- `comm_sig_key`
 - `vc_sign_key`
 - `storage_dek`
 - `hmac_obfuscation_key`

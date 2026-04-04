@@ -205,7 +205,7 @@ export class KmsService implements IKmsService {
   async getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<PublicJwk | undefined> {
     let keySet: EntityKeysSet;
     try {
-      keySet = await this.getEntityKeys(entityVaultId, 'signing');
+      keySet = await this.getEntityKeys(entityVaultId, 'vc_sign');
     } catch {
       return undefined;
     }
@@ -247,7 +247,7 @@ export class KmsService implements IKmsService {
    * Used for mTLS when reusing the legacy X.509 keypair.
    */
   async getLegacyPrivateKeyPem(entityVaultId: string): Promise<string | undefined> {
-    const keySet = await this.getEntityKeys(entityVaultId, 'signing');
+    const keySet = await this.getEntityKeys(entityVaultId, 'vc_sign');
     if (!keySet?.legacySigningKeyPair) return undefined;
     const publicJwk = keySet.legacySigningKeyPair.publicJWKey as any;
     if (!publicJwk?.x || !publicJwk?.y) return undefined;
@@ -353,7 +353,7 @@ export class KmsService implements IKmsService {
    * @returns A `JwsMultiSign` object containing the signature.
    */
   async signWithManagedKey(payload: Uint8Array, entityVaultId: string, alg?: string): Promise<JwsMultiSign> {
-    const keyPairSet = await this.getEntityKeys(entityVaultId, 'signing');
+    const keyPairSet = await this.getEntityKeys(entityVaultId, 'vc_sign');
     const signingKey = this.resolveSigningKey(keyPairSet, alg);
     if (!signingKey) {
       throw new Error(`Signing key not found for entity: ${entityVaultId} (alg=${alg || 'default'})`);
@@ -405,7 +405,7 @@ export class KmsService implements IKmsService {
 
   async createDetachedJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
     this.checkInitialized();
-    const keyPairSet = await this.getEntityKeys(signerVaultId, 'signing');
+    const keyPairSet = await this.getEntityKeys(signerVaultId, 'vc_sign');
     const signingKey = this.resolveSigningKeyByKid(keyPairSet, signerKid);
     if (!signingKey) {
       throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);
@@ -418,7 +418,7 @@ export class KmsService implements IKmsService {
 
   async createCompactJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
     this.checkInitialized();
-    const keyPairSet = await this.getEntityKeys(signerVaultId, 'signing');
+    const keyPairSet = await this.getEntityKeys(signerVaultId, 'vc_sign');
     const signingKey = this.resolveSigningKeyByKid(keyPairSet, signerKid);
     if (!signingKey) {
       throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);

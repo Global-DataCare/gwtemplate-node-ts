@@ -1,4 +1,4 @@
-export type WrappedKeyPurpose = 'hmac' | 'storage' | 'signing' | 'encryption';
+export type WrappedKeyPurpose = 'hmac' | 'storage' | 'comm_sig' | 'vc_sign' | 'encryption';
 
 export type WrappedKeyRecord = {
   entityVaultId: string;
@@ -36,4 +36,3 @@ export class InMemoryWrappedKeyRepository implements WrappedKeyRepository {
     return `${entityVaultId}::${purpose}::${keyVersion}`;
   }
 }
-

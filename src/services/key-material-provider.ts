@@ -1,4 +1,4 @@
-export type KeyMaterialPurpose = 'all' | 'hmac' | 'storage' | 'signing' | 'encryption';
+export type KeyMaterialPurpose = 'all' | 'hmac' | 'storage' | 'comm_sig' | 'vc_sign' | 'encryption';
 
 export type KeyMaterialRecord<T> = {
   entityVaultId: string;
@@ -17,4 +17,3 @@ export interface KeyMaterialProvider<T> {
 
   invalidate(entityVaultId?: string, purpose?: KeyMaterialPurpose): void;
 }
-
