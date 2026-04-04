@@ -25,6 +25,53 @@ import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/r
 import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
+type SecurityMode = 'strict' | 'compat' | 'demo';
+type ParsedContentType = 'secure-form' | 'didcomm-plain' | 'json' | 'fhir' | 'unsupported';
+
+function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
+  if (value === undefined) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'enabled') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'disabled') return false;
+  return fallback;
+}
+
+function resolveSecurityModeFromEnv(): SecurityMode {
+  const normalized = String(process.env.SECURITY_MODE || 'strict').trim().toLowerCase();
+  if (normalized === 'strict' || normalized === 'compat' || normalized === 'demo') return normalized;
+  return 'strict';
+}
+
+function normalizeContentType(rawValue: string | undefined): string {
+  if (!rawValue) return '';
+  return String(rawValue).split(';')[0].trim().toLowerCase();
+}
+
+function parseIncomingContentType(contentType: string): ParsedContentType {
+  if (contentType === 'application/x-www-form-urlencoded') return 'secure-form';
+  if (contentType === 'application/didcomm-plaintext+json') return 'didcomm-plain';
+  if (contentType === 'application/json') return 'json';
+  if (contentType === 'application/fhir+json') return 'fhir';
+  return 'unsupported';
+}
+
+function isContentTypeAllowedBySecurityPolicy(contentType: ParsedContentType): boolean {
+  const securityMode = resolveSecurityModeFromEnv();
+  if (contentType === 'secure-form') return true;
+  if (contentType === 'unsupported') return false;
+
+  if (securityMode === 'strict') return false;
+  if (securityMode === 'demo') return true;
+
+  const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
+  const fhirLegacy = parseBooleanEnv(process.env.FHIR_LEGACY, false);
+  const jsonLegacy = parseBooleanEnv(process.env.JSON_LEGACY, false);
+
+  if (contentType === 'didcomm-plain') return didcommPlainEnabled;
+  if (contentType === 'fhir') return fhirLegacy;
+  if (contentType === 'json') return jsonLegacy;
+  return false;
+}
 
 function getRequestBaseUrl(req: express.Request, fallback: string): string {
   const forwardedProto = req.headers['x-forwarded-proto'];
@@ -1631,12 +1678,24 @@ export function createApiRouter(
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
   router.post(`${cdsRoutePrefix}/:action`, async (req, res) => {
     const { tenantId, section, resourceType, sector, action } = req.params;
-    const contentType = req.headers['content-type'] || '';
+    const contentTypeHeader = String(req.headers['content-type'] || '');
+    const contentType = normalizeContentType(contentTypeHeader);
+    const parsedContentType = parseIncomingContentType(contentType);
     let jobRequest: JobRequest;
 
     try {
+      if (!isContentTypeAllowedBySecurityPolicy(parsedContentType)) {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          415,
+          IssueType.NotSupported,
+          `Unsupported Content-Type for current SECURITY_MODE: ${contentTypeHeader || '<missing>'}`,
+        );
+      }
+
       // --- 1. Payload Handling & JobRequest Construction ---
-      if (contentType.startsWith('application/x-www-form-urlencoded')) {
+      if (parsedContentType === 'secure-form') {
         // ENCRYPTED FLOW (FAPI/JAR-style)
         if (!req.body.request) {
           return sendDidcommEarlyError(
@@ -1760,9 +1819,9 @@ export function createApiRouter(
         };
 
       } else if (
-        contentType.startsWith('application/didcomm-plaintext+json') ||
-        contentType.startsWith('application/json') ||
-        contentType.startsWith('application/fhir+json')
+        parsedContentType === 'didcomm-plain' ||
+        parsedContentType === 'json' ||
+        parsedContentType === 'fhir'
       ) {
         // LEGACY / PLAINTEXT FLOW (demo/dev convenience)
         const authToken = req.headers.authorization;
