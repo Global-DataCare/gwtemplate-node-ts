@@ -6,6 +6,8 @@ let configInstance: IServerConfig;
 const MAIN_SECTORS = ['animal', 'health'] as const;
 const SUBSECTORS = ['research', 'care', 'index', 'tech'] as const;
 
+export type NetworkMode = 'test' | 'test-network' | 'network';
+
 type MainSector = typeof MAIN_SECTORS[number];
 type Subsector = typeof SUBSECTORS[number];
 
@@ -26,6 +28,22 @@ export function parseSecurityMode(value: string | undefined): 'strict' | 'compat
     return normalized;
   }
   throw new Error("Config Error: Invalid SECURITY_MODE. Allowed: strict, compat, demo");
+}
+
+function mapNodeEnvToNetworkMode(nodeEnv: string | undefined): NetworkMode {
+  const normalized = String(nodeEnv || '').trim().toLowerCase();
+  if (normalized === 'production') return 'network';
+  if (normalized === 'development' || normalized === 'staging') return 'test-network';
+  return 'test';
+}
+
+export function parseNetworkMode(value: string | undefined, nodeEnv?: string): NetworkMode {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return mapNodeEnvToNetworkMode(nodeEnv);
+  if (normalized === 'test' || normalized === 'test-network' || normalized === 'network') {
+    return normalized;
+  }
+  throw new Error("Config Error: Invalid NETWORK_MODE. Allowed: test, test-network, network");
 }
 
 export function resetServerConfig(): void {
@@ -135,7 +153,9 @@ export function getConfig(): IServerConfig {
       .map((value) => value.trim().toUpperCase())
       .filter(Boolean);
 
+    const nodeEnv = process.env.NODE_ENV || 'development';
     const securityMode = parseSecurityMode(process.env.SECURITY_MODE);
+    const networkMode = parseNetworkMode(process.env.NETWORK_MODE, nodeEnv);
     const fhirLegacy = parseBooleanEnv(process.env.FHIR_LEGACY, false);
     const jsonLegacy = parseBooleanEnv(process.env.JSON_LEGACY, false);
     const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
@@ -143,11 +163,12 @@ export function getConfig(): IServerConfig {
 
     configInstance = {
       securityMode,
+      networkMode,
       fhirLegacy,
       jsonLegacy,
       didcommPlainEnabled,
       demoAllowInsecureBearer,
-      nodeEnv: process.env.NODE_ENV || 'development',
+      nodeEnv,
       port: port,
       apiHostname,
       hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || new URL(apiBaseUrl).host,

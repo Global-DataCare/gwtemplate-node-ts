@@ -86,7 +86,8 @@ function handleAsyncPoll(store: IAsyncResponseStore, req: any, res: any): void {
 export function createCredentialLedgerRouter(
   ledgerAdapter: ICredentialLedgerAdapter,
   asyncResponseStore: IAsyncResponseStore,
-  tenantsCacheManager: TenantsCacheManager
+  tenantsCacheManager: TenantsCacheManager,
+  networkMode?: 'test' | 'test-network' | 'network'
 ): Router {
   const router = Router();
 
@@ -102,7 +103,7 @@ export function createCredentialLedgerRouter(
     return { vaultId, jurisdiction, tenantConfig };
   };
 
-  const resolveNetwork = () => resolveHostRegistrySector(process.env.NODE_ENV);
+  const resolveNetwork = () => resolveHostRegistrySector({ nodeEnv: process.env.NODE_ENV, networkMode });
 
   router.get(`${ledgerBasePath}/_status`, async (req, res) => {
     const id = getIdFromRequest({ query: req.query });

@@ -131,7 +131,7 @@ function logSecurityModeCapabilities(config: ReturnType<typeof getConfig>): void
   const allowsInsecureBearer = config.securityMode === 'demo' && config.demoAllowInsecureBearer;
 
   console.log(
-    `[GW-API] Security mode=${config.securityMode} capabilities: `
+    `[GW-API] Security mode=${config.securityMode} network-mode=${config.networkMode} capabilities: `
       + `didcomm-encrypted=${acceptsDidcommEncrypted}, `
       + `didcomm-plain=${acceptsDidcommPlain}, `
       + `json-legacy=${acceptsLegacyJson}, `
@@ -407,7 +407,7 @@ async function startServer(options?: StartServerOptions) {
   );
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);
-  const ledgerRouter = createCredentialLedgerRouter(credentialLedgerAdapter, asyncResponseStore, tenantManager);
+  const ledgerRouter = createCredentialLedgerRouter(credentialLedgerAdapter, asyncResponseStore, tenantManager, config.networkMode);
   const webhooksRouter = createWebhooksRouter(queueAdapter);
   const authRouter = createAuthRouter(appAuthManager, tokenManager);
   app.use('/', discoveryRouter);

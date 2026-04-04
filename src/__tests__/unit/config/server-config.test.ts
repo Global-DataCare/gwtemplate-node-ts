@@ -4,6 +4,7 @@ import {
   parseAndValidateMainSector,
   parseAndValidateSectors,
   parseAndValidateSubsectors,
+  parseNetworkMode,
   parseSecurityMode,
   resetServerConfig,
   resolveAllowedSectorsFromEnv,
@@ -78,11 +79,23 @@ describe('server-config sector resolution', () => {
     expect(() => parseSecurityMode('invalid-mode')).toThrow(/Invalid SECURITY_MODE/);
   });
 
-  it('should expose security flags from environment', () => {
+  it('should parse NETWORK_MODE values and fallback by NODE_ENV', () => {
+    expect(parseNetworkMode('test')).toBe('test');
+    expect(parseNetworkMode('test-network')).toBe('test-network');
+    expect(parseNetworkMode('network')).toBe('network');
+
+    expect(parseNetworkMode(undefined, 'production')).toBe('network');
+    expect(parseNetworkMode(undefined, 'staging')).toBe('test-network');
+    expect(parseNetworkMode(undefined, 'test')).toBe('test');
+    expect(() => parseNetworkMode('invalid-mode')).toThrow(/Invalid NETWORK_MODE/);
+  });
+
+  it('should expose security and network flags from environment', () => {
     const previousEnv = process.env;
     process.env = {
       ...previousEnv,
       SECURITY_MODE: 'compat',
+      NETWORK_MODE: 'test-network',
       FHIR_LEGACY: 'true',
       JSON_LEGACY: '1',
       DIDCOMM_PLAIN: 'enabled',
@@ -93,6 +106,7 @@ describe('server-config sector resolution', () => {
     const config = getConfig();
 
     expect(config.securityMode).toBe('compat');
+    expect(config.networkMode).toBe('test-network');
     expect(config.fhirLegacy).toBe(true);
     expect(config.jsonLegacy).toBe(true);
     expect(config.didcommPlainEnabled).toBe(true);
@@ -102,11 +116,13 @@ describe('server-config sector resolution', () => {
     resetServerConfig();
   });
 
-  it('should default security flags to disabled', () => {
+  it('should default security flags to disabled and map NETWORK_MODE by NODE_ENV', () => {
     const previousEnv = process.env;
     process.env = {
       ...previousEnv,
+      NODE_ENV: 'production',
       SECURITY_MODE: '',
+      NETWORK_MODE: '',
       FHIR_LEGACY: '',
       JSON_LEGACY: '',
       DIDCOMM_PLAIN: '',
@@ -117,10 +133,34 @@ describe('server-config sector resolution', () => {
     const config = getConfig();
 
     expect(config.securityMode).toBe('strict');
+    expect(config.networkMode).toBe('network');
     expect(config.fhirLegacy).toBe(false);
     expect(config.jsonLegacy).toBe(false);
     expect(config.didcommPlainEnabled).toBe(false);
     expect(config.demoAllowInsecureBearer).toBe(false);
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
+  it('should accept every SECURITY_MODE x NETWORK_MODE pair independently', () => {
+    const previousEnv = process.env;
+    const securityModes = ['strict', 'compat', 'demo'] as const;
+    const networkModes = ['test', 'test-network', 'network'] as const;
+
+    for (const securityMode of securityModes) {
+      for (const networkMode of networkModes) {
+        process.env = {
+          ...previousEnv,
+          SECURITY_MODE: securityMode,
+          NETWORK_MODE: networkMode,
+        };
+        resetServerConfig();
+        const config = getConfig();
+        expect(config.securityMode).toBe(securityMode);
+        expect(config.networkMode).toBe(networkMode);
+      }
+    }
 
     process.env = previousEnv;
     resetServerConfig();

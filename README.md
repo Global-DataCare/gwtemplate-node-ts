@@ -220,6 +220,16 @@ Leaf certificates are named with:
 
 ## Security Modes
 
+`SECURITY_MODE` and `NETWORK_MODE` are independent controls:
+- `SECURITY_MODE`: inbound content/auth policy (`strict|compat|demo`).
+- `NETWORK_MODE`: host-registry and ledger environment (`test|test-network|network`).
+
+If `NETWORK_MODE` is unset, GW falls back to `NODE_ENV` mapping:
+- `production` -> `network`
+- `development|staging` -> `test-network`
+- otherwise -> `test`
+
+
 GW supports a unified inbound security policy controlled by `SECURITY_MODE`:
 
 - `strict`: only secure form-encoded requests (`application/x-www-form-urlencoded` with `request=<jwe>`).

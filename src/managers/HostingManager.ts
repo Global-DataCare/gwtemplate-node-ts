@@ -1190,7 +1190,7 @@ export class HostingManager {
 
     const didId = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
     const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: didId, alsoKnownAs: [] };
-    const didConfigServices = initializeHostServicesConfig(this.config.sectorsAllowed, this.config.nodeEnv);
+    const didConfigServices = initializeHostServicesConfig(this.config.sectorsAllowed, this.config.nodeEnv, this.config.networkMode);
     const baseUrl = this.config.apiBaseUrl;
     const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
     const legacySignAlg = this.config.legacySignAlg;
