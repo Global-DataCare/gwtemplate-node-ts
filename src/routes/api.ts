@@ -73,6 +73,11 @@ function isContentTypeAllowedBySecurityPolicy(contentType: ParsedContentType): b
   return false;
 }
 
+function allowsInsecureBearerBySecurityMode(): boolean {
+  return resolveSecurityModeFromEnv() === 'demo'
+    && parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
+}
+
 function getRequestBaseUrl(req: express.Request, fallback: string): string {
   const forwardedProto = req.headers['x-forwarded-proto'];
   const forwardedHost = req.headers['x-forwarded-host'];
@@ -269,6 +274,29 @@ export function createApiRouter(
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
+    }
+    const accessToken = authHeader.split(' ')[1];
+    if (!allowsInsecureBearerBySecurityMode()) {
+      if (!appAuthManager) {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          500,
+          IssueType.Exception,
+          'Bearer validation is required by SECURITY_MODE but AppAuthorizationManager is not configured.',
+        );
+      }
+      try {
+        await appAuthManager.verifyIdToken(accessToken);
+      } catch (error: any) {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          401,
+          IssueType.Security,
+          `Invalid Bearer token: ${error?.message || 'verification failed'}`,
+        );
+      }
     }
 
     const { tenantId, sector } = req.params;
@@ -1825,13 +1853,36 @@ export function createApiRouter(
       ) {
         // LEGACY / PLAINTEXT FLOW (demo/dev convenience)
         const authToken = req.headers.authorization;
+        const enforceBearerValidation = !allowsInsecureBearerBySecurityMode();
         // The 'ping' endpoint is a public health check and does not require authentication for legacy requests.
         if (section !== 'ping' && (!authToken || !authToken.startsWith('Bearer '))) {
           return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
         }
 
-        // TODO: Implement actual token validation (e.g., call a verifier like GoogleTokenVerifier).
-        // For now, any Bearer token is accepted in non-production environments.
+        if (section !== 'ping' && enforceBearerValidation) {
+          if (!appAuthManager) {
+            return sendDidcommEarlyError(
+              req,
+              res,
+              500,
+              IssueType.Exception,
+              'Bearer validation is required by SECURITY_MODE but AppAuthorizationManager is not configured.',
+            );
+          }
+          try {
+            const bearerToken = authToken?.split(' ')[1] || '';
+            await appAuthManager.verifyIdToken(bearerToken);
+          } catch (error: any) {
+            return sendDidcommEarlyError(
+              req,
+              res,
+              401,
+              IssueType.Security,
+              `Invalid Bearer token: ${error?.message || 'verification failed'}`,
+            );
+          }
+        }
+
         if (
           appAuthManager &&
           section === 'identity' &&
