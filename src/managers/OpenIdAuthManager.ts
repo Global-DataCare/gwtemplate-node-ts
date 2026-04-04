@@ -188,9 +188,9 @@ export class OpenIdAuthManager implements IJobProcessor {
     const legacyAlgCandidate = (process.env.LEGACY_SIGN_ALG === 'ES256' || process.env.LEGACY_SIGN_ALG === 'ES384')
       ? process.env.LEGACY_SIGN_ALG
       : 'ES384';
-    let signingKey = await this.kmsService.getPublicVerificationKey(issuerVaultId);
+    let signingKey = await this.kmsService.getPublicVerificationKey(issuerVaultId, undefined, 'comm_sig');
     if (legacyEnabled) {
-      const legacyKey = await this.kmsService.getPublicVerificationKey(issuerVaultId, legacyAlgCandidate);
+      const legacyKey = await this.kmsService.getPublicVerificationKey(issuerVaultId, legacyAlgCandidate, 'comm_sig');
       if (legacyKey?.kid) {
         signingKey = legacyKey;
       }
@@ -219,7 +219,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     const encodedHeader = Content.stringToBase64Url(JSON.stringify(jwtHeader));
     const encodedPayload = Content.stringToBase64Url(JSON.stringify(jwtPayload));
     const bytesToSign = Content.stringToBytesUTF8(`${encodedHeader}.${encodedPayload}`);
-    const jwsObject = await this.kmsService.signWithManagedKey(bytesToSign, issuerVaultId, signingAlg);
+    const jwsObject = await this.kmsService.signWithManagedKey(bytesToSign, issuerVaultId, signingAlg, 'comm_sig');
     const signature = jwsObject.signatures[0]?.signature;
     if (!signature) {
       throw new ManagerError('Failed to sign access token.', IssueType.Exception);

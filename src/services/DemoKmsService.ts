@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { JwsHeader, JwsMultiSign } from 'gdc-common-utils-ts/models/jws';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import type { SigningPurpose } from '../gdc-backend-utils-node/models/IKmsService';
 import { JwkSet, JWK } from '../gdc-backend-utils-node/models/jwk';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { MlkemPublicJwk, PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
@@ -51,8 +52,8 @@ export class DemoKmsService implements IKmsService {
     return this._realKmsService.getPublicJwks(entityId);
   }
 
-  async getPublicVerificationKey(entityId: string, alg?: string): Promise<PublicJwk | undefined> {
-    return this._realKmsService.getPublicVerificationKey(entityId, alg);
+  async getPublicVerificationKey(entityId: string, alg?: string, purpose?: SigningPurpose): Promise<PublicJwk | undefined> {
+    return this._realKmsService.getPublicVerificationKey(entityId, alg, purpose);
   }
 
   async getPublicEncryptionKey(entityId: string, crv?: string): Promise<MlkemPublicJwk | undefined> {
@@ -63,9 +64,9 @@ export class DemoKmsService implements IKmsService {
     return this._realKmsService.getHostPublicJwkSet();
   }
   
-  async signWithManagedKey(payload: Uint8Array, entityId: string, alg?: string): Promise<JwsMultiSign> {
+  async signWithManagedKey(payload: Uint8Array, entityId: string, alg?: string, purpose?: SigningPurpose): Promise<JwsMultiSign> {
     console.warn(`[DemoKmsService] Delegating real signing for entity: ${entityId}`);
-    return this._realKmsService.signWithManagedKey(payload, entityId, alg);
+    return this._realKmsService.signWithManagedKey(payload, entityId, alg, purpose);
   }
   
   async signWithReconstructedKey(
@@ -86,14 +87,14 @@ export class DemoKmsService implements IKmsService {
     return this._realKmsService.protectAttributesNameAndValue(attributes, entityId);
   }
 
-  async createDetachedJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
+  async createDetachedJws(payload: object, signerKid: string, signerVaultId: string, purpose?: SigningPurpose): Promise<string> {
     console.warn(`[DemoKmsService] Delegating real detached JWS creation for: ${signerVaultId}`);
-    return this._realKmsService.createDetachedJws(payload, signerKid, signerVaultId);
+    return this._realKmsService.createDetachedJws(payload, signerKid, signerVaultId, purpose);
   }
 
-  async createCompactJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
+  async createCompactJws(payload: object, signerKid: string, signerVaultId: string, purpose?: SigningPurpose): Promise<string> {
     console.warn(`[DemoKmsService] Delegating real compact JWS creation for: ${signerVaultId}`);
-    return this._realKmsService.createCompactJws(payload, signerKid, signerVaultId);
+    return this._realKmsService.createCompactJws(payload, signerKid, signerVaultId, purpose);
   }
 
   // --- SIMULATED METHODS (Communication Bypass) ---

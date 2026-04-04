@@ -318,7 +318,7 @@ export function createApiRouter(
     const forcePqc = String(req.query.pqc || req.headers['x-pqc-signature'] || '').toLowerCase() === 'true';
     const legacyAlgCandidate = hostConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG;
     const preferredAlg = (!forcePqc && legacyAlgCandidate) ? legacyAlgCandidate : 'ML-DSA-44';
-    const signingKey = await kmsService.getPublicVerificationKey(issuerVaultId, preferredAlg);
+    const signingKey = await kmsService.getPublicVerificationKey(issuerVaultId, preferredAlg, 'vc_sign');
     if (!signingKey?.kid) {
       throw new Error('Signing key not available for credential issuance.');
     }
@@ -330,7 +330,7 @@ export function createApiRouter(
       issuerDid: issuerDid,
     });
     const unsignedVc = createGaiaXLegalParticipantCredential(credentialOptions);
-    const detachedJws = await kmsService.createDetachedJws(unsignedVc, signingKey.kid, issuerVaultId);
+    const detachedJws = await kmsService.createDetachedJws(unsignedVc, signingKey.kid, issuerVaultId, 'vc_sign');
 
     const signedVc = {
       ...unsignedVc,

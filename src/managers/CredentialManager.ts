@@ -187,8 +187,13 @@ export class CredentialManager {
     // Generate the deterministic, versioned ID from the subject's public identifier and issuance date.
     unsignedVc.id = generateVcId(unsignedVc.credentialSubject.identifier as string, unsignedVc.validFrom as string);
 
-    const signatureResult = await this.kmsService.signWithManagedKey(objectToBytes(unsignedVc), signerEntityId);
-    const signingKey = await this.kmsService.getPublicVerificationKey(signerEntityId);
+    const signatureResult = await this.kmsService.signWithManagedKey(
+      objectToBytes(unsignedVc),
+      signerEntityId,
+      undefined,
+      'vc_sign',
+    );
+    const signingKey = await this.kmsService.getPublicVerificationKey(signerEntityId, undefined, 'vc_sign');
     if (!signingKey) {
       throw new ManagerError(`Could not retrieve public key for signer '${signerEntityId}'.`, IssueType.NotFound);
     }

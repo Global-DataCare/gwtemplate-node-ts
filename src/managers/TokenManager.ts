@@ -40,7 +40,7 @@ export class TokenManager {
     }
 
     // 2. Get Host signing key for the 'kid' in the header
-    const hostSignKey = await this.kmsService.getPublicVerificationKey('host');
+    const hostSignKey = await this.kmsService.getPublicVerificationKey('host', undefined, 'comm_sig');
     if (!hostSignKey || !hostSignKey.kid) {
         throw new ManagerError('Could not resolve host signing key.', IssueType.Exception);
     }
@@ -56,6 +56,6 @@ export class TokenManager {
     };
 
     // Must be a standard compact JWS (HEADER.PAYLOAD.SIGNATURE) so the verifier can validate it.
-    return this.kmsService.createCompactJws(jwtPayload, hostSignKey.kid, 'host');
+    return this.kmsService.createCompactJws(jwtPayload, hostSignKey.kid, 'host', 'comm_sig');
   }
 }

@@ -5,6 +5,7 @@ import { JWK, JwkSet } from '../gdc-backend-utils-node/models/jwk';
 import { JwsHeader, JwsMultiSign } from 'gdc-common-utils-ts/models/jws';
 import { ConfidentialStorageDoc, IndexedAttribute } from 'gdc-common-utils-ts/models/confidential-storage';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
+import type { SigningPurpose } from '../gdc-backend-utils-node/models/IKmsService';
 import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
@@ -216,7 +217,7 @@ export class KmsService implements IKmsService {
     };
   }
 
-  async getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<PublicJwk | undefined> {
+  async getPublicVerificationKey(entityVaultId: string, alg?: string, purpose: SigningPurpose = 'comm_sig'): Promise<PublicJwk | undefined> {
     let keySet: EntityKeysSet;
     try {
       keySet = await this.getEntityKeys(entityVaultId, 'vc_sign');
@@ -224,9 +225,11 @@ export class KmsService implements IKmsService {
       return undefined;
     }
 
-    // Default without algorithm hint: communication-signing key.
+    // Default without algorithm hint uses selected signing domain.
     if (!alg) {
-      return keySet.commSigningKeyPair.publicJWKey;
+      return purpose === 'vc_sign'
+        ? keySet.vcSigningKeyPair.publicJWKey
+        : keySet.commSigningKeyPair.publicJWKey;
     }
 
     // Legacy ES* remains dedicated to legacy VC/JWT compatibility.
@@ -234,13 +237,16 @@ export class KmsService implements IKmsService {
       return keySet.legacySigningKeyPair.publicJWKey as PublicJwk;
     }
 
-    // For modern algorithms shared by comm/vc (e.g. ML-DSA-*), prefer VC key when alg is explicitly requested.
-    if (keySet.vcSigningKeyPair.publicJWKey.alg === alg) {
+    // For modern algorithms shared by comm/vc (e.g. ML-DSA-*), pick according to selected purpose.
+    if (purpose === 'vc_sign' && keySet.vcSigningKeyPair.publicJWKey.alg === alg) {
       return keySet.vcSigningKeyPair.publicJWKey;
     }
-    if (keySet.commSigningKeyPair.publicJWKey.alg === alg) {
+    if (purpose === 'comm_sig' && keySet.commSigningKeyPair.publicJWKey.alg === alg) {
       return keySet.commSigningKeyPair.publicJWKey;
     }
+    // Fallback: return whichever domain matches requested algorithm.
+    if (keySet.vcSigningKeyPair.publicJWKey.alg === alg) return keySet.vcSigningKeyPair.publicJWKey;
+    if (keySet.commSigningKeyPair.publicJWKey.alg === alg) return keySet.commSigningKeyPair.publicJWKey;
     return undefined;
   }
 
@@ -374,9 +380,14 @@ export class KmsService implements IKmsService {
    * @param entityId The identifier of the signing entity.
    * @returns A `JwsMultiSign` object containing the signature.
    */
-  async signWithManagedKey(payload: Uint8Array, entityVaultId: string, alg?: string): Promise<JwsMultiSign> {
-    const keyPairSet = await this.getEntityKeys(entityVaultId, 'vc_sign');
-    const signingKey = this.resolveSigningKey(keyPairSet, alg);
+  async signWithManagedKey(
+    payload: Uint8Array,
+    entityVaultId: string,
+    alg?: string,
+    purpose: SigningPurpose = 'vc_sign',
+  ): Promise<JwsMultiSign> {
+    const keyPairSet = await this.getEntityKeys(entityVaultId, purpose);
+    const signingKey = this.resolveSigningKey(keyPairSet, alg, purpose);
     if (!signingKey) {
       throw new Error(`Signing key not found for entity: ${entityVaultId} (alg=${alg || 'default'})`);
     }
@@ -425,9 +436,14 @@ export class KmsService implements IKmsService {
     };
   }
 
-  async createDetachedJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
+  async createDetachedJws(
+    payload: object,
+    signerKid: string,
+    signerVaultId: string,
+    purpose: SigningPurpose = 'vc_sign',
+  ): Promise<string> {
     this.checkInitialized();
-    const keyPairSet = await this.getEntityKeys(signerVaultId, 'vc_sign');
+    const keyPairSet = await this.getEntityKeys(signerVaultId, purpose);
     const signingKey = this.resolveSigningKeyByKid(keyPairSet, signerKid);
     if (!signingKey) {
       throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);
@@ -438,9 +454,14 @@ export class KmsService implements IKmsService {
     return `${jwsParts.protected}..${jwsParts.signature}`;
   }
 
-  async createCompactJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
+  async createCompactJws(
+    payload: object,
+    signerKid: string,
+    signerVaultId: string,
+    purpose: SigningPurpose = 'vc_sign',
+  ): Promise<string> {
     this.checkInitialized();
-    const keyPairSet = await this.getEntityKeys(signerVaultId, 'vc_sign');
+    const keyPairSet = await this.getEntityKeys(signerVaultId, purpose);
     const signingKey = this.resolveSigningKeyByKid(keyPairSet, signerKid);
     if (!signingKey) {
       throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);
@@ -472,8 +493,24 @@ export class KmsService implements IKmsService {
     return { publicJWKey: publicJwk, secretKeyBytes };
   }
 
-  private resolveSigningKey(keySet: EntityKeysSet, alg?: string) {
-    if (!alg || alg === keySet.vcSigningKeyPair.publicJWKey.alg) {
+  private resolveSigningKey(keySet: EntityKeysSet, alg: string | undefined, purpose: SigningPurpose) {
+    if (!alg) {
+      if (purpose === 'comm_sig') {
+        return {
+          publicJwk: keySet.commSigningKeyPair.publicJWKey as JWK & { kid: string },
+          secretKeyBytes: keySet.commSigningKeyPair.secretKeyBytes,
+        };
+      }
+      return { publicJwk: keySet.vcSigningKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.vcSigningKeyPair.secretKeyBytes };
+    }
+    if (purpose === 'vc_sign' && alg === keySet.vcSigningKeyPair.publicJWKey.alg) {
+      return { publicJwk: keySet.vcSigningKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.vcSigningKeyPair.secretKeyBytes };
+    }
+    if (purpose === 'comm_sig' && alg === keySet.commSigningKeyPair.publicJWKey.alg) {
+      return { publicJwk: keySet.commSigningKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.commSigningKeyPair.secretKeyBytes };
+    }
+    // Fallback for shared algs: prefer VC then comm.
+    if (alg === keySet.vcSigningKeyPair.publicJWKey.alg) {
       return { publicJwk: keySet.vcSigningKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.vcSigningKeyPair.secretKeyBytes };
     }
     if (alg === keySet.commSigningKeyPair.publicJWKey.alg) {
