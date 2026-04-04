@@ -49,7 +49,11 @@ import { TenantsCacheManager } from '../managers/TenantsCacheManager';
  * The `entityId` (e.g., 'host', or a tenant's UUID) is the primary identifier for a key set.
  */
 type EntityKeysSet = {
-  verificationKeyPair: {
+  commSigningKeyPair: {
+    publicJWKey: MldsaPublicJwk & { kid: string; };
+    secretKeyBytes: Uint8Array;
+  };
+  vcSigningKeyPair: {
     publicJWKey: MldsaPublicJwk & { kid: string; };
     secretKeyBytes: Uint8Array;
   };
@@ -134,7 +138,8 @@ export class KmsService implements IKmsService {
    * @returns A JWKSet containing the public keys (signing and encryption).
    */
   async provisionKeys(entityVaultId: string): Promise<JwkSet> {
-    let dsaSeed: Uint8Array;
+    let commDsaSeed: Uint8Array;
+    let vcDsaSeed: Uint8Array;
     let kemSeed: Uint8Array;
     let dataEncryptionKey: Uint8Array;
     let hmacKey: Uint8Array;
@@ -143,28 +148,35 @@ export class KmsService implements IKmsService {
     if (process.env.NODE_ENV === 'development' && process.env.DEV_SEED === 'true') {
       // Deterministic generation for development and testing.
       // Use the modern `.subarr000 está ay()` which is the safe replacement for the deprecated `.slice()` on Buffers.
-      dsaSeed = createHash('sha256').update(entityVaultId + '-dsa').digest().subarray(0, 32);
+      commDsaSeed = createHash('sha256').update(entityVaultId + '-dsa-comm').digest().subarray(0, 32);
+      vcDsaSeed = createHash('sha256').update(entityVaultId + '-dsa-vc').digest().subarray(0, 32);
       kemSeed = createHash('sha512').update(entityVaultId + '-kem').digest().subarray(0, 64);
       dataEncryptionKey = createHash('sha256').update(entityVaultId + '-dek').digest().subarray(0, 32);
       hmacKey = createHash('sha256').update(entityVaultId + '-hmac').digest().subarray(0, 32);
     } else {
       // Secure random generation for production
-      dsaSeed = randomBytes(32);
+      commDsaSeed = randomBytes(32);
+      vcDsaSeed = randomBytes(32);
       kemSeed = randomBytes(64);
       dataEncryptionKey = randomBytes(32);
       hmacKey = randomBytes(32);
     }
-    const verificationKeyPair = await this.crypto.generateKeyPairMlDsa(dsaSeed);
+    const commSigningKeyPair = await this.crypto.generateKeyPairMlDsa(commDsaSeed);
+    const vcSigningKeyPair = await this.crypto.generateKeyPairMlDsa(vcDsaSeed);
     const encryptionKeyPair = await this.crypto.generateKeyPairMlKem(kemSeed);
     // Mark intended JOSE usage to allow downstream selection logic (`use === 'sig'|'enc'`).
-    (verificationKeyPair.publicJWKey as any).use = 'sig';
+    (commSigningKeyPair.publicJWKey as any).use = 'sig';
+    (commSigningKeyPair.publicJWKey as any).purpose = 'comm_sig';
+    (vcSigningKeyPair.publicJWKey as any).use = 'sig';
+    (vcSigningKeyPair.publicJWKey as any).purpose = 'vc_sign';
     (encryptionKeyPair.publicJWKey as any).use = 'enc';
 
     const legacySigningKeyPair = await this.provisionLegacySigningKey(entityVaultId, process.env.LEGACY_SIGN_ALG);
 
     // In a production vault, the `dataEncryptionKey` would be encrypted with the Host KEK here before storage.
     this._managedKeys.set(entityVaultId, { 
-      verificationKeyPair: { publicJWKey: verificationKeyPair.publicJWKey, secretKeyBytes: verificationKeyPair.secretKeyBytes },
+      commSigningKeyPair: { publicJWKey: commSigningKeyPair.publicJWKey, secretKeyBytes: commSigningKeyPair.secretKeyBytes },
+      vcSigningKeyPair: { publicJWKey: vcSigningKeyPair.publicJWKey, secretKeyBytes: vcSigningKeyPair.secretKeyBytes },
       ...(legacySigningKeyPair ? { legacySigningKeyPair } : {}),
       encryptionKeyPair: { publicJWKey: encryptionKeyPair.publicJWKey, secretKeyBytes: encryptionKeyPair.secretKeyBytes },
       dataEncryptionKey: dataEncryptionKey,
@@ -175,7 +187,8 @@ export class KmsService implements IKmsService {
     
     const publicJwkSet = {
       keys: [
-        verificationKeyPair.publicJWKey as JWK,
+        commSigningKeyPair.publicJWKey as JWK,
+        vcSigningKeyPair.publicJWKey as JWK,
         ...(legacySigningKeyPair ? [legacySigningKeyPair.publicJWKey as JWK] : []),
         encryptionKeyPair.publicJWKey as JWK,
       ],
@@ -195,7 +208,8 @@ export class KmsService implements IKmsService {
     const keyPairSet = await this.getEntityKeys(entityVaultId, 'all');
     return {
       keys: [
-        keyPairSet.verificationKeyPair.publicJWKey as JWK,
+        keyPairSet.commSigningKeyPair.publicJWKey as JWK,
+        keyPairSet.vcSigningKeyPair.publicJWKey as JWK,
         ...(keyPairSet.legacySigningKeyPair ? [keyPairSet.legacySigningKeyPair.publicJWKey as JWK] : []),
         keyPairSet.encryptionKeyPair.publicJWKey as JWK
       ]
@@ -210,15 +224,22 @@ export class KmsService implements IKmsService {
       return undefined;
     }
 
-    // For now, we only support one key type, so we ignore the 'alg' parameter.
-    // In the future, this would filter a list of keys.
-    // Default to ML-DSA-44 if no alg is provided.
-    if (!alg || alg === 'ML-DSA-44') {
-      return keySet.verificationKeyPair.publicJWKey;
+    // Default without algorithm hint: communication-signing key.
+    if (!alg) {
+      return keySet.commSigningKeyPair.publicJWKey;
     }
-    
+
+    // Legacy ES* remains dedicated to legacy VC/JWT compatibility.
     if (keySet.legacySigningKeyPair && keySet.legacySigningKeyPair.publicJWKey.alg === alg) {
       return keySet.legacySigningKeyPair.publicJWKey as PublicJwk;
+    }
+
+    // For modern algorithms shared by comm/vc (e.g. ML-DSA-*), prefer VC key when alg is explicitly requested.
+    if (keySet.vcSigningKeyPair.publicJWKey.alg === alg) {
+      return keySet.vcSigningKeyPair.publicJWKey;
+    }
+    if (keySet.commSigningKeyPair.publicJWKey.alg === alg) {
+      return keySet.commSigningKeyPair.publicJWKey;
     }
     return undefined;
   }
@@ -262,7 +283,8 @@ export class KmsService implements IKmsService {
     const hostKeys = await this.getEntityKeys('host', 'all');
     return {
       keys: [
-        hostKeys.verificationKeyPair.publicJWKey as JWK,
+        hostKeys.commSigningKeyPair.publicJWKey as JWK,
+        hostKeys.vcSigningKeyPair.publicJWKey as JWK,
         ...(hostKeys.legacySigningKeyPair ? [hostKeys.legacySigningKeyPair.publicJWKey as JWK] : []),
         hostKeys.encryptionKeyPair.publicJWKey as JWK,
       ],
@@ -451,8 +473,11 @@ export class KmsService implements IKmsService {
   }
 
   private resolveSigningKey(keySet: EntityKeysSet, alg?: string) {
-    if (!alg || alg === keySet.verificationKeyPair.publicJWKey.alg) {
-      return { publicJwk: keySet.verificationKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.verificationKeyPair.secretKeyBytes };
+    if (!alg || alg === keySet.vcSigningKeyPair.publicJWKey.alg) {
+      return { publicJwk: keySet.vcSigningKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.vcSigningKeyPair.secretKeyBytes };
+    }
+    if (alg === keySet.commSigningKeyPair.publicJWKey.alg) {
+      return { publicJwk: keySet.commSigningKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.commSigningKeyPair.secretKeyBytes };
     }
     if (keySet.legacySigningKeyPair && keySet.legacySigningKeyPair.publicJWKey.alg === alg) {
       return { publicJwk: keySet.legacySigningKeyPair.publicJWKey, secretKeyBytes: keySet.legacySigningKeyPair.secretKeyBytes };
@@ -462,8 +487,11 @@ export class KmsService implements IKmsService {
 
   private resolveSigningKeyByKid(keySet: EntityKeysSet | undefined, kid: string) {
     if (!keySet) return undefined;
-    if (keySet.verificationKeyPair.publicJWKey.kid === kid) {
-      return { publicJwk: keySet.verificationKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.verificationKeyPair.secretKeyBytes };
+    if (keySet.vcSigningKeyPair.publicJWKey.kid === kid) {
+      return { publicJwk: keySet.vcSigningKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.vcSigningKeyPair.secretKeyBytes };
+    }
+    if (keySet.commSigningKeyPair.publicJWKey.kid === kid) {
+      return { publicJwk: keySet.commSigningKeyPair.publicJWKey as JWK & { kid: string }, secretKeyBytes: keySet.commSigningKeyPair.secretKeyBytes };
     }
     if (keySet.legacySigningKeyPair?.publicJWKey.kid === kid) {
       return { publicJwk: keySet.legacySigningKeyPair.publicJWKey, secretKeyBytes: keySet.legacySigningKeyPair.secretKeyBytes };
