@@ -17,6 +17,9 @@ import { deriveKeyPair } from '../utils/pki';
 import { computeHmacSha256Base64Url } from 'gdc-common-utils-ts/hmac';
 import { ProtectedDataAES } from 'gdc-common-utils-ts/models/aes';
 import { ParameterData } from 'gdc-common-utils-ts/models/params';
+import { InMemoryKeyMaterialProvider } from './in-memory-key-material-provider';
+import type { KeyMaterialProvider, KeyMaterialPurpose } from './key-material-provider';
+import { TenantKeyCache } from './tenant-key-cache';
 
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 
@@ -79,15 +82,20 @@ export class KmsService implements IKmsService {
   private tenantsCacheManager: TenantsCacheManager;
   /** In-memory key storage. Key: entityId, Value: KeyPairSet. */
   private _managedKeys: Map<string, EntityKeysSet>;
+  private keyVersions: Map<string, number>;
+  private keyMaterialProvider: KeyMaterialProvider<EntityKeysSet>;
   private isHostInitialized: boolean = false;
 
   constructor(
     cryptographyService: ICryptography,
     tenantsCacheManager: TenantsCacheManager,
+    keyMaterialProvider?: KeyMaterialProvider<EntityKeysSet>,
     ) {
     this.crypto = cryptographyService;
     this.tenantsCacheManager = tenantsCacheManager;
     this._managedKeys = new Map();
+    this.keyVersions = new Map();
+    this.keyMaterialProvider = keyMaterialProvider || this.buildDefaultKeyMaterialProvider();
   }
 
   /**
@@ -162,6 +170,8 @@ export class KmsService implements IKmsService {
       dataEncryptionKey: dataEncryptionKey,
       hmacKey: hmacKey
     });
+    this.keyVersions.set(entityVaultId, (this.keyVersions.get(entityVaultId) || 0) + 1);
+    this.keyMaterialProvider.invalidate(entityVaultId, 'all');
     
     const publicJwkSet = {
       keys: [
@@ -182,10 +192,7 @@ export class KmsService implements IKmsService {
    * @returns A JWKSet of the entity's public keys.
    */
   async getPublicJwks(entityVaultId: string): Promise<JwkSet> {
-    const keyPairSet = this._managedKeys.get(entityVaultId);
-    if (!keyPairSet) {
-      throw new Error(`Keys not found for entity: ${entityVaultId}`);
-    }
+    const keyPairSet = await this.getEntityKeys(entityVaultId, 'all');
     return {
       keys: [
         keyPairSet.verificationKeyPair.publicJWKey as JWK,
@@ -196,8 +203,12 @@ export class KmsService implements IKmsService {
   }
 
   async getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<PublicJwk | undefined> {
-    const keySet = this._managedKeys.get(entityVaultId);
-    if (!keySet) return undefined;
+    let keySet: EntityKeysSet;
+    try {
+      keySet = await this.getEntityKeys(entityVaultId, 'signing');
+    } catch {
+      return undefined;
+    }
 
     // For now, we only support one key type, so we ignore the 'alg' parameter.
     // In the future, this would filter a list of keys.
@@ -213,8 +224,12 @@ export class KmsService implements IKmsService {
   }
 
   async getPublicEncryptionKey(entityVaultId: string, crv?: string): Promise<MlkemPublicJwk | undefined> {
-    const keySet = this._managedKeys.get(entityVaultId);
-    if (!keySet) return undefined;
+    let keySet: EntityKeysSet;
+    try {
+      keySet = await this.getEntityKeys(entityVaultId, 'encryption');
+    } catch {
+      return undefined;
+    }
 
     // For now, we only support one key type, so we ignore the 'crv' parameter.
     // In the future, this would filter a list of keys.
@@ -232,7 +247,7 @@ export class KmsService implements IKmsService {
    * Used for mTLS when reusing the legacy X.509 keypair.
    */
   async getLegacyPrivateKeyPem(entityVaultId: string): Promise<string | undefined> {
-    const keySet = this._managedKeys.get(entityVaultId);
+    const keySet = await this.getEntityKeys(entityVaultId, 'signing');
     if (!keySet?.legacySigningKeyPair) return undefined;
     const publicJwk = keySet.legacySigningKeyPair.publicJWKey as any;
     if (!publicJwk?.x || !publicJwk?.y) return undefined;
@@ -244,11 +259,7 @@ export class KmsService implements IKmsService {
 
   async getHostPublicJwkSet(): Promise<JwkSet> {
     this.checkInitialized();
-    const hostKeys = this._managedKeys.get('host');
-    if (!hostKeys) {
-      // This state should be impossible if init() was called successfully.
-      throw new Error('Host keys not found despite service being initialized.');
-    }
+    const hostKeys = await this.getEntityKeys('host', 'all');
     return {
       keys: [
         hostKeys.verificationKeyPair.publicJWKey as JWK,
@@ -342,10 +353,7 @@ export class KmsService implements IKmsService {
    * @returns A `JwsMultiSign` object containing the signature.
    */
   async signWithManagedKey(payload: Uint8Array, entityVaultId: string, alg?: string): Promise<JwsMultiSign> {
-    const keyPairSet = this._managedKeys.get(entityVaultId);
-    if (!keyPairSet) {
-      throw new Error(`Verification key not found for entity: ${entityVaultId}`);
-    }
+    const keyPairSet = await this.getEntityKeys(entityVaultId, 'signing');
     const signingKey = this.resolveSigningKey(keyPairSet, alg);
     if (!signingKey) {
       throw new Error(`Signing key not found for entity: ${entityVaultId} (alg=${alg || 'default'})`);
@@ -374,10 +382,7 @@ export class KmsService implements IKmsService {
     protectorEntityId: string
   ): Promise<JwsMultiSign> {
     this.checkInitialized();
-    const protectorKeys = this._managedKeys.get(protectorEntityId);
-    if (!protectorKeys) {
-      throw new Error(`Protector entity's keys not found: ${protectorEntityId}`);
-    }
+    const protectorKeys = await this.getEntityKeys(protectorEntityId, 'storage');
 
     const encryptedDataString = Content.bytesToStringUTF8(encryptedSeedPartB);
     const encryptedDataObject: ProtectedDataAES = JSON.parse(encryptedDataString);
@@ -400,7 +405,7 @@ export class KmsService implements IKmsService {
 
   async createDetachedJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
     this.checkInitialized();
-    const keyPairSet = this._managedKeys.get(signerVaultId);
+    const keyPairSet = await this.getEntityKeys(signerVaultId, 'signing');
     const signingKey = this.resolveSigningKeyByKid(keyPairSet, signerKid);
     if (!signingKey) {
       throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);
@@ -413,7 +418,7 @@ export class KmsService implements IKmsService {
 
   async createCompactJws(payload: object, signerKid: string, signerVaultId: string): Promise<string> {
     this.checkInitialized();
-    const keyPairSet = this._managedKeys.get(signerVaultId);
+    const keyPairSet = await this.getEntityKeys(signerVaultId, 'signing');
     const signingKey = this.resolveSigningKeyByKid(keyPairSet, signerKid);
     if (!signingKey) {
       throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);
@@ -512,10 +517,7 @@ export class KmsService implements IKmsService {
    * @returns The encrypted JWE as a compact string (for a single recipient) or a JSON string (for multiple).
    */
   async encodeResponse(payload: any, recipientJwks: JWK[], senderVaultId: string): Promise<string> {
-    const senderKeys = this._managedKeys.get(senderVaultId);
-    if (!senderKeys) {
-      throw new Error(`Sender keys not found for entity: ${senderVaultId}`);
-    }
+    const senderKeys = await this.getEntityKeys(senderVaultId, 'encryption');
     const senderPrivKey: MlkemPrivateJwk = {
       ...senderKeys.encryptionKeyPair.publicJWKey,
       dBytes: senderKeys.encryptionKeyPair.secretKeyBytes,
@@ -554,10 +556,7 @@ export class KmsService implements IKmsService {
     if (!doc.content) {
       throw new Error('Document has no "content" to protect.');
     }
-    const protectorKeys = this._managedKeys.get(entityVaultId);
-    if (!protectorKeys) {
-      throw new Error(`Protector entity's keys not found: ${entityVaultId}`);
-    }
+    const protectorKeys = await this.getEntityKeys(entityVaultId, 'storage');
 
     const contentString = JSON.stringify(doc.content);
     // The AAD is crucial here to bind the ciphertext to the entity.
@@ -580,10 +579,7 @@ export class KmsService implements IKmsService {
     if (!doc.jwe || typeof doc.jwe !== 'object') {
       throw new Error('Document has no valid "jwe" property to unprotect.');
     }
-    const protectorKeys = this._managedKeys.get(entityVaultId);
-    if (!protectorKeys) {
-      throw new Error(`Protector entity's keys not found: ${entityVaultId}`);
-    }
+    const protectorKeys = await this.getEntityKeys(entityVaultId, 'storage');
 
     const encryptedDataObject = doc.jwe as ProtectedDataAES;
     // The AAD must match the one used during encryption.
@@ -599,10 +595,7 @@ export class KmsService implements IKmsService {
    */
   async getHmacBase64Url(plaintext: string, entityVaultId: string): Promise<string> {
     this.checkInitialized();
-    const keys = this._managedKeys.get(entityVaultId);
-    if (!keys) {
-      throw new Error(`Keys not found for entity: ${entityVaultId}`);
-    }
+    const keys = await this.getEntityKeys(entityVaultId, 'hmac');
     if (!keys.hmacKey) {
       // This should not happen if provisionKeys is always used.
       throw new Error(`HMAC key is missing for entity: ${entityVaultId}`);
@@ -648,5 +641,31 @@ export class KmsService implements IKmsService {
       protectedAttributes.push(indexedAttr);
     }
     return protectedAttributes;
+  }
+
+  private buildDefaultKeyMaterialProvider(): KeyMaterialProvider<EntityKeysSet> {
+    const ttlMsRaw = Number.parseInt(process.env.KEY_MATERIAL_CACHE_TTL_MS || '', 10);
+    const maxEntriesRaw = Number.parseInt(process.env.KEY_MATERIAL_CACHE_MAX_ENTRIES || '', 10);
+    const cache = new TenantKeyCache<EntityKeysSet>({
+      ttlMs: Number.isFinite(ttlMsRaw) && ttlMsRaw > 0 ? ttlMsRaw : 300_000,
+      maxEntries: Number.isFinite(maxEntriesRaw) && maxEntriesRaw > 0 ? maxEntriesRaw : 1_024,
+    });
+
+    return new InMemoryKeyMaterialProvider<EntityKeysSet>({
+      cache,
+      loader: async (entityVaultId: string, _purpose: KeyMaterialPurpose) => {
+        const keyMaterial = this._managedKeys.get(entityVaultId);
+        if (!keyMaterial) {
+          throw new Error(`Keys not found for entity: ${entityVaultId}`);
+        }
+        const keyVersion = String(this.keyVersions.get(entityVaultId) || 0);
+        return { keyMaterial, keyVersion };
+      },
+    });
+  }
+
+  private async getEntityKeys(entityVaultId: string, purpose: KeyMaterialPurpose): Promise<EntityKeysSet> {
+    const record = await this.keyMaterialProvider.get(entityVaultId, purpose);
+    return record.keyMaterial;
   }
 }
