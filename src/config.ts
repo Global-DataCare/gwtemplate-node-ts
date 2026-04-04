@@ -9,6 +9,11 @@ import { Sector } from "gdc-common-utils-ts/models/urlPath";
  * for dependency injection, without needing to know where the configuration comes from.
  */
 export interface IServerConfig {
+  securityMode: 'strict' | 'compat' | 'demo';
+  fhirLegacy: boolean;
+  jsonLegacy: boolean;
+  didcommPlainEnabled: boolean;
+  demoAllowInsecureBearer: boolean;
   nodeEnv: string;
   port: number;
   apiHostname: string;

@@ -12,6 +12,22 @@ type Subsector = typeof SUBSECTORS[number];
 const DEFAULT_MAIN_SECTOR: MainSector = 'health';
 const DEFAULT_SUBSECTORS: Subsector[] = ['research', 'care', 'index'];
 
+function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
+  if (value === undefined) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'enabled') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'disabled') return false;
+  return fallback;
+}
+
+export function parseSecurityMode(value: string | undefined): 'strict' | 'compat' | 'demo' {
+  const normalized = String(value || 'strict').trim().toLowerCase();
+  if (normalized === 'strict' || normalized === 'compat' || normalized === 'demo') {
+    return normalized;
+  }
+  throw new Error("Config Error: Invalid SECURITY_MODE. Allowed: strict, compat, demo");
+}
+
 export function resetServerConfig(): void {
   configInstance = undefined as unknown as IServerConfig;
 }
@@ -119,7 +135,18 @@ export function getConfig(): IServerConfig {
       .map((value) => value.trim().toUpperCase())
       .filter(Boolean);
 
+    const securityMode = parseSecurityMode(process.env.SECURITY_MODE);
+    const fhirLegacy = parseBooleanEnv(process.env.FHIR_LEGACY, false);
+    const jsonLegacy = parseBooleanEnv(process.env.JSON_LEGACY, false);
+    const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
+    const demoAllowInsecureBearer = parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
+
     configInstance = {
+      securityMode,
+      fhirLegacy,
+      jsonLegacy,
+      didcommPlainEnabled,
+      demoAllowInsecureBearer,
       nodeEnv: process.env.NODE_ENV || 'development',
       port: port,
       apiHostname,

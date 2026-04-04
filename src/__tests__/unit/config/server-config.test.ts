@@ -1,8 +1,11 @@
 import {
   buildSectorsFromMainAndSubsectors,
+  getConfig,
   parseAndValidateMainSector,
   parseAndValidateSectors,
   parseAndValidateSubsectors,
+  parseSecurityMode,
+  resetServerConfig,
   resolveAllowedSectorsFromEnv,
 } from '../../../config/server-config';
 
@@ -65,5 +68,61 @@ describe('server-config sector resolution', () => {
     expect(buildSectorsFromMainAndSubsectors('animal', ['care'])).toEqual([
       'animal-care',
     ]);
+  });
+
+  it('should parse SECURITY_MODE values', () => {
+    expect(parseSecurityMode('strict')).toBe('strict');
+    expect(parseSecurityMode('compat')).toBe('compat');
+    expect(parseSecurityMode('demo')).toBe('demo');
+    expect(parseSecurityMode(undefined)).toBe('strict');
+    expect(() => parseSecurityMode('invalid-mode')).toThrow(/Invalid SECURITY_MODE/);
+  });
+
+  it('should expose security flags from environment', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'compat',
+      FHIR_LEGACY: 'true',
+      JSON_LEGACY: '1',
+      DIDCOMM_PLAIN: 'enabled',
+      DEMO_ALLOW_INSECURE_BEARER: 'yes',
+    };
+
+    resetServerConfig();
+    const config = getConfig();
+
+    expect(config.securityMode).toBe('compat');
+    expect(config.fhirLegacy).toBe(true);
+    expect(config.jsonLegacy).toBe(true);
+    expect(config.didcommPlainEnabled).toBe(true);
+    expect(config.demoAllowInsecureBearer).toBe(true);
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
+  it('should default security flags to disabled', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: '',
+      FHIR_LEGACY: '',
+      JSON_LEGACY: '',
+      DIDCOMM_PLAIN: '',
+      DEMO_ALLOW_INSECURE_BEARER: '',
+    };
+
+    resetServerConfig();
+    const config = getConfig();
+
+    expect(config.securityMode).toBe('strict');
+    expect(config.fhirLegacy).toBe(false);
+    expect(config.jsonLegacy).toBe(false);
+    expect(config.didcommPlainEnabled).toBe(false);
+    expect(config.demoAllowInsecureBearer).toBe(false);
+
+    process.env = previousEnv;
+    resetServerConfig();
   });
 });
