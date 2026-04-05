@@ -1,6 +1,10 @@
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { ClearingHouseVerificationResult, IClearingHouseService } from '../services/ClearingHouseService';
+import {
+  DefaultTrustRegistryAdapter,
+  ITrustRegistryAdapter,
+} from './trust-registry.adapter';
 
 export type ActivationNetworkMode = 'test' | 'test-network' | 'network';
 
@@ -79,9 +83,14 @@ function assertActivationCredentialConsistency(params: {
 
 export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
   private readonly clearingHouseService: IClearingHouseService;
+  private readonly trustRegistryAdapter: ITrustRegistryAdapter;
 
-  constructor(clearingHouseService: IClearingHouseService) {
+  constructor(
+    clearingHouseService: IClearingHouseService,
+    trustRegistryAdapter: ITrustRegistryAdapter = new DefaultTrustRegistryAdapter(),
+  ) {
     this.clearingHouseService = clearingHouseService;
+    this.trustRegistryAdapter = trustRegistryAdapter;
   }
 
   async evaluate(input: ActivationTrustEvaluationInput): Promise<ActivationTrustEvaluationResult> {
@@ -100,9 +109,15 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
       ],
     });
 
-    // NOTE: These checks are explicitly modeled by network mode so they can be delegated
-    // to specialized adapters (dataspace/blockchain) without coupling HostingManager.
-    const strictNetwork = input.networkMode === 'test-network' || input.networkMode === 'network';
+    const trustPolicy = await this.trustRegistryAdapter.verifyActivationTrust({
+      networkMode: input.networkMode,
+      jurisdiction: input.jurisdiction,
+      sector: input.sector,
+      organizationDid: consistency.organizationDid,
+      representativeDid: consistency.representativeDid,
+      organizationCredential: input.organizationCredential,
+      representativeCredential: input.representativeCredential,
+    });
 
     return {
       organizationDid: consistency.organizationDid,
@@ -110,10 +125,7 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
       clearingHouse,
       trustPolicy: {
         networkMode: input.networkMode,
-        revocationChecked: strictNetwork,
-        issuerKeyStatusChecked: strictNetwork,
-        subjectKeyStatusChecked: strictNetwork,
-        onChainChecked: input.networkMode === 'network',
+        ...trustPolicy,
       },
     };
   }

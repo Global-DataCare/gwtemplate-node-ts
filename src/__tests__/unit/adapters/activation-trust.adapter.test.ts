@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { DefaultActivationTrustAdapter } from '../../../adapters/activation-trust.adapter';
 import { IClearingHouseService } from '../../../services/ClearingHouseService';
+import { ITrustRegistryAdapter } from '../../../adapters/trust-registry.adapter';
 
 function buildCredential(subjectDid: string): any {
   return {
@@ -18,7 +19,15 @@ describe('DefaultActivationTrustAdapter', () => {
         ledgerVerified: true,
       })),
     };
-    const adapter = new DefaultActivationTrustAdapter(clearingHouseService);
+    const trustRegistryAdapter: ITrustRegistryAdapter = {
+      verifyActivationTrust: jest.fn(async () => ({
+        revocationChecked: true,
+        issuerKeyStatusChecked: true,
+        subjectKeyStatusChecked: true,
+        onChainChecked: false,
+      })),
+    };
+    const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
 
     const result = await adapter.evaluate({
       networkMode: 'test-network',
@@ -32,6 +41,10 @@ describe('DefaultActivationTrustAdapter', () => {
     expect(result.trustPolicy.networkMode).toBe('test-network');
     expect(result.trustPolicy.revocationChecked).toBe(true);
     expect(result.trustPolicy.onChainChecked).toBe(false);
+    expect((trustRegistryAdapter.verifyActivationTrust as jest.Mock).mock.calls[0][0]).toMatchObject({
+      networkMode: 'test-network',
+      organizationDid: 'did:web:org.example',
+    });
   });
 
   it('requires representative credential for activation consistency', async () => {
@@ -41,7 +54,15 @@ describe('DefaultActivationTrustAdapter', () => {
         ledgerVerified: true,
       })),
     };
-    const adapter = new DefaultActivationTrustAdapter(clearingHouseService);
+    const trustRegistryAdapter: ITrustRegistryAdapter = {
+      verifyActivationTrust: jest.fn(async () => ({
+        revocationChecked: true,
+        issuerKeyStatusChecked: true,
+        subjectKeyStatusChecked: true,
+        onChainChecked: true,
+      })),
+    };
+    const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
 
     await expect(adapter.evaluate({
       networkMode: 'network',
