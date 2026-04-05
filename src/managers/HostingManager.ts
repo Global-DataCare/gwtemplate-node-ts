@@ -49,6 +49,10 @@ import { resolveIdentityChannel } from '../utils/ledger';
 import { slugFromDomain } from '../utils/slug';
 import { getEnvSectionId } from '../utils/section-env';
 import { ClearingHouseService, IClearingHouseService } from '../services/ClearingHouseService';
+import {
+  DefaultActivationTrustAdapter,
+  IActivationTrustAdapter,
+} from '../adapters/activation-trust.adapter';
 
 /**
  * Manages the initial onboarding of new tenants onto the Gateway.
@@ -73,6 +77,7 @@ export class HostingManager {
   private logger: ILogger;
   private config: IServerConfig;
   private clearingHouseService: IClearingHouseService;
+  private activationTrustAdapter: IActivationTrustAdapter;
 
   constructor(
     vaultRepository: IVaultRepository,
@@ -82,6 +87,7 @@ export class HostingManager {
     logger: ILogger,
     config: IServerConfig,
     clearingHouseService?: IClearingHouseService,
+    activationTrustAdapter?: IActivationTrustAdapter,
   ) {
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
@@ -90,6 +96,7 @@ export class HostingManager {
     this.logger = logger;
     this.config = config;
     this.clearingHouseService = clearingHouseService || new ClearingHouseService();
+    this.activationTrustAdapter = activationTrustAdapter || new DefaultActivationTrustAdapter(this.clearingHouseService);
   }
 
   public async bootstrapHost(hostClaims: ClaimsRecord): Promise<void> {
@@ -188,42 +195,6 @@ export class HostingManager {
           ? getBaseUrlFromDidWeb(primaryDid)
           : undefined),
     };
-  }
-
-  private assertActivationCredentialConsistency(params: {
-    primaryDid?: string;
-    organizationCredential?: any;
-    representativeCredential?: any;
-  }): { organizationDid: string } {
-    const { primaryDid, organizationCredential, representativeCredential } = params;
-    if (!organizationCredential) {
-      throw new ManagerError('Missing ICA-issued organization credential.', IssueType.Required);
-    }
-    if (!representativeCredential) {
-      throw new ManagerError('Missing ICA-issued representative credential.', IssueType.Required);
-    }
-
-    const organizationDidFromCredential = this.extractDidFromCredential(organizationCredential);
-    if (!organizationDidFromCredential) {
-      throw new ManagerError('ICA-issued organization credential is missing credentialSubject.id did:web.', IssueType.Required);
-    }
-    if (primaryDid && organizationDidFromCredential !== primaryDid) {
-      throw new ManagerError('Submitted organization DID does not match ICA-issued organization credential DID.', IssueType.Conflict);
-    }
-
-    return { organizationDid: organizationDidFromCredential };
-  }
-
-  private async verifyActivationVpToken(vpToken: string, presentationSubmission?: any) {
-    const acrValues = [
-      'urn:antifraud:acr:openid4vp:employee',
-      'urn:antifraud:acr:openid4vp:individual',
-    ];
-    return await this.clearingHouseService.verifyVpToken({
-      vpToken,
-      presentationSubmission,
-      acrValues,
-    });
   }
 
   private getIcaDidCreateUrl(): string | undefined {
@@ -537,15 +508,18 @@ export class HostingManager {
     if (!activation.vpToken || typeof activation.vpToken !== 'string') {
       throw new ManagerError("Missing required activation proof 'vp_token'.", IssueType.Required);
     }
-    const clearingResult = await this.verifyActivationVpToken(
-      activation.vpToken,
-      activation.presentationSubmission,
-    );
-    const { organizationDid } = this.assertActivationCredentialConsistency({
+    const trustResult = await this.activationTrustAdapter.evaluate({
+      networkMode: this.config.networkMode,
+      vpToken: activation.vpToken,
+      presentationSubmission: activation.presentationSubmission,
       primaryDid: activation.primaryDid,
       organizationCredential: activation.organizationCredential,
       representativeCredential: activation.representativeCredential,
+      jurisdiction: body?.jurisdiction,
+      sector: body?.sector,
     });
+    const clearingResult = trustResult.clearingHouse;
+    const { organizationDid } = trustResult;
 
     const rawClaims = entry?.meta?.claims;
     const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
@@ -622,6 +596,7 @@ export class HostingManager {
         presentation_submission: activation.presentationSubmission,
         representativeCredential: activation.representativeCredential,
         clearingHouse: clearingResult,
+        trustPolicy: trustResult.trustPolicy,
       };
     }
 
@@ -686,6 +661,7 @@ export class HostingManager {
           vp_token: activation.vpToken,
           presentation_submission: activation.presentationSubmission,
           clearingHouse: clearingResult,
+          trustPolicy: trustResult.trustPolicy,
           organizationCredential: activation.organizationCredential,
           representativeCredential: activation.representativeCredential,
           icaDidRegistration,
@@ -716,6 +692,9 @@ export class HostingManager {
           'org.schema.Organization.did': finalTenantConfig.didDocument?.id,
           'org.schema.Action.clearingHouse.acr': clearingResult.acr,
           'org.schema.Action.clearingHouse.ledgerVerified': String(clearingResult.ledgerVerified),
+          'org.schema.Action.activation.networkMode': trustResult.trustPolicy.networkMode,
+          'org.schema.Action.activation.revocationChecked': String(trustResult.trustPolicy.revocationChecked),
+          'org.schema.Action.activation.onChainChecked': String(trustResult.trustPolicy.onChainChecked),
         },
       },
       resource: {
