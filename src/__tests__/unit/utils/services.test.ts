@@ -218,5 +218,18 @@ describe('Service Initialization Utilities', () => {
       const identityServices = services.filter((s: DidService) => (s as any).selector?.section === 'identity');
       expect(identityServices).toHaveLength(4); // (research + health-care) × (firebase + openid)
     });
+
+    it('should allow explicit NETWORK_MODE override independently of NODE_ENV', () => {
+      const hostConfig = createTestTenantConfig(Sector.SYSTEM, 'did:web:host.example.com', [Sector.RESEARCH]);
+      const services = initializeHostServicesConfig(
+        hostConfig.provider!.service.sectorsAllowed as Sector[],
+        'production',
+        'test-network',
+      );
+
+      const registryServices = services.filter((s: DidService) => (s as any).selector?.section === 'registry');
+      expect(registryServices).toHaveLength(1);
+      expect((registryServices[0] as any).selector?.sector).toBe('test-network');
+    });
   });
 });

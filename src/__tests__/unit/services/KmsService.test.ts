@@ -63,9 +63,9 @@ describe('KmsService', () => {
     it('should generate and store a full key set for an entity', async () => {
       const jwks = await kmsService.provisionKeys('tenant-123');
       
-      expect(mockCryptoService.generateKeyPairMlDsa).toHaveBeenCalledTimes(1);
+      expect(mockCryptoService.generateKeyPairMlDsa).toHaveBeenCalledTimes(2);
       expect(mockCryptoService.generateKeyPairMlKem).toHaveBeenCalledTimes(1);
-      expect(jwks.keys).toHaveLength(3);
+      expect(jwks.keys).toHaveLength(4);
       expect(jwks.keys).toContainEqual(mockMldsaPublicKey);
       expect(jwks.keys).toContainEqual(mockMlkemPublicKey);
       expect(jwks.keys.find((key) => key.alg?.startsWith('ES'))).toBeDefined();
@@ -88,7 +88,7 @@ describe('KmsService', () => {
       // Verify the host keys are actually available
       const hostKeys = await kmsService.getPublicJwks('host');
       expect(hostKeys).toBeDefined();
-      expect(hostKeys.keys).toHaveLength(3);
+      expect(hostKeys.keys).toHaveLength(4);
 
       provisionSpy.mockRestore();
     });

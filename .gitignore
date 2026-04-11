@@ -113,3 +113,7 @@ artifacts/**/fabric-ca-server-ica/ca-key.pem
 
 # Local Fabric toolchain downloads
 tools/
+
+# Internal planning notes (keep local)
+_TODO-TASKS.md
+docs/_TODO-TASKS.md

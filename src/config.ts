@@ -9,6 +9,12 @@ import { Sector } from "gdc-common-utils-ts/models/urlPath";
  * for dependency injection, without needing to know where the configuration comes from.
  */
 export interface IServerConfig {
+  securityMode: 'strict' | 'compat' | 'demo';
+  networkMode: 'test' | 'test-network' | 'network';
+  fhirLegacy: boolean;
+  jsonLegacy: boolean;
+  didcommPlainEnabled: boolean;
+  demoAllowInsecureBearer: boolean;
   nodeEnv: string;
   port: number;
   apiHostname: string;
@@ -33,6 +39,16 @@ export interface IServerConfig {
   dbProvider: string;
   storageProvider: string;
   queueProvider: string;
+  postgres?: {
+    host?: string;
+    port?: number;
+    database?: string;
+    user?: string;
+    password?: string;
+    ssl?: boolean;
+    schema?: string;
+    maxPoolSize?: number;
+  };
   gcsBucketName?: string;
   kekSecret?: string;
   host: {

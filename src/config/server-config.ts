@@ -6,11 +6,45 @@ let configInstance: IServerConfig;
 const MAIN_SECTORS = ['animal', 'health'] as const;
 const SUBSECTORS = ['research', 'care', 'index', 'tech'] as const;
 
+export type NetworkMode = 'test' | 'test-network' | 'network';
+
 type MainSector = typeof MAIN_SECTORS[number];
 type Subsector = typeof SUBSECTORS[number];
 
 const DEFAULT_MAIN_SECTOR: MainSector = 'health';
 const DEFAULT_SUBSECTORS: Subsector[] = ['research', 'care', 'index'];
+
+function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
+  if (value === undefined) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'enabled') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'disabled') return false;
+  return fallback;
+}
+
+export function parseSecurityMode(value: string | undefined): 'strict' | 'compat' | 'demo' {
+  const normalized = String(value || 'strict').trim().toLowerCase();
+  if (normalized === 'strict' || normalized === 'compat' || normalized === 'demo') {
+    return normalized;
+  }
+  throw new Error("Config Error: Invalid SECURITY_MODE. Allowed: strict, compat, demo");
+}
+
+function mapNodeEnvToNetworkMode(nodeEnv: string | undefined): NetworkMode {
+  const normalized = String(nodeEnv || '').trim().toLowerCase();
+  if (normalized === 'production') return 'network';
+  if (normalized === 'development' || normalized === 'staging') return 'test-network';
+  return 'test';
+}
+
+export function parseNetworkMode(value: string | undefined, nodeEnv?: string): NetworkMode {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return mapNodeEnvToNetworkMode(nodeEnv);
+  if (normalized === 'test' || normalized === 'test-network' || normalized === 'network') {
+    return normalized;
+  }
+  throw new Error("Config Error: Invalid NETWORK_MODE. Allowed: test, test-network, network");
+}
 
 export function resetServerConfig(): void {
   configInstance = undefined as unknown as IServerConfig;
@@ -119,8 +153,22 @@ export function getConfig(): IServerConfig {
       .map((value) => value.trim().toUpperCase())
       .filter(Boolean);
 
+    const nodeEnv = process.env.NODE_ENV || 'development';
+    const securityMode = parseSecurityMode(process.env.SECURITY_MODE);
+    const networkMode = parseNetworkMode(process.env.NETWORK_MODE, nodeEnv);
+    const fhirLegacy = parseBooleanEnv(process.env.FHIR_LEGACY, false);
+    const jsonLegacy = parseBooleanEnv(process.env.JSON_LEGACY, false);
+    const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
+    const demoAllowInsecureBearer = parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
+
     configInstance = {
-      nodeEnv: process.env.NODE_ENV || 'development',
+      securityMode,
+      networkMode,
+      fhirLegacy,
+      jsonLegacy,
+      didcommPlainEnabled,
+      demoAllowInsecureBearer,
+      nodeEnv,
       port: port,
       apiHostname,
       hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || new URL(apiBaseUrl).host,
@@ -131,6 +179,16 @@ export function getConfig(): IServerConfig {
       dbProvider: process.env.DB_PROVIDER || 'mem',
       storageProvider: process.env.STORAGE_PROVIDER || 'mem',
       queueProvider: process.env.QUEUE_PROVIDER || 'mem',
+      postgres: {
+        host: process.env.POSTGRES_HOST,
+        port: process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT, 10) : undefined,
+        database: process.env.POSTGRES_DB,
+        user: process.env.POSTGRES_USER,
+        password: process.env.POSTGRES_PASSWORD,
+        ssl: parseBooleanEnv(process.env.POSTGRES_SSL, false),
+        schema: process.env.POSTGRES_SCHEMA,
+        maxPoolSize: process.env.POSTGRES_MAX_POOL_SIZE ? parseInt(process.env.POSTGRES_MAX_POOL_SIZE, 10) : undefined,
+      },
       gcsBucketName: process.env.GCS_BUCKET_NAME,
       kekSecret: process.env.KEK_SECRET,
       host: {

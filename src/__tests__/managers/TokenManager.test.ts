@@ -64,7 +64,7 @@ describe('TokenManager', () => {
       const token = await manager.createInitialAccessToken(inputClaims, tokenLifetime);
 
       // Assert
-      expect(mockKmsService.createCompactJws).toHaveBeenCalledWith(expect.any(Object), 'host-key-1', 'host');
+      expect(mockKmsService.createCompactJws).toHaveBeenCalledWith(expect.any(Object), 'host-key-1', 'host', 'comm_sig');
       expect(token).toContain('.'); // compact JWS
 
       // Decode the payload to verify its contents

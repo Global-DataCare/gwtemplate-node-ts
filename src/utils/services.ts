@@ -19,11 +19,21 @@ export type HostRegistrySector = 'test' | 'test-network' | 'network';
  * - `development`/`staging` -> `test-network` (Hyperledger Fabric test network)
  * - `production` -> `network` (Hyperledger Fabric production network)
  */
-export function resolveHostRegistrySector(nodeEnv: string | undefined): HostRegistrySector {
-  const env = String(nodeEnv || '').trim().toLowerCase();
+export function resolveHostRegistrySector(input: string | undefined | { nodeEnv?: string; networkMode?: string }): HostRegistrySector {
+  if (typeof input === 'object' && input !== null) {
+    const networkMode = String(input.networkMode || '').trim().toLowerCase();
+    if (networkMode === 'test' || networkMode === 'test-network' || networkMode === 'network') {
+      return networkMode as HostRegistrySector;
+    }
+    const env = String(input.nodeEnv || '').trim().toLowerCase();
+    if (env === 'production') return 'network';
+    if (env === 'development' || env === 'staging') return 'test-network';
+    return 'test';
+  }
+
+  const env = String(input || '').trim().toLowerCase();
   if (env === 'production') return 'network';
   if (env === 'development' || env === 'staging') return 'test-network';
-  // Jest sets NODE_ENV=test; demo mode is explicitly NODE_ENV=demo.
   return 'test';
 }
 
@@ -238,9 +248,9 @@ export function initializeTenantServicesConfig(sector: Sector, customServices: D
  * Generates the business logic service CONFIGURATION for the Host.
  * This defines the services for `didConfig.service`.
  */
-export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: string): DidService[] {
+export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: string, networkMode?: string): DidService[] {
   const services: DidService[] = [];
-  const hostRegistrySector = resolveHostRegistrySector(nodeEnv);
+  const hostRegistrySector = resolveHostRegistrySector({ nodeEnv, networkMode });
 
   // Host onboarding (Organization registration + Order) is exposed under a "network env sector".
   services.push(

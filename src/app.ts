@@ -4,6 +4,33 @@
 import express from 'express';
 import cors from 'cors';
 
+type SecurityMode = 'strict' | 'compat' | 'demo';
+
+function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
+  if (value === undefined) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'enabled') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'disabled') return false;
+  return fallback;
+}
+
+function resolveSecurityModeFromEnv(): SecurityMode {
+  const normalized = String(process.env.SECURITY_MODE || 'strict').trim().toLowerCase();
+  if (normalized === 'strict' || normalized === 'compat' || normalized === 'demo') return normalized;
+  return 'strict';
+}
+
+function buildAcceptedJsonBodyTypes(): string[] {
+  const mode = resolveSecurityModeFromEnv();
+  const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
+  const acceptsDidcommPlain = mode === 'demo' || didcommPlainEnabled;
+  const types = ['application/json', 'application/fhir+json'];
+  if (acceptsDidcommPlain) {
+    types.push('application/didcomm-plaintext+json');
+  }
+  return types;
+}
+
 export function createApp() {
   const app = express();
 
@@ -40,7 +67,7 @@ export function createApp() {
   }
 
   app.use(express.json({
-    type: ['application/json', 'application/fhir+json', 'application/didcomm-plaintext+json'],
+    type: buildAcceptedJsonBodyTypes(),
   }));
 
   return app;

@@ -65,6 +65,7 @@ export async function signVerifiableCredential(
     proofType?: string;
     proofPurpose?: string;
     signerAlg?: string;
+    signerKeyPurpose?: 'comm_sig' | 'vc_sign';
     append?: boolean;
   }
 ): Promise<any> {
@@ -76,7 +77,12 @@ export async function signVerifiableCredential(
   const payloadToSign = createLdpJwsPayload(unsignedVc);
 
   // 3. Sign the HASH using the KMS.
-  const jws = await kmsService.signWithManagedKey(payloadToSign, signerVaultId, options?.signerAlg);
+  const jws = await kmsService.signWithManagedKey(
+    payloadToSign,
+    signerVaultId,
+    options?.signerAlg,
+    options?.signerKeyPurpose || 'vc_sign',
+  );
   const { protected: protectedHeader, signature } = jws.signatures[0];
 
   // 4. Construct the final 'proofValue' for the detached JWS.

@@ -25,6 +25,58 @@ import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/r
 import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
+type SecurityMode = 'strict' | 'compat' | 'demo';
+type ParsedContentType = 'secure-form' | 'didcomm-plain' | 'json' | 'fhir' | 'unsupported';
+
+function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
+  if (value === undefined) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'enabled') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'disabled') return false;
+  return fallback;
+}
+
+function resolveSecurityModeFromEnv(): SecurityMode {
+  const normalized = String(process.env.SECURITY_MODE || 'strict').trim().toLowerCase();
+  if (normalized === 'strict' || normalized === 'compat' || normalized === 'demo') return normalized;
+  return 'strict';
+}
+
+function normalizeContentType(rawValue: string | undefined): string {
+  if (!rawValue) return '';
+  return String(rawValue).split(';')[0].trim().toLowerCase();
+}
+
+function parseIncomingContentType(contentType: string): ParsedContentType {
+  if (contentType === 'application/x-www-form-urlencoded') return 'secure-form';
+  if (contentType === 'application/didcomm-plaintext+json') return 'didcomm-plain';
+  if (contentType === 'application/json') return 'json';
+  if (contentType === 'application/fhir+json') return 'fhir';
+  return 'unsupported';
+}
+
+function isContentTypeAllowedBySecurityPolicy(contentType: ParsedContentType): boolean {
+  const securityMode = resolveSecurityModeFromEnv();
+  if (contentType === 'secure-form') return true;
+  if (contentType === 'unsupported') return false;
+
+  if (securityMode === 'strict') return false;
+  if (securityMode === 'demo') return true;
+
+  const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
+  const fhirLegacy = parseBooleanEnv(process.env.FHIR_LEGACY, false);
+  const jsonLegacy = parseBooleanEnv(process.env.JSON_LEGACY, false);
+
+  if (contentType === 'didcomm-plain') return didcommPlainEnabled;
+  if (contentType === 'fhir') return fhirLegacy;
+  if (contentType === 'json') return jsonLegacy;
+  return false;
+}
+
+function allowsInsecureBearerBySecurityMode(): boolean {
+  return resolveSecurityModeFromEnv() === 'demo'
+    && parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
+}
 
 function getRequestBaseUrl(req: express.Request, fallback: string): string {
   const forwardedProto = req.headers['x-forwarded-proto'];
@@ -223,6 +275,29 @@ export function createApiRouter(
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
     }
+    const accessToken = authHeader.split(' ')[1];
+    if (!allowsInsecureBearerBySecurityMode()) {
+      if (!appAuthManager) {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          500,
+          IssueType.Exception,
+          'Bearer validation is required by SECURITY_MODE but AppAuthorizationManager is not configured.',
+        );
+      }
+      try {
+        await appAuthManager.verifyIdToken(accessToken);
+      } catch (error: any) {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          401,
+          IssueType.Security,
+          `Invalid Bearer token: ${error?.message || 'verification failed'}`,
+        );
+      }
+    }
 
     const { tenantId, sector } = req.params;
     const vaultId = tenantId === 'host' ? 'host' : getTenantVaultId(sector, tenantId);
@@ -243,7 +318,7 @@ export function createApiRouter(
     const forcePqc = String(req.query.pqc || req.headers['x-pqc-signature'] || '').toLowerCase() === 'true';
     const legacyAlgCandidate = hostConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG;
     const preferredAlg = (!forcePqc && legacyAlgCandidate) ? legacyAlgCandidate : 'ML-DSA-44';
-    const signingKey = await kmsService.getPublicVerificationKey(issuerVaultId, preferredAlg);
+    const signingKey = await kmsService.getPublicVerificationKey(issuerVaultId, preferredAlg, 'vc_sign');
     if (!signingKey?.kid) {
       throw new Error('Signing key not available for credential issuance.');
     }
@@ -255,7 +330,7 @@ export function createApiRouter(
       issuerDid: issuerDid,
     });
     const unsignedVc = createGaiaXLegalParticipantCredential(credentialOptions);
-    const detachedJws = await kmsService.createDetachedJws(unsignedVc, signingKey.kid, issuerVaultId);
+    const detachedJws = await kmsService.createDetachedJws(unsignedVc, signingKey.kid, issuerVaultId, 'vc_sign');
 
     const signedVc = {
       ...unsignedVc,
@@ -1631,12 +1706,24 @@ export function createApiRouter(
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
   router.post(`${cdsRoutePrefix}/:action`, async (req, res) => {
     const { tenantId, section, resourceType, sector, action } = req.params;
-    const contentType = req.headers['content-type'] || '';
+    const contentTypeHeader = String(req.headers['content-type'] || '');
+    const contentType = normalizeContentType(contentTypeHeader);
+    const parsedContentType = parseIncomingContentType(contentType);
     let jobRequest: JobRequest;
 
     try {
+      if (!isContentTypeAllowedBySecurityPolicy(parsedContentType)) {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          415,
+          IssueType.NotSupported,
+          `Unsupported Content-Type for current SECURITY_MODE: ${contentTypeHeader || '<missing>'}`,
+        );
+      }
+
       // --- 1. Payload Handling & JobRequest Construction ---
-      if (contentType.startsWith('application/x-www-form-urlencoded')) {
+      if (parsedContentType === 'secure-form') {
         // ENCRYPTED FLOW (FAPI/JAR-style)
         if (!req.body.request) {
           return sendDidcommEarlyError(
@@ -1760,19 +1847,42 @@ export function createApiRouter(
         };
 
       } else if (
-        contentType.startsWith('application/didcomm-plaintext+json') ||
-        contentType.startsWith('application/json') ||
-        contentType.startsWith('application/fhir+json')
+        parsedContentType === 'didcomm-plain' ||
+        parsedContentType === 'json' ||
+        parsedContentType === 'fhir'
       ) {
         // LEGACY / PLAINTEXT FLOW (demo/dev convenience)
         const authToken = req.headers.authorization;
+        const enforceBearerValidation = !allowsInsecureBearerBySecurityMode();
         // The 'ping' endpoint is a public health check and does not require authentication for legacy requests.
         if (section !== 'ping' && (!authToken || !authToken.startsWith('Bearer '))) {
           return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
         }
 
-        // TODO: Implement actual token validation (e.g., call a verifier like GoogleTokenVerifier).
-        // For now, any Bearer token is accepted in non-production environments.
+        if (section !== 'ping' && enforceBearerValidation) {
+          if (!appAuthManager) {
+            return sendDidcommEarlyError(
+              req,
+              res,
+              500,
+              IssueType.Exception,
+              'Bearer validation is required by SECURITY_MODE but AppAuthorizationManager is not configured.',
+            );
+          }
+          try {
+            const bearerToken = authToken?.split(' ')[1] || '';
+            await appAuthManager.verifyIdToken(bearerToken);
+          } catch (error: any) {
+            return sendDidcommEarlyError(
+              req,
+              res,
+              401,
+              IssueType.Security,
+              `Invalid Bearer token: ${error?.message || 'verification failed'}`,
+            );
+          }
+        }
+
         if (
           appAuthManager &&
           section === 'identity' &&

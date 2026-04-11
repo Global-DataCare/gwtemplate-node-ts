@@ -125,7 +125,7 @@ export class AppAuthorizationManager {
     }
 
     // 1. Verify Signature
-    const hostSignKey = await this.kmsService.getPublicVerificationKey('host');
+    const hostSignKey = await this.kmsService.getPublicVerificationKey('host', undefined, 'comm_sig');
     if (!hostSignKey) {
       throw new ManagerError('Host signing key not found, cannot verify token.', IssueType.Exception);
     }

@@ -8,6 +8,8 @@ import { ConfidentialStorageDoc, IndexedAttribute } from 'gdc-common-utils-ts/mo
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { MlkemPublicJwk, PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 
+export type SigningPurpose = 'comm_sig' | 'vc_sign';
+
 /**
  * Defines the Key Management Service (KMS).
  *
@@ -61,7 +63,7 @@ export interface IKmsService {
    * Retrieves the public signing key for an entity, optionally filtering by algorithm.
    * If no algorithm is specified, it defaults to the preferred modern algorithm (e.g., ML-DSA-44).
    */
-  getPublicVerificationKey(entityVaultId: string, alg?: string): Promise<PublicJwk | undefined>;
+  getPublicVerificationKey(entityVaultId: string, alg?: string, purpose?: SigningPurpose): Promise<PublicJwk | undefined>;
   
   /** 
    * Retrieves the public encryption key for an entity, optionally filtering by curve.
@@ -102,7 +104,7 @@ export interface IKmsService {
    * @param entityId The ID of the internal entity that is signing.
    * @returns The signed data as a JwsObject.
    */
-  signWithManagedKey(payload: Uint8Array, entityVaultId: string, alg?: string): Promise<JwsMultiSign>;
+  signWithManagedKey(payload: Uint8Array, entityVaultId: string, alg?: string, purpose?: SigningPurpose): Promise<JwsMultiSign>;
 
   /**
    * Signs a payload by reconstructing a key from its components (e.g., for an Employee's cloud key).
@@ -130,7 +132,7 @@ export interface IKmsService {
    * @param signerVaultId The vault ID of the entity that owns the key.
    * @returns A promise that resolves to the detached JWS string.
    */
-  createDetachedJws(payload: object, signerKid: string, signerVaultId: string): Promise<string>;
+  createDetachedJws(payload: object, signerKid: string, signerVaultId: string, purpose?: SigningPurpose): Promise<string>;
 
   /**
    * Creates a compact JWS for a JSON payload (HEADER.PAYLOAD.SIGNATURE).
@@ -140,7 +142,7 @@ export interface IKmsService {
    * @param signerVaultId The vault ID of the entity that owns the key.
    * @returns A promise that resolves to the compact JWS string.
    */
-  createCompactJws(payload: object, signerKid: string, signerVaultId: string): Promise<string>;
+  createCompactJws(payload: object, signerKid: string, signerVaultId: string, purpose?: SigningPurpose): Promise<string>;
 
   // --- Outbound Encryption ---
 
