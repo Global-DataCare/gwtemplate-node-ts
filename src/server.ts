@@ -32,6 +32,9 @@ import { AsyncResponseStoreMem } from './adapters/async-response-store.mem';
 import { IVaultRepository } from './database/repositories/vault/vault.repository';
 import { VaultMemRepository } from './database/repositories/vault/vault.mem.repository';
 import { FirestoreVaultRepository } from './database/repositories/firestore/firestore.vault.repository';
+import { createPostgresPool } from './database/repositories/postgres/postgres.client';
+import { ensurePostgresVaultSchema } from './database/repositories/postgres/postgres.schema';
+import { PostgresVaultRepository } from './database/repositories/postgres/postgres.vault.repository';
 import { ManagerRegistry } from './managers/registry';
 import { HostingManager } from './managers/HostingManager';
 import { TenantsCacheManager } from './managers/TenantsCacheManager';
@@ -178,6 +181,11 @@ async function startServer(options?: StartServerOptions) {
     const db = admin.firestore();
     vaultRepository = new FirestoreVaultRepository(db, hostCollectionName);
     console.log('[GW-API] Using Firestore Vault Repository.');
+  } else if (config.dbProvider === 'postgres') {
+    const pool = createPostgresPool(config.postgres);
+    await ensurePostgresVaultSchema(pool, config.postgres?.schema);
+    vaultRepository = new PostgresVaultRepository(pool, hostCollectionName, config.postgres?.schema);
+    console.log('[GW-API] Using PostgreSQL Vault Repository.');
   } else {
     vaultRepository = new VaultMemRepository();
     (vaultRepository as VaultMemRepository).clear(); // Explicitly clear on start

@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [UNRELEASED]
 
+## [1.3.0] - 2026-04-11
+
+### Added
+
+- 2026-04-11: Added PostgreSQL-backed vault repository support with schema bootstrap, runtime wiring for `DB_PROVIDER=postgres`, and integration coverage using `pg-mem` for secure indexed confidential storage queries.
+- 2026-04-11: Added `.env.local.postgres` overrides and `npm run api:local-postgres` for running the API locally against PostgreSQL without duplicating the full local environment file.
+- 2026-04-11: Added `docker-compose.postgres.yml` plus local helper scripts to start, stop, and inspect a dedicated PostgreSQL container for the new vault provider.
+- 2026-04-11: Added `db:local-postgres:reset`; the PostgreSQL vault schema is auto-created by the API at startup, so no manual init SQL is required for this initial adapter rollout.
+
 ## [1.2.0] - 2026-03-14
 
 ### Added

@@ -6,6 +6,15 @@ This repository provides a robust, asynchronous, and policy-driven API gateway t
 
 It is designed for building secure, multi-tenant systems that handle complex data interactions, and integration with technologies like Financial API (FAPI), DIDComm and blockchain.
 
+## Repository Navigation
+
+- Main docs index: [docs/README.md](docs/README.md)
+- Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
+- Repo briefing: [BRIEFING_DATASPACE_EN.md](BRIEFING_DATASPACE_EN.md)
+- Local environment template: [env.example](env.example)
+- Local PostgreSQL overrides: [.env.local.postgres](.env.local.postgres)
+- Local PostgreSQL container: [docker-compose.postgres.yml](docker-compose.postgres.yml)
+
 ## Test-Driven Development (TDD)
 
 This project follows a Test-Driven Development (TDD) approach. This means that tests are written *before* the code they are intended to verify. The TDD cycle consists of:
@@ -40,6 +49,8 @@ cp env.example .env.local
 
 Next, open `.env.local` and review its contents. For basic local development, the default values are often sufficient. The key variable for local testing is `DB_PROVIDER`, which is pre-configured to `mem` for an in-memory database, requiring no external setup.
 
+If you want to run the vault against PostgreSQL locally, keep `.env.local` as your base file and use the overrides in `.env.local.postgres`.
+
 ### 2. Install Dependencies
 
 Install the necessary Node.js packages:
@@ -59,7 +70,30 @@ npm run dev
 ```
 The server will be available at `http://localhost:3000`.
 
-#### Option B: Using Docker
+#### Option B: Using Node.js with Local PostgreSQL
+
+This method starts a dedicated local PostgreSQL container and runs the API with `.env.local.postgres` layered on top of `.env.local`.
+
+1. Start PostgreSQL:
+```bash
+npm run db:local-postgres:up
+```
+
+2. Run the API with PostgreSQL:
+```bash
+npm run api:local-postgres
+```
+
+Useful helpers:
+```bash
+npm run db:local-postgres:logs
+npm run db:local-postgres:reset
+npm run db:local-postgres:down
+```
+
+The vault schema is created automatically by the API on startup.
+
+#### Option C: Using Docker
 
 This method runs the application inside a Docker container, which is a great way to ensure a consistent environment. This is the same image that will be deployed to the cloud.
 
@@ -266,3 +300,7 @@ For the multi-cloud Fabric deployment plan and scripts, see:
 
 Local (minikube/k3s) is test-only and documented in:
 - `private-deploy.local.config`
+
+## Roadmap and Briefing
+- `BRIEFING_DATASPACE_EN.md`
+- `TODO_ROADMAP.md`

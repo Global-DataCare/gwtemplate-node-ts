@@ -179,6 +179,16 @@ export function getConfig(): IServerConfig {
       dbProvider: process.env.DB_PROVIDER || 'mem',
       storageProvider: process.env.STORAGE_PROVIDER || 'mem',
       queueProvider: process.env.QUEUE_PROVIDER || 'mem',
+      postgres: {
+        host: process.env.POSTGRES_HOST,
+        port: process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT, 10) : undefined,
+        database: process.env.POSTGRES_DB,
+        user: process.env.POSTGRES_USER,
+        password: process.env.POSTGRES_PASSWORD,
+        ssl: parseBooleanEnv(process.env.POSTGRES_SSL, false),
+        schema: process.env.POSTGRES_SCHEMA,
+        maxPoolSize: process.env.POSTGRES_MAX_POOL_SIZE ? parseInt(process.env.POSTGRES_MAX_POOL_SIZE, 10) : undefined,
+      },
       gcsBucketName: process.env.GCS_BUCKET_NAME,
       kekSecret: process.env.KEK_SECRET,
       host: {

@@ -39,6 +39,16 @@ export interface IServerConfig {
   dbProvider: string;
   storageProvider: string;
   queueProvider: string;
+  postgres?: {
+    host?: string;
+    port?: number;
+    database?: string;
+    user?: string;
+    password?: string;
+    ssl?: boolean;
+    schema?: string;
+    maxPoolSize?: number;
+  };
   gcsBucketName?: string;
   kekSecret?: string;
   host: {
