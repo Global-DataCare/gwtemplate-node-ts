@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [UNRELEASED]
 
+### Added
+
+- 2026-04-11 11:35: Integrated the external package `tasks-core-node-ts` as a sibling workspace dependency, added env-based feature flags for care reminders, mounted the module bootstrap in the server, and added gateway integration coverage for `/tasks-core/_status`.
+
 ## [1.3.0] - 2026-04-11
 
 ### Added
