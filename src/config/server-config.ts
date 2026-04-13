@@ -189,21 +189,6 @@ export function getConfig(): IServerConfig {
         schema: process.env.POSTGRES_SCHEMA,
         maxPoolSize: process.env.POSTGRES_MAX_POOL_SIZE ? parseInt(process.env.POSTGRES_MAX_POOL_SIZE, 10) : undefined,
       },
-      tasksCore: {
-        enabled: parseBooleanEnv(process.env.CARE_REMINDERS_ENABLED, false),
-        apiEnabled: parseBooleanEnv(process.env.CARE_REMINDERS_API_ENABLED, true),
-        workerEnabled: parseBooleanEnv(process.env.CARE_REMINDERS_WORKER_ENABLED, true),
-        fhirEnabled: parseBooleanEnv(process.env.CARE_REMINDERS_FHIR_ENABLED, true),
-        csvEnabled: parseBooleanEnv(process.env.CARE_REMINDERS_CSV_ENABLED, true),
-        defaultChannels: (process.env.CARE_REMINDERS_DEFAULT_CHANNELS || '')
-          .split(',')
-          .map((value) => value.trim())
-          .filter(Boolean),
-        autoCloseMinutes: process.env.CARE_REMINDERS_AUTO_CLOSE_MINUTES
-          ? parseInt(process.env.CARE_REMINDERS_AUTO_CLOSE_MINUTES, 10)
-          : 120,
-        confirmationRequiredDefault: parseBooleanEnv(process.env.CARE_REMINDERS_CONFIRMATION_REQUIRED_DEFAULT, true),
-      },
       gcsBucketName: process.env.GCS_BUCKET_NAME,
       kekSecret: process.env.KEK_SECRET,
       host: {

@@ -6,7 +6,6 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- 2026-04-11 11:35: Integrated the external package `tasks-core-node-ts` as a sibling workspace dependency, added env-based feature flags for care reminders, mounted the module bootstrap in the server, and added gateway integration coverage for `/tasks-core/_status`.
 - 2026-04-12 21:41: Documented claims-first Subject profile contract in the integration guide for `individual/org.hl7.fhir.api/Subject/_batch`, including optional `@context`/`@type`, One Health claim keys, `Subject.id` immutability, and auditable `Subject.organization` updates.
 - 2026-04-12 21:44: Added OpenAPI documentation for Subject profile endpoints (`individual/org.hl7.fhir.api/Subject/_batch` and `_batch-response`) and added the `8.1 Subject Profile` tag group in Swagger.
 - 2026-04-12 21:46: Persisted Subject OpenAPI changes at source level (`src/routes/api.ts`, `swagger.config.cjs`) and regenerated `swagger-spec.json` to include `8.1 Subject Profile` and `Subject/_batch` polling contract.
