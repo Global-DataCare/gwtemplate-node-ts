@@ -3,7 +3,7 @@
 
 import { testClaimsOfferEntityExpanded, testClaimsOfferFamilyExpanded } from './offer.data';
 import { testClaimsRegisterTenantExpanded } from './organization.data';
-import { testFamilyRegisterExpanded } from './family.data';
+import { testSubjectOrgRegisterExpanded, testFamilyRegisterExpanded } from './family.data';
 
 
 /**
@@ -541,27 +541,46 @@ export const EMPLOYEE_REGISTRATION_REQUEST = {
  * @see API_INTEGRATORS_GUIDE.md section 8.2
  * Initial request to register a new family organization.
  */
-export const FAMILY_REGISTRATION_REQUEST = {
-  "jti": "family-registration-request-<test-id>",
-  "thid": "family-registration-thread-<test-id>",
-  "iss": "adult1@example.com",
+/**
+ * Subject Organization registration request (e.g. family, animal group, organization as legal representative).
+ * Generic payload for registering an Organization with an owner/representative and a subject.
+ *
+ * The structure supports:
+ * - Families: person is representative of another person (e.g., parent → child)
+ * - Animal groups: person/organization is responsible party for animals (e.g., sanctuary, colony)
+ * - Organizations as representatives: organization acts as legal representative (e.g., municipality as guardian)
+ *
+ * All use the same Offer/Order flow; the semantics vary by role:
+ * - Person.hasOccupation = "RESPRSN" → responsible party/tutor
+ * - Person.hasOccupation = "GUARD" → legal guardian
+ * - Person.hasOccupation = "ONESELF" → auto-representative
+ * - Person.hasOccupation = "PARENT" / "CHILD" → personal relationships
+ *
+ * @see API_INTEGRATORS_GUIDE.md section 8.2
+ */
+export const SUBJECTORG_REGISTRATION_REQUEST = {
+  "jti": "subjectorg-registration-request-<test-id>",
+  "thid": "subjectorg-registration-thread-<test-id>",
+  "iss": "alice@example.com",
   "aud": "did:web:api.acme.org",
   "type": "application/api+json",
   "body": {
     "data": [{
-      "type": "Family-registration-form-v1.0",
+      "type": "SubjectOrg-registration-form-v1.0",
       "meta": {
         "claims": {
           "@context": "org.schema",
           "@type": "template",
-          ...testFamilyRegisterExpanded,
-          "org.schema.Service.termsOfService": pdfEmbeddedData,
+          ...testSubjectOrgRegisterExpanded,
         }
       }
     }]
   },
   "meta": { ...metaRequestBodyFullJWK }
 };
+
+/** Backwards compatibility alias for existing tests */
+export const FAMILY_REGISTRATION_REQUEST = SUBJECTORG_REGISTRATION_REQUEST;
 
 /**
  * @see API_INTEGRATORS_GUIDE.md section 8.2.1
@@ -587,7 +606,6 @@ export const FAMILY_ORDER_REQUEST = {
   },
   "meta": { ...metaRequestBodyOnlyKidHeader }
 };
-
 
 // --- Other Payloads (Retained for existing tests) ---
 

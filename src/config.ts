@@ -49,6 +49,16 @@ export interface IServerConfig {
     schema?: string;
     maxPoolSize?: number;
   };
+  tasksCore?: {
+    enabled: boolean;
+    apiEnabled: boolean;
+    workerEnabled: boolean;
+    fhirEnabled: boolean;
+    csvEnabled: boolean;
+    defaultChannels: string[];
+    autoCloseMinutes: number;
+    confirmationRequiredDefault: boolean;
+  };
   gcsBucketName?: string;
   kekSecret?: string;
   host: {

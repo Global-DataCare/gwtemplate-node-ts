@@ -1245,6 +1245,65 @@ export function createApiRouter(
    *     responses:
    *       '202': { description: Pending. Retry later. }
    *       '200': { description: Completed. }
+  *
+  * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/_batch:
+  *   post:
+  *     tags:
+  *       - 8.1 Subject Profile
+  *     summary: Create or update Subject profile (claims-first)
+  *     description: |
+  *       Creates or updates One Health Subject profiles using contextualized flat claims (`@context: org.hl7.fhir.api`).
+  *
+  *       Contract notes:
+  *       - Endpoint may autofill `@context` and `@type` if omitted.
+  *       - `@type` (when provided) can be `Person`, `Animal`, or `Thing`.
+  *       - `Subject.id` is immutable once created.
+  *       - `Subject.organization` (`did:web` of Individual Organization) can be updated and must be auditable.
+  *     parameters:
+  *       - $ref: '#/components/parameters/AppId'
+  *       - $ref: '#/components/parameters/AppVersion'
+  *       - $ref: "#/components/parameters/TenantId"
+  *       - $ref: "#/components/parameters/Jurisdiction"
+  *       - $ref: "#/components/parameters/Sector"
+  *     requestBody:
+  *       required: true
+  *       content:
+  *         application/didcomm-plaintext+json:
+  *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+  *         application/json:
+  *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+  *         application/x-www-form-urlencoded:
+  *           schema: { $ref: '#/components/schemas/SecureRequest' }
+  *     security:
+  *       - BearerAuth: []
+  *     responses:
+  *       '202': { description: Accepted. Poll the Location URL for the result. }
+  *
+  * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/_batch-response:
+  *   post:
+  *     tags:
+  *       - 8.1 Subject Profile
+  *     summary: Poll the Subject profile operation result
+  *     parameters:
+  *       - $ref: '#/components/parameters/AppId'
+  *       - $ref: '#/components/parameters/AppVersion'
+  *       - $ref: "#/components/parameters/TenantId"
+  *       - $ref: "#/components/parameters/Jurisdiction"
+  *       - $ref: "#/components/parameters/Sector"
+  *     requestBody:
+  *       required: true
+  *       content:
+  *         application/json:
+  *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+  *           examples:
+  *             message: { $ref: '#/components/examples/TenantOrderPollRequest' }
+  *         application/x-www-form-urlencoded:
+  *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+  *           examples:
+  *             message: { $ref: '#/components/examples/TenantOrderPollRequest' }
+  *     responses:
+  *       '202': { description: Pending. Retry later. }
+  *       '200': { description: Completed. }
    * 
    * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch:
    *   post:

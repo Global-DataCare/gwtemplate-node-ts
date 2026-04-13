@@ -84,6 +84,7 @@ import { CredentialLedgerAdapterFabric } from './adapters/CredentialLedgerAdapte
 import { createAuthorityRouter } from './routes/authority';
 import { loadAuthorityArtifacts } from './utils/authority-artifacts';
 import { generatePkiChainFromEnv } from './utils/pki-chain';
+import { bootstrapTasksCoreModule } from 'tasks-core-node-ts';
 import {
   IReplayProtectionStore,
   ReplayProtectionStoreMem,
@@ -428,6 +429,11 @@ async function startServer(options?: StartServerOptions) {
   app.use('/', fhirRouter);
   app.use('/webhooks', webhooksRouter);
   app.use('/auth', authRouter);
+
+  bootstrapTasksCoreModule({
+    app,
+    config: config.tasksCore,
+  });
 
   // --- Global Error Handling Middleware (MUST be the LAST middleware) ---
   app.use(createGlobalErrorHandler(logger));
