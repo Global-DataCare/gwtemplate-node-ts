@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- 2026-04-12 22:11: Reverted unintended `tasks-core-node-ts` integration commit from GW `main` while preserving Subject profile/OpenAPI and webhook updates included in releases 1.3.1/1.3.2.
 - 2026-04-11 12:10: Fixed Stripe webhook endpoint mounting so the public route is `/webhooks/stripe` (previously double-prefixed as `/webhooks/webhooks/stripe`), and added integration coverage for route resolution.
 
 ## [1.3.0] - 2026-04-11
