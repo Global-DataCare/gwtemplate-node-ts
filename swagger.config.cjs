@@ -68,6 +68,10 @@ const swaggerDefinition = {
       description: 'Step 9: update the Unified Health Index (FHIR Composition).',
     },
     {
+      name: '8.1 Subject Profile',
+      description: 'Create/update One Health subject profiles (claims-first) for Person, Animal, or Thing.',
+    },
+    {
       name: '8.4 Personal Observations',
       description: 'Collect self-reported, non-clinical observations for emergency/care continuity.',
     },
@@ -129,7 +133,7 @@ const swaggerDefinition = {
     },
     {
       name: '8. Personal Data',
-      tags: ['8.4 Personal Observations'],
+      tags: ['8.1 Subject Profile', '8.4 Personal Observations'],
     },
     {
       name: '9. Research Data',

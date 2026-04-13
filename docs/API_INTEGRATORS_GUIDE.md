@@ -1588,6 +1588,40 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.sc
 
 The server responds with a `202 Accepted` and a `Location` header pointing to the polling endpoint. The response, once ready, will contain an `Offer` that must be confirmed.
 
+#### Subject Profile (Claims-First, One Health)
+
+For One Health subject profiles (human or animal), use the claims-first Subject endpoint:
+
+- `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/_batch`
+
+Claims contract notes:
+
+- Use `Subject.<param>` keys and `-` inside parameter names (for example `Subject.address-country`).
+- `@context` and `@type` are optional in requests; the endpoint can fill them if omitted.
+- If provided, `@type` can be `Person`, `Animal`, or `Thing`.
+
+Mutability rules:
+
+- `Subject.id` is immutable once the subject exists.
+- `Subject.organization` (public `did:web` of the Individual Organization) can be updated.
+- Every `Subject.organization` change must be audited with timestamp, actor, and reason.
+
+Current v1 claim set:
+
+- `Subject.id`
+- `Subject.organization`
+- `Subject.address-country`
+- `Subject.address-postalcode`
+- `Subject.animal-breeds`
+- `Subject.animal-species`
+- `Subject.animal-genderstatus`
+- `Subject.gender`
+- `Subject.birthsex`
+- `Subject.birthyear`
+- `Subject.deathdate`
+- `Subject.maincolor`
+- `Subject.status`
+
 #### 8.2.1. Step 6a: Confirm the Family Order
 
 To complete the registration, the individual must accept the `Offer` by submitting an `Order`, identical to the flow in Step 2. This confirms the terms and leads to the payment step.
