@@ -32,7 +32,7 @@ export function createWebhooksRouter(queueAdapter: QueueAdapter): express.Router
 
   // CRITICAL: Use `express.raw` to get the raw request body. Stripe's signature verification
   // fails if the body is parsed as JSON beforehand by `express.json()`.
-  router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
 
     let event: stripe.Stripe.Event;
