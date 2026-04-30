@@ -213,7 +213,7 @@ This pattern demonstrates a secure, robust, and user-friendly way to handle heal
 
 ---
 
-## Developer Guide: Testing with cURL (Legacy Mode)
+## Developer Guide: Testing with cURL (Reference Flow)
 
 This section provides `cURL` commands for developers and integrators to test the FHIR Communication endpoint directly in a local development environment.
 

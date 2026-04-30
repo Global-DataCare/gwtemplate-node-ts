@@ -28,6 +28,26 @@ export class BlockchainAdapterMem implements IBlockchainAdapter {
     return results;
   }
 
+  public async registerCidVersionMappings(
+    mappings: Array<{
+      cid: string;
+      versionId: string;
+      resourceType?: string;
+      resourceId?: string;
+      fullUrl?: string;
+    }>,
+    channel: string,
+    chaincode: string,
+  ): Promise<{ accepted: number; txId?: string }> {
+    // This memory adapter acknowledges all mappings without persistent blockchain effects.
+    // Production adapters can write these mappings on-chain.
+    await new Promise(resolve => setTimeout(resolve, 10));
+    return {
+      accepted: mappings.length,
+      txId: `mem-tx-${Date.now()}`,
+    };
+  }
+
   // Helper method for tests to populate the ledger
   public addMapping(hash: string, did: string) {
     this.ledger.set(hash, did);

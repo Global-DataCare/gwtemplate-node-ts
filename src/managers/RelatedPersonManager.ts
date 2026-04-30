@@ -18,6 +18,8 @@ import {
   normalizeFhirIngestionFormat,
   validateFhirPayloadByVersion,
 } from '../utils/fhir-ingestion';
+import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
+import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -40,7 +42,10 @@ type FhirBundleLike = {
  * - Payload is a DIDComm message whose body is a FHIR Bundle with `entry[]` and `meta.claims` using `@context: org.hl7.fhir.api`.
  */
 export class RelatedPersonManager implements IJobProcessor {
-  constructor(private readonly vaultRepository: IVaultRepository) {}
+  constructor(
+    private readonly vaultRepository: IVaultRepository,
+    private readonly blockchainAdapter?: IBlockchainAdapter,
+  ) {}
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const thid = job.content?.thid as string | undefined;
@@ -68,6 +73,7 @@ export class RelatedPersonManager implements IJobProcessor {
       [];
 
     const responseEntries: any[] = [];
+    const cidMappings: FhirCidVersionMapping[] = [];
 
     for (const entry of entries) {
       const rawClaims = entry?.meta?.claims;
@@ -93,7 +99,14 @@ export class RelatedPersonManager implements IJobProcessor {
         const identifierClaim =
           getClaimValue<string>(claims, 'RelatedPerson.identifier') ||
           getClaimValue<string>(claims, 'RelatedPerson.identifier.value');
-        const id = determineResourceId(identifierClaim, process.env.NODE_ENV);
+        const fallbackId = determineResourceId(identifierClaim, process.env.NODE_ENV);
+        const versioning = applyFhirCidVersioningToEntry({
+          entry,
+          claims,
+          resourceType: 'RelatedPerson',
+          resourceId: fallbackId,
+        });
+        const id = String(entry?.resource?.id || fallbackId);
 
         const sectionId = getSubjectScopedSectionId(subject, scope, 'related-persons');
         const record: Record<string, any> = { id, ...claims };
@@ -102,6 +115,7 @@ export class RelatedPersonManager implements IJobProcessor {
           record.tag = researchTags;
         }
         await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
+        if (versioning.mapping) cidMappings.push(versioning.mapping);
 
         const responseAction = `${normalizedAction}-response`;
         responseEntries.push({
@@ -128,6 +142,13 @@ export class RelatedPersonManager implements IJobProcessor {
         });
       }
     }
+
+    await registerFhirCidMappings({
+      blockchainAdapter: this.blockchainAdapter,
+      sector: job.sector,
+      jurisdiction,
+      mappings: cidMappings,
+    });
 
     return {
       jti: randomUUID(),

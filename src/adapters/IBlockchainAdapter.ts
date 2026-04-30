@@ -17,4 +17,22 @@ export interface IBlockchainAdapter {
    *          is either the found 'did:web' string or undefined if not found.
    */
   discoverDidsByHashes(hashes: string[], channel: string, chaincode: string): Promise<(string | undefined)[]>;
+
+  /**
+   * Optional write path for registering content-addressed FHIR version identifiers.
+   * `resource.id` remains UUID; `versionId` can carry a CID/multihash for traceability.
+   *
+   * Implementations can persist these mappings on-chain for audit/discovery.
+   */
+  registerCidVersionMappings?(
+    mappings: Array<{
+      cid: string;
+      versionId: string;
+      resourceType?: string;
+      resourceId?: string;
+      fullUrl?: string;
+    }>,
+    channel: string,
+    chaincode: string,
+  ): Promise<{ accepted: number; txId?: string }>;
 }

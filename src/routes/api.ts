@@ -55,6 +55,28 @@ function parseIncomingContentType(contentType: string): ParsedContentType {
   return 'unsupported';
 }
 
+function normalizeDidcommBodyForFhirFormat<T extends { body?: any } | undefined>(
+  content: T,
+  format: string | undefined,
+): T {
+  if (!content) return content;
+  const normalizedFormat = String(format || '').toLowerCase();
+  if (!normalizedFormat.includes('fhir')) return content;
+
+  const body = (content as any).body;
+  if (!body || typeof body !== 'object') return content;
+  if (Array.isArray(body.data)) return content;
+  if (!Array.isArray(body.entry)) return content;
+
+  return {
+    ...(content as any),
+    body: {
+      ...body,
+      data: body.entry,
+    },
+  } as T;
+}
+
 function isContentTypeAllowedBySecurityPolicy(contentType: ParsedContentType): boolean {
   const securityMode = resolveSecurityModeFromEnv();
   if (contentType === 'secure-form') return true;
@@ -88,6 +110,68 @@ function getRequestBaseUrl(req: express.Request, fallback: string): string {
   const protocol = forwardedProtocol || (socketEncrypted ? 'https' : 'http');
   const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
   return host ? `${protocol}://${host}` : fallback;
+}
+
+type RouteParams = {
+  tenantId: string;
+  jurisdiction: string;
+  sector: string;
+  section: string;
+  format: string;
+  resourceType: string;
+  action?: string;
+  actionResponse?: string;
+};
+
+/**
+ * Backward/forward compatibility adapter:
+ * - New SDK identity pattern:
+ *   /host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/{action}
+ * - Current GW runtime pattern:
+ *   /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/{openid|firebase}/{Token|Device|License}/{action}
+ */
+function normalizeUnifiedIdentityAuthRouteParams(raw: RouteParams): RouteParams {
+  const format = String(raw.format || '').toLowerCase();
+  const resourceType = String(raw.resourceType || '').toLowerCase();
+  if (format !== 'identity' || resourceType !== 'auth') {
+    return raw;
+  }
+
+  const actionRaw = String(raw.action || raw.actionResponse || '');
+  const actionBase = actionRaw.endsWith('-response')
+    ? actionRaw.slice(0, -('-response'.length))
+    : actionRaw;
+  const mappedTenantId = String(raw.section || '').trim();
+  if (!mappedTenantId) return raw;
+
+  let mappedFormat: string | undefined;
+  let mappedResourceType: string | undefined;
+
+  if (actionBase === '_dcr') {
+    mappedFormat = 'openid';
+    mappedResourceType = 'Device';
+  } else if (actionBase === '_code' || actionBase === '_token' || actionBase === '_exchange') {
+    mappedFormat = 'openid';
+    mappedResourceType = 'Token';
+  } else if (actionBase === '_issue') {
+    mappedFormat = 'openid';
+    mappedResourceType = 'License';
+  } else if (actionBase === '_custom') {
+    mappedFormat = 'firebase';
+    mappedResourceType = 'Token';
+  }
+
+  if (!mappedFormat || !mappedResourceType) {
+    return raw;
+  }
+
+  return {
+    ...raw,
+    tenantId: mappedTenantId,
+    section: 'identity',
+    format: mappedFormat,
+    resourceType: mappedResourceType,
+  };
 }
 
 /**
@@ -438,7 +522,9 @@ export function createApiRouter(
    *       Expected semantics:
    *       - the controller submits ICA-derived proof, for example through a `vp_token`
    *       - the host validates the ICA proof and activates the tenant backend/connector
-   *       - employee licensing and later device onboarding remain separate steps
+   *       - activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`
+   *         (include that claim in `meta.claims` to size requested seats)
+   *         so clients can continue with order/payment and licensing without a separate `_batch` submit
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1764,6 +1850,8 @@ export function createApiRouter(
    */
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
   router.post(`${cdsRoutePrefix}/:action`, async (req, res) => {
+    const normalizedParams = normalizeUnifiedIdentityAuthRouteParams(req.params as unknown as RouteParams);
+    req.params = { ...req.params, ...normalizedParams };
     const { tenantId, section, resourceType, sector, action } = req.params;
     const contentTypeHeader = String(req.headers['content-type'] || '');
     const contentType = normalizeContentType(contentTypeHeader);
@@ -1899,9 +1987,14 @@ export function createApiRouter(
         }
         
         // Path parameters are authoritative for routing and must override any values embedded in the payload.
+        const normalizedSecureContent = normalizeDidcommBodyForFhirFormat(
+          decodedJob.content as any,
+          req.params.format,
+        );
         jobRequest = {
           ...decodedJob,
           ...req.params,
+          content: normalizedSecureContent,
           contentType: contentType,
         };
 
@@ -1957,7 +2050,7 @@ export function createApiRouter(
           await appAuthManager.verifyInitialAccessToken(bearerToken);
         }
 
-        const legacyBody = req.body || {};
+        const legacyBody = normalizeDidcommBodyForFhirFormat(req.body || {}, req.params.format);
         const legacyMeta = legacyBody?.meta || {};
 
         jobRequest = {

@@ -148,6 +148,85 @@ For more advanced testing and scripting, the project includes a comprehensive co
 - `npm run test:unit` / `npm run test:integration` / `npm run test:e2e`: Run specific test tiers.
 - `npm run seed:dev`: Generate deterministic dev CA material (used by Fabric CA containers).
 
+## Portal Web (apptemplate) - What Must Work in GW
+
+To validate `gdc-sdk-client-ts` from `apptemplate` (web portal), keep `gwtemplate-node-ts` focused on the frontend flows (UC5 family/individual and identity paths), and run backend/chat-specific flows in `gdc-unid-node-ts`.
+
+### Cross-SDK integration index (GW + frontend + node)
+
+Use this order to avoid drift between implementations:
+
+1. GW readiness and route compatibility:
+   - [docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
+2. Frontend SDK use cases and exact calls (`gdc-sdk-client-ts`):
+   - [../gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md](../gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md)
+3. Backend Node SDK use cases and exact calls (`dataspace-client-sdk-node`):
+   - [../dataspace-client-sdk-node/docs/DEVELOPER_USE_CASES.md](../dataspace-client-sdk-node/docs/DEVELOPER_USE_CASES.md)
+
+Flow contract to keep aligned:
+
+- Client SDKs call GW only (never ICA directly).
+- UC5.6 stays decoupled in demos and production:
+  1. Consent submission (`Consent/_batch`).
+  2. SMART token request by professional app.
+- Legacy+unified identity route compatibility remains enabled in GW.
+
+Integration boundary (mandatory):
+
+- Frontend SDK and backend client SDK must call GW routes only.
+- SDKs must not call ICA directly.
+- GW is the orchestration gateway: it receives DidComm bundles, validates claims/attachments, calls ICA and any external verification services internally, and returns Offer/Order activation outcomes asynchronously.
+
+Current status (important):
+
+- `dataspace-client-sdk-node` identity helpers target unified routes:
+  - `/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/...`
+- `gwtemplate-node-ts` keeps legacy runtime routes:
+  - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/...`
+- `gwtemplate-node-ts` now accepts both patterns for identity auth (new unified + legacy) and normalizes internally.
+
+The list below reflects the canonical legacy route surface still used by portal checks/docs.
+Important compatibility rule: `/_activate` (ICA-first activation) and legacy onboarding (`Organization/_batch` -> Offer, then `Order/_batch` -> activation/payment) must both stay available. `/_activate-response` now also carries Offer claims (derived from `org.schema.Organization.numberOfEmployees`) so client flows can continue with order/payment without forcing an extra registration submit.
+Compatibility aliases are also enabled: `Organization/_verify` behaves as `Organization/_batch`, and `Organization/_verify-response` behaves as `Organization/_batch-response`.
+
+Minimum backend routes required for portal tests (current gwtemplate):
+
+1. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
+2. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
+3. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch`
+4. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response`
+5. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`
+6. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response`
+7. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch`
+8. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch-response`
+9. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange`
+10. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response`
+11. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr`
+12. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response`
+13. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token`
+14. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response`
+15. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch`
+16. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response`
+
+Recommended local preparation sequence:
+
+1. Start GW in local demo mode.
+2. Start ICA/local dependencies when needed.
+3. Bootstrap tenant/controller through Node SDK script:
+   - `cd ../dataspace-client-sdk-node`
+   - `npm run example:e2e-bootstrap-tenant` (with `VP_TOKEN` and envs)
+4. Run `apptemplate` web with the selected profile.
+
+Before opening `apptemplate`, run the 5-minute Go/No-Go checklist:
+
+- [docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
+
+Automated check command:
+
+```bash
+npm run check:portal-web-go-no-go
+```
+
 ## API Integrators Flow Runner
 
 Use this runner to validate the journey documented in `docs/API_INTEGRATORS_GUIDE.md` against the current code:
@@ -304,3 +383,17 @@ Local (minikube/k3s) is test-only and documented in:
 ## Roadmap and Briefing
 - `BRIEFING_DATASPACE_EN.md`
 - `TODO_ROADMAP.md`
+
+## Pending Compatibility TODO
+- See [SMART EHR compatibility TODO](docs/TODO_SMART_EHR_COMPAT.md).
+
+## Local Single-Tenant Bootstrap (acme)
+Run this before chat/voice E2E when you need a business tenant ready for individual organization and FHIR flows:
+
+```bash
+TENANT_ID=acme JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
+```
+
+Notes:
+- This registers/ensures tenant `acme` via host registry Offer/Order flow.
+- `host` is reserved for platform-level routes and well-known endpoints.

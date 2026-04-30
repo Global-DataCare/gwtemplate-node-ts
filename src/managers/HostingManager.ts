@@ -554,7 +554,7 @@ export class HostingManager {
 
     const { organization, person, service } = this.extractResources(claims, environment);
     const processedService = await this._handleServiceAttachment(service);
-    const processedClaims = { ...claims, ...(processedService?.meta.claims || {}) };
+    let processedClaims = { ...claims, ...(processedService?.meta.claims || {}) };
     const normalizedPublicUrl = this.normalizeTenantPublicUrl(
       activation.publicTenantUrl
       || (processedClaims[ClaimsOrganizationSchemaorg.url] as string | undefined),
@@ -572,6 +572,21 @@ export class HostingManager {
         idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
       });
     }
+    const rawEmployeeCount = Number(processedClaims[ClaimsOrganizationSchemaorg.numberOfEmployees]);
+    const employeeCount = Number.isFinite(rawEmployeeCount) && rawEmployeeCount > 0
+      ? Math.trunc(rawEmployeeCount)
+      : 1;
+    (processedClaims as any)[ClaimsOrganizationSchemaorg.numberOfEmployees] = employeeCount;
+    const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const jurisdiction = String(processedClaims[ClaimsOrganizationSchemaorg.addressCountry] || '').toLowerCase();
+    const offerClaims = generateLicenseOffer(
+      employeeCount,
+      hostDid,
+      jurisdiction,
+      requestedSector,
+      this.config.allowedPaymentMethods,
+    );
+    processedClaims = { ...processedClaims, ...offerClaims };
 
     const tenantCollectionName = generateTenantCollectionNameFromClaims(processedClaims);
     await this.vaultRepository.createNewVault({ id: tenantCollectionName });

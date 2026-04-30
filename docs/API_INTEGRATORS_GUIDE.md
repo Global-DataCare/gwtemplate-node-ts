@@ -209,7 +209,7 @@ Current implementation status (February 16, 2026):
 
 ## 4. Interaction Modes
 
-### 4.1. FHIR Legacy Mode (Insecure)
+### 4.1. Plain FHIR Mode (Insecure)
 
 This mode is available for basic interoperability testing on the test network. **It MUST NOT be used for sensitive data.**
 
@@ -1335,10 +1335,11 @@ real SMART `/authorize` request, including PKCE parameters and `vp_token`. The r
 -   **`vp_token`:** Verifiable Presentation (JWS or JSON-LD VP) validated by the Gaia-X Clearing House.
 -   **`presentation_submission`:** Presentation Exchange mapping (OpenID4VP), when available.
 -   **`acr_values`:** Requested Authentication Context Class Reference (e.g., `urn:antifraud:acr:openid4vp:employee`).
--   **`scope`:** Defines the permissions requested, following SMART v2.0 syntax (e.g., `patient/Composition.rs` or `organization/PractitionerRole.crus`).
-    - **Gateway extension (context pinning):** The token context (the target individual) is specified by a mandatory scope item `patient/Composition.<cruds>?subject=<did:web:...:individual:<id>>`.
+-   **`scope`:** Defines the permissions requested, following SMART v2.0 syntax (e.g., `organization/Composition.rs` or `org.schema/Person.cruds`).
+    - **Namespace convention:** administration scopes use `org.schema/Organization.<cruds>` and `org.schema/Person.<cruds>`; subject/personal-organization FHIR scopes use `organization/<ResourceType>.<cruds|rs>` (optionally with `?subject=...`).
+    - **Gateway extension (context pinning):** The token context (the target individual) is specified by a mandatory scope item `organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>`.
       - **Important:** `sub` (JWT/OpenID) and `subject` (FHIR-style context parameter in this gateway extension) are different concepts and must not be confused.
-      - A token MUST be single-patient: all scope items in the request MUST refer to the same `subject`.
+      - A token MUST be single-subject: all scope items in the request MUST refer to the same `subject`.
 
 The connector is responsible for issuing the access token. Before doing so, it verifies that the requesting entity (`iss`) has the appropriate permissions to perform the operations requested in the `scope` on the subject (`sub`). This verification includes checking against stored consent rules. The resulting signed `access_token` can then be presented to other members of the data space as proof of authorization. For maximum security, the receiving system can further verify the consent rules on the blockchain before granting access.
 
@@ -1384,7 +1385,7 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/identity/openid/s
     "expires_in": 300,
     "token_type": "Bearer",
     "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
-    "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier> patient/Consent.cruds"
+    "scope": "organization/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier> organization/Consent.cruds"
   },
   "meta": {
     "jwe": {
@@ -1427,9 +1428,9 @@ Note that delete operations are generally not permitted for resources like emplo
 
 ### 8.1. Step 5: Create an Employee Role
 
-An employee is represented by a `Practitioner` resource, and their roles within the organization are defined by one or more `PractitionerRole` resources.
+Employee management in this flow is handled in the org.schema plane as `org.schema.Person` claims (for example `org.schema.Person.hasOccupation`), not through FHIR `PractitionerRole` resources.
 
-This action is typically performed by an administrator (e.g., the legal representative from the previous steps) using an `access_token` with the required scope (`organization/PractitionerRole.crus`). The `iss` of the request is the administrator's registered device `client_id`, and the `Authorization` header contains the `access_token` they obtained.
+This action is typically performed by an administrator (e.g., the legal representative from the previous steps) using an `access_token` with the required scope (`org.schema/Person.cruds`). The `iss` of the request is the administrator's registered device `client_id`, and the `Authorization` header contains the `access_token` they obtained.
 
 **Endpoint:** `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch`
 
@@ -1438,7 +1439,7 @@ This action is typically performed by an administrator (e.g., the legal represen
 curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/entity/org.schema/Employee/_batch' \
 --header 'App-ID: [APP-ID]' \
 --header 'App-Version: [APP-VERSION]' \
-# The Bearer token is a SMART access_token with 'organization/PractitionerRole.crus' scope.
+# The Bearer token is a SMART access_token with 'org.schema/Person.cruds' scope.
 --header 'Authorization: Bearer [SMART_TOKEN_FOR_ADMIN]' \
 --header 'Content-Type: application/didcomm-plaintext+json' \
 --data '{
@@ -2340,7 +2341,7 @@ In this example, a practitioner from `hospital.example.com`, having been granted
 curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch' \
 --header 'App-ID: [APP-ID]' \
 --header 'App-Version: [APP-VERSION]' \
-# Token obtained by the external practitioner with scope 'patient/Composition.u?subject=<unified-health-identifier>'
+# Token obtained by the external practitioner with scope 'organization/Composition.u?subject=<unified-health-identifier>'
 --header 'Authorization: Bearer [SMART_TOKEN_FOR_COMPOSITION]' \
 --header 'Content-Type: application/didcomm-plaintext+json' \
 --data '{

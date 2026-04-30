@@ -1,4 +1,4 @@
-# Full End-to-End cURL Guide (Legacy Mode)
+# Full End-to-End cURL Guide (Reference Flow)
 
 This document provides a complete, step-by-step guide for developers and integrators to test the entire legacy workflow using `cURL`. The commands are designed to be copied and pasted directly into a terminal.
 
@@ -79,7 +79,7 @@ curl -i --location --request POST 'http://localhost:3000/acme/cds-ES/v1/health-c
 A radiologist's app requests a `launch/list` context and scopes matching the granular permissions needed.
 
 ```bash
-curl -i --location --request POST 'http://localhost:3000/oauth/authorize' \
+curl -i --location --request POST 'http://localhost:3000/acme/cds-es/v1/health-care/identity/openid/auth/authorize' \
 --header "Authorization: Bearer {RADIOLOGIST_ID_TOKEN}" \
 --header 'Content-Type: application/didcomm-plaintext+json' \
 --data-raw '{
@@ -88,7 +88,7 @@ curl -i --location --request POST 'http://localhost:3000/oauth/authorize' \
   "body": {
     "response_type": "code",
     "client_id": "radiology-app-789",
-    "scope": "launch/list user/Composition.rs user/AppointmentResponse.rs patient/Communication.c",
+    "scope": "launch/list organization/Composition.rs organization/AppointmentResponse.rs organization/Communication.c",
     "state": "state456",
     "redirect_uri": "https://radiology-app.com/callback",
     "aud": "http://localhost:3002"
@@ -99,7 +99,7 @@ curl -i --location --request POST 'http://localhost:3000/oauth/authorize' \
 
 #### 7.2. Token Exchange (`/token`)
 ```bash
-curl -i --location --request POST 'http://localhost:3000/oauth/token' \
+curl -i --location --request POST 'http://localhost:3000/acme/cds-es/v1/health-care/identity/openid/auth/token' \
 --header "Authorization: Bearer {RADIOLOGIST_ID_TOKEN}" \
 --header 'Content-Type: application/didcomm-plaintext+json' \
 --data-raw '{
@@ -119,7 +119,7 @@ curl -i --location --request POST 'http://localhost:3000/oauth/token' \
   "access_token": "mock-radiology-access-token",
   "token_type": "Bearer",
   "expires_in": 3600,
-  "scope": "launch/list user/Composition.rs user/AppointmentResponse.rs patient/Communication.c",
+  "scope": "launch/list organization/Composition.rs organization/AppointmentResponse.rs organization/Communication.c",
   "patient": "{CUSTOMER_INTERNAL_ID}",
   "fhirContext": [
     {

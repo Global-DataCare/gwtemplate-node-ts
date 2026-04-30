@@ -8,7 +8,7 @@ import { ILogger } from '../../../loggers/ILogger';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
 import { getEnvSectionId } from '../../../utils/section-env';
@@ -217,6 +217,10 @@ describe('HostingManager activation flow', () => {
     expect(entry.meta.claims['org.schema.Action.activation.networkMode']).toBe('test-network');
     expect(entry.meta.claims['org.schema.Action.activation.revocationChecked']).toBe('true');
     expect(entry.meta.claims['org.schema.Action.activation.onChainChecked']).toBe('false');
+    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain('urn:cds:es:v1:health-care:product:org.schema:Offer:');
+    expect(entry.meta.claims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(
+      testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.numberOfEmployees],
+    );
 
     const claims = job.content!.body!.data[0]!.meta!.claims;
     const tenantVaultId = tenantUtils.getTenantVaultId(

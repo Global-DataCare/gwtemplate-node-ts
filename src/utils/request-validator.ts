@@ -21,7 +21,8 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
   const normalizedSection = String(section || '').toLowerCase();
   const normalizedFormat = String(format || '').toLowerCase();
   const normalizedResourceType = String(resourceType || '').toLowerCase();
-  const normalizedAction = String(action || '');
+  const normalizedActionRaw = String(action || '');
+  const normalizedAction = normalizedActionRaw === '_verify' ? '_batch' : normalizedActionRaw;
   const normalizedSector = String(sector || '').toLowerCase();
 
   if (!normalizedSection || !normalizedFormat || !normalizedResourceType || !normalizedAction) {

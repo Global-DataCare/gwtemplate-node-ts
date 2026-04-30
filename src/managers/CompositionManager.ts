@@ -1,7 +1,7 @@
 // src/managers/CompositionManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import type { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import type { BundleEntryResponse, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
@@ -16,8 +16,11 @@ import {
   normalizeFhirIngestionFormat,
   validateFhirPayloadByVersion,
 } from '../utils/fhir-ingestion';
+import { determineResourceId } from '../utils/resource';
+import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IJobProcessor } from './registry';
+import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 
 /**
  * Stores Unified Health Index updates as Composition-style flat claims.
@@ -28,7 +31,10 @@ import type { IJobProcessor } from './registry';
  * - This is a minimal implementation to support demo/SDK flows; indexing semantics can be refined later.
  */
 export class CompositionManager implements IJobProcessor {
-  constructor(private readonly vaultRepository: IVaultRepository) {}
+  constructor(
+    private readonly vaultRepository: IVaultRepository,
+    private readonly blockchainAdapter?: IBlockchainAdapter,
+  ) {}
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const body = job.content?.body as any;
@@ -62,6 +68,7 @@ export class CompositionManager implements IJobProcessor {
       normalizedSection === 'digitaltwin' ? 'digitaltwin' : 'individual';
 
     const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
+    const cidMappings: FhirCidVersionMapping[] = [];
 
     for (const entry of entries) {
       let rawClaims: Record<string, any> | undefined;
@@ -115,9 +122,17 @@ export class CompositionManager implements IJobProcessor {
         const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
         if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
-        // Deterministic id for "one section update event".
-        const idInput = `${subject}|${section}|${author}|${date}|${type}|${entryRefs}`;
-        const id = createHash('sha3-256').update(idInput, 'utf8').digest('hex');
+        const identifierClaim =
+          getClaimValue<string>(claims, 'Composition.identifier') ||
+          getClaimValue<string>(claims, 'Composition.identifier.value');
+        const fallbackId = determineResourceId(identifierClaim, process.env.NODE_ENV);
+        const versioning = applyFhirCidVersioningToEntry({
+          entry,
+          claims,
+          resourceType: 'Composition',
+          resourceId: fallbackId,
+        });
+        const id = String(entry?.resource?.id || fallbackId);
 
         const record: RecordBase & { meta?: { tag?: any[] }; tag?: any[] } = {
           id,
@@ -130,6 +145,7 @@ export class CompositionManager implements IJobProcessor {
 
         const sectionId = getSubjectScopedSectionId(subject, scope, 'composition');
         await this.vaultRepository.put(tenantVaultId, [record], sectionId);
+        if (versioning.mapping) cidMappings.push(versioning.mapping);
 
         responseEntries.push({
           type: 'Composition',
@@ -150,6 +166,13 @@ export class CompositionManager implements IJobProcessor {
         } as any);
       }
     }
+
+    await registerFhirCidMappings({
+      blockchainAdapter: this.blockchainAdapter,
+      sector: job.sector,
+      jurisdiction,
+      mappings: cidMappings,
+    });
 
     const responseBundle: BundleJsonApi = {
       resourceType: 'Bundle',

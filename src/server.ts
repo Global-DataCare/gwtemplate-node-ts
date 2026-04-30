@@ -284,8 +284,8 @@ async function startServer(options?: StartServerOptions) {
     config,
   );
 
-  const compositionManager = new CompositionManager(vaultRepository);
-  const documentReferenceManager = new DocumentReferenceManager(vaultRepository);
+  const compositionManager = new CompositionManager(vaultRepository, blockchainAdapter);
+  const documentReferenceManager = new DocumentReferenceManager(vaultRepository, blockchainAdapter);
   const communicationManager = new CommunicationManager({ tenantsCacheManager: tenantManager });
   const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService);
   const licenseManager = new LicenseManager(vaultRepository, kmsService);
@@ -304,9 +304,9 @@ async function startServer(options?: StartServerOptions) {
   const tokenManager = new TokenManager(kmsService, tenantManager);
   const identityTokenManager = new IdentityTokenManager(appAuthManager, tokenManager);
   const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository, clearingHouseService);
-  const observationManager = new ObservationManager(vaultRepository);
-  const relatedPersonManager = new RelatedPersonManager(vaultRepository);
-  const consentManager = new ConsentManager({ vaultRepository });
+  const observationManager = new ObservationManager(vaultRepository, blockchainAdapter);
+  const relatedPersonManager = new RelatedPersonManager(vaultRepository, blockchainAdapter);
+  const consentManager = new ConsentManager({ vaultRepository, blockchainAdapter });
 
   const discoveryService = new DiscoveryService(tenantManager);
 

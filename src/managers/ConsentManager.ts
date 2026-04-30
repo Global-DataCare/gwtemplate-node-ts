@@ -19,9 +19,13 @@ import {
   validateFhirPayloadByVersion,
 } from '../utils/fhir-ingestion';
 import { IJobProcessor } from './registry';
+import { determineResourceId } from '../utils/resource';
+import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
+import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 
 export interface ConsentManagerDeps {
   vaultRepository: IVaultRepository;
+  blockchainAdapter?: IBlockchainAdapter;
 }
 
 const requiredClaims = [
@@ -38,9 +42,11 @@ const requiredClaims = [
 
 export class ConsentManager implements IJobProcessor {
   private readonly vaultRepository: IVaultRepository;
+  private readonly blockchainAdapter?: IBlockchainAdapter;
 
   constructor(deps: ConsentManagerDeps) {
     this.vaultRepository = deps.vaultRepository;
+    this.blockchainAdapter = deps.blockchainAdapter;
   }
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
@@ -64,6 +70,7 @@ export class ConsentManager implements IJobProcessor {
       (bundle && Array.isArray((bundle as any).data) && (bundle as any).data) ||
       (body && Array.isArray(body.entry) && body.entry) ||
       [];
+    const cidMappings: FhirCidVersionMapping[] = [];
 
     for (const entry of entries) {
         const rawClaims =
@@ -81,6 +88,16 @@ export class ConsentManager implements IJobProcessor {
             //   prepend `${@context}.` and sort keys alphabetically (canonical form).
             const claims = normalizeContextualizedClaims(rawClaims) as Record<string, any>;
             const researchTags = extractLedgerSafeResearchTags(entry);
+            const identifierClaim =
+              getClaimValue<string>(claims, 'Consent.identifier') ||
+              getClaimValue<string>(claims, 'Consent.identifier.value');
+            const fallbackId = determineResourceId(identifierClaim, process.env.NODE_ENV);
+            const versioning = applyFhirCidVersioningToEntry({
+              entry,
+              claims,
+              resourceType: 'Consent',
+              resourceId: fallbackId,
+            });
 
             // Backward/forward compatibility:
             // - Support `Consent.actor-reference` as an alias of `Consent.actor-identifier`.
@@ -165,6 +182,7 @@ export class ConsentManager implements IJobProcessor {
             }
 
             await this.vaultRepository.put(tenantVaultId, [consentRule], individualRulesSectionId);
+            if (versioning.mapping) cidMappings.push(versioning.mapping);
 
             const responseAction = `${normalizedAction}-response`;
             responseEntries.push({
@@ -189,6 +207,13 @@ export class ConsentManager implements IJobProcessor {
             });
         }
     }
+
+    await registerFhirCidMappings({
+      blockchainAdapter: this.blockchainAdapter,
+      sector: job.sector as string,
+      jurisdiction,
+      mappings: cidMappings,
+    });
 
     const responseBundle: BundleJsonApi = {
       resourceType: 'Bundle',

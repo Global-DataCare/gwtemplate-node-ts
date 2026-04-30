@@ -1,0 +1,58 @@
+# TODO: SMART EHR Compatibility (patient scope alias)
+
+Status: pending
+Owner: TBD
+Priority: medium
+
+## Goal
+Support EHR integrations that request SMART scopes using `patient/*` without custom `?subject=...`, while preserving the current gateway profile based on subject-pinned scopes.
+
+## Current state (today)
+- Gateway profile expects subject pinning through scope query parameter (`?subject=...`).
+- Current token flow uses actor identity in `sub` and subject context extracted from scope.
+- This differs from SMART App Launch standard patient context behavior.
+
+## Target behavior
+1. Keep current gateway profile (`organization/*?subject=...`) for existing clients.
+2. Add compatibility profile for SMART EHR (`patient/*`) without requiring query `subject`.
+3. Resolve patient context via SMART launch context (authorize -> token `patient` context), not via custom query-only requirement.
+4. Keep single-subject enforcement per token request.
+
+## Proposed switch
+- Environment flag (default enabled compatibility):
+  - `DISABLE_PATIENT_SCOPE_ALIAS=false` (default)
+  - `DISABLE_PATIENT_SCOPE_ALIAS=true` disables alias compatibility
+
+## Implementation TODO
+1. Scope parser
+- Accept `patient/*` root scopes when alias compatibility is enabled.
+- Normalize internally to canonical authorization checks.
+
+2. Subject/patient context resolution
+- Priority order:
+  1) launch context patient id (SMART standard)
+  2) explicit `?subject=...` (gateway profile)
+- Reject when no resolvable subject context exists.
+
+3. Token payload contract
+- Include/propagate patient context field consistent with SMART expectations.
+- Preserve actor identity semantics already used by gateway.
+
+4. Policy checks
+- Ensure consent/rule lookup uses resolved subject context.
+- Enforce single-subject invariant.
+
+5. Documentation
+- Add compatibility matrix:
+  - SMART standard mode (launch/patient context)
+  - Gateway mode (scope subject pinning)
+- Clarify required fields per mode.
+
+6. Tests
+- Unit tests: scope parsing + subject resolution matrix.
+- Integration tests: EHR-style `patient/*` and gateway-style `organization/*?subject=...`.
+- Negative tests: missing subject context, mixed-subject scopes.
+
+## Out of scope (for this TODO)
+- Full redesign of authorization model.
+- Breaking changes in existing gateway clients.

@@ -1,3 +1,9 @@
+## 1.3.4 - 2026-04-30
+
+### Changed
+- Synced fork with UNID baseline changes while keeping UHC Task module out of scope for the original template project.
+- Included sector/business routing consistency, docs updates, and alignment utilities/tests from upstream evolution scope excluding tasks module behavior.
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
