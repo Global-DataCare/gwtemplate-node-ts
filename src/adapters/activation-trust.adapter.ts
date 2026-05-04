@@ -53,13 +53,10 @@ function assertActivationCredentialConsistency(params: {
   primaryDid?: string;
   organizationCredential?: any;
   representativeCredential?: any;
-}): { organizationDid: string; representativeDid: string } {
+}): { organizationDid: string; representativeDid?: string } {
   const { primaryDid, organizationCredential, representativeCredential } = params;
   if (!organizationCredential) {
     throw new ManagerError('Missing ICA-issued organization credential.', IssueType.Required);
-  }
-  if (!representativeCredential) {
-    throw new ManagerError('Missing ICA-issued representative credential.', IssueType.Required);
   }
 
   const organizationDidFromCredential = extractDidFromCredential(organizationCredential);
@@ -70,8 +67,10 @@ function assertActivationCredentialConsistency(params: {
     throw new ManagerError('Submitted organization DID does not match ICA-issued organization credential DID.', IssueType.Conflict);
   }
 
-  const representativeDidFromCredential = extractDidFromCredential(representativeCredential);
-  if (!representativeDidFromCredential) {
+  const representativeDidFromCredential = representativeCredential
+    ? extractDidFromCredential(representativeCredential)
+    : undefined;
+  if (representativeCredential && !representativeDidFromCredential) {
     throw new ManagerError('ICA-issued representative credential is missing credentialSubject.id did:web.', IssueType.Required);
   }
 

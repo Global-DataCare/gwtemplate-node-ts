@@ -276,6 +276,36 @@ describe('HostingManager activation flow', () => {
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('vp_token');
   });
 
+  it('should resolve OrganizationCredential from vp_token verifiableCredential array', async () => {
+    const job = buildActivationJob();
+    delete (job.content!.body as any).organizationCredential;
+    delete (job.content!.body as any).representativeCredential;
+    (job.content!.body as any).vp_token = JSON.stringify({
+      '@context': ['https://www.w3.org/2018/credentials/v1'],
+      type: ['VerifiablePresentation'],
+      verifiableCredential: [
+        {
+          id: 'urn:uuid:vc-member-002',
+          type: ['VerifiableCredential', 'OrganizationCredential'],
+          issuer: 'did:web:localhost%3A3310',
+          credentialSubject: {
+            id: 'did:web:api.acme.org',
+            '@type': 'Organization',
+            legalName: 'Acme Health SL',
+            taxID: 'VATES-A12345678',
+          },
+        },
+      ],
+    });
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
+    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain('urn:cds:es:v1:health-care:product:org.schema:Offer:');
+  });
+
   it('should poll ICA DID creation when remote endpoint responds 202', async () => {
     mockConfig.ica = {
       mode: 'external',

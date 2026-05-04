@@ -131,6 +131,34 @@ export class HostingManager {
       : undefined;
   }
 
+  private parseVpTokenPayload(vpToken: unknown): Record<string, any> | undefined {
+    if (!vpToken) return undefined;
+    if (typeof vpToken === 'object') return vpToken as Record<string, any>;
+    if (typeof vpToken !== 'string') return undefined;
+    const raw = vpToken.trim();
+    if (!raw.startsWith('{')) return undefined;
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed as Record<string, any> : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private extractCredentialFromVp(vpPayload: Record<string, any> | undefined, acceptedTypes: string[]): any {
+    if (!vpPayload) return undefined;
+    const vp = (vpPayload?.vp && typeof vpPayload.vp === 'object' ? vpPayload.vp : vpPayload) as Record<string, any>;
+    const vcsRaw = vp?.verifiableCredential;
+    const vcs = Array.isArray(vcsRaw) ? vcsRaw : (vcsRaw ? [vcsRaw] : []);
+    for (const vc of vcs) {
+      if (!vc || typeof vc !== 'object') continue;
+      const vcTypesRaw = (vc as any).type;
+      const vcTypes = Array.isArray(vcTypesRaw) ? vcTypesRaw.map(String) : [String(vcTypesRaw || '')];
+      if (acceptedTypes.some((t) => vcTypes.includes(t))) return vc;
+    }
+    return undefined;
+  }
+
   private normalizeTenantPublicUrl(urlOrDomain?: string): string | undefined {
     if (!urlOrDomain || typeof urlOrDomain !== 'string') {
       return undefined;
@@ -147,6 +175,16 @@ export class HostingManager {
   private extractActivationMaterial(entry: BundleEntry, body: any) {
     const entryMeta = (entry?.meta || {}) as Record<string, any>;
     const entryResource = (entry?.resource || {}) as Record<string, any>;
+    const vpToken = body?.vp_token || entryMeta?.vp_token || entryResource?.vp_token;
+    const vpPayload = this.parseVpTokenPayload(vpToken);
+    const orgCredentialFromVp = this.extractCredentialFromVp(
+      vpPayload,
+      ['OrganizationCredential', 'LegalOrganizationCredential'],
+    );
+    const repCredentialFromVp = this.extractCredentialFromVp(
+      vpPayload,
+      ['LegalRepresentativeCredential', 'PersonCredential'],
+    );
     const primaryDid =
       entryResource?.didDocument?.id
       || entryResource?.organizationDid
@@ -154,7 +192,8 @@ export class HostingManager {
       || entryMeta?.organizationDid
       || entryMeta?.organization_did
       || this.extractDidFromCredential(
-        body?.organizationCredential
+        orgCredentialFromVp
+        || body?.organizationCredential
         || body?.organization_credential
         || entryMeta?.organizationCredential
         || entryMeta?.organization_credential
@@ -163,20 +202,22 @@ export class HostingManager {
       );
 
     return {
-      vpToken: body?.vp_token || entryMeta?.vp_token || entryResource?.vp_token,
+      vpToken,
       presentationSubmission:
         body?.presentation_submission
         || entryMeta?.presentation_submission
         || entryResource?.presentation_submission,
       organizationCredential:
-        body?.organizationCredential
+        orgCredentialFromVp
+        || body?.organizationCredential
         || body?.organization_credential
         || entryMeta?.organizationCredential
         || entryMeta?.organization_credential
         || entryResource?.organizationCredential
         || entryResource?.organization_credential,
       representativeCredential:
-        body?.representativeCredential
+        repCredentialFromVp
+        || body?.representativeCredential
         || body?.representative_credential
         || body?.legalRepresentativeCredential
         || entryMeta?.representativeCredential

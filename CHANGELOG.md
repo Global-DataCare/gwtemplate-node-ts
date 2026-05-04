@@ -1,3 +1,13 @@
+## 1.3.5 - 2026-05-04
+
+### Changed
+- Activation trust now accepts organization credential resolved from `vp_token` (Verifiable Presentation) without requiring representative credential as mandatory input.
+- Hosting activation parsing now resolves `OrganizationCredential` / `LegalOrganizationCredential` (and optional representative credential) from `vp_token.verifiableCredential[]`.
+
+### Tests
+- Added unit coverage for VP-based organization credential extraction in hosting activation flow.
+- Updated activation trust adapter tests to validate activation without representative credential.
+
 ## 1.3.4 - 2026-04-30
 
 ### Changed

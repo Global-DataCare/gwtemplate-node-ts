@@ -47,7 +47,7 @@ describe('DefaultActivationTrustAdapter', () => {
     });
   });
 
-  it('requires representative credential for activation consistency', async () => {
+  it('allows activation without representative credential', async () => {
     const clearingHouseService: IClearingHouseService = {
       verifyVpToken: jest.fn(async () => ({
         acr: 'urn:test:acr',
@@ -64,10 +64,13 @@ describe('DefaultActivationTrustAdapter', () => {
     };
     const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
 
-    await expect(adapter.evaluate({
+    const result = await adapter.evaluate({
       networkMode: 'network',
       vpToken: 'vp-token-001',
       organizationCredential: buildCredential('did:web:org.example'),
-    })).rejects.toThrow(/representative credential/i);
+    });
+
+    expect(result.organizationDid).toBe('did:web:org.example');
+    expect(result.representativeDid).toBeUndefined();
   });
 });
