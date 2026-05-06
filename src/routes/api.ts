@@ -100,6 +100,20 @@ function allowsInsecureBearerBySecurityMode(): boolean {
     && parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
 }
 
+function isHostOrganizationActivateRoute(
+  tenantId: string,
+  section: string,
+  format: string,
+  resourceType: string,
+  action: string,
+): boolean {
+  return tenantId === 'host'
+    && section === 'registry'
+    && String(format || '').toLowerCase() === 'org.schema'
+    && String(resourceType || '').toLowerCase() === 'organization'
+    && action === '_activate';
+}
+
 function getRequestBaseUrl(req: express.Request, fallback: string): string {
   const forwardedProto = req.headers['x-forwarded-proto'];
   const forwardedHost = req.headers['x-forwarded-host'];
@@ -193,6 +207,17 @@ export function createApiRouter(
   replayProtectionStore: IReplayProtectionStore = new ReplayProtectionStoreNoop(),
 ): express.Router {
   const router = express.Router();
+
+  const resolveVaultId = async (tenantId: string, sector: string): Promise<string> => {
+    if (tenantId === 'host') return 'host';
+    const directVaultId = getTenantVaultId(sector, tenantId);
+    const directTenant = await tenantsCacheManager.getTenant(directVaultId);
+    if (directTenant) return directVaultId;
+
+    const canonicalVaultId = await tenantsCacheManager.findTenantVaultIdByIdentifierValue(tenantId);
+    if (canonicalVaultId) return canonicalVaultId;
+    return directVaultId;
+  };
 
   const getReplayTtlSeconds = (payload: any): number => {
     const nowSeconds = Math.floor(Date.now() / 1000);
@@ -384,7 +409,7 @@ export function createApiRouter(
     }
 
     const { tenantId, sector } = req.params;
-    const vaultId = tenantId === 'host' ? 'host' : getTenantVaultId(sector, tenantId);
+    const vaultId = await resolveVaultId(tenantId, sector);
     const tenantConfig = await tenantsCacheManager.getTenant(vaultId);
     if (!tenantConfig?.claims || !tenantConfig?.didDocument) {
       return res.status(404).type('text').send('Not Found');
@@ -1943,7 +1968,7 @@ export function createApiRouter(
 
           // 1. Determine the tenant vault from the request path (authoritative).
           // Some legacy hosted DIDs do not encode `cds-XX/v1/{sector}` segments, so parsing the DID is not reliable.
-          const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
+          const vaultId = await resolveVaultId(tenantId, sector);
           try {
             const vaultIdFromDid = getTenantVaultIdFromIss(senderDid);
             if (vaultIdFromDid !== vaultId) {
@@ -2039,13 +2064,24 @@ export function createApiRouter(
       ) {
         // LEGACY / PLAINTEXT FLOW (demo/dev convenience)
         const authToken = req.headers.authorization;
+        const allowNoBearerForActivate = isHostOrganizationActivateRoute(
+          tenantId,
+          section,
+          req.params.format,
+          resourceType,
+          action,
+        );
         const enforceBearerValidation = !allowsInsecureBearerBySecurityMode();
         // The 'ping' endpoint is a public health check and does not require authentication for legacy requests.
-        if (section !== 'ping' && (!authToken || !authToken.startsWith('Bearer '))) {
+        if (
+          section !== 'ping'
+          && !allowNoBearerForActivate
+          && (!authToken || !authToken.startsWith('Bearer '))
+        ) {
           return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
         }
 
-        if (section !== 'ping' && enforceBearerValidation) {
+        if (section !== 'ping' && !allowNoBearerForActivate && enforceBearerValidation) {
           if (!appAuthManager) {
             return sendDidcommEarlyError(
               req,
@@ -2152,7 +2188,7 @@ export function createApiRouter(
       );
     }
     
-    const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
+    const vaultId = await resolveVaultId(tenantId, sector);
     const tenantServices = await tenantsCacheManager.getDidServiceConfig(vaultId);
 
     if (!isRequestValid(tenantServices, { ...req.params, action })) {

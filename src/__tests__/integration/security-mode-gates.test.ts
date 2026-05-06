@@ -133,5 +133,24 @@ describe('SECURITY_MODE content-type gates', () => {
 
     expect(response.status).toBe(400);
   });
-});
 
+  it('allows host organization _activate without bearer in demo mode', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'demo',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'true',
+      FHIR_LEGACY: 'false',
+      DIDCOMM_PLAIN: 'true',
+    };
+
+    const app = buildTestApp();
+    const response = await request(app)
+      .post('/host/cds-es/v1/test/registry/org.schema/Organization/_activate')
+      .set('Content-Type', 'application/json')
+      .send({});
+
+    // If bearer were still mandatory here, we'd get 401.
+    expect(response.status).toBe(400);
+  });
+});
