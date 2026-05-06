@@ -31,6 +31,15 @@ import { getEnvSectionId } from '../utils/section-env';
 
 const EMPLOYEE_SECTION = getEnvSectionId('employees');
 const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
+function isMandatoryLicenseCreatingMembersEnabled(): boolean {
+  return String(process.env.MANDATORY_LICENSE_CREATING_MEMBERS || '').toLowerCase() === 'true';
+}
+
+type LicenseGateState = {
+  enabled: boolean;
+  poolConfigured: boolean;
+  availableSeats: number;
+};
 
 export class EmployeeManager {
   private vaultRepository: IVaultRepository;
@@ -71,6 +80,8 @@ export class EmployeeManager {
       throw new ManagerError('Job is missing cryptographic metadata.', IssueType.Invalid);
     }
 
+    const licenseGateState = await this.buildLicenseGateState(vaultId);
+
     for (const entry of entries) {
       try {
         // Pass the fetched URN and the job metadata down to the entry processor.
@@ -83,6 +94,7 @@ export class EmployeeManager {
           environment,
           job.sector,
           job.jurisdiction,
+          licenseGateState,
         );
         responseEntries.push(resultEntry);
       } catch (error: any) {
@@ -119,6 +131,7 @@ export class EmployeeManager {
     environment?: string,
     sector?: string,
     jurisdiction?: string,
+    licenseGateState?: LicenseGateState,
   ): Promise<BundleEntry> {
     const requestEntry = entry as BundleEntryRequest;
     const { request, meta: entryMeta, type } = requestEntry;
@@ -136,7 +149,7 @@ export class EmployeeManager {
 
     switch (request.method) {
       case 'POST':
-        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction);
+        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction, licenseGateState);
       case 'DELETE':
         return this.disableEmployee(vaultId, employeeId, type);
       default:
@@ -154,6 +167,7 @@ export class EmployeeManager {
     contentType?: string,
     sector?: string,
     jurisdiction?: string,
+    licenseGateState?: LicenseGateState,
   ): Promise<BundleEntry> {
     let signerJwk: PublicJwk | undefined;
     let encrypterJwk: PublicJwk | undefined;
@@ -175,6 +189,7 @@ export class EmployeeManager {
       employeeId,
       sector: sector || 'health-care',
       jurisdiction: jurisdiction || 'us',
+      licenseGateState,
     });
     if (licenseOffer) return licenseOffer;
 
@@ -315,7 +330,44 @@ export class EmployeeManager {
     employeeId: string;
     sector: string;
     jurisdiction: string;
+    licenseGateState?: LicenseGateState;
   }): Promise<BundleEntry | undefined> {
+    const state = params.licenseGateState;
+    if (state?.enabled) {
+      if (!state.poolConfigured) {
+        throw new ManagerError('Employee license pool is not configured.', IssueType.Conflict);
+      }
+      if (state.availableSeats <= 0) {
+        throw new ManagerError('No available employee licenses.', IssueType.Conflict);
+      }
+      state.availableSeats -= 1;
+      const nowSec = Math.floor(Date.now() / 1000);
+      const licenseDocs =
+        (await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+          params.vaultId,
+          DEVICE_LICENSE_SECTION,
+        )) || [];
+      const availableDoc = licenseDocs.find(
+        (doc) => (doc.content as DeviceLicense | undefined)?.userClass === 'employee'
+          && (doc.content as DeviceLicense).status === 'available',
+      );
+      if (!availableDoc) {
+        throw new ManagerError('No available employee licenses.', IssueType.Conflict);
+      }
+      const updatedLicense: DeviceLicense = {
+        ...(availableDoc.content as DeviceLicense),
+        status: 'issued',
+        subjectId: params.employeeId,
+        issuedAt: nowSec,
+      };
+      await this.vaultRepository.put(
+        params.vaultId,
+        [{ ...availableDoc, content: updatedLicense }],
+        DEVICE_LICENSE_SECTION,
+      );
+      return undefined;
+    }
+
     const licenseDocs =
       (await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
         params.vaultId,
@@ -361,6 +413,28 @@ export class EmployeeManager {
       DEVICE_LICENSE_SECTION,
     );
     return undefined;
+  }
+
+  private async buildLicenseGateState(vaultId: string): Promise<LicenseGateState> {
+    if (!isMandatoryLicenseCreatingMembersEnabled()) {
+      return { enabled: false, poolConfigured: false, availableSeats: 0 };
+    }
+    const licenseDocs =
+      (await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+        vaultId,
+        DEVICE_LICENSE_SECTION,
+      )) || [];
+    const employeeLicenseDocs = licenseDocs.filter(
+      (doc) => (doc.content as DeviceLicense | undefined)?.userClass === 'employee',
+    );
+    const availableSeats = employeeLicenseDocs.filter(
+      (doc) => (doc.content as DeviceLicense).status === 'available',
+    ).length;
+    return {
+      enabled: true,
+      poolConfigured: employeeLicenseDocs.length > 0,
+      availableSeats,
+    };
   }
 
   private async disableEmployee(vaultId: string, employeeId: string, entryType: string): Promise<BundleEntry> {

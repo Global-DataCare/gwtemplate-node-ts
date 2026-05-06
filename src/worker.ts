@@ -40,6 +40,7 @@ export class Worker {
       if (!job.tenantId || !job.sector) {
         throw new Error('Job is missing required tenantId or sector.');
       }
+      this.normalizeClaimsPlacement(jobName, job);
 
       const { resourceType } = jobInfo;
       let manager: IJobProcessor | undefined;
@@ -78,6 +79,9 @@ export class Worker {
           break;
         case 'Observation':
           manager = this.managers.observationManager;
+          break;
+        case 'MedicationStatement':
+          manager = this.managers.medicationStatementManager;
           break;
         case 'RelatedPerson':
           manager = this.managers.relatedPersonManager;
@@ -184,6 +188,57 @@ export class Worker {
         // In the legacy flow, we can't be sure who to encrypt for in an error case,
         // so we must return a plaintext JSON string. The polling handler MUST handle this.
         return JSON.stringify(errorResponse);
+      }
+    }
+  }
+
+  /**
+   * Transitional compatibility layer for claims placement.
+   *
+   * Canonical contract:
+   * - Batch endpoints: `entry.resource.meta.claims`
+   *
+   * During migration we accept both shapes and normalize to BOTH locations
+   * so existing managers/tests continue working:
+   * - `entry.resource.meta.claims`
+   * - `entry.meta.claims`
+   */
+  private normalizeClaimsPlacement(jobName: string, job: JobRequest): void {
+    const body: any = job.content?.body;
+    if (!body || typeof body !== 'object') return;
+
+    const candidates: any[] = [];
+    if (Array.isArray(body.data)) candidates.push(...body.data);
+    if (Array.isArray(body.entry)) candidates.push(...body.entry);
+    if (candidates.length === 0) return;
+
+    for (const item of candidates) {
+      if (!item || typeof item !== 'object') continue;
+
+      const resourceType = String(item?.resource?.resourceType || item?.type || 'unknown');
+      const entryClaims = item?.meta?.claims;
+      const resourceClaims = item?.resource?.meta?.claims;
+      const hasEntryClaims = !!entryClaims && typeof entryClaims === 'object';
+      const hasResourceClaims = !!resourceClaims && typeof resourceClaims === 'object';
+
+      if (!hasEntryClaims && !hasResourceClaims) continue;
+
+      // Canonical source is resource.meta.claims.
+      if (hasEntryClaims && !hasResourceClaims) {
+        if (!item.resource || typeof item.resource !== 'object') item.resource = {};
+        if (!item.resource.meta || typeof item.resource.meta !== 'object') item.resource.meta = {};
+        item.resource.meta.claims = { ...entryClaims };
+        console.warn(
+          `[Worker] Deprecated claims placement detected for '${resourceType}' in '${jobName}'. ` +
+          `Use resource.meta.claims (canonical). entry.meta.claims is accepted temporarily for compatibility.`
+        );
+      }
+
+      // Compatibility mirror for managers that still read entry.meta.claims.
+      const canonicalClaims = item?.resource?.meta?.claims;
+      if (canonicalClaims && typeof canonicalClaims === 'object' && !hasEntryClaims) {
+        if (!item.meta || typeof item.meta !== 'object') item.meta = {};
+        item.meta.claims = { ...canonicalClaims };
       }
     }
   }

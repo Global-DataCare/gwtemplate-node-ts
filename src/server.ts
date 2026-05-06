@@ -68,6 +68,7 @@ import { OpenIdAuthManager } from './managers/OpenIdAuthManager';
 import { ClearingHouseService } from './services/ClearingHouseService';
 import { IdentityTokenManager } from './managers/IdentityTokenManager';
 import { ObservationManager } from './managers/ObservationManager';
+import { MedicationStatementManager } from './managers/MedicationStatementManager';
 import { RelatedPersonManager } from './managers/RelatedPersonManager';
 import { ConsentManager } from './managers/ConsentManager';
 import { createApiDocsSetupOptions } from './managers/ApiDocsManager';
@@ -305,6 +306,7 @@ async function startServer(options?: StartServerOptions) {
   const identityTokenManager = new IdentityTokenManager(appAuthManager, tokenManager);
   const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository, clearingHouseService);
   const observationManager = new ObservationManager(vaultRepository, blockchainAdapter);
+  const medicationStatementManager = new MedicationStatementManager(vaultRepository);
   const relatedPersonManager = new RelatedPersonManager(vaultRepository, blockchainAdapter);
   const consentManager = new ConsentManager({ vaultRepository, blockchainAdapter });
 
@@ -341,6 +343,7 @@ async function startServer(options?: StartServerOptions) {
     messagingManager,
     identityTokenManager,
     observationManager,
+    medicationStatementManager,
     relatedPersonManager,
     familyManager,
     employeeManager,

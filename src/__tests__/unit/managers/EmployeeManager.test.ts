@@ -39,6 +39,7 @@ describe('EmployeeManager', () => {
   const TENANT_SECTOR = 'health-care';
   const TENANT_VAULT_ID = `${TENANT_SECTOR}_${TENANT_ALTERNATE_NAME}`;
   const TENANT_URN = `urn:antifraud:soschain-test:us:v1:${TENANT_SECTOR}:entity:tax:123456789`;
+  const ORIGINAL_MANDATORY = process.env.MANDATORY_LICENSE_CREATING_MEMBERS;
 
   beforeEach(() => {
     mockVaultRepository = mock<IVaultRepository>();
@@ -64,6 +65,11 @@ describe('EmployeeManager', () => {
         unique: attr.unique,
       }));
     });
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_MANDATORY === undefined) delete process.env.MANDATORY_LICENSE_CREATING_MEMBERS;
+    else process.env.MANDATORY_LICENSE_CREATING_MEMBERS = ORIGINAL_MANDATORY;
   });
 
   describe('Employee Creation (POST)', () => {
@@ -180,6 +186,60 @@ describe('EmployeeManager', () => {
       expect(consumeCall[2]).toBe(getEnvSectionId('device-licenses'));
 
       expect(response.body.data[0].response.status).toBe('201');
+    });
+
+    it('should create until seats are exhausted then return 409 OperationOutcome for remaining entries in mandatory mode', async () => {
+      process.env.MANDATORY_LICENSE_CREATING_MEMBERS = 'true';
+      const base = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      const first = structuredClone(base.content!.body!.data![0]) as any;
+      const second = structuredClone(base.content!.body!.data![0]) as any;
+      const third = structuredClone(base.content!.body!.data![0]) as any;
+      first.meta.claims[ClaimsPersonSchemaorg.identifier] = 'member-1@example.com';
+      first.meta.claims[ClaimsPersonSchemaorg.email] = 'member-1@example.com';
+      second.meta.claims[ClaimsPersonSchemaorg.identifier] = 'member-2@example.com';
+      second.meta.claims[ClaimsPersonSchemaorg.email] = 'member-2@example.com';
+      third.meta.claims[ClaimsPersonSchemaorg.identifier] = 'member-3@example.com';
+      third.meta.claims[ClaimsPersonSchemaorg.email] = 'member-3@example.com';
+      const job = {
+        ...base,
+        content: {
+          ...base.content!,
+          body: { ...base.content!.body!, data: [first, second, third] },
+        },
+      } as JobRequest;
+
+      mockVaultRepository.put.mockResolvedValue(true);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockTenantsCacheManager.getEntityClaims.mockResolvedValue({});
+
+      const availableLicenseA: DeviceLicense = {
+        id: 'lic-a',
+        tenantId: TENANT_ALTERNATE_NAME,
+        orderId: 'order-1',
+        userClass: 'employee',
+        userCategory: 'default',
+        type: 'mobile',
+        status: 'available',
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      };
+      const availableLicenseB: DeviceLicense = { ...availableLicenseA, id: 'lic-b' };
+
+      mockVaultRepository.getContainersInSection.mockResolvedValue([
+        { id: availableLicenseA.id, sequence: 0, content: availableLicenseA } as unknown as ConfidentialStorageDoc,
+        { id: availableLicenseB.id, sequence: 0, content: availableLicenseB } as unknown as ConfidentialStorageDoc,
+      ]);
+
+      const response = await employeeManager.process(job);
+      const entries = response.body.data as any[];
+      expect(entries).toHaveLength(3);
+      expect(entries[0].response.status).toBe('201');
+      expect(entries[1].response.status).toBe('201');
+      expect(entries[2].response.status).toBe('409');
+      expect(entries[2].response.outcome?.resourceType).toBe('OperationOutcome');
+      expect(entries[2].response.outcome?.issue?.[0]?.code).toBe('conflict');
     });
   });
 

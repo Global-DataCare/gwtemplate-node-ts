@@ -100,6 +100,20 @@ function allowsInsecureBearerBySecurityMode(): boolean {
     && parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
 }
 
+function isHostOrganizationActivateRoute(
+  tenantId: string,
+  section: string,
+  format: string,
+  resourceType: string,
+  action: string,
+): boolean {
+  return tenantId === 'host'
+    && section === 'registry'
+    && String(format || '').toLowerCase() === 'org.schema'
+    && String(resourceType || '').toLowerCase() === 'organization'
+    && action === '_activate';
+}
+
 function getRequestBaseUrl(req: express.Request, fallback: string): string {
   const forwardedProto = req.headers['x-forwarded-proto'];
   const forwardedHost = req.headers['x-forwarded-host'];
@@ -125,9 +139,9 @@ type RouteParams = {
 
 /**
  * Backward/forward compatibility adapter:
- * - New SDK identity pattern:
+ * - Canonical SDK identity pattern (preferred for new integrations):
  *   /host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/{action}
- * - Current GW runtime pattern:
+ * - Legacy runtime-compatible pattern (temporary alias during migration):
  *   /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/{openid|firebase}/{Token|Device|License}/{action}
  */
 function normalizeUnifiedIdentityAuthRouteParams(raw: RouteParams): RouteParams {
@@ -193,6 +207,17 @@ export function createApiRouter(
   replayProtectionStore: IReplayProtectionStore = new ReplayProtectionStoreNoop(),
 ): express.Router {
   const router = express.Router();
+
+  const resolveVaultId = async (tenantId: string, sector: string): Promise<string> => {
+    if (tenantId === 'host') return 'host';
+    const directVaultId = getTenantVaultId(sector, tenantId);
+    const directTenant = await tenantsCacheManager.getTenant(directVaultId);
+    if (directTenant) return directVaultId;
+
+    const canonicalVaultId = await tenantsCacheManager.findTenantVaultIdByIdentifierValue(tenantId);
+    if (canonicalVaultId) return canonicalVaultId;
+    return directVaultId;
+  };
 
   const getReplayTtlSeconds = (payload: any): number => {
     const nowSeconds = Math.floor(Date.now() / 1000);
@@ -384,7 +409,7 @@ export function createApiRouter(
     }
 
     const { tenantId, sector } = req.params;
-    const vaultId = tenantId === 'host' ? 'host' : getTenantVaultId(sector, tenantId);
+    const vaultId = await resolveVaultId(tenantId, sector);
     const tenantConfig = await tenantsCacheManager.getTenant(vaultId);
     if (!tenantConfig?.claims || !tenantConfig?.didDocument) {
       return res.status(404).type('text').send('Not Found');
@@ -525,6 +550,9 @@ export function createApiRouter(
    *       - activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`
    *         (include that claim in `meta.claims` to size requested seats)
    *         so clients can continue with order/payment and licensing without a separate `_batch` submit
+   *       - next mandatory step is `Order/_batch` with `Order.acceptedOffer.identifier` from activation result
+   *       - after Order, the controller uses activation code (`org.schema.IndividualProduct.serialNumber`)
+   *         to run `Token/_exchange` + `Device/_dcr` before creating additional employees
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -569,6 +597,9 @@ export function createApiRouter(
    *     description: |
    *       Submits an asynchronous job to create a new professional (employee) within an existing tenant.
    *       The `tenantId` in the path specifies the organization under which the employee is being created.
+   *       Prerequisite: controller device/client must already be active (`Token/_exchange` + `Device/_dcr`).
+   *       Creating an employee profile does not automatically activate employee devices.
+   *       For additional employees/devices, use `License/_issue` and then run `_exchange` + `_dcr`.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -700,6 +731,10 @@ export function createApiRouter(
    *       - 2.1.2 Initial Access Token Exchange
    *     summary: Exchange activation code for initial_access_token (async)
    *     description: |
+   *       Canonical route for new integrations is:
+   *       `/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_exchange`.
+   *       This `identity/openid` route is maintained as a temporary compatibility alias.
+   *
    *       Submits an async job that exchanges:
    *       - Authorization Bearer token: Firebase `id_token` (JWT format), and
    *       - request body `subject_token`: single-use activation code (opaque string, not JWT).
@@ -742,6 +777,10 @@ export function createApiRouter(
    *       - 2.1.4 License Issuance (Invite)
    *     summary: Issue (reserve) an activation code from the tenant license pool (async)
    *     description: |
+   *       Canonical route for new integrations is:
+   *       `/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_issue`.
+   *       This `identity/openid` route is maintained as a temporary compatibility alias.
+   *
    *       Tenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role
    *       and returns a single-use activation code for subsequent `Token/_exchange`.
    *       User licenses can issue multiple activation codes for different device profiles (mobile/web).
@@ -1399,8 +1438,10 @@ export function createApiRouter(
    *     description: |
    *       Step 2 of onboarding. Submits an Order that accepts a prior Offer from Step 1 (tenant registration).
    *       The Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the
-   *       Offer returned by the Organization registration _batch-response.
-   *       The final polled result typically contains a payment/checkout URL.
+   *       Offer returned by the Organization activation `_activate-response`.
+   *       This step is always required (including `0` amount offers).
+   *       The final polled result typically contains payment/checkout claims and the first controller
+   *       activation code (`org.schema.IndividualProduct.serialNumber`).
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1711,6 +1752,10 @@ export function createApiRouter(
    *       - 2.1.3 Device Registration (DCR)
    *     summary: Register device keys (OpenID DCR)
    *     description: |
+   *       Canonical route for new integrations is:
+   *       `/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_dcr`.
+   *       This `identity/openid` route is maintained as a temporary compatibility alias.
+   *
    *       Registers a device/client using OpenID Dynamic Client Registration. Requires an initial_access_token from Token/_exchange.
    *       Request is usually a secure (form-encoded JWE) DIDComm message; demo plaintext is also accepted.
    *     parameters:
@@ -1853,6 +1898,20 @@ export function createApiRouter(
     const normalizedParams = normalizeUnifiedIdentityAuthRouteParams(req.params as unknown as RouteParams);
     req.params = { ...req.params, ...normalizedParams };
     const { tenantId, section, resourceType, sector, action } = req.params;
+    const format = String(req.params.format || '').toLowerCase();
+    const normalizedResourceType = String(resourceType || '').toLowerCase();
+    const normalizedAction = String(action || '').trim();
+    const isLegacyHostOrganizationSubmit = tenantId === 'host'
+      && section === 'registry'
+      && format === 'org.schema'
+      && normalizedResourceType === 'organization'
+      && (normalizedAction === '_batch' || normalizedAction === '_verify');
+    if (isLegacyHostOrganizationSubmit) {
+      console.warn(
+        '[API] Legacy host onboarding endpoint used (Organization/_batch or alias _verify). '
+        + 'Prefer Organization/_activate for ICA-first onboarding.',
+      );
+    }
     const contentTypeHeader = String(req.headers['content-type'] || '');
     const contentType = normalizeContentType(contentTypeHeader);
     const parsedContentType = parseIncomingContentType(contentType);
@@ -1909,7 +1968,7 @@ export function createApiRouter(
 
           // 1. Determine the tenant vault from the request path (authoritative).
           // Some legacy hosted DIDs do not encode `cds-XX/v1/{sector}` segments, so parsing the DID is not reliable.
-          const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
+          const vaultId = await resolveVaultId(tenantId, sector);
           try {
             const vaultIdFromDid = getTenantVaultIdFromIss(senderDid);
             if (vaultIdFromDid !== vaultId) {
@@ -2005,13 +2064,24 @@ export function createApiRouter(
       ) {
         // LEGACY / PLAINTEXT FLOW (demo/dev convenience)
         const authToken = req.headers.authorization;
+        const allowNoBearerForActivate = isHostOrganizationActivateRoute(
+          tenantId,
+          section,
+          req.params.format,
+          resourceType,
+          action,
+        );
         const enforceBearerValidation = !allowsInsecureBearerBySecurityMode();
         // The 'ping' endpoint is a public health check and does not require authentication for legacy requests.
-        if (section !== 'ping' && (!authToken || !authToken.startsWith('Bearer '))) {
+        if (
+          section !== 'ping'
+          && !allowNoBearerForActivate
+          && (!authToken || !authToken.startsWith('Bearer '))
+        ) {
           return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
         }
 
-        if (section !== 'ping' && enforceBearerValidation) {
+        if (section !== 'ping' && !allowNoBearerForActivate && enforceBearerValidation) {
           if (!appAuthManager) {
             return sendDidcommEarlyError(
               req,
@@ -2118,7 +2188,7 @@ export function createApiRouter(
       );
     }
     
-    const vaultId = (tenantId === 'host') ? 'host' : getTenantVaultId(sector, tenantId);
+    const vaultId = await resolveVaultId(tenantId, sector);
     const tenantServices = await tenantsCacheManager.getDidServiceConfig(vaultId);
 
     if (!isRequestValid(tenantServices, { ...req.params, action })) {

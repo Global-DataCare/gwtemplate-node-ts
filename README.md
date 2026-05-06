@@ -150,7 +150,7 @@ For more advanced testing and scripting, the project includes a comprehensive co
 
 ## Portal Web (apptemplate) - What Must Work in GW
 
-To validate `gdc-sdk-client-ts` from `apptemplate` (web portal), keep `gwtemplate-node-ts` focused on the frontend flows (UC5 family/individual and identity paths), and run backend/chat-specific flows in `gdc-unid-node-ts`.
+To validate `gdc-sdk-client-ts` from `apptemplate` (web portal), keep `gwtemplate-node-ts` focused on the frontend flows (UC5 family/individual and identity paths).
 
 ### Cross-SDK integration index (GW + frontend + node)
 
@@ -397,3 +397,18 @@ TENANT_ID=acme JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm 
 Notes:
 - This registers/ensures tenant `acme` via host registry Offer/Order flow.
 - `host` is reserved for platform-level routes and well-known endpoints.
+
+### Compatibility Matrix: Legacy/Plaintext Support
+
+| SECURITY_MODE | FHIR_LEGACY / JSON_LEGACY | DIDCOMM_PLAIN                    | DEMO_ALLOW_INSECURE_BEARER |
+|--------------|---------------------------|-----------------------------------|----------------------------|
+| strict       | ❌                        | Only if `DIDCOMM_PLAIN=true`      | ❌                         |
+| compat       | Only if `=true`           | Only if `=true`                   | ❌                         |
+| demo         | Always allowed            | Always allowed                    | Only if `=true`            |
+
+- In `strict`, didcomm-plain is only allowed if you set `DIDCOMM_PLAIN=true`.
+- In `compat`, you can enable legacy and didcomm-plain with the corresponding variables.
+- In `demo`, all legacy and plaintext types are allowed by default.
+- In production, `SECURITY_MODE=demo` is blocked.
+
+> **Note:** If you are unsure which modes are active, check the startup log: it will show the enabled capabilities (`didcomm-encrypted`, `didcomm-plain`, etc).
