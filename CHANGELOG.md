@@ -1,8 +1,26 @@
+## 1.3.6 - 2026-05-05
+
+### Added
+- Added strict license-gating mode for employee creation with `MANDATORY_LICENSE_CREATING_MEMBERS=true`.
+- In strict mode, `Employee/_batch` now processes entries sequentially and returns per-entry `409 + OperationOutcome` when seats are exhausted, while keeping prior successful entries.
+
+### Changed
+- Kept backward compatibility when strict mode is disabled: legacy `Employee-license-offer-v1.0` behavior remains unchanged.
+- Updated controller/practitioner step-by-step docs and endpoint/path clarifications for onboarding vs runtime identity/token flows.
+
+### Tests
+- Added unit coverage for partial batch behavior under mandatory license mode (success prefix, failure suffix).
+
 ## 1.3.5 - 2026-05-04
 
 ### Changed
 - Activation trust now accepts organization credential resolved from `vp_token` (Verifiable Presentation) without requiring representative credential as mandatory input.
 - Hosting activation parsing now resolves `OrganizationCredential` / `LegalOrganizationCredential` (and optional representative credential) from `vp_token.verifiableCredential[]`.
+- Host onboarding/integration contract aligned to `/host/...` routes with `auth` security model for current gateway flows (OIDC pre-DCR and SMART post-DCR).
+- Documentation alignment clarified for cross-service namespace consistency:
+  - Gateway: `/host/...`
+  - ICA: `/ica/...`
+  - DataConv: `/publisher/...`
 
 ### Tests
 - Added unit coverage for VP-based organization credential extraction in hosting activation flow.
@@ -11,24 +29,11 @@
 ## 1.3.4 - 2026-04-30
 
 ### Changed
-- Synced fork with UNID baseline changes while keeping UHC Task module out of scope for the original template project.
-- Included sector/business routing consistency, docs updates, and alignment utilities/tests from upstream evolution scope excluding tasks module behavior.
 
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-## [UNRELEASED]
-
-### Added
-
-- 2026-04-12 21:41: Documented claims-first Subject profile contract in the integration guide for `individual/org.hl7.fhir.api/Subject/_batch`, including optional `@context`/`@type`, One Health claim keys, `Subject.id` immutability, and auditable `Subject.organization` updates.
-- 2026-04-12 21:44: Added OpenAPI documentation for Subject profile endpoints (`individual/org.hl7.fhir.api/Subject/_batch` and `_batch-response`) and added the `8.1 Subject Profile` tag group in Swagger.
-- 2026-04-12 21:46: Persisted Subject OpenAPI changes at source level (`src/routes/api.ts`, `swagger.config.cjs`) and regenerated `swagger-spec.json` to include `8.1 Subject Profile` and `Subject/_batch` polling contract.
+- Included sector/business routing consistency, docs updates, and alignment utilities/tests from upstream evolution scope.
 
 ### Fixed
 
-- 2026-04-12 22:11: Reverted unintended `tasks-core-node-ts` integration commit from GW `main` while preserving Subject profile/OpenAPI and webhook updates included in releases 1.3.1/1.3.2.
 - 2026-04-11 12:10: Fixed Stripe webhook endpoint mounting so the public route is `/webhooks/stripe` (previously double-prefixed as `/webhooks/webhooks/stripe`), and added integration coverage for route resolution.
 
 ## [1.3.0] - 2026-04-11

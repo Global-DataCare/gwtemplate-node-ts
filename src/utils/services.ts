@@ -107,8 +107,15 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'individual', format: 'org.hl7.fhir.api' },
-        ['Consent', 'Communication', 'Composition', 'DocumentReference', 'Observation', 'RelatedPerson', 'Bundle'],
+        ['Consent', 'Communication', 'Composition', 'DocumentReference', 'Observation', 'RelatedPerson', 'MedicationStatement', 'Bundle'],
         ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'individual', format: 'org.hl7.fhir.api' },
+        ['MedicationStatement'],
+        ['_search'],
       ),
     );
   }

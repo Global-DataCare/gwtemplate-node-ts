@@ -15,6 +15,7 @@ import { getClaimValue } from '../utils/claims';
 import { parseActorFromSub } from 'gdc-common-utils-ts/utils/actor';
 import { getIndividualSectionId } from '../utils/individual-sections';
 import { IClearingHouseService } from '../services/ClearingHouseService';
+import { normalizeConsentActorRole } from '../utils/consent';
 
 type TokenRequestBody = {
   scope?: string;
@@ -94,6 +95,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     // - apply deny-overrides and purpose logic.
     const actor = parseActorFromSub(sub);
     const actorRole = actor.role?.trim();
+    const normalizedActorRole = actorRole ? normalizeConsentActorRole(actorRole, 'professional') : undefined;
     const purpose = body.purpose?.trim();
 
     const jurisdiction = job.jurisdiction.toUpperCase();
@@ -103,6 +105,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     } else {
       jurisdictionActorIds.push(`urn:iso:3166:${jurisdiction}`);
       jurisdictionActorIds.push(`urn:iso:3166-2:${jurisdiction}`);
+      jurisdictionActorIds.push(`urn:iso:std:iso:3166|${jurisdiction}`);
     }
 
     const rules = await this.vaultRepository.getContainersInSection<any>(tenantVaultId, getIndividualSectionId(subject, 'rules'));
@@ -142,17 +145,17 @@ export class OpenIdAuthManager implements IJobProcessor {
 
       const ruleRole = getClaimValue<string>(rule as any, 'Consent.actor-role');
       if (ruleRole) {
-        const normalizedRuleRole = ruleRole.trim();
+        const normalizedRuleRole = normalizeConsentActorRole(ruleRole, 'professional');
         if (normalizedRuleRole === '*') {
           // Wildcard roles are only permitted for email-based rules.
           if (!isRuleEmail) return false;
-        } else if (actorRole) {
-          if (normalizedRuleRole !== actorRole) return false;
+        } else if (normalizedActorRole) {
+          if (normalizedRuleRole !== normalizedActorRole) return false;
         } else {
           // If the actor doesn't carry a role, only email rules with wildcard roles can match.
           return false;
         }
-      } else if (actorRole) {
+      } else if (normalizedActorRole) {
         // If the rule doesn't specify a role, allow only for email-based rules (role-less external actors).
         if (!isRuleEmail) return false;
       }
