@@ -7,8 +7,8 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
       const KEY_PREFIX = 'gw-api-docs:';
       const fields = [
         { key: 'testId', label: 'test id', placeholder: '01' },
-        { key: 'tenantId', label: 'tenantId', placeholder: 'acme' },
-        { key: 'taxId', label: 'tax id', placeholder: 'default: TaxNumber-<tenantId>, e.g. TaxNumber-acme' },
+        { key: 'tenantId', label: 'tenantId', placeholder: 'Organization.identifier.value (e.g. VATES-B12345678)' },
+        { key: 'taxId', label: 'tax id', placeholder: 'default: same as tenantId for legal organizations' },
         { key: 'jurisdiction', label: 'jurisdiction', placeholder: 'ES' },
         { key: 'sector', label: 'sector', placeholder: 'health-care' },
         { key: 'hostSector', label: 'network type', placeholder: 'test' },
@@ -20,7 +20,7 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
       function getValue(key) { return localStorage.getItem(KEY_PREFIX + key) || ''; }
       function setValue(key, value) { localStorage.setItem(KEY_PREFIX + key, value || ''); }
       const paramDefaults = {
-        tenantId: 'acme',
+        tenantId: 'VATES-B12345678',
         jurisdiction: 'ES',
         sector: 'health-care',
       };
@@ -169,7 +169,7 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
       }
 
       function ensureDefaultContextValues() {
-        const tenantId = getValue('tenantId') || 'acme';
+        const tenantId = getValue('tenantId') || 'VATES-B12345678';
         if (!getValue('tenantId')) {
           setValue('tenantId', tenantId);
         }
@@ -180,7 +180,7 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
           setValue('hostSector', 'test');
         }
         if (!getValue('taxId')) {
-          setValue('taxId', 'TaxNumber-' + tenantId);
+          setValue('taxId', tenantId);
         }
         if (!getValue('testId')) {
           setValue('testId', nowTestId());

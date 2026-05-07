@@ -306,6 +306,53 @@ describe('HostingManager activation flow', () => {
     expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain('urn:cds:es:v1:health-care:product:org.schema:Offer:');
   });
 
+  it('should resolve both credentials from compact JWT vp_token payload', async () => {
+    const job = buildActivationJob();
+    delete (job.content!.body as any).organizationCredential;
+    delete (job.content!.body as any).representativeCredential;
+    const vpPayload = {
+      iss: 'did:web:controller.example.com',
+      sub: 'did:web:controller.example.com',
+      vp: {
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiablePresentation'],
+        verifiableCredential: [
+          {
+            id: 'urn:uuid:vc-org-001',
+            type: ['VerifiableCredential', 'OrganizationCredential'],
+            credentialSubject: {
+              id: 'did:web:api.acme.org',
+              '@type': 'Organization',
+              taxID: 'VATES-A12345678',
+            },
+          },
+          {
+            id: 'urn:uuid:vc-rep-001',
+            type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
+            credentialSubject: {
+              id: 'did:web:controller.example.com',
+              '@type': 'Person',
+              memberOf: { '@type': 'Organization', taxID: 'VATES-A12345678' },
+            },
+          },
+        ],
+      },
+    };
+    const compactVp = [
+      Buffer.from(JSON.stringify({ alg: 'ES384', typ: 'JWT', kid: 'controller-kid' })).toString('base64url'),
+      Buffer.from(JSON.stringify(vpPayload)).toString('base64url'),
+      'signature-placeholder',
+    ].join('.');
+    (job.content!.body as any).vp_token = compactVp;
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
+    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain('urn:cds:es:v1:health-care:product:org.schema:Offer:');
+  });
+
   it('should poll ICA DID creation when remote endpoint responds 202', async () => {
     mockConfig.ica = {
       mode: 'external',

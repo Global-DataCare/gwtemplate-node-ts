@@ -1,6 +1,7 @@
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { ClearingHouseVerificationResult, IClearingHouseService } from '../services/ClearingHouseService';
+import { compactVerify, decodeProtectedHeader, importJWK, JWK } from 'jose';
 import {
   DefaultTrustRegistryAdapter,
   ITrustRegistryAdapter,
@@ -34,6 +35,35 @@ export type ActivationTrustEvaluationResult = {
 
 export interface IActivationTrustAdapter {
   evaluate(input: ActivationTrustEvaluationInput): Promise<ActivationTrustEvaluationResult>;
+}
+
+function isDemoSecurityMode(): boolean {
+  const securityMode = String(process.env.SECURITY_MODE || '').trim().toLowerCase();
+  const nodeEnv = String(process.env.NODE_ENV || '').trim().toLowerCase();
+  return securityMode === 'demo' || nodeEnv === 'demo';
+}
+
+async function verifyVpTokenProof(vpToken: string): Promise<void> {
+  const compact = String(vpToken || '').trim();
+  const parts = compact.split('.');
+  if (parts.length !== 3) {
+    throw new ManagerError('vp_token must be a compact JWT (JWS).', IssueType.Security);
+  }
+  const header = decodeProtectedHeader(compact);
+  const alg = String(header.alg || '').trim();
+  if (!alg || alg.toLowerCase() === 'none') {
+    throw new ManagerError('vp_token must be signed with a supported algorithm.', IssueType.Security);
+  }
+  const allowed = new Set(['ES256K', 'ES384', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']);
+  if (!allowed.has(alg)) {
+    throw new ManagerError(`Unsupported vp_token algorithm '${alg}'.`, IssueType.Security);
+  }
+
+  // For classical JOSE algorithms, verify immediately when JWK is embedded.
+  if ((alg === 'ES256K' || alg === 'ES384') && header.jwk && typeof header.jwk === 'object') {
+    const keyLike = await importJWK(header.jwk as JWK, alg);
+    await compactVerify(compact, keyLike);
+  }
 }
 
 function extractDidFromCredential(credential: any): string | undefined {
@@ -93,6 +123,10 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
   }
 
   async evaluate(input: ActivationTrustEvaluationInput): Promise<ActivationTrustEvaluationResult> {
+    if (!isDemoSecurityMode()) {
+      await verifyVpTokenProof(input.vpToken);
+    }
+
     const consistency = assertActivationCredentialConsistency({
       primaryDid: input.primaryDid,
       organizationCredential: input.organizationCredential,

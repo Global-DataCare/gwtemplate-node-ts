@@ -136,9 +136,22 @@ export class HostingManager {
     if (typeof vpToken === 'object') return vpToken as Record<string, any>;
     if (typeof vpToken !== 'string') return undefined;
     const raw = vpToken.trim();
-    if (!raw.startsWith('{')) return undefined;
+    if (raw.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed as Record<string, any> : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+
+    const jwtParts = raw.split('.');
+    if (jwtParts.length !== 3 || !jwtParts[1]) {
+      return undefined;
+    }
     try {
-      const parsed = JSON.parse(raw);
+      const payloadJson = Buffer.from(jwtParts[1], 'base64url').toString('utf8');
+      const parsed = JSON.parse(payloadJson);
       return parsed && typeof parsed === 'object' ? parsed as Record<string, any> : undefined;
     } catch {
       return undefined;
@@ -570,6 +583,10 @@ export class HostingManager {
 
     validateNewOrganizationClaims(claims);
     const alternateName = claims[ClaimsOrganizationSchemaorg.alternateName] as string;
+    const canonicalTenantId = String(claims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
+    if (!canonicalTenantId) {
+      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierValue}'`, IssueType.Required);
+    }
     if (!alternateName) {
       throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
     }
@@ -588,7 +605,7 @@ export class HostingManager {
       throw new ManagerError(`The requested sector '${requestedSector}' is not supported by this gateway.`, IssueType.Value);
     }
 
-    const vaultId = getTenantVaultId(requestedSector, alternateName);
+    const vaultId = getTenantVaultId(requestedSector, canonicalTenantId);
     if (await this.vaultRepository.vaultExists(vaultId)) {
       throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
     }
@@ -657,7 +674,16 @@ export class HostingManager {
     }
 
     const attributes = AllowedIndexableClaims.organizationRegistry
-      .map(claimKey => ({ name: claimKey, value: String(processedClaims[claimKey]), ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }) }))
+      .map(claimKey => ({
+        name: claimKey,
+        value: String(processedClaims[claimKey]),
+        ...(
+          claimKey === ClaimsOrganizationSchemaorg.alternateName
+          || claimKey === ClaimsOrganizationSchemaorg.identifierValue
+            ? { unique: true }
+            : {}
+        ),
+      }))
       .filter(attr => attr.value !== 'undefined' && attr.value !== 'null');
 
     const tenantRegistrationDoc: ConfidentialStorageDoc = {
@@ -880,6 +906,10 @@ export class HostingManager {
 
     const { claims: processedClaims, contained } = decryptedContent as any;
     const alternateName = processedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
+    const canonicalTenantId = String(processedClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
+    if (!canonicalTenantId) {
+      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierValue}'`, IssueType.Required);
+    }
     const sector = processedClaims[ClaimsServiceSchemaorg.category] as Sector;
     // Ensure the canonical tenant identifier URN exists for downstream managers (e.g., EmployeeManager issuer).
     const tenantUrn = createOrganizationUrn({
@@ -896,7 +926,7 @@ export class HostingManager {
     const containedService = this.extractContainedService(contained);
 
     // Finalize the registration and grant test network access.
-    const vaultId = getTenantVaultId(sector, alternateName);
+    const vaultId = getTenantVaultId(sector, canonicalTenantId);
     const tenantCollectionName = generateTenantCollectionNameFromClaims(processedClaims);
     
     // Create the physical vault and keys for the new tenant.
@@ -908,7 +938,16 @@ export class HostingManager {
 
     // Persist all artifacts
     const attributes = AllowedIndexableClaims.organizationRegistry
-      .map(claimKey => ({ name: claimKey, value: String(processedClaims[claimKey]), ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }) }))
+      .map(claimKey => ({
+        name: claimKey,
+        value: String(processedClaims[claimKey]),
+        ...(
+          claimKey === ClaimsOrganizationSchemaorg.alternateName
+          || claimKey === ClaimsOrganizationSchemaorg.identifierValue
+            ? { unique: true }
+            : {}
+        ),
+      }))
       .filter(attr => attr.value !== 'undefined' && attr.value !== 'null');
 
     const finalTenantRegistrationDoc: ConfidentialStorageDoc = {
@@ -981,7 +1020,7 @@ export class HostingManager {
 	        const licenseId = uuidv4();
 	        const license: DeviceLicense = {
 	          id: licenseId,
-	          tenantId: alternateName,
+	          tenantId: canonicalTenantId,
 	          orderId: offerIdentifier,
 	          userClass: 'employee',
 	          userCategory: 'default',
@@ -1028,7 +1067,7 @@ export class HostingManager {
     const tenantDid = finalTenantConfig.didDocument?.id || tenantUrn;
     const paymentContext = {
       offerId,
-      tenantId: alternateName,
+      tenantId: canonicalTenantId,
       tenantDid,
       senderDid: hostDid,
       email: processedClaims[ClaimsPersonSchemaorg.email] as string | undefined,
@@ -1082,9 +1121,13 @@ export class HostingManager {
     try {
       validateNewOrganizationClaims(claims);
       const alternateName = claims[ClaimsOrganizationSchemaorg.alternateName] as string;
+      const canonicalTenantId = String(claims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
 
       if (!alternateName) {
         throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
+      }
+      if (!canonicalTenantId) {
+        throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierValue}'`, IssueType.Required);
       }
 
       let validatedSector: Sector | undefined;
@@ -1108,7 +1151,7 @@ export class HostingManager {
 
         // ARCHITECTURAL NOTE: This is the ONLY place a vault existence check should occur.
         // It happens during the initial provisional request to prevent duplicate alternateNames.
-        const vaultId = getTenantVaultId(validatedSector, alternateName);
+        const vaultId = getTenantVaultId(validatedSector, canonicalTenantId);
         if (await this.vaultRepository.vaultExists(vaultId)) {
           throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
         }
@@ -1153,7 +1196,7 @@ export class HostingManager {
         processedClaims = { ...processedClaims, ...offerClaims };
 
 	        const tenantRegistrationDoc: ConfidentialStorageDoc = {
-	          id: getTenantVaultId(validatedSector!, alternateName),
+	          id: getTenantVaultId(validatedSector!, canonicalTenantId),
 	          status: EntityLifecycleStatus.Pending,
 	          sequence: 0,
 	          indexed: {
@@ -1360,7 +1403,10 @@ export class HostingManager {
   }): Promise<void> {
     const { alternateName, role, externalDomain } = params;
     const sector = Sector.SYSTEM;
-    const vaultId = getTenantVaultId(sector, alternateName);
+    const idType = this.config.host.idType || 'TAX';
+    const idValueRaw = `${this.config.host.idValue || 'UNID'}-${role.toUpperCase()}`;
+    const idValue = idValueRaw.replace(/[^a-zA-Z0-9]/g, '');
+    const vaultId = getTenantVaultId(sector, idValue);
     const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
     if (!hostCollectionName) {
       throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
@@ -1401,10 +1447,6 @@ export class HostingManager {
       didDocument.alsoKnownAs = didDocument.alsoKnownAs || [];
       didDocument.alsoKnownAs.push(`did:web:${externalDomain}`);
     }
-
-    const idType = this.config.host.idType || 'TAX';
-    const idValueRaw = `${this.config.host.idValue || 'UNID'}-${role.toUpperCase()}`;
-    const idValue = idValueRaw.replace(/[^a-zA-Z0-9]/g, '');
 
     const claims: ClaimsRecord = {
       [ClaimsOrganizationSchemaorg.legalName]: this.config.host.legalName || 'UNID',
@@ -1460,7 +1502,11 @@ export class HostingManager {
     contained: IncludedResource[],
     sector: Sector,
   ) {
-    const vaultId = getTenantVaultId(sector, altName);
+    const canonicalTenantId = String(allClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
+    if (!canonicalTenantId) {
+      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierValue}'`, IssueType.Required);
+    }
+    const vaultId = getTenantVaultId(sector, canonicalTenantId);
     const tenantCollectionName = generateTenantCollectionNameFromClaims(allClaims);
     
     // The vault is created here, during finalization. The existence check was done previously.
@@ -1471,7 +1517,16 @@ export class HostingManager {
     
     // 6. Persist all artifacts
     const attributes = AllowedIndexableClaims.organizationRegistry
-      .map(claimKey => ({ name: claimKey, value: String(allClaims[claimKey]), ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }) }))
+      .map(claimKey => ({
+        name: claimKey,
+        value: String(allClaims[claimKey]),
+        ...(
+          claimKey === ClaimsOrganizationSchemaorg.alternateName
+          || claimKey === ClaimsOrganizationSchemaorg.identifierValue
+            ? { unique: true }
+            : {}
+        ),
+      }))
       .filter(attr => attr.value !== 'undefined' && attr.value !== 'null');
 
     const tenantRegistrationDoc: ConfidentialStorageDoc = {

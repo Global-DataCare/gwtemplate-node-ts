@@ -301,11 +301,11 @@ It does **not** change backend defaults or server-side validation rules.
 
 Default values when `/api-docs` is opened:
 - `test id`: timestamp (`YYYYMMDDHHmmss`)
-- `tenantId`: `acme`
+- `tenantId`: `Organization.identifier.value` (example: `VATES-B12345678`)
 - `jurisdiction`: `ES`
 - `sector`: `health-care`
 - `network type` (host sector): `test`
-- `tax id`: `TaxNumber-<tenantId>` (example: `TaxNumber-acme`)
+- `tax id`: usually same value as `tenantId` for legal organizations
 
 What is auto-applied at request execution time:
 - Path params: `tenantId`, `jurisdiction`, `sector`
@@ -502,7 +502,7 @@ curl -X POST 'http://localhost:3000/host/cds-es/v1/test/registry/org.schema/Orga
 
 Testing note:
 - `org.schema.Organization.identifier.value` (Tax ID) participates in tenant collection naming and should be unique per organization registration.
-- For demo flows in `/api-docs`, keep it aligned with tenant context (default pattern: `TaxNumber-<tenantId>`).
+- For demo flows in `/api-docs`, keep `tenantId` aligned with `Organization.identifier.value` and `tax id` equal to it for legal organizations.
 
 **Note:** In these examples, `meta.jwe.header.kid` is the recipient’s public encryption key identifier (resolved from the target DID Document / JWKS), while `meta.jwe.header.skid` is the sender’s public encryption key identifier (so the server can encrypt the async response back). The embedded `jwk` objects above intentionally omit `kid` and `use`. The canonical thumbprint material for ML-DSA / ML-KEM should only include the key parameters (`kty`, `alg`/`crv`, `pub`/`x`) to compute a deterministic RFC 7638 thumbprint. After the backend can resolve the device keys from an existing DID Document / JWKS (e.g., after DCR), subsequent requests can omit embedded `jwk` and only send `kid` / `skid`.
 

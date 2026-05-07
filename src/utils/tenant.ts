@@ -40,19 +40,20 @@ export function generateTenantCollectionNameFromClaims(claims: ClaimsRecord): st
 }
 
   /**
- * Constructs the unique vault identifier for a tenant from its sector and alternate name.
+ * Constructs the unique vault identifier for a tenant from its sector and canonical tenant id.
  * This composite ID is used as the vault name in the repository and as the `entityId`
  * for the tenant's keys in the Key Management Service.
  *
  * @param sector The business sector of the tenant (e.g., 'health', 'insurance').
- * @param alternateName The unique alternate name of the tenant (e.g., 'acme-health-us').
- * @returns A composite string in the format `sector_alternateName`.
+ * @param tenantId Canonical tenant id. For organizations this must map to
+ * `Organization.identifier.value` (e.g., TAX/VATES id). For individual organizations use UUID.
+ * @returns A composite string in the format `sector_tenantId`.
  */
-export function getTenantVaultId(sector: string, alternateName: string): string {
-  if (!sector || !alternateName) {
-    throw new Error('Both sector and alternateName are required to create a tenant vault ID.');
+export function getTenantVaultId(sector: string, tenantId: string): string {
+  if (!sector || !tenantId) {
+    throw new Error('Both sector and tenantId are required to create a tenant vault ID.');
   }
-  return `${sector}_${alternateName}`;
+  return `${sector}_${tenantId}`;
 }
 
 

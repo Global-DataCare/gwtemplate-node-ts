@@ -1,3 +1,14 @@
+## 1.3.7 - 2026-05-06
+
+### Changed
+- Documented `_activate` trust validation contract aligned with ICA credentials:
+  - representative VC must be trusted from ICA signature chain,
+  - `org.schema.Person.memberOf.taxID` must match the organization tenant canonical identifier (`Organization.identifier.value`),
+  - `org.schema.Person.hasCredential.material` is the source of representative signing-key binding for VP signature checks.
+- Clarified authentication semantics for onboarding:
+  - `vp_token` is a proof payload inside the activation message body,
+  - HTTP `Authorization: Bearer` remains a transport/auth header concern and is not the VP itself.
+
 ## 1.3.6 - 2026-05-05
 
 ### Added

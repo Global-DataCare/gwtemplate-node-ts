@@ -187,7 +187,7 @@ const swaggerDefinition = {
         in: 'path',
         required: true,
         schema: { type: 'string', example: 'acme' },
-        description: "The unique 'alternateName' of the tenant.",
+        description: "Canonical tenant identifier (`Organization.identifier.value`). For legal organizations this is typically TAX/VATES; for individual organizations use UUID.",
       },
       Jurisdiction: {
         name: 'jurisdiction',

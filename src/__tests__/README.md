@@ -19,7 +19,7 @@ The API uses a structured, versioned, and multi-tenant path that explicitly decl
 
 `/<tenant_id>/<cds>-<jurisdiction>/<version>/<sector>/<section>/<format>/<resourceType>/<_action>`
 
-*   **`tenant_id`**: The `alternateName` of the tenant (e.g., `org1`).
+*   **`tenant_id`**: Canonical tenant identifier (`Organization.identifier.value`, e.g., `VATES-B12345678`).
 *   **`cds-jurisdiction`**: Common Data Service and jurisdiction (e.g., `cds-es`).
 *   **`version`**: API version (e.g., `v1`).
 *   **`sector`**: Industry sector (e.g., `healthcare`).
@@ -104,7 +104,7 @@ The API uses a structured, versioned, and multi-tenant path that explicitly decl
 
 `/<tenant_id>/<cds>-<jurisdiction>/<version>/<sector>/<section>/<format>/<resourceType>/<_action>`
 
-*   **`tenant_id`**: The `alternateName` of the tenant (e.g., `org1`).
+*   **`tenant_id`**: Canonical tenant identifier (`Organization.identifier.value`, e.g., `VATES-B12345678`).
 *   **`cds-jurisdiction`**: Common Data Service and jurisdiction (e.g., `cds-es`).
 *   **`version`**: API version (e.g., `v1`).
 *   **`sector`**: Industry sector (e.g., `healthcare`).

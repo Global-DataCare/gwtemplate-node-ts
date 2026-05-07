@@ -55,7 +55,7 @@ Family flows use the same Swagger helper described in `docs/API_INTEGRATORS_GUID
 Recommended for repeated tests:
 - Set `tenantId`, `sector`, and `jurisdiction` in the panel before executing Family endpoints.
 - Use a unique `test id` per run so all `jti/thid` templates become unique (`...-<test-id>`).
-- Keep `tax id` unique per registration attempt (default pattern is `TaxNumber-<tenantId>`).
+- Keep `tenantId` aligned with canonical `Organization.identifier.value`. For legal organizations, use the same value for `tax id`.
 
 ## 4. Why This Is First
 

@@ -107,6 +107,33 @@ export class TenantsCacheManager implements ITenantsManager {
   }
 
   /**
+   * Resolves the canonical tenant vault id from an organization identifier value
+   * (e.g. VAT/TAX id stored in `Organization.identifier.value`).
+   */
+  public async findTenantVaultIdByIdentifierValue(identifierValue: string): Promise<string | undefined> {
+    const target = String(identifierValue || '').trim();
+    if (!target || target.toLowerCase() === 'host') return undefined;
+
+    const tenantsSection = getEnvSectionId('tenants');
+    const records = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(this.hostCollectionName, tenantsSection);
+    for (const record of records) {
+      try {
+        const config = await this.kmsService.unprotectConfidentialData<any>(record, 'host');
+        const current = String(config?.claims?.[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
+        if (current && current === target) {
+          const collectionName = generateTenantCollectionNameFromClaims(config.claims);
+          config.collectionName = collectionName;
+          this.tenantCacheByVaultId.set(record.id, config);
+          return record.id;
+        }
+      } catch {
+        // Skip malformed tenant records.
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Returns all tenant configurations currently registered in the host tenant registry.
    * This is intended for operator-level discovery/catalog publication flows.
    */

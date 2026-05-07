@@ -11,6 +11,16 @@ function buildCredential(subjectDid: string): any {
   };
 }
 
+function buildVpCompactJwt(alg: string = 'ES384'): string {
+  const header = Buffer.from(JSON.stringify({ alg, typ: 'JWT', kid: 'controller-kid' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({
+    iss: 'did:web:controller.example.com',
+    sub: 'did:web:controller.example.com',
+    vp: { type: ['VerifiablePresentation'] },
+  })).toString('base64url');
+  return `${header}.${payload}.signature`;
+}
+
 describe('DefaultActivationTrustAdapter', () => {
   it('marks strict trust checks in test-network/network and delegates VP verification', async () => {
     const clearingHouseService: IClearingHouseService = {
@@ -31,7 +41,7 @@ describe('DefaultActivationTrustAdapter', () => {
 
     const result = await adapter.evaluate({
       networkMode: 'test-network',
-      vpToken: 'vp-token-001',
+      vpToken: buildVpCompactJwt(),
       organizationCredential: buildCredential('did:web:org.example'),
       representativeCredential: buildCredential('did:web:rep.example'),
     });
@@ -66,11 +76,37 @@ describe('DefaultActivationTrustAdapter', () => {
 
     const result = await adapter.evaluate({
       networkMode: 'network',
-      vpToken: 'vp-token-001',
+      vpToken: buildVpCompactJwt('ES256K'),
       organizationCredential: buildCredential('did:web:org.example'),
     });
 
     expect(result.organizationDid).toBe('did:web:org.example');
     expect(result.representativeDid).toBeUndefined();
+  });
+
+  it('rejects unsigned vp_token outside demo mode', async () => {
+    const prevSecurityMode = process.env.SECURITY_MODE;
+    const prevNodeEnv = process.env.NODE_ENV;
+    process.env.SECURITY_MODE = 'strict';
+    process.env.NODE_ENV = 'test';
+    const clearingHouseService: IClearingHouseService = {
+      verifyVpToken: jest.fn(async () => ({ acr: 'urn:test:acr', ledgerVerified: true })),
+    };
+    const trustRegistryAdapter: ITrustRegistryAdapter = {
+      verifyActivationTrust: jest.fn(async () => ({
+        revocationChecked: true,
+        issuerKeyStatusChecked: true,
+        subjectKeyStatusChecked: true,
+        onChainChecked: false,
+      })),
+    };
+    const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
+    await expect(adapter.evaluate({
+      networkMode: 'test',
+      vpToken: buildVpCompactJwt('none'),
+      organizationCredential: buildCredential('did:web:org.example'),
+    })).rejects.toThrow('vp_token must be signed');
+    process.env.SECURITY_MODE = prevSecurityMode;
+    process.env.NODE_ENV = prevNodeEnv;
   });
 });

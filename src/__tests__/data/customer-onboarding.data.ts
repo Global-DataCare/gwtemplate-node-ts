@@ -101,8 +101,8 @@ export const testIndividualOnboardingBatchEntries = [
 ];
 
 // TODO: middleware to translate external url request to hosted path
-// The tenantId is the simple alternateName (e.g., 'acme').
-// The tenantVaultId (e.g., 'health-care_acme') is composed later (`getTenantVaultId`).
+// The tenantId is the canonical tenant identifier (`Organization.identifier.value`).
+// The tenantVaultId (e.g., 'health-care_<tenantId>') is composed later (`getTenantVaultId`).
 export const testCreateCustomerJobRequestProfessionalOnboarding: JobRequest = {
     tenantId: `${testTenant1AlternateName}`, // "acme"
     jurisdiction: `${testTenant1AddressCountry}`, // "US"
