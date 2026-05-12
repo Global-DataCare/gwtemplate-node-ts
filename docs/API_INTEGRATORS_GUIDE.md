@@ -334,12 +334,12 @@ Troubleshooting:
 
 ## 6. Onboarding a New Organization
 
-This section details the secure workflow for onboarding a new organization. The process is evolving from the legacy host-side registration flow toward an ICA-driven activation flow. The transport profile remains based on OpenID Connect (OIDC), Dynamic Client Registration (DCR), DIDComm plaintext in non-production, and the Financial-grade API (FAPI) Security Profile in production.
+This section details the secure workflow for onboarding a new organization. The current canonical flow is ICA-driven tenant activation, followed by tenant-side individual indexing and downstream authorization flows. The transport profile remains based on OpenID Connect (OIDC), Dynamic Client Registration (DCR), DIDComm plaintext in non-production, and the Financial-grade API (FAPI) Security Profile in production.
 
-There are currently two host onboarding modes:
+There are two host onboarding modes:
 
-- Legacy: host-side organization registration via `Organization/_batch` plus `Order/_batch`.
-- ICA-driven activation: host-side organization activation via `Organization/_activate`, where the organization identity already comes from ICA-issued credentials and the host activates the tenant connector/backend from that proof.
+- Canonical current flow: host-side organization activation via `Organization/_activate`, where the organization identity already comes from ICA-issued credentials and the host activates the tenant connector/backend from that proof.
+- Legacy compatibility flow: host-side organization registration via `Organization/_batch` plus `Order/_batch`.
 
 For the ICA-driven activation target model:
 
@@ -410,8 +410,8 @@ This is the original host-managed onboarding flow. A legally authorized represen
 **Endpoint:** `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch`
 
 Legacy note:
-- This flow remains supported for backward compatibility.
-- New ICA-first onboarding should prefer `Organization/_activate` (see next section).
+- This flow remains supported for backward compatibility only.
+- New ICA-first onboarding should prefer `Organization/_activate` (see the current flow above).
 
 **Routing note:** `jurisdiction` and `sector` are part of the host routing path.  
 - `jurisdiction` is used to resolve channel/ledger routing and tenant namespace.  
@@ -912,7 +912,7 @@ The client app then exchanges `firebase_custom_token` for a Firebase `id_token` 
 
 #### 7.1.1.a Issue (Reserve) a License Activation Code (Tenant Admin / IT)
 
-`Token/_exchange` requires a **single-use license activation code** (`subject_token`). In the current implementation, licenses live in the tenant vault section `device-licenses` and are created as `available` seats after purchase (e.g., `userClass=employee` for professionals, `userClass=individual` for members of a family organization). The `Offer.serialNumber` list represents **seat IDs** (the pool), not activation codes.
+`Token/_exchange` requires a **single-use license activation code** (`subject_token`). In the current implementation, licenses live in the tenant vault section `device-licenses` and are created as `available` seats after purchase (for example, employee seats for professionals and individual seats for indexed members). The `Offer.serialNumber` list represents **seat IDs** (the pool), not activation codes.
 
 To invite a professional (or reserve a seat for a specific email + role), a tenant controller (or an IT employee with delegated permissions) issues an activation code from that pool. A single seat can issue multiple activation codes for different device profiles (e.g., mobile + web).
 
@@ -1187,7 +1187,7 @@ With a registered `client_id`, the application can now request scoped `access_to
 
 #### 7.1.3 Device Search (admin listing)
 
-Legal representatives and delegated IT roles can list registered devices for their tenant or hosted family organization.
+Legal representatives and delegated IT roles can list registered devices for their tenant or indexed individual context.
 This returns a Bundle whose entries mirror the DCR response shape (`resourceType: "Device"`, plus `SoftwareApplication` claims).
 
 **Endpoint:** `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_search`
@@ -1337,8 +1337,9 @@ real SMART `/authorize` request, including PKCE parameters and `vp_token`. The r
 -   **`acr_values`:** Requested Authentication Context Class Reference (e.g., `urn:antifraud:acr:openid4vp:employee`).
 -   **`scope`:** Defines the permissions requested, following SMART v2.0 syntax (e.g., `organization/Composition.rs` or `org.schema/Person.cruds`).
     - **Namespace convention:** administration scopes use `org.schema/Organization.<cruds>` and `org.schema/Person.<cruds>`; subject/personal-organization FHIR scopes use `organization/<ResourceType>.<cruds|rs>` (optionally with `?subject=...`).
-    - **Gateway extension (context pinning):** The token context (the target individual) is specified by a mandatory scope item `organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>`.
+    - **Gateway extension (context pinning):** The token context (the target individual) is specified by a scope item `patient/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=*|<code>[,<code>...]]`.
       - **Important:** `sub` (JWT/OpenID) and `subject` (FHIR-style context parameter in this gateway extension) are different concepts and must not be confused.
+      - `section=*` explicitly means all permitted sections. Omitting `section` means the backend's default permitted set for that subject.
       - A token MUST be single-subject: all scope items in the request MUST refer to the same `subject`.
 
 The connector is responsible for issuing the access token. Before doing so, it verifies that the requesting entity (`iss`) has the appropriate permissions to perform the operations requested in the `scope` on the subject (`sub`). This verification includes checking against stored consent rules. The resulting signed `access_token` can then be presented to other members of the data space as proof of authorization. For maximum security, the receiving system can further verify the consent rules on the blockchain before granting access.
@@ -1385,7 +1386,7 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/identity/openid/s
     "expires_in": 300,
     "token_type": "Bearer",
     "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
-    "scope": "organization/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier> organization/Consent.cruds"
+    "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=* patient/Consent.cruds"
   },
   "meta": {
     "jwe": {
@@ -1422,7 +1423,7 @@ Now that the organization is registered and the initial administrator has a secu
 
 **Swagger numbering note:** The `/api-docs` Swagger UI presents this journey with its own progressive numbering (`1.x`, `2.x`, `3.x`, ...) to keep the onboarding flow readable in a single flat list. Those numbers map to the order of sections in this guide, but they do not match the guide’s section numbers (`6.x`, `7.x`, `8.x`, `9.x`).
 
-**Individual onboarding model note:** In the current canonical flow, an "individual" is onboarded via a hosted **Family Organization** using the Offer/Order pattern (see Step 6 below). The older direct `Person/_batch` onboarding endpoint is treated as legacy/internal and is not part of the primary journey.
+**Individual onboarding model note:** In the current canonical flow, an "individual" is indexed inside the tenant's personal indexing service provider model. The older direct `Person/_batch` onboarding endpoint and the hosted family-style offer/order journey are treated as legacy/internal compatibility paths and are not part of the primary portal journey.
 
 Note that delete operations are generally not permitted for resources like employees to ensure traceability. Instead, objects should be updated to an "inactive" status. For data privacy and "right to be forgotten" requests, specific consent flows must be used to remove an individual's index and personal information.
 
@@ -1481,13 +1482,13 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/entity/org.schema
 
 **License gating (employee seats):** If the tenant has a finite pool of employee device licenses stored in `device-licenses` and none are `available`, the final polled bundle entry will be an Offer (`Employee-license-offer-v1.0`) containing `org.schema.Offer.*` claims (including `org.schema.Offer.identifier`) instead of creating the employee.
 
-### 8.2. Step 6: Register a Family Organization
+### 8.2. Step 6: Register an Individual in the Tenant Index
 
-A critical concept is that an individual or a group of related individuals (a family) are managed within their own `Organization` resource. This "Family Organization" is not a top-level tenant but is instead *hosted by* a tenant (e.g., a hospital or insurance provider). This model allows for consistent management of roles, consents, and licenses across all sectors.
+A critical concept is that the current portal journey indexes an individual inside the tenant's personal indexing service provider model. This is not the same as creating a hosted family-style organization. The tenant remains the top-level administrative boundary, and the individual record is indexed under that tenant for consent, composition, appointments, medications, and related data planes.
 
 #### 8.2.0. Prerequisite: Provider discovery from operator catalog (DSP/DCAT-3)
 
-Before creating a family under a provider, clients should discover available providers from an operator DID:
+Before indexing an individual under a provider, clients should discover available providers from an operator DID:
 
 1. Resolve operator DID Document.
 2. Read `CatalogService.serviceEndpoint`.
@@ -1502,16 +1503,13 @@ Hosted tenant form:
 
 The response is canonical DSP-style JSON-LD (`dcat:Catalog` with `dcat:dataset`), not an ad-hoc `providers[]` format.
 
-Registration follows the same secure, asynchronous **Offer/Order pattern** as a top-level tenant. There are two primary scenarios for creating a family organization:
+Registration follows the tenant indexing pattern used by the portal backend and the SDK. The current primary scenario is tenant-backed individual indexing, where the portal backend uses GW to index the individual, create the required relationships and permissions, and then continue with consent and SMART flows.
 
-1.  **Individual Self-Service:** An individual uses their own OIDC `id_token` to register their family. They act as the first controller and are responsible for paying for any required licenses.
-2.  **Employee-Assisted:** An employee of a tenant (e.g., a hospital receptionist) uses a scoped `SMART token` to register a family on behalf of a patient. The tenant organization's license pool is used.
-
-The endpoint is the same in both cases, but the authorization method differs.
+Legacy compatibility remains available for historical family-style onboarding, but it is not the primary journey described by this guide.
 
 **Endpoint:** `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch`
 
-#### Scenario A: Individual Self-Service Registration
+#### Scenario A: Legacy Individual Self-Service Registration
 
 In this flow, the individual authenticates themselves with an `id_token`. The `iss` in the payload should be their email or another unique identifier.
 
@@ -1587,7 +1585,7 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.sc
 }' -i
 ```
 
-The server responds with a `202 Accepted` and a `Location` header pointing to the polling endpoint. The response, once ready, will contain an `Offer` that must be confirmed.
+The server responds with a `202 Accepted` and a `Location` header pointing to the polling endpoint. The response, once ready, contains an `Offer` only for the legacy compatibility path.
 
 #### Subject Profile (Claims-First, One Health)
 
@@ -1623,9 +1621,9 @@ Current v1 claim set:
 - `Subject.maincolor`
 - `Subject.status`
 
-#### 8.2.1. Step 6a: Confirm the Family Order
+#### 8.2.1. Step 6a: Confirm the Legacy Order
 
-To complete the registration, the individual must accept the `Offer` by submitting an `Order`, identical to the flow in Step 2. This confirms the terms and leads to the payment step.
+To complete the legacy registration, the individual must accept the `Offer` by submitting an `Order`, identical to the historical flow in Step 2. This confirms the terms and leads to the payment step.
 
 ```bash
 curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.schema/Order/_batch' \
@@ -1652,12 +1650,11 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.sc
 ```
 Use the exact Offer identifier returned by the family registration polling response (replace any
 placeholders in examples with the real Offer ID you received).
-After polling, the final response will contain an order response entry with the invoice reference and (when available)
-the payment URL in `Order.paymentUrl`. Once paid, the Family Organization is active.
+After polling, the final response will contain an order response entry with the invoice reference and (when available) the payment URL in `Order.paymentUrl`. Once paid, the legacy hosted organization is active.
 
-#### 8.2.2. Step 6b: Register Family Member Relationships (Emergency Contacts)
+#### 8.2.2. Step 6b: Register Member Relationships (Emergency Contacts)
 
-After the Family Organization exists, the controller can register family members and emergency contacts as `RelatedPerson` relationships under the individual vault. This is the canonical entry point for emergency contacts used by emergency/care-continuity apps.
+After the indexed individual exists, the controller can register family members and emergency contacts as `RelatedPerson` relationships under the individual vault. This is the canonical entry point for emergency contacts used by emergency/care-continuity apps.
 
 **Endpoint:** `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch`
 
@@ -1696,7 +1693,7 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.hl
 
 #### 8.2.3. Step 6c: Collect Personal Observations (Non-Clinical)
 
-After the Family Organization exists (and optionally after registering emergency contacts), the controller or the individual can submit **self-reported** observations for emergencies and care continuity (e.g., functional context, preferences, non-clinical symptoms captured by a conversational assistant).
+After the indexed individual exists (and optionally after registering emergency contacts), the controller or the individual can submit **self-reported** observations for emergencies and care continuity (e.g., functional context, preferences, non-clinical symptoms captured by a conversational assistant).
 
 This endpoint is **not** intended for "official clinical data exchange" (that is done via provider-to-provider links, certified attachments, and indexing flows). These observations are allowed to be more free-form, but should still use standard terminologies when possible.
 
@@ -1791,9 +1788,9 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.hl
       "meta": {
         "claims": {
           "@context": "org.hl7.fhir.api",
-          "Consent.action": "LOINC|48765-2",
+          "Consent.action": "LOINC|48765-2,LOINC|10160-0",
           "Consent.actor-reference": "did:web:hospital.example.com",
-          "Consent.actor-role": "ISCO-08|2211",
+          "Consent.actor-role": "ISCO-08|2211,ISCO-08|2221",
           "Consent.attachment-contentType": "application/odrl+json",
           "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9",
           "Consent.date": "2025-11-25",
@@ -2389,11 +2386,11 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.hl
         "subject": { "reference": "did:web:api.acme.org:individual:<unified-health-identifier>" },
         "status": "final",
         "title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
-        "type": {
-          "coding": [{
-            "system": "http://loinc.org",
-            "code": "60591-5",
-          }]
+          "scope": {
+            "coding": [{
+              "code": "rs",
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+            }],
         },
       },
       "resourceType": "Bundle",

@@ -150,7 +150,7 @@ For more advanced testing and scripting, the project includes a comprehensive co
 
 ## Portal Web (apptemplate) - What Must Work in GW
 
-To validate `gdc-sdk-client-ts` from `apptemplate` (web portal), keep `gwtemplate-node-ts` focused on the frontend flows (UC5 family/individual and identity paths).
+To validate `gdc-sdk-client-ts` from `apptemplate` (web portal), keep `gwtemplate-node-ts` focused on the current portal flows: tenant organization activation from signed proof, individual indexing in the hosted tenant, consent, SMART, and identity paths.
 
 ### Cross-SDK integration index (GW + frontend + node)
 
@@ -169,7 +169,7 @@ Flow contract to keep aligned:
 - UC5.6 stays decoupled in demos and production:
   1. Consent submission (`Consent/_batch`).
   2. SMART token request by professional app.
-- Legacy+unified identity route compatibility remains enabled in GW.
+- Legacy family/onboarding routes remain available only for backward compatibility; new portal docs should use the tenant organization activation + individual indexing flow.
 
 Integration boundary (mandatory):
 
@@ -185,18 +185,17 @@ Current status (important):
   - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/...`
 - `gwtemplate-node-ts` now accepts both patterns for identity auth (new unified + legacy) and normalizes internally.
 
-The list below reflects the canonical legacy route surface still used by portal checks/docs.
-Important compatibility rule: `/_activate` (ICA-first activation) and legacy onboarding (`Organization/_batch` -> Offer, then `Order/_batch` -> activation/payment) must both stay available. `/_activate-response` now also carries Offer claims (derived from `org.schema.Organization.numberOfEmployees`) so client flows can continue with order/payment without forcing an extra registration submit.
-Compatibility aliases are also enabled: `Organization/_verify` behaves as `Organization/_batch`, and `Organization/_verify-response` behaves as `Organization/_batch-response`.
+The list below mixes current portal routes and legacy compatibility routes. The current canonical path is `/_activate` for tenant organization onboarding from signed proof; the older `Organization/_batch` / `Order/_batch` family remains only for backward compatibility and portal regression checks.
+Compatibility aliases are also enabled for older callers: `Organization/_verify` behaves as `Organization/_batch`, and `Organization/_verify-response` behaves as `Organization/_batch-response`.
 
 Minimum backend routes required for portal tests (current gwtemplate):
 
 1. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
 2. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
-3. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch`
-4. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response`
-5. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`
-6. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response`
+3. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch` (legacy compatibility)
+4. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response` (legacy compatibility)
+5. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch` (legacy compatibility)
+6. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response` (legacy compatibility)
 7. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch`
 8. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch-response`
 9. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange`
@@ -205,14 +204,14 @@ Minimum backend routes required for portal tests (current gwtemplate):
 12. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response`
 13. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token`
 14. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response`
-15. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch`
-16. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response`
+15. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch` (legacy compatibility)
+16. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response` (legacy compatibility)
 
 Recommended local preparation sequence:
 
 1. Start GW in local demo mode.
 2. Start ICA/local dependencies when needed.
-3. Bootstrap tenant/controller through Node SDK script:
+3. Bootstrap tenant/controller only for legacy or regression validation:
    - `cd ../dataspace-client-sdk-node`
    - `npm run example:e2e-bootstrap-tenant` (with `VP_TOKEN` and envs)
 4. Run `apptemplate` web with the selected profile.
@@ -236,7 +235,7 @@ Use this runner to validate the journey documented in `docs/API_INTEGRATORS_GUID
 - Scope:
   - Host discovery + organization onboarding (Offer/Order)
   - ICA status message checks for legal representative (`messaging/_messages` and `messaging/_get`)
-  - Initial access token, DCR, SMART token, employee/family, consent, communication, composition
+  - Initial access token, DCR, SMART token, employee, consent, communication, composition
 
 Notes:
 - The report includes both expected success and intentional negative-path checks.
@@ -388,7 +387,7 @@ Local (minikube/k3s) is test-only and documented in:
 - See [SMART EHR compatibility TODO](docs/TODO_SMART_EHR_COMPAT.md).
 
 ## Local Single-Tenant Bootstrap (acme)
-Run this before chat/voice E2E when you need a business tenant ready for individual organization and FHIR flows:
+Run this before chat/voice E2E when you need a business tenant ready for activation, employee, consent, and FHIR flows:
 
 ```bash
 TENANT_ID=acme JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant

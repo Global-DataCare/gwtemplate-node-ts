@@ -4,7 +4,7 @@ Purpose: quickly validate `gwtemplate-node-ts` readiness before testing `gdc-sdk
 
 Note on route conventions:
 
-- This checklist validates the canonical legacy surface under `identity/openid/...`.
+- This checklist validates the legacy compatibility surface under `identity/openid/...`.
 - `gwtemplate-node-ts` also accepts unified `identity/auth/...` paths and normalizes them internally for compatibility.
 
 Automated version:

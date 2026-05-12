@@ -185,6 +185,13 @@ export class HostingManager {
     return `https://${urlOrDomain}`;
   }
 
+  private getOrganizationIdentifierTypeClaim(claims: Record<string, any>): string | undefined {
+    const canonical = String(claims?.[ClaimsOrganizationSchemaorg.identifierType] || '').trim();
+    if (canonical) return canonical;
+    const legacy = String((claims as any)?.['org.schema.Organization.identifier.type'] || '').trim();
+    return legacy || undefined;
+  }
+
   private extractActivationMaterial(entry: BundleEntry, body: any) {
     const entryMeta = (entry?.meta || {}) as Record<string, any>;
     const entryResource = (entry?.resource || {}) as Record<string, any>;
@@ -214,6 +221,17 @@ export class HostingManager {
         || entryResource?.organization_credential
       );
 
+    const representativeCredential =
+      repCredentialFromVp
+      || body?.representativeCredential
+      || body?.representative_credential
+      || body?.legalRepresentativeCredential
+      || entryMeta?.representativeCredential
+      || entryMeta?.representative_credential
+      || entryMeta?.legalRepresentativeCredential
+      || entryResource?.representativeCredential
+      || entryResource?.representative_credential
+      || entryResource?.legalRepresentativeCredential;
     return {
       vpToken,
       presentationSubmission:
@@ -228,17 +246,7 @@ export class HostingManager {
         || entryMeta?.organization_credential
         || entryResource?.organizationCredential
         || entryResource?.organization_credential,
-      representativeCredential:
-        repCredentialFromVp
-        || body?.representativeCredential
-        || body?.representative_credential
-        || body?.legalRepresentativeCredential
-        || entryMeta?.representativeCredential
-        || entryMeta?.representative_credential
-        || entryMeta?.legalRepresentativeCredential
-        || entryResource?.representativeCredential
-        || entryResource?.representative_credential
-        || entryResource?.legalRepresentativeCredential,
+      representativeCredential,
       primaryDid,
       publicTenantUrl:
         entryResource?.organizationUrl
@@ -613,6 +621,13 @@ export class HostingManager {
     const { organization, person, service } = this.extractResources(claims, environment);
     const processedService = await this._handleServiceAttachment(service);
     let processedClaims = { ...claims, ...(processedService?.meta.claims || {}) };
+    const identifierTypeClaim = this.getOrganizationIdentifierTypeClaim(processedClaims);
+    if (identifierTypeClaim && !(processedClaims as any)[ClaimsOrganizationSchemaorg.identifierType]) {
+      (processedClaims as any)[ClaimsOrganizationSchemaorg.identifierType] = identifierTypeClaim;
+    }
+    if (!identifierTypeClaim) {
+      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierType}'`, IssueType.Required);
+    }
     const normalizedPublicUrl = this.normalizeTenantPublicUrl(
       activation.publicTenantUrl
       || (processedClaims[ClaimsOrganizationSchemaorg.url] as string | undefined),
@@ -626,7 +641,7 @@ export class HostingManager {
         network: 'test-network',
         jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
         sector: requestedSector,
-        idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+        idType: identifierTypeClaim,
         idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
       });
     }
@@ -714,7 +729,7 @@ export class HostingManager {
       network: 'test-network',
       jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       sector: requestedSector,
-      idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+      idType: identifierTypeClaim,
       idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
     });
     const controllerConfig = await this.buildControllerEntityConfig(person, tenantUrn, vaultId, this.extractRegistrationKeys(jobMeta));

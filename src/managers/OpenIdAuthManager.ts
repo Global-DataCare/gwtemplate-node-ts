@@ -15,7 +15,7 @@ import { getClaimValue } from '../utils/claims';
 import { parseActorFromSub } from 'gdc-common-utils-ts/utils/actor';
 import { getIndividualSectionId } from '../utils/individual-sections';
 import { IClearingHouseService } from '../services/ClearingHouseService';
-import { normalizeConsentActorRole } from '../utils/consent';
+import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/consent';
 
 type TokenRequestBody = {
   scope?: string;
@@ -81,7 +81,8 @@ export class OpenIdAuthManager implements IJobProcessor {
 
     // --- Gateway SMART Scope Extension: Context Pinning ---
     // Require a root scope item of the form:
-    //   patient/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=...]
+    //   organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=*|<code>[,<code>...]]
+    // An omitted section means the backend's default permitted set for that subject.
     const { subject, sections } = this.extractPinnedSubjectAndSections(scope);
     const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
     const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
@@ -145,12 +146,12 @@ export class OpenIdAuthManager implements IJobProcessor {
 
       const ruleRole = getClaimValue<string>(rule as any, 'Consent.actor-role');
       if (ruleRole) {
-        const normalizedRuleRole = normalizeConsentActorRole(ruleRole, 'professional');
-        if (normalizedRuleRole === '*') {
+        const normalizedRuleRoles = expandConsentActorRoles(ruleRole, 'professional');
+        if (normalizedRuleRoles.includes('*')) {
           // Wildcard roles are only permitted for email-based rules.
           if (!isRuleEmail) return false;
         } else if (normalizedActorRole) {
-          if (normalizedRuleRole !== normalizedActorRole) return false;
+          if (!normalizedRuleRoles.includes(normalizedActorRole)) return false;
         } else {
           // If the actor doesn't carry a role, only email rules with wildcard roles can match.
           return false;
@@ -250,9 +251,9 @@ export class OpenIdAuthManager implements IJobProcessor {
 
   private extractPinnedSubjectAndSections(scope: string): { subject: string; sections: string[] } {
     const scopes = scope.split(/\s+/).map((s) => s.trim()).filter(Boolean);
-    const rootScopes = scopes.filter((s) => s.toLowerCase().startsWith('patient/composition.'));
+    const rootScopes = scopes.filter((s) => s.toLowerCase().startsWith('organization/composition.'));
     if (rootScopes.length === 0) {
-      throw new ManagerError('Missing required root scope: patient/Composition.<cruds>?subject=...', IssueType.Required);
+      throw new ManagerError('Missing required root scope: organization/Composition.<cruds>?subject=...', IssueType.Required);
     }
 
     const parsed = rootScopes.map((root) => {
@@ -266,10 +267,12 @@ export class OpenIdAuthManager implements IJobProcessor {
         throw new ManagerError(`Invalid root scope (missing subject): ${head}`, IssueType.Required);
       }
       const sectionParam = params.get('section')?.trim() || '';
-      const sections = sectionParam
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const sections = sectionParam.includes('*')
+        ? []
+        : sectionParam
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
       return { subject, sections };
     });
 

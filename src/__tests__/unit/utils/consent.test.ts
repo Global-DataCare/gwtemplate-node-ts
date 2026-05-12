@@ -1,4 +1,10 @@
-import { buildConsentRuleKey, normalizeConsentActorRole } from '../../../utils/consent';
+import {
+  buildConsentRuleKey,
+  expandConsentActorRoles,
+  isValidFhirRoleCode,
+  isValidIsco08RoleCode,
+  normalizeConsentActorRole,
+} from '../../../utils/consent';
 
 describe('consent utils', () => {
   it('normalizes country targets to FHIR ISO 3166 URN format', () => {
@@ -33,6 +39,23 @@ describe('consent utils', () => {
     expect(normalizeConsentActorRole('221', 'professional')).toBe('org.ilo.isco-08|221');
     expect(normalizeConsentActorRole('ISCO-08|221', 'professional')).toBe('org.ilo.isco-08|221');
     expect(normalizeConsentActorRole('org.ilo.isco-08|221', 'professional')).toBe('org.ilo.isco-08|221');
+  });
+
+  it('validates ISCO and FHIR role codes', () => {
+    expect(isValidIsco08RoleCode('221')).toBe(true);
+    expect(isValidIsco08RoleCode('ISCO-08|221')).toBe(true);
+    expect(isValidIsco08RoleCode('RESPRSN')).toBe(false);
+
+    expect(isValidFhirRoleCode('RESPRSN')).toBe(true);
+    expect(isValidFhirRoleCode('v3-RoleCode|RESPRSN')).toBe(true);
+    expect(isValidFhirRoleCode('221')).toBe(false);
+  });
+
+  it('expands comma-separated actor roles into canonical values', () => {
+    expect(expandConsentActorRoles('ISCO-08|221,RESPRSN', 'auto')).toEqual([
+      'org.ilo.isco-08|221',
+      'v3-RoleCode|RESPRSN',
+    ]);
   });
 
   it('normalizes family role formats to canonical v3-RoleCode', () => {

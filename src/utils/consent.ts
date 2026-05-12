@@ -16,6 +16,13 @@ const V3_ROLE_CODE_CANONICAL_SYSTEM = 'v3-RoleCode';
 
 export type ConsentRoleContext = 'professional' | 'family' | 'auto';
 
+function splitCommaSeparated(value: string): string[] {
+  return String(value || '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function normalizeTarget(target: string): string {
   const trimmed = target.trim();
   const telMatch = trimmed.match(/^(?:tel:)?\+([0-9]+)$/i);
@@ -37,9 +44,27 @@ function normalizeRoleSystem(inputSystem: string): string {
 }
 
 function inferRoleSystemFromCode(code: string, context: ConsentRoleContext): string {
+  if (/^[0-9]+$/.test(code)) return ISCO_08_CANONICAL_SYSTEM;
   if (context === 'professional') return ISCO_08_CANONICAL_SYSTEM;
   if (context === 'family') return V3_ROLE_CODE_CANONICAL_SYSTEM;
-  return /^[0-9]+$/.test(code) ? ISCO_08_CANONICAL_SYSTEM : V3_ROLE_CODE_CANONICAL_SYSTEM;
+  return V3_ROLE_CODE_CANONICAL_SYSTEM;
+}
+
+export function isValidIsco08RoleCode(rawRole: string): boolean {
+  const value = String(rawRole || '').trim();
+  if (!value || value === '*') return false;
+  const normalized = normalizeConsentActorRole(value, 'professional');
+  const [system, code] = normalized.split('|', 2);
+  return system === ISCO_08_CANONICAL_SYSTEM && /^[0-9]+$/.test(code || '');
+}
+
+export function isValidFhirRoleCode(rawRole: string): boolean {
+  const value = String(rawRole || '').trim();
+  if (!value || value === '*') return false;
+  if (/^[0-9]+$/.test(value)) return false;
+  const normalized = normalizeConsentActorRole(value, 'family');
+  const [system, code] = normalized.split('|', 2);
+  return system === V3_ROLE_CODE_CANONICAL_SYSTEM && Boolean(code);
 }
 
 export function normalizeConsentActorRole(rawRole: string, context: ConsentRoleContext = 'auto'): string {
@@ -58,6 +83,12 @@ export function normalizeConsentActorRole(rawRole: string, context: ConsentRoleC
   const inferredSystem = inferRoleSystemFromCode(value, context);
   const code = inferredSystem === ISCO_08_CANONICAL_SYSTEM ? value : value.toUpperCase();
   return `${inferredSystem}|${code}`;
+}
+
+export function expandConsentActorRoles(rawRoles: string, context: ConsentRoleContext = 'auto'): string[] {
+  return splitCommaSeparated(rawRoles)
+    .map((role) => normalizeConsentActorRole(role, context))
+    .filter(Boolean);
 }
 
 export function buildConsentRuleKey(parts: ConsentRuleKeyParts): string {

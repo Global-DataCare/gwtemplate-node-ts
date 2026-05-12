@@ -10,6 +10,16 @@ export const testConsentRulePermitOrgDid = {
   'Consent.purpose': 'TREAT',
 } as const;
 
+export const testConsentRulePermitOrgDidMultiRole = {
+  id: 'rule-org-multi-role',
+  '@context': 'org.hl7.fhir.api',
+  'Consent.decision': 'permit',
+  'Consent.actor-identifier': 'did:web:api.acme.org',
+  'Consent.actor-role': 'ISCO-08|2211,ISCO-08|2221',
+  'Consent.action': 'LOINC|48765-2',
+  'Consent.purpose': 'TREAT',
+} as const;
+
 export const testConsentRulePermitJurisdiction = {
   id: 'rule-jurisdiction',
   '@context': 'org.hl7.fhir.api',

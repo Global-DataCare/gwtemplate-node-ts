@@ -398,7 +398,7 @@ export const SMART_TOKEN_REQUEST = {
     "token_type": "Bearer",
     "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
     "purpose": "TREAT",
-    "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=LOINC|48765-2 patient/Consent.cruds"
+    "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=* patient/Consent.cruds"
   },
   "meta": { ...metaRequestBodyOnlyKidHeader }
 };
@@ -671,9 +671,9 @@ export const CONSENT_CREATION_MESSAGE = {
           "Consent.grantee": "did:web:hospital.example.com",
           "Consent.date": "2025-11-25",
           "Consent.purpose": "TREAT",
-          "Consent.action": "LOINC|48765-2",
+          "Consent.action": "LOINC|48765-2,LOINC|10160-0",
           "Consent.actor-identifier": "did:web:hospital.example.com",
-          "Consent.actor-role": "ISCO-08|2211",
+          "Consent.actor-role": "ISCO-08|2211,ISCO-08|2221",
           "Consent.attachment-contentType": "application/odrl+json",
           "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
         }

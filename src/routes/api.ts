@@ -847,8 +847,8 @@ export function createApiRouter(
    *     description: |
    *       This endpoint existed for the older "customer onboarding" flow where a provider created an individual's vault directly.
    *
-   *       Current onboarding is modeled via the Family Organization offer/order flow (`individual/org.schema/Organization/_batch`),
-   *       which is the canonical path described in API_INTEGRATORS_GUIDE.
+  *       This endpoint is kept for legacy compatibility with older individual onboarding flows.
+  *       New portal integrations should use the tenant organization activation + individual indexing flow documented in the current SDK guides.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1618,9 +1618,10 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 4.1 Family Registration
-   *     summary: Register a Family Organization (Offer)
+  *     summary: Register a legacy individual organization offer
    *     description: |
-   *       Registers a Family Organization hosted by a tenant, following the same Offer/Order pattern as tenant onboarding.
+  *       Legacy compatibility endpoint for hosted individual onboarding.
+  *       The current portal flow uses tenant organization activation from signed proof and individual indexing in the hosted tenant.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1654,7 +1655,7 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 4.1 Family Registration
-   *     summary: Poll the family registration result (Offer)
+  *     summary: Poll the legacy individual registration result (Offer)
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1681,9 +1682,9 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 4.2 Family Order
-   *     summary: Confirm the Family Organization order (accept Offer)
+  *     summary: Confirm the legacy individual organization order (accept Offer)
    *     description: |
-   *       Submits an Order that accepts a Family registration Offer to complete onboarding and move into payment/activation.
+  *       Legacy compatibility only. Submits an Order that accepts the registration Offer to complete the historical onboarding flow.
    *       The Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the
    *       Offer returned by the family registration _batch-response.
    *     parameters:
@@ -1719,7 +1720,7 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 4.2 Family Order
-   *     summary: Poll the family order result
+  *     summary: Poll the legacy individual order result
    *     description: |
    *       Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.
    *       The completed response returns a Bundle entry with order invoice claims, including an
@@ -1820,8 +1821,9 @@ export function createApiRouter(
    *       - 2.2 SMART Token
    *     summary: Request a SMART access_token (async)
    *     description: |
-   *       Requests a SMART access token. The request MUST include the gateway context-pinning scope item:
-   *       `patient/Composition.<cruds>?subject=<did:web:...:individual:<id>>`.
+  *       Requests a SMART access token. The request MUST include the gateway context-pinning scope item:
+  *       `organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=*|<code>[,<code>...]]`.
+  *       Omitting `section` is allowed and means the backend's default permitted set for that subject.
    *
    *       OpenID4VP binding: the request MUST include `acr_values` from the prior verification event, using
    *       one of: `urn:antifraud:acr:openid4vp:employee` or `urn:antifraud:acr:openid4vp:individual`. The issued

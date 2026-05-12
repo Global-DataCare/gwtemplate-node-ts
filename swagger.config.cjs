@@ -269,7 +269,7 @@ const swaggerDefinition = {
       },
       SmartTokenRequestPlaintextMessage: {
         summary: 'Plaintext Message for SMART Token Request',
-        description: 'A DIDComm-like message wrapper containing the SMART token request (scope, sub, etc.).',
+        description: 'A DIDComm-like message wrapper containing the SMART token request (scope, sub, optional section pinning, etc.).',
         value: {},
       },
       EmployeeRegistrationPlaintextMessage: {
