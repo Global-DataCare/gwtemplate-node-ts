@@ -4,7 +4,7 @@
     "title": "Gateway API",
     "version": "1.0.3",
     "description": "API documentation for the secure gateway, covering both legacy (JSON) and secure (JWE) flows.",
-    "x-profile-generated-at": "2026-05-18T16:52:10.063Z",
+    "x-profile-generated-at": "2026-05-18T21:09:03.798Z",
     "x-profile-name": "compat"
   },
   "servers": [],

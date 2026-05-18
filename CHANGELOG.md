@@ -1,3 +1,9 @@
+## 1.3.11 - 2026-05-18
+
+### Changed
+- Updated dependency to `gdc-common-utils-ts@^1.4.20`.
+- Refreshed generated OpenAPI profile artifacts after the canonical representative-role alignment release.
+
 ## 1.3.10 - 2026-05-18
 
 ### Changed
