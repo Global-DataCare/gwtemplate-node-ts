@@ -1,5 +1,9 @@
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import {
+  extractDidWebFromCredential,
+  validateActivationRepresentativePolicy,
+} from 'gdc-common-utils-ts/utils/activation-policy';
 import { ClearingHouseVerificationResult, IClearingHouseService } from '../services/ClearingHouseService';
 import { compactVerify, decodeProtectedHeader, importJWK, JWK } from 'jose';
 import {
@@ -66,87 +70,6 @@ async function verifyVpTokenProof(vpToken: string): Promise<void> {
   }
 }
 
-function extractDidFromCredential(credential: any): string | undefined {
-  if (!credential || typeof credential !== 'object') {
-    return undefined;
-  }
-  const subject = Array.isArray(credential.credentialSubject)
-    ? credential.credentialSubject[0]
-    : credential.credentialSubject;
-  const didCandidate = subject?.id || credential?.id;
-  return typeof didCandidate === 'string' && didCandidate.startsWith('did:web:')
-    ? didCandidate
-    : undefined;
-}
-
-function extractCredentialSubject(credential: any): any {
-  if (!credential || typeof credential !== 'object') return undefined;
-  return Array.isArray(credential.credentialSubject)
-    ? credential.credentialSubject[0]
-    : credential.credentialSubject;
-}
-
-function normalizeTax(value: unknown): string | undefined {
-  const v = String(value || '').trim().toUpperCase();
-  return v || undefined;
-}
-
-function extractOrganizationTaxId(organizationCredential: any): string | undefined {
-  const subject = extractCredentialSubject(organizationCredential) || {};
-  return (
-    normalizeTax(subject?.taxID)
-    || normalizeTax(subject?.taxId)
-    || normalizeTax(subject?.identifier?.value)
-    || normalizeTax(subject?.identifierValue)
-  );
-}
-
-function extractRepresentativeMemberOfTaxId(representativeCredential: any): string | undefined {
-  const subject = extractCredentialSubject(representativeCredential) || {};
-  const memberOf = subject?.memberOf;
-  return (
-    normalizeTax(memberOf?.taxID)
-    || normalizeTax(memberOf?.taxId)
-    || normalizeTax(memberOf?.identifier?.value)
-    || normalizeTax(memberOf?.identifierValue)
-  );
-}
-
-function extractRepresentativeRoleCode(representativeCredential: any): string | undefined {
-  const subject = extractCredentialSubject(representativeCredential) || {};
-  const occupation = subject?.hasOccupation;
-  if (typeof occupation === 'string') return occupation.trim() || undefined;
-  if (occupation && typeof occupation === 'object') {
-    const id = String(occupation?.identifier || '').trim();
-    if (id) return id;
-    const name = String(occupation?.name || '').trim();
-    if (name) return name;
-  }
-  return undefined;
-}
-
-function isResponsiblePartyRole(roleCode: string | undefined): boolean {
-  const normalized = String(roleCode || '').trim().toUpperCase();
-  return normalized.includes('RESPRSN');
-}
-
-function extractRepresentativeCredentialMaterial(representativeCredential: any): string | undefined {
-  const subject = extractCredentialSubject(representativeCredential) || {};
-  const cred = subject?.hasCredential;
-  if (typeof cred === 'string') return cred.trim() || undefined;
-  if (Array.isArray(cred)) {
-    for (const item of cred) {
-      const mat = String(item?.material || '').trim();
-      if (mat) return mat;
-    }
-  }
-  if (cred && typeof cred === 'object') {
-    const mat = String(cred?.material || '').trim();
-    if (mat) return mat;
-  }
-  return undefined;
-}
-
 function assertActivationCredentialConsistency(params: {
   primaryDid?: string;
   organizationCredential?: any;
@@ -157,7 +80,7 @@ function assertActivationCredentialConsistency(params: {
     throw new ManagerError('Missing ICA-issued organization credential.', IssueType.Required);
   }
 
-  const organizationDidFromCredential = extractDidFromCredential(organizationCredential);
+  const organizationDidFromCredential = extractDidWebFromCredential(organizationCredential);
   if (!organizationDidFromCredential) {
     throw new ManagerError('ICA-issued organization credential is missing credentialSubject.id did:web.', IssueType.Required);
   }
@@ -166,34 +89,17 @@ function assertActivationCredentialConsistency(params: {
   }
 
   const representativeDidFromCredential = representativeCredential
-    ? extractDidFromCredential(representativeCredential)
+    ? extractDidWebFromCredential(representativeCredential)
     : undefined;
-  if (representativeCredential && !representativeDidFromCredential) {
-    throw new ManagerError('ICA-issued representative credential is missing credentialSubject.id did:web.', IssueType.Required);
-  }
-  if (representativeCredential) {
-    const orgTax = extractOrganizationTaxId(organizationCredential);
-    const repMemberOfTax = extractRepresentativeMemberOfTaxId(representativeCredential);
-    if (orgTax && repMemberOfTax && orgTax !== repMemberOfTax) {
-      throw new ManagerError(
-        'ICA-issued representative credential memberOf.taxID must match organization credential taxID.',
-        IssueType.Conflict,
-      );
-    }
-    const repRole = extractRepresentativeRoleCode(representativeCredential);
-    if (!isResponsiblePartyRole(repRole)) {
-      throw new ManagerError(
-        'ICA-issued representative credential must include Responsible Party role (RESPRSN) in credentialSubject.hasOccupation.',
-        IssueType.Required,
-      );
-    }
-    const repCredentialMaterial = extractRepresentativeCredentialMaterial(representativeCredential);
-    if (!repCredentialMaterial) {
-      throw new ManagerError(
-        'ICA-issued representative credential is missing credentialSubject.hasCredential.material.',
-        IssueType.Required,
-      );
-    }
+  const policyErrors = validateActivationRepresentativePolicy({
+    organizationCredential,
+    representativeCredential,
+    requiredRoleCode: 'RESPRSN',
+  });
+  if (policyErrors.length > 0) {
+    const first = policyErrors[0];
+    const issue = first.code === 'REPRESENTATIVE_TAXID_MISMATCH' ? IssueType.Conflict : IssueType.Required;
+    throw new ManagerError(first.message, issue);
   }
 
   return {

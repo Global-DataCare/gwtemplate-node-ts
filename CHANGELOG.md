@@ -1,3 +1,9 @@
+## 1.3.9 - 2026-05-18
+
+### Changed
+- Activation representative validation now consumes shared `gdc-common-utils-ts` policy helpers instead of local duplicated parsing logic.
+- Core integration doc now states canonical member DID composition: owner DID prefix + `:member:<member-id>:<role>`.
+
 ## 1.3.8 - 2026-05-18
 
 ### Changed
@@ -106,7 +112,7 @@
     -   The new endpoint is `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/test-network/org.schema/Person/_discovery`.
     -   The backend handles URN construction, hashing, and dynamic routing to the appropriate blockchain channel (`<sector>-eu` or `<sector>-global`) and smart contract (`discovery-person`) based on "convention over configuration".
     -   Introduced `NetworkActionsController` and a dedicated `networkRouter` to manage this new API section.
-    -   Added new utility modules to support the discovery logic: `identifier-parser.ts`, `jurisdiction.ts`, and `phone-number.ts`.
+    -   Added new utility modules to support the discovery logic: `identifier-parser.ts`, `jurisdiction.ts`, and identifier-channel helpers.
 -   **Contextualized Claims Normalization:** Added claim normalization + deterministic ordering for contextualized schema.org claims (see `src/utils/claims.ts`) to support future canonical hashing.
 -   **Family Onboarding (Offer/Order):** Added `FamilyManager` and data fixtures to support family (household) registration with the same Offer/Order pattern used for tenant onboarding.
 -   **Sandbox-Safe Integration Test Harness:** Added `invokeExpress` helper to run integration tests without binding a TCP port (required in sandboxed environments).
@@ -116,7 +122,7 @@
 ### Changed
 
 -   **Refactored `CustomerManager`:** The manager now handles the new `_discovery` action alongside the existing `_batch` action.
-    -   The discovery logic is optimized to group multiple identifier hashes (e.g., from `NNES` and `telephone` for the same person) and query the blockchain in a single, efficient batch call per channel target.
+    -   The discovery logic is optimized to group multiple identifier hashes (e.g., from `NNES` and alternate identifiers for the same person) and query the blockchain in a single, efficient batch call per channel target.
     -   The smart contract is expected to implement a "first match wins" optimization for these batch queries.
 -   **Updated `IBlockchainAdapter`:** The interface was changed from `discoverDidByHash` to the batch-aware `discoverDidsByHashes` to support the performance optimization.
 -   **Updated Service Definitions (`services.ts`):**

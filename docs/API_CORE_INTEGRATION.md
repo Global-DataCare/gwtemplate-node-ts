@@ -37,6 +37,8 @@ exchanging the email-proof `id_token` for the `initial_access_token` required by
 `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr` (+ poll),
 binding wallet public key(s) to that license serial number and controller email before creating additional employees.
 - SDK method chain: `activateEmployeeDeviceWithActivationCode(...)`
+- Member DID format used in CORE: `did:web:<owner-did...>:member:<member-id>:<role>`
+- In CORE (SEDIA baseline), `<member-id>` is derived from email hash (multibase58/multihash profile).
 
 4. Individual indexing tenant creation
 - Submit individual organization: `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch`
@@ -79,9 +81,6 @@ Note:
 ## What is intentionally out of this core profile
 
 - Legacy aliases and internal compatibility routes.
-- Extension domains (digital twin variants, sector-specific modules, appointment-only extension paths, genomics, product traceability, etc.).
-
-Those belong in extension repositories/specs.
 
 ## Planned alternative path (confidential app / portal mode)
 
