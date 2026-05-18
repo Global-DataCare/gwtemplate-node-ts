@@ -79,6 +79,39 @@ function extractDidFromCredential(credential: any): string | undefined {
     : undefined;
 }
 
+function extractCredentialSubject(credential: any): any {
+  if (!credential || typeof credential !== 'object') return undefined;
+  return Array.isArray(credential.credentialSubject)
+    ? credential.credentialSubject[0]
+    : credential.credentialSubject;
+}
+
+function normalizeTax(value: unknown): string | undefined {
+  const v = String(value || '').trim().toUpperCase();
+  return v || undefined;
+}
+
+function extractOrganizationTaxId(organizationCredential: any): string | undefined {
+  const subject = extractCredentialSubject(organizationCredential) || {};
+  return (
+    normalizeTax(subject?.taxID)
+    || normalizeTax(subject?.taxId)
+    || normalizeTax(subject?.identifier?.value)
+    || normalizeTax(subject?.identifierValue)
+  );
+}
+
+function extractRepresentativeMemberOfTaxId(representativeCredential: any): string | undefined {
+  const subject = extractCredentialSubject(representativeCredential) || {};
+  const memberOf = subject?.memberOf;
+  return (
+    normalizeTax(memberOf?.taxID)
+    || normalizeTax(memberOf?.taxId)
+    || normalizeTax(memberOf?.identifier?.value)
+    || normalizeTax(memberOf?.identifierValue)
+  );
+}
+
 function assertActivationCredentialConsistency(params: {
   primaryDid?: string;
   organizationCredential?: any;
@@ -102,6 +135,16 @@ function assertActivationCredentialConsistency(params: {
     : undefined;
   if (representativeCredential && !representativeDidFromCredential) {
     throw new ManagerError('ICA-issued representative credential is missing credentialSubject.id did:web.', IssueType.Required);
+  }
+  if (representativeCredential) {
+    const orgTax = extractOrganizationTaxId(organizationCredential);
+    const repMemberOfTax = extractRepresentativeMemberOfTaxId(representativeCredential);
+    if (orgTax && repMemberOfTax && orgTax !== repMemberOfTax) {
+      throw new ManagerError(
+        'ICA-issued representative credential memberOf.taxID must match organization credential taxID.',
+        IssueType.Conflict,
+      );
+    }
   }
 
   return {
