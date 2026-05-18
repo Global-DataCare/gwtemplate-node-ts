@@ -184,7 +184,9 @@ export const ORGANIZATION_ACTIVATION_REQUEST = {
               "identifier": "IDCES-11223344",
               "hasOccupation": {
                 "@type": "Occupation",
-                "identifier": "|RESPRSN",
+                "identifier": {
+                  "value": "RESPRSN"
+                },
                 "name": "ResponsibleParty"
               },
               "memberOf": {

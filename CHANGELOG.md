@@ -1,3 +1,9 @@
+## 1.3.10 - 2026-05-18
+
+### Changed
+- Adopted `gdc-common-utils-ts@^1.4.18` shared role normalization for activation representative validation.
+- Canonical legal-representative occupation format is now `credentialSubject.hasOccupation.identifier.value = "RESPRSN"` (legacy tokens still accepted by normalizer).
+
 ## 1.3.9 - 2026-05-18
 
 ### Changed

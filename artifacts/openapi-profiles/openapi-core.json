@@ -4,7 +4,7 @@
     "title": "Gateway API",
     "version": "1.0.3",
     "description": "API documentation for the secure gateway, covering both legacy (JSON) and secure (JWE) flows.",
-    "x-profile-generated-at": "2026-05-18T16:27:26.828Z",
+    "x-profile-generated-at": "2026-05-18T16:52:10.053Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -295,7 +295,9 @@
                         "identifier": "IDCES-11223344",
                         "hasOccupation": {
                           "@type": "Occupation",
-                          "identifier": "|RESPRSN",
+                          "identifier": {
+                            "value": "RESPRSN"
+                          },
                           "name": "ResponsibleParty"
                         },
                         "memberOf": {

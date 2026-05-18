@@ -21,7 +21,7 @@ This document is intentionally narrower than `API_INTEGRATORS_GUIDE.md` and mirr
 - `organizationCredential` / `representativeCredential` side-fields are legacy compatibility only; canonical proof is VP payload.
 - Representative VC security linkage (enforced):
   - `credentialSubject.memberOf.taxID` must match organization credential tax ID.
-  - `credentialSubject.hasOccupation` must include `RESPRSN` (Responsible Party).
+  - `credentialSubject.hasOccupation.identifier.value` must be `RESPRSN` (Responsible Party). Legacy tokenized formats are normalized for compatibility.
   - `credentialSubject.hasCredential.material` must be present (email/signing-key continuity material).
 
 2. Host order acceptance

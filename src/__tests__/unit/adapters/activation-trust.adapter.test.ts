@@ -103,7 +103,7 @@ describe('DefaultActivationTrustAdapter', () => {
       vpToken: buildVpCompactJwt('ES256K'),
       organizationCredential: buildCredential('did:web:org.example', { taxID: 'VATES-A12345678' }),
       representativeCredential: buildCredential('did:web:rep.example', {
-        hasOccupation: { '@type': 'Occupation', identifier: '|RESPRSN' },
+        hasOccupation: { '@type': 'Occupation', identifier: { value: 'RESPRSN' } },
         hasCredential: { material: 'sha256:rep-email-hash' },
         memberOf: { '@type': 'Organization', taxID: 'VATES-A12345678' },
       }),
@@ -132,7 +132,7 @@ describe('DefaultActivationTrustAdapter', () => {
       vpToken: buildVpCompactJwt('ES256K'),
       organizationCredential: buildCredential('did:web:org.example', { taxID: 'VATES-A12345678' }),
       representativeCredential: buildCredential('did:web:rep.example', {
-        hasOccupation: { '@type': 'Occupation', identifier: '|RESPRSN' },
+        hasOccupation: { '@type': 'Occupation', identifier: { value: 'RESPRSN' } },
         hasCredential: { material: 'sha256:rep-email-hash' },
         memberOf: { '@type': 'Organization', taxID: 'VATES-B99999999' },
       }),
@@ -184,7 +184,7 @@ describe('DefaultActivationTrustAdapter', () => {
       vpToken: buildVpCompactJwt('ES256K'),
       organizationCredential: buildCredential('did:web:org.example', { taxID: 'VATES-A12345678' }),
       representativeCredential: buildCredential('did:web:rep.example', {
-        hasOccupation: { '@type': 'Occupation', identifier: '|RESPRSN' },
+        hasOccupation: { '@type': 'Occupation', identifier: { value: 'RESPRSN' } },
         memberOf: { '@type': 'Organization', taxID: 'VATES-A12345678' },
       }),
     })).rejects.toThrow('missing credentialSubject.hasCredential.material');
