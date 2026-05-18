@@ -193,10 +193,24 @@ export class HostingManager {
   }
 
   private extractActivationMaterial(entry: BundleEntry, body: any) {
+    const entryAny = entry as any;
     const entryMeta = (entry?.meta || {}) as Record<string, any>;
     const entryResource = (entry?.resource || {}) as Record<string, any>;
-    const vpToken = body?.vp_token || entryMeta?.vp_token || entryResource?.vp_token;
-    const vpPayload = this.parseVpTokenPayload(vpToken);
+    const vpTokenCandidate =
+      entryAny?.vp_token
+      || body?.vp_token
+      || entryMeta?.vp_token
+      || entryResource?.vp_token;
+    const vpJsonCandidate =
+      entryAny?.vp
+      || body?.vp
+      || entryMeta?.vp
+      || entryResource?.vp;
+    const vpProofRaw = vpTokenCandidate || vpJsonCandidate;
+    const vpToken = typeof vpProofRaw === 'string'
+      ? vpProofRaw
+      : (vpProofRaw ? JSON.stringify(vpProofRaw) : undefined);
+    const vpPayload = this.parseVpTokenPayload(vpProofRaw);
     const orgCredentialFromVp = this.extractCredentialFromVp(
       vpPayload,
       ['OrganizationCredential', 'LegalOrganizationCredential'],
@@ -234,6 +248,7 @@ export class HostingManager {
       || entryResource?.legalRepresentativeCredential;
     return {
       vpToken,
+      hasVpJson: Boolean(vpJsonCandidate),
       presentationSubmission:
         body?.presentation_submission
         || entryMeta?.presentation_submission
@@ -568,7 +583,7 @@ export class HostingManager {
   ): Promise<BundleEntry | ErrorEntry> {
     const activation = this.extractActivationMaterial(entry, body);
     if (!activation.vpToken || typeof activation.vpToken !== 'string') {
-      throw new ManagerError("Missing required activation proof 'vp_token'.", IssueType.Required);
+      throw new ManagerError("Missing required activation proof in `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP).", IssueType.Required);
     }
     const trustResult = await this.activationTrustAdapter.evaluate({
       networkMode: this.config.networkMode,

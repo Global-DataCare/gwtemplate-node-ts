@@ -145,6 +145,18 @@
 ## [Unreleased]
 
 ### Added
+- Integration coverage for `Bundle/_search` DocumentReference retrieval by canonical hash claim:
+  - `DocumentReference?subject=<did>&contenthash=<cid>`
+  - response contract validated via `DocumentReference-search-response-v1.0`.
+
+### Changed
+- Communication attachment projection now separates:
+  - `DocumentReference.identifier` as logical UUID/URN identifier,
+  - `DocumentReference.contenthash` as content hash/CID for retrieval/integrity.
+- Bundle search parser now prioritizes `contenthash` query/filter names and keeps legacy hash aliases for temporary compatibility.
+- API integrator guide updated with canonical `DocumentReference.contenthash` field contract.
+
+### Added
 - **End-to-End Test for Person Onboarding**: A comprehensive E2E test (`Part 3`) now verifies the entire asynchronous flow for creating a `Person` resource, including job submission (`202 Accepted`), secure polling with `POST` (`200 OK`), and final response validation (`201 Created`).
 - **TDD Roadmap for Future Features**: Added tests (`Part 4` for `Composition` and `Part 5` for `Communication`) in the E2E flow. These tests act as an executable specification and clear roadmap for the next development steps.
 - **`CustomerManager` Integration**: Fully integrated the `CustomerManager` into the server initialization, connecting it to the `Worker` via the `ManagerRegistry`.

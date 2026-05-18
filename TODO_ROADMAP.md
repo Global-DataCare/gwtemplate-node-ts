@@ -3,7 +3,7 @@
 Version:
 - 0.1.0
 - Date: 2026-04-08
-- Source orchestrator: /Users/fernando/GITS/gdc-workspace/TODO_ROADMAP_ORCHESTRATOR.md
+- Source orchestrator: $HOME/GITS/gdc-workspace/TODO_ROADMAP_ORCHESTRATOR.md
 
 ## Current status
 - [ ] Pending repository-specific roadmap definition.

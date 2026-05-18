@@ -146,6 +146,36 @@ export const ORGANIZATION_REGISTRATION_REQUEST = {
 };
 
 /**
+ * Canonical request for Organization activation (`_activate`).
+ * Proof is carried in `body.data[].vp_token` (or alternatively `body.data[].vp` as JSON VP).
+ */
+export const ORGANIZATION_ACTIVATION_REQUEST = {
+  "jti": "org-activation-request-<test-id>",
+  "thid": "org-activation-thread-<test-id>",
+  "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+  "aud": "did:web:host.example.com",
+  "exp": 1678886460,
+  "iat": 1678886400,
+  "nbf": 1678886400,
+  "type": "application/api+json",
+  "body": {
+    "data": [{
+      "type": "Organization-activation-request-v1.0",
+      "vp_token": "<vp-jws>",
+      "meta": {
+        "claims": {
+          "@context": "org.schema",
+          "@type": "template",
+          ...testClaimsRegisterTenantExpanded,
+          "org.schema.Service.termsOfService": pdfEmbeddedData,
+        },
+      },
+    }],
+  },
+  "meta": { ...metaRequestBodyFullJWK }
+};
+
+/**
  * @see API_INTEGRATORS_GUIDE.md section 6.1
  * The response to a successful registration request, containing the Offer.
  */

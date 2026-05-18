@@ -2,6 +2,18 @@
 
 This guide provides a comprehensive, step-by-step walkthrough for the complete API integration flow, from registering a new organization to onboarding its first customer.
 
+For the strict, demonstrable core flow aligned with SDK live tests, use:
+- `docs/API_CORE_INTEGRATION.md`
+
+## Scope
+
+This guide focuses on the core onboarding/data flows required for the current public GW profile.
+Domain/client-specific extensions should be documented in their corresponding extension repositories.
+
+SDK method-level orchestration reference is maintained in:
+- `dataspace-client-sdk-node/docs/01-globaldatacare-gw/*` (core)
+- `dataspace-client-sdk-node/docs/04-reference/*` (API catalog)
+
 **Interactive Documentation:** All endpoints are documented and can be tested interactively via the Swagger UI at the `/api-docs` endpoint of the running service.
 **Online test deployment:** https://globaldatacare-test-961105121121.europe-southwest1.run.app/api-docs
 
@@ -1838,6 +1850,12 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.hl
 
 **Claims canonicalization:** Claims should use `@context: "org.hl7.fhir.api"` to avoid inconsistencies between FHIR versions and keep the consent vocabulary stable across sectors. Clients may submit contextualized keys without the `@context` prefix (e.g., `Consent.purpose`); the gateway normalizes them before hashing and storage by prefixing missing keys with `${@context}.` and sorting keys alphabetically.
 
+**Normalization contract:** See [normalization-spec.md](../../gdc-common-utils-ts/docs/normalization-spec.md) for the canonical cross-repository rules.
+- LOINC has three representations: storage/search tokens (`LOINC|<code>`), FHIR coding (`system=http://loinc.org`, `code=<code>`), and UI/i18n keys (`org.loinc.<code>`).
+- `Consent.action` is used for permission checks, while `Consent.category` is used for consent classification and search.
+- `Communication.datatype` carries the document ontology/type, `Communication.category` carries the subtype/classification, and `Communication.section` is optional for Composition indexing.
+- DB key transforms are backend-internal only: public API contracts must keep canonical logical keys, and physical storage rewrites must not leak into integrator payloads.
+
 ### 8.4. Step 8: Send a Secure Communication
 
 Based on a prior `Consent`, an authorized employee or data provider can send a secure communication (e.g., an appointment reminder) to a patient and any related persons defined in the consent rules.
@@ -1909,6 +1927,7 @@ Fields captured by the form (normalized names):
 - `DocumentReference.basedOn` (URL of source FHIR resource)
 - `DocumentReference.category` (document group / higher-level classification)
 - `DocumentReference.contentdata` (base64)
+- `DocumentReference.contenthash` (CID / hash of attachment content)
 - `DocumentReference.contenttype` (e.g., `application/pdf`)
 - `DocumentReference.context` (`Appointment | Encounter | EpisodeOfCare`)
 - `DocumentReference.creation` (source info creation time)
@@ -1936,6 +1955,7 @@ Fields captured by the form (normalized names):
 | `DocumentReference.basedOn` | URL of the source FHIR resource. | `https://ehr.example.com/fhir/ServiceRequest/sr-991` |
 | `DocumentReference.category` | Group of documents (higher-level). | `http://hl7.org/fhir/ValueSet/document-classcodes|LP173418-7` |
 | `DocumentReference.contentdata` | Base64 document data. | `JVBERi0xLjc...` |
+| `DocumentReference.contenthash` | Content hash/CID for retrieval and integrity checks. | `z4EBG9jDwAxbThHs9AMGBy6dTN1P9fGEcXq6tCm1ugw3pV89Nsc` |
 | `DocumentReference.contenttype` | Content MIME type. | `application/pdf` |
 | `DocumentReference.context` | Context (`Appointment | Encounter | EpisodeOfCare`). | `Encounter/enc-123` |
 | `DocumentReference.creation` | When source information was created. | `2026-02-10T08:20:00Z` |
@@ -2407,7 +2427,7 @@ curl -X POST 'http://localhost:3000/acme/cds-es/v1/health-care/individual/org.hl
 For research pipelines (for example veterinary claims pre-converted from Qvet/Wakyma exports), use the `digitaltwin` section and `org.hl7.fhir.api` format.
 
 - Example pre-conversion source file:
-  - `/Users/fernando/GITS/gdc-workspace/adapter-ingestion-py/examples/input/exampleQvetES.xlsx`
+  - `$HOME/GITS/gdc-workspace/adapter-ingestion-py/examples/input/exampleQvetES.xlsx`
 - Expected adapter output shape:
   - DIDComm plaintext message
   - `body.data[]` (array of Composition resource objects)

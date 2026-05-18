@@ -403,6 +403,40 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
     `,
     swaggerOptions: {
       url: swaggerSpecUrl,
+      defaultModelsExpandDepth: -1,
+      tagsSorter: 'alpha',
+      operationsSorter: (a: any, b: any) => {
+        const read = (obj: any, key: string): string => {
+          try {
+            if (obj?.get && typeof obj.get === 'function') {
+              const v = obj.get(key);
+              return v == null ? '' : String(v);
+            }
+          } catch (_) {}
+          const v = obj?.[key];
+          return v == null ? '' : String(v);
+        };
+        const readStep = (opWrapper: any): string => {
+          // Swagger UI passes Immutable wrappers where operation lives in opWrapper.get('operation').
+          const direct = read(opWrapper, 'x-flow-step');
+          if (direct) return direct;
+          const nested = opWrapper?.get && typeof opWrapper.get === 'function'
+            ? opWrapper.get('operation')
+            : opWrapper?.operation;
+          return read(nested, 'x-flow-step');
+        };
+        const stepA = readStep(a);
+        const stepB = readStep(b);
+        if (stepA && stepB && stepA !== stepB) {
+          return stepA.localeCompare(stepB, undefined, { numeric: true });
+        }
+        const pathA = read(a, 'path');
+        const pathB = read(b, 'path');
+        if (pathA !== pathB) return pathA.localeCompare(pathB);
+        const methodA = read(a, 'method');
+        const methodB = read(b, 'method');
+        return methodA.localeCompare(methodB);
+      },
       parameterMacro: (operation: any, parameter: any) => {
         const browser: any = globalThis as any;
         const key = 'gw-api-docs:' + String(parameter?.name || '');

@@ -545,7 +545,7 @@ export function createApiRouter(
    *       - production: `network`
    *
    *       Expected semantics:
-   *       - the controller submits ICA-derived proof, for example through a `vp_token`
+   *       - the controller submits ICA-derived proof in `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP)
    *       - the host validates the ICA proof and activates the tenant backend/connector
    *       - activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`
    *         (include that claim in `meta.claims` to size requested seats)
@@ -569,6 +569,9 @@ export function createApiRouter(
    *         application/didcomm-plaintext+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/OrganizationActivationPlaintextMessage'
    *         application/json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
@@ -843,11 +846,11 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 99. Legacy / Internal
-   *     summary: (Legacy) Create a Person (individual vault)
+  *     summary: Create a Person (individual vault)
    *     description: |
    *       This endpoint existed for the older "customer onboarding" flow where a provider created an individual's vault directly.
    *
-  *       This endpoint is kept for legacy compatibility with older individual onboarding flows.
+  *       This endpoint remains available for the phone-validated form bootstrap path used by the chat node and other compatibility clients.
   *       New portal integrations should use the tenant organization activation + individual indexing flow documented in the current SDK guides.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -2075,11 +2078,11 @@ export function createApiRouter(
         );
         const enforceBearerValidation = !allowsInsecureBearerBySecurityMode();
         // The 'ping' endpoint is a public health check and does not require authentication for legacy requests.
-        if (
+        const requireBearerHeader =
           section !== 'ping'
           && !allowNoBearerForActivate
-          && (!authToken || !authToken.startsWith('Bearer '))
-        ) {
+          && !allowsInsecureBearerBySecurityMode();
+        if (requireBearerHeader && (!authToken || !authToken.startsWith('Bearer '))) {
           return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
         }
 

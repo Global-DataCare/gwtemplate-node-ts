@@ -2,6 +2,8 @@
 
 This document serves as the central index for all documentation related to the Gateway Template project.
 
+SDK-specific method documentation is canonical in `dataspace-client-sdk-node` docs and should not be duplicated here.
+
 ## Documentation Structure
 
 ```
@@ -20,6 +22,12 @@ docs/
 ## Generated Artifacts
 
 - **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
+- **Core integration bible**: `docs/API_CORE_INTEGRATION.md` defines the canonical SEDIA-aligned flow used by SDK live core tests.
+- **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
+  - `artifacts/openapi-profiles/openapi-core.json`
+  - `artifacts/openapi-profiles/openapi-compat.json`
+  - `artifacts/openapi-profiles/openapi-extension.json`
+  See `docs/OPENAPI_PROFILES.md`.
 - **Docs QA (Flow Report)**: `artifacts/api-integrators-guide.flow-report.json` is generated via `npm run docs:flow-report` and captures the onboarding journey requests/responses.
 - **Contract-check intent**: The flow report is used as a reproducible docs/examples contract check and to keep Swagger examples aligned with real responses.
 - **Intentional negative controls**: Some report steps are expected to fail (for example `2.1.2 Initial Access Token Exchange (invalid code)`) to verify error handling before the valid path.

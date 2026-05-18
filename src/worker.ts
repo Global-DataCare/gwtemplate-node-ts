@@ -66,6 +66,7 @@ export class Worker {
 	          manager = this.managers.individualManager;
 	          break;
         case 'Composition':
+        case 'Bundle':
           manager = this.managers.compositionManager;
           break;
         case 'DocumentReference':

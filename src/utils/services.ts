@@ -118,6 +118,20 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
         ['_search'],
       ),
     );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'individual', format: 'org.hl7.fhir.api' },
+        ['Composition', 'Bundle'],
+        ['_search'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'individual', format: 'org.hl7.fhir.r4' },
+        ['Composition', 'Bundle'],
+        ['_search'],
+      ),
+    );
   }
 
   // Digital twin ingestion for research sectors uses flat interoperable claims (`org.hl7.fhir.api`)

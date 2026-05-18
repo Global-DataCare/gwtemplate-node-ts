@@ -28,6 +28,8 @@ swaggerDefinition.components.schemas.AsyncPollSecureResponse.example = examples.
 
 swaggerDefinition.components.examples.OrganizationRegistrationPlaintextMessage.value =
   examples.ORGANIZATION_REGISTRATION_REQUEST;
+swaggerDefinition.components.examples.OrganizationActivationPlaintextMessage.value =
+  examples.ORGANIZATION_ACTIVATION_REQUEST;
 swaggerDefinition.components.examples.OrganizationOrderPlaintextMessage.value =
   examples.ORGANIZATION_ORDER_REQUEST;
 swaggerDefinition.components.examples.OrganizationOrderResponseBundle.value =
@@ -79,5 +81,8 @@ const swaggerSpec = swaggerJSDoc({
 });
 
 const outputPath = path.resolve(process.cwd(), 'swagger-spec.json');
+const referencePath = path.resolve(process.cwd(), 'swagger-spec.reference.json');
 fs.writeFileSync(outputPath, JSON.stringify(swaggerSpec, null, 2));
+fs.writeFileSync(referencePath, JSON.stringify(swaggerSpec, null, 2));
 console.log(`✅ Swagger specification generated at: ${outputPath}`);
+console.log(`✅ Swagger reference snapshot generated at: ${referencePath}`);

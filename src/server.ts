@@ -62,7 +62,6 @@ import { generateTenantCollectionNameFromClaims } from './utils/tenant';
 import * as swaggerUi from 'swagger-ui-express';
 import { LicenseManager } from './managers/LicenseManager';
 import { TokenManager } from './managers/TokenManager';
-import { DemoTokenVerifier } from './auth/DemoTokenVerifier';
 import { createAuthRouter } from './routes/auth';
 import { OpenIdAuthManager } from './managers/OpenIdAuthManager';
 import { ClearingHouseService } from './services/ClearingHouseService';
@@ -75,7 +74,7 @@ import { createApiDocsSetupOptions } from './managers/ApiDocsManager';
 import { SmartAuthorizationManager } from './managers/auth/SmartAuthorizationManager';
 import { AppAuthorizationManager } from './managers/AppAuthorizationManager';
 import { FamilyManager } from './managers/FamilyManager';
-import { FirebaseTokenVerifier } from './auth/FirebaseTokenVerifier';
+import { resolveTokenVerifierFromEnv } from './auth/token-verifier-registry';
 import * as fs from 'fs';
 import { createCredentialLedgerRouter } from './routes/ledger';
 import { ICredentialLedgerAdapter } from './adapters/ICredentialLedgerAdapter';
@@ -94,22 +93,22 @@ import {
 import { getConfig, resetServerConfig } from './config/server-config';
 import { bootstrapHost } from './bootstrap/host-bootstrap';
 
-function loadSwaggerSpecFromDisk(): any {
+function loadSwaggerSpecFromDisk(fileName = 'swagger-spec.json'): any {
   try {
-    const swaggerSpecPath = path.resolve(process.cwd(), 'swagger-spec.json');
+    const swaggerSpecPath = path.resolve(process.cwd(), fileName);
     return JSON.parse(fs.readFileSync(swaggerSpecPath, 'utf8'));
   } catch (error) {
-    console.warn(`WARN: Could not load swagger-spec.json. Did you run \`npm run build\`? Error: ${error}`);
+    console.warn(`WARN: Could not load ${fileName}. Did you run \`npm run build\`? Error: ${error}`);
     return {
       openapi: '3.0.0',
-      info: { title: 'Swagger Spec Not Found', version: '0.0.0' },
+      info: { title: 'Swagger Spec Not Found', version: '0.0.0', description: `Missing ${fileName}` },
       paths: {},
     };
   }
 }
 
-// Load pre-generated swagger spec once; /swagger-spec.json refreshes from disk on each request.
-let swaggerSpec: any = loadSwaggerSpecFromDisk();
+// Load pre-generated swagger spec once; runtime endpoints refresh from disk on each request.
+let swaggerSpec: any = loadSwaggerSpecFromDisk('artifacts/openapi-profiles/openapi-core.json');
 
 
 
@@ -287,15 +286,12 @@ async function startServer(options?: StartServerOptions) {
 
   const compositionManager = new CompositionManager(vaultRepository, blockchainAdapter);
   const documentReferenceManager = new DocumentReferenceManager(vaultRepository, blockchainAdapter);
-  const communicationManager = new CommunicationManager({ tenantsCacheManager: tenantManager });
+  const communicationManager = new CommunicationManager({ tenantsCacheManager: tenantManager, vaultRepository });
   const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService);
   const licenseManager = new LicenseManager(vaultRepository, kmsService);
 
   // --- Auth Flow Dependencies ---
-  const tokenVerifier =
-    isTestEnv || process.env.AUTH_TOKEN_VERIFIER === 'demo'
-      ? new DemoTokenVerifier()
-      : new FirebaseTokenVerifier();
+  const tokenVerifier = resolveTokenVerifierFromEnv(isTestEnv);
   const appAuthManager = new AppAuthorizationManager(
     vaultRepository,
     tokenVerifier,
@@ -436,7 +432,7 @@ async function startServer(options?: StartServerOptions) {
   app.use(createGlobalErrorHandler(logger));
 
   app.get('/swagger-spec.json', (req: express.Request, res: express.Response) => {
-    const runtimeSwaggerSpec = loadSwaggerSpecFromDisk();
+    const runtimeSwaggerSpec = loadSwaggerSpecFromDisk('artifacts/openapi-profiles/openapi-core.json');
     res.setHeader('Cache-Control', 'no-store');
     if (runtimeSwaggerSpec.info.title === 'Swagger Spec Not Found') {
       res.json(runtimeSwaggerSpec);
@@ -451,8 +447,14 @@ async function startServer(options?: StartServerOptions) {
     const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
     const baseUrl = host ? `${protocol}://${host}` : config.apiBaseUrl;
 
+    const baseTitle = String(runtimeSwaggerSpec?.info?.title || 'Gateway API');
     res.json({
       ...runtimeSwaggerSpec,
+      info: {
+        ...(runtimeSwaggerSpec.info || {}),
+        title: `Gateway API - CORE PROFILE (SEDIA Baseline)`,
+        'x-original-title': baseTitle,
+      },
       servers: [{
         url: baseUrl,
         description: `Server URL for ${config.nodeEnv} environment`,
@@ -460,7 +462,41 @@ async function startServer(options?: StartServerOptions) {
     });
   });
 
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(undefined, createApiDocsSetupOptions('/swagger-spec.json') as any));
+  app.get('/swagger-spec.reference.json', (req: express.Request, res: express.Response) => {
+    const runtimeSwaggerSpec = loadSwaggerSpecFromDisk('swagger-spec.reference.json');
+    res.setHeader('Cache-Control', 'no-store');
+    if (runtimeSwaggerSpec.info.title === 'Swagger Spec Not Found') {
+      res.json(runtimeSwaggerSpec);
+      return;
+    }
+
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const forwardedHost = req.headers['x-forwarded-host'];
+    const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)
+      ?.split(',')[0]
+      ?.trim() || req.protocol;
+    const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
+    const baseUrl = host ? `${protocol}://${host}` : config.apiBaseUrl;
+
+    const baseTitle = String(runtimeSwaggerSpec?.info?.title || 'Gateway API');
+    res.json({
+      ...runtimeSwaggerSpec,
+      info: {
+        ...(runtimeSwaggerSpec.info || {}),
+        title: `Gateway API - REFERENCE PROFILE (Full Surface)`,
+        'x-original-title': baseTitle,
+      },
+      servers: [{
+        url: baseUrl,
+        description: `Server URL for ${config.nodeEnv} environment`,
+      }],
+    });
+  });
+
+  const coreSwaggerUiOptions = createApiDocsSetupOptions('/swagger-spec.json') as any;
+  const referenceSwaggerUiOptions = createApiDocsSetupOptions('/swagger-spec.reference.json') as any;
+  app.use('/api-docs', swaggerUi.serveFiles(undefined, coreSwaggerUiOptions), swaggerUi.setup(undefined, coreSwaggerUiOptions));
+  app.use('/api-docs-reference', swaggerUi.serveFiles(undefined, referenceSwaggerUiOptions), swaggerUi.setup(undefined, referenceSwaggerUiOptions));
 
   const server =
     options?.listen === false

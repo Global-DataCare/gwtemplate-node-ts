@@ -6,11 +6,18 @@ import { CompositionManager } from '../../../managers/CompositionManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
+import {
+  COMPOSITION_BATCH_ENTRY_EXAMPLE,
+  COMPOSITION_SEARCH_BUNDLE_EXAMPLE,
+  COMPOSITION_SEARCH_PARAMETERS_EXAMPLE,
+} from '../../../api-examples';
 
 describe('CompositionManager', () => {
   const mockVaultRepository = {
     vaultExists: jest.fn(),
     put: jest.fn(),
+    query: jest.fn(),
+    getContainersInSection: jest.fn(),
   } as unknown as jest.Mocked<IVaultRepository>;
 
   const manager = new CompositionManager(mockVaultRepository);
@@ -19,6 +26,8 @@ describe('CompositionManager', () => {
     jest.clearAllMocks();
     mockVaultRepository.vaultExists.mockResolvedValue(true as any);
     mockVaultRepository.put.mockResolvedValue(true as any);
+    mockVaultRepository.query.mockResolvedValue([] as any);
+    mockVaultRepository.getContainersInSection.mockResolvedValue([] as any);
   });
 
   const createJob = (overrides: Partial<JobRequest> = {}): JobRequest => ({
@@ -44,20 +53,7 @@ describe('CompositionManager', () => {
         resourceType: 'Bundle',
         type: 'batch',
         entry: [
-          {
-            type: 'Composition',
-            meta: {
-              claims: {
-                '@context': 'org.hl7.fhir.api',
-                'Composition.subject': 'did:web:connector.example.com:animal:chip:z123',
-                'Composition.section': 'LOINC|26436-6',
-                'Composition.author': 'did:web:clinic.example.com:employee:loader',
-                'Composition.date': '2026-03-03T10:00:00Z',
-                'Composition.entry': 'urn:uuid:docref-a,urn:uuid:docref-b',
-                'Composition.type': 'LOINC|60591-5',
-              },
-            },
-          },
+          { ...COMPOSITION_BATCH_ENTRY_EXAMPLE },
         ],
       } as any,
     } as any,
@@ -121,5 +117,39 @@ describe('CompositionManager', () => {
     expect(data[0].type).toBe('OperationOutcome');
     expect(data[0].response.status).toBe('200');
     expect(mockVaultRepository.put).not.toHaveBeenCalled();
+  });
+
+  it('supports _search with FHIR Bundle entry.request.url format', async () => {
+    mockVaultRepository.getContainersInSection.mockResolvedValue([{ id: 'comp-1' }] as any);
+    const job = createJob({
+      action: '_search',
+      content: {
+        ...(createJob().content as any),
+        body: COMPOSITION_SEARCH_BUNDLE_EXAMPLE as any,
+      } as any,
+    });
+
+    const response = await manager.process(job);
+    const data = (response.body as any).data;
+    expect(data[0].type).toBe('Composition-search-response-v1.0');
+    expect(data[0].resource.total).toBe(1);
+    expect(data[0].resource.data).toHaveLength(1);
+  });
+
+  it('supports _search with FHIR Parameters format', async () => {
+    mockVaultRepository.getContainersInSection.mockResolvedValue([{ id: 'comp-1' }, { id: 'comp-2' }] as any);
+    const job = createJob({
+      action: '_search',
+      content: {
+        ...(createJob().content as any),
+        body: COMPOSITION_SEARCH_PARAMETERS_EXAMPLE as any,
+      } as any,
+    });
+
+    const response = await manager.process(job);
+    const data = (response.body as any).data;
+    expect(data[0].type).toBe('Composition-search-response-v1.0');
+    expect(data[0].resource.total).toBe(2);
+    expect(data[0].resource.data).toHaveLength(2);
   });
 });

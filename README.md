@@ -6,6 +6,13 @@ This repository provides a robust, asynchronous, and policy-driven API gateway t
 
 It is designed for building secure, multi-tenant systems that handle complex data interactions, and integration with technologies like Financial API (FAPI), DIDComm and blockchain.
 
+## Non-Negotiable Conventions
+
+- FHIR SearchParameter names are canonical FHIR names only: lowercase and `-` where applicable.
+- No invented camelCase for FHIR claims/search keys (example: use `Communication.part-of`, never `Communication.partOf`).
+- Custom parameter names are allowed only when FHIR has no defined parameter.
+- `resource.meta.claims` is the canonical interoperable claims carrier and must always be persisted/propagated.
+
 ## Repository Navigation
 
 - Main docs index: [docs/README.md](docs/README.md)
