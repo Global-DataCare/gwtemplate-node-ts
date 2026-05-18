@@ -4,7 +4,7 @@
     "title": "Gateway API",
     "version": "1.0.3",
     "description": "API documentation for the secure gateway, covering both legacy (JSON) and secure (JWE) flows.",
-    "x-profile-generated-at": "2026-05-18T15:56:32.078Z",
+    "x-profile-generated-at": "2026-05-18T16:27:26.828Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -257,7 +257,58 @@
             "data": [
               {
                 "type": "Organization-activation-request-v1.0",
-                "vp_token": "<vp-jws>",
+                "vp": {
+                  "@context": [
+                    "https://www.w3.org/ns/credentials/v2"
+                  ],
+                  "type": [
+                    "VerifiablePresentation"
+                  ],
+                  "holder": "did:web:controller.example.org",
+                  "verifiableCredential": [
+                    {
+                      "@context": [
+                        "https://www.w3.org/ns/credentials/v2",
+                        "https://schema.org"
+                      ],
+                      "type": [
+                        "VerifiableCredential",
+                        "OrganizationCredential"
+                      ],
+                      "credentialSubject": {
+                        "id": "did:web:globaldatacare.es:health-care:organization:taxid:VATES-B00112233",
+                        "legalName": "ORGANIZATION LEGAL NAME",
+                        "taxID": "VATES-B00112233"
+                      }
+                    },
+                    {
+                      "@context": [
+                        "https://www.w3.org/ns/credentials/v2",
+                        "https://schema.org"
+                      ],
+                      "type": [
+                        "VerifiableCredential",
+                        "LegalRepresentativeCredential"
+                      ],
+                      "credentialSubject": {
+                        "id": "did:web:controller.example.org",
+                        "identifier": "IDCES-11223344",
+                        "hasOccupation": {
+                          "@type": "Occupation",
+                          "identifier": "|RESPRSN",
+                          "name": "ResponsibleParty"
+                        },
+                        "memberOf": {
+                          "@type": "Organization",
+                          "taxID": "VATES-B00112233"
+                        },
+                        "hasCredential": {
+                          "material": "sha256:legal-representative-email-hash"
+                        }
+                      }
+                    }
+                  ]
+                },
                 "meta": {
                   "claims": {
                     "@context": "org.schema",

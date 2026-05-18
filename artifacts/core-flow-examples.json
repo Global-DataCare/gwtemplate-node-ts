@@ -114,7 +114,19 @@
                 ],
                 "credentialSubject": {
                   "id": "did:web:controller.example.org",
-                  "identifier": "IDCES-11223344"
+                  "identifier": "IDCES-11223344",
+                  "hasOccupation": {
+                    "@type": "Occupation",
+                    "identifier": "|RESPRSN",
+                    "name": "ResponsibleParty"
+                  },
+                  "memberOf": {
+                    "@type": "Organization",
+                    "taxID": "VATES-B00112233"
+                  },
+                  "hasCredential": {
+                    "material": "sha256:legal-representative-email-hash"
+                  }
                 }
               }
             ]

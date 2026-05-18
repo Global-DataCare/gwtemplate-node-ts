@@ -1,3 +1,12 @@
+## 1.3.8 - 2026-05-18
+
+### Changed
+- Enforced legal-representative VC security linkage in `_activate` trust validation:
+  - `credentialSubject.memberOf.taxID` must match organization credential tax ID.
+  - `credentialSubject.hasOccupation` must include `RESPRSN` (Responsible Party).
+  - `credentialSubject.hasCredential.material` is now required.
+- Core API examples are now VP-JSON-first for activation (`body.data[].vp`) to keep proofs readable/auditable; tests can derive `vp_token` JWT from that canonical VP object.
+
 ## 1.3.7 - 2026-05-06
 
 ### Changed

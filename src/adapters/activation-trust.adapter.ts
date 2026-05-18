@@ -112,6 +112,41 @@ function extractRepresentativeMemberOfTaxId(representativeCredential: any): stri
   );
 }
 
+function extractRepresentativeRoleCode(representativeCredential: any): string | undefined {
+  const subject = extractCredentialSubject(representativeCredential) || {};
+  const occupation = subject?.hasOccupation;
+  if (typeof occupation === 'string') return occupation.trim() || undefined;
+  if (occupation && typeof occupation === 'object') {
+    const id = String(occupation?.identifier || '').trim();
+    if (id) return id;
+    const name = String(occupation?.name || '').trim();
+    if (name) return name;
+  }
+  return undefined;
+}
+
+function isResponsiblePartyRole(roleCode: string | undefined): boolean {
+  const normalized = String(roleCode || '').trim().toUpperCase();
+  return normalized.includes('RESPRSN');
+}
+
+function extractRepresentativeCredentialMaterial(representativeCredential: any): string | undefined {
+  const subject = extractCredentialSubject(representativeCredential) || {};
+  const cred = subject?.hasCredential;
+  if (typeof cred === 'string') return cred.trim() || undefined;
+  if (Array.isArray(cred)) {
+    for (const item of cred) {
+      const mat = String(item?.material || '').trim();
+      if (mat) return mat;
+    }
+  }
+  if (cred && typeof cred === 'object') {
+    const mat = String(cred?.material || '').trim();
+    if (mat) return mat;
+  }
+  return undefined;
+}
+
 function assertActivationCredentialConsistency(params: {
   primaryDid?: string;
   organizationCredential?: any;
@@ -143,6 +178,20 @@ function assertActivationCredentialConsistency(params: {
       throw new ManagerError(
         'ICA-issued representative credential memberOf.taxID must match organization credential taxID.',
         IssueType.Conflict,
+      );
+    }
+    const repRole = extractRepresentativeRoleCode(representativeCredential);
+    if (!isResponsiblePartyRole(repRole)) {
+      throw new ManagerError(
+        'ICA-issued representative credential must include Responsible Party role (RESPRSN) in credentialSubject.hasOccupation.',
+        IssueType.Required,
+      );
+    }
+    const repCredentialMaterial = extractRepresentativeCredentialMaterial(representativeCredential);
+    if (!repCredentialMaterial) {
+      throw new ManagerError(
+        'ICA-issued representative credential is missing credentialSubject.hasCredential.material.',
+        IssueType.Required,
       );
     }
   }

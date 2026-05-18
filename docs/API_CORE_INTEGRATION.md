@@ -19,6 +19,10 @@ This document is intentionally narrower than `API_INTEGRATORS_GUIDE.md` and mirr
 - SDK method: `activateOrganizationInGatewayFromIcaProof(...)`
 - Required proof input: `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP)
 - `organizationCredential` / `representativeCredential` side-fields are legacy compatibility only; canonical proof is VP payload.
+- Representative VC security linkage (enforced):
+  - `credentialSubject.memberOf.taxID` must match organization credential tax ID.
+  - `credentialSubject.hasOccupation` must include `RESPRSN` (Responsible Party).
+  - `credentialSubject.hasCredential.material` must be present (email/signing-key continuity material).
 
 2. Host order acceptance
 - Submit: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`
