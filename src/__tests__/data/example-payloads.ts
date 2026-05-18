@@ -147,7 +147,8 @@ export const ORGANIZATION_REGISTRATION_REQUEST = {
 
 /**
  * Canonical request for Organization activation (`_activate`).
- * Proof is carried in `body.data[].vp_token` (or alternatively `body.data[].vp` as JSON VP).
+ * Canonical readable sample uses `body.data[].vp` (JSON VP).
+ * Tests may derive `vp_token` JWT from the same VP object at runtime.
  */
 export const ORGANIZATION_ACTIVATION_REQUEST = {
   "jti": "org-activation-request-<test-id>",
@@ -161,7 +162,30 @@ export const ORGANIZATION_ACTIVATION_REQUEST = {
   "body": {
     "data": [{
       "type": "Organization-activation-request-v1.0",
-      "vp_token": "<vp-jws>",
+      "vp": {
+        "@context": ["https://www.w3.org/ns/credentials/v2"],
+        "type": ["VerifiablePresentation"],
+        "holder": "did:web:controller.example.org",
+        "verifiableCredential": [
+          {
+            "@context": ["https://www.w3.org/ns/credentials/v2", "https://schema.org"],
+            "type": ["VerifiableCredential", "OrganizationCredential"],
+            "credentialSubject": {
+              "id": "did:web:globaldatacare.es:health-care:organization:taxid:VATES-B00112233",
+              "legalName": "ORGANIZATION LEGAL NAME",
+              "taxID": "VATES-B00112233"
+            }
+          },
+          {
+            "@context": ["https://www.w3.org/ns/credentials/v2", "https://schema.org"],
+            "type": ["VerifiableCredential", "LegalRepresentativeCredential"],
+            "credentialSubject": {
+              "id": "did:web:controller.example.org",
+              "identifier": "IDCES-11223344"
+            }
+          }
+        ]
+      },
       "meta": {
         "claims": {
           "@context": "org.schema",

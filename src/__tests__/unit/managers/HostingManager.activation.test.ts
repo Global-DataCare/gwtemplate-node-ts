@@ -12,6 +12,7 @@ import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemao
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
 import { getEnvSectionId } from '../../../utils/section-env';
+import { buildUnsignedVpJwt } from '../../helpers/vp-token-fixture';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -137,6 +138,25 @@ describe('HostingManager activation flow', () => {
   });
 
   function buildActivationJob(overrides?: Partial<JobRequest>): JobRequest {
+    const vpJson = {
+      vp: {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiablePresentation'],
+        holder: 'did:web:controller.example.com',
+        verifiableCredential: [
+          {
+            '@context': ['https://www.w3.org/ns/credentials/v2', 'https://schema.org'],
+            type: ['VerifiableCredential', 'OrganizationCredential'],
+            credentialSubject: { id: 'did:web:api.acme.org' },
+          },
+          {
+            '@context': ['https://www.w3.org/ns/credentials/v2', 'https://schema.org'],
+            type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
+            credentialSubject: { id: 'did:web:controller.example.com' },
+          },
+        ],
+      },
+    } as const;
     return {
       id: 'activation-job-id',
       status: JobStatus.DRAFT,
@@ -156,7 +176,7 @@ describe('HostingManager activation flow', () => {
         jti: 'activation-jti',
         type: 'json',
         body: {
-          vp_token: 'vp-token-001',
+          vp_token: buildUnsignedVpJwt(vpJson as unknown as Record<string, unknown>),
           organizationCredential: {
             '@context': ['https://www.w3.org/2018/credentials/v1'],
             type: ['VerifiableCredential'],
@@ -261,7 +281,7 @@ describe('HostingManager activation flow', () => {
       'activation-proof.json',
       getEnvSectionId('proofs'),
     );
-    expect((proofDoc as any)?.content?.vp_token).toBe('vp-token-001');
+    expect(String((proofDoc as any)?.content?.vp_token || '')).toContain('.');
     expect((proofDoc as any)?.content?.trustPolicy?.networkMode).toBe('test-network');
   });
 
