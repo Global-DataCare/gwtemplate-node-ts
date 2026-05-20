@@ -27,6 +27,10 @@ Primary references:
 - `DocumentReference.contenthash` is content hash/CID
 - hash-based retrieval must use canonical claim name (`contenthash`), with legacy aliases only if documented.
 4. Communication atomic profile constraints must not be presented as native FHIR limitations.
+5. Activation representative checks must consume shared policy from `gdc-common-utils-ts` (no duplicated local parsing).
+6. Canonical representative occupation in examples/docs:
+- `credentialSubject.hasOccupation.identifier.value = "RESPRSN"`
+- avoid `|RESPRSN` as canonical output.
 
 ## TDD Policy
 For any endpoint/manager behavior change:
@@ -39,11 +43,23 @@ For any endpoint/manager behavior change:
 - Unit: `npm run test:unit` or targeted jest files.
 - Integration: `npm run test:integration` or targeted jest files.
 - E2E (when needed): `npm run test:e2e`.
+- Swagger/profile sync when changing contract/examples:
+  - `npm run build:swagger`
 
 ## Core Test Anchors
 - `src/__tests__/unit/managers/CommunicationManager.unit.test.ts`
 - `src/__tests__/unit/managers/DocumentReferenceManager.test.ts`
 - `src/__tests__/integration/composition.bundle-search.api.test.ts`
+- `src/__tests__/unit/adapters/activation-trust.adapter.test.ts`
+
+## Live E2E Execution Policy
+For real core validation, use orchestration script instead of ad-hoc direct test command:
+- `./scripts/run-secure-e2e-google-user.sh`
+
+Collect and preserve audit artifacts:
+1. `gw-secure-e2e-*.log`
+2. `live-gw-http-trace-*.jsonl`
+3. `live-gw-uc5-debug-*.jsonl`
 
 ## Release Discipline
 - Update `CHANGELOG.md` under `Unreleased` with explicit endpoint/manager effects.

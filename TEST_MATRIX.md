@@ -1,5 +1,7 @@
 # TEST_MATRIX - gwtemplate-node-ts
 
+Core baseline summary lives in `TEST_CORE.md`.
+
 ## Goal
 Guarantee endpoint contract correctness and manager behavior for async GW flows.
 

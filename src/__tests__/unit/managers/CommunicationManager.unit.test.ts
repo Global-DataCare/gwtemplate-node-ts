@@ -231,6 +231,7 @@ describe('CommunicationManager Unit Tests', () => {
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
+                  'Communication.identifier': 'comm-audit-001',
                   'Communication.subject': subjectDid,
                   'Communication.recipient': subjectDid,
                   'Communication.sent': '2026-05-17T10:00:00Z',
@@ -270,10 +271,100 @@ describe('CommunicationManager Unit Tests', () => {
       const putCalls = mockVaultRepository.put.mock.calls.filter((args) => args[0] === tenantVaultId && args[2] === docRefSectionId);
       expect(putCalls.length).toBeGreaterThan(0);
       const record = (putCalls[0][1] as any[])[0];
-      expect(record['DocumentReference.subject']).toBe(subjectDid);
-      expect(record['DocumentReference.contenttype']).toBe(contentType);
-      expect(String(record['DocumentReference.identifier']).startsWith('urn:uuid:')).toBe(true);
-      expect(String(record['DocumentReference.contenthash']).startsWith('z')).toBe(true);
+      expect(record['DocumentReference.subject'] || record['org.hl7.fhir.r4.DocumentReference.subject']).toBe(subjectDid);
+      expect(record['DocumentReference.contenttype'] || record['org.hl7.fhir.r4.DocumentReference.contenttype']).toBe(contentType);
+      expect(String(record['DocumentReference.identifier'] || record['org.hl7.fhir.r4.DocumentReference.identifier']).startsWith('urn:uuid:')).toBe(true);
+      expect(String(record['DocumentReference.contenthash'] || record['org.hl7.fhir.r4.DocumentReference.contenthash']).startsWith('z')).toBe(true);
+    });
+  });
+
+  describe('process (subject-scoped communication channel persistence)', () => {
+    const subjectDid = 'did:web:api.acme.org:individual:xyz';
+
+    it('persists an auditable CommMsgExtended channel record per subject', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'thread-audit-001',
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [
+            {
+              type: 'Communication',
+              meta: {
+                claims: {
+                  '@context': 'org.hl7.fhir.r4',
+                  'Communication.identifier': 'comm-audit-001',
+                  'Communication.subject': subjectDid,
+                  'Communication.recipient': subjectDid,
+                  'Communication.sender': 'did:web:operator.example',
+                  'Communication.sent': '2026-05-17T12:30:00Z',
+                },
+              },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                recipient: [{ reference: subjectDid }],
+                sender: { reference: 'did:web:operator.example' },
+                sent: '2026-05-17T12:30:00Z',
+                note: [{ text: 'Permission update requested' }],
+                payload: [
+                  {
+                    contentAttachment: {
+                      id: 'zb2rhfJk6M9MHiMagUhM6YJ6R7Sx9nN2m7r8cfDkQ2uYbGxZq',
+                      contentType: 'application/pdf',
+                      data: Buffer.from('fake-pdf-content', 'utf8').toString('base64'),
+                      title: 'request.pdf',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as any,
+      };
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      await communicationManager.process(job);
+
+      const tenantVaultId = 'health-care_acme';
+      const commSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'communications');
+      const channelPutCalls = mockVaultRepository.put.mock.calls.filter((args) => args[0] === tenantVaultId && args[2] === commSectionId);
+      expect(channelPutCalls.length).toBeGreaterThan(0);
+      const channelRecord = (channelPutCalls[0][1] as any[])[0];
+      expect(channelRecord.id).toBe('comm-audit-001');
+      expect(channelRecord.type).toBe('CommMsgExtended');
+      expect(channelRecord.thid).toBe('thread-audit-001');
+      expect(channelRecord['Communication.identifier']).toBe('comm-audit-001');
+      expect(channelRecord['Communication.subject']).toBe(subjectDid);
+      expect(channelRecord['Communication.sent']).toBe('2026-05-17T12:30:00Z');
+      expect(channelRecord['Communication.note']).toBe('Permission update requested');
+      expect(channelRecord.meta?.payloadCount).toBe(1);
+      expect(channelRecord.meta?.documentReferenceCount).toBe(1);
+      expect(channelRecord['Communication.content-reference']).toContain('DocumentReference/documentreference-from-communication-');
+      expect(channelRecord.resource?.body?.data?.some((item: DataEntry) => item.type === 'Attachment')).toBe(true);
     });
   });
 });

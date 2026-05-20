@@ -1,3 +1,13 @@
+## 1.3.12 - 2026-05-18
+
+### Added
+- `CommunicationManager` now persists a subject-scoped auditable communication channel record as `CommMsgExtended` under `individual_communications_*` sections.
+
+### Changed
+- GW now treats `CommMsgExtended` as the atomic confidential-channel event and `FHIR Communication` as its interoperable health projection.
+- `DocumentReference` extraction from `Communication.payload.contentAttachment` is now an explicit one-attachment-per-record atomic projection for retrieval and secure-storage indexing.
+- Subject-scoped communication channel records now expose canonical `Communication.content-reference` values pointing to referenced business resources and atomized `DocumentReference/<id>` records.
+
 ## 1.3.11 - 2026-05-18
 
 ### Changed

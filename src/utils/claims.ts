@@ -97,6 +97,18 @@ export function normalizeContextualizedClaims(rawClaims: Record<string, any>): R
 
   const trimmedContext = context.trim();
   const prefix = trimmedContext.endsWith('.') ? trimmedContext : `${trimmedContext}.`;
+  const storageMode = resolveClaimsStorageMode(trimmedContext);
+  if (storageMode === 'canonical') {
+    const canonicalized: Record<string, any> = {};
+    for (const key of Object.keys(rawClaims)) {
+      if (key === '@context' || key === '@type') {
+        canonicalized[key] = rawClaims[key];
+        continue;
+      }
+      canonicalized[stripContextualPrefix(key, trimmedContext)] = rawClaims[key];
+    }
+    return sortClaimsAlphabetically(canonicalized);
+  }
 
   const normalized: Record<string, any> = {};
   for (const key of Object.keys(rawClaims)) {
@@ -119,6 +131,45 @@ export function normalizeContextualizedClaims(rawClaims: Record<string, any>): R
   }
 
   return sortClaimsAlphabetically(normalized);
+}
+
+type ClaimsStorageMode = 'contextualized' | 'canonical';
+
+function resolveClaimsStorageMode(context: string): ClaimsStorageMode {
+  const normalizedContext = String(context || '').trim().toLowerCase();
+  const isFhir = normalizedContext === 'api' || normalizedContext.startsWith('org.hl7.fhir');
+  const isIdentity = normalizedContext.startsWith('org.schema');
+  if (isFhir) {
+    return normalizeMode(process.env.CLAIMS_FHIR_STORAGE_MODE) || 'contextualized';
+  }
+  if (isIdentity) {
+    return normalizeMode(process.env.CLAIMS_IDENTITY_STORAGE_MODE) || 'contextualized';
+  }
+  return normalizeMode(process.env.CLAIMS_DEFAULT_STORAGE_MODE) || 'contextualized';
+}
+
+function normalizeMode(raw: unknown): ClaimsStorageMode | undefined {
+  const mode = String(raw || '').trim().toLowerCase();
+  if (mode === 'contextualized' || mode === 'canonical') return mode;
+  return undefined;
+}
+
+function stripContextualPrefix(key: string, context: string): string {
+  const trimmedKey = String(key || '').trim();
+  if (!trimmedKey) return trimmedKey;
+  const contextPrefix = context.endsWith('.') ? context : `${context}.`;
+  if (trimmedKey.startsWith(contextPrefix)) return trimmedKey.slice(contextPrefix.length);
+
+  const normalizedContext = String(context || '').trim().toLowerCase();
+  if (normalizedContext === 'api' || normalizedContext.startsWith('org.hl7.fhir')) {
+    if (trimmedKey.startsWith('org.hl7.fhir.api.')) return trimmedKey.slice('org.hl7.fhir.api.'.length);
+    if (trimmedKey.startsWith('org.hl7.fhir.r4.')) return trimmedKey.slice('org.hl7.fhir.r4.'.length);
+    if (trimmedKey.startsWith('api.')) return trimmedKey.slice('api.'.length);
+  }
+  if (normalizedContext.startsWith('org.schema') && trimmedKey.startsWith('org.schema.')) {
+    return trimmedKey.slice('org.schema.'.length);
+  }
+  return trimmedKey;
 }
 
 

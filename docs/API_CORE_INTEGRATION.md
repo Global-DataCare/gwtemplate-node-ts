@@ -4,6 +4,9 @@ Purpose: canonical, demonstrable integration flow for developers and AI agents.
 
 This document is intentionally narrower than `API_INTEGRATORS_GUIDE.md` and mirrors the live SDK core E2E flow.
 
+Short coverage summary for memory/thesis justification:
+- `../TEST_CORE.md`
+
 ## Source-of-Truth Alignment
 
 - GW OpenAPI core profile served at: `/api-docs` (`/swagger-spec.json`).

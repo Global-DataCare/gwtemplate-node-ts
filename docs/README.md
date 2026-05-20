@@ -23,6 +23,7 @@ docs/
 
 - **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
 - **Core integration bible**: `docs/API_CORE_INTEGRATION.md` defines the canonical SEDIA-aligned flow used by SDK live core tests.
+- **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
   - `artifacts/openapi-profiles/openapi-core.json`
   - `artifacts/openapi-profiles/openapi-compat.json`

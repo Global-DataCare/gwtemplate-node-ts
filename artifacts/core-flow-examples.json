@@ -326,7 +326,7 @@
               "Communication.content-attachment-title": "appointment-details.ics",
               "Communication.content-attachment-type": "text/calendar",
               "Communication.content-reference": "https://url-to-appointment-source.com/some-uuid",
-              "Communication.partOf": "urn:uuid:communication-channel-id",
+              "Communication.part-of": "urn:uuid:communication-channel-id",
               "Communication.recipient": "{CUSTOMER_DID_WEB}",
               "Communication.sender": "{ORGANIZATION_DID_WEB}",
               "Communication.sent": "2025-10-15T14:30:00Z",
