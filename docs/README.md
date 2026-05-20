@@ -8,6 +8,11 @@ SDK-specific method documentation is canonical in `dataspace-client-sdk-node` do
 
 - Canonical policy and cleanup rules: `docs/DOCS_GOVERNANCE.md`.
 
+## Transitional Docs
+
+- Top-level docs marked `Status: Transitional` are migration/bridge content.
+- They must be reviewed and either moved into numbered folders or explicitly retained as cross-cutting runbooks.
+
 ## Documentation Structure
 
 ```

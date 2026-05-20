@@ -1,3 +1,5 @@
+Status: Transitional
+
 # Family API Integrators Guide
 
 This guide is the Family-specific integration profile for the gateway.

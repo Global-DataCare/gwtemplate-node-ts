@@ -1,3 +1,5 @@
+Status: Transitional
+
 # NEXT AGENT HANDOFF - gwtemplate-node-ts
 
 ## Objective

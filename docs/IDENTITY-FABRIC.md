@@ -1,3 +1,5 @@
+Status: Transitional
+
 ## Identity Fabric (Ledger Registry)
 
 This document defines the minimal ledger schema for the identity registry used in the `eu-identity` channel. The registry stores organization identifiers, sector-specific DIDs, and cryptographic keys for auditability, lifecycle status, and verification support. The ledger is not a DID resolver; verifiers still resolve DID documents and VCs via `/.well-known`.

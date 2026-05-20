@@ -1,3 +1,5 @@
+Status: Transitional
+
 # UC Capability Matrix
 
 Purpose: single source of truth for implemented capabilities and missing SDK methods/classes, with mandatory full-flow coverage.

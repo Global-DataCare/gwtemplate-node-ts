@@ -1,3 +1,5 @@
+Status: Transitional
+
 # Gateway API Service: Integration Guide
 
 This guide provides a comprehensive, step-by-step walkthrough for the complete API integration flow, from registering a new organization to onboarding its first customer.
