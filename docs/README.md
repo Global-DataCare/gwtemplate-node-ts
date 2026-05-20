@@ -4,6 +4,10 @@ This document serves as the central index for all documentation related to the G
 
 SDK-specific method documentation is canonical in `dataspace-client-sdk-node` docs and should not be duplicated here.
 
+## Documentation Governance
+
+- Canonical policy and cleanup rules: `docs/DOCS_GOVERNANCE.md`.
+
 ## Documentation Structure
 
 ```
