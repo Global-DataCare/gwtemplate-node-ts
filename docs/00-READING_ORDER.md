@@ -23,13 +23,13 @@ Status: Canonical
 
 These docs are transitional and should not be used as primary onboarding sequence:
 
-- `docs/API_INTEGRATORS_GUIDE.md`
-- `docs/API_FAMILY_INTEGRATORS_GUIDE.md`
-- `docs/NEXT_AGENT_HANDOFF.md`
-- `docs/TODO_COMMUNICATION_ROOT_CHANNEL.md`
-- `docs/TODO_SMART_EHR_COMPAT.md`
-- `docs/UC_CAPABILITY_MATRIX_SEDIA.md`
-- `docs/OPERATORS_REGISTRY.md`
-- `docs/END_TO_END_DEVICE_FLOW.md`
-- `docs/IDENTITY-FABRIC.md`
-- `docs/KEY_CUSTODY_RUNBOOK.md`
+- `docs/90-API_INTEGRATORS_GUIDE.md`
+- `docs/90-API_FAMILY_INTEGRATORS_GUIDE.md`
+- `docs/90-NEXT_AGENT_HANDOFF.md`
+- `docs/90-TODO_COMMUNICATION_ROOT_CHANNEL.md`
+- `docs/90-TODO_SMART_EHR_COMPAT.md`
+- `docs/90-UC_CAPABILITY_MATRIX_SEDIA.md`
+- `docs/90-OPERATORS_REGISTRY.md`
+- `docs/90-END_TO_END_DEVICE_FLOW.md`
+- `docs/90-IDENTITY-FABRIC.md`
+- `docs/90-KEY_CUSTODY_RUNBOOK.md`
