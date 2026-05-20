@@ -15,6 +15,7 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 
 ## Repository Navigation
 
+- Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
 - Main docs index: [docs/README.md](docs/README.md)
 - Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
 - Repo briefing: [BRIEFING_DATASPACE_EN.md](BRIEFING_DATASPACE_EN.md)
