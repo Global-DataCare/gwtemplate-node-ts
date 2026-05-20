@@ -1,5 +1,7 @@
 # Project Documentation Index
 
+- Start here for ordered reading: `docs/00-READING_ORDER.md`
+
 This document serves as the central index for all documentation related to the Gateway Template project.
 
 SDK-specific method documentation is canonical in `dataspace-client-sdk-node` docs and should not be duplicated here.
