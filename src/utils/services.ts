@@ -96,10 +96,49 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   // FHIR endpoints are exposed under explicit FHIR formats (as documented in API_INTEGRATORS_GUIDE and Swagger).
   // Keep them separate from `org.schema` so request validation matches the URL path format segment.
   if (isFhir) {
+    const fhirR4CoreBatchResources = [
+      'Consent',
+      'Communication',
+      'Composition',
+      'DocumentReference',
+      'Patient',
+      'AllergyIntolerance',
+      'Condition',
+      'MedicationStatement',
+      'Observation',
+      'Procedure',
+      'Immunization',
+      'DiagnosticReport',
+      'CarePlan',
+      'Encounter',
+      'AdverseEvent',
+      'RelatedPerson',
+      'Bundle',
+    ];
+    const fhirApiCoreBatchResources = [
+      'Consent',
+      'Communication',
+      'Composition',
+      'DocumentReference',
+      'Patient',
+      'AllergyIntolerance',
+      'Condition',
+      'MedicationStatement',
+      'Observation',
+      'Procedure',
+      'Immunization',
+      'DiagnosticReport',
+      'CarePlan',
+      'Encounter',
+      'AdverseEvent',
+      'RelatedPerson',
+      'Bundle',
+    ];
+
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'individual', format: 'org.hl7.fhir.r4' },
-        ['Consent', 'Communication', 'Composition', 'DocumentReference', 'Observation', 'RelatedPerson', 'Bundle'],
+        fhirR4CoreBatchResources,
         ['_batch'],
       ),
     );
@@ -107,7 +146,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'individual', format: 'org.hl7.fhir.api' },
-        ['Consent', 'Communication', 'Composition', 'DocumentReference', 'Observation', 'RelatedPerson', 'MedicationStatement', 'Bundle'],
+        fhirApiCoreBatchResources,
         ['_batch'],
       ),
     );
