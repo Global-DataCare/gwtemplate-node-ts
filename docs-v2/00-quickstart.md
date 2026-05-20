@@ -13,4 +13,4 @@ Objective: run API, validate health, run one core test flow.
 
 - `docs-v2/06-security-model-and-why.md`
 - `docs-v2/07-didweb-pqc-and-trust-chain.md`
-- `docs-v2/08-use-case-flow-explanations.md`
+- `docs-v2/05-use-case-flow-explanations.md`
