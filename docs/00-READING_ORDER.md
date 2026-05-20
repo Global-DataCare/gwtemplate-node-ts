@@ -17,19 +17,19 @@ Status: Canonical
 
 - Identity/trust: `docs/03-IDENTITY-AND-TRUST/*`
 - Deep dives: `docs/04-DEEP-DIVES/*`
-- Scenarios: `docs/scenarios/*`
+- Scenarios: `docs/05-USE-CASES/*`
 
 ## Transitional Top-Level Docs (not first-read)
 
 These docs are transitional and should not be used as primary onboarding sequence:
 
-- `docs/90-API_INTEGRATORS_GUIDE.md`
-- `docs/90-API_FAMILY_INTEGRATORS_GUIDE.md`
-- `docs/90-NEXT_AGENT_HANDOFF.md`
-- `docs/90-TODO_COMMUNICATION_ROOT_CHANNEL.md`
-- `docs/90-TODO_SMART_EHR_COMPAT.md`
-- `docs/90-UC_CAPABILITY_MATRIX_SEDIA.md`
-- `docs/90-OPERATORS_REGISTRY.md`
-- `docs/90-END_TO_END_DEVICE_FLOW.md`
-- `docs/90-IDENTITY-FABRIC.md`
-- `docs/90-KEY_CUSTODY_RUNBOOK.md`
+- `docs/90.A-API_INTEGRATORS_GUIDE.md`
+- `docs/90.B-API_FAMILY_INTEGRATORS_GUIDE.md`
+- `docs/90.C-NEXT_AGENT_HANDOFF.md`
+- `docs/90.D-TODO_COMMUNICATION_ROOT_CHANNEL.md`
+- `docs/90.E-TODO_SMART_EHR_COMPAT.md`
+- `docs/90.F-UC_CAPABILITY_MATRIX_SEDIA.md`
+- `docs/90.G-OPERATORS_REGISTRY.md`
+- `docs/90.H-END_TO_END_DEVICE_FLOW.md`
+- `docs/90.I-IDENTITY-FABRIC.md`
+- `docs/90.J-KEY_CUSTODY_RUNBOOK.md`

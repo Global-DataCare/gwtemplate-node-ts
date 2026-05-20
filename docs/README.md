@@ -23,7 +23,7 @@ docs/
 ├── 02-API-AND-ENDPOINTS/       # Detailed API endpoint documentation and cURL examples.
 ├── 03-IDENTITY-AND-TRUST/      # Concepts related to identity, DIDs, and trust policies.
 ├── 04-DEEP-DIVES/              # In-depth explanations of specific subsystems (Storage, Fabric, etc.).
-└── scenarios/                  # End-to-end flow descriptions for specific use cases.
+└── 05-USE-CASES/               # End-to-end flow descriptions for specific use cases.
 ```
 
 ---
@@ -83,8 +83,8 @@ docs/
 *   **[04.H-DATASPACE-PUBLICATION-ATTESTATION.md](04-DEEP-DIVES/04.H-DATASPACE-PUBLICATION-ATTESTATION.md)**: Clarifies what is published by link vs anchored on-ledger (hashes/tags), and how attestation/provenance fits.
 *   **[04.I-FABRIC-MULTICLOUD-BLUEPRINT.md](04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md)**: Multi-cloud Fabric deployment plan and channel governance.
 
-### 📂 scenarios
-*   Core scenarios only. Legacy/extension scenario docs were moved to transitional `90.*` files.
+### 📂 05-USE-CASES
+*   Core use cases only. Legacy/extension use-case docs were moved to transitional `90.*` files.
 
 ### 📂 Transitional Scenarios (Not Core Baseline)
 *   **[90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md](90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md)**: Legacy appointment-notification narrative (not part of current core baseline).

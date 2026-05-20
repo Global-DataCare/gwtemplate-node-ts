@@ -165,7 +165,7 @@ To validate `gdc-sdk-client-ts` from `apptemplate` (web portal), keep `gwtemplat
 Use this order to avoid drift between implementations:
 
 1. GW readiness and route compatibility:
-   - [docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
+   - [docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
 2. Frontend SDK use cases and exact calls (`gdc-sdk-client-ts`):
    - [../gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md](../gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md)
 3. Backend Node SDK use cases and exact calls (`dataspace-client-sdk-node`):
@@ -226,7 +226,7 @@ Recommended local preparation sequence:
 
 Before opening `apptemplate`, run the 5-minute Go/No-Go checklist:
 
-- [docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
+- [docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
 
 Automated check command:
 
