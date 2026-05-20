@@ -7,4 +7,10 @@ Objective: run API, validate health, run one core test flow.
 3. Health check: `GET /host/.well-known/ping`
 4. Run targeted tests (core first):
 - Communication/Composition/DocumentReference
-- Then extension tests (if repo is UNID)
+- Then extension tests (if any)
+
+## Read next (context that must not be skipped)
+
+- `docs-v2/06-security-model-and-why.md`
+- `docs-v2/07-didweb-pqc-and-trust-chain.md`
+- `docs-v2/08-use-case-flow-explanations.md`
