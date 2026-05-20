@@ -84,5 +84,8 @@ docs/
 *   **[04.I-FABRIC-MULTICLOUD-BLUEPRINT.md](04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md)**: Multi-cloud Fabric deployment plan and channel governance.
 
 ### 📂 scenarios
-*   **[appointment-notification-flow.md](scenarios/appointment-notification-flow.md)**: E2E description of an appointment notification use case.
-*   **[end-to-end-legacy-flow.md](scenarios/end-to-end-legacy-flow.md)**: E2E description of a data flow involving legacy systems.
+*   Core scenarios only. Legacy/extension scenario docs were moved to transitional `90.*` files.
+
+### 📂 Transitional Scenarios (Not Core Baseline)
+*   **[90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md](90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md)**: Legacy appointment-notification narrative (not part of current core baseline).
+*   **[90.O-END_TO_END_LEGACY_FLOW.md](90.O-END_TO_END_LEGACY_FLOW.md)**: Legacy end-to-end flow reference (transitional).
