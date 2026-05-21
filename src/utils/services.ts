@@ -93,6 +93,13 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     ['_batch']
   ));
 
+  // Family/onboarding flows query the household organization via org.schema.
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'individual', format: 'org.schema' },
+    ['Organization'],
+    ['_search']
+  ));
+
   // FHIR endpoints are exposed under explicit FHIR formats (as documented in API_INTEGRATORS_GUIDE and Swagger).
   // Keep them separate from `org.schema` so request validation matches the URL path format segment.
   if (isFhir) {
