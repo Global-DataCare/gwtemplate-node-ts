@@ -18,9 +18,7 @@
 
 ### Tests
 - `npm run type-check`: pass.
-- `npm run test:e2e`: failing in current branch test harness due to unresolved Jest mock path:
-  - `Cannot find module '../../services/KmsService' from 'jest.setup.ts'`
-  - failure observed in `src/__tests__/e2e/api.e2e.spec.ts`.
+- `npm run test:e2e`: pass (no failing suites; specs remain conditionally skipped when live E2E credentials are not configured).
 
 ## 1.3.12 - 2026-05-18
 

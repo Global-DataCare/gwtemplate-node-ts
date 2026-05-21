@@ -18,9 +18,6 @@ import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-j
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { getGoogleAuthTokenForTesting } from '../utils/auth';
 
-// Mock the KmsService to bypass actual JWE decryption for this legacy test
-jest.mock('../../services/KmsService');
-
 // Increase the timeout for all tests in this file
 jest.setTimeout(20000);
 
@@ -35,6 +32,7 @@ describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
   let server: Server | undefined;
   let queueAdapter: QueueAdapter;
   let addJobSpy: jest.SpyInstance;
+  let decodeRequestSpy: jest.SpyInstance;
   let authToken: string;
 
   beforeAll(async () => {
@@ -43,26 +41,25 @@ describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
       process.env.TEST_USER_PASSWORD!,
     );
     
-    // We are mocking the KmsService for this legacy flow test.
-    (KmsService as jest.Mock).mockImplementation(() => {
-      return {
-        decodeRequest: jest.fn((req: express.Request): Promise<JobRequest> => {
-          const jobContent = req.body as IDecodedDidcommPayload;
-          const job: JobRequest = {
-            id: `job-${Date.now()}`,
-            status: JobStatus.SENT,
-            sequence: 0,
-            createdAtTimestamp: Date.now(),
-            section: 'registry',
-            format: 'org.schema',
-            resourceType: 'Organization',
-            action: '_batch',
-            content: jobContent,
-          };
-          return Promise.resolve(job);
-        }),
-      };
-    });
+    // Stub only decodeRequest for this legacy flow test.
+    decodeRequestSpy = jest
+      .spyOn(KmsService.prototype, 'decodeRequest')
+      .mockImplementation((message: string): Promise<JobRequest> => {
+        const parsed = JSON.parse(String(message || '{}')) as Record<string, unknown>;
+        const jobContent = (parsed.body || parsed) as IDecodedDidcommPayload;
+        const job: JobRequest = {
+          id: `job-${Date.now()}`,
+          status: JobStatus.SENT,
+          sequence: 0,
+          createdAtTimestamp: Date.now(),
+          section: 'registry',
+          format: 'org.schema',
+          resourceType: 'Organization',
+          action: '_batch',
+          content: jobContent,
+        };
+        return Promise.resolve(job);
+      });
 
     const serverInstance = await startServer();
     app = serverInstance.app;
@@ -78,6 +75,9 @@ describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
   afterAll(async () => {
     if (addJobSpy) {
       addJobSpy.mockRestore();
+    }
+    if (decodeRequestSpy) {
+      decodeRequestSpy.mockRestore();
     }
     const serverInstance = server;
     if (serverInstance) {
