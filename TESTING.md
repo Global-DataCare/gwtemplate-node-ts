@@ -50,3 +50,13 @@ Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-cl
     - E2E tests read from `.env.test` via `jest.setup.ts`.
     - Firestore E2E runs only when `FIRESTORE_E2E=true` and either `FIRESTORE_EMULATOR_HOST` or valid Google credentials are present.
     - GCS E2E runs only when `GCS_E2E=true` and `GCS_BUCKET_NAME` is set.
+
+## 4. Authentication Clarity (Real vs Simulated)
+
+- Firebase emulator/mocks are valid for local and integration behavior tests.
+- They are not equivalent to a real production-like identity verification chain.
+- If the target is real auth E2E (real `id_token` verification path), use:
+  - `npm run test:e2e:real`
+- This command performs a precheck:
+  - if `gcloud` login/token is missing, it stops and prints exact login steps;
+  - after authentication, rerun the same command.

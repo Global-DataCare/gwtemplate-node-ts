@@ -20,6 +20,7 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 - Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
 - Repo briefing: [BRIEFING_DATASPACE_EN.md](BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
+- Firestore demo template: [env.firestore-demo.example](env.firestore-demo.example)
 - Local PostgreSQL overrides: [.env.local.postgres](.env.local.postgres)
 - Local PostgreSQL container: [docker-compose.postgres.yml](docker-compose.postgres.yml)
 
@@ -101,6 +102,22 @@ npm run db:local-postgres:down
 
 The vault schema is created automatically by the API on startup.
 
+#### Option B2: Using Node.js with Firestore Demo
+
+This method keeps demo mode (`NODE_ENV=demo`) but persists confidential storage in Firestore and files in GCS.
+
+1. Create your local profile:
+```bash
+cp env.firestore-demo.example .env.firestore-demo
+```
+
+2. Fill `FIRESTORE_PROJECT_ID`, `GCS_BUCKET_NAME`, and `GOOGLE_APPLICATION_CREDENTIALS`.
+
+3. Run the API:
+```bash
+npm run api:local-firestore-demo
+```
+
 #### Option C: Using Docker
 
 This method runs the application inside a Docker container, which is a great way to ensure a consistent environment. This is the same image that will be deployed to the cloud.
@@ -154,7 +171,19 @@ For more advanced testing and scripting, the project includes a comprehensive co
 - `npm run docs:flow-report`: Run the onboarding journey against the in-memory app and write `artifacts/api-integrators-guide.flow-report.json` (docs QA).
 - `npm test`: Run the full test suite.
 - `npm run test:unit` / `npm run test:integration` / `npm run test:e2e`: Run specific test tiers.
+- `npm run test:e2e:real`: Run E2E with real Google auth precheck. If login is missing, it stops and asks for `gcloud auth login`, then you rerun.
 - `npm run seed:dev`: Generate deterministic dev CA material (used by Fabric CA containers).
+
+## E2E Auth Modes (Do Not Mix)
+
+- Simulated/local tests:
+  - Unit/integration and many E2E checks can run with mocks or local providers.
+  - Useful for deterministic CI and fast feedback.
+- Real auth E2E:
+  - Validates real token verification path.
+  - Requires active `gcloud` login and a real `id_token`.
+  - Use `npm run test:e2e:real`.
+  - If auth is missing, command exits with instructions. After login, rerun the same command.
 
 ## Portal Web (apptemplate) - What Must Work in GW
 
