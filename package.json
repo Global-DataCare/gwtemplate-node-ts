@@ -47,7 +47,9 @@
     "update-deps": "node update-deps.js",
     "docker:build": "./docker_build.sh",
     "docker:run": "./docker_run.sh",
-    "check:portal-web-go-no-go": "bash ./scripts/portal-web-go-no-go.sh"
+    "check:portal-web-go-no-go": "bash ./scripts/portal-web-go-no-go.sh",
+    "local:close": "PORTS=3000 bash ./scripts/local-close.sh",
+    "docker:close": "PORTS=8000 bash ./scripts/local-close.sh"
   },
   "dependencies": {
     "@ahryman40k/ts-fhir-types": "^4.0.39",

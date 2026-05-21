@@ -1,3 +1,27 @@
+## 1.3.13 - 2026-05-20
+
+### Added
+- Local process helpers:
+  - `npm run local:close` (port `3000`)
+  - `npm run docker:close` (port `8000`)
+- Canonical occupation claim helper:
+  - `src/utils/occupation.ts`
+
+### Changed
+- Demo tenant bootstrap now uses canonical representative-role claims:
+  - `org.schema.Person.hasOccupation.identifier.additionalType = "v3-RoleCode"`
+  - `org.schema.Person.hasOccupation.identifier.value = "RESPRSN"`
+- Role-code parsing migrated to canonical occupation helper in:
+  - `HostingManager`
+  - `EmployeeManager`
+  - `FamilyManager`
+
+### Tests
+- `npm run type-check`: pass.
+- `npm run test:e2e`: failing in current branch test harness due to unresolved Jest mock path:
+  - `Cannot find module '../../services/KmsService' from 'jest.setup.ts'`
+  - failure observed in `src/__tests__/e2e/api.e2e.spec.ts`.
+
 ## 1.3.12 - 2026-05-18
 
 ### Added

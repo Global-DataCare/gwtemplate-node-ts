@@ -29,6 +29,7 @@ import { TenantsCacheManager } from './TenantsCacheManager';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
+import { getPersonOccupationClaim } from '../utils/occupation';
 
 type FamilyRegistrationContent = {
   status: EntityLifecycleStatus;
@@ -256,8 +257,7 @@ export class FamilyManager {
       await this.vaultRepository.put(tenantVaultId, licenseDocs, getEnvSectionId('device-licenses'));
 
       const controllerEmail = finalizedContent.claims[ClaimsPersonSchemaorg.email] as string | undefined;
-      const controllerRole =
-        (finalizedContent.claims[ClaimsPersonSchemaorg.hasOccupation] as string | undefined) || 'FAMILY_CONTROLLER';
+      const controllerRole = getPersonOccupationClaim(finalizedContent.claims as Record<string, any> | undefined) || 'FAMILY_CONTROLLER';
       if (controllerEmail) {
         try {
           const { activationCode } = await issueActivationCodeFromPool({

@@ -44,6 +44,7 @@ import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { buildPdfSignatureEvidence, PdfSignatureEvidence } from '../utils/pdf-evidence';
+import { getPersonOccupationClaim } from '../utils/occupation';
 import { ManageAssetOrganization } from '../blockchain/fabric/v3/manageAssetOrganization';
 import { resolveIdentityChannel } from '../utils/ledger';
 import { slugFromDomain } from '../utils/slug';
@@ -415,7 +416,7 @@ export class HostingManager {
     registrationKeys?: { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk },
   ): Promise<EntityConfig> {
     const email = legalRep.meta?.claims?.[ClaimsPersonSchemaorg.email] as string | undefined;
-    const roleCode = legalRep.meta?.claims?.[ClaimsPersonSchemaorg.hasOccupation] as string | undefined;
+    const roleCode = getPersonOccupationClaim(legalRep.meta?.claims as Record<string, any> | undefined);
     if (!email || !roleCode) {
       throw new ManagerError('Missing required admin Person claims (email, hasOccupation).', IssueType.Required);
     }
@@ -473,7 +474,7 @@ export class HostingManager {
   ): Promise<void> {
     const verificationMethods = controllerConfig.didDocument?.verificationMethod || [];
     const email = controllerConfig.claims?.[ClaimsPersonSchemaorg.email] as string | undefined;
-    const roleCode = controllerConfig.claims?.[ClaimsPersonSchemaorg.hasOccupation] as string | undefined;
+    const roleCode = getPersonOccupationClaim(controllerConfig.claims as Record<string, any> | undefined);
 
     const attributesToIndex: ParameterData[] = [
       ...(email ? [{ name: 'email', value: email, unique: true, type: 'string' } as ParameterData] : []),
@@ -1068,7 +1069,7 @@ export class HostingManager {
         // Auto-issue the first activation code for the legal representative so they can register their first device
         // right after accepting/paying the Order (no manual "invite" step needed for the first controller).
         const legalRepEmail = processedClaims[ClaimsPersonSchemaorg.email] as string | undefined;
-        const legalRepRole = processedClaims[ClaimsPersonSchemaorg.hasOccupation] as string | undefined;
+        const legalRepRole = getPersonOccupationClaim(processedClaims as Record<string, any> | undefined);
         if (legalRepEmail && legalRepRole) {
           try {
             const { activationCode } = await issueActivationCodeFromPool({
