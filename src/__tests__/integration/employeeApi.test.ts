@@ -110,4 +110,69 @@ describe('Employee Onboarding API', () => {
     expect(response.status).toBe(202);
     expect(response.headers.location).toBe(expectedPollingUrl);
   });
+
+  it('should decode a deactivate request, queue the DELETE job, and return 202 Accepted', async () => {
+    const asyncResponseStore = new AsyncResponseStoreMem();
+    const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
+
+    const tenantId = testTenant1AlternateName;
+    const jurisdiction = testTenant1AddressCountry.toLowerCase();
+    const sector = 'health-care';
+    const section = 'entity';
+    const format = 'org.schema';
+    const resourceType = 'Employee';
+    const action = '_batch';
+
+    const registrationUrl = `/${tenantId}/cds-${jurisdiction}/v1/${sector}/${section}/${format}/${resourceType}/${action}`;
+    const expectedPollingUrl = `http://localhost:3001${registrationUrl.replace('/_batch', '/_batch-response')}`;
+
+    const mockTenantServices: DidService[] = [
+      {
+        id: `#${section}:${format}`,
+        type: 'EmployeeOnboardingService',
+        serviceEndpoint: resourceType,
+        actions: [action],
+        selector: { section, format },
+      },
+    ];
+    jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue(mockTenantServices);
+
+    const mockJob = {
+      ...ORGANIZATION_REGISTRATION_JOB,
+      content: {
+        ...ORGANIZATION_REGISTRATION_JOB.content,
+        body: {
+          data: [
+            {
+              type: 'Employee-deactivate-v1.0',
+              request: { method: 'DELETE' },
+              meta: {
+                claims: {
+                  '@context': 'org.schema',
+                  'org.schema.Person.identifier': 'urn:uuid:11111111-1111-4111-8111-111111111111',
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+    mockKmsService.decodeRequest.mockResolvedValue(mockJob as any);
+
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: registrationUrl,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { request: testEncryptedJwe1 },
+    });
+
+    expect(mockKmsService.decodeRequest).toHaveBeenCalledWith(testEncryptedJwe1);
+    expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
+    const [jobName, queuedJob] = (mockQueueAdapter.addJob as jest.Mock).mock.calls[0];
+    expect(jobName).toContain('health-care_acme:Employee:_batch');
+    expect(queuedJob.content.body.data[0].request.method).toBe('DELETE');
+    expect(queuedJob.content.body.data[0].type).toBe('Employee-deactivate-v1.0');
+    expect(response.status).toBe(202);
+    expect(response.headers.location).toBe(expectedPollingUrl);
+  });
 });

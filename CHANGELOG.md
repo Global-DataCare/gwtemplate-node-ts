@@ -1,3 +1,12 @@
+## 1.3.14 - 2026-05-21
+
+### Tests
+- Added TDD coverage for the core lifecycle split:
+  - `Employee/_batch` create, deactivate, and not-found handling
+  - `MedicationStatement/_batch` not-found route semantics
+  - `CommunicationManager` tenant-resolution not-found handling
+- Kept coverage focused on canonical core flow resources without introducing UHC extension behavior.
+
 ## 1.3.13 - 2026-05-20
 
 ### Added

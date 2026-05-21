@@ -7,10 +7,66 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 
 describe('MedicationStatement API (integration)', () => {
   afterEach(() => {
     resetServerConfig();
+  });
+
+  it('returns 404 when the tenant route has not been provisioned', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.DB_PROVIDER = 'mem';
+    process.env.STORAGE_PROVIDER = 'mem';
+    process.env.QUEUE_PROVIDER = 'mem';
+    process.env.SECTORS_ALLOWED = 'health-care';
+    process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
+    process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.ORG_HOST_ID_TYPE = 'TAX';
+    process.env.ORG_HOST_ID_VALUE = 'A0011223344';
+    process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
+    process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
+    process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.JSON_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+
+    resetServerConfig();
+
+    const { app, queueAdapter } = await startServer({ listen: false });
+    try {
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.api/MedicationStatement/_batch',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'medication-missing-tenant-001',
+          body: {
+            data: [
+              {
+                type: 'MedicationStatement',
+                request: { method: 'POST' },
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.api',
+                    'MedicationStatement.identifier': 'urn:uuid:medication-missing-tenant',
+                    'MedicationStatement.subject': 'Organization/subject-missing',
+                    'MedicationStatement.medication': 'Paracetamol 500mg',
+                    'MedicationStatement.status': 'active',
+                  },
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      expect(response.status).toBe(404);
+      const payload = JSON.parse(response.text);
+      expect(payload.body?.issues?.issue?.[0]?.code).toBe(IssueType.NotFound);
+    } finally {
+      queueAdapter.stop();
+    }
   });
 
   it('creates and searches MedicationStatement entries for a tenant individual scope', async () => {

@@ -16,6 +16,7 @@ import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
 import { normalizeCodeSystemAndValue } from '../../../utils/normalize-codeAndSystem';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getEnvSectionId } from '../../../utils/section-env';
+import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/enums';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -24,7 +25,7 @@ const uuidMock = {
 
 jest.unstable_mockModule('uuid', () => uuidMock);
 
-const { v4: uuidv4 } = await import('uuid');
+const { v4: uuidv4, validate: uuidValidate } = await import('uuid');
 const { EmployeeManager } = await import('../../../managers/EmployeeManager');
 
 describe('EmployeeManager', () => {
@@ -47,6 +48,7 @@ describe('EmployeeManager', () => {
     mockTenantsCacheManager = mock<TenantsCacheManager>();
     employeeManager = new EmployeeManager(mockVaultRepository, mockKmsService, mockTenantsCacheManager);
     (uuidv4 as jest.Mock).mockReturnValue(MOCKED_OCCUPATION_UUID);
+    (uuidValidate as jest.Mock).mockReturnValue(true);
     jest.clearAllMocks();
 
     mockKmsService.protectConfidentialData.mockImplementation(
@@ -55,6 +57,9 @@ describe('EmployeeManager', () => {
         delete secureDoc.content;
         return secureDoc;
       },
+    );
+    mockKmsService.unprotectConfidentialData.mockImplementation(async (doc: ConfidentialStorageDoc) =>
+      Promise.resolve(doc.content as any),
     );
     
     // Mock for the new secure indexing flow
@@ -244,6 +249,77 @@ describe('EmployeeManager', () => {
   });
 
   describe('Employee Deactivation (DELETE)', () => {
-    it('should be true', () => expect(true).toBe(true));
+    it('should deactivate an existing employee and mark it inactive', async () => {
+      const employeeId = '11111111-1111-4111-8111-111111111111';
+      const createJob = testBaseJobForEmployeeClaims(
+        {
+          ...testClaimsTenant1Receptionist1,
+          [ClaimsPersonSchemaorg.identifier]: `urn:uuid:${employeeId}`,
+        },
+        TENANT_ALTERNATE_NAME,
+        TENANT_SECTOR,
+      );
+
+      mockVaultRepository.put.mockResolvedValue(true);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockTenantsCacheManager.getEntityClaims.mockResolvedValue({});
+
+      const createResponse = await employeeManager.process(createJob);
+      expect(createResponse.body.data[0].response.status).toBe('201');
+
+      const createdEmployeeDoc = mockKmsService.protectConfidentialData.mock.calls[0][0] as ConfidentialStorageDoc;
+      expect(createdEmployeeDoc.content).toBeDefined();
+      mockVaultRepository.get.mockResolvedValueOnce(createdEmployeeDoc);
+
+      const deleteJob: JobRequest = {
+        ...createJob,
+        content: {
+          ...createJob.content!,
+          body: {
+            ...createJob.content!.body,
+            data: [
+              {
+                ...createJob.content!.body!.data![0],
+                request: { method: 'DELETE' },
+                type: 'Employee-deactivate-v1.0',
+              },
+            ],
+          },
+        },
+      } as JobRequest;
+
+      const deleteResponse = await employeeManager.process(deleteJob);
+      const deleteEntry = deleteResponse.body.data[0] as any;
+      expect(deleteEntry.response.status).toBe('200');
+      expect(deleteEntry.resource.id).toBe(employeeId);
+
+      const deactivateCall = mockKmsService.protectConfidentialData.mock.calls[1][0] as ConfidentialStorageDoc;
+      expect((deactivateCall.content as EntityConfig).status).toBe(EntityLifecycleStatus.Inactive);
+    });
+
+    it('should return a 404 OperationOutcome when the employee to deactivate does not exist', async () => {
+      const employeeId = '22222222-2222-4222-8222-222222222222';
+      const deleteJob = testBaseJobForEmployeeClaims(
+        {
+          ...testClaimsTenant1Receptionist1,
+          [ClaimsPersonSchemaorg.identifier]: `urn:uuid:${employeeId}`,
+        },
+        TENANT_ALTERNATE_NAME,
+        TENANT_SECTOR,
+      );
+
+      deleteJob.content!.body!.data![0].request = { method: 'DELETE' };
+
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockTenantsCacheManager.getEntityClaims.mockResolvedValue({});
+      mockVaultRepository.get.mockResolvedValueOnce(undefined as any);
+
+      const response = await employeeManager.process(deleteJob);
+      const entry = response.body.data[0] as any;
+      expect(entry.response.status).toBe('404');
+      expect(entry.response.outcome?.resourceType).toBe('OperationOutcome');
+      expect(entry.response.outcome?.issue?.[0]?.code).toBe('not-found');
+      expect(mockVaultRepository.put).not.toHaveBeenCalled();
+    });
   });
 });

@@ -17,6 +17,8 @@ import { createHash } from 'crypto';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import { fhirResourceToCid } from '../utils/fhir-versioning';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 
 interface CommunicationManagerOptions {
   tenantsCacheManager: TenantsCacheManager;
@@ -55,6 +57,9 @@ export class CommunicationManager implements IJobProcessor {
       (Array.isArray(body?.data) && body.data) ||
       (Array.isArray(body?.entry) && body.entry) ||
       [body];
+    const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+    const serverDid = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
+    const responseIssuer = serverDid || (job.content?.aud as string) || '';
 
     for (const entry of entries) {
       try {
@@ -65,15 +70,14 @@ export class CommunicationManager implements IJobProcessor {
         if (!fhirResource) {
           throw new Error('Malformed entry: missing resource and missing meta.claims');
         }
-        
+
         if (fhirResource.resourceType !== 'Communication') {
           console.warn(`Skipping resource of type ${fhirResource.resourceType}`);
           continue;
         }
 
-        const serverDid = await this.tenantsCacheManager.getTenantDid(getTenantVaultId(job.sector as string, job.tenantId as string));
         if (!serverDid) {
-            throw new Error(`Could not determine server DID for tenant '${job.tenantId}'.`);
+          throw new ManagerError(`Could not determine server DID for tenant '${job.tenantId}'.`, IssueType.NotFound);
         }
         const commMsg = this.convertFhirToCommMsg(job.content.thid, serverDid, fhirResource);
         await this.persistCommunicationChannelRecord(job, entry as any, fhirResource, commMsg);
@@ -93,19 +97,21 @@ export class CommunicationManager implements IJobProcessor {
           resource: commMsg,
         });
 
-      } catch (error) {
+      } catch (error: any) {
         const identifierClaim =
           (entry as any)?.meta?.claims?.['Communication.identifier'] ??
           (entry as any)?.resource?.id;
         const resourceId = determineResourceId(identifierClaim, process.env.NODE_ENV);
+        const status = error instanceof ManagerError ? error.status : '500';
+        const code = error instanceof ManagerError ? error.code : 'processing';
         bundleEntries.push({
           response: {
-            status: '500',
+            status,
             outcome: {
               resourceType: 'OperationOutcome',
               issue: [{
                 severity: 'error',
-                code: 'processing',
+                code,
                 details: { text: error instanceof Error ? error.message : 'Unknown error during conversion.' },
               }],
             }
@@ -122,21 +128,13 @@ export class CommunicationManager implements IJobProcessor {
       type: `${job.action}-response`, // FHIR based: batch-resonse, transaction-response
       data: bundleEntries,
     };
-    
-    const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
-    const serverDid = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
-    if (!serverDid) {
-      // This is a critical configuration error. The tenant is not in the cache.
-      // We cannot issue a response without a valid DID.
-      throw new Error(`Could not determine server DID for tenant '${job.tenantId}'.`);
-    }
 
     // The audience of our response should be the issuer of the request
     const aud = job.content.meta?.bearer?.jwt?.payload?.iss || '';
 
     const result: IDecodedDidcommPayload = {
       jti: uuidv4(),
-      iss: serverDid,
+      iss: responseIssuer,
       aud: aud,
       exp: now + 300, // 5 minutes expiration
       thid: job.content.thid,
