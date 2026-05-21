@@ -5,8 +5,8 @@ Version control:
 - Version: `1.0.0`
 - Status: `Canonical (derived from ES canonical briefing)`
 - Date: `2026-04-08`
-- Canonical ES source: `/Users/fernando/GITS/gdc-workspace/BRIEFING_DATASPACE_ES.md`
-- This EN canonical file: `/Users/fernando/GITS/gdc-workspace/BRIEFING_DATASPACE_EN.md`
+- Canonical ES source: `$HOME/GITS/gdc-workspace/BRIEFING_DATASPACE_ES.md`
+- This EN canonical file: `$HOME/GITS/gdc-workspace/BRIEFING_DATASPACE_EN.md`
 
 ## 1. Purpose
 Single baseline document for project leadership, security audit, and engineering.

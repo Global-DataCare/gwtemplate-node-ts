@@ -44,6 +44,7 @@ import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { buildPdfSignatureEvidence, PdfSignatureEvidence } from '../utils/pdf-evidence';
+import { getPersonOccupationClaim } from '../utils/occupation';
 import { ManageAssetOrganization } from '../blockchain/fabric/v3/manageAssetOrganization';
 import { resolveIdentityChannel } from '../utils/ledger';
 import { slugFromDomain } from '../utils/slug';
@@ -193,10 +194,24 @@ export class HostingManager {
   }
 
   private extractActivationMaterial(entry: BundleEntry, body: any) {
+    const entryAny = entry as any;
     const entryMeta = (entry?.meta || {}) as Record<string, any>;
     const entryResource = (entry?.resource || {}) as Record<string, any>;
-    const vpToken = body?.vp_token || entryMeta?.vp_token || entryResource?.vp_token;
-    const vpPayload = this.parseVpTokenPayload(vpToken);
+    const vpTokenCandidate =
+      entryAny?.vp_token
+      || body?.vp_token
+      || entryMeta?.vp_token
+      || entryResource?.vp_token;
+    const vpJsonCandidate =
+      entryAny?.vp
+      || body?.vp
+      || entryMeta?.vp
+      || entryResource?.vp;
+    const vpProofRaw = vpTokenCandidate || vpJsonCandidate;
+    const vpToken = typeof vpProofRaw === 'string'
+      ? vpProofRaw
+      : (vpProofRaw ? JSON.stringify(vpProofRaw) : undefined);
+    const vpPayload = this.parseVpTokenPayload(vpProofRaw);
     const orgCredentialFromVp = this.extractCredentialFromVp(
       vpPayload,
       ['OrganizationCredential', 'LegalOrganizationCredential'],
@@ -234,6 +249,7 @@ export class HostingManager {
       || entryResource?.legalRepresentativeCredential;
     return {
       vpToken,
+      hasVpJson: Boolean(vpJsonCandidate),
       presentationSubmission:
         body?.presentation_submission
         || entryMeta?.presentation_submission
@@ -400,7 +416,7 @@ export class HostingManager {
     registrationKeys?: { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk },
   ): Promise<EntityConfig> {
     const email = legalRep.meta?.claims?.[ClaimsPersonSchemaorg.email] as string | undefined;
-    const roleCode = legalRep.meta?.claims?.[ClaimsPersonSchemaorg.hasOccupation] as string | undefined;
+    const roleCode = getPersonOccupationClaim(legalRep.meta?.claims as Record<string, any> | undefined);
     if (!email || !roleCode) {
       throw new ManagerError('Missing required admin Person claims (email, hasOccupation).', IssueType.Required);
     }
@@ -458,7 +474,7 @@ export class HostingManager {
   ): Promise<void> {
     const verificationMethods = controllerConfig.didDocument?.verificationMethod || [];
     const email = controllerConfig.claims?.[ClaimsPersonSchemaorg.email] as string | undefined;
-    const roleCode = controllerConfig.claims?.[ClaimsPersonSchemaorg.hasOccupation] as string | undefined;
+    const roleCode = getPersonOccupationClaim(controllerConfig.claims as Record<string, any> | undefined);
 
     const attributesToIndex: ParameterData[] = [
       ...(email ? [{ name: 'email', value: email, unique: true, type: 'string' } as ParameterData] : []),
@@ -568,7 +584,7 @@ export class HostingManager {
   ): Promise<BundleEntry | ErrorEntry> {
     const activation = this.extractActivationMaterial(entry, body);
     if (!activation.vpToken || typeof activation.vpToken !== 'string') {
-      throw new ManagerError("Missing required activation proof 'vp_token'.", IssueType.Required);
+      throw new ManagerError("Missing required activation proof in `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP).", IssueType.Required);
     }
     const trustResult = await this.activationTrustAdapter.evaluate({
       networkMode: this.config.networkMode,
@@ -1053,7 +1069,7 @@ export class HostingManager {
         // Auto-issue the first activation code for the legal representative so they can register their first device
         // right after accepting/paying the Order (no manual "invite" step needed for the first controller).
         const legalRepEmail = processedClaims[ClaimsPersonSchemaorg.email] as string | undefined;
-        const legalRepRole = processedClaims[ClaimsPersonSchemaorg.hasOccupation] as string | undefined;
+        const legalRepRole = getPersonOccupationClaim(processedClaims as Record<string, any> | undefined);
         if (legalRepEmail && legalRepRole) {
           try {
             const { activationCode } = await issueActivationCodeFromPool({

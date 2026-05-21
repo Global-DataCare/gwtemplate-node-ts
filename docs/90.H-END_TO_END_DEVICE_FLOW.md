@@ -1,3 +1,5 @@
+Status: Transitional
+
 # End-to-End Device Registration and Activation Flow
 ## (Enabling SMART App Launch)
 

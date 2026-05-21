@@ -1,3 +1,5 @@
+Status: Transitional
+
 # Key Custody Runbook (GW)
 
 ## Scope

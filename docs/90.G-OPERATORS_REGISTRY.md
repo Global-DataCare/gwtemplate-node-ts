@@ -1,3 +1,5 @@
+Status: Transitional
+
 # Operators Registry (JWS)
 
 This registry lists approved operators and is signed with the UNID Foundation FNMT representative certificate.

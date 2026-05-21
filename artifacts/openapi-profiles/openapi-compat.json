@@ -1,0 +1,5060 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Gateway API",
+    "version": "1.0.3",
+    "description": "API documentation for the secure gateway, covering both legacy (JSON) and secure (JWE) flows.",
+    "x-profile-generated-at": "2026-05-21T05:54:14.523Z",
+    "x-profile-name": "compat"
+  },
+  "servers": [],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "1.1 Organization Registration",
+      "description": "Step 1 (Offer): register a new tenant (organization) on the host."
+    },
+    {
+      "name": "1.2 Organization Order",
+      "description": "Step 2 (Order): accept the registration offer and obtain payment/checkout."
+    },
+    {
+      "name": "2.1.4 License Issuance (Invite)",
+      "description": "Issue an invite for license activation (host or tenant licensing flow)."
+    },
+    {
+      "name": "2.1.2 Initial Access Token Exchange",
+      "description": "Exchange activation code + Firebase id_token for initial_access_token (DCR)."
+    },
+    {
+      "name": "2.1.3 Device Registration (DCR)",
+      "description": "Register device keys / client_id using OpenID Dynamic Client Registration."
+    },
+    {
+      "name": "2.2 OIDC4VCI",
+      "description": "Issue Gaia-X compliance credentials via OIDC4VCI."
+    },
+    {
+      "name": "2.2 SMART Token",
+      "description": "Step 4: request SMART access tokens (scoped) for a single subject context."
+    },
+    {
+      "name": "3.1 Employee Role",
+      "description": "Step 5: create employee/role resources under a tenant."
+    },
+    {
+      "name": "4.1 Family Registration",
+      "description": "Step 6 (Offer): register a family organization/household under a tenant."
+    },
+    {
+      "name": "4.2 Family Order",
+      "description": "Step 6a (Order): accept the family registration offer."
+    },
+    {
+      "name": "4.3 Family Member Relationship",
+      "description": "Step 6b: register family members / emergency contacts (RelatedPerson)."
+    },
+    {
+      "name": "5. Consent",
+      "description": "Step 7: create consent rules (FHIR Consent)."
+    },
+    {
+      "name": "6. Communication",
+      "description": "Step 8: send secure communications (FHIR Communication)."
+    },
+    {
+      "name": "7. Composition",
+      "description": "Step 9: update the Unified Health Index (FHIR Composition)."
+    },
+    {
+      "name": "8.1 Subject Profile",
+      "description": "Create/update One Health subject profiles (claims-first) for Person, Animal, or Thing."
+    },
+    {
+      "name": "8.4 Personal Observations",
+      "description": "Collect self-reported, non-clinical observations for emergency/care continuity."
+    },
+    {
+      "name": "9. Research Digital Twin",
+      "description": "Ingest pre-converted research claims as digital twin Composition batches."
+    },
+    {
+      "name": "Discovery",
+      "description": "Well-known and discovery endpoints."
+    },
+    {
+      "name": "Data Catalog Discovery",
+      "description": "DCAT-3 catalog discovery endpoints (`/dcat3/catalog/...`) for operator/provider dataset lookup."
+    },
+    {
+      "name": "Async Polling",
+      "description": "Polling endpoints (`_batch-response`) used to retrieve the final result of asynchronous jobs."
+    },
+    {
+      "name": "2.1.1 Frontend Identity Federation (Optional)",
+      "description": "Optional pre-step: federate an external OIDC id_token (e.g. eIDAS) into Firebase when the frontend does not already have a Firebase id_token."
+    },
+    {
+      "name": "99. Legacy / Internal",
+      "description": "Deprecated or internal endpoints kept for backward compatibility."
+    }
+  ],
+  "x-tagGroups": [
+    {
+      "name": "1. Onboarding a New Organization",
+      "tags": [
+        "1.1 Organization Registration",
+        "1.2 Organization Order"
+      ]
+    },
+    {
+      "name": "2. Device and Identity Registration",
+      "tags": [
+        "2.1.4 License Issuance (Invite)",
+        "2.1.2 Initial Access Token Exchange",
+        "2.1.3 Device Registration (DCR)",
+        "2.2 OIDC4VCI",
+        "2.2 SMART Token"
+      ]
+    },
+    {
+      "name": "3. Tenant Operations",
+      "tags": [
+        "3.1 Employee Role"
+      ]
+    },
+    {
+      "name": "4. Family Onboarding",
+      "tags": [
+        "4.1 Family Registration",
+        "4.2 Family Order",
+        "4.3 Family Member Relationship"
+      ]
+    },
+    {
+      "name": "5–7. Individual Data Flows",
+      "tags": [
+        "5. Consent",
+        "6. Communication",
+        "7. Composition"
+      ]
+    },
+    {
+      "name": "8. Personal Data",
+      "tags": [
+        "8.1 Subject Profile",
+        "8.4 Personal Observations"
+      ]
+    },
+    {
+      "name": "9. Research Data",
+      "tags": [
+        "9. Research Digital Twin"
+      ]
+    },
+    {
+      "name": "Other",
+      "tags": [
+        "Discovery",
+        "Data Catalog Discovery",
+        "2.1.1 Frontend Identity Federation (Optional)",
+        "99. Legacy / Internal"
+      ]
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Bearer token used by legacy (JSON) flows and some onboarding steps.\n\nDemo/Test-Network note: in non-production environments signature checks may be bypassed, but token format must still be JWT-like (`header.payload.signature`).\nExample token you can paste in Swagger \"Authorize\": `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJkZW1vLXVzZXIiLCJlbWFpbCI6ImRlbW9AZXhhbXBsZS5vcmcifQ.demo`.\n\nProduction note: token validation is environment-dependent and typically expects a Firebase id_token for end-user identity."
+      }
+    },
+    "parameters": {
+      "AppId": {
+        "name": "App-ID",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "com.acme.myapp"
+        },
+        "description": "Reverse-DNS application identifier (similar to Apple Bundle ID). For web apps, use a stable reverse-DNS identifier (e.g. 'org.example.webapp')."
+      },
+      "AppVersion": {
+        "name": "App-Version",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "1.0.0"
+        },
+        "description": "User-facing application version (semver recommended)."
+      },
+      "TenantId": {
+        "name": "tenantId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "acme"
+        },
+        "description": "Canonical tenant identifier (`Organization.identifier.value`). For legal organizations this is typically TAX/VATES; for individual organizations use UUID."
+      },
+      "Jurisdiction": {
+        "name": "jurisdiction",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "ES"
+        },
+        "description": "The provider/tenant jurisdiction code within the host-operated infrastructure (e.g., country code like 'ES' or a subdivision like 'ES-CT')."
+      },
+      "Version": {
+        "name": "version",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "v1"
+        },
+        "description": "API version segment (e.g., v1)."
+      },
+      "Sector": {
+        "name": "sector",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "health-care"
+        },
+        "description": "The business sector."
+      },
+      "HostRegistrySector": {
+        "name": "sector",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "test",
+            "test-network",
+            "network"
+          ],
+          "example": "test",
+          "default": "test"
+        },
+        "description": "Host onboarding network selector (immutable-proof network), not business domain sector. demo/test→test, development/staging→test-network, production→network."
+      }
+    },
+    "examples": {
+      "OrganizationRegistrationPlaintextMessage": {
+        "summary": "Plaintext Message for Organization Registration",
+        "description": "A DIDComm-like message wrapper containing the registration claims. This is the format for `application/didcomm-plaintext+json`.",
+        "value": {
+          "jti": "org-registration-request-<test-id>",
+          "thid": "org-registration-thread-<test-id>",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:host.example.com",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Organization-registration-form-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "template",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.alternateName": "acme",
+                    "org.schema.Organization.identifier.additionalType": "TAX",
+                    "org.schema.Organization.identifier.value": "A123456789",
+                    "org.schema.Organization.legalName": "Acme Organization SL",
+                    "org.schema.Organization.name": "Acme Org",
+                    "org.schema.Organization.numberOfEmployees.value": 2,
+                    "org.schema.Organization.url": "api.acme.org",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
+                "jwk": {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device"
+                }
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device",
+                "jwk": {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device"
+                }
+              }
+            }
+          }
+        }
+      },
+      "OrganizationActivationPlaintextMessage": {
+        "summary": "Plaintext Message for Organization Activation",
+        "description": "A DIDComm-like message wrapper for `_activate`; proof is carried in `body.data[].vp_token` (or `body.data[].vp`).",
+        "value": {
+          "jti": "org-activation-request-<test-id>",
+          "thid": "org-activation-thread-<test-id>",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:host.example.com",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Organization-activation-request-v1.0",
+                "vp": {
+                  "@context": [
+                    "https://www.w3.org/ns/credentials/v2"
+                  ],
+                  "type": [
+                    "VerifiablePresentation"
+                  ],
+                  "holder": "did:web:controller.example.org",
+                  "verifiableCredential": [
+                    {
+                      "@context": [
+                        "https://www.w3.org/ns/credentials/v2",
+                        "https://schema.org"
+                      ],
+                      "type": [
+                        "VerifiableCredential",
+                        "OrganizationCredential"
+                      ],
+                      "credentialSubject": {
+                        "id": "did:web:globaldatacare.es:health-care:organization:taxid:VATES-B00112233",
+                        "legalName": "ORGANIZATION LEGAL NAME",
+                        "taxID": "VATES-B00112233"
+                      }
+                    },
+                    {
+                      "@context": [
+                        "https://www.w3.org/ns/credentials/v2",
+                        "https://schema.org"
+                      ],
+                      "type": [
+                        "VerifiableCredential",
+                        "LegalRepresentativeCredential"
+                      ],
+                      "credentialSubject": {
+                        "id": "did:web:controller.example.org",
+                        "identifier": "IDCES-11223344",
+                        "hasOccupation": {
+                          "@type": "Occupation",
+                          "identifier": {
+                            "value": "RESPRSN"
+                          },
+                          "name": "ResponsibleParty"
+                        },
+                        "memberOf": {
+                          "@type": "Organization",
+                          "taxID": "VATES-B00112233"
+                        },
+                        "hasCredential": {
+                          "material": "sha256:legal-representative-email-hash"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "template",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.alternateName": "acme",
+                    "org.schema.Organization.identifier.additionalType": "TAX",
+                    "org.schema.Organization.identifier.value": "A123456789",
+                    "org.schema.Organization.legalName": "Acme Organization SL",
+                    "org.schema.Organization.name": "Acme Org",
+                    "org.schema.Organization.numberOfEmployees.value": 2,
+                    "org.schema.Organization.url": "api.acme.org",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
+                "jwk": {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device"
+                }
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device",
+                "jwk": {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device"
+                }
+              }
+            }
+          }
+        }
+      },
+      "OrganizationOrderPlaintextMessage": {
+        "summary": "Plaintext Message for Organization Order",
+        "description": "A DIDComm-like message wrapper accepting an Offer via an Order. Order.acceptedOffer.identifier is required and must match the full Offer identifier URN returned by the Organization registration _batch-response (use {{offerId}} placeholder in Swagger UI).",
+        "value": {
+          "jti": "org-order-request-<test-id>",
+          "thid": "org-order-thread-<test-id>",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:host.example.com",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Organization-order-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "Order.acceptedOffer.identifier": "{{offerId}}"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "OrganizationOrderResponseBundle": {
+        "summary": "Organization Order Response Bundle",
+        "description": "Async Order response bundle with Organization-order-response-v1.0, org.schema.Order.* invoice/payment claims and org.schema.IndividualProduct.* activation claims.",
+        "value": {
+          "jti": "org-order-response-<test-id>",
+          "thid": "org-order-thread-<test-id>",
+          "aud": "urn:ietf:rfc:7638:thumbprint-public-enc-key-device",
+          "iss": "did:web:host.example.com",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/json",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "total": 1,
+            "data": [
+              {
+                "type": "Organization-order-response-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "Order:Invoice",
+                    "org.schema.Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>",
+                    "org.schema.Order.partOfInvoice": "<invoice-id-or-url>",
+                    "org.schema.Order.paymentMethod": "Stripe",
+                    "org.schema.Order.paymentDueDate": "2025-10-22T14:30:00Z",
+                    "org.schema.Order.paymentUrl": "<payment-url>",
+                    "org.schema.Order.invoiceIssuedAt": "2025-10-15T14:30:00Z",
+                    "org.schema.IndividualProduct.serialNumber": "lic-activation-code-001",
+                    "org.schema.IndividualProduct.category": "professional"
+                  }
+                },
+                "response": {
+                  "status": "201"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "InitialAccessTokenExchangePlaintextMessage": {
+        "summary": "Plaintext Message for Initial Access Token Exchange",
+        "description": "A DIDComm-like message wrapper containing `subject_token` (activation code). `subject_token` must be a JSON string (quoted); use {{activationCode}} placeholder in Swagger UI.",
+        "value": {
+          "jti": "token-exchange-request-<test-id>",
+          "thid": "token-exchange-thread-<test-id>",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:api.acme.org#identity_openid_token_exchange",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/json",
+          "body": {
+            "subject_token": "{{activationCode}}"
+          }
+        }
+      },
+      "LicenseIssuePlaintextMessage": {
+        "summary": "Plaintext Message for License Issue",
+        "description": "A DIDComm-like message wrapper reserving a seat and issuing an activation code. User licenses can issue multiple device-profile codes; device licenses only issue one.",
+        "value": {
+          "jti": "license-issue-request-<test-id>",
+          "thid": "license-issue-thread-<test-id>",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org#identity_openid_license_issue",
+          "type": "application/api+json",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "data": [
+              {
+                "type": "EmployeeLicenseInvitation-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "IndividualProduct:Issue",
+                    "org.schema.Person.email": "doctor1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|2211",
+                    "org.schema.IndividualProduct.category": "professional",
+                    "org.schema.IndividualProduct.additionalType": "mobile"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "/acme/cds-ES/v1/health-care/identity/openid/License/_issue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "LicenseIssueExistingEmployeePlaintextMessage": {
+        "summary": "Plaintext Message for License Issue (Existing Employee)",
+        "description": "Reserves a seat and issues an activation code for an employee already registered in the tenant (e.g., admin/legal representative adding another device).",
+        "value": {
+          "jti": "license-issue-request-<test-id>-existing-employee",
+          "thid": "license-issue-thread-<test-id>-existing-employee",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org#identity_openid_license_issue",
+          "type": "application/api+json",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "data": [
+              {
+                "type": "EmployeeLicenseInvitation-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "IndividualProduct:Issue",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.IndividualProduct.category": "professional",
+                    "org.schema.IndividualProduct.additionalType": "mobile"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "/acme/cds-ES/v1/health-care/identity/openid/License/_issue"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "FirebaseCustomTokenPlaintextMessage": {
+        "summary": "Plaintext Message for Firebase Custom Token Federation",
+        "description": "A DIDComm-like message wrapper containing `provider` + `id_token`.",
+        "value": {
+          "jti": "firebase-custom-token-request-<test-id>",
+          "thid": "firebase-custom-token-thread-<test-id>",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:api.acme.org#identity_firebase_token_custom",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/json",
+          "body": {
+            "provider": "eidas",
+            "id_token": "<external-oidc-id-token>"
+          }
+        }
+      },
+      "DeviceRegistrationPlaintextMessage": {
+        "summary": "Plaintext Message for Device Registration (DCR)",
+        "description": "A DIDComm-like message wrapper containing the OpenID DCR request body.",
+        "value": {
+          "jti": "device-registration-request-<test-id>",
+          "thid": "device-registration-thread-<test-id>",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:api.acme.org#identity_openid_device_dcr",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/json",
+          "body": {
+            "application_type": "native",
+            "client_name": "App for [email] as [role] on [iOS, Android, Web]",
+            "code": "00000000-0000-0000-0000-000000000000",
+            "redirect_uris": [
+              "myapp://callback"
+            ],
+            "token_endpoint_auth_method": "private_key_jwt",
+            "ext_device_info": {
+              "device_id": "iOS-17.1.2-ABC-123",
+              "device_name": "User's iPhone 15 Pro",
+              "os": "iOS",
+              "os_version": "17.1.2",
+              "push_provider": "expo",
+              "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+            },
+            "jwks": {
+              "keys": [
+                {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device",
+                  "kid": "thumbprint-public-sig-key-device",
+                  "use": "sig"
+                },
+                {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device",
+                  "kid": "thumbprint-public-enc-key-device",
+                  "use": "enc"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "SmartTokenRequestPlaintextMessage": {
+        "summary": "Plaintext Message for SMART Token Request",
+        "description": "A DIDComm-like message wrapper containing the SMART token request (scope, sub, optional section pinning, etc.).",
+        "value": {
+          "jti": "smart-token-request-<test-id>",
+          "thid": "smart-token-thread-<test-id>",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/json",
+          "body": {
+            "client_id": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+            "redirect_uri": "https://app.acme.org/callback",
+            "code_challenge": "b2MtY2hhbGxlbmdlLWJhc2U2NA",
+            "code_challenge_method": "S256",
+            "acr_values": "urn:antifraud:acr:openid4vp:employee",
+            "vp_token": "<vp-jws-or-jsonld>",
+            "presentation_submission": {
+              "id": "ps-001",
+              "definition_id": "pd-001",
+              "descriptor_map": [
+                {
+                  "id": "vp-credential",
+                  "format": "jwt_vp",
+                  "path": "$.vp_token"
+                }
+              ]
+            },
+            "expires_in": 300,
+            "token_type": "Bearer",
+            "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
+            "purpose": "TREAT",
+            "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=* patient/Consent.cruds"
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "EmployeeRegistrationPlaintextMessage": {
+        "summary": "Plaintext Message for Employee Registration",
+        "description": "A DIDComm-like message wrapper containing the employee claims.",
+        "value": {
+          "jti": "employeerole-registration-request-<test-id>",
+          "thid": "employeerole-registration-thread-<test-id>",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Employee-form-v1.0",
+                "meta": {
+                  "claims": {
+                    "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
+                    "org.schema.Person.hasOccupation": "ISCO-08|4226",
+                    "org.schema.Person.email": "receptionist1@acme.org"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "FamilyRegistrationPlaintextMessage": {
+        "summary": "Plaintext Message for Family Registration",
+        "description": "A DIDComm-like message wrapper containing the family organization claims.",
+        "value": {
+          "jti": "subjectorg-registration-request-<test-id>",
+          "thid": "subjectorg-registration-thread-<test-id>",
+          "iss": "alice@example.com",
+          "aud": "did:web:api.acme.org",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "SubjectOrg-registration-form-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "template",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.identifier": "urn:uuid:<uuid-1>",
+                    "org.schema.Organization.name": "Smith Family",
+                    "org.schema.Organization.additionalType": "CareTeam",
+                    "org.schema.Organization.owner.email": "alice@example.com",
+                    "org.schema.Organization.owner.identifier": "did:web:alice.example.com",
+                    "org.schema.Person.email": "bob@example.com",
+                    "org.schema.Person.hasOccupation": "org.hl7.v3.RoleCode|RESPRSN",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.termsOfService": "https://provider.example.com/terms.pdf"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
+                "jwk": {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device"
+                }
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device",
+                "jwk": {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device"
+                }
+              }
+            }
+          }
+        }
+      },
+      "FamilyOrderPlaintextMessage": {
+        "summary": "Plaintext Message for Family Order",
+        "description": "A DIDComm-like message wrapper accepting the family registration Offer. Order.acceptedOffer.identifier is required and must match the Offer ID returned by the family registration _batch-response.",
+        "value": {
+          "jti": "family-order-request-<test-id>",
+          "thid": "family-order-thread-<test-id>",
+          "iss": "adult1@example.com",
+          "aud": "did:web:api.acme.org",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Family-order-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "Order.acceptedOffer.identifier": "{{offerId}}"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "ConsentCreationPlaintextMessage": {
+        "summary": "Plaintext Message for FHIR Consent Creation",
+        "description": "A DIDComm-like message wrapper containing a FHIR Consent resource in the `body`.",
+        "value": {
+          "jti": "unique-consent-fhir-message-<test-id>",
+          "thid": "thread-consent-fhir-batch-<test-id>",
+          "iss": "did:web:ehr-system.example.com",
+          "aud": "did:web:gateway.example.com",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "url": "https://ehr-system.example.com/fhir/r4/Consent/patient-consent-uuid",
+                "type": "Consent",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "Consent.decision": "permit",
+                    "Consent.subject": "unified-health-id",
+                    "Consent.identifier": "urn:uuid:patient-consent-uuid",
+                    "Consent.grantee": "did:web:hospital.example.com",
+                    "Consent.date": "2025-11-25",
+                    "Consent.purpose": "TREAT",
+                    "Consent.action": "LOINC|48765-2,LOINC|10160-0",
+                    "Consent.actor-identifier": "did:web:hospital.example.com",
+                    "Consent.actor-role": "ISCO-08|2211,ISCO-08|2221",
+                    "Consent.attachment-contentType": "application/odrl+json",
+                    "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "/health-care/individual/org.hl7.fhir.api/Consent"
+                },
+                "resource": {
+                  "identifier": "urn:uuid:patient-consent-uuid",
+                  "resourceType": "Consent",
+                  "status": "active",
+                  "scope": {
+                    "coding": [
+                      {
+                        "system": "http://terminology.hl7.org/CodeSystem/consentscope",
+                        "code": "patient-privacy"
+                      }
+                    ]
+                  },
+                  "category": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://terminology.hl7.org/CodeSystem/consentcategorycodes",
+                          "code": "TREAT"
+                        }
+                      ]
+                    }
+                  ],
+                  "patient": {
+                    "reference": "unified-health-id"
+                  },
+                  "performer": [
+                    {
+                      "reference": "did:web:hospital.example.com"
+                    }
+                  ],
+                  "provision": {
+                    "type": "permit"
+                  },
+                  "sourceAttachment": {
+                    "contentType": "application/odrl+json",
+                    "data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "CommunicationCreationPlaintextMessage": {
+        "summary": "Plaintext Message for FHIR Communication",
+        "description": "A DIDComm-like message wrapper containing a FHIR Communication resource in the `body`.",
+        "value": {
+          "jti": "unique-communication-message-<test-id>",
+          "thid": "thread-communication-id",
+          "iss": "did:web:ehr-system.example.com",
+          "aud": "did:web:gateway.acme.org",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "type": "Communication",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "@type": "Communication:Appointment",
+                    "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|appointment-reminder",
+                    "Communication.content-attachment-data": "QkVHSU4...5EQVI=",
+                    "Communication.content-attachment-title": "appointment-details.ics",
+                    "Communication.content-attachment-type": "text/calendar",
+                    "Communication.content-reference": "https://url-to-appointment-source.com/some-uuid",
+                    "Communication.part-of": "urn:uuid:communication-channel-id",
+                    "Communication.recipient": "{CUSTOMER_DID_WEB}",
+                    "Communication.sender": "{ORGANIZATION_DID_WEB}",
+                    "Communication.sent": "2025-10-15T14:30:00Z",
+                    "Communication.subject": "{CUSTOMER_DID_WEB}",
+                    "Communication.text": "This is your new appointment. Best regards."
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.hl7.fhir.r4/Communication"
+                },
+                "resource": {
+                  "resourceType": "Communication",
+                  "status": "completed",
+                  "partOf": [
+                    {
+                      "reference": "urn:uuid:communication-channel-id"
+                    }
+                  ],
+                  "category": [
+                    {
+                      "coding": [
+                        {
+                          "code": "appointment-reminder",
+                          "system": "http://terminology.hl7.org/CodeSystem/communication-category"
+                        }
+                      ]
+                    }
+                  ],
+                  "recipient": [
+                    {
+                      "reference": "{CUSTOMER_DID_WEB}"
+                    }
+                  ],
+                  "sender": {
+                    "reference": "{ORGANIZATION_DID_WEB}"
+                  },
+                  "sent": "2025-10-15T14:30:00Z",
+                  "note": [
+                    {
+                      "text": "This is your new appointment. Best regards."
+                    }
+                  ],
+                  "payload": [
+                    {
+                      "contentReference": {
+                        "reference": "https://url-to-appointment-source.com/some-uuid"
+                      }
+                    },
+                    {
+                      "contentAttachment": {
+                        "contentType": "text/calendar",
+                        "data": "QkVHSU46VkNBTEVOREFSCgpWRVJTSU9OOjIuMApQUk9ESUQ6LS8vQWNtZS8vZGlkOndlYjphcGkuYWNtZS5vcmcvL0VTCkJFR0lOOlZFVkVOVApVSUQ6PHV1aWQtdjQ+CkRUU1BTVA6MjAyNTEwMTZUMTIwMDAwWgpEVFNUQVJUOjIwMjUxMDE3VDE1MDAwMFoKRF RFTkQ6MjAyNTEwMTdUMTYwMDAwWgpTVU1NQVJZOlJlc3VtZW4gZGUgY2l0YS4KREVTQ1JJUFRJT046RW5jdWVudHJvIHZpcnR1YWwuCkxPQ0FUSU9OOk9ubGluZQpFTkQ6VkVWRU5UCkVORDpWQ0FMRU5EQVI=",
+                        "title": "appointment-details.ics"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "CompositionUpdatePlaintextMessage": {
+        "summary": "Plaintext Message for FHIR Composition Update",
+        "description": "A DIDComm-like message wrapper containing a FHIR Composition bundle entry in the `body`.",
+        "value": {
+          "jti": "composition-update-request-<test-id>",
+          "thid": "composition-update-thread-<test-id>",
+          "iss": "did:web:hospital.example.com",
+          "aud": "did:web:api.acme.org",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "type": "Composition",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "@type": "Composition:IndexEntry",
+                    "Composition.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "Composition.section": "LOINC|48765-2",
+                    "Composition.entry": "https://ehr.hospital.example.com/fhir/AllergyIntolerance/12345,https://ehr.hospital.example.com/fhir/DiagnosticReport/67890",
+                    "Composition.date": "2025-11-26T10:00:00Z",
+                    "Composition.author": "did:web:hospital.example.com",
+                    "Composition.title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
+                    "Composition.type": "LOINC|60591-5"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.hl7.fhir.r4/Composition"
+                },
+                "resource": {
+                  "resourceType": "Composition",
+                  "status": "final",
+                  "subject": {
+                    "reference": "did:web:api.acme.org:individual:<unified-health-identifier>"
+                  },
+                  "date": "2025-11-26T10:00:00Z",
+                  "author": [
+                    {
+                      "reference": "did:web:hospital.example.com"
+                    }
+                  ],
+                  "title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
+                  "type": {
+                    "coding": [
+                      {
+                        "system": "http://loinc.org",
+                        "code": "60591-5"
+                      }
+                    ]
+                  },
+                  "section": [
+                    {
+                      "title": "Allergies and Intolerances",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "http://loinc.org",
+                            "code": "48765-2"
+                          }
+                        ]
+                      },
+                      "entry": [
+                        {
+                          "reference": "https://ehr.hospital.example.com/fhir/AllergyIntolerance/12345"
+                        },
+                        {
+                          "reference": "https://ehr.hospital.example.com/fhir/DiagnosticReport/67890"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "ResearchCompositionIngestionPlaintextMessage": {
+        "summary": "Plaintext Message for Research Digital Twin Composition Ingestion",
+        "description": "A DIDComm-like message wrapper containing a `body.data[]` array of Composition resource objects generated by a pre-conversion adapter.",
+        "value": {
+          "jti": "research-composition-request-<test-id>",
+          "thid": "research-composition-thread-<test-id>",
+          "iss": "did:web:clinic.example.com:employee:data-loader",
+          "aud": "did:web:api.acme.org",
+          "type": "application/api+json",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "data": [
+              {
+                "type": "Composition",
+                "resource": {
+                  "resourceType": "Composition",
+                  "id": "urn:uuid:0dbe2f39-3f6a-48a3-9807-2f9a102f1a11",
+                  "meta": {
+                    "claims": {
+                      "@context": "org.hl7.fhir.api",
+                      "@type": "Composition:ResearchDigitalTwin",
+                      "Composition.subject": "did:web:connector.example.com:animal:multihash:z3vYh7w9q2p1k4m8n6a5b4c3d2e1f0",
+                      "Composition.section": "LOINC|26436-6",
+                      "Composition.type": "LOINC|60591-5",
+                      "Composition.date": "2026-01-31T10:45:00Z",
+                      "Composition.author": "",
+                      "Composition.entry": "urn:uuid:c2b1f9ee-90d4-4f1d-8dc6-4c3f0b29621b,urn:uuid:aad1f0bc-5781-42dc-9d8f-30252fbce6a9"
+                    }
+                  },
+                  "contained": [
+                    {
+                      "resourceType": "DocumentReference",
+                      "id": "urn:uuid:c2b1f9ee-90d4-4f1d-8dc6-4c3f0b29621b",
+                      "meta": {
+                        "claims": {
+                          "@context": "org.hl7.fhir.api",
+                          "@type": "DocumentReference:Lab",
+                          "DocumentReference.subject": "did:web:connector.example.com:animal:multihash:z3vYh7w9q2p1k4m8n6a5b4c3d2e1f0",
+                          "DocumentReference.identifier": "urn:uuid:c2b1f9ee-90d4-4f1d-8dc6-4c3f0b29621b",
+                          "DocumentReference.type": "http://loinc.org|26436-6",
+                          "DocumentReference.category": "http://loinc.org|26436-6",
+                          "DocumentReference.status": "current",
+                          "DocumentReference.date": "2026-01-15T09:00:00Z",
+                          "DocumentReference.description": "Laboratorio propio"
+                        }
+                      }
+                    },
+                    {
+                      "resourceType": "DocumentReference",
+                      "id": "urn:uuid:aad1f0bc-5781-42dc-9d8f-30252fbce6a9",
+                      "meta": {
+                        "claims": {
+                          "@context": "org.hl7.fhir.api",
+                          "@type": "DocumentReference:Imaging",
+                          "DocumentReference.subject": "did:web:connector.example.com:animal:multihash:z3vYh7w9q2p1k4m8n6a5b4c3d2e1f0",
+                          "DocumentReference.identifier": "urn:uuid:aad1f0bc-5781-42dc-9d8f-30252fbce6a9",
+                          "DocumentReference.type": "http://loinc.org|18748-4",
+                          "DocumentReference.category": "http://loinc.org|18726-0",
+                          "DocumentReference.status": "current",
+                          "DocumentReference.date": "2026-01-16T12:30:00Z",
+                          "DocumentReference.description": "Diagnostico por imagen propio"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "digitaltwin/org.hl7.fhir.api/Composition"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "FamilyMemberRelationshipPlaintextMessage": {
+        "summary": "Plaintext Message for Family Member Relationship",
+        "description": "A DIDComm-like message wrapper registering an emergency contact / family relationship (RelatedPerson) using `org.hl7.fhir.api` claims.",
+        "value": {
+          "jti": "family-relationship-message-<test-id>",
+          "thid": "thid-family-relationship",
+          "iss": "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "type": "RelatedPerson",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "@type": "RelatedPerson:EmergencyContact",
+                    "RelatedPerson.patient": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "RelatedPerson.identifier": "urn:uuid:related-person-uuid",
+                    "RelatedPerson.relationship": "http://terminology.hl7.org/CodeSystem/v3-RoleCode|PRN",
+                    "RelatedPerson.telecom": "tel:+34600123456",
+                    "RelatedPerson.name": "Jane Doe"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.hl7.fhir.api/RelatedPerson"
+                },
+                "resource": {
+                  "resourceType": "RelatedPerson"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "PersonalObservationPlaintextMessage": {
+        "summary": "Plaintext Message for Personal Observations",
+        "description": "A DIDComm-like message wrapper collecting self-reported (non-clinical) observations using `org.hl7.fhir.api` claims.",
+        "value": {
+          "jti": "personal-observation-message-<test-id>",
+          "thid": "thid-personal-observation",
+          "iss": "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "type": "Observation",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "@type": "Observation:SelfReported",
+                    "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
+                    "Observation.code": "SNOMED|48694002",
+                    "Observation.code-userselected": true,
+                    "Observation.issued": "2025-11-27T10:00:00Z",
+                    "Observation.date-when": "NIGHT",
+                    "Observation.value-string": "Feels anxious at night.",
+                    "Observation.meta-tag": "Anxiety,Night"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.hl7.fhir.api/Observation"
+                },
+                "resource": {
+                  "resourceType": "Observation",
+                  "status": "final"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "CustomerOnboardingPlaintextMessage": {
+        "summary": "(Legacy) Plaintext Message for Person/Customer Onboarding",
+        "description": "Legacy flow: DIDComm-like message wrapper containing Person onboarding claims.",
+        "value": {
+          "jti": "unique-customer-onboard-message-<test-id>",
+          "thid": "thread-onboarding-customer-id",
+          "iss": "did:web:acme.org:employee:...",
+          "aud": "did:web:acme.org",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Individual-terms-v1.0",
+                "meta": {
+                  "claims": {
+                    "org.schema.Person.alternateName": "Joe",
+                    "org.schema.Person.identifier": "urn:uuid:8e0d846a-2492-4b9c-8a4e-5e065fb6ba76",
+                    "org.schema.Person.email": "customer1@example.com",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|FAMRQT,PWATRNY,METAMGT,FRAUD,RECORDMGT,COVAUTH,TREAT,DISASTER,HPAYMT,MLTRAINING,ETREAT,HOPERAT,CAREMGT,HSYSADMIN,PATADMIN,PATSFTY",
+                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.schema/Person/"
+                }
+              },
+              {
+                "type": "Personal-identity-v1.0",
+                "meta": {
+                  "claims": {
+                    "org.schema.Person.identifier": "urn:uuid:8e0d846a-2492-4b9c-8a4e-5e065fb6ba76",
+                    "org.schema.Person.identifierType": "NNES",
+                    "org.schema.Person.identifierValue": "12345678X"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.schema/Person/"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "AsyncPollRequest": {
+        "summary": "Async Poll Request",
+        "description": "HTTP polling request body (JSON) containing the `thid` from the original submission.",
+        "value": {
+          "thid": "action-thread-<test-id>"
+        }
+      },
+      "OrganizationRegistrationPollRequest": {
+        "summary": "Organization Registration Poll Request",
+        "description": "Polls the Organization registration job using the same `thid` from the Organization _batch request.",
+        "value": {
+          "thid": "org-registration-thread-<test-id>"
+        }
+      },
+      "OrganizationOrderPollRequest": {
+        "summary": "Organization Order Poll Request",
+        "description": "Polls the Order job using the same `thid` from the Order _batch request.",
+        "value": {
+          "thid": "org-order-thread-<test-id>"
+        }
+      },
+      "EmployeePollRequest": {
+        "summary": "Employee Poll Request",
+        "description": "Polls the Employee job using the same `thid` from the Employee _batch request.",
+        "value": {
+          "thid": "employee-thread-<test-id>"
+        }
+      },
+      "PersonPollRequest": {
+        "summary": "Person Poll Request",
+        "description": "Polls the Person job using the same `thid` from the Person _batch request.",
+        "value": {
+          "thid": "person-thread-<test-id>"
+        }
+      },
+      "ConsentPollRequest": {
+        "summary": "Consent Poll Request",
+        "description": "Polls the Consent job using the same `thid` from the Consent _batch request.",
+        "value": {
+          "thid": "consent-thread-<test-id>"
+        }
+      },
+      "CommunicationPollRequest": {
+        "summary": "Communication Poll Request",
+        "description": "Polls the Communication job using the same `thid` from the Communication _batch request.",
+        "value": {
+          "thid": "communication-thread-<test-id>"
+        }
+      },
+      "TokenExchangePollRequest": {
+        "summary": "Token Exchange Poll Request",
+        "description": "Polls the initial access token exchange job using the same `thid` from Token/_exchange.",
+        "value": {
+          "thid": "token-exchange-thread-<test-id>"
+        }
+      },
+      "CompositionPollRequest": {
+        "summary": "Composition Poll Request",
+        "description": "Polls the Composition job using the same `thid` from the Composition _batch request.",
+        "value": {
+          "thid": "composition-thread-<test-id>"
+        }
+      },
+      "RelatedPersonPollRequest": {
+        "summary": "RelatedPerson Poll Request",
+        "description": "Polls the RelatedPerson job using the same `thid` from the RelatedPerson _batch request.",
+        "value": {
+          "thid": "relatedperson-thread-<test-id>"
+        }
+      },
+      "ObservationPollRequest": {
+        "summary": "Observation Poll Request",
+        "description": "Polls the Observation job using the same `thid` from the Observation _batch request.",
+        "value": {
+          "thid": "observation-thread-<test-id>"
+        }
+      },
+      "TenantOrganizationPollRequest": {
+        "summary": "Tenant Organization Poll Request",
+        "description": "Polls the tenant Organization job using the same `thid` from the Organization _batch request.",
+        "value": {
+          "thid": "tenant-organization-thread-<test-id>"
+        }
+      },
+      "TenantOrderPollRequest": {
+        "summary": "Tenant Order Poll Request",
+        "description": "Polls the tenant Order job using the same `thid` from the Order _batch request.",
+        "value": {
+          "thid": "tenant-order-thread-<test-id>"
+        }
+      },
+      "AsyncPollPending": {
+        "summary": "Async Poll Pending Response",
+        "description": "HTTP polling response while the job is still running (`202 Accepted`).",
+        "value": {
+          "thid": "action-thread-<test-id>",
+          "status": "PENDING"
+        }
+      },
+      "AsyncPollSecureResponse": {
+        "summary": "Async Poll Secure Response",
+        "description": "Polling response format for secure flows (`application/x-www-form-urlencoded`), returning `response=<jwe>`.",
+        "value": {
+          "response": "eyJ...<jwe>"
+        }
+      },
+      "DidcommEarlyErrorBundleApiExample": {
+        "summary": "Early Error (DIDComm bundle-api envelope)",
+        "value": {
+          "type": "application/bundle-api+json",
+          "body": {
+            "resourceType": "Bundle",
+            "data": [],
+            "total": 0,
+            "issues": {
+              "issue": [
+                {
+                  "severity": "error",
+                  "code": "required",
+                  "diagnostics": "Missing or invalid \"thid\" parameter."
+                }
+              ]
+            }
+          }
+        }
+      },
+      "DidcommEarlyErrorFhirEnvelopeExample": {
+        "summary": "Early Error (DIDComm FHIR envelope)",
+        "value": {
+          "type": "application/fhir+json",
+          "body": {
+            "resourceType": "Bundle",
+            "entry": [],
+            "total": 0,
+            "issues": {
+              "issue": [
+                {
+                  "severity": "error",
+                  "code": "required",
+                  "diagnostics": "Missing or invalid \"thid\" parameter."
+                }
+              ]
+            }
+          }
+        }
+      },
+      "LegacyFhirEarlyErrorExample": {
+        "summary": "Early Error (LEGACY_FHIR raw body)",
+        "value": {
+          "resourceType": "Bundle",
+          "entry": [],
+          "total": 0,
+          "issues": {
+            "issue": [
+              {
+                "severity": "error",
+                "code": "required",
+                "diagnostics": "Missing or invalid \"thid\" parameter."
+              }
+            ]
+          }
+        }
+      }
+    },
+    "schemas": {
+      "DidcommPlaintextMessage": {
+        "type": "object",
+        "required": [
+          "jti",
+          "thid",
+          "iss",
+          "aud",
+          "type",
+          "body"
+        ],
+        "properties": {
+          "jti": {
+            "type": "string"
+          },
+          "thid": {
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "aud": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          },
+          "meta": {
+            "type": "object"
+          }
+        }
+      },
+      "IssueDetail": {
+        "type": "object",
+        "required": [
+          "severity",
+          "code"
+        ],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "fatal",
+              "error",
+              "warning",
+              "information"
+            ],
+            "example": "error"
+          },
+          "code": {
+            "type": "string",
+            "example": "not-found"
+          },
+          "diagnostics": {
+            "type": "string"
+          }
+        }
+      },
+      "DidcommEarlyErrorEnvelopeBundleApi": {
+        "type": "object",
+        "required": [
+          "type",
+          "body"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "application/bundle-api+json"
+            ]
+          },
+          "body": {
+            "type": "object",
+            "required": [
+              "resourceType",
+              "data",
+              "total",
+              "issues"
+            ],
+            "properties": {
+              "resourceType": {
+                "type": "string",
+                "enum": [
+                  "Bundle"
+                ]
+              },
+              "data": {
+                "type": "array",
+                "items": {},
+                "example": []
+              },
+              "total": {
+                "type": "integer",
+                "enum": [
+                  0
+                ],
+                "example": 0
+              },
+              "issues": {
+                "type": "object",
+                "required": [
+                  "issue"
+                ],
+                "properties": {
+                  "issue": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/IssueDetail"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "DidcommEarlyErrorEnvelopeFhir": {
+        "type": "object",
+        "required": [
+          "type",
+          "body"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "application/fhir+json"
+            ]
+          },
+          "body": {
+            "type": "object",
+            "required": [
+              "resourceType",
+              "entry",
+              "total",
+              "issues"
+            ],
+            "properties": {
+              "resourceType": {
+                "type": "string",
+                "enum": [
+                  "Bundle"
+                ]
+              },
+              "entry": {
+                "type": "array",
+                "items": {},
+                "example": []
+              },
+              "total": {
+                "type": "integer",
+                "enum": [
+                  0
+                ],
+                "example": 0
+              },
+              "issues": {
+                "type": "object",
+                "required": [
+                  "issue"
+                ],
+                "properties": {
+                  "issue": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/IssueDetail"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "LegacyFhirEarlyError": {
+        "type": "object",
+        "required": [
+          "resourceType",
+          "entry",
+          "total",
+          "issues"
+        ],
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "Bundle"
+            ]
+          },
+          "entry": {
+            "type": "array",
+            "items": {},
+            "example": []
+          },
+          "total": {
+            "type": "integer",
+            "enum": [
+              0
+            ],
+            "example": 0
+          },
+          "issues": {
+            "type": "object",
+            "required": [
+              "issue"
+            ],
+            "properties": {
+              "issue": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "description": "Early error contract. DIDComm/JARM flows return a `{type, body}` envelope. LEGACY_FHIR (`application/fhir+json`) returns the raw FHIR Bundle body.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/DidcommEarlyErrorEnvelopeBundleApi"
+          },
+          {
+            "$ref": "#/components/schemas/DidcommEarlyErrorEnvelopeFhir"
+          },
+          {
+            "$ref": "#/components/schemas/LegacyFhirEarlyError"
+          }
+        ]
+      },
+      "OrganizationRegistrationLegacy": {
+        "type": "object",
+        "properties": {
+          "thid": {
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "aud": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          }
+        },
+        "example": {
+          "jti": "org-registration-request-<test-id>",
+          "thid": "org-registration-thread-<test-id>",
+          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
+          "aud": "did:web:host.example.com",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Organization-registration-form-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "template",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.alternateName": "acme",
+                    "org.schema.Organization.identifier.additionalType": "TAX",
+                    "org.schema.Organization.identifier.value": "A123456789",
+                    "org.schema.Organization.legalName": "Acme Organization SL",
+                    "org.schema.Organization.name": "Acme Org",
+                    "org.schema.Organization.numberOfEmployees.value": 2,
+                    "org.schema.Organization.url": "api.acme.org",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
+                "jwk": {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device"
+                }
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device",
+                "jwk": {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device"
+                }
+              }
+            }
+          }
+        }
+      },
+      "EmployeeCreationLegacy": {
+        "type": "object",
+        "properties": {
+          "thid": {
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "aud": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          }
+        },
+        "example": {
+          "jti": "employeerole-registration-request-<test-id>",
+          "thid": "employeerole-registration-thread-<test-id>",
+          "iss": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Employee-form-v1.0",
+                "meta": {
+                  "claims": {
+                    "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
+                    "org.schema.Person.hasOccupation": "ISCO-08|4226",
+                    "org.schema.Person.email": "receptionist1@acme.org"
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device"
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device"
+              }
+            }
+          }
+        }
+      },
+      "CustomerCreationLegacy": {
+        "type": "object",
+        "properties": {
+          "thid": {
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "aud": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          }
+        },
+        "example": {
+          "jti": "unique-customer-onboard-message-<test-id>",
+          "thid": "thread-onboarding-customer-id",
+          "iss": "did:web:acme.org:employee:...",
+          "aud": "did:web:acme.org",
+          "type": "application/api+json",
+          "body": {
+            "data": [
+              {
+                "type": "Individual-terms-v1.0",
+                "meta": {
+                  "claims": {
+                    "org.schema.Person.alternateName": "Joe",
+                    "org.schema.Person.identifier": "urn:uuid:8e0d846a-2492-4b9c-8a4e-5e065fb6ba76",
+                    "org.schema.Person.email": "customer1@example.com",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|FAMRQT,PWATRNY,METAMGT,FRAUD,RECORDMGT,COVAUTH,TREAT,DISASTER,HPAYMT,MLTRAINING,ETREAT,HOPERAT,CAREMGT,HSYSADMIN,PATADMIN,PATSFTY",
+                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.schema/Person/"
+                }
+              },
+              {
+                "type": "Personal-identity-v1.0",
+                "meta": {
+                  "claims": {
+                    "org.schema.Person.identifier": "urn:uuid:8e0d846a-2492-4b9c-8a4e-5e065fb6ba76",
+                    "org.schema.Person.identifierType": "NNES",
+                    "org.schema.Person.identifierValue": "12345678X"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.schema/Person/"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "SecureRequest": {
+        "type": "object",
+        "description": "A JWE-encrypted payload, sent as a form parameter.",
+        "properties": {
+          "request": {
+            "type": "string",
+            "format": "jwe",
+            "example": "ey..."
+          }
+        }
+      },
+      "AsyncPollRequest": {
+        "type": "object",
+        "required": [
+          "thid"
+        ],
+        "description": "Polling request body for asynchronous jobs. The `thid` must match the thread id from the corresponding request (e.g., registration vs order).",
+        "properties": {
+          "thid": {
+            "type": "string",
+            "example": "request-thid"
+          }
+        },
+        "example": {
+          "thid": "action-thread-<test-id>"
+        }
+      },
+      "AsyncPollPending": {
+        "type": "object",
+        "required": [
+          "thid",
+          "status"
+        ],
+        "properties": {
+          "thid": {
+            "type": "string",
+            "example": "request-thid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING"
+            ],
+            "example": "PENDING"
+          }
+        },
+        "example": {
+          "thid": "action-thread-<test-id>",
+          "status": "PENDING"
+        }
+      },
+      "AsyncPollSecureResponse": {
+        "type": "object",
+        "description": "Polling response format for secure (FAPI/JARM-style) flows. The encrypted payload is returned in the `response` form parameter.",
+        "properties": {
+          "response": {
+            "type": "string",
+            "format": "jwe",
+            "example": "ey..."
+          }
+        },
+        "example": {
+          "response": "eyJ...<jwe>"
+        }
+      },
+      "ConsentCreation": {
+        "type": "object",
+        "properties": {
+          "thid": {
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "aud": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          }
+        },
+        "example": {
+          "jti": "unique-consent-fhir-message-<test-id>",
+          "thid": "thread-consent-fhir-batch-<test-id>",
+          "iss": "did:web:ehr-system.example.com",
+          "aud": "did:web:gateway.example.com",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "url": "https://ehr-system.example.com/fhir/r4/Consent/patient-consent-uuid",
+                "type": "Consent",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "Consent.decision": "permit",
+                    "Consent.subject": "unified-health-id",
+                    "Consent.identifier": "urn:uuid:patient-consent-uuid",
+                    "Consent.grantee": "did:web:hospital.example.com",
+                    "Consent.date": "2025-11-25",
+                    "Consent.purpose": "TREAT",
+                    "Consent.action": "LOINC|48765-2,LOINC|10160-0",
+                    "Consent.actor-identifier": "did:web:hospital.example.com",
+                    "Consent.actor-role": "ISCO-08|2211,ISCO-08|2221",
+                    "Consent.attachment-contentType": "application/odrl+json",
+                    "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "/health-care/individual/org.hl7.fhir.api/Consent"
+                },
+                "resource": {
+                  "identifier": "urn:uuid:patient-consent-uuid",
+                  "resourceType": "Consent",
+                  "status": "active",
+                  "scope": {
+                    "coding": [
+                      {
+                        "system": "http://terminology.hl7.org/CodeSystem/consentscope",
+                        "code": "patient-privacy"
+                      }
+                    ]
+                  },
+                  "category": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://terminology.hl7.org/CodeSystem/consentcategorycodes",
+                          "code": "TREAT"
+                        }
+                      ]
+                    }
+                  ],
+                  "patient": {
+                    "reference": "unified-health-id"
+                  },
+                  "performer": [
+                    {
+                      "reference": "did:web:hospital.example.com"
+                    }
+                  ],
+                  "provision": {
+                    "type": "permit"
+                  },
+                  "sourceAttachment": {
+                    "contentType": "application/odrl+json",
+                    "data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "CommunicationCreation": {
+        "type": "object",
+        "properties": {
+          "thid": {
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "aud": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          }
+        },
+        "example": {
+          "jti": "unique-communication-message-<test-id>",
+          "thid": "thread-communication-id",
+          "iss": "did:web:ehr-system.example.com",
+          "aud": "did:web:gateway.acme.org",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "type": "Communication",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "@type": "Communication:Appointment",
+                    "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|appointment-reminder",
+                    "Communication.content-attachment-data": "QkVHSU4...5EQVI=",
+                    "Communication.content-attachment-title": "appointment-details.ics",
+                    "Communication.content-attachment-type": "text/calendar",
+                    "Communication.content-reference": "https://url-to-appointment-source.com/some-uuid",
+                    "Communication.part-of": "urn:uuid:communication-channel-id",
+                    "Communication.recipient": "{CUSTOMER_DID_WEB}",
+                    "Communication.sender": "{ORGANIZATION_DID_WEB}",
+                    "Communication.sent": "2025-10-15T14:30:00Z",
+                    "Communication.subject": "{CUSTOMER_DID_WEB}",
+                    "Communication.text": "This is your new appointment. Best regards."
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.hl7.fhir.r4/Communication"
+                },
+                "resource": {
+                  "resourceType": "Communication",
+                  "status": "completed",
+                  "partOf": [
+                    {
+                      "reference": "urn:uuid:communication-channel-id"
+                    }
+                  ],
+                  "category": [
+                    {
+                      "coding": [
+                        {
+                          "code": "appointment-reminder",
+                          "system": "http://terminology.hl7.org/CodeSystem/communication-category"
+                        }
+                      ]
+                    }
+                  ],
+                  "recipient": [
+                    {
+                      "reference": "{CUSTOMER_DID_WEB}"
+                    }
+                  ],
+                  "sender": {
+                    "reference": "{ORGANIZATION_DID_WEB}"
+                  },
+                  "sent": "2025-10-15T14:30:00Z",
+                  "note": [
+                    {
+                      "text": "This is your new appointment. Best regards."
+                    }
+                  ],
+                  "payload": [
+                    {
+                      "contentReference": {
+                        "reference": "https://url-to-appointment-source.com/some-uuid"
+                      }
+                    },
+                    {
+                      "contentAttachment": {
+                        "contentType": "text/calendar",
+                        "data": "QkVHSU46VkNBTEVOREFSCgpWRVJTSU9OOjIuMApQUk9ESUQ6LS8vQWNtZS8vZGlkOndlYjphcGkuYWNtZS5vcmcvL0VTCkJFR0lOOlZFVkVOVApVSUQ6PHV1aWQtdjQ+CkRUU1BTVA6MjAyNTEwMTZUMTIwMDAwWgpEVFNUQVJUOjIwMjUxMDE3VDE1MDAwMFoKRF RFTkQ6MjAyNTEwMTdUMTYwMDAwWgpTVU1NQVJZOlJlc3VtZW4gZGUgY2l0YS4KREVTQ1JJUFRJT046RW5jdWVudHJvIHZpcnR1YWwuCkxPQ0FUSU9OOk9ubGluZQpFTkQ6VkVWRU5UCkVORDpWQ0FMRU5EQVI=",
+                        "title": "appointment-details.ics"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "RelatedPersonCreation": {
+        "type": "object",
+        "properties": {
+          "thid": {
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "aud": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          }
+        },
+        "example": {
+          "jti": "family-relationship-message-<test-id>",
+          "thid": "thid-family-relationship",
+          "iss": "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "type": "RelatedPerson",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "@type": "RelatedPerson:EmergencyContact",
+                    "RelatedPerson.patient": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "RelatedPerson.identifier": "urn:uuid:related-person-uuid",
+                    "RelatedPerson.relationship": "http://terminology.hl7.org/CodeSystem/v3-RoleCode|PRN",
+                    "RelatedPerson.telecom": "tel:+34600123456",
+                    "RelatedPerson.name": "Jane Doe"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.hl7.fhir.api/RelatedPerson"
+                },
+                "resource": {
+                  "resourceType": "RelatedPerson"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "ObservationCreation": {
+        "type": "object",
+        "properties": {
+          "thid": {
+            "type": "string"
+          },
+          "iss": {
+            "type": "string"
+          },
+          "aud": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          }
+        },
+        "example": {
+          "jti": "personal-observation-message-<test-id>",
+          "thid": "thid-personal-observation",
+          "iss": "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+          "aud": "did:web:api.acme.org",
+          "type": "org.hl7.fhir.r4.Bundle",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch",
+            "entry": [
+              {
+                "type": "Observation",
+                "meta": {
+                  "claims": {
+                    "@context": "org.hl7.fhir.api",
+                    "@type": "Observation:SelfReported",
+                    "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
+                    "Observation.code": "SNOMED|48694002",
+                    "Observation.code-userselected": true,
+                    "Observation.issued": "2025-11-27T10:00:00Z",
+                    "Observation.date-when": "NIGHT",
+                    "Observation.value-string": "Feels anxious at night.",
+                    "Observation.meta-tag": "Anxiety,Night"
+                  }
+                },
+                "request": {
+                  "method": "POST",
+                  "url": "individual/org.hl7.fhir.api/Observation"
+                },
+                "resource": {
+                  "resourceType": "Observation",
+                  "status": "final"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/oidc/credential": {
+      "post": {
+        "tags": [
+          "2.2 OIDC4VCI"
+        ],
+        "summary": "Issue a Gaia-X compliance VC (OIDC4VCI)",
+        "description": "Issues a Gaia-X Legal Participant VC. This endpoint expects a Bearer access_token.\nIn demo/non-production, any Bearer token is accepted for now.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "pqc": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Issued VC"
+          },
+          "401": {
+            "description": "Missing or invalid Bearer token"
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch": {
+      "post": {
+        "tags": [
+          "1.1 Organization Registration"
+        ],
+        "summary": "Register a new Tenant (Organization)",
+        "description": "Submits an asynchronous job to register a new tenant on the platform. This is the first step for any new organization.\nThe endpoint supports both a plaintext JSON \"legacy\" flow (for simple onboarding) and a JWE-based \"secure\" flow.\n\nThe `{sector}` segment is a host onboarding \"network environment\" selector:\n- demo/test: `test`\n- development/staging: `test-network`\n- production: `network`\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "requestBody": {
+          "description": "The DIDComm message for registration.\nProduction: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationRegistrationLegacy"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/OrganizationRegistrationPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationRegistrationLegacy"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. The job has been queued. The client should poll the URL provided in the `Location` header to get the result.\n",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The polling URL for the job result."
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "5"
+                },
+                "description": "Suggested delay in seconds before polling."
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. The payload is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized. Invalid or missing Bearer token for legacy flow, or failed JWE decryption/JWS verification for secure flow.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or sector).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate": {
+      "post": {
+        "tags": [
+          "1.1 Organization Activation"
+        ],
+        "summary": "Activate a new Tenant (Organization) from ICA-issued proof",
+        "description": "Submits an asynchronous job to activate a new tenant on the platform from\nICA-issued proof. This is a distinct flow from the legacy `_batch`\nregistration endpoint.\n\nThe `{sector}` segment is a host onboarding network selector:\n- demo/test: `test`\n- development/staging: `test-network`\n- production: `network`\n\nExpected semantics:\n- the controller submits ICA-derived proof in `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP)\n- the host validates the ICA proof and activates the tenant backend/connector\n- activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`\n  (include that claim in `meta.claims` to size requested seats)\n  so clients can continue with order/payment and licensing without a separate `_batch` submit\n- next mandatory step is `Order/_batch` with `Order.acceptedOffer.identifier` from activation result\n- after Order, the controller uses activation code (`org.schema.IndividualProduct.serialNumber`)\n  to run `Token/_exchange` + `Device/_dcr` before creating additional employees\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted\n(secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical,\nand `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/OrganizationActivationPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. The activation job has been queued. The client should poll\nthe URL provided in the `Location` header to get the result.\n"
+          },
+          "400": {
+            "description": "Bad Request. The payload is malformed."
+          },
+          "401": {
+            "description": "Unauthorized. Invalid or missing Bearer token for legacy flow, or failed JWE decryption/JWS verification for secure flow."
+          },
+          "404": {
+            "description": "Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or network selector)."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch": {
+      "post": {
+        "tags": [
+          "3.1 Employee Role"
+        ],
+        "summary": "Create a new Professional (Employee)",
+        "description": "Submits an asynchronous job to create a new professional (employee) within an existing tenant.\nThe `tenantId` in the path specifies the organization under which the employee is being created.\nPrerequisite: controller device/client must already be active (`Token/_exchange` + `Device/_dcr`).\nCreating an employee profile does not automatically activate employee devices.\nFor additional employees/devices, use `License/_issue` and then run `_exchange` + `_dcr`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "DIDComm request for employee creation.\nProduction: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployeeCreationLegacy"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/EmployeeRegistrationPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployeeCreationLegacy"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. The job has been queued.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch-response": {
+      "post": {
+        "tags": [
+          "3.1 Employee Role"
+        ],
+        "summary": "Poll the employee creation job result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/EmployeePollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/EmployeePollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom": {
+      "post": {
+        "tags": [
+          "2.1.1 Frontend Identity Federation (Optional)"
+        ],
+        "summary": "Federate external OIDC id_token to Firebase custom token (async)",
+        "description": "Submits an async job that verifies a provider id_token (e.g. eIDAS) and returns a Firebase custom_token.\n\nThis endpoint is always DIDComm (plaintext in demo, encrypted in production).\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/FirebaseCustomTokenPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          },
+          "400": {
+            "description": "Bad Request."
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom-response": {
+      "post": {
+        "tags": [
+          "2.1.1 Frontend Identity Federation (Optional)"
+        ],
+        "summary": "Poll the federation result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/ConsentPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/ConsentPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange": {
+      "post": {
+        "tags": [
+          "2.1.2 Initial Access Token Exchange"
+        ],
+        "summary": "Exchange activation code for initial_access_token (async)",
+        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_exchange`.\nThis `identity/openid` route is maintained as a temporary compatibility alias.\n\nSubmits an async job that exchanges:\n- Authorization Bearer token: Firebase `id_token` (JWT format), and\n- request body `subject_token`: single-use activation code (opaque string, not JWT).\nfor an `initial_access_token`.\n\nSubmit-time errors are returned immediately if the request cannot be accepted/enqueued.\nProcessing/business errors are returned when polling.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/InitialAccessTokenExchangePlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          },
+          "400": {
+            "description": "Bad Request."
+          },
+          "401": {
+            "description": "Missing/invalid Firebase id_token."
+          },
+          "404": {
+            "description": "Activation code not found."
+          },
+          "409": {
+            "description": "Activation code already used."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/License/_issue": {
+      "post": {
+        "tags": [
+          "2.1.4 License Issuance (Invite)"
+        ],
+        "summary": "Issue (reserve) an activation code from the tenant license pool (async)",
+        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_issue`.\nThis `identity/openid` route is maintained as a temporary compatibility alias.\n\nTenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role\nand returns a single-use activation code for subsequent `Token/_exchange`.\nUser licenses can issue multiple activation codes for different device profiles (mobile/web).\nDevice licenses only issue a single activation code per seat.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "newEmployee": {
+                  "$ref": "#/components/examples/LicenseIssuePlaintextMessage"
+                },
+                "existingEmployee": {
+                  "$ref": "#/components/examples/LicenseIssueExistingEmployeePlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "newEmployeeJson": {
+                  "$ref": "#/components/examples/LicenseIssuePlaintextMessage"
+                },
+                "existingEmployeeJson": {
+                  "$ref": "#/components/examples/LicenseIssueExistingEmployeePlaintextMessage"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "compat"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response": {
+      "post": {
+        "tags": [
+          "2.1.2 Initial Access Token Exchange"
+        ],
+        "summary": "Poll the initial_access_token exchange result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TokenExchangePollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TokenExchangePollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Person/_batch": {
+      "post": {
+        "tags": [
+          "99. Legacy / Internal"
+        ],
+        "summary": "Create a Person (individual vault)",
+        "description": "This endpoint existed for the older \"customer onboarding\" flow where a provider created an individual's vault directly.\n\nThis endpoint remains available for the phone-validated form bootstrap path used by the chat node and other compatibility clients.\nNew portal integrations should use the tenant organization activation + individual indexing flow documented in the current SDK guides.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Legacy endpoint. Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCreationLegacy"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/CustomerOnboardingPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCreationLegacy"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. The job has been queued.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent/_batch": {
+      "post": {
+        "tags": [
+          "5. Consent"
+        ],
+        "summary": "Create a FHIR Consent Resource",
+        "description": "Submits an async job to create a FHIR Consent resource, wrapped in a DIDComm message.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\nLegacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentCreation"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/ConsentCreationPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentCreation"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            },
+            "application/fhir+json": {
+              "schema": {
+                "type": "object"
+              },
+              "description": "Legacy FHIR JSON (raw Bundle without DIDComm envelope). Allowed only in non-production environments and only for `org.hl7.fhir.*` endpoints.\nThis mode is still asynchronous: submit with `_batch` and poll `_batch-response`.\n"
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent/_batch-response": {
+      "post": {
+        "tags": [
+          "5. Consent"
+        ],
+        "summary": "Poll the Consent job result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/CompositionPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/CompositionPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "application/x-www-form-urlencoded": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollSecureResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Pending. Retry later.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "5"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollPending"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication/_batch": {
+      "post": {
+        "tags": [
+          "6. Communication"
+        ],
+        "summary": "Create a FHIR Communication Resource",
+        "description": "Submits an async job to create a FHIR Communication resource, wrapped in a DIDComm message, subject to a prior Consent.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\nLegacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunicationCreation"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/CommunicationCreationPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunicationCreation"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            },
+            "application/fhir+json": {
+              "schema": {
+                "type": "object"
+              },
+              "description": "Legacy FHIR JSON (raw Bundle without DIDComm envelope). Allowed only in non-production environments and only for `org.hl7.fhir.*` endpoints.\nThis mode is still asynchronous: submit with `_batch` and poll `_batch-response`.\n"
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication/_batch-response": {
+      "post": {
+        "tags": [
+          "6. Communication"
+        ],
+        "summary": "Poll the Communication job result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/RelatedPersonPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/RelatedPersonPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "application/x-www-form-urlencoded": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollSecureResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Pending. Retry later.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "5"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollPending"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch": {
+      "post": {
+        "tags": [
+          "7. Composition"
+        ],
+        "summary": "Update the Unified Health Index (FHIR Composition)",
+        "description": "Submits an async job to update the individual's index using a FHIR Composition bundle entry.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\nLegacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/CompositionUpdatePlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            },
+            "application/fhir+json": {
+              "schema": {
+                "type": "object"
+              },
+              "description": "Legacy FHIR JSON (raw Bundle without DIDComm envelope). Allowed only in non-production environments and only for `org.hl7.fhir.*` endpoints.\nThis mode is still asynchronous: submit with `_batch` and poll `_batch-response`.\n"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch-response": {
+      "post": {
+        "tags": [
+          "7. Composition"
+        ],
+        "summary": "Poll the Composition job result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/ObservationPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/ObservationPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "application/x-www-form-urlencoded": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollSecureResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Pending. Retry later.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "5"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollPending"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch": {
+      "post": {
+        "tags": [
+          "4.3 Family Member Relationship"
+        ],
+        "summary": "Register a family member relationship (emergency contact)",
+        "description": "Stores a relationship/emergency-contact record for an individual using contextualized flat claims (`@context: org.hl7.fhir.api`).\nThis is intended for family-controlled or self-managed emergency contacts and non-clinical context.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch-response": {
+      "post": {
+        "tags": [
+          "4.3 Family Member Relationship"
+        ],
+        "summary": "Poll the relationship registration result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrganizationPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrganizationPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch": {
+      "post": {
+        "tags": [
+          "1.2 Organization Order"
+        ],
+        "summary": "Confirm the organization registration order (host)",
+        "description": "Step 2 of onboarding. Submits an Order that accepts a prior Offer from Step 1 (tenant registration).\nThe Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the\nOffer returned by the Organization activation `_activate-response`.\nThis step is always required (including `0` amount offers).\nThe final polled result typically contains payment/checkout claims and the first controller\nactivation code (`org.schema.IndividualProduct.serialNumber`).\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/OrganizationOrderPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response": {
+      "post": {
+        "tags": [
+          "1.1 Organization Registration"
+        ],
+        "summary": "Poll the organization registration result (host)",
+        "description": "Polls the asynchronous job submitted to `.../Organization/_batch`.\n\nSubmit vs poll behavior:\n- Submit (`_batch`) returns immediate errors if the request cannot be accepted/enqueued.\n- Poll (`_batch-response`) returns `202` while pending, then `200` (success) or `500` (processing error).\n\nResponse format depends on the original submission flow:\n- Legacy/plaintext: returns JSON.\n- Secure (form-encoded JWE): returns `application/x-www-form-urlencoded` with `response=<jwe>`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/OrganizationRegistrationPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/OrganizationRegistrationPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed. Returns either JSON (legacy) or `response=<jwe>` (secure).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "application/x-www-form-urlencoded": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollSecureResponse"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/AsyncPollSecureResponse"
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Pending. Retry later.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "5"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollPending"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/AsyncPollPending"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response": {
+      "post": {
+        "tags": [
+          "1.1 Organization Activation"
+        ],
+        "summary": "Poll the organization activation result (host)",
+        "description": "Polls the asynchronous job submitted to `.../Organization/_activate`.\n\nSubmit vs poll behavior:\n- Submit (`_activate`) returns immediate errors if the request cannot be accepted/enqueued.\n- Poll (`_activate-response`) returns `202` while pending, then `200` (success) or `500` (processing error).\n\nResponse format depends on the original submission flow:\n- Plaintext: returns JSON.\n- Secure (form-encoded JWE): returns `application/x-www-form-urlencoded` with `response=<jwe>`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed. Returns either JSON (plaintext) or `response=<jwe>` (secure)."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response": {
+      "post": {
+        "tags": [
+          "1.2 Organization Order"
+        ],
+        "summary": "Poll the organization order result (host)",
+        "description": "Polls the asynchronous job submitted to `.../Order/_batch`. The `jurisdiction` and `sector` are path routing parameters for the host registry.\nThe completed response returns a Bundle entry with order invoice claims, including an optional payment\nlink (`org.schema.Order.paymentUrl`) and the accepted Offer reference (`org.schema.Order.acceptedOffer.identifier`). When using\nStripe (INVOICE_PROVIDER=stripe, INVOICE_FLOW=pre), `org.schema.Order.partOfInvoice` and `org.schema.Order.paymentUrl` refer to\nthe Stripe invoice/checkout URL. UBL/PDF/VeriFactu invoices are not emitted yet.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/OrganizationOrderPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/OrganizationOrderPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed. Returns either JSON (legacy) or `response=<jwe>` (secure).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/OrganizationOrderResponseBundle"
+                  }
+                }
+              },
+              "application/x-www-form-urlencoded": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollSecureResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Pending. Retry later.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "5"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollPending"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch": {
+      "post": {
+        "tags": [
+          "4.1 Family Registration"
+        ],
+        "summary": "Register a legacy individual organization offer",
+        "description": "Legacy compatibility endpoint for hosted individual onboarding.\nThe current portal flow uses tenant organization activation from signed proof and individual indexing in the hosted tenant.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/FamilyRegistrationPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the Offer result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response": {
+      "post": {
+        "tags": [
+          "4.1 Family Registration"
+        ],
+        "summary": "Poll the legacy individual registration result (Offer)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch": {
+      "post": {
+        "tags": [
+          "4.2 Family Order"
+        ],
+        "summary": "Confirm the legacy individual organization order (accept Offer)",
+        "description": "Legacy compatibility only. Submits an Order that accepts the registration Offer to complete the historical onboarding flow.\nThe Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the\nOffer returned by the family registration _batch-response.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/FamilyOrderPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch-response": {
+      "post": {
+        "tags": [
+          "4.2 Family Order"
+        ],
+        "summary": "Poll the legacy individual order result",
+        "description": "Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.\nThe completed response returns a Bundle entry with order invoice claims, including an\noptional payment link (`org.schema.Order.paymentUrl`) and the accepted Offer reference (`org.schema.Order.acceptedOffer.identifier`).\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr": {
+      "post": {
+        "tags": [
+          "2.1.3 Device Registration (DCR)"
+        ],
+        "summary": "Register device keys (OpenID DCR)",
+        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_dcr`.\nThis `identity/openid` route is maintained as a temporary compatibility alias.\n\nRegisters a device/client using OpenID Dynamic Client Registration. Requires an initial_access_token from Token/_exchange.\nRequest is usually a secure (form-encoded JWE) DIDComm message; demo plaintext is also accepted.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/DeviceRegistrationPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response": {
+      "post": {
+        "tags": [
+          "2.1.3 Device Registration (DCR)"
+        ],
+        "summary": "Poll the device registration (DCR) result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token": {
+      "post": {
+        "tags": [
+          "2.2 SMART Token"
+        ],
+        "summary": "Request a SMART access_token (async)",
+        "description": "Requests a SMART access token. The request MUST include the gateway context-pinning scope item:\n`organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=*|<code>[,<code>...]]`.\nOmitting `section` is allowed and means the backend's default permitted set for that subject.\n\nOpenID4VP binding: the request MUST include `acr_values` from the prior verification event, using\none of: `urn:antifraud:acr:openid4vp:employee` or `urn:antifraud:acr:openid4vp:individual`. The issued\nSMART token includes the matching `acr` and SHOULD include `amr` entries like `openid4vp`, `vc`, and\n`device_bound`.\n\nVP requirement: the SMART authorization request MUST include a verifiable presentation (VP) inside\nthe JAR (request object) or the DIDComm payload (demo flow). This VP is validated via the Gaia-X\nClearing House to enforce non-revocation before issuing the token.\n\nDemo payload note: in this endpoint the DIDComm `body` represents the JAR (authorize request object),\nincluding PKCE parameters (`code_challenge`, `code_challenge_method`), `client_id`, `redirect_uri`,\n`vp_token`, optional `presentation_submission`, and `acr_values`.\n\nThe worker will validate the target subject exists and that at least one consent rule matches the actor.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/SmartTokenRequestPlaintextMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll `.../identity/openid/smart/_batch-response` with `thid`."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response": {
+      "post": {
+        "tags": [
+          "2.2 SMART Token"
+        ],
+        "summary": "Poll the SMART token issuance result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/auth/token": {
+      "post": {
+        "tags": [
+          "99. Legacy / Internal"
+        ],
+        "summary": "Exchange an Activation Code for an Initial Access Token",
+        "description": "This endpoint performs a token exchange. The user authenticates by presenting a valid `id_token` (from an OIDC provider) as a Bearer token.\nIn the request body, they provide an `activation_code` (`subject_token`).\nIf both are valid, the server returns a short-lived `initial_access_token` with the scope `dcr:register`, which grants permission to call the DCR endpoint.\n",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenExchangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success. Returns the initial access token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenExchangeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. The request body is malformed or the activation code is invalid."
+          },
+          "401": {
+            "description": "Unauthorized. The `id_token` is missing, invalid, or expired."
+          },
+          "404": {
+            "description": "The activation code was not found."
+          },
+          "409": {
+            "description": "Conflict. The activation code has already been used."
+          }
+        },
+        "x-profile": "compat"
+      }
+    },
+    "/host/.well-known/ping": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Ping (host)",
+        "description": "Health check for the host tenant.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/ping": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Ping (tenant)",
+        "description": "Health check for a tenant resolved by its CDS path.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/.well-known/did.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "DID document (host)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/did.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "DID document (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/.well-known/jwks.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "JWKS (host)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/jwks.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "JWKS (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/.well-known/openid-configuration": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "OpenID configuration (host)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/openid-configuration": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "OpenID configuration (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/.well-known/smart-configuration": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "SMART configuration (host)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/smart-configuration": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "SMART configuration (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/.well-known/legal-participant.vc.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Gaia-X Legal Participant VC (host)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/legal-participant.vc.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Gaia-X Legal Participant VC (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "FHIR CapabilityStatement (tenant)",
+        "description": "Returns the tenant's FHIR capability statement for supported sectors.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/dcat3/catalog/request": {
+      "post": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Operator catalog request (DSP/DCAT-3)",
+        "description": "Returns a `dcat:Catalog` with provider datasets discoverable by client apps.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filters": {
+                    "type": "object",
+                    "properties": {
+                      "sector": {
+                        "type": "string"
+                      },
+                      "jurisdiction": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DSP catalog response"
+          },
+          "503": {
+            "description": "Host not available"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/dcat3/catalog/datasets/{id}": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Read one provider dataset from operator catalog",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dataset found"
+          },
+          "404": {
+            "description": "Dataset not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/request": {
+      "post": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Hosted provider catalog request (tenant scoped)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DSP catalog response"
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/datasets/{id}": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Read one provider dataset from hosted tenant catalog",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dataset found"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    }
+  }
+}

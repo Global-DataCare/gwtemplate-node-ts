@@ -1,6 +1,19 @@
 # Project Documentation Index
 
+- Start here for ordered reading: `docs/00-READING_ORDER.md`
+
 This document serves as the central index for all documentation related to the Gateway Template project.
+
+SDK-specific method documentation is canonical in `dataspace-client-sdk-node` docs and should not be duplicated here.
+
+## Documentation Governance
+
+- Canonical policy and cleanup rules: `docs/DOCS_GOVERNANCE.md`.
+
+## Transitional Docs
+
+- Top-level docs marked `Status: Transitional` are migration/bridge content.
+- They must be reviewed and either moved into numbered folders or explicitly retained as cross-cutting runbooks.
 
 ## Documentation Structure
 
@@ -10,7 +23,7 @@ docs/
 ├── 02-API-AND-ENDPOINTS/       # Detailed API endpoint documentation and cURL examples.
 ├── 03-IDENTITY-AND-TRUST/      # Concepts related to identity, DIDs, and trust policies.
 ├── 04-DEEP-DIVES/              # In-depth explanations of specific subsystems (Storage, Fabric, etc.).
-└── scenarios/                  # End-to-end flow descriptions for specific use cases.
+└── 05-USE-CASES/               # End-to-end flow descriptions for specific use cases.
 ```
 
 ---
@@ -20,6 +33,13 @@ docs/
 ## Generated Artifacts
 
 - **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
+- **Core integration bible**: `docs/API_CORE_INTEGRATION.md` defines the canonical SEDIA-aligned flow used by SDK live core tests.
+- **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
+- **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
+  - `artifacts/openapi-profiles/openapi-core.json`
+  - `artifacts/openapi-profiles/openapi-compat.json`
+  - `artifacts/openapi-profiles/openapi-extension.json`
+  See `docs/OPENAPI_PROFILES.md`.
 - **Docs QA (Flow Report)**: `artifacts/api-integrators-guide.flow-report.json` is generated via `npm run docs:flow-report` and captures the onboarding journey requests/responses.
 - **Contract-check intent**: The flow report is used as a reproducible docs/examples contract check and to keep Swagger examples aligned with real responses.
 - **Intentional negative controls**: Some report steps are expected to fail (for example `2.1.2 Initial Access Token Exchange (invalid code)`) to verify error handling before the valid path.
@@ -63,6 +83,9 @@ docs/
 *   **[04.H-DATASPACE-PUBLICATION-ATTESTATION.md](04-DEEP-DIVES/04.H-DATASPACE-PUBLICATION-ATTESTATION.md)**: Clarifies what is published by link vs anchored on-ledger (hashes/tags), and how attestation/provenance fits.
 *   **[04.I-FABRIC-MULTICLOUD-BLUEPRINT.md](04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md)**: Multi-cloud Fabric deployment plan and channel governance.
 
-### 📂 scenarios
-*   **[appointment-notification-flow.md](scenarios/appointment-notification-flow.md)**: E2E description of an appointment notification use case.
-*   **[end-to-end-legacy-flow.md](scenarios/end-to-end-legacy-flow.md)**: E2E description of a data flow involving legacy systems.
+### 📂 05-USE-CASES
+*   Core use cases only. Legacy/extension use-case docs were moved to transitional `90.*` files.
+
+### 📂 Transitional Scenarios (Not Core Baseline)
+*   **[90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md](90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md)**: Legacy appointment-notification narrative (not part of current core baseline).
+*   **[90.O-END_TO_END_LEGACY_FLOW.md](90.O-END_TO_END_LEGACY_FLOW.md)**: Legacy end-to-end flow reference (transitional).

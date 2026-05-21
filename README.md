@@ -6,12 +6,21 @@ This repository provides a robust, asynchronous, and policy-driven API gateway t
 
 It is designed for building secure, multi-tenant systems that handle complex data interactions, and integration with technologies like Financial API (FAPI), DIDComm and blockchain.
 
+## Non-Negotiable Conventions
+
+- FHIR SearchParameter names are canonical FHIR names only: lowercase and `-` where applicable.
+- No invented camelCase for FHIR claims/search keys (example: use `Communication.part-of`, never `Communication.partOf`).
+- Custom parameter names are allowed only when FHIR has no defined parameter.
+- `resource.meta.claims` is the canonical interoperable claims carrier and must always be persisted/propagated.
+
 ## Repository Navigation
 
+- Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
 - Main docs index: [docs/README.md](docs/README.md)
 - Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
 - Repo briefing: [BRIEFING_DATASPACE_EN.md](BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
+- Firestore demo template: [env.firestore-demo.example](env.firestore-demo.example)
 - Local PostgreSQL overrides: [.env.local.postgres](.env.local.postgres)
 - Local PostgreSQL container: [docker-compose.postgres.yml](docker-compose.postgres.yml)
 
@@ -93,6 +102,22 @@ npm run db:local-postgres:down
 
 The vault schema is created automatically by the API on startup.
 
+#### Option B2: Using Node.js with Firestore Demo
+
+This method keeps demo mode (`NODE_ENV=demo`) but persists confidential storage in Firestore and files in GCS.
+
+1. Create your local profile:
+```bash
+cp env.firestore-demo.example .env.firestore-demo
+```
+
+2. Fill `FIRESTORE_PROJECT_ID`, `GCS_BUCKET_NAME`, and `GOOGLE_APPLICATION_CREDENTIALS`.
+
+3. Run the API:
+```bash
+npm run api:local-firestore-demo
+```
+
 #### Option C: Using Docker
 
 This method runs the application inside a Docker container, which is a great way to ensure a consistent environment. This is the same image that will be deployed to the cloud.
@@ -146,7 +171,19 @@ For more advanced testing and scripting, the project includes a comprehensive co
 - `npm run docs:flow-report`: Run the onboarding journey against the in-memory app and write `artifacts/api-integrators-guide.flow-report.json` (docs QA).
 - `npm test`: Run the full test suite.
 - `npm run test:unit` / `npm run test:integration` / `npm run test:e2e`: Run specific test tiers.
+- `npm run test:e2e:real`: Run E2E with real Google auth precheck. If login is missing, it stops and asks for `gcloud auth login`, then you rerun.
 - `npm run seed:dev`: Generate deterministic dev CA material (used by Fabric CA containers).
+
+## E2E Auth Modes (Do Not Mix)
+
+- Simulated/local tests:
+  - Unit/integration and many E2E checks can run with mocks or local providers.
+  - Useful for deterministic CI and fast feedback.
+- Real auth E2E:
+  - Validates real token verification path.
+  - Requires active `gcloud` login and a real `id_token`.
+  - Use `npm run test:e2e:real`.
+  - If auth is missing, command exits with instructions. After login, rerun the same command.
 
 ## Portal Web (apptemplate) - What Must Work in GW
 
@@ -157,7 +194,7 @@ To validate `gdc-sdk-client-ts` from `apptemplate` (web portal), keep `gwtemplat
 Use this order to avoid drift between implementations:
 
 1. GW readiness and route compatibility:
-   - [docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
+   - [docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
 2. Frontend SDK use cases and exact calls (`gdc-sdk-client-ts`):
    - [../gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md](../gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md)
 3. Backend Node SDK use cases and exact calls (`dataspace-client-sdk-node`):
@@ -218,7 +255,7 @@ Recommended local preparation sequence:
 
 Before opening `apptemplate`, run the 5-minute Go/No-Go checklist:
 
-- [docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/scenarios/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
+- [docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
 
 Automated check command:
 

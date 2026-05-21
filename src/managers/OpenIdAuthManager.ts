@@ -16,6 +16,7 @@ import { parseActorFromSub } from 'gdc-common-utils-ts/utils/actor';
 import { getIndividualSectionId } from '../utils/individual-sections';
 import { IClearingHouseService } from '../services/ClearingHouseService';
 import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/consent';
+import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 
 type TokenRequestBody = {
   scope?: string;
@@ -167,7 +168,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       if (sections.length > 0) {
         const ruleActions = (getClaimValue<string>(rule as any, 'Consent.action') || '')
           .split(',')
-          .map((s) => s.trim())
+          .map((s) => normalizeCodeSystemAndValue(s.trim()))
           .filter(Boolean);
         return sections.every((s) => ruleActions.includes(s));
       }
@@ -271,7 +272,7 @@ export class OpenIdAuthManager implements IJobProcessor {
         ? []
         : sectionParam
             .split(',')
-            .map((s) => s.trim())
+            .map((s) => normalizeCodeSystemAndValue(s.trim()))
             .filter(Boolean);
       return { subject, sections };
     });

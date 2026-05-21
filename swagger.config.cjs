@@ -215,9 +215,9 @@ const swaggerDefinition = {
         name: 'sector',
         in: 'path',
         required: true,
-        schema: { type: 'string', enum: ['test', 'test-network', 'network'], example: 'test' },
+        schema: { type: 'string', enum: ['test', 'test-network', 'network'], example: 'test', default: 'test' },
         description:
-          'Host onboarding "network environment" sector. demo/test→test, development/staging→test-network, production→network.',
+          'Host onboarding network selector (immutable-proof network), not business domain sector. demo/test→test, development/staging→test-network, production→network.',
       },
     },
     examples: {
@@ -225,6 +225,12 @@ const swaggerDefinition = {
         summary: 'Plaintext Message for Organization Registration',
         description:
           'A DIDComm-like message wrapper containing the registration claims. This is the format for `application/didcomm-plaintext+json`.',
+        value: {},
+      },
+      OrganizationActivationPlaintextMessage: {
+        summary: 'Plaintext Message for Organization Activation',
+        description:
+          'A DIDComm-like message wrapper for `_activate`; proof is carried in `body.data[].vp_token` (or `body.data[].vp`).',
         value: {},
       },
       OrganizationOrderPlaintextMessage: {

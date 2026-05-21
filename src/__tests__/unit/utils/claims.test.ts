@@ -1,6 +1,6 @@
 // File: src/__tests__/unit/utils/claims.test.ts
 
-import { processResponseModesClaim } from '../../../utils/claims';
+import { getClaimValue, normalizeContextualizedClaims, processResponseModesClaim } from '../../../utils/claims';
 
 describe('processResponseModesClaim', () => {
   const propertyId = 'net.openid.connect.discovery.response_modes_supported';
@@ -67,4 +67,80 @@ describe('processResponseModesClaim', () => {
     expect(processResponseModesClaim(claim)).toBe(expected);
   });
 
+});
+
+describe('normalizeContextualizedClaims', () => {
+  const oldFhirMode = process.env.CLAIMS_FHIR_STORAGE_MODE;
+  const oldIdentityMode = process.env.CLAIMS_IDENTITY_STORAGE_MODE;
+  const oldDefaultMode = process.env.CLAIMS_DEFAULT_STORAGE_MODE;
+
+  afterEach(() => {
+    process.env.CLAIMS_FHIR_STORAGE_MODE = oldFhirMode;
+    process.env.CLAIMS_IDENTITY_STORAGE_MODE = oldIdentityMode;
+    process.env.CLAIMS_DEFAULT_STORAGE_MODE = oldDefaultMode;
+  });
+
+  test('should prefix contextual claims and preserve fully-qualified keys and context fields', () => {
+    const claims = normalizeContextualizedClaims({
+      '@context': 'org.schema',
+      '@type': 'Offer',
+      'Offer.identifier': 'urn:uuid:offer-1',
+      'org.schema.Offer.status': 'active',
+      'Offer.name': 'Care plan',
+    });
+
+    expect(claims).toEqual({
+      '@context': 'org.schema',
+      '@type': 'Offer',
+      'org.schema.Offer.identifier': 'urn:uuid:offer-1',
+      'org.schema.Offer.name': 'Care plan',
+      'org.schema.Offer.status': 'active',
+    });
+  });
+
+  test('should keep existing claim lookup working for contextualized keys', () => {
+    const claims = normalizeContextualizedClaims({
+      '@context': 'org.hl7.fhir.api',
+      '@type': 'Consent',
+      'Consent.action': 'LOINC|48765-2',
+      'org.hl7.fhir.api.Consent.actor-role': 'ISCO-08|2211',
+    });
+
+    expect(getClaimValue(claims, 'Consent.action')).toBe('LOINC|48765-2');
+    expect(getClaimValue(claims, 'Consent.actor-role')).toBe('ISCO-08|2211');
+  });
+
+  test('should normalize FHIR claims to canonical mode when configured', () => {
+    process.env.CLAIMS_FHIR_STORAGE_MODE = 'canonical';
+    const claims = normalizeContextualizedClaims({
+      '@context': 'org.hl7.fhir.api',
+      '@type': 'MedicationStatement',
+      'org.hl7.fhir.api.MedicationStatement.subject': 'did:web:subject:1',
+      'MedicationStatement.status': 'active',
+    });
+
+    expect(claims).toEqual({
+      '@context': 'org.hl7.fhir.api',
+      '@type': 'MedicationStatement',
+      'MedicationStatement.status': 'active',
+      'MedicationStatement.subject': 'did:web:subject:1',
+    });
+  });
+
+  test('should normalize identity claims to canonical mode when configured', () => {
+    process.env.CLAIMS_IDENTITY_STORAGE_MODE = 'canonical';
+    const claims = normalizeContextualizedClaims({
+      '@context': 'org.schema',
+      '@type': 'Organization',
+      'org.schema.Organization.identifier': 'urn:example:org:1',
+      'Organization.legalName': 'Acme',
+    });
+
+    expect(claims).toEqual({
+      '@context': 'org.schema',
+      '@type': 'Organization',
+      'Organization.identifier': 'urn:example:org:1',
+      'Organization.legalName': 'Acme',
+    });
+  });
 });

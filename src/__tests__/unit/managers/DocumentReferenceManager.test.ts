@@ -55,8 +55,8 @@ describe('DocumentReferenceManager', () => {
       'DocumentReference.subject': subject,
       'DocumentReference.identifier': 'urn:uuid:docref-001',
       'DocumentReference.category': 'http://loinc.org|11502-2',
-      'DocumentReference.content-attachment-type': 'application/pdf',
-      'DocumentReference.content-attachment-data': 'JVBERi0xLjQKJ...',
+      'DocumentReference.contenttype': 'application/pdf',
+      'DocumentReference.contentdata': 'JVBERi0xLjQKJ...',
     });
 
     const response = await manager.process(job);

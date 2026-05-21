@@ -3,11 +3,11 @@ import { DefaultActivationTrustAdapter } from '../../../adapters/activation-trus
 import { IClearingHouseService } from '../../../services/ClearingHouseService';
 import { ITrustRegistryAdapter } from '../../../adapters/trust-registry.adapter';
 
-function buildCredential(subjectDid: string): any {
+function buildCredential(subjectDid: string, extra?: Record<string, unknown>): any {
   return {
     '@context': ['https://www.w3.org/2018/credentials/v1'],
     type: ['VerifiableCredential'],
-    credentialSubject: { id: subjectDid },
+    credentialSubject: { id: subjectDid, ...(extra || {}) },
   };
 }
 
@@ -82,6 +82,112 @@ describe('DefaultActivationTrustAdapter', () => {
 
     expect(result.organizationDid).toBe('did:web:org.example');
     expect(result.representativeDid).toBeUndefined();
+  });
+
+  it('accepts representative memberOf.taxID when it matches organization taxID', async () => {
+    const clearingHouseService: IClearingHouseService = {
+      verifyVpToken: jest.fn(async () => ({ acr: 'urn:test:acr', ledgerVerified: true })),
+    };
+    const trustRegistryAdapter: ITrustRegistryAdapter = {
+      verifyActivationTrust: jest.fn(async () => ({
+        revocationChecked: true,
+        issuerKeyStatusChecked: true,
+        subjectKeyStatusChecked: true,
+        onChainChecked: true,
+      })),
+    };
+    const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
+
+    const result = await adapter.evaluate({
+      networkMode: 'network',
+      vpToken: buildVpCompactJwt('ES256K'),
+      organizationCredential: buildCredential('did:web:org.example', { taxID: 'VATES-A12345678' }),
+      representativeCredential: buildCredential('did:web:rep.example', {
+        hasOccupation: { '@type': 'Occupation', identifier: { value: 'RESPRSN' } },
+        hasCredential: { material: 'sha256:rep-email-hash' },
+        memberOf: { '@type': 'Organization', taxID: 'VATES-A12345678' },
+      }),
+    });
+
+    expect(result.organizationDid).toBe('did:web:org.example');
+    expect(result.representativeDid).toBe('did:web:rep.example');
+  });
+
+  it('rejects representative memberOf.taxID when it does not match organization taxID', async () => {
+    const clearingHouseService: IClearingHouseService = {
+      verifyVpToken: jest.fn(async () => ({ acr: 'urn:test:acr', ledgerVerified: true })),
+    };
+    const trustRegistryAdapter: ITrustRegistryAdapter = {
+      verifyActivationTrust: jest.fn(async () => ({
+        revocationChecked: true,
+        issuerKeyStatusChecked: true,
+        subjectKeyStatusChecked: true,
+        onChainChecked: true,
+      })),
+    };
+    const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
+
+    await expect(adapter.evaluate({
+      networkMode: 'network',
+      vpToken: buildVpCompactJwt('ES256K'),
+      organizationCredential: buildCredential('did:web:org.example', { taxID: 'VATES-A12345678' }),
+      representativeCredential: buildCredential('did:web:rep.example', {
+        hasOccupation: { '@type': 'Occupation', identifier: { value: 'RESPRSN' } },
+        hasCredential: { material: 'sha256:rep-email-hash' },
+        memberOf: { '@type': 'Organization', taxID: 'VATES-B99999999' },
+      }),
+    })).rejects.toThrow('memberOf.taxID must match organization credential taxID');
+  });
+
+  it('rejects representative credential missing RESPRSN role', async () => {
+    const clearingHouseService: IClearingHouseService = {
+      verifyVpToken: jest.fn(async () => ({ acr: 'urn:test:acr', ledgerVerified: true })),
+    };
+    const trustRegistryAdapter: ITrustRegistryAdapter = {
+      verifyActivationTrust: jest.fn(async () => ({
+        revocationChecked: true,
+        issuerKeyStatusChecked: true,
+        subjectKeyStatusChecked: true,
+        onChainChecked: true,
+      })),
+    };
+    const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
+
+    await expect(adapter.evaluate({
+      networkMode: 'network',
+      vpToken: buildVpCompactJwt('ES256K'),
+      organizationCredential: buildCredential('did:web:org.example', { taxID: 'VATES-A12345678' }),
+      representativeCredential: buildCredential('did:web:rep.example', {
+        hasOccupation: { '@type': 'Occupation', identifier: 'ISCO-08|2211' },
+        hasCredential: { material: 'sha256:rep-email-hash' },
+        memberOf: { '@type': 'Organization', taxID: 'VATES-A12345678' },
+      }),
+    })).rejects.toThrow('must include Responsible Party role');
+  });
+
+  it('rejects representative credential missing hasCredential.material', async () => {
+    const clearingHouseService: IClearingHouseService = {
+      verifyVpToken: jest.fn(async () => ({ acr: 'urn:test:acr', ledgerVerified: true })),
+    };
+    const trustRegistryAdapter: ITrustRegistryAdapter = {
+      verifyActivationTrust: jest.fn(async () => ({
+        revocationChecked: true,
+        issuerKeyStatusChecked: true,
+        subjectKeyStatusChecked: true,
+        onChainChecked: true,
+      })),
+    };
+    const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
+
+    await expect(adapter.evaluate({
+      networkMode: 'network',
+      vpToken: buildVpCompactJwt('ES256K'),
+      organizationCredential: buildCredential('did:web:org.example', { taxID: 'VATES-A12345678' }),
+      representativeCredential: buildCredential('did:web:rep.example', {
+        hasOccupation: { '@type': 'Occupation', identifier: { value: 'RESPRSN' } },
+        memberOf: { '@type': 'Organization', taxID: 'VATES-A12345678' },
+      }),
+    })).rejects.toThrow('missing credentialSubject.hasCredential.material');
   });
 
   it('rejects unsigned vp_token outside demo mode', async () => {

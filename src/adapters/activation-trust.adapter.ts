@@ -1,5 +1,9 @@
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import {
+  extractDidWebFromCredential,
+  validateActivationRepresentativePolicy,
+} from 'gdc-common-utils-ts/utils/activation-policy';
 import { ClearingHouseVerificationResult, IClearingHouseService } from '../services/ClearingHouseService';
 import { compactVerify, decodeProtectedHeader, importJWK, JWK } from 'jose';
 import {
@@ -66,19 +70,6 @@ async function verifyVpTokenProof(vpToken: string): Promise<void> {
   }
 }
 
-function extractDidFromCredential(credential: any): string | undefined {
-  if (!credential || typeof credential !== 'object') {
-    return undefined;
-  }
-  const subject = Array.isArray(credential.credentialSubject)
-    ? credential.credentialSubject[0]
-    : credential.credentialSubject;
-  const didCandidate = subject?.id || credential?.id;
-  return typeof didCandidate === 'string' && didCandidate.startsWith('did:web:')
-    ? didCandidate
-    : undefined;
-}
-
 function assertActivationCredentialConsistency(params: {
   primaryDid?: string;
   organizationCredential?: any;
@@ -89,7 +80,7 @@ function assertActivationCredentialConsistency(params: {
     throw new ManagerError('Missing ICA-issued organization credential.', IssueType.Required);
   }
 
-  const organizationDidFromCredential = extractDidFromCredential(organizationCredential);
+  const organizationDidFromCredential = extractDidWebFromCredential(organizationCredential);
   if (!organizationDidFromCredential) {
     throw new ManagerError('ICA-issued organization credential is missing credentialSubject.id did:web.', IssueType.Required);
   }
@@ -98,10 +89,17 @@ function assertActivationCredentialConsistency(params: {
   }
 
   const representativeDidFromCredential = representativeCredential
-    ? extractDidFromCredential(representativeCredential)
+    ? extractDidWebFromCredential(representativeCredential)
     : undefined;
-  if (representativeCredential && !representativeDidFromCredential) {
-    throw new ManagerError('ICA-issued representative credential is missing credentialSubject.id did:web.', IssueType.Required);
+  const policyErrors = validateActivationRepresentativePolicy({
+    organizationCredential,
+    representativeCredential,
+    requiredRoleCode: 'RESPRSN',
+  });
+  if (policyErrors.length > 0) {
+    const first = policyErrors[0];
+    const issue = first.code === 'REPRESENTATIVE_TAXID_MISMATCH' ? IssueType.Conflict : IssueType.Required;
+    throw new ManagerError(first.message, issue);
   }
 
   return {

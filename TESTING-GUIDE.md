@@ -12,6 +12,15 @@ The E2E test suite (`npm run test:e2e`) is designed to run against a real GCP pr
 
 **Never run E2E tests against a production database or storage bucket.** Use a dedicated test project.
 
+### Real Auth vs Simulated Auth
+
+- Simulated auth:
+  - Firebase emulator, mocked verifiers, and test-only tokens are suitable for unit/integration.
+- Real auth:
+  - Required when validating true token verification behavior (issuer/audience/signature path).
+  - Use `gcloud` login and run `npm run test:e2e:real`.
+  - The precheck command fails fast if no real auth session exists, so you can authenticate and rerun cleanly.
+
 ---
 
 ## 2. GCP Project Setup (One-Time)
@@ -106,3 +115,13 @@ npm run test:e2e
 ```
 
 This command will execute all test files in the `src/__tests__/e2e` directory. If the environment is configured correctly, all tests should pass.
+
+For real-auth prechecked execution:
+
+```shell
+npm run test:e2e:real
+```
+
+If authentication is missing, the command prints:
+1. `gcloud auth login`
+2. rerun `npm run test:e2e:real`

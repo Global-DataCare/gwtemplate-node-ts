@@ -28,6 +28,7 @@ import { EntityLifecycleStatus, EntityType } from '../gdc-backend-utils-node/mod
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { generateLicenseOffer } from '../utils/offer';
 import { getEnvSectionId } from '../utils/section-env';
+import { getPersonOccupationClaim } from '../utils/occupation';
 
 const EMPLOYEE_SECTION = getEnvSectionId('employees');
 const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
@@ -177,7 +178,7 @@ export class EmployeeManager {
       throw new ManagerError('Missing or invalid email claim.', IssueType.Required);
     }
 
-    const roleCode = claims[ClaimsPersonSchemaorg.hasOccupation] as string; // e.g. ISCO-08|<code>
+    const roleCode = getPersonOccupationClaim(claims); // canonical: hasOccupation.identifier.value (+ optional system)
     if (!roleCode) {
       throw new ManagerError('Missing or invalid hasOccupation claim.', IssueType.Required);
     }

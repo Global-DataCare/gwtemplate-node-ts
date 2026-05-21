@@ -59,6 +59,9 @@ export class CompositionManager implements IJobProcessor {
     if (!normalizedAction) {
       throw new Error('Missing required job.action.');
     }
+    if (normalizedAction !== '_batch' && normalizedAction !== '_search') {
+      throw new Error(`Unsupported action '${normalizedAction}' for CompositionManager.`);
+    }
     if (normalizedSection !== 'individual' && normalizedSection !== 'digitaltwin') {
       throw new Error(`Unsupported section '${normalizedSection}' for CompositionManager.`);
     }
@@ -69,6 +72,52 @@ export class CompositionManager implements IJobProcessor {
 
     const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
     const cidMappings: FhirCidVersionMapping[] = [];
+
+    if (normalizedAction === '_search') {
+      const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
+      const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+      if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
+
+      const searchResourceType = this.extractSearchResourceType(body);
+      const useDocumentReferenceSection = searchResourceType === 'documentreference';
+      const searchSubject = this.extractSearchSubject(body);
+      if (!searchSubject) {
+        throw new Error('Missing required subject search parameter for Composition search.');
+      }
+      const searchSections = this.extractSearchSections(body);
+      const documentReferenceFilters = this.extractDocumentReferenceSearchFilters(body);
+      const commonFilters = this.extractCommonSearchFilters(body);
+
+      const sectionId = getSubjectScopedSectionId(
+        searchSubject,
+        scope,
+        useDocumentReferenceSection ? 'document-references' : 'composition',
+      );
+      const matchesRaw = await this.vaultRepository.getContainersInSection(tenantVaultId, sectionId);
+      const matches = useDocumentReferenceSection
+        ? this.filterDocumentReferenceMatches(matchesRaw, documentReferenceFilters)
+        : this.filterMatchesBySections(matchesRaw, searchSections);
+      const filteredMatches = this.filterMatchesByCommonFilters(matches, commonFilters);
+      const responseBundle: BundleJsonApi = {
+        resourceType: 'Bundle',
+        type: 'batch-response',
+        data: [{
+          type: useDocumentReferenceSection ? 'DocumentReference-search-response-v1.0' : 'Composition-search-response-v1.0',
+          resource: { total: filteredMatches.length, data: filteredMatches },
+          response: { status: '200' },
+        } as any],
+        total: 1,
+      };
+
+      return {
+        jti: randomUUID(),
+        type: 'transaction-response',
+        thid: job.content?.thid as string,
+        iss: job.content?.aud as string,
+        aud: job.content?.iss as string,
+        body: responseBundle,
+      };
+    }
 
     for (const entry of entries) {
       let rawClaims: Record<string, any> | undefined;
@@ -188,5 +237,322 @@ export class CompositionManager implements IJobProcessor {
       aud: job.content?.iss as string,
       body: responseBundle,
     };
+  }
+
+  private extractSearchSubject(body: any): string {
+    // FHIR Parameters style:
+    // {
+    //   "resourceType":"Parameters",
+    //   "parameter":[{"name":"subject","valueString":"did:..." }]
+    // }
+    const parameters = Array.isArray(body?.parameter) ? body.parameter : [];
+    for (const p of parameters) {
+      if (String(p?.name || '').toLowerCase() !== 'subject') continue;
+      const value = String(p?.valueString || p?.valueUri || p?.valueReference?.reference || '').trim();
+      if (value) return value;
+    }
+
+    // FHIR Batch style search wrapper:
+    // body.entry[0].request.url === "Composition?subject=did:..."
+    // JSON:API compatibility can rename entry -> data, so accept both.
+    const wrappers = [
+      ...(Array.isArray(body?.entry) ? body.entry : []),
+      ...(Array.isArray(body?.data) ? body.data : []),
+    ];
+    for (const wrapper of wrappers) {
+      const requestUrl = String(wrapper?.request?.url || '').trim();
+      if (!requestUrl) continue;
+      const queryIndex = requestUrl.indexOf('?');
+      if (queryIndex < 0) continue;
+      const query = requestUrl.slice(queryIndex + 1);
+      const params = new URLSearchParams(query);
+      const subject = String(
+        params.get('subject')
+          || params.get('composition.subject')
+          || '',
+      ).trim();
+      if (subject) return subject;
+    }
+
+    return '';
+  }
+
+  private extractSearchSections(body: any): string[] {
+    const result = new Set<string>();
+
+    const parameters = Array.isArray(body?.parameter) ? body.parameter : [];
+    for (const p of parameters) {
+      const name = String(p?.name || '').toLowerCase();
+      if (name !== 'section' && name !== 'composition.section') continue;
+      const value = String(p?.valueString || p?.valueCode || p?.valueCoding?.code || '').trim();
+      if (!value) continue;
+      value.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
+    }
+
+    const wrappers = [
+      ...(Array.isArray(body?.entry) ? body.entry : []),
+      ...(Array.isArray(body?.data) ? body.data : []),
+    ];
+    for (const wrapper of wrappers) {
+      const requestUrl = String(wrapper?.request?.url || '').trim();
+      if (!requestUrl) continue;
+      const queryIndex = requestUrl.indexOf('?');
+      if (queryIndex < 0) continue;
+      const query = requestUrl.slice(queryIndex + 1);
+      const params = new URLSearchParams(query);
+      const sectionRaw = String(
+        params.get('section')
+          || params.get('composition.section')
+          || '',
+      ).trim();
+      if (!sectionRaw) continue;
+      sectionRaw.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
+    }
+
+    return Array.from(result);
+  }
+
+  private extractSearchResourceType(body: any): string {
+    const wrappers = [
+      ...(Array.isArray(body?.entry) ? body.entry : []),
+      ...(Array.isArray(body?.data) ? body.data : []),
+    ];
+    for (const wrapper of wrappers) {
+      const requestUrl = String(wrapper?.request?.url || '').trim();
+      if (!requestUrl) continue;
+      const target = requestUrl.split('?')[0]?.trim();
+      if (!target) continue;
+      return target.toLowerCase();
+    }
+    return 'composition';
+  }
+
+  private extractDocumentReferenceSearchFilters(body: any): {
+    identifier?: string;
+    attachmentHash?: string;
+  } {
+    let identifier = '';
+    let attachmentHash = '';
+
+    const wrappers = [
+      ...(Array.isArray(body?.entry) ? body.entry : []),
+      ...(Array.isArray(body?.data) ? body.data : []),
+    ];
+    for (const wrapper of wrappers) {
+      const requestUrl = String(wrapper?.request?.url || '').trim();
+      if (!requestUrl) continue;
+      const queryIndex = requestUrl.indexOf('?');
+      if (queryIndex < 0) continue;
+      const query = requestUrl.slice(queryIndex + 1);
+      const params = new URLSearchParams(query);
+      identifier =
+        identifier
+        || String(params.get('identifier') || params.get('documentreference.identifier') || '').trim();
+      attachmentHash =
+        attachmentHash
+        || String(
+          params.get('contenthash')
+            || params.get('documentreference.contenthash')
+            || params.get('attachment.hash')
+            || '',
+        ).trim();
+    }
+
+    return {
+      identifier: identifier || undefined,
+      attachmentHash: attachmentHash || undefined,
+    };
+  }
+
+  private filterDocumentReferenceMatches(
+    matches: any[],
+    filters: { identifier?: string; attachmentHash?: string },
+  ): any[] {
+    if (!Array.isArray(matches)) return [];
+    const requiredIdentifier = String(filters.identifier || '').trim();
+    const requiredAttachmentHash = String(filters.attachmentHash || '').trim();
+    if (!requiredIdentifier && !requiredAttachmentHash) return matches;
+
+    return matches.filter((record: any) => {
+      const identifier = String(
+        record?.['DocumentReference.identifier']
+          || record?.['org.hl7.fhir.r4.DocumentReference.identifier']
+          || '',
+      ).trim();
+      const attachmentHash = String(
+        record?.['DocumentReference.contenthash']
+          || record?.['org.hl7.fhir.r4.DocumentReference.contenthash']
+          || '',
+      ).trim();
+
+      if (requiredIdentifier && identifier !== requiredIdentifier) return false;
+      if (requiredAttachmentHash && attachmentHash !== requiredAttachmentHash) return false;
+      return true;
+    });
+  }
+
+  private filterMatchesBySections(matches: any[], requiredSections: string[]): any[] {
+    if (!Array.isArray(matches)) return [];
+    if (!requiredSections || requiredSections.length === 0) return matches;
+
+    const required = new Set(requiredSections.map((s) => String(s || '').trim()).filter(Boolean));
+    if (required.size === 0) return matches;
+
+    return matches.filter((record: any) => {
+      const keys = [
+        'Composition.section',
+        'org.hl7.fhir.r4.Composition.section',
+        'org.hl7.fhir.api.Composition.section',
+      ];
+      let sectionValue = '';
+      for (const key of keys) {
+        const candidate = String(record?.[key] || '').trim();
+        if (candidate) {
+          sectionValue = candidate;
+          break;
+        }
+      }
+      if (!sectionValue) return false;
+      const got = new Set(sectionValue.split(',').map((v: string) => v.trim()).filter(Boolean));
+      for (const req of required) {
+        if (got.has(req)) return true;
+      }
+      return false;
+    });
+  }
+
+  private extractCommonSearchFilters(body: any): {
+    start?: string;
+    end?: string;
+    code?: string[];
+    category?: string[];
+    author?: string[];
+    thread?: string;
+    partOf?: string;
+    includedTypes?: string[];
+  } {
+    const wrappers = [
+      ...(Array.isArray(body?.entry) ? body.entry : []),
+      ...(Array.isArray(body?.data) ? body.data : []),
+    ];
+    let start = '';
+    let end = '';
+    let thread = '';
+    let partOf = '';
+    const code = new Set<string>();
+    const category = new Set<string>();
+    const author = new Set<string>();
+    const includedTypes = new Set<string>();
+
+    for (const wrapper of wrappers) {
+      const requestUrl = String(wrapper?.request?.url || '').trim();
+      if (!requestUrl) continue;
+      const queryIndex = requestUrl.indexOf('?');
+      if (queryIndex < 0) continue;
+      const params = new URLSearchParams(requestUrl.slice(queryIndex + 1));
+      start = start || String(params.get('start') || params.get('date-start') || '').trim();
+      end = end || String(params.get('end') || params.get('date-end') || '').trim();
+      thread = thread || String(params.get('thread') || params.get('thid') || '').trim();
+      partOf = partOf || String(params.get('part-of') || params.get('partof') || '').trim();
+      this.addCsvToSet(params.get('code'), code);
+      this.addCsvToSet(params.get('category'), category);
+      this.addCsvToSet(params.get('author'), author);
+      this.addCsvToSet(params.get('_type'), includedTypes);
+    }
+
+    return {
+      start: start || undefined,
+      end: end || undefined,
+      code: code.size ? Array.from(code) : undefined,
+      category: category.size ? Array.from(category) : undefined,
+      author: author.size ? Array.from(author) : undefined,
+      thread: thread || undefined,
+      partOf: partOf || undefined,
+      includedTypes: includedTypes.size ? Array.from(includedTypes) : undefined,
+    };
+  }
+
+  private addCsvToSet(value: string | null, target: Set<string>): void {
+    String(value || '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .forEach((v) => target.add(v));
+  }
+
+  private filterMatchesByCommonFilters(
+    matches: any[],
+    filters: {
+      start?: string;
+      end?: string;
+      code?: string[];
+      category?: string[];
+      author?: string[];
+      thread?: string;
+      partOf?: string;
+      includedTypes?: string[];
+    },
+  ): any[] {
+    if (!Array.isArray(matches)) return [];
+    const requiredCode = new Set((filters.code || []).map((v) => String(v).trim()).filter(Boolean));
+    const requiredCategory = new Set((filters.category || []).map((v) => String(v).trim()).filter(Boolean));
+    const requiredAuthor = new Set((filters.author || []).map((v) => String(v).trim()).filter(Boolean));
+    const requiredTypes = new Set((filters.includedTypes || []).map((v) => String(v).trim().toLowerCase()).filter(Boolean));
+    const requiredThread = String(filters.thread || '').trim();
+    const requiredPartOf = String(filters.partOf || '').trim();
+    const startMs = filters.start ? Date.parse(filters.start) : NaN;
+    const endMs = filters.end ? Date.parse(filters.end) : NaN;
+
+    return matches.filter((record: any) => {
+      const recordType = String(record?.resourceType || record?.type || '').trim().toLowerCase();
+      if (requiredTypes.size > 0 && recordType && !requiredTypes.has(recordType)) return false;
+
+      if (requiredThread) {
+        const gotThread = String(record?.thid || record?.['Communication.thid'] || '').trim();
+        if (gotThread !== requiredThread) return false;
+      }
+      if (requiredPartOf) {
+        const gotPartOf = String(record?.['part-of'] || record?.['Task.part-of'] || '').trim();
+        if (gotPartOf !== requiredPartOf) return false;
+      }
+
+      const recordDate = this.getFirstNonEmpty(record, ['Composition.date', 'DocumentReference.date', 'MedicationStatement.effective-date-time']);
+      if (Number.isFinite(startMs) || Number.isFinite(endMs)) {
+        const gotMs = recordDate ? Date.parse(recordDate) : NaN;
+        if (!Number.isFinite(gotMs)) return false;
+        if (Number.isFinite(startMs) && gotMs < startMs) return false;
+        if (Number.isFinite(endMs) && gotMs > endMs) return false;
+      }
+
+      if (requiredCode.size > 0) {
+        const gotCode = this.getFirstNonEmpty(record, ['Composition.type', 'Observation.code', 'Condition.code', 'MedicationStatement.medication']);
+        if (!gotCode || !this.anyTokenMatch(gotCode, requiredCode)) return false;
+      }
+      if (requiredCategory.size > 0) {
+        const gotCategory = this.getFirstNonEmpty(record, ['Communication.category', 'DocumentReference.category', 'Observation.category']);
+        if (!gotCategory || !this.anyTokenMatch(gotCategory, requiredCategory)) return false;
+      }
+      if (requiredAuthor.size > 0) {
+        const gotAuthor = this.getFirstNonEmpty(record, ['Composition.author', 'Communication.sender', 'DocumentReference.author']);
+        if (!gotAuthor || !this.anyTokenMatch(gotAuthor, requiredAuthor)) return false;
+      }
+      return true;
+    });
+  }
+
+  private getFirstNonEmpty(record: any, keys: string[]): string {
+    for (const key of keys) {
+      const value = String(record?.[key] || '').trim();
+      if (value) return value;
+    }
+    return '';
+  }
+
+  private anyTokenMatch(value: string, required: Set<string>): boolean {
+    const tokens = value.split(',').map((v) => v.trim()).filter(Boolean);
+    for (const token of tokens) {
+      if (required.has(token)) return true;
+    }
+    return false;
   }
 }
