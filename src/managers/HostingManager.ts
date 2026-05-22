@@ -1606,11 +1606,11 @@ export class HostingManager {
     }
 
     const idType = this.config.host.idType || 'TAX';
-    const idValueRaw = `${this.config.host.idValue || 'UNID'}-${role.toUpperCase()}`;
+    const idValueRaw = `${this.config.host.idValue || 'GWCORE'}-${role.toUpperCase()}`;
     const idValue = idValueRaw.replace(/[^a-zA-Z0-9]/g, '');
 
     const claims: ClaimsRecord = {
-      [ClaimsOrganizationSchemaorg.legalName]: this.config.host.legalName || 'UNID',
+      [ClaimsOrganizationSchemaorg.legalName]: this.config.host.legalName || 'GW CORE Host',
       [ClaimsOrganizationSchemaorg.alternateName]: alternateName,
       [ClaimsOrganizationSchemaorg.addressCountry]: this.config.host.jurisdiction || 'es',
       [ClaimsOrganizationSchemaorg.identifierType]: idType,

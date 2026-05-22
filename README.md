@@ -65,6 +65,20 @@ Command:
 TENANT_ID=acme JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
 ```
 
+## 6) Ingest medications via Communication and retrieve IPS search views (Terminal 2)
+
+Command:
+
+```bash
+TENANT_ID=acme JURISDICTION=ES SECTOR=health-care npm run demo:communication-medications-ips
+```
+
+With log file:
+
+```bash
+TENANT_ID=acme JURISDICTION=ES SECTOR=health-care npm run demo:communication-medications-ips:logged
+```
+
 ## Test-Driven Development (TDD)
 
 This project follows a Test-Driven Development (TDD) approach. This means that tests are written *before* the code they are intended to verify. The TDD cycle consists of:

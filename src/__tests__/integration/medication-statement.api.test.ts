@@ -12,7 +12,7 @@ describe('MedicationStatement API (integration)', () => {
     resetServerConfig();
   });
 
-  it('creates and searches MedicationStatement entries for a tenant individual scope', async () => {
+  it('ingests medications via Communication and retrieves them via MedicationStatement/_search and Bundle/_search', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -60,31 +60,81 @@ describe('MedicationStatement API (integration)', () => {
       await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
       await tenantManager.getTenant(tenantVaultId);
 
-      const thidBatch = 'medication-batch-001';
+      const subjectDid = 'did:web:api.acme.org:individual:subject-001';
+      const documentBundle = {
+        resourceType: 'Bundle',
+        type: 'document',
+        entry: [
+          {
+            resource: {
+              resourceType: 'Composition',
+              id: 'ips-composition-001',
+              status: 'final',
+              type: {
+                coding: [{ system: 'http://loinc.org', code: '60591-5', display: 'Patient summary Document' }],
+              },
+              subject: { reference: subjectDid },
+              date: '2026-05-22T10:00:00Z',
+              title: 'IPS Medication Summary',
+              section: [
+                {
+                  code: { coding: [{ system: 'http://loinc.org', code: '10160-0', display: 'History of Medication Use' }] },
+                  entry: [{ reference: 'urn:uuid:medication-001' }],
+                },
+              ],
+            },
+          },
+          {
+            resource: {
+              resourceType: 'MedicationStatement',
+              id: 'medication-001',
+              status: 'active',
+              subject: { reference: subjectDid },
+              effectiveDateTime: '2026-05-22T10:00:00Z',
+              medicationCodeableConcept: { text: 'Paracetamol 500mg cada 8 horas' },
+              note: [{ text: 'Frecuencia reportada por paciente: cada 8 horas' }],
+              identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:medication-001' }],
+            },
+          },
+        ],
+      };
+      const documentBundleB64 = Buffer.from(JSON.stringify(documentBundle), 'utf8').toString('base64');
+
+      const thidBatch = 'communication-medication-batch-001';
       const submitResp = await invokeExpress(app, {
         method: 'POST',
-        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.api/MedicationStatement/_batch',
+        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch',
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidBatch,
           body: {
-            data: [
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
               {
-                type: 'MedicationStatement',
-                request: { method: 'POST' },
-                resource: {
-                  resourceType: 'MedicationStatement',
-                  id: 'medication-001',
-                },
+                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
                 meta: {
                   claims: {
-                    '@context': 'org.hl7.fhir.api',
-                    'MedicationStatement.identifier': 'urn:uuid:medication-001',
-                    'MedicationStatement.subject': 'Organization/subject-001',
-                    'MedicationStatement.medication': 'Paracetamol 500mg',
-                    'MedicationStatement.status': 'active',
-                    'MedicationStatement.effective-date-time': '2026-05-01T10:00:00Z',
+                    '@context': 'org.hl7.fhir.r4',
+                    'Communication.subject': subjectDid,
+                    'Communication.sent': '2026-05-22T10:00:00Z',
+                    'Composition.section': 'LOINC|10160-0',
                   },
+                },
+                resource: {
+                  resourceType: 'Communication',
+                  status: 'completed',
+                  subject: { reference: subjectDid },
+                  sent: '2026-05-22T10:00:00Z',
+                  payload: [
+                    {
+                      contentAttachment: {
+                        contentType: 'application/fhir+json',
+                        title: 'ips-medications.json',
+                        data: documentBundleB64,
+                      },
+                    },
+                  ],
                 },
               },
             ],
@@ -97,7 +147,7 @@ describe('MedicationStatement API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.api/MedicationStatement/_batch-response',
+          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response',
           headers: { 'content-type': 'application/json' },
           body: { thid: thidBatch },
         });
@@ -125,7 +175,7 @@ describe('MedicationStatement API (integration)', () => {
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.api',
-                    'MedicationStatement.subject': 'Organization/subject-001',
+                    'MedicationStatement.subject': subjectDid,
                   },
                 },
               },
@@ -152,8 +202,49 @@ describe('MedicationStatement API (integration)', () => {
 
       expect(searchPayload?.resourceType).toBe('Bundle');
       expect(searchPayload?.data?.[0]?.response?.status).toBe('200');
-      expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(0);
+      expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
       expect(Array.isArray(searchPayload?.data?.[0]?.resource?.data)).toBe(true);
+
+      const thidIpsSearch = 'ips-bundle-search-001';
+      const ipsSearchResp = await invokeExpress(app, {
+        method: 'POST',
+        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: thidIpsSearch,
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: {
+                  method: 'GET',
+                  url: `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.section=${encodeURIComponent('LOINC|10160-0')}`,
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(ipsSearchResp.status).toBe(202);
+
+      let ipsSearchPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response',
+          headers: { 'content-type': 'application/json' },
+          body: { thid: thidIpsSearch },
+        });
+        if (pollResp.status === 200) {
+          ipsSearchPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(ipsSearchPayload?.resourceType).toBe('Bundle');
+      expect(ipsSearchPayload?.data?.[0]?.response?.status).toBe('200');
+      expect(ipsSearchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
     } finally {
       queueAdapter.stop();
     }

@@ -58,6 +58,20 @@ const createDidEndpointConfigFromSelector = (
 };
 
 /**
+ * Parses a comma-separated resource list from env and returns normalized FHIR resource names.
+ *
+ * @example
+ * EXT_FHIR_API_BATCH_RESOURCES="Appointment,Task"
+ * // => ["Appointment", "Task"]
+ */
+function parseResourceListFromEnv(value: string | undefined): string[] {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+/**
  * (Internal) Generates the default set of BUSINESS LOGIC service endpoints for a new tenant.
  *
  * @architecture
@@ -78,9 +92,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
 
   if (isFhir) {
     entityResources.push('Practitioner', 'PractitionerRole', 'Location');
-    // UNID extension scope: Appointment is enabled for individual flows here.
-    // GW core can keep this excluded if needed.
-    individualResources.push('Patient', 'Appointment');
+    individualResources.push('Patient');
   }
 
   services.push(createDidEndpointConfigFromSelector(
@@ -143,8 +155,13 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
       'MedicationStatement',
       'Bundle',
     ];
-    // UNID/UHC extension resources (operational, not GW core): Task / Appointment.
-    const fhirApiExtensionBatchResources = ['Task'];
+    /**
+     * Optional non-core FHIR API resources.
+     *
+     * CORE baseline keeps this empty by default; external deployments can opt-in
+     * via env without changing code.
+     */
+    const fhirApiExtensionBatchResources: string[] = parseResourceListFromEnv(process.env.EXT_FHIR_API_BATCH_RESOURCES);
 
     services.push(
       createDidEndpointConfigFromSelector(
@@ -159,13 +176,6 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
         { sector, section: 'individual', format: 'org.hl7.fhir.api' },
         [...fhirApiCoreBatchResources, ...fhirApiExtensionBatchResources],
         ['_batch'],
-      ),
-    );
-    services.push(
-      createDidEndpointConfigFromSelector(
-        { sector, section: 'individual', format: 'org.hl7.fhir.api' },
-        ['Task'],
-        ['_search'],
       ),
     );
     services.push(
@@ -378,15 +388,21 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
     );
   }
 
-  // UNID/UHC extension on host test sector:
-  // allow Task async batch/search flows used by local reminder orchestration/integration tests.
-  services.push(
-    createDidEndpointConfigFromSelector(
-      { sector: Sector.TEST as any, section: 'individual', format: 'org.hl7.fhir.api' },
-      ['Task'],
-      ['_batch', '_search'],
-    ),
-  );
+  /**
+   * Optional host-level extension resources for local/demo environments.
+   *
+   * This keeps CORE neutral: nothing is exposed unless explicitly enabled.
+   */
+  const hostExtensionResources = parseResourceListFromEnv(process.env.EXT_HOST_FHIR_API_RESOURCES);
+  if (hostExtensionResources.length > 0) {
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector: Sector.TEST as any, section: 'individual', format: 'org.hl7.fhir.api' },
+        hostExtensionResources,
+        ['_batch', '_search'],
+      ),
+    );
+  }
 
   // DSP/DCP discovery entries for operator/host DID.
   services.push(

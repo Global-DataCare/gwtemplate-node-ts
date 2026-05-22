@@ -33,7 +33,7 @@ docs/
 ## Generated Artifacts
 
 - **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
-- **Core integration bible**: `docs/API_CORE_INTEGRATION.md` defines the canonical SEDIA-aligned flow used by SDK live core tests.
+- **Core integration bible**: [API_CORE_INTEGRATION.md](API_CORE_INTEGRATION.md) defines the canonical SEDIA-aligned flow used by SDK live core tests.
 - **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
   - `artifacts/openapi-profiles/openapi-core.json`
@@ -61,7 +61,7 @@ docs/
 *   **[02.C-CURL-TESTS.md](02-API-AND-ENDPOINTS/02.C-CURL-TESTS.md)**: A collection of `curl` commands for manual API testing.
 *   **[02.D-USE-CASE-CURL-EXAMPLES.md](02-API-AND-ENDPOINTS/02.D-USE-CASE-CURL-EXAMPLES.md)**: `curl` commands organized by specific use cases.
 *   **[02.E-DATASPACE-DID-SERVICES.md](02-API-AND-ENDPOINTS/02.E-DATASPACE-DID-SERVICES.md)**: DSP/DCP DID `service` publication profile and conformance targets.
-*   **[API_FAMILY_INTEGRATORS_GUIDE.md](API_FAMILY_INTEGRATORS_GUIDE.md)**: Family-first integration guide (operator catalog discovery + family onboarding).
+*   **[90.B-API_FAMILY_INTEGRATORS_GUIDE.md](90.B-API_FAMILY_INTEGRATORS_GUIDE.md)**: Family-first integration guide (operator catalog discovery + family onboarding).
 
 ### 📂 03-IDENTITY-AND-TRUST
 *   **[03.A-CUSTOMER-IDENTITY-MODEL.md](03-IDENTITY-AND-TRUST/03.A-CUSTOMER-IDENTITY-MODEL.md)**: Describes the data model for representing user and organization identities.

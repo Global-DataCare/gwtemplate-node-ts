@@ -38,6 +38,13 @@ import type { CryptographyService } from 'gdc-common-utils-ts/CryptographyServic
 
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
 
+/**
+ * Builds the manager registry used by the worker/router runtime.
+ *
+ * Design intent:
+ * - keep core managers always available
+ * - keep optional capabilities pluggable behind configuration and service exposure
+ */
 export function buildManagers(options: {
   config: IServerConfig;
   vaultRepository: IVaultRepository;
