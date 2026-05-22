@@ -26,6 +26,8 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 
 ## Quick test
 
+Minimal demo flow only (in-memory / demo mode).
+
 ## 1) Clone repository
 
 ```bash
@@ -47,7 +49,7 @@ Copy the file `env.local-example` as `.env.local`
 cp env.local-example .env.local
 ```
 
-## 4) Start GW/UNID backend in demo mode (Terminal 1)
+## 4) Start backend in demo mode (Terminal 1)
 
 Command:
 
@@ -84,15 +86,17 @@ To get a full overview and navigate the documentation effectively, please start 
 
 ## Quick Start
 
+General development setup. This section is broader than Quick test.
+
 Follow these steps to get your local development environment up and running.
 
 ### 1. Configure Your Local Environment
 
 The server's configuration for local development is managed through a `.env.local` file. This file is **not** tracked in Git, ensuring your local settings and secrets are kept private.
 
-First, copy the template file to create your local configuration:
+First, copy the template file to create your local configuration (same file used in Quick test):
 ```bash
-cp env.example .env.local
+cp env.local-example .env.local
 ```
 
 Next, open `.env.local` and review its contents. For basic local development, the default values are often sufficient. The key variable for local testing is `DB_PROVIDER`, which is pre-configured to `mem` for an in-memory database, requiring no external setup.
@@ -118,7 +122,7 @@ npm run dev
 ```
 The server will be available at `http://localhost:3000`.
 
-#### Option B: Using Node.js with Local PostgreSQL
+#### Option B: Using Node.js with Local PostgreSQL (Optional, not validated yet in this guide)
 
 This method starts a dedicated local PostgreSQL container and runs the API with `.env.local.postgres` layered on top of `.env.local`.
 
@@ -463,7 +467,7 @@ Local (minikube/k3s) is test-only and documented in:
 - See [SMART EHR compatibility TODO](docs/TODO_SMART_EHR_COMPAT.md).
 
 ## Local Single-Tenant Bootstrap (acme)
-Run this before chat/voice E2E when you need a business tenant ready for activation, employee, consent, and FHIR flows:
+Run this when you need tenant `acme` ready for activation, employee, consent, and FHIR flows:
 
 ```bash
 TENANT_ID=acme JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
