@@ -101,18 +101,18 @@ describe('Worker', () => {
   });
 
   it('should normalize resource.meta.claims into entry.meta.claims before manager routing', async () => {
-    const mockTaskManager = mock<IJobProcessor>();
-    const registryWithTask = mock<ManagerRegistry>({
-      taskManager: mockTaskManager,
+    const mockPersonManager = mock<IJobProcessor>();
+    const registryWithPerson = mock<ManagerRegistry>({
+      individualManager: mockPersonManager,
     });
-    const localWorker = new Worker(registryWithTask, API_BASE_URL, mockKmsService);
+    const localWorker = new Worker(registryWithPerson, API_BASE_URL, mockKmsService);
 
-    const jobName = createJobName('test_host', 'Task', '_batch');
+    const jobName = createJobName('test_host', 'Person', '_batch');
     const job: JobRequest = {
       ...testCreateCustomerJobRequestProfessionalOnboarding,
       tenantId: 'host',
       sector: 'test',
-      resourceType: 'Task',
+      resourceType: 'Person',
       contentType: 'application/json',
       content: {
         ...(testCreateCustomerJobRequestProfessionalOnboarding.content || {}),
@@ -120,10 +120,10 @@ describe('Worker', () => {
         body: {
           data: [
             {
-              type: 'Task',
+              type: 'Person',
               request: { method: 'POST' },
               resource: {
-                resourceType: 'Task',
+                resourceType: 'Person',
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.api',
@@ -140,22 +140,22 @@ describe('Worker', () => {
     };
 
     const managerResponse: IDecodedDidcommPayload = {
-      jti: 'mock-jti-task',
+      jti: 'mock-jti-person',
       type: 'batch-response',
       iss: API_BASE_URL,
       aud: 'did:web:client.example.com',
       exp: Math.floor(Date.now() / 1000) + 300,
-      thid: 'thid-task-normalize-001',
+      thid: 'thid-person-normalize-001',
       body: { data: [] },
     };
 
-    mockTaskManager.process.mockResolvedValue(managerResponse);
+    mockPersonManager.process.mockResolvedValue(managerResponse);
     mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'host-key' } as any);
     mockKmsService.encodeResponse.mockResolvedValue('encrypted-task-response');
 
     await localWorker.process(jobName, job);
 
-    expect(mockTaskManager.process).toHaveBeenCalledTimes(1);
+    expect(mockPersonManager.process).toHaveBeenCalledTimes(1);
     expect((job.content as any).body.data[0].meta.claims).toMatchObject({
       '@context': 'org.hl7.fhir.api',
       id: 'task-normalize-001',

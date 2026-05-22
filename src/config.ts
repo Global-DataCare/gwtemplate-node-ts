@@ -49,52 +49,6 @@ export interface IServerConfig {
     schema?: string;
     maxPoolSize?: number;
   };
-  tasksCore?: {
-    enabled: boolean;
-    apiEnabled: boolean;
-    workerEnabled: boolean;
-    fhirEnabled: boolean;
-    csvEnabled: boolean;
-    defaultChannels: string[];
-    autoCloseMinutes: number;
-    confirmationRequiredDefault: boolean;
-  };
-  uhcTelephony?: {
-    /** `twilio` uses real Twilio API; `mock` uses in-memory adapter (test/demo). */
-    provider: 'twilio' | 'mock';
-    smsEnabled: boolean;
-    voiceEnabled: boolean;
-    verifyEnabled: boolean;
-    maxAttempts: number;
-    retryIntervalMinutes: number;
-    autoRescheduleOnNoResponse: boolean;
-    escalationDelayMinutes: number;
-    /** Enables ad-hoc reminder debug API endpoints (create/update/call/logs). Keep false in production. */
-    reminderDebugApiEnabled: boolean;
-    /** Emits reminder/voice events to server console when true. */
-    reminderConsoleLogsEnabled: boolean;
-    /** Enables the server-side reminder daemon that scans scheduled tasks and starts voice calls automatically. */
-    reminderDaemonEnabled: boolean;
-    /** Poll interval for reminder daemon in seconds. */
-    reminderDaemonPollSeconds: number;
-    /** Group reminder roots for the same subject when schedule difference is within this window. */
-    groupWindowMinutes: number;
-    /** Default locale for outbound messages (BCP-47, e.g. 'es', 'en', 'fr'). */
-    defaultLocale: string;
-    /** Default Twilio <Say> voice token (e.g. alice, Google.es-ES-Standard-A). */
-    defaultTtsVoice?: string;
-    twilio?: {
-      accountSid?: string;
-      authToken?: string;
-      apiKeySid?: string;
-      apiKeySecret?: string;
-      messagingServiceSid?: string;
-      voiceFromNumber?: string;
-      voiceFlowSid?: string;
-      verifyServiceSid?: string;
-      webhookSignatureValidation: boolean;
-    };
-  };
   gcsBucketName?: string;
   kekSecret?: string;
   host: {
