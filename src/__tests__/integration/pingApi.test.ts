@@ -108,7 +108,6 @@ describe('Ping API Endpoint', () => {
 
       const pingUrl = '/host/cds-xx/v1/test/ping/standard/resource/_batch';
       const expectedPollingUrl = `http://testhost.com${pingUrl.replace('/_batch', '/_batch-response')}`;
-
       // --- Act ---
       const response = await invokeExpress(app, {
         method: 'POST',
@@ -238,7 +237,7 @@ describe('Ping API Endpoint', () => {
     });
 
   describe('POST /host/.../_batch (Legacy JSON Ping)', () => {
-    it('should accept a plain JSON request and queue a job with the correct contentType', async () => {
+    it('should reject plain JSON when JSON legacy mode is not enabled', async () => {
       // --- Arrange ---
       const asyncResponseStore = new AsyncResponseStoreMem();
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
@@ -258,17 +257,8 @@ describe('Ping API Endpoint', () => {
       });
         
       // --- Assert ---
-      expect(response.status).toBe(202);
-      expect(response.headers.location).toBe(expectedPollingUrl);
-      expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
-      
-      const [jobName, jobRequest] = (mockQueueAdapter.addJob as jest.Mock).mock.calls[0];
-      expect(jobName).toContain('host:resource:_batch');
-      expect(jobRequest.tenantId).toBe('host');
-      
-      // CRITICAL: Verify the contentType is set correctly for the worker
-      expect(jobRequest.contentType).toBe('application/json');
-      expect(jobRequest.content).toEqual(expect.objectContaining(decodedPingMessage));
+      expect(response.status).toBe(415);
+      expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
     });
   });
 

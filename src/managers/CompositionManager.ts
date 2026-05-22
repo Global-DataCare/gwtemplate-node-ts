@@ -86,7 +86,6 @@ export class CompositionManager implements IJobProcessor {
       }
       const searchSections = this.extractSearchSections(body);
       const documentReferenceFilters = this.extractDocumentReferenceSearchFilters(body);
-      const commonFilters = this.extractCommonSearchFilters(body);
 
       const sectionId = getSubjectScopedSectionId(
         searchSubject,
@@ -97,13 +96,12 @@ export class CompositionManager implements IJobProcessor {
       const matches = useDocumentReferenceSection
         ? this.filterDocumentReferenceMatches(matchesRaw, documentReferenceFilters)
         : this.filterMatchesBySections(matchesRaw, searchSections);
-      const filteredMatches = this.filterMatchesByCommonFilters(matches, commonFilters);
       const responseBundle: BundleJsonApi = {
         resourceType: 'Bundle',
         type: 'batch-response',
         data: [{
           type: useDocumentReferenceSection ? 'DocumentReference-search-response-v1.0' : 'Composition-search-response-v1.0',
-          resource: { total: filteredMatches.length, data: filteredMatches },
+          resource: { total: matches.length, data: matches },
           response: { status: '200' },
         } as any],
         total: 1,
@@ -419,140 +417,5 @@ export class CompositionManager implements IJobProcessor {
       }
       return false;
     });
-  }
-
-  private extractCommonSearchFilters(body: any): {
-    start?: string;
-    end?: string;
-    code?: string[];
-    category?: string[];
-    author?: string[];
-    thread?: string;
-    partOf?: string;
-    includedTypes?: string[];
-  } {
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-    let start = '';
-    let end = '';
-    let thread = '';
-    let partOf = '';
-    const code = new Set<string>();
-    const category = new Set<string>();
-    const author = new Set<string>();
-    const includedTypes = new Set<string>();
-
-    for (const wrapper of wrappers) {
-      const requestUrl = String(wrapper?.request?.url || '').trim();
-      if (!requestUrl) continue;
-      const queryIndex = requestUrl.indexOf('?');
-      if (queryIndex < 0) continue;
-      const params = new URLSearchParams(requestUrl.slice(queryIndex + 1));
-      start = start || String(params.get('start') || params.get('date-start') || '').trim();
-      end = end || String(params.get('end') || params.get('date-end') || '').trim();
-      thread = thread || String(params.get('thread') || params.get('thid') || '').trim();
-      partOf = partOf || String(params.get('part-of') || params.get('partof') || '').trim();
-      this.addCsvToSet(params.get('code'), code);
-      this.addCsvToSet(params.get('category'), category);
-      this.addCsvToSet(params.get('author'), author);
-      this.addCsvToSet(params.get('_type'), includedTypes);
-    }
-
-    return {
-      start: start || undefined,
-      end: end || undefined,
-      code: code.size ? Array.from(code) : undefined,
-      category: category.size ? Array.from(category) : undefined,
-      author: author.size ? Array.from(author) : undefined,
-      thread: thread || undefined,
-      partOf: partOf || undefined,
-      includedTypes: includedTypes.size ? Array.from(includedTypes) : undefined,
-    };
-  }
-
-  private addCsvToSet(value: string | null, target: Set<string>): void {
-    String(value || '')
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean)
-      .forEach((v) => target.add(v));
-  }
-
-  private filterMatchesByCommonFilters(
-    matches: any[],
-    filters: {
-      start?: string;
-      end?: string;
-      code?: string[];
-      category?: string[];
-      author?: string[];
-      thread?: string;
-      partOf?: string;
-      includedTypes?: string[];
-    },
-  ): any[] {
-    if (!Array.isArray(matches)) return [];
-    const requiredCode = new Set((filters.code || []).map((v) => String(v).trim()).filter(Boolean));
-    const requiredCategory = new Set((filters.category || []).map((v) => String(v).trim()).filter(Boolean));
-    const requiredAuthor = new Set((filters.author || []).map((v) => String(v).trim()).filter(Boolean));
-    const requiredTypes = new Set((filters.includedTypes || []).map((v) => String(v).trim().toLowerCase()).filter(Boolean));
-    const requiredThread = String(filters.thread || '').trim();
-    const requiredPartOf = String(filters.partOf || '').trim();
-    const startMs = filters.start ? Date.parse(filters.start) : NaN;
-    const endMs = filters.end ? Date.parse(filters.end) : NaN;
-
-    return matches.filter((record: any) => {
-      const recordType = String(record?.resourceType || record?.type || '').trim().toLowerCase();
-      if (requiredTypes.size > 0 && recordType && !requiredTypes.has(recordType)) return false;
-
-      if (requiredThread) {
-        const gotThread = String(record?.thid || record?.['Communication.thid'] || '').trim();
-        if (gotThread !== requiredThread) return false;
-      }
-      if (requiredPartOf) {
-        const gotPartOf = String(record?.['part-of'] || record?.['Task.part-of'] || '').trim();
-        if (gotPartOf !== requiredPartOf) return false;
-      }
-
-      const recordDate = this.getFirstNonEmpty(record, ['Composition.date', 'DocumentReference.date', 'MedicationStatement.effective-date-time']);
-      if (Number.isFinite(startMs) || Number.isFinite(endMs)) {
-        const gotMs = recordDate ? Date.parse(recordDate) : NaN;
-        if (!Number.isFinite(gotMs)) return false;
-        if (Number.isFinite(startMs) && gotMs < startMs) return false;
-        if (Number.isFinite(endMs) && gotMs > endMs) return false;
-      }
-
-      if (requiredCode.size > 0) {
-        const gotCode = this.getFirstNonEmpty(record, ['Composition.type', 'Observation.code', 'Condition.code', 'MedicationStatement.medication']);
-        if (!gotCode || !this.anyTokenMatch(gotCode, requiredCode)) return false;
-      }
-      if (requiredCategory.size > 0) {
-        const gotCategory = this.getFirstNonEmpty(record, ['Communication.category', 'DocumentReference.category', 'Observation.category']);
-        if (!gotCategory || !this.anyTokenMatch(gotCategory, requiredCategory)) return false;
-      }
-      if (requiredAuthor.size > 0) {
-        const gotAuthor = this.getFirstNonEmpty(record, ['Composition.author', 'Communication.sender', 'DocumentReference.author']);
-        if (!gotAuthor || !this.anyTokenMatch(gotAuthor, requiredAuthor)) return false;
-      }
-      return true;
-    });
-  }
-
-  private getFirstNonEmpty(record: any, keys: string[]): string {
-    for (const key of keys) {
-      const value = String(record?.[key] || '').trim();
-      if (value) return value;
-    }
-    return '';
-  }
-
-  private anyTokenMatch(value: string, required: Set<string>): boolean {
-    const tokens = value.split(',').map((v) => v.trim()).filter(Boolean);
-    for (const token of tokens) {
-      if (required.has(token)) return true;
-    }
-    return false;
   }
 }

@@ -8,3 +8,4 @@ export class NotificationManager {
     return this.emailAdapter.send(payload);
   }
 }
+

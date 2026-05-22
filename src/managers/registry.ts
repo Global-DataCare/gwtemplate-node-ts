@@ -25,6 +25,7 @@ export interface IJobProcessor {
 export interface ManagerRegistry {
   hostingManager: IJobProcessor;
   tenantManager: TenantsCacheManager;
+  taskManager?: IJobProcessor;
   identityTokenManager?: IJobProcessor;
   observationManager?: IJobProcessor;
   medicationStatementManager?: IJobProcessor;

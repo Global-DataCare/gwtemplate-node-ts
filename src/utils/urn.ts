@@ -1,9 +1,14 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/utils/urn.ts
+import { sha256 } from '@noble/hashes/sha2.js';
+import baseX from 'base-x';
+
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const base58btc = baseX(BASE58_ALPHABET);
 
 export interface EntityUrnBaseParams {
   namespace: string;
-  network: 'test-network';
+  network: string;
   jurisdiction: string;
   version?: string;
   sector: string;
@@ -17,6 +22,30 @@ export interface OrganizationUrnParams extends EntityUrnBaseParams {
 export interface EmployeeUrnParams extends OrganizationUrnParams {
   email: string;
   role: string;
+}
+
+function hashEmployeeEmail(email: string): string {
+  const bytes = new TextEncoder().encode(email.trim().toLowerCase());
+  const digest = sha256(bytes);
+  const multihash = new Uint8Array(2 + digest.length);
+  multihash[0] = 0x12; // sha2-256
+  multihash[1] = 0x20; // 32 bytes
+  multihash.set(digest, 2);
+  return 'z' + base58btc.encode(multihash);
+}
+
+function normalizeEmployeeRole(role: string): string {
+  const normalized = String(role || '').trim().toLowerCase();
+  if (!normalized) return 'v3-rolecode|resprsn';
+  if (normalized.includes('|')) {
+    const [system, code] = normalized.split('|', 2);
+    return `${system.trim()}|${(code || '').trim()}`;
+  }
+  if (normalized.includes(':')) {
+    const [system, code] = normalized.split(':', 2);
+    return `${system.trim()}|${(code || '').trim()}`;
+  }
+  return normalized;
 }
 
 /**
@@ -45,23 +74,39 @@ export function createOrganizationUrn(params: OrganizationUrnParams): string {
 }
 
 /**
- * Creates the canonical URN for an employee, inheriting its base from the parent organization.
- * All components are normalized to lowercase, except for the organization's idValue.
+ * Crea el URN canónico para un empleado, heredando la base de la organización.
  *
- * @param params An object containing the components of the URN for both the organization and the employee.
- * @returns The canonical, hierarchical, and normalized URN string for the employee.
+ * - Todos los componentes se normalizan a minúsculas, excepto el idValue de la organización.
+ * - El email se normaliza a minúsculas.
+ * - El parámetro `role` puede ser solo el código (ej: '1120') o incluir esquema (ej: 'ISCO-08:1120').
+ *   - Si no se especifica esquema, se asume 'isco-08' por defecto.
+ *   - El esquema y el código se normalizan a minúsculas.
+ *
+ * Formato resultante:
+ *   urn:<namespace>:<network>:<jurisdiction>:<version>:<sector>:entity:<idType>:<idValue>:employee:<email>:role:<roleScheme>:<roleCode>
+ *
+ * Ejemplo con role simple:
+ *   urn:unid:test-network:es:v1:health-care:entity:vat:B12345678:employee:john.doe@example.com:role:isco-08:1120
+ *
+ * Ejemplo con role con esquema:
+ *   urn:unid:test-network:es:v1:health-care:entity:vat:B12345678:employee:john.doe@example.com:role:isco-08:1120
+ *
+ * @param params Objeto con los componentes del URN para la organización y el empleado.
+ * @param params.namespace Namespace del sistema (ej: 'unid').
+ * @param params.network Red lógica (debe ser 'test-network').
+ * @param params.jurisdiction Jurisdicción (ej: 'ES').
+ * @param params.version Versión (por defecto 'v1').
+ * @param params.sector Sector de negocio (ej: 'health-care').
+ * @param params.idType Tipo de identificador de la organización (ej: 'vat').
+ * @param params.idValue Valor del identificador de la organización (ej: 'B12345678').
+ * @param params.email Email del empleado (se normaliza a minúsculas).
+ * @param params.role Rol del empleado, puede ser solo código o esquema:código.
+ * @returns URN canónico, jerárquico y normalizado del empleado.
  */
 export function createEmployeeUrn(params: EmployeeUrnParams): string {
   const orgUrn = createOrganizationUrn(params);
   const { email, role } = params;
-
-  // Normalize employee-specific parts to lowercase.
-  // The role is split into its scheme (e.g., 'isco-08') and code, and both are lowercased.
-  const roleParts = role.toLowerCase().split(':');
-  const roleScheme = roleParts.length > 1 ? roleParts[0] : 'isco-08';
-  const roleCode = roleParts.length > 1 ? roleParts[1] : roleParts[0];
-
-  return `${orgUrn}:employee:${email.toLowerCase()}:role:${roleScheme}:${roleCode}`;
+  return `${orgUrn}:employee:${hashEmployeeEmail(email)}:role:${normalizeEmployeeRole(role)}`;
 }
 
 /**

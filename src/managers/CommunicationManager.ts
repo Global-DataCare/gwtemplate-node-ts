@@ -17,8 +17,6 @@ import { createHash } from 'crypto';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import { fhirResourceToCid } from '../utils/fhir-versioning';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
-import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
-import { IssueType } from 'gdc-common-utils-ts/models/issue';
 
 interface CommunicationManagerOptions {
   tenantsCacheManager: TenantsCacheManager;
@@ -57,9 +55,6 @@ export class CommunicationManager implements IJobProcessor {
       (Array.isArray(body?.data) && body.data) ||
       (Array.isArray(body?.entry) && body.entry) ||
       [body];
-    const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
-    const serverDid = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
-    const responseIssuer = serverDid || (job.content?.aud as string) || '';
 
     for (const entry of entries) {
       try {
@@ -70,14 +65,15 @@ export class CommunicationManager implements IJobProcessor {
         if (!fhirResource) {
           throw new Error('Malformed entry: missing resource and missing meta.claims');
         }
-
+        
         if (fhirResource.resourceType !== 'Communication') {
           console.warn(`Skipping resource of type ${fhirResource.resourceType}`);
           continue;
         }
 
+        const serverDid = await this.tenantsCacheManager.getTenantDid(getTenantVaultId(job.sector as string, job.tenantId as string));
         if (!serverDid) {
-          throw new ManagerError(`Could not determine server DID for tenant '${job.tenantId}'.`, IssueType.NotFound);
+            throw new Error(`Could not determine server DID for tenant '${job.tenantId}'.`);
         }
         const commMsg = this.convertFhirToCommMsg(job.content.thid, serverDid, fhirResource);
         await this.persistCommunicationChannelRecord(job, entry as any, fhirResource, commMsg);
@@ -97,21 +93,19 @@ export class CommunicationManager implements IJobProcessor {
           resource: commMsg,
         });
 
-      } catch (error: any) {
+      } catch (error) {
         const identifierClaim =
           (entry as any)?.meta?.claims?.['Communication.identifier'] ??
           (entry as any)?.resource?.id;
         const resourceId = determineResourceId(identifierClaim, process.env.NODE_ENV);
-        const status = error instanceof ManagerError ? error.status : '500';
-        const code = error instanceof ManagerError ? error.code : 'processing';
         bundleEntries.push({
           response: {
-            status,
+            status: '500',
             outcome: {
               resourceType: 'OperationOutcome',
               issue: [{
                 severity: 'error',
-                code,
+                code: 'processing',
                 details: { text: error instanceof Error ? error.message : 'Unknown error during conversion.' },
               }],
             }
@@ -128,13 +122,21 @@ export class CommunicationManager implements IJobProcessor {
       type: `${job.action}-response`, // FHIR based: batch-resonse, transaction-response
       data: bundleEntries,
     };
+    
+    const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+    const serverDid = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
+    if (!serverDid) {
+      // This is a critical configuration error. The tenant is not in the cache.
+      // We cannot issue a response without a valid DID.
+      throw new Error(`Could not determine server DID for tenant '${job.tenantId}'.`);
+    }
 
     // The audience of our response should be the issuer of the request
     const aud = job.content.meta?.bearer?.jwt?.payload?.iss || '';
 
     const result: IDecodedDidcommPayload = {
       jti: uuidv4(),
-      iss: responseIssuer,
+      iss: serverDid,
       aud: aud,
       exp: now + 300, // 5 minutes expiration
       thid: job.content.thid,
@@ -427,16 +429,27 @@ export class CommunicationManager implements IJobProcessor {
           'MedicationStatement.status': String(resource?.status || '').trim() || 'active',
         }) as Record<string, string>;
 
+        const language = String(resource?.language || (fhirResource as any)?.language || 'und').trim();
+        claims['MedicationStatement.language'] = language || 'und';
+
         const medicationText = String(
           resource?.medicationCodeableConcept?.text
           || resource?.medicationCodeableConcept?.coding?.[0]?.code
           || resource?.medicationReference?.reference
           || '',
         ).trim();
-        if (medicationText) claims['MedicationStatement.medication'] = medicationText;
+        if (medicationText) claims['MedicationStatement.medication-text'] = medicationText;
+
+        const noteText = String(resource?.note?.[0]?.text || '').trim();
+        if (noteText) claims['MedicationStatement.note'] = noteText;
+
+        const userSelectedRaw = resource?.medicationCodeableConcept?.coding?.[0]?.userSelected;
+        claims['MedicationStatement.user-selected'] = String(
+          typeof userSelectedRaw === 'boolean' ? userSelectedRaw : true,
+        );
 
         const effectiveDateTime = String(resource?.effectiveDateTime || '').trim();
-        if (effectiveDateTime) claims['MedicationStatement.effective-date-time'] = effectiveDateTime;
+        if (effectiveDateTime) claims['MedicationStatement.effective'] = effectiveDateTime;
 
         const medicationIdentifier = getClaimValue<string>(claims, 'MedicationStatement.identifier') || `urn:uuid:${uuidv4()}`;
         const recordId = String(resource?.id || determineResourceId(medicationIdentifier, process.env.NODE_ENV));

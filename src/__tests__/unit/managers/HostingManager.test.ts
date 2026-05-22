@@ -137,6 +137,12 @@ describe('HostingManager', () => {
     mockTenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName) as jest.Mocked<TenantsCacheManager>;
 
     mockConfig = {
+      securityMode: 'demo',
+      networkMode: 'test',
+      fhirLegacy: true,
+      jsonLegacy: true,
+      didcommPlainEnabled: true,
+      demoAllowInsecureBearer: true,
       nodeEnv: 'test',
       port: 3000,
       apiHostname: 'testhost',

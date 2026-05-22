@@ -113,7 +113,7 @@ describe('CredentialManager', () => {
 
       expect(vc.proof).toBeDefined();
       expect((vc.proof as Array<ProofEBSIv2>)[0].verificationMethod).toBe(`${testHostDidWeb}#${mockHostPublicKey.kid}`);
-      expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(expect.any(Uint8Array), 'host');
+      expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(expect.any(Uint8Array), 'host', undefined, 'vc_sign');
     });
   });
 
@@ -142,7 +142,7 @@ describe('CredentialManager', () => {
       
       expect(vc.proof).toBeDefined();
       expect((vc.proof as Array<ProofEBSIv2>)[0].verificationMethod).toBe(`${testTenant1IdentifierUrn}#${mockTenantPublicKey.kid}`);
-      expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(expect.any(Uint8Array), jobContext.tenantVaultId);
+      expect(mockKmsService.signWithManagedKey).toHaveBeenCalledWith(expect.any(Uint8Array), jobContext.tenantVaultId, undefined, 'vc_sign');
     });
 
     it('should throw an error if the tenant URN cannot be resolved', async () => {

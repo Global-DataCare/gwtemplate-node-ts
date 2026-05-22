@@ -3,7 +3,7 @@
 
 import { testClaimsOfferEntityExpanded, testClaimsOfferFamilyExpanded } from './offer.data';
 import { testClaimsRegisterTenantExpanded } from './organization.data';
-import { testSubjectOrgRegisterExpanded, testFamilyRegisterExpanded } from './family.data';
+import { testFamilyRegisterExpanded } from './family.data';
 
 
 /**
@@ -132,74 +132,6 @@ export const ORGANIZATION_REGISTRATION_REQUEST = {
   "body": {
     "data": [{
       "type": "Organization-registration-form-v1.0",
-      "meta": {
-        "claims": {
-          "@context": "org.schema",
-          "@type": "template",
-          ...testClaimsRegisterTenantExpanded,
-          "org.schema.Service.termsOfService": pdfEmbeddedData,
-        },
-      },
-    }],
-  },
-  "meta": { ...metaRequestBodyFullJWK }
-};
-
-/**
- * Canonical request for Organization activation (`_activate`).
- * Canonical readable sample uses `body.data[].vp` (JSON VP).
- * Tests may derive `vp_token` JWT from the same VP object at runtime.
- */
-export const ORGANIZATION_ACTIVATION_REQUEST = {
-  "jti": "org-activation-request-<test-id>",
-  "thid": "org-activation-thread-<test-id>",
-  "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
-  "aud": "did:web:host.example.com",
-  "exp": 1678886460,
-  "iat": 1678886400,
-  "nbf": 1678886400,
-  "type": "application/api+json",
-  "body": {
-    "data": [{
-      "type": "Organization-activation-request-v1.0",
-      "vp": {
-        "@context": ["https://www.w3.org/ns/credentials/v2"],
-        "type": ["VerifiablePresentation"],
-        "holder": "did:web:controller.example.org",
-        "verifiableCredential": [
-          {
-            "@context": ["https://www.w3.org/ns/credentials/v2", "https://schema.org"],
-            "type": ["VerifiableCredential", "OrganizationCredential"],
-            "credentialSubject": {
-              "id": "did:web:globaldatacare.es:health-care:organization:taxid:VATES-B00112233",
-              "legalName": "ORGANIZATION LEGAL NAME",
-              "taxID": "VATES-B00112233"
-            }
-          },
-          {
-            "@context": ["https://www.w3.org/ns/credentials/v2", "https://schema.org"],
-            "type": ["VerifiableCredential", "LegalRepresentativeCredential"],
-            "credentialSubject": {
-              "id": "did:web:controller.example.org",
-              "identifier": "IDCES-11223344",
-              "hasOccupation": {
-                "@type": "Occupation",
-                "identifier": {
-                  "value": "RESPRSN"
-                },
-                "name": "ResponsibleParty"
-              },
-              "memberOf": {
-                "@type": "Organization",
-                "taxID": "VATES-B00112233"
-              },
-              "hasCredential": {
-                "material": "sha256:legal-representative-email-hash"
-              }
-            }
-          }
-        ]
-      },
       "meta": {
         "claims": {
           "@context": "org.schema",
@@ -466,7 +398,7 @@ export const SMART_TOKEN_REQUEST = {
     "token_type": "Bearer",
     "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
     "purpose": "TREAT",
-    "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=* patient/Consent.cruds"
+    "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=LOINC|48765-2 patient/Consent.cruds"
   },
   "meta": { ...metaRequestBodyOnlyKidHeader }
 };
@@ -609,46 +541,27 @@ export const EMPLOYEE_REGISTRATION_REQUEST = {
  * @see API_INTEGRATORS_GUIDE.md section 8.2
  * Initial request to register a new family organization.
  */
-/**
- * Subject Organization registration request (e.g. family, animal group, organization as legal representative).
- * Generic payload for registering an Organization with an owner/representative and a subject.
- *
- * The structure supports:
- * - Families: person is representative of another person (e.g., parent → child)
- * - Animal groups: person/organization is responsible party for animals (e.g., sanctuary, colony)
- * - Organizations as representatives: organization acts as legal representative (e.g., municipality as guardian)
- *
- * All use the same Offer/Order flow; the semantics vary by role:
- * - Person.hasOccupation = "RESPRSN" → responsible party/tutor
- * - Person.hasOccupation = "GUARD" → legal guardian
- * - Person.hasOccupation = "ONESELF" → auto-representative
- * - Person.hasOccupation = "PARENT" / "CHILD" → personal relationships
- *
- * @see API_INTEGRATORS_GUIDE.md section 8.2
- */
-export const SUBJECTORG_REGISTRATION_REQUEST = {
-  "jti": "subjectorg-registration-request-<test-id>",
-  "thid": "subjectorg-registration-thread-<test-id>",
-  "iss": "alice@example.com",
+export const FAMILY_REGISTRATION_REQUEST = {
+  "jti": "family-registration-request-<test-id>",
+  "thid": "family-registration-thread-<test-id>",
+  "iss": "adult1@example.com",
   "aud": "did:web:api.acme.org",
   "type": "application/api+json",
   "body": {
     "data": [{
-      "type": "SubjectOrg-registration-form-v1.0",
+      "type": "Family-registration-form-v1.0",
       "meta": {
         "claims": {
           "@context": "org.schema",
           "@type": "template",
-          ...testSubjectOrgRegisterExpanded,
+          ...testFamilyRegisterExpanded,
+          "org.schema.Service.termsOfService": pdfEmbeddedData,
         }
       }
     }]
   },
   "meta": { ...metaRequestBodyFullJWK }
 };
-
-/** Backwards compatibility alias for existing tests */
-export const FAMILY_REGISTRATION_REQUEST = SUBJECTORG_REGISTRATION_REQUEST;
 
 /**
  * @see API_INTEGRATORS_GUIDE.md section 8.2.1
@@ -674,6 +587,7 @@ export const FAMILY_ORDER_REQUEST = {
   },
   "meta": { ...metaRequestBodyOnlyKidHeader }
 };
+
 
 // --- Other Payloads (Retained for existing tests) ---
 
@@ -739,9 +653,9 @@ export const CONSENT_CREATION_MESSAGE = {
           "Consent.grantee": "did:web:hospital.example.com",
           "Consent.date": "2025-11-25",
           "Consent.purpose": "TREAT",
-          "Consent.action": "LOINC|48765-2,LOINC|10160-0",
+          "Consent.action": "LOINC|48765-2",
           "Consent.actor-identifier": "did:web:hospital.example.com",
-          "Consent.actor-role": "ISCO-08|2211,ISCO-08|2221",
+          "Consent.actor-role": "ISCO-08|2211",
           "Consent.attachment-contentType": "application/odrl+json",
           "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
         }

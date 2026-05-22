@@ -84,6 +84,9 @@ export class Worker {
         case 'MedicationStatement':
           manager = this.managers.medicationStatementManager;
           break;
+        case 'Task':
+          manager = this.managers.taskManager;
+          break;
         case 'RelatedPerson':
           manager = this.managers.relatedPersonManager;
           break;

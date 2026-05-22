@@ -1,4 +1,24 @@
 # API and Testing Strategy Overview
+#
+## Sectors: Network vs Business (Important!)
+
+There are two distinct sector concepts in this platform:
+
+- **Network sector (infrastructure):**
+    - Typical values: `test`, `test-network`, `network`.
+    - Used in host routes for organization registration and to select the blockchain/network where tenants are stored.
+    - Example: `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`
+- **Business sector (functional):**
+    - Typical values: `health-care`, `animal-health`, etc.
+    - Used in tenant routes, for resources, vaultId, and business operations.
+    - Example: `/acme/cds-ES/v1/health-care/.well-known/ping`
+
+**Never mix these two!** Using the wrong sector will cause errors like "Tenant not found" or inconsistent records.
+
+- Always use `HOST_REGISTRY_SECTOR` for host/infrastructure operations.
+- Always use `SECTOR` for tenant/business operations.
+
+See comments in scripts and tests for more details and examples.
 
 This document outlines the complete architecture and testing strategy for the API, focusing on its asynchronous FAPI-compliant nature, data models, and multi-tenant design. It also includes information about the specific tests for organization registration.
 
@@ -19,7 +39,7 @@ The API uses a structured, versioned, and multi-tenant path that explicitly decl
 
 `/<tenant_id>/<cds>-<jurisdiction>/<version>/<sector>/<section>/<format>/<resourceType>/<_action>`
 
-*   **`tenant_id`**: Canonical tenant identifier (`Organization.identifier.value`, e.g., `VATES-B12345678`).
+*   **`tenant_id`**: The `alternateName` of the tenant (e.g., `org1`).
 *   **`cds-jurisdiction`**: Common Data Service and jurisdiction (e.g., `cds-es`).
 *   **`version`**: API version (e.g., `v1`).
 *   **`sector`**: Industry sector (e.g., `healthcare`).
@@ -104,7 +124,7 @@ The API uses a structured, versioned, and multi-tenant path that explicitly decl
 
 `/<tenant_id>/<cds>-<jurisdiction>/<version>/<sector>/<section>/<format>/<resourceType>/<_action>`
 
-*   **`tenant_id`**: Canonical tenant identifier (`Organization.identifier.value`, e.g., `VATES-B12345678`).
+*   **`tenant_id`**: The `alternateName` of the tenant (e.g., `org1`).
 *   **`cds-jurisdiction`**: Common Data Service and jurisdiction (e.g., `cds-es`).
 *   **`version`**: API version (e.g., `v1`).
 *   **`sector`**: Industry sector (e.g., `healthcare`).

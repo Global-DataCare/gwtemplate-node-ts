@@ -18,3 +18,4 @@ export function createEmailNotificationAdapterFromEnv(env: NodeJS.ProcessEnv = p
 export function createNotificationManagerFromEnv(env: NodeJS.ProcessEnv = process.env): NotificationManager {
   return new NotificationManager(createEmailNotificationAdapterFromEnv(env));
 }
+

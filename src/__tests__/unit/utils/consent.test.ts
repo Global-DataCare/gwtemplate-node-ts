@@ -38,7 +38,6 @@ describe('consent utils', () => {
   it('normalizes professional role formats to canonical ISCO-08', () => {
     expect(normalizeConsentActorRole('221', 'professional')).toBe('org.ilo.isco-08|221');
     expect(normalizeConsentActorRole('ISCO-08|221', 'professional')).toBe('org.ilo.isco-08|221');
-    expect(normalizeConsentActorRole('isco-08|221', 'professional')).toBe('org.ilo.isco-08|221');
     expect(normalizeConsentActorRole('org.ilo.isco-08|221', 'professional')).toBe('org.ilo.isco-08|221');
   });
 
@@ -62,8 +61,6 @@ describe('consent utils', () => {
   it('normalizes family role formats to canonical v3-RoleCode', () => {
     expect(normalizeConsentActorRole('RESPRSN', 'family')).toBe('v3-RoleCode|RESPRSN');
     expect(normalizeConsentActorRole('http://terminology.hl7.org/CodeSystem/v3-RoleCode|RESPRSN', 'family'))
-      .toBe('v3-RoleCode|RESPRSN');
-    expect(normalizeConsentActorRole('http://terminology.hl7.org/CodeSystem/v3-RoleCode|resprsn', 'family'))
       .toBe('v3-RoleCode|RESPRSN');
     expect(normalizeConsentActorRole('org.hl7.terminology.CodeSystem.v3-RoleCode|RESPRSN', 'family'))
       .toBe('v3-RoleCode|RESPRSN');

@@ -7,8 +7,8 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
       const KEY_PREFIX = 'gw-api-docs:';
       const fields = [
         { key: 'testId', label: 'test id', placeholder: '01' },
-        { key: 'tenantId', label: 'tenantId', placeholder: 'Organization.identifier.value (e.g. VATES-B12345678)' },
-        { key: 'taxId', label: 'tax id', placeholder: 'default: same as tenantId for legal organizations' },
+        { key: 'tenantId', label: 'tenantId', placeholder: 'acme' },
+        { key: 'taxId', label: 'tax id', placeholder: 'default: TaxNumber-<tenantId>, e.g. TaxNumber-acme' },
         { key: 'jurisdiction', label: 'jurisdiction', placeholder: 'ES' },
         { key: 'sector', label: 'sector', placeholder: 'health-care' },
         { key: 'hostSector', label: 'network type', placeholder: 'test' },
@@ -20,7 +20,7 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
       function getValue(key) { return localStorage.getItem(KEY_PREFIX + key) || ''; }
       function setValue(key, value) { localStorage.setItem(KEY_PREFIX + key, value || ''); }
       const paramDefaults = {
-        tenantId: 'VATES-B12345678',
+        tenantId: 'acme',
         jurisdiction: 'ES',
         sector: 'health-care',
       };
@@ -169,7 +169,7 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
       }
 
       function ensureDefaultContextValues() {
-        const tenantId = getValue('tenantId') || 'VATES-B12345678';
+        const tenantId = getValue('tenantId') || 'acme';
         if (!getValue('tenantId')) {
           setValue('tenantId', tenantId);
         }
@@ -180,7 +180,7 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
           setValue('hostSector', 'test');
         }
         if (!getValue('taxId')) {
-          setValue('taxId', tenantId);
+          setValue('taxId', 'TaxNumber-' + tenantId);
         }
         if (!getValue('testId')) {
           setValue('testId', nowTestId());
@@ -403,40 +403,6 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
     `,
     swaggerOptions: {
       url: swaggerSpecUrl,
-      defaultModelsExpandDepth: -1,
-      tagsSorter: 'alpha',
-      operationsSorter: (a: any, b: any) => {
-        const read = (obj: any, key: string): string => {
-          try {
-            if (obj?.get && typeof obj.get === 'function') {
-              const v = obj.get(key);
-              return v == null ? '' : String(v);
-            }
-          } catch (_) {}
-          const v = obj?.[key];
-          return v == null ? '' : String(v);
-        };
-        const readStep = (opWrapper: any): string => {
-          // Swagger UI passes Immutable wrappers where operation lives in opWrapper.get('operation').
-          const direct = read(opWrapper, 'x-flow-step');
-          if (direct) return direct;
-          const nested = opWrapper?.get && typeof opWrapper.get === 'function'
-            ? opWrapper.get('operation')
-            : opWrapper?.operation;
-          return read(nested, 'x-flow-step');
-        };
-        const stepA = readStep(a);
-        const stepB = readStep(b);
-        if (stepA && stepB && stepA !== stepB) {
-          return stepA.localeCompare(stepB, undefined, { numeric: true });
-        }
-        const pathA = read(a, 'path');
-        const pathB = read(b, 'path');
-        if (pathA !== pathB) return pathA.localeCompare(pathB);
-        const methodA = read(a, 'method');
-        const methodB = read(b, 'method');
-        return methodA.localeCompare(methodB);
-      },
       parameterMacro: (operation: any, parameter: any) => {
         const browser: any = globalThis as any;
         const key = 'gw-api-docs:' + String(parameter?.name || '');

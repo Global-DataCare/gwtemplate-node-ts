@@ -4,7 +4,7 @@
     "title": "Gateway API",
     "version": "1.0.3",
     "description": "API documentation for the secure gateway, covering both legacy (JSON) and secure (JWE) flows.",
-    "x-profile-generated-at": "2026-05-21T05:54:14.498Z",
+    "x-profile-generated-at": "2026-05-22T13:49:21.173Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -243,128 +243,7 @@
       },
       "OrganizationActivationPlaintextMessage": {
         "summary": "Plaintext Message for Organization Activation",
-        "description": "A DIDComm-like message wrapper for `_activate`; proof is carried in `body.data[].vp_token` (or `body.data[].vp`).",
-        "value": {
-          "jti": "org-activation-request-<test-id>",
-          "thid": "org-activation-thread-<test-id>",
-          "iss": "urn:ietf:rfc:7638:thumbprint-public-sig-key-device",
-          "aud": "did:web:host.example.com",
-          "exp": 1678886460,
-          "iat": 1678886400,
-          "nbf": 1678886400,
-          "type": "application/api+json",
-          "body": {
-            "data": [
-              {
-                "type": "Organization-activation-request-v1.0",
-                "vp": {
-                  "@context": [
-                    "https://www.w3.org/ns/credentials/v2"
-                  ],
-                  "type": [
-                    "VerifiablePresentation"
-                  ],
-                  "holder": "did:web:controller.example.org",
-                  "verifiableCredential": [
-                    {
-                      "@context": [
-                        "https://www.w3.org/ns/credentials/v2",
-                        "https://schema.org"
-                      ],
-                      "type": [
-                        "VerifiableCredential",
-                        "OrganizationCredential"
-                      ],
-                      "credentialSubject": {
-                        "id": "did:web:globaldatacare.es:health-care:organization:taxid:VATES-B00112233",
-                        "legalName": "ORGANIZATION LEGAL NAME",
-                        "taxID": "VATES-B00112233"
-                      }
-                    },
-                    {
-                      "@context": [
-                        "https://www.w3.org/ns/credentials/v2",
-                        "https://schema.org"
-                      ],
-                      "type": [
-                        "VerifiableCredential",
-                        "LegalRepresentativeCredential"
-                      ],
-                      "credentialSubject": {
-                        "id": "did:web:controller.example.org",
-                        "identifier": "IDCES-11223344",
-                        "hasOccupation": {
-                          "@type": "Occupation",
-                          "identifier": {
-                            "value": "RESPRSN"
-                          },
-                          "name": "ResponsibleParty"
-                        },
-                        "memberOf": {
-                          "@type": "Organization",
-                          "taxID": "VATES-B00112233"
-                        },
-                        "hasCredential": {
-                          "material": "sha256:legal-representative-email-hash"
-                        }
-                      }
-                    }
-                  ]
-                },
-                "meta": {
-                  "claims": {
-                    "@context": "org.schema",
-                    "@type": "template",
-                    "org.schema.Organization.address.addressCountry": "ES",
-                    "org.schema.Organization.alternateName": "acme",
-                    "org.schema.Organization.identifier.additionalType": "TAX",
-                    "org.schema.Organization.identifier.value": "A123456789",
-                    "org.schema.Organization.legalName": "Acme Organization SL",
-                    "org.schema.Organization.name": "Acme Org",
-                    "org.schema.Organization.numberOfEmployees.value": 2,
-                    "org.schema.Organization.url": "api.acme.org",
-                    "org.schema.Person.email": "admin1@acme.org",
-                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
-                    "org.schema.Service.category": "health-care",
-                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
-                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
-                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
-                  }
-                }
-              }
-            ]
-          },
-          "meta": {
-            "jwe": {
-              "header": {
-                "typ": "application/didcomm-encrypted+json",
-                "cty": "JWS",
-                "enc": "A256GCM",
-                "alg": "ML-KEM-768",
-                "kid": "thumbprint-public-enc-key-recipient",
-                "skid": "thumbprint-public-enc-key-device",
-                "jwk": {
-                  "crv": "ML-KEM-768",
-                  "kty": "OKP",
-                  "x": "base64url-public-enc-key-device"
-                }
-              }
-            },
-            "jws": {
-              "protected": {
-                "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
-                "alg": "ML-DSA-44",
-                "kid": "thumbprint-public-sig-key-device",
-                "jwk": {
-                  "alg": "ML-DSA-44",
-                  "kty": "AKP",
-                  "pub": "base64url-public-sig-key-device"
-                }
-              }
-            }
-          }
-        }
+        "description": "A DIDComm-like message wrapper for `_activate`; proof is carried in `body.data[].vp_token` (or `body.data[].vp`)."
       },
       "OrganizationOrderPlaintextMessage": {
         "summary": "Plaintext Message for Organization Order",
@@ -640,7 +519,7 @@
             "token_type": "Bearer",
             "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
             "purpose": "TREAT",
-            "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=* patient/Consent.cruds"
+            "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=LOINC|48765-2 patient/Consent.cruds"
           },
           "meta": {
             "jwe": {
@@ -716,30 +595,31 @@
         "summary": "Plaintext Message for Family Registration",
         "description": "A DIDComm-like message wrapper containing the family organization claims.",
         "value": {
-          "jti": "subjectorg-registration-request-<test-id>",
-          "thid": "subjectorg-registration-thread-<test-id>",
-          "iss": "alice@example.com",
+          "jti": "family-registration-request-<test-id>",
+          "thid": "family-registration-thread-<test-id>",
+          "iss": "adult1@example.com",
           "aud": "did:web:api.acme.org",
           "type": "application/api+json",
           "body": {
             "data": [
               {
-                "type": "SubjectOrg-registration-form-v1.0",
+                "type": "Family-registration-form-v1.0",
                 "meta": {
                   "claims": {
                     "@context": "org.schema",
                     "@type": "template",
-                    "org.schema.Organization.address.addressCountry": "ES",
-                    "org.schema.Organization.identifier": "urn:uuid:<uuid-1>",
-                    "org.schema.Organization.name": "Smith Family",
-                    "org.schema.Organization.additionalType": "CareTeam",
-                    "org.schema.Organization.owner.email": "alice@example.com",
-                    "org.schema.Organization.owner.identifier": "did:web:alice.example.com",
-                    "org.schema.Person.email": "bob@example.com",
-                    "org.schema.Person.hasOccupation": "org.hl7.v3.RoleCode|RESPRSN",
-                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
-                    "org.schema.Service.category": "health-care",
-                    "org.schema.Service.termsOfService": "https://provider.example.com/terms.pdf"
+                    "Organization.address.addressCountry": "ES",
+                    "Organization.identifier.additionalType": "UUID",
+                    "Organization.identifier.value": "<UUID>",
+                    "Organization.owner.email": "adult1@example.com",
+                    "Organization.owner.identifier.value": "adult1@example.com",
+                    "Person.email": "child1@example.com",
+                    "Person.identifier.additionalType": "UUID",
+                    "Person.identifier.value": "<child1-ID>",
+                    "Service.category": "health-care",
+                    "Service.identifier": "did:web:api-provider.example.com",
+                    "Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
                   }
                 }
               }
@@ -846,9 +726,9 @@
                     "Consent.grantee": "did:web:hospital.example.com",
                     "Consent.date": "2025-11-25",
                     "Consent.purpose": "TREAT",
-                    "Consent.action": "LOINC|48765-2,LOINC|10160-0",
+                    "Consent.action": "LOINC|48765-2",
                     "Consent.actor-identifier": "did:web:hospital.example.com",
-                    "Consent.actor-role": "ISCO-08|2211,ISCO-08|2221",
+                    "Consent.actor-role": "ISCO-08|2211",
                     "Consent.attachment-contentType": "application/odrl+json",
                     "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
                   }
@@ -1978,9 +1858,9 @@
                     "Consent.grantee": "did:web:hospital.example.com",
                     "Consent.date": "2025-11-25",
                     "Consent.purpose": "TREAT",
-                    "Consent.action": "LOINC|48765-2,LOINC|10160-0",
+                    "Consent.action": "LOINC|48765-2",
                     "Consent.actor-identifier": "did:web:hospital.example.com",
-                    "Consent.actor-role": "ISCO-08|2211,ISCO-08|2221",
+                    "Consent.actor-role": "ISCO-08|2211",
                     "Consent.attachment-contentType": "application/odrl+json",
                     "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
                   }
@@ -2248,7 +2128,7 @@
           "Core Flow (SDK E2E Use Cases)"
         ],
         "summary": "[Step 1.1] Activate a new Tenant (Organization) from ICA-issued proof",
-        "description": "Submits an asynchronous job to activate a new tenant on the platform from\nICA-issued proof. This is a distinct flow from the legacy `_batch`\nregistration endpoint.\n\nThe `{sector}` segment is a host onboarding network selector:\n- demo/test: `test`\n- development/staging: `test-network`\n- production: `network`\n\nExpected semantics:\n- the controller submits ICA-derived proof in `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP)\n- the host validates the ICA proof and activates the tenant backend/connector\n- activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`\n  (include that claim in `meta.claims` to size requested seats)\n  so clients can continue with order/payment and licensing without a separate `_batch` submit\n- next mandatory step is `Order/_batch` with `Order.acceptedOffer.identifier` from activation result\n- after Order, the controller uses activation code (`org.schema.IndividualProduct.serialNumber`)\n  to run `Token/_exchange` + `Device/_dcr` before creating additional employees\n",
+        "description": "Submits an asynchronous job to activate a new tenant on the platform from\nICA-issued proof. This is a distinct flow from the legacy `_batch`\nregistration endpoint.\n\nThe `{sector}` segment is a host onboarding network selector:\n- demo/test: `test`\n- development/staging: `test-network`\n- production: `network`\n\nExpected semantics:\n- the controller submits ICA-derived proof, for example through a `vp_token`\n- the host validates the ICA proof and activates the tenant backend/connector\n- activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`\n  (include that claim in `meta.claims` to size requested seats)\n  so clients can continue with order/payment and licensing without a separate `_batch` submit\n- next mandatory step is `Order/_batch` with `Order.acceptedOffer.identifier` from activation result\n- after Order, the controller uses activation code (`org.schema.IndividualProduct.serialNumber`)\n  to run `Token/_exchange` + `Device/_dcr` before creating additional employees\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -2270,11 +2150,6 @@
             "application/didcomm-plaintext+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
-              },
-              "examples": {
-                "message": {
-                  "$ref": "#/components/examples/OrganizationActivationPlaintextMessage"
-                }
               }
             },
             "application/json": {

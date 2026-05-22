@@ -2,14 +2,8 @@ const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID 
 
 import { createApp } from './app';
 import * as express from 'express';
-import admin from 'firebase-admin';
 
 
-import { ILogger } from './loggers/ILogger';
-import { ConsoleLogger } from './loggers/ConsoleLogger';
-import { GcsStorageAdapter } from './database/storage/gcs.storage.adapter';
-import { IStorageAdapter } from './database/storage/IStorageAdapter';
-import { StorageMemAdapter } from './database/storage/mem.storage.adapter';
 import { initializeFirebase } from './utils/firebase';
 
 // Initialize Firebase Admin SDK early if configured
@@ -23,18 +17,9 @@ import { createApiRouter } from './routes/api';
 import { createDiscoveryRouter } from './routes/discovery';
 import { DiscoveryService } from './services/DiscoveryService';
 import { IKmsService } from './gdc-backend-utils-node/models/IKmsService';
-import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
-import { AdapterCryptoSdkNode } from './gdc-backend-utils-node/adapters/node/crypto';
-import { KmsService } from './services/KmsService';
-import { DemoKmsService } from './services/DemoKmsService';
 import { QueueAdapterMem } from './adapters/queue-mem';
 import { AsyncResponseStoreMem } from './adapters/async-response-store.mem';
 import { IVaultRepository } from './database/repositories/vault/vault.repository';
-import { VaultMemRepository } from './database/repositories/vault/vault.mem.repository';
-import { FirestoreVaultRepository } from './database/repositories/firestore/firestore.vault.repository';
-import { createPostgresPool } from './database/repositories/postgres/postgres.client';
-import { ensurePostgresVaultSchema } from './database/repositories/postgres/postgres.schema';
-import { PostgresVaultRepository } from './database/repositories/postgres/postgres.vault.repository';
 import { ManagerRegistry } from './managers/registry';
 import { HostingManager } from './managers/HostingManager';
 import { TenantsCacheManager } from './managers/TenantsCacheManager';
@@ -92,23 +77,26 @@ import {
 } from './adapters/replay-protection-store';
 import { getConfig, resetServerConfig } from './config/server-config';
 import { bootstrapHost } from './bootstrap/host-bootstrap';
+import { registerCoreRouters } from './bootstrap/register-core-routers';
+import { buildInfrastructure } from './bootstrap/build-infrastructure';
+import { buildManagers } from './bootstrap/build-managers';
 
-function loadSwaggerSpecFromDisk(fileName = 'swagger-spec.json'): any {
+function loadSwaggerSpecFromDisk(): any {
   try {
-    const swaggerSpecPath = path.resolve(process.cwd(), fileName);
+    const swaggerSpecPath = path.resolve(process.cwd(), 'swagger-spec.json');
     return JSON.parse(fs.readFileSync(swaggerSpecPath, 'utf8'));
   } catch (error) {
-    console.warn(`WARN: Could not load ${fileName}. Did you run \`npm run build\`? Error: ${error}`);
+    console.warn(`WARN: Could not load swagger-spec.json. Did you run \`npm run build\`? Error: ${error}`);
     return {
       openapi: '3.0.0',
-      info: { title: 'Swagger Spec Not Found', version: '0.0.0', description: `Missing ${fileName}` },
+      info: { title: 'Swagger Spec Not Found', version: '0.0.0' },
       paths: {},
     };
   }
 }
 
-// Load pre-generated swagger spec once; runtime endpoints refresh from disk on each request.
-let swaggerSpec: any = loadSwaggerSpecFromDisk('artifacts/openapi-profiles/openapi-core.json');
+// Load pre-generated swagger spec once; /swagger-spec.json refreshes from disk on each request.
+let swaggerSpec: any = loadSwaggerSpecFromDisk();
 
 
 
@@ -176,137 +164,46 @@ async function startServer(options?: StartServerOptions) {
   const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
   
   // --- DEPENDENCY INJECTION ---
-  let vaultRepository: IVaultRepository;
-  if (config.dbProvider === 'firestore') {
-    const db = admin.firestore();
-    vaultRepository = new FirestoreVaultRepository(db, hostCollectionName);
-    console.log('[GW-API] Using Firestore Vault Repository.');
-  } else if (config.dbProvider === 'postgres') {
-    const pool = createPostgresPool(config.postgres);
-    await ensurePostgresVaultSchema(pool, config.postgres?.schema);
-    vaultRepository = new PostgresVaultRepository(pool, hostCollectionName, config.postgres?.schema);
-    console.log('[GW-API] Using PostgreSQL Vault Repository.');
-  } else {
-    vaultRepository = new VaultMemRepository();
-    (vaultRepository as VaultMemRepository).clear(); // Explicitly clear on start
-    console.log('[GW-API] Using In-Memory Vault Repository (cleared).');
-  }
-
-  let storageAdapter: IStorageAdapter;
-  if (config.storageProvider === 'gcs') {
-    if (!config.gcsBucketName) {
-      throw new Error("STORAGE_PROVIDER is 'gcs', but GCS_BUCKET_NAME is not configured.");
-    }
-    storageAdapter = new GcsStorageAdapter(config.gcsBucketName);
-    console.log(`[GW-API] Using GCS Storage Adapter with bucket: ${config.gcsBucketName}`);
-  } else {
-    storageAdapter = new StorageMemAdapter();
-    console.log('[GW-API] Using In-Memory Storage Adapter.');
-  }
-
-  const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
-
-  // --- Logger Instantiation ---
-  // Default to console logger. This can be expanded with a factory for other providers.
-  const logger: ILogger = new ConsoleLogger();
-
-  let kmsService: IKmsService;
-  // The TenantsCacheManager now requires the physical host collection name to find the host config.
-  const tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, hostCollectionName);
-
-
-  if (config.nodeEnv === 'demo') {
-    // In demo mode, we create a real KMS service first to handle key generation...
-    const realKmsService = new KmsService(cryptographyService, tenantManager);
-    // ...and then wrap it with the DemoKmsService which bypasses communication crypto.
-    kmsService = new DemoKmsService(realKmsService);
-    console.log('[GW-API] Using DemoKmsService (with real key generation).');
-  } else {
-    // In production, we use the real KMS service directly.
-    kmsService = new KmsService(cryptographyService, tenantManager);
-    console.log('[GW-API] Using KmsService.');
-  }
-  
-  await kmsService.init();
-  const clearingHouseService = new ClearingHouseService();
-
-  const hostingManager = new HostingManager(
+  const {
     vaultRepository,
-    kmsService,
-    tenantManager,
     storageAdapter,
-    logger, // Inject logger
-    config,
-    clearingHouseService,
-  );
-  const icaManager = new IcaManager(vaultRepository, kmsService);
-  const messagingManager = new MessagingManager(vaultRepository, kmsService);
-  const employeeManager = new EmployeeManager(vaultRepository, kmsService, tenantManager);
-  
-  const credentialManager = new CredentialManager(
-    vaultRepository,
-    kmsService,
+    cryptographyService,
+    logger,
     tenantManager,
-    config.hostExternalDomain,
-  );
-
-  const blockchainAdapter: IBlockchainAdapter = new BlockchainAdapterMem();
-  const credentialLedgerMem = new CredentialLedgerAdapterMem();
-  const credentialLedgerFabric = new CredentialLedgerAdapterFabric();
-  const ledgerProviderMap = parseLedgerProviderMap(process.env.LEDGER_PROVIDER_MAP);
-  const ledgerDefaultProvider = process.env.LEDGER_PROVIDER_DEFAULT || 'mem';
-  const ledgerProviders: Record<string, ICredentialLedgerAdapter> = {
-    mem: credentialLedgerMem,
-    fabric: credentialLedgerFabric,
-    multi: new CredentialLedgerAdapterMulti([credentialLedgerMem, credentialLedgerFabric]),
-  };
-  const credentialLedgerAdapter: ICredentialLedgerAdapter = new CredentialLedgerResolver({
-    defaultProvider: ledgerDefaultProvider,
-    providerMap: ledgerProviderMap,
-    providers: ledgerProviders,
-  });
-
-  const individualManager = new IndividualManager(
-    vaultRepository,
     kmsService,
-    tenantManager,
-    credentialManager,
+  } = await buildInfrastructure({ config, hostCollectionName });
+  const {
+    hostingManager,
+    icaManager,
+    messagingManager,
+    employeeManager,
     blockchainAdapter,
-    config.namespace,
-  );
-
-  const familyManager = new FamilyManager(
+    credentialLedgerAdapter,
+    individualManager,
+    familyManager,
+    compositionManager,
+    documentReferenceManager,
+    communicationManager,
+    deviceRegistrationManager,
+    licenseManager,
+    appAuthManager,
+    tokenManager,
+    identityTokenManager,
+    openIdAuthManager,
+    observationManager,
+    medicationStatementManager,
+    relatedPersonManager,
+    consentManager,
+    discoveryService,
+  } = buildManagers({
+    config,
     vaultRepository,
     kmsService,
     tenantManager,
     storageAdapter,
     logger,
-    config,
-  );
-
-  const compositionManager = new CompositionManager(vaultRepository, blockchainAdapter);
-  const documentReferenceManager = new DocumentReferenceManager(vaultRepository, blockchainAdapter);
-  const communicationManager = new CommunicationManager({ tenantsCacheManager: tenantManager, vaultRepository });
-  const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService);
-  const licenseManager = new LicenseManager(vaultRepository, kmsService);
-
-  // --- Auth Flow Dependencies ---
-  const tokenVerifier = resolveTokenVerifierFromEnv(isTestEnv);
-  const appAuthManager = new AppAuthorizationManager(
-    vaultRepository,
-    tokenVerifier,
-    kmsService,
-    cryptographyService
-  );
-  const tokenManager = new TokenManager(kmsService, tenantManager);
-  const identityTokenManager = new IdentityTokenManager(appAuthManager, tokenManager);
-  const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository, clearingHouseService);
-  const observationManager = new ObservationManager(vaultRepository, blockchainAdapter);
-  const medicationStatementManager = new MedicationStatementManager(vaultRepository);
-  const relatedPersonManager = new RelatedPersonManager(vaultRepository, blockchainAdapter);
-  const consentManager = new ConsentManager({ vaultRepository, blockchainAdapter });
-
-  const discoveryService = new DiscoveryService(tenantManager);
+    cryptographyService,
+  });
 
   // Proactively load the host configuration into the cache at startup.
   await tenantManager.loadHost();
@@ -417,22 +314,23 @@ async function startServer(options?: StartServerOptions) {
   const ledgerRouter = createCredentialLedgerRouter(credentialLedgerAdapter, asyncResponseStore, tenantManager, config.networkMode);
   const webhooksRouter = createWebhooksRouter(queueAdapter);
   const authRouter = createAuthRouter(appAuthManager, tokenManager);
-  app.use('/', discoveryRouter);
-  if (authorityRouter) {
-    app.use('/', authorityRouter);
-  }
-  app.use('/', ledgerRouter);
-  app.use('/', apiRouter);
-  app.use('/', networkRouter);
-  app.use('/', fhirRouter);
-  app.use('/webhooks', webhooksRouter);
-  app.use('/auth', authRouter);
+  registerCoreRouters({
+    app,
+    discoveryRouter,
+    authorityRouter,
+    ledgerRouter,
+    apiRouter,
+    networkRouter,
+    fhirRouter,
+    webhooksRouter,
+    authRouter,
+  });
 
   // --- Global Error Handling Middleware (MUST be the LAST middleware) ---
   app.use(createGlobalErrorHandler(logger));
 
   app.get('/swagger-spec.json', (req: express.Request, res: express.Response) => {
-    const runtimeSwaggerSpec = loadSwaggerSpecFromDisk('artifacts/openapi-profiles/openapi-core.json');
+    const runtimeSwaggerSpec = loadSwaggerSpecFromDisk();
     res.setHeader('Cache-Control', 'no-store');
     if (runtimeSwaggerSpec.info.title === 'Swagger Spec Not Found') {
       res.json(runtimeSwaggerSpec);
@@ -447,14 +345,8 @@ async function startServer(options?: StartServerOptions) {
     const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
     const baseUrl = host ? `${protocol}://${host}` : config.apiBaseUrl;
 
-    const baseTitle = String(runtimeSwaggerSpec?.info?.title || 'Gateway API');
     res.json({
       ...runtimeSwaggerSpec,
-      info: {
-        ...(runtimeSwaggerSpec.info || {}),
-        title: `Gateway API - CORE PROFILE (SEDIA Baseline)`,
-        'x-original-title': baseTitle,
-      },
       servers: [{
         url: baseUrl,
         description: `Server URL for ${config.nodeEnv} environment`,
@@ -462,41 +354,7 @@ async function startServer(options?: StartServerOptions) {
     });
   });
 
-  app.get('/swagger-spec.reference.json', (req: express.Request, res: express.Response) => {
-    const runtimeSwaggerSpec = loadSwaggerSpecFromDisk('swagger-spec.reference.json');
-    res.setHeader('Cache-Control', 'no-store');
-    if (runtimeSwaggerSpec.info.title === 'Swagger Spec Not Found') {
-      res.json(runtimeSwaggerSpec);
-      return;
-    }
-
-    const forwardedProto = req.headers['x-forwarded-proto'];
-    const forwardedHost = req.headers['x-forwarded-host'];
-    const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)
-      ?.split(',')[0]
-      ?.trim() || req.protocol;
-    const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.get('host');
-    const baseUrl = host ? `${protocol}://${host}` : config.apiBaseUrl;
-
-    const baseTitle = String(runtimeSwaggerSpec?.info?.title || 'Gateway API');
-    res.json({
-      ...runtimeSwaggerSpec,
-      info: {
-        ...(runtimeSwaggerSpec.info || {}),
-        title: `Gateway API - REFERENCE PROFILE (Full Surface)`,
-        'x-original-title': baseTitle,
-      },
-      servers: [{
-        url: baseUrl,
-        description: `Server URL for ${config.nodeEnv} environment`,
-      }],
-    });
-  });
-
-  const coreSwaggerUiOptions = createApiDocsSetupOptions('/swagger-spec.json') as any;
-  const referenceSwaggerUiOptions = createApiDocsSetupOptions('/swagger-spec.reference.json') as any;
-  app.use('/api-docs', swaggerUi.serveFiles(undefined, coreSwaggerUiOptions), swaggerUi.setup(undefined, coreSwaggerUiOptions));
-  app.use('/api-docs-reference', swaggerUi.serveFiles(undefined, referenceSwaggerUiOptions), swaggerUi.setup(undefined, referenceSwaggerUiOptions));
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(undefined, createApiDocsSetupOptions('/swagger-spec.json') as any));
 
   const server =
     options?.listen === false

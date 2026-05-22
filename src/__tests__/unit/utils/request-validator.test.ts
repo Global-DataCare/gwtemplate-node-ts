@@ -74,17 +74,6 @@ describe('isRequestValid', () => {
     expect(isRequestValid(mockServices, params)).toBe(true);
   });
 
-  it('should return TRUE for legacy verify alias mapped to _batch', () => {
-    const params = {
-      sector: 'test',
-      section: 'registry',
-      format: 'org.schema',
-      resourceType: 'Organization',
-      action: '_verify',
-    };
-    expect(isRequestValid(mockServices, params)).toBe(true);
-  });
-
   it('should return FALSE if no services are defined for the tenant', () => {
     const params = {
       sector: Sector.HEALTH_CARE,

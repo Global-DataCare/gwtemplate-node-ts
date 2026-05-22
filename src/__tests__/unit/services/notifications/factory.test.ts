@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
-import { ConsoleEmailNotificationAdapter } from '../../../../services/notifications/ConsoleEmailNotificationAdapter';
-import { SendGridEmailNotificationAdapter } from '../../../../services/notifications/SendGridEmailNotificationAdapter';
-import { createEmailNotificationAdapterFromEnv } from '../../../../services/notifications/factory';
+import { ConsoleEmailNotificationAdapter } from '../../../../services/notifications/ConsoleEmailNotificationAdapter.js';
+import { SendGridEmailNotificationAdapter } from '../../../../services/notifications/SendGridEmailNotificationAdapter.js';
+import { createEmailNotificationAdapterFromEnv } from '../../../../services/notifications/factory.js';
 
 describe('notifications factory', () => {
   it('builds console adapter by default', () => {
@@ -19,3 +19,4 @@ describe('notifications factory', () => {
     expect(adapter).toBeInstanceOf(SendGridEmailNotificationAdapter);
   });
 });
+

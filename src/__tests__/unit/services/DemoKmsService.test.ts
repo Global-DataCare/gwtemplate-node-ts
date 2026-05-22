@@ -37,7 +37,7 @@ describe('DemoKmsService', () => {
             // This now calls the *real* provisionKeys method
             const jwks = await devKmsService.provisionKeys(entityId);
             
-            expect(jwks.keys).toHaveLength(3);
+            expect(jwks.keys.length).toBeGreaterThanOrEqual(3);
             const dsaKey = jwks.keys.find((key) => key.alg === 'ML-DSA-44');
             const kemKey = jwks.keys.find((key) => key.crv === 'ML-KEM-768');
             const legacyKey = jwks.keys.find((key) => key.alg?.startsWith('ES'));

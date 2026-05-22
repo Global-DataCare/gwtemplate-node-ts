@@ -103,6 +103,10 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     
     process.env.NODE_ENV = 'development';
     process.env.DEV_SEED = 'true';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.JSON_LEGACY = 'true';
+    process.env.FHIR_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
     
     const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
     tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, hostCollectionName);
@@ -110,6 +114,12 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     await kmsService.init();
 
     const mockConfig: IServerConfig = {
+      securityMode: 'demo',
+      networkMode: 'test',
+      fhirLegacy: true,
+      jsonLegacy: true,
+      didcommPlainEnabled: true,
+      demoAllowInsecureBearer: true,
       nodeEnv: 'test', port: 3000, apiHostname: 'testhost', hostExternalDomain: 'testhost.com',
       apiBaseUrl: 'http://testhost:3000', namespace: 'test-namespace', sectorsAllowed: [Sector.HEALTH_CARE, Sector.TEST],
       allowedPaymentMethods: ['Stripe'],
@@ -127,7 +137,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
 	      employeeManager: new EmployeeManager(vaultRepository, kmsService, tenantManager),
 	      individualManager: new IndividualManager(vaultRepository, kmsService, tenantManager, new CredentialManager(vaultRepository, kmsService, tenantManager, 'testhost.com'), new BlockchainAdapterMem(), 'test-ns'),
 	      compositionManager: new CompositionManager(vaultRepository),
-	      communicationManager: new CommunicationManager({ tenantsCacheManager: tenantManager }),
+	      communicationManager: new CommunicationManager({ tenantsCacheManager: tenantManager, vaultRepository }),
 	      licenseManager: new LicenseManager(vaultRepository, kmsService),
 	      tenantManager,
 	    };

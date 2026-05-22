@@ -28,7 +28,7 @@ import { determineResourceId } from '../utils/resource';
 import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../utils/services';
 import { generateTenantCollectionNameFromClaims, getTenantVaultId, isValidTenantAlternateName } from '../utils/tenant';
 import { AllowedIndexableClaims } from '../gdc-backend-utils-node/models/indexing';
-import { createOrganizationUrn } from '../utils/urn';
+import { createEmployeeUrn, createOrganizationUrn, parseTenantUrn } from '../utils/urn';
 import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { ILogger } from '../loggers/ILogger';
 import { TenantsCacheManager } from './TenantsCacheManager';
@@ -107,6 +107,14 @@ export class HostingManager {
     await this.persistHostConfig(organization, allClaims, [person, processedService!]);
   }
 
+  /**
+   * Maps a host registry sector string to a NetworkName enum value.
+   *
+   * @param hostSector {string} Must be a NETWORK sector ('test', 'test-network', 'network').
+   * @returns {NetworkName}
+   * @warning Only use for infra/host logic. Never pass a business sector here.
+   * @todo If you ever change sector handling, audit all usages for sector confusion.
+   */
   private mapHostRegistrySectorToNetworkName(hostSector?: string): NetworkName {
     switch (String(hostSector || '').trim().toLowerCase()) {
       case 'test-network':
@@ -117,6 +125,14 @@ export class HostingManager {
       default:
         return NetworkName.Test;
     }
+  }
+
+  private getCurrentUrnNetwork(): 'test' | 'test-network' | 'network' {
+    const mode = String(this.config.networkMode || '').trim().toLowerCase();
+    if (mode === 'test' || mode === 'test-network' || mode === 'network') {
+      return mode;
+    }
+    return 'test';
   }
 
   private extractDidFromCredential(credential: any): string | undefined {
@@ -132,47 +148,6 @@ export class HostingManager {
       : undefined;
   }
 
-  private parseVpTokenPayload(vpToken: unknown): Record<string, any> | undefined {
-    if (!vpToken) return undefined;
-    if (typeof vpToken === 'object') return vpToken as Record<string, any>;
-    if (typeof vpToken !== 'string') return undefined;
-    const raw = vpToken.trim();
-    if (raw.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed as Record<string, any> : undefined;
-      } catch {
-        return undefined;
-      }
-    }
-
-    const jwtParts = raw.split('.');
-    if (jwtParts.length !== 3 || !jwtParts[1]) {
-      return undefined;
-    }
-    try {
-      const payloadJson = Buffer.from(jwtParts[1], 'base64url').toString('utf8');
-      const parsed = JSON.parse(payloadJson);
-      return parsed && typeof parsed === 'object' ? parsed as Record<string, any> : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private extractCredentialFromVp(vpPayload: Record<string, any> | undefined, acceptedTypes: string[]): any {
-    if (!vpPayload) return undefined;
-    const vp = (vpPayload?.vp && typeof vpPayload.vp === 'object' ? vpPayload.vp : vpPayload) as Record<string, any>;
-    const vcsRaw = vp?.verifiableCredential;
-    const vcs = Array.isArray(vcsRaw) ? vcsRaw : (vcsRaw ? [vcsRaw] : []);
-    for (const vc of vcs) {
-      if (!vc || typeof vc !== 'object') continue;
-      const vcTypesRaw = (vc as any).type;
-      const vcTypes = Array.isArray(vcTypesRaw) ? vcTypesRaw.map(String) : [String(vcTypesRaw || '')];
-      if (acceptedTypes.some((t) => vcTypes.includes(t))) return vc;
-    }
-    return undefined;
-  }
-
   private normalizeTenantPublicUrl(urlOrDomain?: string): string | undefined {
     if (!urlOrDomain || typeof urlOrDomain !== 'string') {
       return undefined;
@@ -186,40 +161,9 @@ export class HostingManager {
     return `https://${urlOrDomain}`;
   }
 
-  private getOrganizationIdentifierTypeClaim(claims: Record<string, any>): string | undefined {
-    const canonical = String(claims?.[ClaimsOrganizationSchemaorg.identifierType] || '').trim();
-    if (canonical) return canonical;
-    const legacy = String((claims as any)?.['org.schema.Organization.identifier.type'] || '').trim();
-    return legacy || undefined;
-  }
-
   private extractActivationMaterial(entry: BundleEntry, body: any) {
-    const entryAny = entry as any;
     const entryMeta = (entry?.meta || {}) as Record<string, any>;
     const entryResource = (entry?.resource || {}) as Record<string, any>;
-    const vpTokenCandidate =
-      entryAny?.vp_token
-      || body?.vp_token
-      || entryMeta?.vp_token
-      || entryResource?.vp_token;
-    const vpJsonCandidate =
-      entryAny?.vp
-      || body?.vp
-      || entryMeta?.vp
-      || entryResource?.vp;
-    const vpProofRaw = vpTokenCandidate || vpJsonCandidate;
-    const vpToken = typeof vpProofRaw === 'string'
-      ? vpProofRaw
-      : (vpProofRaw ? JSON.stringify(vpProofRaw) : undefined);
-    const vpPayload = this.parseVpTokenPayload(vpProofRaw);
-    const orgCredentialFromVp = this.extractCredentialFromVp(
-      vpPayload,
-      ['OrganizationCredential', 'LegalOrganizationCredential'],
-    );
-    const repCredentialFromVp = this.extractCredentialFromVp(
-      vpPayload,
-      ['LegalRepresentativeCredential', 'PersonCredential'],
-    );
     const primaryDid =
       entryResource?.didDocument?.id
       || entryResource?.organizationDid
@@ -227,8 +171,7 @@ export class HostingManager {
       || entryMeta?.organizationDid
       || entryMeta?.organization_did
       || this.extractDidFromCredential(
-        orgCredentialFromVp
-        || body?.organizationCredential
+        body?.organizationCredential
         || body?.organization_credential
         || entryMeta?.organizationCredential
         || entryMeta?.organization_credential
@@ -236,33 +179,29 @@ export class HostingManager {
         || entryResource?.organization_credential
       );
 
-    const representativeCredential =
-      repCredentialFromVp
-      || body?.representativeCredential
-      || body?.representative_credential
-      || body?.legalRepresentativeCredential
-      || entryMeta?.representativeCredential
-      || entryMeta?.representative_credential
-      || entryMeta?.legalRepresentativeCredential
-      || entryResource?.representativeCredential
-      || entryResource?.representative_credential
-      || entryResource?.legalRepresentativeCredential;
     return {
-      vpToken,
-      hasVpJson: Boolean(vpJsonCandidate),
+      vpToken: body?.vp_token || entryMeta?.vp_token || entryResource?.vp_token,
       presentationSubmission:
         body?.presentation_submission
         || entryMeta?.presentation_submission
         || entryResource?.presentation_submission,
       organizationCredential:
-        orgCredentialFromVp
-        || body?.organizationCredential
+        body?.organizationCredential
         || body?.organization_credential
         || entryMeta?.organizationCredential
         || entryMeta?.organization_credential
         || entryResource?.organizationCredential
         || entryResource?.organization_credential,
-      representativeCredential,
+      representativeCredential:
+        body?.representativeCredential
+        || body?.representative_credential
+        || body?.legalRepresentativeCredential
+        || entryMeta?.representativeCredential
+        || entryMeta?.representative_credential
+        || entryMeta?.legalRepresentativeCredential
+        || entryResource?.representativeCredential
+        || entryResource?.representative_credential
+        || entryResource?.legalRepresentativeCredential,
       primaryDid,
       publicTenantUrl:
         entryResource?.organizationUrl
@@ -421,7 +360,21 @@ export class HostingManager {
       throw new ManagerError('Missing required admin Person claims (email, hasOccupation).', IssueType.Required);
     }
 
-    const employeeUrn = `${tenantUrn}:employee:${email}:role:isco-08|${roleCode}`;
+    const parsedTenantUrn = parseTenantUrn(tenantUrn);
+    if (!parsedTenantUrn) {
+      throw new ManagerError(`Invalid tenant URN format: '${tenantUrn}'`, IssueType.Value);
+    }
+    const employeeUrn = createEmployeeUrn({
+      namespace: parsedTenantUrn.namespace,
+      network: parsedTenantUrn.network,
+      jurisdiction: parsedTenantUrn.jurisdiction,
+      version: parsedTenantUrn.version,
+      sector: parsedTenantUrn.sector,
+      idType: parsedTenantUrn.idType,
+      idValue: parsedTenantUrn.idValue,
+      email,
+      role: roleCode,
+    });
 
     let signerJwk = registrationKeys?.signerJwk;
     let encrypterJwk = registrationKeys?.encrypterJwk;
@@ -584,7 +537,7 @@ export class HostingManager {
   ): Promise<BundleEntry | ErrorEntry> {
     const activation = this.extractActivationMaterial(entry, body);
     if (!activation.vpToken || typeof activation.vpToken !== 'string') {
-      throw new ManagerError("Missing required activation proof in `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP).", IssueType.Required);
+      throw new ManagerError("Missing required activation proof 'vp_token'.", IssueType.Required);
     }
     const trustResult = await this.activationTrustAdapter.evaluate({
       networkMode: this.config.networkMode,
@@ -607,10 +560,6 @@ export class HostingManager {
 
     validateNewOrganizationClaims(claims);
     const alternateName = claims[ClaimsOrganizationSchemaorg.alternateName] as string;
-    const canonicalTenantId = String(claims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
-    if (!canonicalTenantId) {
-      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierValue}'`, IssueType.Required);
-    }
     if (!alternateName) {
       throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
     }
@@ -629,21 +578,14 @@ export class HostingManager {
       throw new ManagerError(`The requested sector '${requestedSector}' is not supported by this gateway.`, IssueType.Value);
     }
 
-    const vaultId = getTenantVaultId(requestedSector, canonicalTenantId);
+    const vaultId = getTenantVaultId(requestedSector, alternateName);
     if (await this.vaultRepository.vaultExists(vaultId)) {
       throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
     }
 
     const { organization, person, service } = this.extractResources(claims, environment);
     const processedService = await this._handleServiceAttachment(service);
-    let processedClaims = { ...claims, ...(processedService?.meta.claims || {}) };
-    const identifierTypeClaim = this.getOrganizationIdentifierTypeClaim(processedClaims);
-    if (identifierTypeClaim && !(processedClaims as any)[ClaimsOrganizationSchemaorg.identifierType]) {
-      (processedClaims as any)[ClaimsOrganizationSchemaorg.identifierType] = identifierTypeClaim;
-    }
-    if (!identifierTypeClaim) {
-      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierType}'`, IssueType.Required);
-    }
+    const processedClaims = { ...claims, ...(processedService?.meta.claims || {}) };
     const normalizedPublicUrl = this.normalizeTenantPublicUrl(
       activation.publicTenantUrl
       || (processedClaims[ClaimsOrganizationSchemaorg.url] as string | undefined),
@@ -654,28 +596,13 @@ export class HostingManager {
     if (!(processedClaims as any)[ClaimsOrganizationSchemaorg.identifier]) {
       (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = createOrganizationUrn({
         namespace: this.config.namespace,
-        network: 'test-network',
+        network: this.getCurrentUrnNetwork(),
         jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
         sector: requestedSector,
-        idType: identifierTypeClaim,
+        idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
         idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
       });
     }
-    const rawEmployeeCount = Number(processedClaims[ClaimsOrganizationSchemaorg.numberOfEmployees]);
-    const employeeCount = Number.isFinite(rawEmployeeCount) && rawEmployeeCount > 0
-      ? Math.trunc(rawEmployeeCount)
-      : 1;
-    (processedClaims as any)[ClaimsOrganizationSchemaorg.numberOfEmployees] = employeeCount;
-    const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
-    const jurisdiction = String(processedClaims[ClaimsOrganizationSchemaorg.addressCountry] || '').toLowerCase();
-    const offerClaims = generateLicenseOffer(
-      employeeCount,
-      hostDid,
-      jurisdiction,
-      requestedSector,
-      this.config.allowedPaymentMethods,
-    );
-    processedClaims = { ...processedClaims, ...offerClaims };
 
     const tenantCollectionName = generateTenantCollectionNameFromClaims(processedClaims);
     await this.vaultRepository.createNewVault({ id: tenantCollectionName });
@@ -705,16 +632,7 @@ export class HostingManager {
     }
 
     const attributes = AllowedIndexableClaims.organizationRegistry
-      .map(claimKey => ({
-        name: claimKey,
-        value: String(processedClaims[claimKey]),
-        ...(
-          claimKey === ClaimsOrganizationSchemaorg.alternateName
-          || claimKey === ClaimsOrganizationSchemaorg.identifierValue
-            ? { unique: true }
-            : {}
-        ),
-      }))
+      .map(claimKey => ({ name: claimKey, value: String(processedClaims[claimKey]), ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }) }))
       .filter(attr => attr.value !== 'undefined' && attr.value !== 'null');
 
     const tenantRegistrationDoc: ConfidentialStorageDoc = {
@@ -742,10 +660,10 @@ export class HostingManager {
 
     const tenantUrn = createOrganizationUrn({
       namespace: this.config.namespace,
-      network: 'test-network',
+      network: this.getCurrentUrnNetwork(),
       jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       sector: requestedSector,
-      idType: identifierTypeClaim,
+      idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
       idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
     });
     const controllerConfig = await this.buildControllerEntityConfig(person, tenantUrn, vaultId, this.extractRegistrationKeys(jobMeta));
@@ -822,6 +740,10 @@ export class HostingManager {
    * Handles Phase 1, Step 1: Provisional Registration.
    */
   private async processOrganizationRegistration(job: JobRequest, environment?: string, isBootstrap: boolean = false): Promise<IDecodedDidcommPayload> {
+    if (job.section === 'individual' && (job.action === '_batch' || job.action === '_search')) {
+      return this.processIndividualOrganizationFlow(job, environment);
+    }
+
     const jobEntries = job?.content?.body?.data || [];
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
 
@@ -853,6 +775,230 @@ export class HostingManager {
       aud: job.content?.iss as string,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: responseBundle,
+    };
+  }
+
+  private async processIndividualOrganizationFlow(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
+    const jobEntries = job?.content?.body?.data || [];
+    const responseEntries: (BundleEntry | ErrorEntry)[] = [];
+
+    for (const entry of jobEntries) {
+      try {
+        if (job.action === '_search') {
+          responseEntries.push(await this.processIndividualOrganizationSearchEntry(job, entry));
+        } else {
+          responseEntries.push(await this.processIndividualOrganizationRegistrationEntry(job, entry, environment));
+        }
+      } catch (error) {
+        responseEntries.push(this.handleError(error, entry.type, entry.meta));
+      }
+    }
+
+    const responseBundle: BundleJsonApi = {
+      data: responseEntries,
+      resourceType: 'Bundle',
+      type: getBundleResponseTypeForAction(job.action),
+      total: responseEntries.length,
+    };
+
+    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    return {
+      jti: uuidv4(),
+      type: 'hosting-response',
+      thid: job.content?.thid as string,
+      iss: issuerDid,
+      aud: job.content?.iss as string,
+      exp: Math.floor(Date.now() / 1000) + 300,
+      body: responseBundle,
+    };
+  }
+
+  private splitOwnerValues(value?: string): string[] {
+    if (!value) return [];
+    return value.split(',').map((v) => v.trim()).filter(Boolean);
+  }
+
+  private async resolveTenantCollectionForIndividuals(tenantVaultId: string, createIfMissing: boolean): Promise<string> {
+    const cached = await this.tenantsCacheManager.getCollectionName(tenantVaultId);
+    if (cached) return cached;
+
+    if (createIfMissing) {
+      const exists = await this.vaultRepository.vaultExists(tenantVaultId);
+      if (!exists) {
+        await this.vaultRepository.createNewVault({ id: tenantVaultId });
+      }
+    }
+    return tenantVaultId;
+  }
+
+  private async processIndividualOrganizationRegistrationEntry(
+    job: JobRequest,
+    entry: BundleEntry,
+    environment?: string,
+  ): Promise<BundleEntry | ErrorEntry> {
+    const rawClaims = entry?.meta?.claims;
+    const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
+    if (!claims) {
+      throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
+    }
+
+    const sector = (job.sector || claims[ClaimsServiceSchemaorg.category]) as Sector | undefined;
+    if (!sector) {
+      throw new ManagerError(`Missing required claim: '${ClaimsServiceSchemaorg.category}'`, IssueType.Required);
+    }
+    if (!job.tenantId) {
+      throw new ManagerError('Job is missing tenantId.', IssueType.Required);
+    }
+
+    const tenantVaultId = getTenantVaultId(sector, job.tenantId);
+    const tenantCollectionName = await this.resolveTenantCollectionForIndividuals(tenantVaultId, true);
+
+    const apodo = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
+    const ownerPhones = this.splitOwnerValues(claims['org.schema.Organization.owner.telephone'] as string | undefined);
+    const ownerEmails = this.splitOwnerValues(claims['org.schema.Organization.owner.email'] as string | undefined);
+    if (!apodo || (ownerPhones.length === 0 && ownerEmails.length === 0)) {
+      throw new ManagerError(
+        `Missing required claims: '${ClaimsOrganizationSchemaorg.alternateName}' and one of owner.telephone/owner.email`,
+        IssueType.Required,
+      );
+    }
+
+    for (const phone of ownerPhones) {
+      const results = await this.vaultRepository.query(tenantCollectionName, {
+        sectionId: getEnvSectionId('individual'),
+        where: [
+          { name: 'org.schema.Organization.owner.telephone', value: phone },
+          { name: ClaimsOrganizationSchemaorg.alternateName, value: apodo },
+        ],
+      });
+      if (results.length > 0) {
+        const existing = results[0] as ConfidentialStorageDoc;
+        const content = await this.kmsService.unprotectConfidentialData<any>(existing, tenantVaultId);
+        return {
+          type: 'Family-registration-offer-v1.0',
+          meta: { claims: { ...(content?.claims || {}), 'org.schema.FamilyRegistration.status': 'already_exists' } },
+          resource: { resourceType: 'Organization', id: existing.id },
+          response: { status: '200' },
+        };
+      }
+    }
+    for (const email of ownerEmails) {
+      const results = await this.vaultRepository.query(tenantCollectionName, {
+        sectionId: getEnvSectionId('individual'),
+        where: [
+          { name: 'org.schema.Organization.owner.email', value: email },
+          { name: ClaimsOrganizationSchemaorg.alternateName, value: apodo },
+        ],
+      });
+      if (results.length > 0) {
+        const existing = results[0] as ConfidentialStorageDoc;
+        const content = await this.kmsService.unprotectConfidentialData<any>(existing, tenantVaultId);
+        return {
+          type: 'Family-registration-offer-v1.0',
+          meta: { claims: { ...(content?.claims || {}), 'org.schema.FamilyRegistration.status': 'already_exists' } },
+          resource: { resourceType: 'Organization', id: existing.id },
+          response: { status: '200' },
+        };
+      }
+    }
+
+    const { organization } = this.extractResources(claims, environment);
+    const docId = String(claims[`${ClaimsOrganizationSchemaorg.identifierValue}`] || organization.id || uuidv4());
+    const finalClaims = { ...claims, [ClaimsOrganizationSchemaorg.identifierValue]: docId };
+    const indexedAttributes = [
+      { name: 'status', value: EntityLifecycleStatus.Active },
+      { name: ClaimsOrganizationSchemaorg.alternateName, value: apodo },
+      ...ownerPhones.map((phone) => ({ name: 'org.schema.Organization.owner.telephone', value: phone })),
+      ...ownerEmails.map((email) => ({ name: 'org.schema.Organization.owner.email', value: email })),
+    ];
+
+    const registrationDoc: ConfidentialStorageDoc = {
+      id: docId,
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      indexed: {
+        attributes: indexedAttributes,
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
+      content: {
+        status: EntityLifecycleStatus.Active,
+        claims: finalClaims,
+      },
+    };
+    const secureDoc = await this.kmsService.protectConfidentialData(registrationDoc, tenantVaultId);
+    await this.vaultRepository.put(tenantCollectionName, [secureDoc], getEnvSectionId('individual'));
+
+    return {
+      type: 'Family-registration-offer-v1.0',
+      meta: { claims: { ...finalClaims, 'org.schema.FamilyRegistration.status': 'new_created' } },
+      resource: { resourceType: 'Organization', id: docId },
+      response: { status: '201' },
+    };
+  }
+
+  private async processIndividualOrganizationSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry | ErrorEntry> {
+    const rawClaims = entry?.meta?.claims;
+    const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
+    if (!claims) {
+      throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
+    }
+
+    const sector = (job.sector || claims[ClaimsServiceSchemaorg.category]) as Sector | undefined;
+    if (!sector) {
+      throw new ManagerError(`Missing required claim: '${ClaimsServiceSchemaorg.category}'`, IssueType.Required);
+    }
+    if (!job.tenantId) {
+      throw new ManagerError('Job is missing tenantId.', IssueType.Required);
+    }
+
+    const tenantVaultId = getTenantVaultId(sector, job.tenantId);
+    const tenantCollectionName = await this.resolveTenantCollectionForIndividuals(tenantVaultId, false);
+
+    const apodo = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
+    const ownerPhones = this.splitOwnerValues(claims['org.schema.Organization.owner.telephone'] as string | undefined);
+    const ownerEmails = this.splitOwnerValues(claims['org.schema.Organization.owner.email'] as string | undefined);
+    if (!apodo || (ownerPhones.length === 0 && ownerEmails.length === 0)) {
+      throw new ManagerError(
+        `Missing required claims for search: '${ClaimsOrganizationSchemaorg.alternateName}' and one of owner.telephone/owner.email`,
+        IssueType.Required,
+      );
+    }
+
+    const whereByPhone = ownerPhones.map((phone) => [
+      { name: 'org.schema.Organization.owner.telephone', value: phone },
+      { name: ClaimsOrganizationSchemaorg.alternateName, value: apodo },
+    ]);
+    const whereByEmail = ownerEmails.map((email) => [
+      { name: 'org.schema.Organization.owner.email', value: email },
+      { name: ClaimsOrganizationSchemaorg.alternateName, value: apodo },
+    ]);
+
+    let found: ConfidentialStorageDoc | undefined;
+    for (const where of [...whereByPhone, ...whereByEmail]) {
+      const results = await this.vaultRepository.query(tenantCollectionName, {
+        sectionId: getEnvSectionId('individual'),
+        where,
+      });
+      if (results.length > 0) {
+        found = results[0] as ConfidentialStorageDoc;
+        break;
+      }
+    }
+
+    if (!found) {
+      return {
+        type: 'Family-search-result-v1.0',
+        meta: { claims: { 'org.schema.FamilyRegistration.status': 'not_found' } },
+        response: { status: '200' },
+      };
+    }
+
+    const content = await this.kmsService.unprotectConfidentialData<any>(found, tenantVaultId);
+    return {
+      type: 'Family-search-result-v1.0',
+      meta: { claims: { ...(content?.claims || {}), 'org.schema.FamilyRegistration.status': 'already_exists' } },
+      resource: { resourceType: 'Organization', id: found.id },
+      response: { status: '200' },
     };
   }
 
@@ -937,15 +1083,11 @@ export class HostingManager {
 
     const { claims: processedClaims, contained } = decryptedContent as any;
     const alternateName = processedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
-    const canonicalTenantId = String(processedClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
-    if (!canonicalTenantId) {
-      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierValue}'`, IssueType.Required);
-    }
     const sector = processedClaims[ClaimsServiceSchemaorg.category] as Sector;
     // Ensure the canonical tenant identifier URN exists for downstream managers (e.g., EmployeeManager issuer).
     const tenantUrn = createOrganizationUrn({
       namespace: this.config.namespace,
-      network: 'test-network',
+      network: this.getCurrentUrnNetwork(),
       jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       sector,
       idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
@@ -957,7 +1099,7 @@ export class HostingManager {
     const containedService = this.extractContainedService(contained);
 
     // Finalize the registration and grant test network access.
-    const vaultId = getTenantVaultId(sector, canonicalTenantId);
+    const vaultId = getTenantVaultId(sector, alternateName);
     const tenantCollectionName = generateTenantCollectionNameFromClaims(processedClaims);
     
     // Create the physical vault and keys for the new tenant.
@@ -969,16 +1111,7 @@ export class HostingManager {
 
     // Persist all artifacts
     const attributes = AllowedIndexableClaims.organizationRegistry
-      .map(claimKey => ({
-        name: claimKey,
-        value: String(processedClaims[claimKey]),
-        ...(
-          claimKey === ClaimsOrganizationSchemaorg.alternateName
-          || claimKey === ClaimsOrganizationSchemaorg.identifierValue
-            ? { unique: true }
-            : {}
-        ),
-      }))
+      .map(claimKey => ({ name: claimKey, value: String(processedClaims[claimKey]), ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }) }))
       .filter(attr => attr.value !== 'undefined' && attr.value !== 'null');
 
     const finalTenantRegistrationDoc: ConfidentialStorageDoc = {
@@ -1051,7 +1184,7 @@ export class HostingManager {
 	        const licenseId = uuidv4();
 	        const license: DeviceLicense = {
 	          id: licenseId,
-	          tenantId: canonicalTenantId,
+	          tenantId: alternateName,
 	          orderId: offerIdentifier,
 	          userClass: 'employee',
 	          userCategory: 'default',
@@ -1098,7 +1231,7 @@ export class HostingManager {
     const tenantDid = finalTenantConfig.didDocument?.id || tenantUrn;
     const paymentContext = {
       offerId,
-      tenantId: canonicalTenantId,
+      tenantId: alternateName,
       tenantDid,
       senderDid: hostDid,
       email: processedClaims[ClaimsPersonSchemaorg.email] as string | undefined,
@@ -1152,13 +1285,9 @@ export class HostingManager {
     try {
       validateNewOrganizationClaims(claims);
       const alternateName = claims[ClaimsOrganizationSchemaorg.alternateName] as string;
-      const canonicalTenantId = String(claims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
 
       if (!alternateName) {
         throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
-      }
-      if (!canonicalTenantId) {
-        throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierValue}'`, IssueType.Required);
       }
 
       let validatedSector: Sector | undefined;
@@ -1182,7 +1311,7 @@ export class HostingManager {
 
         // ARCHITECTURAL NOTE: This is the ONLY place a vault existence check should occur.
         // It happens during the initial provisional request to prevent duplicate alternateNames.
-        const vaultId = getTenantVaultId(validatedSector, canonicalTenantId);
+        const vaultId = getTenantVaultId(validatedSector, alternateName);
         if (await this.vaultRepository.vaultExists(vaultId)) {
           throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
         }
@@ -1195,26 +1324,27 @@ export class HostingManager {
       if (alternateName === 'host') {
         await this.persistHostConfig(organization, processedClaims, [person, processedService!]);
       } else {
-        // The client bootstraps its keys during the first request by providing:
-        // - `jwk`: the public JWK *thumbprint material* (RFC 7638) WITHOUT `kid`/`use`
-        // - `kid`: a key identifier in the JOSE header (often the JWK thumbprint, but treat it as opaque)
-        // Persist the *full* public JWKs (including `kid`) so the legal representative can later be
-        // represented as a DID subject.
         const registrationKeys = this.extractRegistrationKeys(jobMeta);
-
         const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
         const jurisdiction = processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;
+        const isIndividualOrg = !!claims['org.schema.Organization.owner.telephone'];
 
-        // Persist a canonical tenant identifier URN early (even while pending) so the cache/discovery can resolve it.
-        const tenantUrn = createOrganizationUrn({
-          namespace: this.config.namespace,
-          network: 'test-network',
-          jurisdiction,
-          sector: validatedSector!,
-          idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
-          idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
-        });
-        (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = tenantUrn;
+        let tenantUrn: string | undefined = undefined;
+        if (!isIndividualOrg) {
+          // Only generate canonical URN for legal orgs
+          tenantUrn = createOrganizationUrn({
+            namespace: this.config.namespace,
+            network: this.getCurrentUrnNetwork(),
+            jurisdiction,
+            sector: validatedSector!,
+            idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+            idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+          });
+          (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = tenantUrn;
+        } else {
+          // For individual orgs, use a simple identifier (e.g., alternateName or a UUID)
+          (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = alternateName || organization.id;
+        }
 
         const offerClaims = generateLicenseOffer(
           processedClaims[ClaimsOrganizationSchemaorg.numberOfEmployees] as number,
@@ -1223,27 +1353,26 @@ export class HostingManager {
           validatedSector!,
           this.config.allowedPaymentMethods
         );
-  
         processedClaims = { ...processedClaims, ...offerClaims };
 
-	        const tenantRegistrationDoc: ConfidentialStorageDoc = {
-	          id: getTenantVaultId(validatedSector!, canonicalTenantId),
-	          status: EntityLifecycleStatus.Pending,
-	          sequence: 0,
-	          indexed: {
-	            attributes: [
-	              { name: 'status', value: 'pending' },
-	              { name: ClaimsOfferSchemaorg.identifier, value: processedClaims[ClaimsOfferSchemaorg.identifier] as string, unique: true },
-	            ],
-	            hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
-	          },
-	          content: {
-	            status: EntityLifecycleStatus.Pending,
-	            claims: processedClaims,
-	            contained: [person, processedService],
-	            ...(registrationKeys.signerJwk || registrationKeys.encrypterJwk ? { registrationKeys } : {}),
-	          },
-	        };
+        const tenantRegistrationDoc: ConfidentialStorageDoc = {
+          id: getTenantVaultId(validatedSector!, alternateName),
+          status: EntityLifecycleStatus.Pending,
+          sequence: 0,
+          indexed: {
+            attributes: [
+              { name: 'status', value: 'pending' },
+              { name: ClaimsOfferSchemaorg.identifier, value: processedClaims[ClaimsOfferSchemaorg.identifier] as string, unique: true },
+            ],
+            hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+          },
+          content: {
+            status: EntityLifecycleStatus.Pending,
+            claims: processedClaims,
+            contained: [person, processedService].filter(Boolean),
+            ...(registrationKeys.signerJwk || registrationKeys.encrypterJwk ? { registrationKeys } : {}),
+          },
+        };
 
         const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
         const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
@@ -1434,10 +1563,7 @@ export class HostingManager {
   }): Promise<void> {
     const { alternateName, role, externalDomain } = params;
     const sector = Sector.SYSTEM;
-    const idType = this.config.host.idType || 'TAX';
-    const idValueRaw = `${this.config.host.idValue || 'UNID'}-${role.toUpperCase()}`;
-    const idValue = idValueRaw.replace(/[^a-zA-Z0-9]/g, '');
-    const vaultId = getTenantVaultId(sector, idValue);
+    const vaultId = getTenantVaultId(sector, alternateName);
     const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
     if (!hostCollectionName) {
       throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
@@ -1479,6 +1605,10 @@ export class HostingManager {
       didDocument.alsoKnownAs.push(`did:web:${externalDomain}`);
     }
 
+    const idType = this.config.host.idType || 'TAX';
+    const idValueRaw = `${this.config.host.idValue || 'UNID'}-${role.toUpperCase()}`;
+    const idValue = idValueRaw.replace(/[^a-zA-Z0-9]/g, '');
+
     const claims: ClaimsRecord = {
       [ClaimsOrganizationSchemaorg.legalName]: this.config.host.legalName || 'UNID',
       [ClaimsOrganizationSchemaorg.alternateName]: alternateName,
@@ -1491,7 +1621,7 @@ export class HostingManager {
 
     const orgUrn = createOrganizationUrn({
       namespace: this.config.namespace,
-      network: 'test-network',
+      network: this.getCurrentUrnNetwork(),
       jurisdiction: claims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       sector,
       idType,
@@ -1533,11 +1663,7 @@ export class HostingManager {
     contained: IncludedResource[],
     sector: Sector,
   ) {
-    const canonicalTenantId = String(allClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
-    if (!canonicalTenantId) {
-      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierValue}'`, IssueType.Required);
-    }
-    const vaultId = getTenantVaultId(sector, canonicalTenantId);
+    const vaultId = getTenantVaultId(sector, altName);
     const tenantCollectionName = generateTenantCollectionNameFromClaims(allClaims);
     
     // The vault is created here, during finalization. The existence check was done previously.
@@ -1548,16 +1674,7 @@ export class HostingManager {
     
     // 6. Persist all artifacts
     const attributes = AllowedIndexableClaims.organizationRegistry
-      .map(claimKey => ({
-        name: claimKey,
-        value: String(allClaims[claimKey]),
-        ...(
-          claimKey === ClaimsOrganizationSchemaorg.alternateName
-          || claimKey === ClaimsOrganizationSchemaorg.identifierValue
-            ? { unique: true }
-            : {}
-        ),
-      }))
+      .map(claimKey => ({ name: claimKey, value: String(allClaims[claimKey]), ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }) }))
       .filter(attr => attr.value !== 'undefined' && attr.value !== 'null');
 
     const tenantRegistrationDoc: ConfidentialStorageDoc = {
@@ -1628,7 +1745,7 @@ export class HostingManager {
 
     // 2. Construct DID and DID Document
     const tenantUrn = createOrganizationUrn({
-      namespace: this.config.namespace, network: 'test-network',
+      namespace: this.config.namespace, network: this.getCurrentUrnNetwork(),
       jurisdiction: allClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       sector: sector, idType: allClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
       idValue: allClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
@@ -1953,10 +2070,19 @@ export class HostingManager {
         };
       }
     }
-    // console.log('--- DEBUG: Extracted resources ---', JSON.stringify(resources, null, 2));
-    if (!resources.organization || !resources.person || !resources.service) {
-      throw new ManagerError('Incomplete claims: Organization, Person, and Service resources are required.', IssueType.Required);
+    // For individual orgs: allow missing Person resource if org claims include owner.telephone
+    const isIndividualOrg = !!claims['org.schema.Organization.owner.telephone'];
+    if (!resources.organization || !resources.service || (!resources.person && !isIndividualOrg)) {
+      throw new ManagerError(
+        'Incomplete claims: Organization and Service are required. Person is required for legal orgs, but not for individual orgs.',
+        IssueType.Required
+      );
     }
-    return resources as { organization: IncludedResource; person: IncludedResource; service: IncludedResource };
+    // Return with person if present, else only org and service
+    return {
+      organization: resources.organization,
+      ...(resources.person ? { person: resources.person } : {}),
+      service: resources.service,
+    } as any;
   }
 }

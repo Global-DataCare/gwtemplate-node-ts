@@ -3,6 +3,10 @@
 import { PdfSignatureVerificationManager, BasicPdfSignatureVerifierAdapter, PdfVerifySubmission } from '../../../utils/pdf-signature-verification';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 describe('PdfSignatureVerificationManager', () => {
   it('verifies a sample PDF (simulated) and returns signer and signingTime', async () => {

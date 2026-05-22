@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { ConsoleEmailNotificationAdapter } from '../../../../services/notifications/ConsoleEmailNotificationAdapter';
+import { ConsoleEmailNotificationAdapter } from '../../../../services/notifications/ConsoleEmailNotificationAdapter.js';
 
 describe('ConsoleEmailNotificationAdapter', () => {
   afterEach(() => {
@@ -25,3 +25,4 @@ describe('ConsoleEmailNotificationAdapter', () => {
     );
   });
 });
+

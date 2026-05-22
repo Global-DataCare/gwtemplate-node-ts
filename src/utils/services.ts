@@ -78,6 +78,8 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
 
   if (isFhir) {
     entityResources.push('Practitioner', 'PractitionerRole', 'Location');
+    // UNID extension scope: Appointment is enabled for individual flows here.
+    // GW core can keep this excluded if needed.
     individualResources.push('Patient', 'Appointment');
   }
 
@@ -130,7 +132,6 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
       'Patient',
       'AllergyIntolerance',
       'Condition',
-      'MedicationStatement',
       'Observation',
       'Procedure',
       'Immunization',
@@ -139,8 +140,11 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
       'Encounter',
       'AdverseEvent',
       'RelatedPerson',
+      'MedicationStatement',
       'Bundle',
     ];
+    // UNID/UHC extension resources (operational, not GW core): Task / Appointment.
+    const fhirApiExtensionBatchResources = ['Task'];
 
     services.push(
       createDidEndpointConfigFromSelector(
@@ -153,8 +157,15 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'individual', format: 'org.hl7.fhir.api' },
-        fhirApiCoreBatchResources,
+        [...fhirApiCoreBatchResources, ...fhirApiExtensionBatchResources],
         ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'individual', format: 'org.hl7.fhir.api' },
+        ['Task'],
+        ['_search'],
       ),
     );
     services.push(
@@ -366,6 +377,16 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
       ),
     );
   }
+
+  // UNID/UHC extension on host test sector:
+  // allow Task async batch/search flows used by local reminder orchestration/integration tests.
+  services.push(
+    createDidEndpointConfigFromSelector(
+      { sector: Sector.TEST as any, section: 'individual', format: 'org.hl7.fhir.api' },
+      ['Task'],
+      ['_batch', '_search'],
+    ),
+  );
 
   // DSP/DCP discovery entries for operator/host DID.
   services.push(

@@ -19,6 +19,7 @@ import { createOperationOutcome } from '../utils/outcome';
 import { IssueLevel } from 'gdc-common-utils-ts/models/issue';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { getEnvSectionId } from '../utils/section-env';
+import { getPersonOccupationClaim } from '../utils/occupation';
 
 /**
  * Manages the business logic for creating device activation licenses.
@@ -196,7 +197,7 @@ export class LicenseManager implements IJobProcessor {
           getClaimValue<string>(claims, 'org.schema.Person.email') ||
           getClaimValue<string>(claims, 'License.email');
         const inviteRole =
-          getClaimValue<string>(claims, 'org.schema.Person.hasOccupation') ||
+          getPersonOccupationClaim(claims as Record<string, any>) ||
           getClaimValue<string>(claims, 'License.role');
 
         if (!inviteEmail) throw new Error('Missing required claim: org.schema.Person.email');

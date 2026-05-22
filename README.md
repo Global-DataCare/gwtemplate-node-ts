@@ -4,14 +4,14 @@
 
 This repository provides a robust, asynchronous, and policy-driven API gateway template.
 
-It is designed for building secure, multi-tenant systems that handle complex data interactions, and integration with technologies like Financial API (FAPI), DIDComm and blockchain.
+It is designed for building secure, multi-tenant systems that handle complex data interactions, and integration with technologies like Financial API (FAPI), DIDComm, SMART-On-FHIR, and blockchain.
 
 ## Non-Negotiable Conventions
 
 - FHIR SearchParameter names are canonical FHIR names only: lowercase and `-` where applicable.
 - No invented camelCase for FHIR claims/search keys (example: use `Communication.part-of`, never `Communication.partOf`).
 - Custom parameter names are allowed only when FHIR has no defined parameter.
-- `resource.meta.claims` is the canonical interoperable claims carrier and must always be persisted/propagated.
+- `resource.meta.claims` is the canonical interoperable claims carrier in a Bundle document (or JSON:API Primary document embedded in a DIDComm message) and must always be persisted/propagated.
 
 ## Repository Navigation
 
@@ -23,6 +23,45 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 - Firestore demo template: [env.firestore-demo.example](env.firestore-demo.example)
 - Local PostgreSQL overrides: [.env.local.postgres](.env.local.postgres)
 - Local PostgreSQL container: [docker-compose.postgres.yml](docker-compose.postgres.yml)
+
+## Quick test
+
+## 1) Clone repository
+
+```bash
+git clone <REPO_URL>
+cd gwtemplate-node-ts
+```
+
+## 2) Install dependencies
+
+```bash
+npm install
+```
+
+## 3) Preparing the environment
+
+Copy the file `env.local-example` as `.env.local`
+
+```bash
+cp env.local-example .env.local
+```
+
+## 4) Start GW/UNID backend in demo mode (Terminal 1)
+
+Command:
+
+```bash
+npm run api:local-demo
+```
+
+## 5) Bootstrap tenant in GW (Terminal 2, once per tenant)
+
+Command:
+
+```bash
+TENANT_ID=acme JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
+```
 
 ## Test-Driven Development (TDD)
 

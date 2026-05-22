@@ -8,11 +8,10 @@ import { ILogger } from '../../../loggers/ILogger';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
-import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
 import { getEnvSectionId } from '../../../utils/section-env';
-import { buildUnsignedVpJwt } from '../../helpers/vp-token-fixture';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -59,6 +58,12 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 };
 
 describe('HostingManager activation flow', () => {
+  const vpTokenCompact = [
+    Buffer.from(JSON.stringify({ alg: 'ML-DSA-44', typ: 'JWT' })).toString('base64url'),
+    Buffer.from(JSON.stringify({ sub: 'did:web:controller.example.com' })).toString('base64url'),
+    'mock-signature',
+  ].join('.');
+
   let hostingManager: InstanceType<typeof HostingManager>;
   let vaultRepository: VaultMemRepository;
   let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
@@ -138,25 +143,6 @@ describe('HostingManager activation flow', () => {
   });
 
   function buildActivationJob(overrides?: Partial<JobRequest>): JobRequest {
-    const vpJson = {
-      vp: {
-        '@context': ['https://www.w3.org/ns/credentials/v2'],
-        type: ['VerifiablePresentation'],
-        holder: 'did:web:controller.example.com',
-        verifiableCredential: [
-          {
-            '@context': ['https://www.w3.org/ns/credentials/v2', 'https://schema.org'],
-            type: ['VerifiableCredential', 'OrganizationCredential'],
-            credentialSubject: { id: 'did:web:api.acme.org' },
-          },
-          {
-            '@context': ['https://www.w3.org/ns/credentials/v2', 'https://schema.org'],
-            type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
-            credentialSubject: { id: 'did:web:controller.example.com' },
-          },
-        ],
-      },
-    } as const;
     return {
       id: 'activation-job-id',
       status: JobStatus.DRAFT,
@@ -176,7 +162,7 @@ describe('HostingManager activation flow', () => {
         jti: 'activation-jti',
         type: 'json',
         body: {
-          vp_token: buildUnsignedVpJwt(vpJson as unknown as Record<string, unknown>),
+          vp_token: vpTokenCompact,
           organizationCredential: {
             '@context': ['https://www.w3.org/2018/credentials/v1'],
             type: ['VerifiableCredential'],
@@ -189,6 +175,14 @@ describe('HostingManager activation flow', () => {
             type: ['VerifiableCredential'],
             credentialSubject: {
               id: 'did:web:controller.example.com',
+              hasOccupation: {
+                identifier: {
+                  value: 'RESPRSN',
+                },
+              },
+              hasCredential: {
+                material: 'controller-sig-kid',
+              },
             },
           },
           data: [
@@ -237,10 +231,6 @@ describe('HostingManager activation flow', () => {
     expect(entry.meta.claims['org.schema.Action.activation.networkMode']).toBe('test-network');
     expect(entry.meta.claims['org.schema.Action.activation.revocationChecked']).toBe('true');
     expect(entry.meta.claims['org.schema.Action.activation.onChainChecked']).toBe('false');
-    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain('urn:cds:es:v1:health-care:product:org.schema:Offer:');
-    expect(entry.meta.claims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(
-      testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.numberOfEmployees],
-    );
 
     const claims = job.content!.body!.data[0]!.meta!.claims;
     const tenantVaultId = tenantUtils.getTenantVaultId(
@@ -281,7 +271,7 @@ describe('HostingManager activation flow', () => {
       'activation-proof.json',
       getEnvSectionId('proofs'),
     );
-    expect(String((proofDoc as any)?.content?.vp_token || '')).toContain('.');
+    expect((proofDoc as any)?.content?.vp_token).toBe(vpTokenCompact);
     expect((proofDoc as any)?.content?.trustPolicy?.networkMode).toBe('test-network');
   });
 
@@ -294,83 +284,6 @@ describe('HostingManager activation flow', () => {
 
     expect(errorEntry.response.status).toBe('400');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('vp_token');
-  });
-
-  it('should resolve OrganizationCredential from vp_token verifiableCredential array', async () => {
-    const job = buildActivationJob();
-    delete (job.content!.body as any).organizationCredential;
-    delete (job.content!.body as any).representativeCredential;
-    (job.content!.body as any).vp_token = JSON.stringify({
-      '@context': ['https://www.w3.org/2018/credentials/v1'],
-      type: ['VerifiablePresentation'],
-      verifiableCredential: [
-        {
-          id: 'urn:uuid:vc-member-002',
-          type: ['VerifiableCredential', 'OrganizationCredential'],
-          issuer: 'did:web:localhost%3A3310',
-          credentialSubject: {
-            id: 'did:web:api.acme.org',
-            '@type': 'Organization',
-            legalName: 'Acme Health SL',
-            taxID: 'VATES-A12345678',
-          },
-        },
-      ],
-    });
-
-    const responsePayload = await hostingManager.process(job);
-    const entry = responsePayload.body.data[0];
-
-    expect(entry.response.status).toBe('201');
-    expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
-    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain('urn:cds:es:v1:health-care:product:org.schema:Offer:');
-  });
-
-  it('should resolve both credentials from compact JWT vp_token payload', async () => {
-    const job = buildActivationJob();
-    delete (job.content!.body as any).organizationCredential;
-    delete (job.content!.body as any).representativeCredential;
-    const vpPayload = {
-      iss: 'did:web:controller.example.com',
-      sub: 'did:web:controller.example.com',
-      vp: {
-        '@context': ['https://www.w3.org/2018/credentials/v1'],
-        type: ['VerifiablePresentation'],
-        verifiableCredential: [
-          {
-            id: 'urn:uuid:vc-org-001',
-            type: ['VerifiableCredential', 'OrganizationCredential'],
-            credentialSubject: {
-              id: 'did:web:api.acme.org',
-              '@type': 'Organization',
-              taxID: 'VATES-A12345678',
-            },
-          },
-          {
-            id: 'urn:uuid:vc-rep-001',
-            type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
-            credentialSubject: {
-              id: 'did:web:controller.example.com',
-              '@type': 'Person',
-              memberOf: { '@type': 'Organization', taxID: 'VATES-A12345678' },
-            },
-          },
-        ],
-      },
-    };
-    const compactVp = [
-      Buffer.from(JSON.stringify({ alg: 'ES384', typ: 'JWT', kid: 'controller-kid' })).toString('base64url'),
-      Buffer.from(JSON.stringify(vpPayload)).toString('base64url'),
-      'signature-placeholder',
-    ].join('.');
-    (job.content!.body as any).vp_token = compactVp;
-
-    const responsePayload = await hostingManager.process(job);
-    const entry = responsePayload.body.data[0];
-
-    expect(entry.response.status).toBe('201');
-    expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
-    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain('urn:cds:es:v1:health-care:product:org.schema:Offer:');
   });
 
   it('should poll ICA DID creation when remote endpoint responds 202', async () => {

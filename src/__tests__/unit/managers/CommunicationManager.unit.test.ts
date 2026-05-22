@@ -12,7 +12,6 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { randomUUID } from 'crypto';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
-import { IssueType } from 'gdc-common-utils-ts/models/issue';
 
 describe('CommunicationManager Unit Tests', () => {
   let communicationManager: CommunicationManager;
@@ -201,58 +200,6 @@ describe('CommunicationManager Unit Tests', () => {
       expect(Array.isArray(data)).toBe(true);
       expect(data[0].type).toBe('CommMsgExtended');
       expect(data[0].resource?.body?.data?.some((d: DataEntry) => d.type === 'Annotation')).toBe(true);
-    });
-
-    it('should return a 404 OperationOutcome when the tenant DID cannot be resolved', async () => {
-      mockTenantsCacheManager.getTenantDid.mockResolvedValue(undefined as any);
-
-      const decoded: IDecodedDidcommPayload = {
-        jti: randomUUID(),
-        thid: 'communication-missing-tenant-thread',
-        iss: 'did:web:sender.example',
-        aud: 'did:web:receiver.example',
-        exp: Math.floor(Date.now() / 1000) + 300,
-        type: 'org.hl7.fhir.r4.Bundle',
-        body: {
-          resourceType: 'Bundle',
-          type: 'batch',
-          data: [
-            {
-              type: 'Communication',
-              meta: {
-                claims: {
-                  '@context': 'org.hl7.fhir.api',
-                  'Communication.identifier': 'comm-missing-tenant-001',
-                  'Communication.subject': 'did:web:api.acme.org:individual:abc',
-                  'Communication.sent': '2025-11-27T20:00:00Z',
-                },
-              },
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.api/Communication' },
-            },
-          ],
-        } as any,
-      };
-
-      const job: JobRequest = {
-        id: randomUUID(),
-        status: JobStatus.DRAFT,
-        sequence: 0,
-        createdAtTimestamp: Date.now(),
-        tenantId: 'acme',
-        jurisdiction: 'es',
-        sector: 'health-care',
-        section: 'individual',
-        format: 'org.hl7.fhir.api' as any,
-        resourceType: 'Communication',
-        action: '_batch',
-        content: decoded,
-      };
-
-      const response = await communicationManager.process(job);
-      const data = (response.body as any).data;
-      expect(response.body?.resourceType).toBe('Bundle');
-      expect(data[0].response.status).toBe('404');
-      expect(data[0].response.outcome.issue[0].code).toBe(IssueType.NotFound);
     });
   });
 

@@ -40,20 +40,24 @@ export function generateTenantCollectionNameFromClaims(claims: ClaimsRecord): st
 }
 
   /**
- * Constructs the unique vault identifier for a tenant from its sector and canonical tenant id.
- * This composite ID is used as the vault name in the repository and as the `entityId`
- * for the tenant's keys in the Key Management Service.
+
+
+/**
+ * Constructs the unique vault identifier for a tenant from its sector and alternate name.
  *
- * @param sector The business sector of the tenant (e.g., 'health', 'insurance').
- * @param tenantId Canonical tenant id. For organizations this must map to
- * `Organization.identifier.value` (e.g., TAX/VATES id). For individual organizations use UUID.
- * @returns A composite string in the format `sector_tenantId`.
+ * @param sector {string} The BUSINESS sector of the tenant (e.g., 'health-care', 'animal-health').
+ *   - WARNING: This must NEVER be a network sector ('test', 'test-network', 'network').
+ *   - TODO: If you ever change this logic, audit all usages for sector confusion.
+ * @param alternateName {string} The unique alternate name of the tenant (e.g., 'acme-health-us').
+ * @returns {string} A composite string in the format `sector_alternateName`.
  */
-export function getTenantVaultId(sector: string, tenantId: string): string {
-  if (!sector || !tenantId) {
-    throw new Error('Both sector and tenantId are required to create a tenant vault ID.');
+export function getTenantVaultId(sector: string, alternateName: string): string {
+  if (!sector || !alternateName) {
+    throw new Error('Both sector and alternateName are required to create a tenant vault ID.');
   }
-  return `${sector}_${tenantId}`;
+  // Only BUSINESS sector is valid here!
+  // TODO: If sector is a network sector, throw or log a warning.
+  return `${sector}_${alternateName}`;
 }
 
 
@@ -91,9 +95,14 @@ export function getIdentifierUrnFromClaims(claims: any): string | undefined {
 
 
 /**
+
+/**
  * Parses a DID (`did:web`) of a hosted entity (Employee, Individual) to extract 
  * the components needed to form the parent tenant's vault ID.
+ *
  * Example: `did:web:provider.com:acme:cds-es:v1:health-care:employee:admin` -> `health-care_acme`
+ *
+ * IMPORTANT: The sector extracted here is always the BUSINESS sector.
  *
  * @param iss The issuer DID string.
  * @returns The composite vault ID string.
@@ -105,13 +114,10 @@ export function getTenantVaultIdFromIss(iss: string): string {
   if (parts.length < 7 || parts[0] !== 'did' || parts[1] !== 'web') {
     throw new Error(`Invalid or unsupported DID format for issuer: ${iss}`);
   }
-  
   const tenantId = parts[3];
-  const sector = parts[6];
-  
+  const sector = parts[6]; // BUSINESS sector only
   if (!sector || !tenantId) {
     throw new Error(`Could not extract sector and tenantId from DID: ${iss}`);
   }
-  
   return getTenantVaultId(sector, tenantId);
 }

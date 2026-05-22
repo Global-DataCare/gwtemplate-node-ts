@@ -3,3 +3,4 @@ import type { EmailNotificationPayload, EmailNotificationResult } from './types.
 export interface IEmailNotificationAdapter {
   send(payload: EmailNotificationPayload): Promise<EmailNotificationResult>;
 }
+

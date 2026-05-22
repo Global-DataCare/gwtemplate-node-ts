@@ -14,3 +14,4 @@ export type EmailNotificationResult = {
   messageId?: string;
   statusCode?: number;
 };
+

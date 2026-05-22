@@ -62,3 +62,4 @@ export class SendGridEmailNotificationAdapter implements IEmailNotificationAdapt
     };
   }
 }
+

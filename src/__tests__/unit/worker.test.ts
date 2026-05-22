@@ -100,6 +100,70 @@ describe('Worker', () => {
     expect(errorIssue.diagnostics).toContain(`No manager configured for resourceType '${resourceType}'`);
   });
 
+  it('should normalize resource.meta.claims into entry.meta.claims before manager routing', async () => {
+    const mockTaskManager = mock<IJobProcessor>();
+    const registryWithTask = mock<ManagerRegistry>({
+      taskManager: mockTaskManager,
+    });
+    const localWorker = new Worker(registryWithTask, API_BASE_URL, mockKmsService);
+
+    const jobName = createJobName('test_host', 'Task', '_batch');
+    const job: JobRequest = {
+      ...testCreateCustomerJobRequestProfessionalOnboarding,
+      tenantId: 'host',
+      sector: 'test',
+      resourceType: 'Task',
+      contentType: 'application/json',
+      content: {
+        ...(testCreateCustomerJobRequestProfessionalOnboarding.content || {}),
+        thid: 'thid-task-normalize-001',
+        body: {
+          data: [
+            {
+              type: 'Task',
+              request: { method: 'POST' },
+              resource: {
+                resourceType: 'Task',
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.api',
+                    id: 'task-normalize-001',
+                    subject: 'Person/elder-001',
+                    status: 'active',
+                  },
+                },
+              },
+            },
+          ],
+        },
+      } as any,
+    };
+
+    const managerResponse: IDecodedDidcommPayload = {
+      jti: 'mock-jti-task',
+      type: 'batch-response',
+      iss: API_BASE_URL,
+      aud: 'did:web:client.example.com',
+      exp: Math.floor(Date.now() / 1000) + 300,
+      thid: 'thid-task-normalize-001',
+      body: { data: [] },
+    };
+
+    mockTaskManager.process.mockResolvedValue(managerResponse);
+    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'host-key' } as any);
+    mockKmsService.encodeResponse.mockResolvedValue('encrypted-task-response');
+
+    await localWorker.process(jobName, job);
+
+    expect(mockTaskManager.process).toHaveBeenCalledTimes(1);
+    expect((job.content as any).body.data[0].meta.claims).toMatchObject({
+      '@context': 'org.hl7.fhir.api',
+      id: 'task-normalize-001',
+      subject: 'Person/elder-001',
+      status: 'active',
+    });
+  });
+
   describe('Architecture Keeper Tests', () => {
     it('should ALWAYS use encodeResponse for legacy (JSON) requests, NEVER protectConfidentialData', async () => {
       // ARRANGE

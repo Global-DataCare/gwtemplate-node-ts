@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { SendGridEmailNotificationAdapter } from '../../../../services/notifications/SendGridEmailNotificationAdapter';
+import { SendGridEmailNotificationAdapter } from '../../../../services/notifications/SendGridEmailNotificationAdapter.js';
 
 describe('SendGridEmailNotificationAdapter', () => {
   beforeEach(() => {
@@ -99,3 +99,4 @@ describe('SendGridEmailNotificationAdapter', () => {
     ).rejects.toThrow('SendGrid send failed (400): bad request');
   });
 });
+

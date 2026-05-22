@@ -15,3 +15,4 @@ export class ConsoleEmailNotificationAdapter implements IEmailNotificationAdapte
     return { provider: 'console', accepted: true };
   }
 }
+

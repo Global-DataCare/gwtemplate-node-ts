@@ -545,7 +545,7 @@ export function createApiRouter(
    *       - production: `network`
    *
    *       Expected semantics:
-   *       - the controller submits ICA-derived proof in `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP)
+   *       - the controller submits ICA-derived proof, for example through a `vp_token`
    *       - the host validates the ICA proof and activates the tenant backend/connector
    *       - activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`
    *         (include that claim in `meta.claims` to size requested seats)
@@ -569,9 +569,6 @@ export function createApiRouter(
    *         application/didcomm-plaintext+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
-   *           examples:
-   *             message:
-   *               $ref: '#/components/examples/OrganizationActivationPlaintextMessage'
    *         application/json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
