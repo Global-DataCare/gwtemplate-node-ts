@@ -1,3 +1,13 @@
+## 1.5.1 - 2026-05-23
+
+### Changed
+- Aligned GW CORE activation, DID publication, discovery, and shared examples with the new shared package minor line.
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.5.0`.
+- Clarified canonical `_activate` semantics around `vp_token`, `controller.*`, and deprecated legacy credential side-fields.
+
+### Testing
+- Targeted activation/discovery/shared-example suites pass against the packaged shared dependency.
+
 ## 1.3.14 - 2026-05-21
 
 ### Tests
