@@ -1,3 +1,20 @@
+## [Unreleased]
+
+### Changed
+- Updated SMART token authorization to evaluate the full active consent set for the subject instead of the previous single-rule MVP match.
+- Added explicit deny precedence over broader organization/jurisdiction coverage in the live SMART path.
+- Extended subject-scoped `Bundle/_search` handling so `Communication` permission requests can be recovered by:
+  - `Communication.identifier`
+  - `thid`
+  - linked `DocumentReference.contenthash`
+- Updated SMART compatibility and docs index notes to reflect the current live consent-evaluation behavior.
+
+### Testing
+- Added/updated focused tests for:
+  - SMART consent evaluation precedence
+  - related-person SMART access
+  - `Communication` lookup by identifier, thread id, and linked CID
+
 ## 1.5.1 - 2026-05-23
 
 ### Changed

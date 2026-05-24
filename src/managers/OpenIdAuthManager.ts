@@ -15,8 +15,8 @@ import { getClaimValue } from '../utils/claims';
 import { parseActorFromSub } from 'gdc-common-utils-ts/utils/actor';
 import { getIndividualSectionId } from '../utils/individual-sections';
 import { IClearingHouseService } from '../services/ClearingHouseService';
-import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/consent';
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
+import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/consent';
 
 type TokenRequestBody = {
   scope?: string;
@@ -96,87 +96,29 @@ export class OpenIdAuthManager implements IJobProcessor {
     // - parse all scope items and map to rule semantics (resource-level + section-level),
     // - apply deny-overrides and purpose logic.
     const actor = parseActorFromSub(sub);
-    const actorRole = actor.role?.trim();
-    const normalizedActorRole = actorRole ? normalizeConsentActorRole(actorRole, 'professional') : undefined;
     const purpose = body.purpose?.trim();
-
-    const jurisdiction = job.jurisdiction.toUpperCase();
-    const jurisdictionActorIds: string[] = [];
-    if (jurisdiction.includes('-')) {
-      jurisdictionActorIds.push(`urn:iso:3166-2:${jurisdiction}`);
-    } else {
-      jurisdictionActorIds.push(`urn:iso:3166:${jurisdiction}`);
-      jurisdictionActorIds.push(`urn:iso:3166-2:${jurisdiction}`);
-      jurisdictionActorIds.push(`urn:iso:std:iso:3166|${jurisdiction}`);
-    }
-
     const rules = await this.vaultRepository.getContainersInSection<any>(tenantVaultId, getIndividualSectionId(subject, 'rules'));
-    const matchingRule = rules.find((rule) => {
-      const decision = getClaimValue<string>(rule as any, 'Consent.decision');
-      if (decision !== 'permit') return false;
-
-      const ruleActor = getClaimValue<string>(rule as any, 'Consent.actor-identifier');
-      if (!ruleActor) return false;
-
-      // Actor matching supports 3 "actor-identifier" types:
-      // 1) Jurisdiction URNs (ISO country/subdivision) => match the request jurisdiction.
-      // 2) did:web (organization/department/office) => match the actor's base org did:web.
-      // 3) Email => match the actor email.
-      const normalizedRuleActor = ruleActor.trim();
-      const isRuleEmail = normalizedRuleActor.includes('@') && !/\s/.test(normalizedRuleActor) && !normalizedRuleActor.startsWith('did:');
-      const isRuleDidWeb = normalizedRuleActor.startsWith('did:web:');
-      const isRuleJurisdictionUrn = normalizedRuleActor.startsWith('urn:iso:');
-
-      if (isRuleJurisdictionUrn) {
-        if (!jurisdictionActorIds.includes(normalizedRuleActor)) return false;
-      } else if (isRuleDidWeb) {
-        if (!actor.organization) return false;
-        // A rule may refer to the tenant DID (base) or a more specific department/office DID under the same host.
-        if (!(normalizedRuleActor === actor.organization || normalizedRuleActor.startsWith(`${actor.organization}:`))) {
-          return false;
-        }
-      } else if (isRuleEmail) {
-        const actorEmail = actor.identifier && actor.identifier.includes('@')
-          ? actor.identifier.toLowerCase()
-          : undefined;
-        if (!actorEmail) return false;
-        if (normalizedRuleActor.toLowerCase() !== actorEmail) return false;
-      } else {
-        return false;
-      }
-
-      const ruleRole = getClaimValue<string>(rule as any, 'Consent.actor-role');
-      if (ruleRole) {
-        const normalizedRuleRoles = expandConsentActorRoles(ruleRole, 'professional');
-        if (normalizedRuleRoles.includes('*')) {
-          // Wildcard roles are only permitted for email-based rules.
-          if (!isRuleEmail) return false;
-        } else if (normalizedActorRole) {
-          if (!normalizedRuleRoles.includes(normalizedActorRole)) return false;
-        } else {
-          // If the actor doesn't carry a role, only email rules with wildcard roles can match.
-          return false;
-        }
-      } else if (normalizedActorRole) {
-        // If the rule doesn't specify a role, allow only for email-based rules (role-less external actors).
-        if (!isRuleEmail) return false;
-      }
-
-      const rulePurpose = getClaimValue<string>(rule as any, 'Consent.purpose');
-      if (purpose && rulePurpose && rulePurpose !== purpose) return false;
-
-      if (sections.length > 0) {
-        const ruleActions = (getClaimValue<string>(rule as any, 'Consent.action') || '')
-          .split(',')
-          .map((s) => normalizeCodeSystemAndValue(s.trim()))
-          .filter(Boolean);
-        return sections.every((s) => ruleActions.includes(s));
-      }
-      return true;
+    const evaluation = this.evaluateRequestedConsent({
+      rules,
+      subject,
+      actor,
+      purpose,
+      sections,
+      jurisdiction: job.jurisdiction,
     });
 
-    if (!matchingRule) {
-      throw new ManagerError('No matching consent rule found for requested scope.', IssueType.Forbidden);
+    if (!evaluation.allowed) {
+      const missingSections = evaluation.missingSections.map((value) => normalizeCodeSystemAndValue(value)).filter(Boolean);
+      const detail = [
+        missingSections.length ? `missing sections=${missingSections.join(',')}` : '',
+        evaluation.missingResourceTypes.length ? `missing resourceTypes=${evaluation.missingResourceTypes.join(',')}` : '',
+      ].filter(Boolean).join('; ');
+      throw new ManagerError(
+        detail
+          ? `No matching consent rule found for requested scope. ${detail}`
+          : 'No matching consent rule found for requested scope.',
+        IssueType.Forbidden,
+      );
     }
 
     const lifetimeSeconds = Math.max(1, Math.min(3600, body.expires_in || 300));
@@ -295,5 +237,145 @@ export class OpenIdAuthManager implements IJobProcessor {
       .split(/\s+/)
       .map((value) => value.trim())
       .filter(Boolean);
+  }
+
+  private extractRequestedResourceTypes(scope: string): string[] {
+    const resourceTypes = new Set<string>();
+    for (const token of scope.split(/\s+/).map((value) => value.trim()).filter(Boolean)) {
+      const [head] = token.split('?', 1);
+      const target = head.split('/')[1] || '';
+      const resourceType = target.split('.')[0]?.trim();
+      if (resourceType) resourceTypes.add(resourceType);
+    }
+    return Array.from(resourceTypes);
+  }
+
+  private evaluateRequestedConsent(input: {
+    rules: any[];
+    subject: string;
+    actor: ReturnType<typeof parseActorFromSub>;
+    purpose?: string;
+    sections: string[];
+    jurisdiction: string;
+  }): {
+    allowed: boolean;
+    missingSections: string[];
+    missingResourceTypes: string[];
+  } {
+    const missingSections: string[] = [];
+    const missingResourceTypes: string[] = [];
+    const normalizedActorRole = input.actor.role?.trim()
+      ? normalizeConsentActorRole(input.actor.role.trim(), input.actor.sub.includes(':family:') ? 'family' : 'professional')
+      : undefined;
+    const normalizedJurisdiction = String(input.jurisdiction || '').trim().toUpperCase();
+    const actorEmail = input.actor.identifier && input.actor.identifier.includes('@')
+      ? input.actor.identifier.toLowerCase()
+      : undefined;
+
+    for (const section of input.sections.length > 0 ? input.sections : ['*']) {
+      const normalizedSection = section === '*' ? '*' : normalizeCodeSystemAndValue(section);
+      const candidates = (input.rules || [])
+        .filter((rule) => String(getClaimValue<string>(rule, 'Consent.subject') || '').trim() === input.subject)
+        .filter((rule) => this.isRuleTimeActive(rule))
+        .filter((rule) => this.matchesRulePurpose(rule, input.purpose))
+        .filter((rule) => this.matchesRuleRole(rule, normalizedActorRole, actorEmail))
+        .filter((rule) => this.matchesRuleSection(rule, normalizedSection))
+        .map((rule) => {
+          const match = this.resolveRuleMatchKind(rule, input.actor, actorEmail, normalizedJurisdiction);
+          if (!match) return undefined;
+          return {
+            rule,
+            precedence: this.resolvePrecedence(rule, match),
+          };
+        })
+        .filter((value): value is { rule: any; precedence: number } => Boolean(value))
+        .sort((a, b) => a.precedence - b.precedence);
+
+      const winner = candidates[0];
+      if (!winner || String(getClaimValue<string>(winner.rule, 'Consent.decision') || '').trim() !== 'permit') {
+        if (normalizedSection !== '*') missingSections.push(normalizedSection);
+      }
+    }
+
+    return {
+      allowed: missingSections.length === 0 && missingResourceTypes.length === 0,
+      missingSections: Array.from(new Set(missingSections)),
+      missingResourceTypes: Array.from(new Set(missingResourceTypes)),
+    };
+  }
+
+  private isRuleTimeActive(rule: any): boolean {
+    const now = Date.now();
+    const start = String(getClaimValue<string>(rule, 'Consent.period-start') || '').trim();
+    const end = String(getClaimValue<string>(rule, 'Consent.period-end') || '').trim();
+    if (start && !Number.isNaN(Date.parse(start)) && Date.parse(start) > now) return false;
+    if (end && !Number.isNaN(Date.parse(end)) && Date.parse(end) < now) return false;
+    return true;
+  }
+
+  private matchesRulePurpose(rule: any, purpose?: string): boolean {
+    const rulePurpose = String(getClaimValue<string>(rule, 'Consent.purpose') || '').trim();
+    if (!purpose || !rulePurpose) return true;
+    return rulePurpose === purpose;
+  }
+
+  private matchesRuleRole(rule: any, normalizedActorRole?: string, actorEmail?: string): boolean {
+    const ruleRole = String(getClaimValue<string>(rule, 'Consent.actor-role') || '').trim();
+    if (!ruleRole) return !normalizedActorRole || !!actorEmail;
+    const normalizedRuleRoles = expandConsentActorRoles(ruleRole, normalizedActorRole?.startsWith('v3-rolecode|') ? 'family' : 'professional');
+    if (normalizedRuleRoles.includes('*')) return !!actorEmail;
+    if (!normalizedActorRole) return false;
+    return normalizedRuleRoles.includes(normalizedActorRole);
+  }
+
+  private matchesRuleSection(rule: any, normalizedSection: string): boolean {
+    if (!normalizedSection || normalizedSection === '*') return true;
+    const actions = String(getClaimValue<string>(rule, 'Consent.action') || '')
+      .split(',')
+      .map((value) => normalizeCodeSystemAndValue(value.trim()))
+      .filter(Boolean);
+    return actions.includes('*') || actions.includes(normalizedSection);
+  }
+
+  private resolveRuleMatchKind(
+    rule: any,
+    actor: ReturnType<typeof parseActorFromSub>,
+    actorEmail: string | undefined,
+    jurisdiction: string,
+  ): 'direct' | 'organization' | 'jurisdiction' | undefined {
+    const ruleActor = String(getClaimValue<string>(rule, 'Consent.actor-identifier') || '').trim();
+    if (!ruleActor) return undefined;
+
+    if (actorEmail && ruleActor.toLowerCase() === actorEmail) return 'direct';
+    if (ruleActor === actor.sub) return 'direct';
+
+    if (ruleActor.startsWith('did:web:')) {
+      if (actor.organization && (ruleActor === actor.organization || ruleActor.startsWith(`${actor.organization}:`))) {
+        return ruleActor === actor.sub ? 'direct' : 'organization';
+      }
+      if (ruleActor === actor.sub) return 'direct';
+    }
+
+    const normalizedRuleJurisdiction = this.normalizeJurisdictionRuleActor(ruleActor);
+    if (normalizedRuleJurisdiction && normalizedRuleJurisdiction === jurisdiction) return 'jurisdiction';
+
+    return undefined;
+  }
+
+  private normalizeJurisdictionRuleActor(ruleActor: string): string | undefined {
+    const direct = String(ruleActor || '').trim().toUpperCase();
+    if (/^[A-Z]{2}$/.test(direct)) return direct;
+    const isoStd = direct.match(/^URN:ISO:STD:ISO:3166\|([A-Z]{2})$/);
+    if (isoStd) return isoStd[1];
+    const iso = direct.match(/^URN:ISO:3166(?:-2)?:([A-Z]{2})(?:[-:].*)?$/);
+    if (iso) return iso[1];
+    return undefined;
+  }
+
+  private resolvePrecedence(rule: any, matchKind: 'direct' | 'organization' | 'jurisdiction'): number {
+    const decision = String(getClaimValue<string>(rule, 'Consent.decision') || '').trim();
+    if (matchKind === 'direct') return decision === 'deny' ? 10 : 11;
+    if (matchKind === 'organization') return decision === 'deny' ? 20 : 21;
+    return decision === 'deny' ? 30 : 31;
   }
 }

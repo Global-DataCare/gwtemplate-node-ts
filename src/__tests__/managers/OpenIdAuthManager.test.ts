@@ -543,4 +543,189 @@ describe('OpenIdAuthManager', () => {
       } as any,
     } as JobRequest)).rejects.toThrow("Missing 'vp_token'");
   });
+
+  it('should deny when a direct physician deny overrides a broader organization allow', async () => {
+    const mockKmsService: jest.Mocked<IKmsService> = {
+      init: jest.fn(),
+      provisionKeys: jest.fn(),
+      getPublicJwks: jest.fn(),
+      getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' } as any),
+      getPublicEncryptionKey: jest.fn(),
+      getHostPublicJwkSet: jest.fn(),
+      decodeRequest: jest.fn(),
+      signWithManagedKey: jest.fn(),
+      signWithReconstructedKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+      createCompactJws: jest.fn(),
+      encodeResponse: jest.fn(),
+      protectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getHmacBase64Url: jest.fn(),
+      protectAttributesNameAndValue: jest.fn(),
+    };
+
+    const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
+      getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+    } as any;
+
+    const mockVaultRepository: jest.Mocked<IVaultRepository> = {
+      createNewVault: jest.fn(),
+      vaultExists: jest.fn().mockResolvedValue(true),
+      getVaultConfig: jest.fn().mockResolvedValue({ id: 'vault' } as any),
+      createNewSection: jest.fn(),
+      updateSection: jest.fn(),
+      getAllSections: jest.fn(),
+      sectionExists: jest.fn(),
+      getContainersListInSection: jest.fn(),
+      getContainersInSection: jest.fn().mockResolvedValue([
+        { ...testConsentRulePermitOrgDid },
+        {
+          ...testConsentRulePermitEmailWildcardRole,
+          'Consent.decision': 'deny',
+          'Consent.actor-role': 'ISCO-08|2211',
+        },
+      ] as any),
+      put: jest.fn(),
+      get: jest.fn(),
+      getHistory: jest.fn(),
+      query: jest.fn(),
+      delete: jest.fn(),
+      purge: jest.fn(),
+    };
+
+    const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
+      verifyVpToken: jest.fn().mockResolvedValue({
+        acr: 'urn:antifraud:acr:openid4vp:employee',
+        amr: ['openid4vp', 'vc'],
+        vpHash: 'hash',
+        ledgerVerified: true,
+      }),
+    };
+
+    const manager = new OpenIdAuthManager(
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockVaultRepository,
+      mockClearingHouse,
+    );
+
+    await expect(manager.process({
+      tenantId: 'acme',
+      jurisdiction: 'ES',
+      sector: 'health-care',
+      section: 'identity',
+      format: 'openid',
+      resourceType: 'smart',
+      action: 'token',
+      id: '',
+      sequence: 0,
+      status: 'DRAFT' as any,
+      createdAtTimestamp: Date.now(),
+      content: {
+        thid: 'thid',
+        iss: 'did:web:device.example',
+        aud: 'did:web:api.acme.org',
+        body: {
+          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
+          scope: 'organization/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2',
+          purpose: 'TREAT',
+          vp_token: 'vp',
+          acr_values: 'urn:antifraud:acr:openid4vp:employee',
+        },
+      } as any,
+    } as JobRequest)).rejects.toThrow('No matching consent rule found for requested scope.');
+  });
+
+  it('should permit a related person targeted directly by email', async () => {
+    const mockKmsService: jest.Mocked<IKmsService> = {
+      init: jest.fn(),
+      provisionKeys: jest.fn(),
+      getPublicJwks: jest.fn(),
+      getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' } as any),
+      getPublicEncryptionKey: jest.fn(),
+      getHostPublicJwkSet: jest.fn(),
+      decodeRequest: jest.fn(),
+      signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
+      signWithReconstructedKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+      createCompactJws: jest.fn(),
+      encodeResponse: jest.fn(),
+      protectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getHmacBase64Url: jest.fn(),
+      protectAttributesNameAndValue: jest.fn(),
+    };
+
+    const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
+      getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+    } as any;
+
+    const mockVaultRepository: jest.Mocked<IVaultRepository> = {
+      createNewVault: jest.fn(),
+      vaultExists: jest.fn().mockResolvedValue(true),
+      getVaultConfig: jest.fn().mockResolvedValue({ id: 'vault' } as any),
+      createNewSection: jest.fn(),
+      updateSection: jest.fn(),
+      getAllSections: jest.fn(),
+      sectionExists: jest.fn(),
+      getContainersListInSection: jest.fn(),
+      getContainersInSection: jest.fn().mockResolvedValue([
+        {
+          ...testConsentRulePermitEmailWildcardRole,
+          'Consent.actor-identifier': 'guardian@example.org',
+          'Consent.actor-role': 'v3-RoleCode|RESPRSN',
+        },
+      ] as any),
+      put: jest.fn(),
+      get: jest.fn(),
+      getHistory: jest.fn(),
+      query: jest.fn(),
+      delete: jest.fn(),
+      purge: jest.fn(),
+    };
+
+    const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
+      verifyVpToken: jest.fn().mockResolvedValue({
+        acr: 'urn:antifraud:acr:openid4vp:employee',
+        amr: ['openid4vp', 'vc'],
+        vpHash: 'hash',
+        ledgerVerified: true,
+      }),
+    };
+
+    const manager = new OpenIdAuthManager(
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockVaultRepository,
+      mockClearingHouse,
+    );
+
+    const response = await manager.process({
+      tenantId: 'acme',
+      jurisdiction: 'ES',
+      sector: 'health-care',
+      section: 'identity',
+      format: 'openid',
+      resourceType: 'smart',
+      action: 'token',
+      id: '',
+      sequence: 0,
+      status: 'DRAFT' as any,
+      createdAtTimestamp: Date.now(),
+      content: {
+        thid: 'thid',
+        iss: 'did:web:device.example',
+        aud: 'did:web:api.acme.org',
+        body: {
+          sub: 'did:web:api.acme.org:family:guardian@example.org:v3-RoleCode|RESPRSN',
+          scope: 'organization/Composition.rs?subject=did:web:api.acme.org:individual:123&section=LOINC|48765-2',
+          purpose: 'TREAT',
+          vp_token: 'vp',
+          acr_values: 'urn:antifraud:acr:openid4vp:employee',
+        },
+      } as any,
+    } as JobRequest);
+
+    expect(response.body.access_token).toBeDefined();
+  });
 });

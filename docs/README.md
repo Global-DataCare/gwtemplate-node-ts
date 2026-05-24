@@ -34,6 +34,7 @@ docs/
 
 - **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
 - **Core integration bible**: [API_CORE_INTEGRATION.md](API_CORE_INTEGRATION.md) defines the canonical SEDIA-aligned flow used by SDK live core tests.
+- **Consent access status**: [90.E-TODO_SMART_EHR_COMPAT.md](90.E-TODO_SMART_EHR_COMPAT.md) also records the current live SMART consent-evaluation behavior, including deny precedence and permission-request lookup identifiers.
 - **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
   - `artifacts/openapi-profiles/openapi-core.json`
