@@ -1,10 +1,10 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Gateway API",
+    "title": "Gateway API - COMPAT",
     "version": "1.0.3",
-    "description": "API documentation for the secure gateway, covering both legacy (JSON) and secure (JWE) flows.",
-    "x-profile-generated-at": "2026-05-22T13:49:21.189Z",
+    "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
+    "x-profile-generated-at": "2026-05-24T01:41:34.636Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -327,7 +327,105 @@
       },
       "OrganizationActivationPlaintextMessage": {
         "summary": "Plaintext Message for Organization Activation",
-        "description": "A DIDComm-like message wrapper for `_activate`; proof is carried in `body.data[].vp_token` (or `body.data[].vp`)."
+        "description": "A DIDComm-like message wrapper for `_activate`; canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields.",
+        "value": {
+          "jti": "org-activation-request-<test-id>",
+          "thid": "org-activation-thread-<test-id>",
+          "iss": "did:web:controller.example.org",
+          "aud": "did:web:host.example.com",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/api+json",
+          "body": {
+            "vp_token": "<ica-proof-token>",
+            "controller": {
+              "did": "did:web:people.acme.org:controllers:primary",
+              "sameAs": "mailto:controller@acme.org",
+              "publicKeyJwk": {
+                "kid": "controller-es384-001",
+                "kty": "EC",
+                "crv": "P-384",
+                "x": "<x>",
+                "y": "<y>",
+                "alg": "ES384",
+                "use": "sig"
+              },
+              "jwks": {
+                "keys": [
+                  {
+                    "kid": "controller-didcomm-enc-001",
+                    "kty": "EC",
+                    "crv": "P-384",
+                    "x": "<enc-x>",
+                    "y": "<enc-y>",
+                    "use": "enc",
+                    "purposes": [
+                      "didcomm-enc"
+                    ]
+                  }
+                ]
+              }
+            },
+            "organizationCredential": "<deprecated-legacy-compat>",
+            "representativeCredential": "<deprecated-legacy-compat>",
+            "data": [
+              {
+                "type": "Organization-activation-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "@type": "template",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.alternateName": "acme",
+                    "org.schema.Organization.identifier.additionalType": "TAX",
+                    "org.schema.Organization.identifier.value": "A123456789",
+                    "org.schema.Organization.legalName": "Acme Organization SL",
+                    "org.schema.Organization.name": "Acme Org",
+                    "org.schema.Organization.numberOfEmployees.value": 2,
+                    "org.schema.Organization.url": "api.acme.org",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                  }
+                }
+              }
+            ]
+          },
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
+                "jwk": {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device"
+                }
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plaintext+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device",
+                "jwk": {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device"
+                }
+              }
+            }
+          }
+        }
       },
       "OrganizationOrderPlaintextMessage": {
         "summary": "Plaintext Message for Organization Order",
@@ -454,7 +552,7 @@
                     "@context": "org.schema",
                     "@type": "IndividualProduct:Issue",
                     "org.schema.Person.email": "doctor1@acme.org",
-                    "org.schema.Person.hasOccupation": "ISCO-08|2211",
+                    "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|2211",
                     "org.schema.IndividualProduct.category": "professional",
                     "org.schema.IndividualProduct.additionalType": "mobile"
                   }
@@ -488,7 +586,7 @@
                     "@context": "org.schema",
                     "@type": "IndividualProduct:Issue",
                     "org.schema.Person.email": "admin1@acme.org",
-                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|1120",
                     "org.schema.IndividualProduct.category": "professional",
                     "org.schema.IndividualProduct.additionalType": "mobile"
                   }
@@ -533,7 +631,7 @@
           "nbf": 1678886400,
           "type": "application/json",
           "body": {
-            "application_type": "native",
+            "application_type": "web",
             "client_name": "App for [email] as [role] on [iOS, Android, Web]",
             "code": "00000000-0000-0000-0000-000000000000",
             "redirect_uris": [
@@ -646,7 +744,7 @@
                 "meta": {
                   "claims": {
                     "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-                    "org.schema.Person.hasOccupation": "ISCO-08|4226",
+                    "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
                     "org.schema.Person.email": "receptionist1@acme.org"
                   }
                 }
@@ -868,84 +966,61 @@
         "summary": "Plaintext Message for FHIR Communication",
         "description": "A DIDComm-like message wrapper containing a FHIR Communication resource in the `body`.",
         "value": {
-          "jti": "unique-communication-message-<test-id>",
-          "thid": "thread-communication-id",
+          "jti": "unique-communication-message-ips-001",
+          "thid": "thread-communication-ips-001",
           "iss": "did:web:ehr-system.example.com",
           "aud": "did:web:gateway.acme.org",
-          "type": "org.hl7.fhir.r4.Bundle",
+          "type": "application/fhir+json; fhirVersion=4.0",
           "body": {
             "resourceType": "Bundle",
             "type": "batch",
             "entry": [
               {
-                "type": "Communication",
-                "meta": {
-                  "claims": {
-                    "@context": "org.hl7.fhir.api",
-                    "@type": "Communication:Appointment",
-                    "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|appointment-reminder",
-                    "Communication.content-attachment-data": "QkVHSU4...5EQVI=",
-                    "Communication.content-attachment-title": "appointment-details.ics",
-                    "Communication.content-attachment-type": "text/calendar",
-                    "Communication.content-reference": "https://url-to-appointment-source.com/some-uuid",
-                    "Communication.part-of": "urn:uuid:communication-channel-id",
-                    "Communication.recipient": "{CUSTOMER_DID_WEB}",
-                    "Communication.sender": "{ORGANIZATION_DID_WEB}",
-                    "Communication.sent": "2025-10-15T14:30:00Z",
-                    "Communication.subject": "{CUSTOMER_DID_WEB}",
-                    "Communication.text": "This is your new appointment. Best regards."
-                  }
-                },
                 "request": {
                   "method": "POST",
                   "url": "individual/org.hl7.fhir.r4/Communication"
                 },
+                "type": "Communication-ingestion-request-v1.0",
                 "resource": {
                   "resourceType": "Communication",
                   "status": "completed",
-                  "partOf": [
-                    {
-                      "reference": "urn:uuid:communication-channel-id"
-                    }
-                  ],
+                  "subject": {
+                    "reference": "Patient/did:web:api.acme.org:individual:123"
+                  },
                   "category": [
                     {
                       "coding": [
                         {
-                          "code": "appointment-reminder",
-                          "system": "http://terminology.hl7.org/CodeSystem/communication-category"
+                          "system": "http://terminology.hl7.org/CodeSystem/communication-category",
+                          "code": "notification"
                         }
                       ]
                     }
                   ],
-                  "recipient": [
-                    {
-                      "reference": "{CUSTOMER_DID_WEB}"
-                    }
-                  ],
-                  "sender": {
-                    "reference": "{ORGANIZATION_DID_WEB}"
-                  },
-                  "sent": "2025-10-15T14:30:00Z",
-                  "note": [
-                    {
-                      "text": "This is your new appointment. Best regards."
-                    }
-                  ],
                   "payload": [
                     {
-                      "contentReference": {
-                        "reference": "https://url-to-appointment-source.com/some-uuid"
-                      }
-                    },
-                    {
                       "contentAttachment": {
-                        "contentType": "text/calendar",
-                        "data": "QkVHSU46VkNBTEVOREFSCgpWRVJTSU9OOjIuMApQUk9ESUQ6LS8vQWNtZS8vZGlkOndlYjphcGkuYWNtZS5vcmcvL0VTCkJFR0lOOlZFVkVOVApVSUQ6PHV1aWQtdjQ+CkRUU1BTVA6MjAyNTEwMTZUMTIwMDAwWgpEVFNUQVJUOjIwMjUxMDE3VDE1MDAwMFoKRF RFTkQ6MjAyNTEwMTdUMTYwMDAwWgpTVU1NQVJZOlJlc3VtZW4gZGUgY2l0YS4KREVTQ1JJUFRJT046RW5jdWVudHJvIHZpcnR1YWwuCkxPQ0FUSU9OOk9ubGluZQpFTkQ6VkVWRU5UCkVORDpWQ0FMRU5EQVI=",
-                        "title": "appointment-details.ics"
+                        "contentType": "application/fhir+json",
+                        "title": "IPS DocumentReference",
+                        "data": "eyJyZXNvdXJjZVR5cGUiOiJEb2N1bWVudFJlZmVyZW5jZSIsInN1YmplY3QiOnsicmVmZXJlbmNlIjoiZGlkOndlYjphcGkuYWNtZS5vcmc6aW5kaXZpZHVhbDoxMjMifSwiZGF0ZSI6IjIwMjYtMDUtMTZUMDA6MDA6MDAuMDAwWiIsImRlc2NyaXB0aW9uIjoiSVBTIERvY3VtZW50IEJ1bmRsZSIsImlkZW50aWZpZXIiOlt7InZhbHVlIjoidXJuOnV1aWQ6aXBzLWRvY3VtZW50LXJlZmVyZW5jZS0wMDEifV0sImNvbnRlbnQiOlt7ImF0dGFjaG1lbnQiOnsiY29udGVudFR5cGUiOiJhcHBsaWNhdGlvbi9maGlyK2pzb24iLCJ0aXRsZSI6Imlwcy1saWdodC5qc29uIiwiZGF0YSI6ImV5SnlaWE52ZFhKalpWUjVjR1VpT2lKQ2RXNWtiR1VpTENKMGVYQmxJam9pWkc5amRXMWxiblFpTENKbGJuUnllU0k2VzNzaWNtVnpiM1Z5WTJVaU9uc2ljbVZ6YjNWeVkyVlVlWEJsSWpvaVEyOXRjRzl6YVhScGIyNGlMQ0p6ZEdGMGRYTWlPaUptYVc1aGJDSXNJblI1Y0dVaU9uc2lZMjlrYVc1bklqcGJleUp6ZVhOMFpXMGlPaUpvZEhSd09pOHZiRzlwYm1NdWIzSm5JaXdpWTI5a1pTSTZJall3TlRreExUVWlmVjE5ZlgxZGZRPT0ifX1dfQ=="
                       }
                     }
-                  ]
+                  ],
+                  "note": [
+                    {
+                      "text": "IPS ingestion request"
+                    }
+                  ],
+                  "meta": {
+                    "claims": {
+                      "@context": "org.hl7.fhir.r4",
+                      "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|notification",
+                      "Communication.subject": "did:web:api.acme.org:individual:123",
+                      "Communication.sent": "2026-05-16T00:00:00.000Z",
+                      "Communication.note-text": "IPS ingestion request",
+                      "Communication.content-attachment-type": "application/fhir+json"
+                    }
+                  }
                 }
               }
             ]
@@ -1751,7 +1826,7 @@
                 "meta": {
                   "claims": {
                     "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-                    "org.schema.Person.hasOccupation": "ISCO-08|4226",
+                    "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
                     "org.schema.Person.email": "receptionist1@acme.org"
                   }
                 }
@@ -2013,84 +2088,61 @@
           }
         },
         "example": {
-          "jti": "unique-communication-message-<test-id>",
-          "thid": "thread-communication-id",
+          "jti": "unique-communication-message-ips-001",
+          "thid": "thread-communication-ips-001",
           "iss": "did:web:ehr-system.example.com",
           "aud": "did:web:gateway.acme.org",
-          "type": "org.hl7.fhir.r4.Bundle",
+          "type": "application/fhir+json; fhirVersion=4.0",
           "body": {
             "resourceType": "Bundle",
             "type": "batch",
             "entry": [
               {
-                "type": "Communication",
-                "meta": {
-                  "claims": {
-                    "@context": "org.hl7.fhir.api",
-                    "@type": "Communication:Appointment",
-                    "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|appointment-reminder",
-                    "Communication.content-attachment-data": "QkVHSU4...5EQVI=",
-                    "Communication.content-attachment-title": "appointment-details.ics",
-                    "Communication.content-attachment-type": "text/calendar",
-                    "Communication.content-reference": "https://url-to-appointment-source.com/some-uuid",
-                    "Communication.part-of": "urn:uuid:communication-channel-id",
-                    "Communication.recipient": "{CUSTOMER_DID_WEB}",
-                    "Communication.sender": "{ORGANIZATION_DID_WEB}",
-                    "Communication.sent": "2025-10-15T14:30:00Z",
-                    "Communication.subject": "{CUSTOMER_DID_WEB}",
-                    "Communication.text": "This is your new appointment. Best regards."
-                  }
-                },
                 "request": {
                   "method": "POST",
                   "url": "individual/org.hl7.fhir.r4/Communication"
                 },
+                "type": "Communication-ingestion-request-v1.0",
                 "resource": {
                   "resourceType": "Communication",
                   "status": "completed",
-                  "partOf": [
-                    {
-                      "reference": "urn:uuid:communication-channel-id"
-                    }
-                  ],
+                  "subject": {
+                    "reference": "Patient/did:web:api.acme.org:individual:123"
+                  },
                   "category": [
                     {
                       "coding": [
                         {
-                          "code": "appointment-reminder",
-                          "system": "http://terminology.hl7.org/CodeSystem/communication-category"
+                          "system": "http://terminology.hl7.org/CodeSystem/communication-category",
+                          "code": "notification"
                         }
                       ]
                     }
                   ],
-                  "recipient": [
-                    {
-                      "reference": "{CUSTOMER_DID_WEB}"
-                    }
-                  ],
-                  "sender": {
-                    "reference": "{ORGANIZATION_DID_WEB}"
-                  },
-                  "sent": "2025-10-15T14:30:00Z",
-                  "note": [
-                    {
-                      "text": "This is your new appointment. Best regards."
-                    }
-                  ],
                   "payload": [
                     {
-                      "contentReference": {
-                        "reference": "https://url-to-appointment-source.com/some-uuid"
-                      }
-                    },
-                    {
                       "contentAttachment": {
-                        "contentType": "text/calendar",
-                        "data": "QkVHSU46VkNBTEVOREFSCgpWRVJTSU9OOjIuMApQUk9ESUQ6LS8vQWNtZS8vZGlkOndlYjphcGkuYWNtZS5vcmcvL0VTCkJFR0lOOlZFVkVOVApVSUQ6PHV1aWQtdjQ+CkRUU1BTVA6MjAyNTEwMTZUMTIwMDAwWgpEVFNUQVJUOjIwMjUxMDE3VDE1MDAwMFoKRF RFTkQ6MjAyNTEwMTdUMTYwMDAwWgpTVU1NQVJZOlJlc3VtZW4gZGUgY2l0YS4KREVTQ1JJUFRJT046RW5jdWVudHJvIHZpcnR1YWwuCkxPQ0FUSU9OOk9ubGluZQpFTkQ6VkVWRU5UCkVORDpWQ0FMRU5EQVI=",
-                        "title": "appointment-details.ics"
+                        "contentType": "application/fhir+json",
+                        "title": "IPS DocumentReference",
+                        "data": "eyJyZXNvdXJjZVR5cGUiOiJEb2N1bWVudFJlZmVyZW5jZSIsInN1YmplY3QiOnsicmVmZXJlbmNlIjoiZGlkOndlYjphcGkuYWNtZS5vcmc6aW5kaXZpZHVhbDoxMjMifSwiZGF0ZSI6IjIwMjYtMDUtMTZUMDA6MDA6MDAuMDAwWiIsImRlc2NyaXB0aW9uIjoiSVBTIERvY3VtZW50IEJ1bmRsZSIsImlkZW50aWZpZXIiOlt7InZhbHVlIjoidXJuOnV1aWQ6aXBzLWRvY3VtZW50LXJlZmVyZW5jZS0wMDEifV0sImNvbnRlbnQiOlt7ImF0dGFjaG1lbnQiOnsiY29udGVudFR5cGUiOiJhcHBsaWNhdGlvbi9maGlyK2pzb24iLCJ0aXRsZSI6Imlwcy1saWdodC5qc29uIiwiZGF0YSI6ImV5SnlaWE52ZFhKalpWUjVjR1VpT2lKQ2RXNWtiR1VpTENKMGVYQmxJam9pWkc5amRXMWxiblFpTENKbGJuUnllU0k2VzNzaWNtVnpiM1Z5WTJVaU9uc2ljbVZ6YjNWeVkyVlVlWEJsSWpvaVEyOXRjRzl6YVhScGIyNGlMQ0p6ZEdGMGRYTWlPaUptYVc1aGJDSXNJblI1Y0dVaU9uc2lZMjlrYVc1bklqcGJleUp6ZVhOMFpXMGlPaUpvZEhSd09pOHZiRzlwYm1NdWIzSm5JaXdpWTI5a1pTSTZJall3TlRreExUVWlmVjE5ZlgxZGZRPT0ifX1dfQ=="
                       }
                     }
-                  ]
+                  ],
+                  "note": [
+                    {
+                      "text": "IPS ingestion request"
+                    }
+                  ],
+                  "meta": {
+                    "claims": {
+                      "@context": "org.hl7.fhir.r4",
+                      "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|notification",
+                      "Communication.subject": "did:web:api.acme.org:individual:123",
+                      "Communication.sent": "2026-05-16T00:00:00.000Z",
+                      "Communication.note-text": "IPS ingestion request",
+                      "Communication.content-attachment-type": "application/fhir+json"
+                    }
+                  }
                 }
               }
             ]
@@ -2381,7 +2433,7 @@
           "1.1 Organization Activation"
         ],
         "summary": "Activate a new Tenant (Organization) from ICA-issued proof",
-        "description": "Submits an asynchronous job to activate a new tenant on the platform from\nICA-issued proof. This is a distinct flow from the legacy `_batch`\nregistration endpoint.\n\nThe `{sector}` segment is a host onboarding network selector:\n- demo/test: `test`\n- development/staging: `test-network`\n- production: `network`\n\nExpected semantics:\n- the controller submits ICA-derived proof, for example through a `vp_token`\n- the host validates the ICA proof and activates the tenant backend/connector\n- activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`\n  (include that claim in `meta.claims` to size requested seats)\n  so clients can continue with order/payment and licensing without a separate `_batch` submit\n- next mandatory step is `Order/_batch` with `Order.acceptedOffer.identifier` from activation result\n- after Order, the controller uses activation code (`org.schema.IndividualProduct.serialNumber`)\n  to run `Token/_exchange` + `Device/_dcr` before creating additional employees\n",
+        "description": "Submits an asynchronous job to activate a new tenant on the platform from\nICA-issued proof. This is a distinct flow from the legacy `_batch`\nregistration endpoint.\n\nThe `{sector}` segment is a host onboarding network selector:\n- demo/test: `test`\n- development/staging: `test-network`\n- production: `network`\n\nExpected semantics:\n- canonical proof input is `body.vp_token`; the ICA organization + representative evidence belongs there\n- `body.controller.*` is the explicit controller key-binding contract inherited from the ICA model and is used when GW must publish/bootstrap the controller person DID\n- `body.organizationCredential` / `body.representativeCredential` are deprecated compatibility fields and must not be treated as the canonical proof contract\n- the host validates the ICA proof and activates the tenant backend/connector\n- activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`\n  (include that claim in `meta.claims` to size requested seats)\n  so clients can continue with order/payment and licensing without a separate `_batch` submit\n- next mandatory step is `Order/_batch` with `Order.acceptedOffer.identifier` from activation result\n- after Order, the controller uses activation code (`org.schema.IndividualProduct.serialNumber`)\n  to run `Token/_exchange` + `Device/_dcr` before creating additional employees\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

@@ -11,7 +11,7 @@ import { testConfigTenant1, testTenant1IdentifierUrn, testHostDidWeb } from '../
 import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
 
-describe('TenantsCacheManager - getTenantDomainUrl', () => {
+describe('TenantsCacheManager - tenant urls', () => {
   let tenantsCacheManager: TenantsCacheManager;
   let realKmsService: KmsService;
 
@@ -37,6 +37,14 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
   } as any;
   delete (tenantConfigWithoutUrl.claims as any)[ClaimsOrganizationSchemaorg.url];
 
+  const tenantConfigWithOperationalUrl: EntityConfig = {
+    ...tenantConfigWithUrl,
+    claims: {
+      ...tenantConfigWithUrl.claims,
+      'org.schema.Service.url': 'operator.acme.example.com',
+    },
+  } as any;
+
   beforeEach(() => {
     const cryptoService = new CryptographyService(new AdapterCryptoSdkNode());
     const vaultRepository = new VaultMemRepository();
@@ -51,6 +59,7 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
       if (vaultId === 'host') return hostConfig.didDocument;
       if (vaultId === 'health-care_acme_with_url') return tenantConfigWithUrl.didDocument;
       if (vaultId === 'health-care_acme_no_url') return tenantConfigWithoutUrl.didDocument;
+      if (vaultId === 'health-care_acme_with_operational_url') return tenantConfigWithOperationalUrl.didDocument;
       return undefined;
     });
 
@@ -58,6 +67,7 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
     (tenantsCacheManager as any).tenantCacheByVaultId.set('host', hostConfig);
     (tenantsCacheManager as any).tenantCacheByVaultId.set('health-care_acme_with_url', tenantConfigWithUrl);
     (tenantsCacheManager as any).tenantCacheByVaultId.set('health-care_acme_no_url', tenantConfigWithoutUrl);
+    (tenantsCacheManager as any).tenantCacheByVaultId.set('health-care_acme_with_operational_url', tenantConfigWithOperationalUrl);
   });
 
   afterEach(() => {
@@ -95,5 +105,18 @@ describe('TenantsCacheManager - getTenantDomainUrl', () => {
     const url = await tenantsCacheManager.getTenantDomainUrl('non-existent-vault');
     // ASSERT
     expect(url).toBeUndefined();
+  });
+
+  it('should return the operational URL when the service claim exists', async () => {
+    const url = await tenantsCacheManager.getTenantOperationalUrl('health-care_acme_with_operational_url');
+    expect(url).toBe('https://operator.acme.example.com');
+  });
+
+  it('should fall back to the hosted operational URL when no service claim exists', async () => {
+    const url = await tenantsCacheManager.getTenantOperationalUrl('health-care_acme_no_url');
+    const hostDomain = testHostDidWeb.replace('did:web:', '');
+    const urnParts = testTenant1IdentifierUrn.split(':');
+    const expectedUrl = `https://${hostDomain}/acme/cds-${urnParts[3].toLowerCase()}/${urnParts[4]}/${urnParts[5]}`;
+    expect(url).toBe(expectedUrl);
   });
 });

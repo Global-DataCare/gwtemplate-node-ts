@@ -8,6 +8,7 @@ const { options, swaggerDefinition } = require('../swagger.config.cjs');
 
 // Dynamic examples from the same TS source of truth used in tests and docs.
 const examples = await import('../src/__tests__/data/example-payloads.ts');
+const apiExamples = await import('../src/api-examples/index.ts');
 
 swaggerDefinition.components.schemas.OrganizationRegistrationLegacy.example =
   examples.ORGANIZATION_REGISTRATION_REQUEST;
@@ -17,7 +18,7 @@ swaggerDefinition.components.schemas.CustomerCreationLegacy.example =
   examples.CUSTOMER_ONBOARDING_MESSAGE;
 swaggerDefinition.components.schemas.ConsentCreation.example = examples.CONSENT_CREATION_MESSAGE;
 swaggerDefinition.components.schemas.CommunicationCreation.example =
-  examples.COMMUNICATION_CREATION_MESSAGE;
+  apiExamples.COMMUNICATION_INGESTION_MESSAGE_EXAMPLE;
 swaggerDefinition.components.schemas.RelatedPersonCreation.example =
   examples.FAMILY_MEMBER_RELATIONSHIP_MESSAGE;
 swaggerDefinition.components.schemas.ObservationCreation.example =
@@ -57,7 +58,7 @@ swaggerDefinition.components.examples.CustomerOnboardingPlaintextMessage.value =
 swaggerDefinition.components.examples.ConsentCreationPlaintextMessage.value =
   examples.CONSENT_CREATION_MESSAGE;
 swaggerDefinition.components.examples.CommunicationCreationPlaintextMessage.value =
-  examples.COMMUNICATION_CREATION_MESSAGE;
+  apiExamples.COMMUNICATION_INGESTION_MESSAGE_EXAMPLE;
 swaggerDefinition.components.examples.CompositionUpdatePlaintextMessage.value =
   examples.COMPOSITION_UPDATE_MESSAGE;
 swaggerDefinition.components.examples.ResearchCompositionIngestionPlaintextMessage.value =

@@ -25,6 +25,14 @@ function createWellKnownDidServices(did: string, baseUrl: string): DidService[] 
   ];
 }
 
+function stripTrailingSlash(url: string): string {
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+}
+
+function buildTenantContextPath(tenantContext: { alternateName: string; jurisdiction: string; version: string; sector: string; }): string {
+  return `${tenantContext.alternateName}/cds-${tenantContext.jurisdiction}/${tenantContext.version}/${tenantContext.sector}`;
+}
+
 /**
  * Assembles the final `service` array for a public DID Document by "multiplexing"
  * the internal service configuration into multiple, discrete public endpoints.
@@ -42,17 +50,21 @@ function createWellKnownDidServices(did: string, baseUrl: string): DidService[] 
  */
 export function populateDidDocumentServices(
   did: string,
-  baseUrl: string,
+  publicBaseUrl: string,
   businessServicesConfig: DidService[],
   isHosted: boolean,
-  tenantContext: { alternateName: string; jurisdiction: string; version: string; sector: string; }
+  tenantContext: { alternateName: string; jurisdiction: string; version: string; sector: string; },
+  operationalBaseUrl?: string,
 ): DidService[] {
-  
+  const normalizedPublicBaseUrl = stripTrailingSlash(publicBaseUrl);
+  const normalizedOperationalBaseUrl = stripTrailingSlash(operationalBaseUrl || publicBaseUrl);
+  const contextualPath = isHosted ? buildTenantContextPath(tenantContext) : '';
+
   // For hosted tenants, the well-known endpoints are at the root of their full contextual path.
   // For own-domain tenants, they are at the root of their domain.
   const wellKnownBaseUrl = isHosted
-    ? `${baseUrl}/${tenantContext.alternateName}/cds-${tenantContext.jurisdiction}/${tenantContext.version}/${tenantContext.sector}`
-    : baseUrl;
+    ? `${normalizedPublicBaseUrl}/${contextualPath}`
+    : normalizedPublicBaseUrl;
 
   // 1. Create the standard, W3C-compliant well-known services.
   const wellKnownServices = createWellKnownDidServices(did, wellKnownBaseUrl);
@@ -104,12 +116,11 @@ export function populateDidDocumentServices(
 
         let serviceEndpointUrl: string;
         if (isHosted) {
-          // A hosted tenant's URL is fully contextual.
-          const contextualPath = `${tenantContext.alternateName}/cds-${tenantContext.jurisdiction}/${tenantContext.version}/${tenantContext.sector}`;
-          serviceEndpointUrl = `${baseUrl}/${contextualPath}/${functionalPath}`;
+          // A hosted tenant's public DID may resolve on one domain while the callable API lives on another.
+          serviceEndpointUrl = `${normalizedOperationalBaseUrl}/${contextualPath}/${functionalPath}`;
         } else {
           // An own-domain tenant's URL is simple and functional.
-          serviceEndpointUrl = `${baseUrl}/${functionalPath}`;
+          serviceEndpointUrl = `${normalizedOperationalBaseUrl}/${functionalPath}`;
         }
 
         // Return the final, public service object.

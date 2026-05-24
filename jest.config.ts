@@ -66,8 +66,8 @@ const config: JestConfigWithTsJest = {
   // Jest/ts-jest resolves TS sources directly, so we strip the .js extension for relative imports.
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
-    '^gdc-common-utils-ts$': '<rootDir>/node_modules/gdc-common-utils-ts/dist/index.js',
-    '^gdc-common-utils-ts/(.*)$': '<rootDir>/node_modules/gdc-common-utils-ts/dist/$1.js',
+    '^gdc-common-utils-ts$': '<rootDir>/../gdc-common-utils-ts/dist/index.js',
+    '^gdc-common-utils-ts/(.*)$': '<rootDir>/../gdc-common-utils-ts/dist/$1.js',
     '^gdc-sdk-client-ts$': '<rootDir>/node_modules/gdc-sdk-client-ts/dist/index.js',
     '^gdc-sdk-client-ts/(.*)$': '<rootDir>/node_modules/gdc-sdk-client-ts/dist/$1.js',
     '^@noble/post-quantum/ml-dsa$': '@noble/post-quantum/ml-dsa.js',

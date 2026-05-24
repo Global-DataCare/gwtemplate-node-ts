@@ -241,6 +241,69 @@ export const ORGANIZATION_ORDER_RESPONSE = {
   }
 };
 
+/**
+ * @see API_INTEGRATORS_GUIDE.md section 6.2
+ * Canonical ICA-first activation request.
+ *
+ * Contract priority:
+ * - `vp_token` is the canonical proof carrier and should embed the ICA evidence
+ * - `controller.*` is explicit public key binding material for controller/person DID bootstrap
+ * - `organizationCredential` / `representativeCredential` are deprecated compatibility fields
+ */
+export const ORGANIZATION_ACTIVATION_REQUEST = {
+  "jti": "org-activation-request-<test-id>",
+  "thid": "org-activation-thread-<test-id>",
+  "iss": "did:web:controller.example.org",
+  "aud": "did:web:host.example.com",
+  "exp": 1678886460,
+  "iat": 1678886400,
+  "nbf": 1678886400,
+  "type": "application/api+json",
+  "body": {
+    "vp_token": "<ica-proof-token>",
+    "controller": {
+      "did": "did:web:people.acme.org:controllers:primary",
+      "sameAs": "mailto:controller@acme.org",
+      "publicKeyJwk": {
+        "kid": "controller-es384-001",
+        "kty": "EC",
+        "crv": "P-384",
+        "x": "<x>",
+        "y": "<y>",
+        "alg": "ES384",
+        "use": "sig"
+      },
+      "jwks": {
+        "keys": [
+          {
+            "kid": "controller-didcomm-enc-001",
+            "kty": "EC",
+            "crv": "P-384",
+            "x": "<enc-x>",
+            "y": "<enc-y>",
+            "use": "enc",
+            "purposes": ["didcomm-enc"]
+          }
+        ]
+      }
+    },
+    "organizationCredential": "<deprecated-legacy-compat>",
+    "representativeCredential": "<deprecated-legacy-compat>",
+    "data": [{
+      "type": "Organization-activation-request-v1.0",
+      "meta": {
+        "claims": {
+          "@context": "org.schema",
+          "@type": "template",
+          ...testClaimsRegisterTenantExpanded,
+          "org.schema.Service.termsOfService": pdfEmbeddedData
+        }
+      }
+    }]
+  },
+  "meta": { ...metaRequestBodyFullJWK }
+};
+
 // --- Async Polling (HTTP-level payloads) ---
 
 export const ASYNC_POLL_REQUEST = {
@@ -313,7 +376,7 @@ export const ASYNC_POLL_SECURE_RESPONSE_FORM = {
  * The inner body of a Device Registration (DCR) request.
  */
 export const DCR_REQUEST_BODY = {
-  "application_type": "native",
+  "application_type": "web",
   "client_name": "App for [email] as [role] on [iOS, Android, Web]",
   "code": "00000000-0000-0000-0000-000000000000",
   "redirect_uris": ["myapp://callback"],
@@ -448,7 +511,7 @@ export const LICENSE_ISSUE_REQUEST = {
             '@context': 'org.schema',
             '@type': 'IndividualProduct:Issue',
             'org.schema.Person.email': 'doctor1@acme.org',
-            'org.schema.Person.hasOccupation': 'ISCO-08|2211',
+            'org.schema.Person.hasOccupation.identifier.value': 'ISCO-08|2211',
             'org.schema.IndividualProduct.category': 'professional',
             'org.schema.IndividualProduct.additionalType': 'mobile',
           },
@@ -477,7 +540,7 @@ export const LICENSE_ISSUE_EXISTING_EMPLOYEE_REQUEST = {
             '@context': 'org.schema',
             '@type': 'IndividualProduct:Issue',
             'org.schema.Person.email': 'admin1@acme.org',
-            'org.schema.Person.hasOccupation': 'ISCO-08|1120',
+            'org.schema.Person.hasOccupation.identifier.value': 'ISCO-08|1120',
             'org.schema.IndividualProduct.category': 'professional',
             'org.schema.IndividualProduct.additionalType': 'mobile',
           },
@@ -528,7 +591,7 @@ export const EMPLOYEE_REGISTRATION_REQUEST = {
       "meta": {
         "claims": {
           "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-          "org.schema.Person.hasOccupation": "ISCO-08|4226",
+          "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
           "org.schema.Person.email": "receptionist1@acme.org"
         }
       }
@@ -707,7 +770,7 @@ export const COMMUNICATION_CREATION_MESSAGE = {
         claims: {
           "@context": "org.hl7.fhir.api",
           "@type": "Communication:Appointment",
-          "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|appointment-reminder",
+          "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|reminder",
           "Communication.content-attachment-data": "QkVHSU4...5EQVI=",
           "Communication.content-attachment-title": "appointment-details.ics",
           "Communication.content-attachment-type": "text/calendar",
@@ -730,7 +793,7 @@ export const COMMUNICATION_CREATION_MESSAGE = {
         partOf: [{ reference: "urn:uuid:communication-channel-id" }],
         category: [{
           coding: [{
-            code: "appointment-reminder",
+            code: "reminder",
             system: "http://terminology.hl7.org/CodeSystem/communication-category"
           }]
         }],

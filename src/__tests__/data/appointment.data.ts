@@ -48,7 +48,7 @@ export const testCommunicationAppointmentFhirR4 = {
             "coding": [
                 {
                     "system": "http://terminology.hl7.org/CodeSystem/communication-category",
-                    "code": "appointment-reminder"
+                    "code": "reminder"
                 }
             ]
         }
@@ -79,7 +79,7 @@ export const testCommMsgExtAppointmentRequest = {
   "from": testTenant1DidWebExternal,
   "sub": testExamplesDidWeb.customer,
   "nbf": 1729002600,
-  "category": "http://terminology.hl7.org/CodeSystem/communication-category|appointment-reminder",
+  "category": "http://terminology.hl7.org/CodeSystem/communication-category|reminder",
   // "note": [{ "text": "This is your new appointment. Best regards." }],
   "body": {
     "data": [

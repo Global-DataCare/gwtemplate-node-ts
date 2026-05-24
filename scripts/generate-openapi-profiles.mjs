@@ -99,6 +99,7 @@ const CORE_FLOW_DESCRIPTION_OVERRIDES = {
 function deriveSpec(spec, targetProfile) {
   const clone = structuredClone(spec);
   const kept = {};
+  const collected = new Map();
 
   for (const [p, item] of Object.entries(clone.paths || {})) {
     const profile = classifyPath(p);
@@ -124,6 +125,15 @@ function deriveSpec(spec, targetProfile) {
             if (baseSummary && !baseSummary.startsWith(`[Step ${step}]`)) {
               op.summary = `[Step ${step}] ${baseSummary}`;
             }
+            const stepLead = `[Step ${step}]`;
+            const baseDescription = String(op.description || '').trim();
+            if (!baseDescription) {
+              op.description = stepLead;
+            } else if (
+              !baseDescription.startsWith(stepLead)
+            ) {
+              op.description = `${stepLead}\n\n${baseDescription}`;
+            }
           }
           const override = CORE_FLOW_DESCRIPTION_OVERRIDES[p];
           if (override) {
@@ -133,11 +143,31 @@ function deriveSpec(spec, targetProfile) {
         }
       }
     }
-    kept[p] = item;
+    collected.set(p, item);
+  }
+
+  if (targetProfile === 'core') {
+    for (const p of CORE_FLOW_PATHS) {
+      if (collected.has(p)) kept[p] = collected.get(p);
+    }
+  } else {
+    for (const [p, item] of collected.entries()) {
+      kept[p] = item;
+    }
   }
 
   clone.paths = kept;
   clone.info = clone.info || {};
+  if (targetProfile === 'core') {
+    clone.info.title = 'Gateway API - SEDIA CORE';
+    clone.info.description = 'SEDIA CORE API documentation for the secure gateway canonical flow.';
+  } else if (targetProfile === 'compat') {
+    clone.info.title = 'Gateway API - COMPAT';
+    clone.info.description = 'Compatibility profile including legacy and alias routes on top of the core flow.';
+  } else if (targetProfile === 'extension') {
+    clone.info.title = 'Gateway API - EXTENSIONS';
+    clone.info.description = 'Extension profile including non-core and vertical-specific capabilities on top of core and compat.';
+  }
   clone.info['x-profile-generated-at'] = new Date().toISOString();
   clone.info['x-profile-name'] = targetProfile;
   if (targetProfile === 'core') {

@@ -1,6 +1,6 @@
 // src/managers/ConsentManager.ts
 
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { BundleEntryRequest, BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { ConsentRule, ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
@@ -12,7 +12,6 @@ import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { buildConsentRuleKey, hashConsentRuleId } from '../utils/consent';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { getTenantVaultId } from '../utils/tenant';
-import { getIndividualSectionId } from '../utils/individual-sections';
 import {
   extractLedgerSafeResearchTags,
   normalizeFhirIngestionFormat,
@@ -22,23 +21,12 @@ import { IJobProcessor } from './registry';
 import { determineResourceId } from '../utils/resource';
 import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
+import { persistConsentRuleAndAttachment, requiredConsentClaims } from '../utils/consent-storage';
 
 export interface ConsentManagerDeps {
   vaultRepository: IVaultRepository;
   blockchainAdapter?: IBlockchainAdapter;
 }
-
-const requiredClaims = [
-  ClaimConsent.decision,
-  ClaimConsent.subject,
-  ClaimConsent.identifier,
-  ClaimConsent.date,
-  ClaimConsent.purpose,
-  ClaimConsent.action,
-  ClaimConsent.actorRole,
-  ClaimConsent.attachmentContentType,
-  ClaimConsent.attachmentData,
-];
 
 export class ConsentManager implements IJobProcessor {
   private readonly vaultRepository: IVaultRepository;
@@ -99,89 +87,23 @@ export class ConsentManager implements IJobProcessor {
               resourceId: fallbackId,
             });
 
-            // Backward/forward compatibility:
-            // - Support `Consent.actor-reference` as an alias of `Consent.actor-identifier`.
-            const actorIdentifier =
-              getClaimValue<string>(claims, ClaimConsent.actorIdentifier) ??
-              getClaimValue<string>(claims, 'Consent.actor-reference');
-            if (actorIdentifier) {
-              const context = claims['@context'];
-              if (typeof context === 'string' && context.length > 0) {
-                const prefixedKey = context.endsWith('.')
-                  ? `${context}${ClaimConsent.actorIdentifier}`
-                  : `${context}.${ClaimConsent.actorIdentifier}`;
-                if (claims[prefixedKey] === undefined) claims[prefixedKey] = actorIdentifier;
-              } else if (claims[ClaimConsent.actorIdentifier] === undefined) {
-                claims[ClaimConsent.actorIdentifier] = actorIdentifier;
-              }
-            }
-
-            for (const claimKey of requiredClaims) {
+            for (const claimKey of requiredConsentClaims) {
                 if (!getClaimValue(claims, claimKey)) {
                     throw new Error(`Missing required claim: ${claimKey}`);
                 }
             }
-            if (!actorIdentifier) {
-              throw new Error(`Missing required claim: ${ClaimConsent.actorIdentifier}`);
-            }
-
-            const subjectId = getClaimValue<string>(claims, ClaimConsent.subject);
-            if (!subjectId) throw new Error(`Missing required claim: ${ClaimConsent.subject}`);
-            const ruleKey = buildConsentRuleKey({
-              subjectId: subjectId,
-              sector: job.sector as string,
-              target: actorIdentifier,
-              decision: getClaimValue<string>(claims, ClaimConsent.decision) as string,
-              purpose: getClaimValue<string>(claims, ClaimConsent.purpose) as string,
-            });
-            const ruleId = hashConsentRuleId(ruleKey);
             const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
-            const individualRulesSectionId = getIndividualSectionId(subjectId, 'rules');
 
             const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
             if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
-            // 1. Handle the attachment
-            const attachmentDataBase64 = getClaimValue<string>(claims, ClaimConsent.attachmentData);
-            if (!attachmentDataBase64) { throw new Error('Attachment data is missing.'); }
-            const decodedData = Buffer.from(attachmentDataBase64, 'base64');
-            const attachmentHash = createHash('sha3-384').update(decodedData).digest('hex');
-
-            const attachmentRecord: RecordBase & { data: string; contentType: string } = {
-                id: attachmentHash,
-                data: attachmentDataBase64,
-                contentType: getClaimValue<string>(claims, ClaimConsent.attachmentContentType) as string,
-            };
-
-            await this.vaultRepository.put(
-                tenantVaultId,
-                [attachmentRecord],
-                getIndividualSectionId(subjectId, 'attachments')
-            );
-
-            // 2. Create and store the rule
-            const ruleToStore: Record<string, any> = { ...claims };
-            const context = ruleToStore['@context'];
-            if (typeof context === 'string' && context.length > 0) {
-              const prefix = context.endsWith('.') ? context : `${context}.`;
-              delete ruleToStore[`${prefix}${ClaimConsent.attachmentData}`];
-              delete ruleToStore[`${prefix}Consent.actor-reference`];
-              ruleToStore[`${prefix}${ClaimConsent.attachmentId}`] = attachmentHash;
-            }
-            delete ruleToStore[ClaimConsent.attachmentData];
-            delete ruleToStore['Consent.actor-reference'];
-            ruleToStore[ClaimConsent.attachmentId] = attachmentHash;
-
-            const consentRule: ConsentRule & RecordBase = {
-              ...(ruleToStore as any),
-              id: ruleId,
-            };
-            if (researchTags && researchTags.length > 0) {
-              (consentRule as any).meta = { tag: researchTags };
-              (consentRule as any).tag = researchTags;
-            }
-
-            await this.vaultRepository.put(tenantVaultId, [consentRule], individualRulesSectionId);
+            await persistConsentRuleAndAttachment({
+              vaultRepository: this.vaultRepository,
+              tenantVaultId,
+              sector: job.sector as string,
+              claims,
+              researchTags,
+            });
             if (versioning.mapping) cidMappings.push(versioning.mapping);
 
             const responseAction = `${normalizedAction}-response`;

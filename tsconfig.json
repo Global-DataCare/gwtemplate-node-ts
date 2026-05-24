@@ -13,6 +13,12 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "gdc-common-utils-ts": ["../gdc-common-utils-ts/dist/index.d.ts"],
+      "gdc-common-utils-ts/constants": ["../gdc-common-utils-ts/dist/constants/index.d.ts"],
+      "gdc-common-utils-ts/*": ["../gdc-common-utils-ts/dist/*"]
+    },
     "typeRoots": [
       "./src/types",
       "./node_modules/@types"

@@ -21,7 +21,17 @@ Short coverage summary for memory/thesis justification:
 - Poll: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
 - SDK method: `activateOrganizationInGatewayFromIcaProof(...)`
 - Required proof input: `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP)
-- `organizationCredential` / `representativeCredential` side-fields are legacy compatibility only; canonical proof is VP payload.
+- Canonical proof is `body.vp_token`.
+- `organizationCredential` / `representativeCredential` are deprecated legacy compatibility side-fields and must not be treated as the primary proof contract.
+- Optional explicit controller binding input for immediate person-DID publication:
+  - `body.controller.did`
+  - `body.controller.sameAs`
+  - `body.controller.publicKeyJwk`
+  - `body.controller.jwks`
+- Runtime rule:
+  - organization/provider DID publication uses GW/operator transport keys and real `serviceEndpoint` URLs
+  - controller person DID publication uses explicit controller key material when provided
+  - DIDComm `meta.jws.protected.jwk` / `meta.jwe.header.jwk` remain technical transport fallback, not the preferred person-key contract
 - Representative VC security linkage (enforced):
   - `credentialSubject.memberOf.taxID` must match organization credential tax ID.
   - `credentialSubject.hasOccupation.identifier.value` must be `RESPRSN` (Responsible Party). Legacy tokenized formats are normalized for compatibility.
@@ -40,6 +50,9 @@ exchanging the email-proof `id_token` for the `initial_access_token` required by
 `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr` (+ poll),
 binding wallet public key(s) to that license serial number and controller email before creating additional employees.
 - SDK method chain: `activateEmployeeDeviceWithActivationCode(...)`
+- DCR semantics in CORE:
+  - registers the technical client/device/app identity
+  - does not by itself publish or replace the human controller/professional DID document
 - Member DID format used in CORE: `did:web:<owner-did...>:member:<member-id>:<role>`
 - In CORE (SEDIA baseline), `<member-id>` is derived from email hash (multibase58/multihash profile).
 
@@ -55,6 +68,9 @@ Note:
 - Submit: `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent/_batch`
 - Poll: `.../Consent/_batch-response`
 - SDK method: `grantProfessionalAccessSimple(...)`
+- Follow-up authorization matrix task:
+  - [../../gdc-common-utils-ts/docs/consent-access-matrix-task.md](../../gdc-common-utils-ts/docs/consent-access-matrix-task.md)
+  - covers active consent aggregation, explicit deny precedence, controller views, permission-request communications, and final SMART scope evaluation
 
 6. SMART token with consent/scope enforcement
 - Submit: `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token`

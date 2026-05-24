@@ -57,4 +57,29 @@ describe('populateDidDocumentServices', () => {
     const licenseIssueService = allServices.find(s => s.id.endsWith('#identity:openid:license:_issue'));
     expect(licenseIssueService).toBeDefined();
   });
+
+  it('should keep public well-known urls separate from operational service endpoints', () => {
+    const did = 'did:web:public.acme-health.com';
+    const publicBaseUrl = 'https://public.acme-health.com';
+    const operationalBaseUrl = 'https://operator.gateway.net';
+    const businessConfig = initializeTenantServicesConfig(Sector.HEALTH_CARE);
+    const tenantContext = { alternateName: 'acme', jurisdiction: 'es', version: 'v1', sector: Sector.HEALTH_CARE };
+
+    const allServices = populateDidDocumentServices(
+      did,
+      publicBaseUrl,
+      businessConfig,
+      true,
+      tenantContext,
+      operationalBaseUrl,
+    );
+
+    const jwksService = allServices.find(s => s.id === `${did}#jwks`);
+    expect(jwksService?.serviceEndpoint).toBe('https://public.acme-health.com/acme/cds-es/v1/health-care/jwks.json');
+
+    const smartTokenService = allServices.find(s => s.id.endsWith('#identity:openid:smart:token'));
+    expect(smartTokenService?.serviceEndpoint).toBe(
+      'https://operator.gateway.net/acme/cds-es/v1/health-care/identity/openid/smart/token',
+    );
+  });
 });

@@ -545,7 +545,9 @@ export function createApiRouter(
    *       - production: `network`
    *
    *       Expected semantics:
-   *       - the controller submits ICA-derived proof, for example through a `vp_token`
+   *       - canonical proof input is `body.vp_token`; the ICA organization + representative evidence belongs there
+   *       - `body.controller.*` is the explicit controller key-binding contract inherited from the ICA model and is used when GW must publish/bootstrap the controller person DID
+   *       - `body.organizationCredential` / `body.representativeCredential` are deprecated compatibility fields and must not be treated as the canonical proof contract
    *       - the host validates the ICA proof and activates the tenant backend/connector
    *       - activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`
    *         (include that claim in `meta.claims` to size requested seats)

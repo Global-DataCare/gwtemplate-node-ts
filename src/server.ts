@@ -98,6 +98,13 @@ function loadSwaggerSpecFromDisk(): any {
 // Load pre-generated swagger spec once; /swagger-spec.json refreshes from disk on each request.
 let swaggerSpec: any = loadSwaggerSpecFromDisk();
 
+const OPENAPI_PROFILE_DOCS = [
+  { name: 'SEDIA CORE', url: '/artifacts/openapi-profiles/openapi-core.json' },
+  { name: 'COMPAT', url: '/artifacts/openapi-profiles/openapi-compat.json' },
+  { name: 'EXTENSIONS', url: '/artifacts/openapi-profiles/openapi-extension.json' },
+  { name: 'RUNTIME', url: '/swagger-spec.json' },
+];
+
 
 
 interface StartServerOptions {
@@ -354,7 +361,20 @@ async function startServer(options?: StartServerOptions) {
     });
   });
 
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(undefined, createApiDocsSetupOptions('/swagger-spec.json') as any));
+  app.use(
+    '/artifacts/openapi-profiles',
+    express.static(path.resolve(process.cwd(), 'artifacts', 'openapi-profiles'), {
+      setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store');
+      },
+    }),
+  );
+
+  app.use(
+    '/api-docs',
+    swaggerUi.serve,
+    swaggerUi.setup(undefined, createApiDocsSetupOptions('/swagger-spec.json', OPENAPI_PROFILE_DOCS) as any),
+  );
 
   const server =
     options?.listen === false

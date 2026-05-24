@@ -23,3 +23,8 @@ Version:
   - optional standalone signed-only request profile (DIDComm signed without encryption) if required by policy.
   - CBOR-based transport/profile option in addition to current FAPI JAR/JARM `request=<jws/jwe>` / `response=<jws/jwe>`.
   - keep compatibility matrix explicit by `SECURITY_MODE` (`strict|compat|demo`) and content-type.
+- [ ] Unify canonical API examples across GW, tests, scripts, and SDKs:
+  - keep request/response fixtures in shared JSON example files (single source of truth).
+  - tests and demo scripts should load fixtures and override only runtime fields (`thid`, `subject`, timestamps, ids).
+  - expose the same fixtures to SDK repositories to avoid contract drift.
+  - map fixtures to OpenAPI/docs generation so examples are test-proven.

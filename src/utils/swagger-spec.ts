@@ -9,6 +9,7 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
 
   // Same source of truth as docs/tests.
   const examples = await import('../__tests__/data/example-payloads');
+  const apiExamples = await import('../api-examples');
 
   swaggerDefinition.components.schemas.OrganizationRegistrationLegacy.example =
     examples.ORGANIZATION_REGISTRATION_REQUEST;
@@ -18,7 +19,7 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
     examples.CUSTOMER_ONBOARDING_MESSAGE;
   swaggerDefinition.components.schemas.ConsentCreation.example = examples.CONSENT_CREATION_MESSAGE;
   swaggerDefinition.components.schemas.CommunicationCreation.example =
-    examples.COMMUNICATION_CREATION_MESSAGE;
+    apiExamples.COMMUNICATION_INGESTION_MESSAGE_EXAMPLE;
   swaggerDefinition.components.schemas.RelatedPersonCreation.example =
     examples.FAMILY_MEMBER_RELATIONSHIP_MESSAGE;
   swaggerDefinition.components.schemas.ObservationCreation.example =
@@ -29,6 +30,8 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
 
   swaggerDefinition.components.examples.OrganizationRegistrationPlaintextMessage.value =
     examples.ORGANIZATION_REGISTRATION_REQUEST;
+  swaggerDefinition.components.examples.OrganizationActivationPlaintextMessage.value =
+    examples.ORGANIZATION_ACTIVATION_REQUEST;
   swaggerDefinition.components.examples.OrganizationOrderPlaintextMessage.value =
     examples.ORGANIZATION_ORDER_REQUEST;
   swaggerDefinition.components.examples.OrganizationOrderResponseBundle.value =
@@ -56,7 +59,7 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
   swaggerDefinition.components.examples.ConsentCreationPlaintextMessage.value =
     examples.CONSENT_CREATION_MESSAGE;
   swaggerDefinition.components.examples.CommunicationCreationPlaintextMessage.value =
-    examples.COMMUNICATION_CREATION_MESSAGE;
+    apiExamples.COMMUNICATION_INGESTION_MESSAGE_EXAMPLE;
   swaggerDefinition.components.examples.CompositionUpdatePlaintextMessage.value =
     examples.COMPOSITION_UPDATE_MESSAGE;
   swaggerDefinition.components.examples.ResearchCompositionIngestionPlaintextMessage.value =

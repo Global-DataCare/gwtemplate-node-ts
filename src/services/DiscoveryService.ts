@@ -5,7 +5,14 @@ import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { DidDocument } from '../gdc-backend-utils-node/models/did';
 import { JwkSet } from '../gdc-backend-utils-node/models/jwk';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
-import { getBaseUrlFromDidWeb } from '../utils/did-backend';
+
+function ensureTrailingSlash(url: string): string {
+  return url.endsWith('/') ? url : `${url}/`;
+}
+
+function resolveDidServiceEndpoint(didDoc: DidDocument, suffix: string): string | undefined {
+  return didDoc.service?.find((service) => service.id === `${didDoc.id}${suffix}`)?.serviceEndpoint as string | undefined;
+}
 
 /**
  * Handles the stateless, synchronous logic for generating public discovery documents
@@ -47,19 +54,22 @@ export class DiscoveryService {
   public async getOpenIdConfiguration(vaultId: string): Promise<object | undefined> {
     const didDoc = await this.tenantsCacheManager.getDidDocument(vaultId);
     const tenantUrl = await this.tenantsCacheManager.getTenantDomainUrl(vaultId);
+    const operationalUrl = await this.tenantsCacheManager.getTenantOperationalUrl(vaultId);
 
-    if (!didDoc || !tenantUrl) return undefined;
+    if (!didDoc || !tenantUrl || !operationalUrl) return undefined;
     
-    const jwksBaseUrl = getBaseUrlFromDidWeb(didDoc.id);
-    const jwks_uri = new URL('/.well-known/jwks.json', jwksBaseUrl).toString();
+    const jwks_uri = resolveDidServiceEndpoint(didDoc, '#jwks');
+    const didDocumentUrl = resolveDidServiceEndpoint(didDoc, '#did-document');
+    if (!jwks_uri || !didDocumentUrl) return undefined;
     
-    const credentialIssuer = new URL('/.well-known/openid-credential-issuer', tenantUrl).toString();
+    const credentialIssuer = new URL('.well-known/openid-credential-issuer', ensureTrailingSlash(tenantUrl)).toString();
     return {
       issuer: tenantUrl,
-      jwks_uri: jwks_uri,
+      jwks_uri,
+      did_document: didDocumentUrl,
       credential_issuer: credentialIssuer,
-      authorization_endpoint: new URL('/identity/oidc/authorize', tenantUrl).toString(),
-      token_endpoint: new URL('/identity/oidc/token', tenantUrl).toString(),
+      authorization_endpoint: new URL('identity/oidc/authorize', ensureTrailingSlash(operationalUrl)).toString(),
+      token_endpoint: new URL('identity/oidc/token', ensureTrailingSlash(operationalUrl)).toString(),
       response_types_supported: ['code', 'vp_token'],
       grant_types_supported: ['authorization_code'],
       request_object_signing_alg_values_supported: ['ES256', 'ES384', 'ML-DSA-44'],
@@ -75,16 +85,17 @@ export class DiscoveryService {
    */
   public async getOpenIdCredentialIssuerMetadata(vaultId: string): Promise<object | undefined> {
     const tenantUrl = await this.tenantsCacheManager.getTenantDomainUrl(vaultId);
+    const operationalUrl = await this.tenantsCacheManager.getTenantOperationalUrl(vaultId);
     const tenantConfig = await this.tenantsCacheManager.getTenant(vaultId);
-    if (!tenantUrl) return undefined;
+    if (!tenantUrl || !operationalUrl) return undefined;
 
     const legacyAlg = tenantConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG;
     const algValues = ['ML-DSA-44', ...(legacyAlg ? [legacyAlg] : [])];
 
     return {
       credential_issuer: tenantUrl,
-      credential_endpoint: new URL('/identity/oidc/credential', tenantUrl).toString(),
-      deferred_credential_endpoint: new URL('/identity/oidc/credential/deferred', tenantUrl).toString(),
+      credential_endpoint: new URL('identity/oidc/credential', ensureTrailingSlash(operationalUrl)).toString(),
+      deferred_credential_endpoint: new URL('identity/oidc/credential/deferred', ensureTrailingSlash(operationalUrl)).toString(),
       credential_signing_alg_values_supported: algValues,
       credentials_supported: [
         {
@@ -102,10 +113,12 @@ export class DiscoveryService {
    */
   public async getSmartConfiguration(vaultId: string): Promise<object | undefined> {
     const tenantUrl = await this.tenantsCacheManager.getTenantDomainUrl(vaultId);
-    if (!tenantUrl) return undefined;
+    const operationalUrl = await this.tenantsCacheManager.getTenantOperationalUrl(vaultId);
+    if (!tenantUrl || !operationalUrl) return undefined;
 
     return {
       issuer: tenantUrl,
+      token_endpoint: new URL('identity/openid/smart/token', ensureTrailingSlash(operationalUrl)).toString(),
       // Additional SMART on FHIR metadata would be populated here.
     };
   }

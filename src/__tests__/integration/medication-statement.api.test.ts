@@ -1,6 +1,7 @@
 import { invokeExpress } from './helpers/invokeExpress';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { HealthcareBasicSections } from '../../shared/healthcare-constants';
 import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
 import { initializeTenantServicesConfig } from '../../utils/services';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
@@ -71,14 +72,22 @@ describe('MedicationStatement API (integration)', () => {
               id: 'ips-composition-001',
               status: 'final',
               type: {
-                coding: [{ system: 'http://loinc.org', code: '60591-5', display: 'Patient summary Document' }],
+                coding: [{
+                  system: HealthcareBasicSections.PatientSummaryDocument.system,
+                  code: HealthcareBasicSections.PatientSummaryDocument.code,
+                  display: 'Patient summary Document',
+                }],
               },
               subject: { reference: subjectDid },
               date: '2026-05-22T10:00:00Z',
               title: 'IPS Medication Summary',
               section: [
                 {
-                  code: { coding: [{ system: 'http://loinc.org', code: '10160-0', display: 'History of Medication Use' }] },
+                  code: { coding: [{
+                    system: HealthcareBasicSections.HistoryOfMedicationUse.system,
+                    code: HealthcareBasicSections.HistoryOfMedicationUse.code,
+                    display: 'History of Medication Use',
+                  }] },
                   entry: [{ reference: 'urn:uuid:medication-001' }],
                 },
               ],
@@ -99,6 +108,24 @@ describe('MedicationStatement API (integration)', () => {
         ],
       };
       const documentBundleB64 = Buffer.from(JSON.stringify(documentBundle), 'utf8').toString('base64');
+      const embeddedDocumentReference = {
+        resourceType: 'DocumentReference',
+        id: 'ips-document-reference-001',
+        subject: { reference: subjectDid },
+        date: '2026-05-22T10:00:00Z',
+        description: 'IPS Medication Summary',
+        identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:ips-document-reference-001' }],
+        content: [
+          {
+            attachment: {
+              contentType: 'application/fhir+json',
+              title: 'ips-medications.json',
+              data: documentBundleB64,
+            },
+          },
+        ],
+      };
+      const embeddedDocumentReferenceB64 = Buffer.from(JSON.stringify(embeddedDocumentReference), 'utf8').toString('base64');
 
       const thidBatch = 'communication-medication-batch-001';
       const submitResp = await invokeExpress(app, {
@@ -118,7 +145,7 @@ describe('MedicationStatement API (integration)', () => {
                     '@context': 'org.hl7.fhir.r4',
                     'Communication.subject': subjectDid,
                     'Communication.sent': '2026-05-22T10:00:00Z',
-                    'Composition.section': 'LOINC|10160-0',
+                    'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.claim,
                   },
                 },
                 resource: {
@@ -130,8 +157,8 @@ describe('MedicationStatement API (integration)', () => {
                     {
                       contentAttachment: {
                         contentType: 'application/fhir+json',
-                        title: 'ips-medications.json',
-                        data: documentBundleB64,
+                        title: 'ips-document-reference.json',
+                        data: embeddedDocumentReferenceB64,
                       },
                     },
                   ],
@@ -159,7 +186,7 @@ describe('MedicationStatement API (integration)', () => {
       }
 
       expect(batchPayload?.resourceType).toBe('Bundle');
-      expect(batchPayload?.data?.[0]?.response?.status).toBe('201');
+      expect(batchPayload?.data?.[0]?.response?.status).toBe('200');
 
       const thidSearch = 'medication-search-001';
       const searchResp = await invokeExpress(app, {
@@ -219,7 +246,7 @@ describe('MedicationStatement API (integration)', () => {
               {
                 request: {
                   method: 'GET',
-                  url: `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.section=${encodeURIComponent('LOINC|10160-0')}`,
+                  url: `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.section=${encodeURIComponent(HealthcareBasicSections.HistoryOfMedicationUse.claim)}`,
                 },
               },
             ],

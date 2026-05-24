@@ -15,7 +15,13 @@ describe('api-examples communication', () => {
   it('keeps claims aligned with payload-based Communication shape', () => {
     const claims: any = COMMUNICATION_INGESTION_ENTRY_EXAMPLE.resource.meta.claims;
     expect(claims['Communication.content-attachment-type']).toBe('application/fhir+json');
-    expect(claims['Communication.note']).toBe('IPS ingestion request');
+    expect(claims['Communication.note-text']).toBe('IPS ingestion request');
+  });
+
+  it('embeds a DocumentReference whose attachment carries the IPS bundle', () => {
+    const attachment: any = COMMUNICATION_INGESTION_ENTRY_EXAMPLE.resource.payload[0].contentAttachment;
+    const documentReference = JSON.parse(Buffer.from(attachment.data, 'base64').toString('utf8'));
+    expect(documentReference.resourceType).toBe('DocumentReference');
+    expect(documentReference.content[0].attachment.contentType).toBe('application/fhir+json');
   });
 });
-

@@ -13,6 +13,8 @@ import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 import { parseTenantUrn } from '../utils/urn';
 import { getEnvSectionId } from '../utils/section-env';
 
+const SERVICE_OPERATIONAL_URL_CLAIM = 'org.schema.Service.url';
+
 /**
  * An in-memory cache implementation of the Tenant Manager.
  * Its primary role is to load all tenant configurations at startup and provide
@@ -318,6 +320,29 @@ export class TenantsCacheManager implements ITenantsManager {
     if (externalUrl) {
       return externalUrl.startsWith('http') ? externalUrl : `https://${externalUrl}`;
     }
+    return await this.constructHostedUrl(tenantConfig);
+  }
+
+  /**
+   * Retrieves the operational base URL for a tenant.
+   * This URL is intended for direct API invocation (`didDocument.service[].serviceEndpoint`).
+   */
+  public async getTenantOperationalUrl(vaultId: string): Promise<string | undefined> {
+    if (vaultId === 'host') {
+      const hostDidDoc = await this.getDidDocument('host');
+      return hostDidDoc ? getBaseUrlFromDidWeb(hostDidDoc.id) : undefined;
+    }
+
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
+    if (!tenantConfig) {
+      return undefined;
+    }
+
+    const operationalUrl = tenantConfig.claims[SERVICE_OPERATIONAL_URL_CLAIM];
+    if (typeof operationalUrl === 'string' && operationalUrl.trim()) {
+      return operationalUrl.startsWith('http') ? operationalUrl : `https://${operationalUrl}`;
+    }
+
     return await this.constructHostedUrl(tenantConfig);
   }
 

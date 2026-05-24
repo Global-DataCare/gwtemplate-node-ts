@@ -1,7 +1,10 @@
 // src/managers/ApiDocsManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json'): any {
+export function createApiDocsSetupOptions(
+  swaggerSpecUrl = '/swagger-spec.json',
+  swaggerSpecUrls?: Array<{ url: string; name: string }>,
+): any {
   const globalContextScript = `
     (() => {
       const KEY_PREFIX = 'gw-api-docs:';
@@ -402,7 +405,14 @@ export function createApiDocsSetupOptions(swaggerSpecUrl = '/swagger-spec.json')
       }
     `,
     swaggerOptions: {
-      url: swaggerSpecUrl,
+      ...(Array.isArray(swaggerSpecUrls) && swaggerSpecUrls.length > 0
+        ? {
+            urls: swaggerSpecUrls,
+            urlsPrimaryName: swaggerSpecUrls[0]?.name,
+          }
+        : {
+            url: swaggerSpecUrl,
+          }),
       parameterMacro: (operation: any, parameter: any) => {
         const browser: any = globalThis as any;
         const key = 'gw-api-docs:' + String(parameter?.name || '');

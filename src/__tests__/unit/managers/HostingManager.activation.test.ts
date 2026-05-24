@@ -58,9 +58,42 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 };
 
 describe('HostingManager activation flow', () => {
+  const vpPayloadWithCredentials = {
+    sub: 'did:web:controller.example.com',
+    vp: {
+      verifiableCredential: [
+        {
+          '@context': ['https://www.w3.org/2018/credentials/v1'],
+          type: ['VerifiableCredential', 'OrganizationCredential'],
+          credentialSubject: {
+            id: 'did:web:api.acme.org',
+            taxID: 'VATES-B00112233',
+          },
+        },
+        {
+          '@context': ['https://www.w3.org/2018/credentials/v1'],
+          type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
+          credentialSubject: {
+            id: 'did:web:controller.example.com',
+            memberOf: {
+              taxID: 'VATES-B00112233',
+            },
+            hasOccupation: {
+              identifier: {
+                value: 'RESPRSN',
+              },
+            },
+            hasCredential: {
+              material: 'controller-sig-kid',
+            },
+          },
+        },
+      ],
+    },
+  };
   const vpTokenCompact = [
     Buffer.from(JSON.stringify({ alg: 'ML-DSA-44', typ: 'JWT' })).toString('base64url'),
-    Buffer.from(JSON.stringify({ sub: 'did:web:controller.example.com' })).toString('base64url'),
+    Buffer.from(JSON.stringify(vpPayloadWithCredentials)).toString('base64url'),
     'mock-signature',
   ].join('.');
 
@@ -273,6 +306,9 @@ describe('HostingManager activation flow', () => {
     );
     expect((proofDoc as any)?.content?.vp_token).toBe(vpTokenCompact);
     expect((proofDoc as any)?.content?.trustPolicy?.networkMode).toBe('test-network');
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('_activate received deprecated legacy compatibility field(s): organizationCredential, representativeCredential'),
+    );
   });
 
   it('should reject activation when vp_token is missing', async () => {
@@ -284,6 +320,123 @@ describe('HostingManager activation flow', () => {
 
     expect(errorEntry.response.status).toBe('400');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('vp_token');
+  });
+
+  it('should not warn about deprecated activation credential side-fields when only vp_token + controller.* are used', async () => {
+    const job = buildActivationJob();
+    delete (job.content!.body as any).organizationCredential;
+    delete (job.content!.body as any).representativeCredential;
+    (job.content!.body as any).controller = {
+      did: 'did:web:people.acme.org:controllers:primary',
+      publicKeyJwk: {
+        kid: 'explicit-controller-sig-kid',
+        kty: 'EC',
+        crv: 'P-384',
+        x: 'explicit-controller-sig-x',
+        y: 'explicit-controller-sig-y',
+        alg: 'ES384',
+        use: 'sig',
+      },
+      jwks: {
+        keys: [
+          {
+            kid: 'explicit-controller-enc-kid',
+            kty: 'EC',
+            crv: 'P-384',
+            x: 'explicit-controller-enc-x',
+            y: 'explicit-controller-enc-y',
+            use: 'enc',
+            purposes: ['didcomm-enc'],
+          },
+        ],
+      },
+    };
+
+    const responsePayload = await hostingManager.process(job);
+    expect(responsePayload.body.data[0].response.status).toBe('201');
+    expect(mockLogger.warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('_activate received deprecated legacy compatibility field(s):'),
+    );
+  });
+
+  it('should prefer explicit controller signing material over DIDComm transport metadata', async () => {
+    const fetchMock = jest.fn() as any;
+    fetchMock.mockResolvedValue({
+      status: 200,
+      ok: true,
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-type' ? 'application/json' : null),
+      },
+      json: async () => ({ status: 'approved' }),
+    });
+    global.fetch = fetchMock;
+    mockConfig.ica = {
+      mode: 'external',
+      externalUrl: 'https://ica.example.com',
+    };
+    hostingManager = new HostingManager(
+      vaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      mockConfig,
+    );
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await mockTenantsCacheManager.loadHost();
+
+    const job = buildActivationJob();
+    (job.content!.body as any).controller = {
+      did: 'did:web:people.acme.org:controllers:primary',
+      sameAs: 'mailto:controller@acme.org',
+      publicKeyJwk: {
+        kid: 'explicit-controller-sig-kid',
+        kty: 'EC',
+        crv: 'P-384',
+        x: 'explicit-controller-sig-x',
+        y: 'explicit-controller-sig-y',
+        alg: 'ES384',
+        use: 'sig',
+      },
+      jwks: {
+        keys: [
+          {
+            kid: 'explicit-controller-enc-kid',
+            kty: 'EC',
+            crv: 'P-384',
+            x: 'explicit-controller-enc-x',
+            y: 'explicit-controller-enc-y',
+            use: 'enc',
+            purposes: ['didcomm-enc'],
+          },
+        ],
+      },
+    };
+
+    const responsePayload = await hostingManager.process(job);
+    expect(responsePayload.body.data[0].response.status).toBe('201');
+
+    const claims = job.content!.body!.data[0]!.meta!.claims;
+    const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
+      ...claims,
+      [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
+    } as any);
+    const employeeDocs = await vaultRepository.getContainersInSection(
+      tenantCollectionName,
+      getEnvSectionId('employees'),
+    );
+    expect(employeeDocs.length).toBe(1);
+
+    const controllerDidDocument = (employeeDocs[0] as any).content?.didDocument;
+    expect(controllerDidDocument.id).toBe('did:web:people.acme.org:controllers:primary');
+    expect(controllerDidDocument.alsoKnownAs).toContain('mailto:controller@acme.org');
+    expect(controllerDidDocument.verificationMethod?.[0]?.publicKeyJwk?.kid).toBe('explicit-controller-sig-kid');
+    expect(controllerDidDocument.keyAgreement).toContain('did:web:people.acme.org:controllers:primary#explicit-controller-enc-kid');
+
+    const icaRequestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(icaRequestBody.controller.publicKeyJwk.kid).toBe('explicit-controller-sig-kid');
+    expect(icaRequestBody.controller.sameAs).toBe('mailto:controller@acme.org');
+    expect(icaRequestBody.controller.jwks.keys[0].kid).toBe('explicit-controller-enc-kid');
   });
 
   it('should poll ICA DID creation when remote endpoint responds 202', async () => {

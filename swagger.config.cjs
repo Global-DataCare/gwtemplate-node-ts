@@ -230,7 +230,7 @@ const swaggerDefinition = {
       OrganizationActivationPlaintextMessage: {
         summary: 'Plaintext Message for Organization Activation',
         description:
-          'A DIDComm-like message wrapper for `_activate`; proof is carried in `body.data[].vp_token` (or `body.data[].vp`).',
+          'A DIDComm-like message wrapper for `_activate`; canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields.',
         value: {},
       },
       OrganizationOrderPlaintextMessage: {

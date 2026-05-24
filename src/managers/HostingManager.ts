@@ -50,10 +50,20 @@ import { resolveIdentityChannel } from '../utils/ledger';
 import { slugFromDomain } from '../utils/slug';
 import { getEnvSectionId } from '../utils/section-env';
 import { ClearingHouseService, IClearingHouseService } from '../services/ClearingHouseService';
+import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
 import {
   DefaultActivationTrustAdapter,
   IActivationTrustAdapter,
 } from '../adapters/activation-trust.adapter';
+
+type ActivationParticipantMaterial = {
+  did?: string;
+  sameAs?: string;
+  publicKeyJwk?: PublicJwk;
+  jwks?: JwkSet;
+};
+
+type VpCredentialObject = Record<string, unknown>;
 
 /**
  * Manages the initial onboarding of new tenants onto the Gateway.
@@ -148,6 +158,88 @@ export class HostingManager {
       : undefined;
   }
 
+  private decodeVpTokenPayload(vpToken?: string): Record<string, any> | undefined {
+    const raw = String(vpToken || '').trim();
+    if (!raw) {
+      return undefined;
+    }
+    if (raw.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    const parts = raw.split('.');
+    if (parts.length !== 3 || !parts[1]) {
+      return undefined;
+    }
+    try {
+      const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf8');
+      const parsed = JSON.parse(payloadJson);
+      return parsed && typeof parsed === 'object' ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private decodeEmbeddedCredential(candidate: unknown): VpCredentialObject | undefined {
+    if (candidate && typeof candidate === 'object') {
+      return candidate as VpCredentialObject;
+    }
+    if (typeof candidate !== 'string') {
+      return undefined;
+    }
+    const raw = candidate.trim();
+    if (!raw) {
+      return undefined;
+    }
+    if (raw.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    const parts = raw.split('.');
+    if (parts.length !== 3 || !parts[1]) {
+      return undefined;
+    }
+    try {
+      const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf8');
+      const parsed = JSON.parse(payloadJson);
+      return parsed && typeof parsed === 'object' ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private credentialHasAnyType(credential: VpCredentialObject | undefined, acceptedTypes: string[]): boolean {
+    if (!credential) {
+      return false;
+    }
+    const typeRaw =
+      credential.type
+      || (credential as any)?.vc?.type
+      || (credential as any)?.credential?.type;
+    const types = Array.isArray(typeRaw) ? typeRaw.map(String) : [String(typeRaw || '')];
+    return acceptedTypes.some((type) => types.includes(type));
+  }
+
+  private extractCredentialFromVpToken(vpToken: string | undefined, acceptedTypes: string[]): VpCredentialObject | undefined {
+    const payload = this.decodeVpTokenPayload(vpToken);
+    const candidates = Array.isArray(payload?.vp?.verifiableCredential) ? payload.vp.verifiableCredential : [];
+    for (const candidate of candidates) {
+      const credential = this.decodeEmbeddedCredential(candidate);
+      if (this.credentialHasAnyType(credential, acceptedTypes)) {
+        return credential;
+      }
+    }
+    return undefined;
+  }
+
   private normalizeTenantPublicUrl(urlOrDomain?: string): string | undefined {
     if (!urlOrDomain || typeof urlOrDomain !== 'string') {
       return undefined;
@@ -161,47 +253,89 @@ export class HostingManager {
     return `https://${urlOrDomain}`;
   }
 
+  private normalizeTenantOperationalUrl(urlOrDomain?: string): string | undefined {
+    return this.normalizeTenantPublicUrl(urlOrDomain);
+  }
+
+  private getOperationalServiceBaseUrl(claims: ClaimsRecord, options?: { operationalTenantUrl?: string; publicTenantUrl?: string; }): string | undefined {
+    const serviceOperationalClaim = claims['org.schema.Service.url'] as string | undefined;
+    const explicitOperationalUrl = this.normalizeTenantOperationalUrl(
+      options?.operationalTenantUrl || serviceOperationalClaim,
+    );
+    if (explicitOperationalUrl) {
+      return explicitOperationalUrl;
+    }
+
+    const normalizedPublicUrl = this.normalizeTenantPublicUrl(
+      options?.publicTenantUrl || claims[ClaimsOrganizationSchemaorg.url] as string | undefined,
+    );
+    return normalizedPublicUrl;
+  }
+
+  private buildTenantAlsoKnownAs(params: {
+    tenantUrn: string;
+    primaryDid: string;
+    externalDid?: string;
+    hostedDid: string;
+    publicTenantUrl?: string;
+    hostedPublicUrl?: string;
+  }): string[] {
+    const aliases = [
+      params.tenantUrn,
+      params.publicTenantUrl,
+      params.externalDid && params.primaryDid !== params.externalDid ? params.externalDid : undefined,
+      params.hostedDid && params.primaryDid !== params.hostedDid ? params.hostedDid : undefined,
+      params.hostedPublicUrl && params.hostedPublicUrl !== params.publicTenantUrl ? params.hostedPublicUrl : undefined,
+    ].filter((value): value is string => Boolean(value));
+
+    return Array.from(new Set(aliases));
+  }
+
   private extractActivationMaterial(entry: BundleEntry, body: any) {
     const entryMeta = (entry?.meta || {}) as Record<string, any>;
     const entryResource = (entry?.resource || {}) as Record<string, any>;
+    const vpToken = body?.vp_token || entryMeta?.vp_token || entryResource?.vp_token;
+    const legacyOrganizationCredential =
+      body?.organizationCredential
+      || body?.organization_credential
+      || entryMeta?.organizationCredential
+      || entryMeta?.organization_credential
+      || entryResource?.organizationCredential
+      || entryResource?.organization_credential;
+    const legacyRepresentativeCredential =
+      body?.representativeCredential
+      || body?.representative_credential
+      || body?.legalRepresentativeCredential
+      || entryMeta?.representativeCredential
+      || entryMeta?.representative_credential
+      || entryMeta?.legalRepresentativeCredential
+      || entryResource?.representativeCredential
+      || entryResource?.representative_credential
+      || entryResource?.legalRepresentativeCredential;
+    const organizationCredential =
+      legacyOrganizationCredential
+      || this.extractCredentialFromVpToken(vpToken, ['OrganizationCredential', 'LegalOrganizationCredential']);
+    const representativeCredential =
+      legacyRepresentativeCredential
+      || this.extractCredentialFromVpToken(vpToken, ['LegalRepresentativeCredential', 'PersonCredential']);
     const primaryDid =
       entryResource?.didDocument?.id
       || entryResource?.organizationDid
       || entryResource?.organization_did
       || entryMeta?.organizationDid
       || entryMeta?.organization_did
-      || this.extractDidFromCredential(
-        body?.organizationCredential
-        || body?.organization_credential
-        || entryMeta?.organizationCredential
-        || entryMeta?.organization_credential
-        || entryResource?.organizationCredential
-        || entryResource?.organization_credential
-      );
+      || this.extractDidFromCredential(organizationCredential);
 
     return {
-      vpToken: body?.vp_token || entryMeta?.vp_token || entryResource?.vp_token,
+      vpToken,
       presentationSubmission:
         body?.presentation_submission
         || entryMeta?.presentation_submission
         || entryResource?.presentation_submission,
-      organizationCredential:
-        body?.organizationCredential
-        || body?.organization_credential
-        || entryMeta?.organizationCredential
-        || entryMeta?.organization_credential
-        || entryResource?.organizationCredential
-        || entryResource?.organization_credential,
-      representativeCredential:
-        body?.representativeCredential
-        || body?.representative_credential
-        || body?.legalRepresentativeCredential
-        || entryMeta?.representativeCredential
-        || entryMeta?.representative_credential
-        || entryMeta?.legalRepresentativeCredential
-        || entryResource?.representativeCredential
-        || entryResource?.representative_credential
-        || entryResource?.legalRepresentativeCredential,
+      organizationCredential,
+      representativeCredential,
+      legacyOrganizationCredential,
+      legacyRepresentativeCredential,
       primaryDid,
       publicTenantUrl:
         entryResource?.organizationUrl
@@ -211,7 +345,95 @@ export class HostingManager {
         || (typeof primaryDid === 'string' && primaryDid.startsWith('did:web:')
           ? getBaseUrlFromDidWeb(primaryDid)
           : undefined),
+      organizationBinding: this.extractActivationParticipantMaterial(
+        body?.organization,
+        entryMeta?.organization,
+        entryResource?.organization,
+        {
+          did: entryResource?.organizationDid || entryResource?.organization_did || entryMeta?.organizationDid || entryMeta?.organization_did,
+          publicKeyJwk:
+            entryResource?.organizationPublicKeyJwk
+            || entryMeta?.organizationPublicKeyJwk
+            || body?.organizationPublicKeyJwk,
+          jwks:
+            entryResource?.organizationJwks
+            || entryMeta?.organizationJwks
+            || body?.organizationJwks,
+        },
+      ),
+      controllerBinding: this.extractActivationParticipantMaterial(
+        body?.controller,
+        entryMeta?.controller,
+        entryResource?.controller,
+        {
+          did:
+            entryResource?.controllerDid
+            || entryResource?.controller_did
+            || entryMeta?.controllerDid
+            || entryMeta?.controller_did
+            || body?.controllerDid,
+          sameAs:
+            entryResource?.controllerSameAs
+            || entryMeta?.controllerSameAs
+            || body?.controllerSameAs,
+          publicKeyJwk:
+            entryResource?.controllerPublicKeyJwk
+            || entryMeta?.controllerPublicKeyJwk
+            || body?.controllerPublicKeyJwk,
+          jwks:
+            entryResource?.controllerJwks
+            || entryMeta?.controllerJwks
+            || body?.controllerJwks,
+        },
+      ),
     };
+  }
+
+  private extractActivationParticipantMaterial(...candidates: Array<any>): ActivationParticipantMaterial | undefined {
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate !== 'object') {
+        continue;
+      }
+      const did = typeof candidate.did === 'string'
+        ? candidate.did
+        : typeof candidate.identifier === 'string'
+          ? candidate.identifier
+          : undefined;
+      const sameAs = typeof candidate.sameAs === 'string' ? candidate.sameAs : undefined;
+      const publicKeyJwk = candidate.publicKeyJwk && typeof candidate.publicKeyJwk === 'object'
+        ? candidate.publicKeyJwk as PublicJwk
+        : undefined;
+      const jwks = Array.isArray(candidate.jwks?.keys)
+        ? { keys: candidate.jwks.keys as any[] }
+        : undefined;
+
+      if (did || sameAs || publicKeyJwk || jwks) {
+        return {
+          ...(did ? { did } : {}),
+          ...(sameAs ? { sameAs } : {}),
+          ...(publicKeyJwk ? { publicKeyJwk } : {}),
+          ...(jwks ? { jwks } : {}),
+        };
+      }
+    }
+    return undefined;
+  }
+
+  private warnOnLegacyActivationCredentialFields(activation: {
+    legacyOrganizationCredential?: any;
+    legacyRepresentativeCredential?: any;
+  }): void {
+    const usedLegacyFields = [
+      activation.legacyOrganizationCredential ? 'organizationCredential' : undefined,
+      activation.legacyRepresentativeCredential ? 'representativeCredential' : undefined,
+    ].filter((value): value is string => Boolean(value));
+    if (!usedLegacyFields.length) {
+      return;
+    }
+    this.logger.warn?.(
+      `[HostingManager] _activate received deprecated legacy compatibility field(s): ${usedLegacyFields.join(', ')}. `
+      + 'Canonical proof must be carried in vp_token; controller.* is the explicit controller key-binding contract.',
+    );
   }
 
   private getIcaDidCreateUrl(): string | undefined {
@@ -267,6 +489,8 @@ export class HostingManager {
     representativeCredential: any;
     organizationDidDocument: DidDocument;
     controllerDidDocument: DidDocument;
+    organizationBinding?: ActivationParticipantMaterial;
+    controllerBinding?: ActivationParticipantMaterial;
   }): Promise<any | undefined> {
     const url = this.getIcaDidCreateUrl();
     if (!url) {
@@ -300,12 +524,15 @@ export class HostingManager {
           did: params.organizationDidDocument.id,
           didDocument: params.organizationDidDocument,
           publicKeyJwk: organizationSigningKey,
+          ...(params.organizationBinding?.jwks ? { jwks: params.organizationBinding.jwks } : {}),
         },
         controller: {
           credential: params.representativeCredential,
           did: params.controllerDidDocument.id,
           didDocument: params.controllerDidDocument,
           publicKeyJwk: controllerSigningKey,
+          ...(params.controllerBinding?.sameAs ? { sameAs: params.controllerBinding.sameAs } : {}),
+          ...(params.controllerBinding?.jwks ? { jwks: params.controllerBinding.jwks } : {}),
         },
       }),
     });
@@ -348,11 +575,60 @@ export class HostingManager {
     return { signerJwk, encrypterJwk };
   }
 
+  private findJwkByUse(jwks: JwkSet | undefined, use: 'sig' | 'enc'): PublicJwk | undefined {
+    if (!jwks?.keys?.length) {
+      return undefined;
+    }
+    return jwks.keys.find((key: any) => use === 'sig' ? this.isSignatureJwk(key) : this.isEncryptionJwk(key)) as PublicJwk | undefined;
+  }
+
+  private isSignatureJwk(key: any): boolean {
+    if (!key || typeof key !== 'object') {
+      return false;
+    }
+    const purposes = Array.isArray(key.purposes) ? key.purposes : [];
+    return key.use === 'sig'
+      || purposes.includes('vc-sign')
+      || purposes.includes('didcomm-sign')
+      || (Array.isArray(key.key_ops) && key.key_ops.includes('verify'))
+      || (typeof key.alg === 'string' && (key.alg.startsWith('ML-DSA') || key.alg.startsWith('ES') || key.alg.startsWith('RS') || key.alg.startsWith('PS')));
+  }
+
+  private isEncryptionJwk(key: any): boolean {
+    if (!key || typeof key !== 'object') {
+      return false;
+    }
+    const purposes = Array.isArray(key.purposes) ? key.purposes : [];
+    return key.use === 'enc'
+      || purposes.includes('didcomm-enc')
+      || (Array.isArray(key.key_ops) && key.key_ops.includes('encrypt'))
+      || (typeof key.crv === 'string' && (key.crv.startsWith('ML-KEM') || key.crv.startsWith('P-')));
+  }
+
+  private mergeActivationJwks(keys: Array<PublicJwk | undefined>, jwks?: JwkSet): JwkSet {
+    const merged = new Map<string, PublicJwk>();
+    const extraKeys = (jwks?.keys || []) as PublicJwk[];
+    for (const key of [...keys, ...extraKeys]) {
+      if (!key || typeof key !== 'object') {
+        continue;
+      }
+      const kid = typeof key.kid === 'string' && key.kid.trim().length > 0
+        ? key.kid
+        : undefined;
+      if (!kid) {
+        throw new ManagerError('Activation public keys must include "kid" properties.', IssueType.Required);
+      }
+      merged.set(kid, key);
+    }
+    return { keys: Array.from(merged.values()) as any[] };
+  }
+
   private async buildControllerEntityConfig(
     legalRep: IncludedResource,
     tenantUrn: string,
     vaultId: string,
     registrationKeys?: { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk },
+    explicitBinding?: ActivationParticipantMaterial,
   ): Promise<EntityConfig> {
     const email = legalRep.meta?.claims?.[ClaimsPersonSchemaorg.email] as string | undefined;
     const roleCode = getPersonOccupationClaim(legalRep.meta?.claims as Record<string, any> | undefined);
@@ -376,31 +652,64 @@ export class HostingManager {
       role: roleCode,
     });
 
-    let signerJwk = registrationKeys?.signerJwk;
-    let encrypterJwk = registrationKeys?.encrypterJwk;
+    let signerJwk = explicitBinding?.publicKeyJwk || this.findJwkByUse(explicitBinding?.jwks, 'sig') || registrationKeys?.signerJwk;
+    let encrypterJwk = this.findJwkByUse(explicitBinding?.jwks, 'enc') || registrationKeys?.encrypterJwk;
     if (!signerJwk || !encrypterJwk) {
       const provisioned = await this.kmsService.provisionKeys(employeeUrn);
-      signerJwk = provisioned.keys.find(k => (k as any).kty === 'AKP') as PublicJwk | undefined;
-      encrypterJwk = provisioned.keys.find(k => (k as any).kty === 'OKP') as PublicJwk | undefined;
+      signerJwk = signerJwk || provisioned.keys.find(k => (k as any).kty === 'AKP') as PublicJwk | undefined;
+      encrypterJwk = encrypterJwk || provisioned.keys.find(k => (k as any).kty === 'OKP') as PublicJwk | undefined;
     }
     if (!signerJwk?.kid || !encrypterJwk?.kid) {
       throw new ManagerError('Admin keys are missing "kid" properties.', IssueType.Required);
     }
+    const didId = explicitBinding?.did || employeeUrn;
+    const alsoKnownAs = Array.from(new Set([
+      didId !== employeeUrn ? employeeUrn : undefined,
+      explicitBinding?.sameAs,
+    ].filter((value): value is string => Boolean(value))));
 
-    const verificationMethods: VerificationMethod[] = [
-      {
-        id: `${employeeUrn}#${signerJwk.kid}`,
-        controller: employeeUrn,
-        type: 'JsonWebKey2020',
-        publicKeyJwk: signerJwk,
-      },
-      {
-        id: `${employeeUrn}#${encrypterJwk.kid}`,
-        controller: employeeUrn,
-        type: 'JsonWebKey2020',
-        publicKeyJwk: encrypterJwk,
-      },
-    ];
+    const mergedJwks = this.mergeActivationJwks([signerJwk, encrypterJwk], explicitBinding?.jwks);
+    const didDocument = didId.startsWith('did:web:')
+      ? populateDidDocumentFromJwks(
+        {
+          '@context': 'https://www.w3.org/ns/did/v1',
+          id: didId,
+          ...(alsoKnownAs.length ? { alsoKnownAs } : {}),
+          service: [],
+        },
+        mergedJwks,
+      )
+      : (() => {
+        const verificationMethod: VerificationMethod[] = [];
+        const assertionMethod: string[] = [];
+        const keyAgreement: string[] = [];
+        for (const key of mergedJwks.keys as PublicJwk[]) {
+          const keyId = `${didId}#${key.kid}`;
+          verificationMethod.push({
+            id: keyId,
+            controller: didId,
+            type: 'JsonWebKey2020',
+            publicKeyJwk: key,
+          });
+          if (this.isSignatureJwk(key)) {
+            assertionMethod.push(keyId);
+          }
+          if (this.isEncryptionJwk(key)) {
+            keyAgreement.push(keyId);
+          }
+        }
+        return {
+          '@context': 'https://www.w3.org/ns/did/v1',
+          id: didId,
+          ...(alsoKnownAs.length ? { alsoKnownAs } : {}),
+          verificationMethod,
+          assertionMethod,
+          keyAgreement,
+          service: [],
+        } as DidDocument;
+      })();
+    const verificationMethods = didDocument.verificationMethod || [];
+    const signerMethodId = verificationMethods.find((method) => (method.publicKeyJwk as any)?.kid === signerJwk?.kid)?.id;
 
     return {
       id: legalRep.id,
@@ -408,12 +717,8 @@ export class HostingManager {
       status: EntityLifecycleStatus.Active,
       claims: legalRep.meta?.claims || {},
       didDocument: {
-        '@context': 'https://www.w3.org/ns/did/v1',
-        id: employeeUrn,
-        verificationMethod: verificationMethods,
-        authentication: [verificationMethods[0].id],
-        keyAgreement: [verificationMethods[1].id],
-        service: [],
+        ...didDocument,
+        authentication: signerMethodId ? [signerMethodId] : didDocument.authentication,
       },
       didConfig: { service: [] },
       meta: { lastUpdated: new Date().toISOString() },
@@ -536,6 +841,7 @@ export class HostingManager {
     hostRegistrySector?: string,
   ): Promise<BundleEntry | ErrorEntry> {
     const activation = this.extractActivationMaterial(entry, body);
+    this.warnOnLegacyActivationCredentialFields(activation);
     if (!activation.vpToken || typeof activation.vpToken !== 'string') {
       throw new ManagerError("Missing required activation proof 'vp_token'.", IssueType.Required);
     }
@@ -666,7 +972,13 @@ export class HostingManager {
       idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
       idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
     });
-    const controllerConfig = await this.buildControllerEntityConfig(person, tenantUrn, vaultId, this.extractRegistrationKeys(jobMeta));
+    const controllerConfig = await this.buildControllerEntityConfig(
+      person,
+      tenantUrn,
+      vaultId,
+      this.extractRegistrationKeys(jobMeta),
+      activation.controllerBinding,
+    );
     await this.storeControllerEntityConfig(controllerConfig, tenantCollectionName, vaultId);
     const icaDidRegistration = await this.registerDidDocumentWithIca({
       vpToken: activation.vpToken,
@@ -675,6 +987,8 @@ export class HostingManager {
       representativeCredential: activation.representativeCredential,
       organizationDidDocument: finalTenantConfig.didDocument!,
       controllerDidDocument: controllerConfig.didDocument!,
+      organizationBinding: activation.organizationBinding,
+      controllerBinding: activation.controllerBinding,
     });
 
     if (processedService) {
@@ -1724,6 +2038,7 @@ export class HostingManager {
     options?: {
       primaryDid?: string;
       publicTenantUrl?: string;
+      operationalTenantUrl?: string;
       governanceVc?: VerifiableCredentialV2;
       networkName?: NetworkName;
     },
@@ -1754,20 +2069,31 @@ export class HostingManager {
     const context = { jurisdiction: allClaims[ClaimsOrganizationSchemaorg.addressCountry] as string, version: 'v1', sector: sector };
     const hostedDid = createHostedDidWeb(hostDid, altName, context);
     const publicTenantUrl = options?.publicTenantUrl || allClaims[ClaimsOrganizationSchemaorg.url] as string | undefined;
+    const operationalTenantUrl = this.getOperationalServiceBaseUrl(allClaims, options);
     const externalDid = options?.primaryDid
       || (publicTenantUrl && publicTenantUrl.startsWith('https://') ? `did:web:${new URL(publicTenantUrl).hostname}` : undefined);
     const primaryDid = externalDid || hostedDid;
-    const alsoKnownAs = [tenantUrn, ...(externalDid && primaryDid !== externalDid ? [externalDid] : []), ...(hostedDid && primaryDid !== hostedDid ? [hostedDid] : [])];
+    const hostedPublicUrl = `${this.config.apiBaseUrl}/${altName}/cds-${String(allClaims[ClaimsOrganizationSchemaorg.addressCountry] || '').toLowerCase()}/v1/${sector}`;
+    const isHosted = !publicTenantUrl?.startsWith('https://')
+      || (!!operationalTenantUrl && !!publicTenantUrl && new URL(operationalTenantUrl).host !== new URL(publicTenantUrl).host);
+    const alsoKnownAs = this.buildTenantAlsoKnownAs({
+      tenantUrn,
+      primaryDid,
+      externalDid,
+      hostedDid,
+      publicTenantUrl,
+      hostedPublicUrl: isHosted ? hostedPublicUrl : undefined,
+    });
     const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: primaryDid, alsoKnownAs: alsoKnownAs };
     const didConfigServices = initializeTenantServicesConfig(sector);
-    const isHosted = !publicTenantUrl?.startsWith('https://');
-    const baseUrl = isHosted ? this.config.apiBaseUrl : publicTenantUrl!;
+    const publicBaseUrl = isHosted ? this.config.apiBaseUrl : (publicTenantUrl || this.config.apiBaseUrl);
+    const serviceBaseUrl = operationalTenantUrl || publicBaseUrl;
     const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
     const tenantContext = { alternateName: altName, jurisdiction: allClaims[ClaimsOrganizationSchemaorg.addressCountry] as string, version: 'v1', sector };
-    didDocument.service = populateDidDocumentServices(primaryDid, baseUrl, didConfigServices, isHosted, tenantContext);
+    didDocument.service = populateDidDocumentServices(primaryDid, publicBaseUrl, didConfigServices, isHosted, tenantContext, serviceBaseUrl);
     const legacySignAlg = this.config.legacySignAlg;
     const legacyX5u = legacySignAlg && this.config.legacyX509DerBase64
-      ? `${baseUrl}/.well-known/x509.der`
+      ? `${publicBaseUrl}/.well-known/x509.der`
       : undefined;
     const legacyChain = this.config.legacyX509DerBase64
       ? [this.config.legacyX509DerBase64, ...(this.config.legacyX509ChainBase64 || [])]
@@ -1783,7 +2109,7 @@ export class HostingManager {
     }
     const legalParticipantOptions = buildGaiaXLegalParticipantOptionsFromClaims({
       claims: allClaims,
-      webDomain: baseUrl,
+      webDomain: publicBaseUrl,
       did: primaryDid,
       issuerDid: hostDid,
     });
@@ -1812,7 +2138,7 @@ export class HostingManager {
     }
     const selfDescriptionOptions = buildGaiaXLegalParticipantOptionsFromClaims({
       claims: allClaims,
-      webDomain: baseUrl,
+      webDomain: publicBaseUrl,
       did: primaryDid,
       issuerDid: primaryDid,
     });

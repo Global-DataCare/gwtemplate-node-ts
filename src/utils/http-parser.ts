@@ -39,6 +39,56 @@ export function convertPlainMessageToJson(message: any, contentType: string): an
   }
 }
 
+function inferFhirVersionFromFormat(format: string | undefined): string | undefined {
+  const normalized = String(format || '').trim().toLowerCase();
+  if (normalized === 'org.hl7.fhir.r5' || normalized.endsWith('.r5')) return '5.0';
+  if (normalized === 'org.hl7.fhir.r4' || normalized.endsWith('.r4')) return '4.0';
+  return undefined;
+}
+
+function inferDidcommPayloadType(
+  payload: any,
+  format: string | undefined,
+  contentType: string | undefined,
+): string | undefined {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined;
+
+  const existingType = typeof payload.type === 'string' ? payload.type.trim() : '';
+  if (existingType) return existingType;
+
+  const body = payload.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return undefined;
+
+  const normalizedContentType = String(contentType || '').toLowerCase();
+  const inferredFhirVersion = inferFhirVersionFromFormat(format);
+
+  if (Array.isArray(body.entry) || normalizedContentType.includes('application/fhir+json')) {
+    return inferredFhirVersion
+      ? `application/fhir+json; fhirVersion=${inferredFhirVersion}`
+      : 'application/fhir+json';
+  }
+
+  if (Array.isArray(body.data)) {
+    return 'application/vnd.api+json';
+  }
+
+  return undefined;
+}
+
+function normalizeDidcommPayloadType(
+  payload: any,
+  format: string | undefined,
+  contentType: string | undefined,
+): any {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
+  const inferredType = inferDidcommPayloadType(payload, format, contentType);
+  if (!inferredType) return payload;
+  return {
+    ...payload,
+    type: inferredType,
+  };
+}
+
 
 // --- Main Parsing Logic (Adapted for the new URL structure) ---
 
@@ -76,7 +126,7 @@ export function extractHttpRequestDataAsJson(
     createdAtTimestamp: Date.now(),
     requestUrl: url,
     httpMethod: httpMethod.toUpperCase(),
-    content: input,
+    content: normalizeDidcommPayloadType(input, pathParts[cdsIndex + 4], contentType),
     contentType: contentType,
     tenantId: pathParts[cdsIndex - 1],
     jurisdiction: pathParts[cdsIndex].substring(4), // Remove 'cds-'

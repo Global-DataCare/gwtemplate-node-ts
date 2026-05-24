@@ -67,16 +67,28 @@ TENANT_ID=acme JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm 
 
 ## 6) Ingest medications via Communication and retrieve IPS search views (Terminal 2)
 
-Command:
+Default mode (`didcomm`):
 
 ```bash
 TENANT_ID=acme JURISDICTION=ES SECTOR=health-care npm run demo:communication-medications-ips
+```
+
+Legacy FHIR transport mode (`Content-Type: application/fhir+json`):
+
+```bash
+MODE=legacy-fhir TENANT_ID=acme JURISDICTION=ES SECTOR=health-care npm run demo:communication-medications-ips
 ```
 
 With log file:
 
 ```bash
 TENANT_ID=acme JURISDICTION=ES SECTOR=health-care npm run demo:communication-medications-ips:logged
+```
+
+Log files are written to:
+
+```bash
+logs/<YYYYMMDDHHMMSS>-communication-medications-ips.log
 ```
 
 ## Test-Driven Development (TDD)
