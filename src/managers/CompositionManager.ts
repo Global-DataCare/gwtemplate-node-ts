@@ -80,27 +80,35 @@ export class CompositionManager implements IJobProcessor {
 
       const searchResourceType = this.extractSearchResourceType(body);
       const useDocumentReferenceSection = searchResourceType === 'documentreference';
+      const useCommunicationSection = searchResourceType === 'communication';
       const searchSubject = this.extractSearchSubject(body);
       if (!searchSubject) {
         throw new Error('Missing required subject search parameter for Composition search.');
       }
       const searchSections = this.extractSearchSections(body);
       const documentReferenceFilters = this.extractDocumentReferenceSearchFilters(body);
+      const communicationFilters = this.extractCommunicationSearchFilters(body);
 
       const sectionId = getSubjectScopedSectionId(
         searchSubject,
         scope,
-        useDocumentReferenceSection ? 'document-references' : 'composition',
+        useDocumentReferenceSection ? 'document-references' : useCommunicationSection ? 'communications' : 'composition',
       );
       const matchesRaw = await this.vaultRepository.getContainersInSection(tenantVaultId, sectionId);
       const matches = useDocumentReferenceSection
         ? this.filterDocumentReferenceMatches(matchesRaw, documentReferenceFilters)
-        : this.filterMatchesBySections(matchesRaw, searchSections);
+        : useCommunicationSection
+          ? await this.filterCommunicationMatches(tenantVaultId, searchSubject, scope, matchesRaw, communicationFilters)
+          : this.filterMatchesBySections(matchesRaw, searchSections);
       const responseBundle: BundleJsonApi = {
         resourceType: 'Bundle',
         type: 'batch-response',
         data: [{
-          type: useDocumentReferenceSection ? 'DocumentReference-search-response-v1.0' : 'Composition-search-response-v1.0',
+          type: useDocumentReferenceSection
+            ? 'DocumentReference-search-response-v1.0'
+            : useCommunicationSection
+              ? 'Communication-search-response-v1.0'
+              : 'Composition-search-response-v1.0',
           resource: { total: matches.length, data: matches },
           response: { status: '200' },
         } as any],
@@ -362,6 +370,50 @@ export class CompositionManager implements IJobProcessor {
     };
   }
 
+  private extractCommunicationSearchFilters(body: any): {
+    identifier?: string;
+    thid?: string;
+    pthid?: string;
+    attachmentHash?: string;
+  } {
+    let identifier = '';
+    let thid = '';
+    let pthid = '';
+    let attachmentHash = '';
+
+    const wrappers = [
+      ...(Array.isArray(body?.entry) ? body.entry : []),
+      ...(Array.isArray(body?.data) ? body.data : []),
+    ];
+    for (const wrapper of wrappers) {
+      const requestUrl = String(wrapper?.request?.url || '').trim();
+      if (!requestUrl) continue;
+      const queryIndex = requestUrl.indexOf('?');
+      if (queryIndex < 0) continue;
+      const params = new URLSearchParams(requestUrl.slice(queryIndex + 1));
+      identifier =
+        identifier
+        || String(params.get('identifier') || params.get('communication.identifier') || '').trim();
+      thid = thid || String(params.get('thid') || '').trim();
+      pthid = pthid || String(params.get('pthid') || '').trim();
+      attachmentHash =
+        attachmentHash
+        || String(
+          params.get('contenthash')
+            || params.get('documentreference.contenthash')
+            || params.get('attachment.hash')
+            || '',
+        ).trim();
+    }
+
+    return {
+      identifier: identifier || undefined,
+      thid: thid || undefined,
+      pthid: pthid || undefined,
+      attachmentHash: attachmentHash || undefined,
+    };
+  }
+
   private filterDocumentReferenceMatches(
     matches: any[],
     filters: { identifier?: string; attachmentHash?: string },
@@ -416,6 +468,59 @@ export class CompositionManager implements IJobProcessor {
         if (got.has(req)) return true;
       }
       return false;
+    });
+  }
+
+  private async filterCommunicationMatches(
+    tenantVaultId: string,
+    subject: string,
+    scope: SubjectSectionScope,
+    matches: any[],
+    filters: {
+      identifier?: string;
+      thid?: string;
+      pthid?: string;
+      attachmentHash?: string;
+    },
+  ): Promise<any[]> {
+    if (!Array.isArray(matches)) return [];
+    let allowedDocumentReferences: Set<string> | undefined;
+    if (filters.attachmentHash) {
+      const documentReferenceSectionId = getSubjectScopedSectionId(subject, scope, 'document-references');
+      const documentReferences = await this.vaultRepository.getContainersInSection(tenantVaultId, documentReferenceSectionId);
+      allowedDocumentReferences = new Set(
+        documentReferences
+          .filter((record: any) => {
+            const attachmentHash = String(
+              record?.['DocumentReference.contenthash']
+                || record?.['org.hl7.fhir.r4.DocumentReference.contenthash']
+                || '',
+            ).trim();
+            return attachmentHash === filters.attachmentHash;
+          })
+          .map((record: any) => String(record?.id || '').trim())
+          .filter(Boolean),
+      );
+      if (allowedDocumentReferences.size === 0) return [];
+    }
+
+    return matches.filter((record: any) => {
+      const identifier = String(record?.['Communication.identifier'] || '').trim();
+      const thid = String(record?.thid || '').trim();
+      const pthid = String(record?.pthid || '').trim();
+      const contentReferences = String(record?.['Communication.content-reference'] || '').split(',').map((value: string) => value.trim()).filter(Boolean);
+
+      if (filters.identifier && identifier !== filters.identifier) return false;
+      if (filters.thid && thid !== filters.thid) return false;
+      if (filters.pthid && pthid !== filters.pthid) return false;
+      if (allowedDocumentReferences) {
+        const hasLinkedDocument = contentReferences.some((reference: string) => {
+          const referenceId = reference.replace(/^DocumentReference\//i, '').trim();
+          return allowedDocumentReferences?.has(referenceId);
+        });
+        if (!hasLinkedDocument) return false;
+      }
+      return true;
     });
   }
 }

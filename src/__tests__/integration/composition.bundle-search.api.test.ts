@@ -274,4 +274,145 @@ describe('Composition Bundle _search API (integration)', () => {
       queueAdapter.stop();
     }
   });
+
+  it('supports Bundle/_search for Communication by identifier, thid, and linked DocumentReference contenthash', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.DB_PROVIDER = 'mem';
+    process.env.STORAGE_PROVIDER = 'mem';
+    process.env.QUEUE_PROVIDER = 'mem';
+    process.env.SECTORS_ALLOWED = 'health-care';
+    process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
+    process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.ORG_HOST_ID_TYPE = 'TAX';
+    process.env.ORG_HOST_ID_VALUE = 'A0011223344';
+    process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
+    process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
+    process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.JSON_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+
+    resetServerConfig();
+
+    const { app, queueAdapter, tenantManager, vaultRepository, kmsService } = await startServer({ listen: false });
+    try {
+      const hostBootstrapClaims = {
+        [ClaimsOrganizationSchemaorg.addressCountry]: process.env.ORG_HOST_JURISDICTION,
+        [ClaimsOrganizationSchemaorg.identifierType]: process.env.ORG_HOST_ID_TYPE,
+        [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
+        [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+      };
+      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantVaultId = getTenantVaultId(
+        tenantClaims[ClaimsServiceSchemaorg.category],
+        tenantClaims[ClaimsOrganizationSchemaorg.alternateName],
+      );
+
+      const tenantConfig = {
+        claims: tenantClaims,
+        didConfig: { service: initializeTenantServicesConfig(Sector.HEALTH_CARE) },
+        didDocument: { id: 'did:web:api.acme.org', '@context': 'https://www.w3.org/ns/did/v1' },
+      };
+
+      await kmsService.provisionKeys(tenantVaultId);
+      const secureTenantRecord = await kmsService.protectConfidentialData(
+        { id: tenantVaultId, sequence: 0, content: tenantConfig } as any,
+        'host',
+      );
+      await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
+      await tenantManager.getTenant(tenantVaultId);
+
+      const subjectDid = 'did:web:api.acme.org:individual:123';
+      const cid = 'zb2rhfJk6M9MHiMagUhM6YJ6R7Sx9nN2m7r8cfDkQ2uYbGxZq';
+      const communicationSectionId = getEnvSectionId(`individual_communications_${createHash('sha256').update(subjectDid, 'utf8').digest('hex')}`);
+      const documentReferenceSectionId = getEnvSectionId(`individual_document_references_${createHash('sha256').update(subjectDid, 'utf8').digest('hex')}`);
+
+      await vaultRepository.put(
+        tenantVaultId,
+        [{
+          id: 'communication-001',
+          type: 'CommMsgExtended',
+          thid: 'permission-thread-001',
+          'Communication.identifier': 'comm-permission-001',
+          'Communication.subject': subjectDid,
+          'Communication.content-reference': 'DocumentReference/documentreference-001',
+        } as any],
+        communicationSectionId,
+      );
+      await vaultRepository.put(
+        tenantVaultId,
+        [{
+          id: 'documentreference-001',
+          '@context': 'org.hl7.fhir.r4',
+          'DocumentReference.subject': subjectDid,
+          'DocumentReference.identifier': 'urn:uuid:docref-001',
+          'DocumentReference.contenthash': cid,
+        } as any],
+        documentReferenceSectionId,
+      );
+
+      const searchCases = [
+        {
+          thid: 'bundle-search-communication-id-001',
+          url: `Communication?subject=${encodeURIComponent(subjectDid)}&identifier=${encodeURIComponent('comm-permission-001')}`,
+        },
+        {
+          thid: 'bundle-search-communication-thid-001',
+          url: `Communication?subject=${encodeURIComponent(subjectDid)}&thid=${encodeURIComponent('permission-thread-001')}`,
+        },
+        {
+          thid: 'bundle-search-communication-cid-001',
+          url: `Communication?subject=${encodeURIComponent(subjectDid)}&contenthash=${encodeURIComponent(cid)}`,
+        },
+      ];
+
+      for (const searchCase of searchCases) {
+        const searchResp = await invokeExpress(app, {
+          method: 'POST',
+          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search',
+          headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+          body: {
+            thid: searchCase.thid,
+            body: {
+              resourceType: 'Bundle',
+              type: 'batch',
+              entry: [
+                {
+                  request: {
+                    method: 'GET',
+                    url: searchCase.url,
+                  },
+                },
+              ],
+            },
+          },
+        });
+        expect(searchResp.status).toBe(202);
+
+        let searchPayload: any;
+        for (let i = 0; i < 50; i++) {
+          const pollResp = await invokeExpress(app, {
+            method: 'POST',
+            url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response',
+            headers: { 'content-type': 'application/json' },
+            body: { thid: searchCase.thid },
+          });
+          if (pollResp.status === 200) {
+            searchPayload = JSON.parse(pollResp.text);
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 50));
+        }
+
+        expect(searchPayload?.resourceType).toBe('Bundle');
+        expect(searchPayload?.data?.[0]?.response?.status).toBe('200');
+        expect(searchPayload?.data?.[0]?.type).toBe('Communication-search-response-v1.0');
+        expect(searchPayload?.data?.[0]?.resource?.total).toBe(1);
+        expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.['Communication.identifier']).toBe('comm-permission-001');
+      }
+    } finally {
+      queueAdapter.stop();
+    }
+  });
 });
