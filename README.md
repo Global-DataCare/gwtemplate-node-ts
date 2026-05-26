@@ -119,6 +119,11 @@ source demo-deploy.config
 SKIP_BUILD=true LOCAL_IMAGE_NAME=gwtemplate ./cloud_deploy.sh gke-demo demo-deploy.config
 ```
 
+The GKE demo deploy should always use an immutable image tag.
+Do not keep `GDC_IMAGE` on mutable tags such as `:demo` or `:latest`.
+Use a versioned tag such as `:1.6.1-8b0539b`.
+If `GDC_IMAGE` still ends in `:demo` or `:latest`, `cloud_deploy.sh gke-demo` now rewrites it automatically to `<package-version>-<short-git-sha>`.
+
 For the current demo path you do not need DNS or a domain. Use the public static IP directly in
 `GDC_PUBLIC_URL`, for example `http://34.x.y.z`.
 

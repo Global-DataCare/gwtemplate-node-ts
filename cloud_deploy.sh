@@ -14,6 +14,36 @@ Usage:
 EOF
 }
 
+resolve_versioned_demo_image() {
+  local image_ref="$1"
+  local explicit_tag="${2:-}"
+  local package_version git_sha computed_tag image_repo image_tag
+
+  if [[ "$image_ref" == *@sha256:* ]]; then
+    echo "$image_ref"
+    return 0
+  fi
+
+  package_version="$(node -p "require('./package.json').version")"
+  git_sha="$(git rev-parse --short HEAD)"
+  computed_tag="${explicit_tag:-${package_version}-${git_sha}}"
+
+  if [[ "$image_ref" == *:* ]]; then
+    image_repo="${image_ref%:*}"
+    image_tag="${image_ref##*:}"
+  else
+    image_repo="$image_ref"
+    image_tag=""
+  fi
+
+  if [[ -z "$image_tag" || "$image_tag" == "demo" || "$image_tag" == "latest" ]]; then
+    echo "${image_repo}:${computed_tag}"
+    return 0
+  fi
+
+  echo "$image_ref"
+}
+
 confirm_or_exit() {
   read -p "Are you sure you want to proceed with the deployment? (y/n): " -n 1 -r
   echo ""
@@ -185,6 +215,9 @@ deploy_gke_demo() {
   set -a
   source "$config_file"
   set +a
+
+  GDC_IMAGE="$(resolve_versioned_demo_image "${GDC_IMAGE:-}" "${GDC_IMAGE_TAG:-}")"
+  export GDC_IMAGE
 
   local required_vars=(
     GCP_PROJECT_ID GCP_REGION GKE_CLUSTER

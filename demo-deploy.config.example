@@ -16,8 +16,12 @@ export GCP_REGION="europe-southwest1"
 export GKE_CLUSTER="gdc-unid-demo"
 
 # GW namespace / image / public edge
+# Do not use mutable tags like :demo or :latest.
+# Prefer <package-version>-<git-sha>, for example 1.6.1-8b0539b.
 export K8S_NAMESPACE_GDC="test-gdc-v1"
-export GDC_IMAGE="europe-southwest1-docker.pkg.dev/globaldatacare-test/gwtemplate/gwtemplate:demo"
+export GDC_IMAGE_REPOSITORY="europe-southwest1-docker.pkg.dev/globaldatacare-test/gwtemplate/gwtemplate"
+export GDC_IMAGE_TAG="1.6.1-8b0539b"
+export GDC_IMAGE="${GDC_IMAGE_REPOSITORY}:${GDC_IMAGE_TAG}"
 export GDC_PUBLIC_IP="0.0.0.0"
 export GDC_PUBLIC_URL="http://${GDC_PUBLIC_IP}"
 export GDC_STATIC_IP_NAME="gdc-gw-demo-ip"
