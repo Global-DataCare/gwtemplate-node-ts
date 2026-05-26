@@ -8,12 +8,34 @@
   - `thid`
   - linked `DocumentReference.contenthash`
 - Updated SMART compatibility and docs index notes to reflect the current live consent-evaluation behavior.
+- Clarified Swagger family-registration examples so `Service.termsOfService` defaults to an HTTPS URL and `org.schema` claims are documented in the default contextualized form, with `CLAIMS_IDENTITY_STORAGE_MODE=canonical` called out as the strict fully-qualified alternative.
+- Added markdown sync markers plus a conformance test so canonical GW guide payloads stay aligned with `src/__tests__/data/example-payloads.ts` instead of drifting as copied markdown.
+- Legal-organization registration compatibility now derives internal `alternateName` from `Organization.identifier.value` when omitted, keeping `v1.x` flows working while public examples teach `taxId`/`identifier.value` as the canonical external input.
+- Canonical legal-organization examples now use `acme-id` and omit `Organization.alternateName`; local bootstrap follows the same convention.
+- Swagger Global Flow Context now re-migrates legacy `tenantId` / `taxId` values back to canonical `taxTenantId=acme-id`, rebuilds stale panels, and re-derives `physicianOrg` / `individualDid` from the canonical context instead of preserving legacy `TaxNumber-acme` or old `api.acme.org` individual DID placeholders.
+- Swagger Global Flow Context now also derives a hashed professional member DID (`physicianDid`) from `physicianEmail` + `physicianRole` under the canonical organization DID, instead of treating the organization DID as the professional actor DID.
+- Swagger Global Flow Context now also derives an individual controller DID (`individualControllerDid`) from `individualControllerEmail` + `individualControllerRole`, keeping the subject DID (`individualDid`) separate from the family/controller actor DID.
+- Canonical individual/family Swagger examples now use homogeneous `{{individualDid}}`, `{{physicianOrg}}`, and `{{physicianDid}}` placeholders across SMART, Consent, Communication, Composition, Observation, and RelatedPerson payloads.
+- Canonical family/controller examples now separate the subject DID from the controller DID, with `RelatedPerson` and related onboarding payloads using `{{individualControllerDid}}` where the human controller signs as the family actor.
+- Added a dedicated `v2.0` TODO document for the future tenant-identifier/vault-id migration instead of mixing that breaking redesign into current core behavior.
+- Added `scripts/render-example-payload.mts` so demo/incremental scripts can render request payloads from the same canonical fixtures used by tests and Swagger, with only explicit parameter overrides.
+- Employee onboarding now behaves as canonical upsert/reactivation by `Organization.owner.email + Organization.owner.hasOccupation.identifier.value`, returning an already-existing active member directly and reactivating an inactive matching member instead of creating duplicates.
+- Family onboarding now accepts and normalizes the signed individual-registration PDF attachment into canonical claims before building the stored registration artifacts.
+- Added a canonical `_transaction` alias for `individual/org.schema/Organization` service discovery and Swagger so individual organization flows can be exercised with the same onboarding semantics as the existing batch route.
+- Regenerated Swagger/OpenAPI profile artifacts and aligned route descriptions, bootstrap scripts, env defaults, and curl examples around canonical `acme-id`, contextualized `org.schema` claims, and the synchronized local example fixtures.
+- Reorganized legacy top-level guides under `docs/`, expanded reading-order/README guidance, and documented the local example-sync workflow so the repo reflects the current source-of-truth layout.
 
 ### Testing
 - Added/updated focused tests for:
   - SMART consent evaluation precedence
   - related-person SMART access
   - `Communication` lookup by identifier, thread id, and linked CID
+  - legal-organization registration without explicit `alternateName`
+  - Swagger Global Flow Context canonical helper fields and legacy migration hooks
+  - employee create/reactivation upsert behavior
+  - family registration signed-PDF claim extraction
+  - individual organization transaction route exposure
+  - synchronized markdown/shared-example conformance checks
 
 ## 1.5.1 - 2026-05-23
 

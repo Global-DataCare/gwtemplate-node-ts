@@ -17,9 +17,8 @@
               "@context": "org.schema",
               "@type": "template",
               "org.schema.Organization.address.addressCountry": "ES",
-              "org.schema.Organization.alternateName": "acme",
               "org.schema.Organization.identifier.additionalType": "TAX",
-              "org.schema.Organization.identifier.value": "A123456789",
+              "org.schema.Organization.identifier.value": "acme-id",
               "org.schema.Organization.legalName": "Acme Organization SL",
               "org.schema.Organization.name": "Acme Org",
               "org.schema.Organization.numberOfEmployees.value": 2,
@@ -115,9 +114,9 @@
               "@context": "org.schema",
               "@type": "template",
               "org.schema.Organization.address.addressCountry": "ES",
-              "org.schema.Organization.alternateName": "acme",
+              "org.schema.Organization.alternateName": "acme-id",
               "org.schema.Organization.identifier.additionalType": "TAX",
-              "org.schema.Organization.identifier.value": "A123456789",
+              "org.schema.Organization.identifier.value": "acme-id",
               "org.schema.Organization.legalName": "Acme Organization SL",
               "org.schema.Organization.name": "Acme Org",
               "org.schema.Organization.numberOfEmployees.value": 2,
@@ -224,13 +223,13 @@
             "claims": {
               "@context": "org.hl7.fhir.api",
               "Consent.decision": "permit",
-              "Consent.subject": "unified-health-id",
+              "Consent.subject": "{{individualDid}}",
               "Consent.identifier": "urn:uuid:patient-consent-uuid",
-              "Consent.grantee": "did:web:hospital.example.com",
+              "Consent.grantee": "{{physicianOrg}}",
               "Consent.date": "2025-11-25",
               "Consent.purpose": "TREAT",
               "Consent.action": "LOINC|48765-2",
-              "Consent.actor-identifier": "did:web:hospital.example.com",
+              "Consent.actor-identifier": "{{physicianOrg}}",
               "Consent.actor-role": "ISCO-08|2211",
               "Consent.attachment-contentType": "application/odrl+json",
               "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
@@ -263,11 +262,11 @@
               }
             ],
             "patient": {
-              "reference": "unified-health-id"
+              "reference": "{{individualDid}}"
             },
             "performer": [
               {
-                "reference": "did:web:hospital.example.com"
+                "reference": "{{physicianOrg}}"
               }
             ],
             "provision": {
@@ -304,10 +303,10 @@
               "Communication.content-attachment-type": "text/calendar",
               "Communication.content-reference": "https://url-to-appointment-source.com/some-uuid",
               "Communication.part-of": "urn:uuid:communication-channel-id",
-              "Communication.recipient": "{CUSTOMER_DID_WEB}",
-              "Communication.sender": "{ORGANIZATION_DID_WEB}",
+              "Communication.recipient": "{{individualDid}}",
+              "Communication.sender": "{{physicianOrg}}",
               "Communication.sent": "2025-10-15T14:30:00Z",
-              "Communication.subject": "{CUSTOMER_DID_WEB}",
+              "Communication.subject": "{{individualDid}}",
               "Communication.text": "This is your new appointment. Best regards."
             }
           },
@@ -335,11 +334,11 @@
             ],
             "recipient": [
               {
-                "reference": "{CUSTOMER_DID_WEB}"
+                "reference": "{{individualDid}}"
               }
             ],
             "sender": {
-              "reference": "{ORGANIZATION_DID_WEB}"
+              "reference": "{{physicianOrg}}"
             },
             "sent": "2025-10-15T14:30:00Z",
             "note": [
@@ -369,7 +368,7 @@
   "COMPOSITION_UPDATE_MESSAGE": {
     "jti": "composition-update-request-<test-id>",
     "thid": "composition-update-thread-<test-id>",
-    "iss": "did:web:hospital.example.com",
+    "iss": "{{physicianOrg}}",
     "aud": "did:web:api.acme.org",
     "exp": 1678886460,
     "iat": 1678886400,
@@ -385,11 +384,11 @@
             "claims": {
               "@context": "org.hl7.fhir.api",
               "@type": "Composition:IndexEntry",
-              "Composition.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+              "Composition.subject": "{{individualDid}}",
               "Composition.section": "LOINC|48765-2",
               "Composition.entry": "https://ehr.hospital.example.com/fhir/AllergyIntolerance/12345,https://ehr.hospital.example.com/fhir/DiagnosticReport/67890",
               "Composition.date": "2025-11-26T10:00:00Z",
-              "Composition.author": "did:web:hospital.example.com",
+              "Composition.author": "{{physicianOrg}}",
               "Composition.title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
               "Composition.type": "LOINC|60591-5"
             }
@@ -402,12 +401,12 @@
             "resourceType": "Composition",
             "status": "final",
             "subject": {
-              "reference": "did:web:api.acme.org:individual:<unified-health-identifier>"
+              "reference": "{{individualDid}}"
             },
             "date": "2025-11-26T10:00:00Z",
             "author": [
               {
-                "reference": "did:web:hospital.example.com"
+                "reference": "{{physicianOrg}}"
               }
             ],
             "title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
@@ -476,7 +475,7 @@
       "token_type": "Bearer",
       "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
       "purpose": "TREAT",
-      "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=LOINC|48765-2 patient/Consent.cruds"
+      "scope": "patient/Composition.rs?subject={{individualDid}}&section=LOINC|48765-2 patient/Consent.cruds"
     },
     "meta": {
       "jwe": {

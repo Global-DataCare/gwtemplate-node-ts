@@ -170,6 +170,11 @@ export class EmployeeManager {
       throw new ManagerError('Missing or invalid hasOccupation claim.', IssueType.Required);
     }
 
+    const existingEmployee = await this.findEmployeeByEmailAndRole(vaultId, email, roleCode);
+    if (existingEmployee) {
+      return this.upsertExistingEmployee(existingEmployee, vaultId, claims, entryType);
+    }
+
     const parsedTenantUrn = parseTenantUrn(tenantUrn);
     if (!parsedTenantUrn) {
       throw new ManagerError(`Invalid tenant URN format: '${tenantUrn}'`, IssueType.Value);
@@ -326,6 +331,81 @@ export class EmployeeManager {
     };
   }
 
+  /**
+   * Finds an existing employee by its functional business identity.
+   *
+   * In v1, employee onboarding is treated as an idempotent/upsert-like flow keyed by
+   * `email + role`. The physical record id can still vary across payloads, but the
+   * business identity must not create duplicates for the same role assignment.
+   */
+  private async findEmployeeByEmailAndRole(
+    vaultId: string,
+    email: string,
+    roleCode: string,
+  ): Promise<ConfidentialStorageDoc | undefined> {
+    const queryAttributes: ParameterData[] = [
+      { name: 'email', value: email, unique: true, type: 'string' },
+      { name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token' },
+    ];
+
+    const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(queryAttributes, vaultId);
+    const results = await this.vaultRepository.query(vaultId, {
+      sectionId: EMPLOYEE_SECTION,
+      where: protectedAttributes.map((attribute) => ({
+        name: attribute.name,
+        value: attribute.value,
+      })),
+    });
+
+    return ((results || [])[0] as ConfidentialStorageDoc | undefined) || undefined;
+  }
+
+  /**
+   * Applies v1 upsert semantics for an existing employee record.
+   *
+   * - active existing employee: return the current record without consuming another seat
+   * - inactive existing employee: reactivate it and update claims/metadata in place
+   *
+   * This keeps `disable` aligned with suspension semantics rather than duplicate recreation.
+   */
+  private async upsertExistingEmployee(
+    employeeDoc: ConfidentialStorageDoc,
+    vaultId: string,
+    claims: ClaimsRecord,
+    entryType: string,
+  ): Promise<BundleEntry> {
+    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
+    const isActive = employee.status === EntityLifecycleStatus.Active;
+
+    if (!isActive) {
+      employee.status = EntityLifecycleStatus.Active;
+      employee.claims = claims;
+      employee.meta = {
+        ...(employee.meta || {}),
+        lastUpdated: new Date().toISOString(),
+      };
+
+      const docToProtect: ConfidentialStorageDoc = {
+        ...employeeDoc,
+        status: employee.status,
+        sequence: (employeeDoc.sequence || 0) + 1,
+        content: employee,
+      };
+      const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
+      await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);
+    }
+
+    return {
+      type: entryType,
+      resource: {
+        id: employee.id,
+        type: 'Person',
+        meta: { claims: isActive ? employee.claims : claims },
+      },
+      response: { status: '200' },
+    };
+  }
+
   private async tryConsumeEmployeeSeatOrOffer(params: {
     vaultId: string;
     employeeId: string;
@@ -388,7 +468,12 @@ export class EmployeeManager {
     const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
     employee.status = EntityLifecycleStatus.Inactive;
 
-    const docToProtect: ConfidentialStorageDoc = { ...employeeDoc, content: employee };
+    const docToProtect: ConfidentialStorageDoc = {
+      ...employeeDoc,
+      status: employee.status,
+      sequence: (employeeDoc.sequence || 0) + 1,
+      content: employee,
+    };
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
     await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);
 

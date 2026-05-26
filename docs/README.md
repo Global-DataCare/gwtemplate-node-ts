@@ -35,6 +35,7 @@ docs/
 - **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
 - **Core integration bible**: [API_CORE_INTEGRATION.md](API_CORE_INTEGRATION.md) defines the canonical SEDIA-aligned flow used by SDK live core tests.
 - **Consent access status**: [90.E-TODO_SMART_EHR_COMPAT.md](90.E-TODO_SMART_EHR_COMPAT.md) also records the current live SMART consent-evaluation behavior, including deny precedence and permission-request lookup identifiers.
+- **Tenant identifier migration note**: [90.K-TODO_TENANT_IDENTIFIER_V2.md](90.K-TODO_TENANT_IDENTIFIER_V2.md) tracks the deferred `v2.0` redesign away from `alternateName`-based hosted compatibility.
 - **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
   - `artifacts/openapi-profiles/openapi-core.json`
@@ -45,6 +46,25 @@ docs/
 - **Contract-check intent**: The flow report is used as a reproducible docs/examples contract check and to keep Swagger examples aligned with real responses.
 - **Intentional negative controls**: Some report steps are expected to fail (for example `2.1.2 Initial Access Token Exchange (invalid code)`) to verify error handling before the valid path.
 - **Flow Coverage Note**: `docs:flow-report` also validates ICA status messaging for the legal representative (`/_messages` and `/_get`). If ICA connectivity is not configured, the report records that check as informational.
+
+## Example Data And Docs Sync
+
+- GW canonical payload fixtures live in `src/__tests__/data/example-payloads.ts`.
+- Swagger/OpenAPI examples are injected from those fixtures by `src/utils/swagger-spec.ts` and `scripts/generate-swagger-spec.mts`.
+- Demo/incremental flow scripts should render from those same fixtures via `scripts/render-example-payload.mts`, applying only explicit overrides.
+- Shared cross-repo examples from `gdc-common-utils-ts/examples/...` are checked by `src/__tests__/unit/examples/shared-flow-examples.test.ts`.
+- Canonical markdown examples in `docs/90.A-API_INTEGRATORS_GUIDE.md` are marked with `<!-- sync-example: ... -->` and checked by `src/__tests__/unit/examples/markdown-examples.test.ts`.
+
+Practical rule:
+
+- Change the exported fixture first.
+- Regenerate Swagger if needed with `npm run build:swagger`.
+- Keep any marked markdown example byte-aligned with that fixture.
+- Run:
+
+```bash
+npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.ts src/__tests__/unit/examples/shared-flow-examples.test.ts src/__tests__/unit/utils/swagger-spec.test.ts
+```
 
 ### 📂 01-OVERVIEW-AND-GUIDES
 *   **[01.A-ARCHITECTURE-OVERVIEW.md](01-OVERVIEW-AND-GUIDES/01.A-ARCHITECTURE-OVERVIEW.md)**: **(START HERE)** The main document outlining the core architectural patterns, data flows, and principles.

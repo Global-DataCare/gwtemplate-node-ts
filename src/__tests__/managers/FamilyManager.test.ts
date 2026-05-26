@@ -2,9 +2,19 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { randomUUID } from 'crypto';
+import { execFileSync } from 'child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { mock, MockProxy } from 'jest-mock-extended';
+import { tmpdir } from 'os';
+import path from 'path';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { BundleJsonApi, BundleEntry } from 'gdc-common-utils-ts/models/bundle';
+import { PDFDocument } from 'pdf-lib';
+import {
+  ClaimsOrganizationSchemaorg,
+  ClaimsPersonSchemaorg,
+  ClaimsServiceSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
 import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
 import { IStorageAdapter } from '../../database/storage/IStorageAdapter';
 import { ILogger } from '../../loggers/ILogger';
@@ -13,6 +23,7 @@ import { EntityLifecycleStatus } from '../../gdc-backend-utils-node/models/enums
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { mockKmsService } from '../mocks/kms.mock';
+import { buildClaimsFromIndividualFormPdf } from '../../utils/individual-form-pdf';
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -30,22 +41,22 @@ const TENANT_DID = 'did:web:host.example.com';
  * `termsOfService` is an https URL so handleServiceAttachment skips file upload.
  */
 const BASE_CLAIMS: Record<string, unknown> = {
-  'org.schema.Service.category': SECTOR,
-  'org.schema.Organization.addressCountry': 'ES',
-  'org.schema.Organization.identifier.additionalType': 'UUID',
-  'org.schema.Organization.identifierValue': randomUUID(),
-  'org.schema.Organization.owner.email': 'parent@example.com',
-  'org.schema.Organization.owner.telephone': '+34600000001',
-  'org.schema.Organization.owner.identifier.value': 'parent@example.com',
-  'org.schema.Organization.alternateName': 'Ana',
-  'org.schema.Person.email': 'child@example.com',
-  'org.schema.Person.identifier.additionalType': 'UUID',
-  'org.schema.Person.identifier.value': randomUUID(),
-  'org.schema.Person.telephone': '+34600000001',
-  'org.schema.Person.alternateName': 'Ana',
-  'org.schema.Service.identifier': 'did:web:provider.example.com',
-  'org.schema.Service.serviceType': 'http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC',
-  'org.schema.Service.termsOfService': 'https://example.com/terms',
+  [ClaimsServiceSchemaorg.category]: SECTOR,
+  [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+  [ClaimsOrganizationSchemaorg.identifierType]: 'UUID',
+  [ClaimsOrganizationSchemaorg.identifierValue]: randomUUID(),
+  [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent@example.com',
+  [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
+  [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: 'IDCES-TEST-CONTROLLER',
+  [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+  [ClaimsPersonSchemaorg.email]: 'child@example.com',
+  [ClaimsPersonSchemaorg.identifierType]: 'UUID',
+  [ClaimsPersonSchemaorg.identifierValue]: randomUUID(),
+  [ClaimsPersonSchemaorg.telephone]: '+34600000001',
+  [ClaimsPersonSchemaorg.alternateName]: 'Ana',
+  [ClaimsServiceSchemaorg.identifier]: 'did:web:provider.example.com',
+  [ClaimsServiceSchemaorg.serviceType]: 'http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC',
+  [ClaimsServiceSchemaorg.termsOfService]: 'https://example.com/terms',
 };
 
 function makeBatchJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
@@ -76,6 +87,38 @@ function makeBatchJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
   };
 }
 
+function makeTransactionJob(
+  overrideClaims: Record<string, unknown> = {},
+  attachments?: Array<Record<string, unknown>>,
+): JobRequest {
+  return {
+    id: randomUUID(),
+    status: JobStatus.DRAFT,
+    sequence: 0,
+    createdAtTimestamp: Date.now(),
+    tenantId: TENANT_ID,
+    sector: SECTOR,
+    section: 'individual',
+    format: 'org.schema',
+    action: '_transaction',
+    resourceType: 'Organization',
+    content: {
+      jti: randomUUID(),
+      thid: randomUUID(),
+      iss: 'did:web:client.example.com',
+      aud: `did:web:${TENANT_ID}.example.com`,
+      type: 'application/api+json',
+      body: {
+        data: [{
+          type: 'Family-registration-form-v1.0',
+          meta: { claims: { ...BASE_CLAIMS, ...overrideClaims } },
+        }],
+      },
+      ...(attachments ? { attachments } : {}),
+    },
+  };
+}
+
 function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
   return {
     id: randomUUID(),
@@ -99,16 +142,115 @@ function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest
           type: 'Family-search-v1.0',
           meta: {
             claims: {
-              'org.schema.Organization.owner.telephone': '+34600000001',
-              'org.schema.Organization.owner.email': 'parent@example.com',
-              'org.schema.Organization.alternateName': 'Ana',
-              'org.schema.Service.category': SECTOR,
+              [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
+              [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent@example.com',
+              [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+              [ClaimsServiceSchemaorg.category]: SECTOR,
               ...overrideClaims,
             },
           },
         }],
       },
     },
+  };
+}
+
+async function extractPdfFormFieldsFromFixture(pdfPath: string): Promise<Record<string, string>> {
+  const document = await PDFDocument.load(readFileSync(pdfPath), { ignoreEncryption: true, updateMetadata: false });
+  const fields: Record<string, string> = {};
+  for (const field of document.getForm().getFields()) {
+    const name = field.getName()?.trim();
+    if (!name) continue;
+
+    let value = '';
+    if (typeof (field as any).getText === 'function') {
+      value = String((field as any).getText() || '').trim();
+    } else if (typeof (field as any).getSelected === 'function') {
+      const selected = (field as any).getSelected();
+      value = Array.isArray(selected) ? selected.join(', ').trim() : String(selected || '').trim();
+    } else if (typeof (field as any).isChecked === 'function') {
+      value = (field as any).isChecked() ? 'true' : 'false';
+    }
+    if (value) fields[name] = value;
+  }
+  return fields;
+}
+
+function extractNaturalPersonSignerSubjectFromPdf(pdfPath: string): string {
+  const pdfBytes = readFileSync(pdfPath);
+  const pdfAsLatin1 = pdfBytes.toString('latin1');
+  const byteRangeRegex = /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g;
+  const match = byteRangeRegex.exec(pdfAsLatin1);
+  if (!match) {
+    throw new Error('Real PDF fixture is missing ByteRange.');
+  }
+
+  const [start1, length1, start2] = match.slice(1, 4).map((value) => Number.parseInt(value, 10));
+  const signatureWindow = pdfBytes.subarray(start1 + length1, start2);
+  const lt = signatureWindow.indexOf(0x3c);
+  const gt = signatureWindow.lastIndexOf(0x3e);
+  let hex = signatureWindow.subarray(lt + 1, gt).toString('latin1').replace(/[^0-9a-fA-F]/g, '');
+  while (hex.endsWith('00')) {
+    hex = hex.slice(0, -2);
+  }
+
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'gw-family-pdf-fixture-'));
+  try {
+    const signatureDerPath = path.join(tempDir, 'signature.der');
+    const certsPath = path.join(tempDir, 'certs.pem');
+    writeFileSync(signatureDerPath, Buffer.from(hex, 'hex'));
+    execFileSync('openssl', ['pkcs7', '-inform', 'DER', '-in', signatureDerPath, '-print_certs', '-out', certsPath]);
+
+    const certs = (readFileSync(certsPath, 'utf8').match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) || []);
+    for (const [index, certPem] of certs.entries()) {
+      const certPath = path.join(tempDir, `cert-${index}.pem`);
+      writeFileSync(certPath, `${certPem}\n`);
+      const subject = execFileSync(
+        'openssl',
+        ['x509', '-in', certPath, '-noout', '-subject', '-nameopt', 'RFC2253'],
+        { encoding: 'utf8' },
+      ).trim();
+      if (/\bserialNumber=IDCES-/i.test(subject)) {
+        return subject.replace(/^subject=/i, '');
+      }
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+
+  throw new Error('Natural-person signer certificate not found in real PDF fixture.');
+}
+
+function getIndividualPdfFixtureConfig(): {
+  pdfPath: string;
+  expectedSignerSubjectDn: string;
+  expectedControllerEmail: string;
+  expectedOrganizationAlternateName: string;
+  expectedControllerBirthDate?: string;
+  expectedControllerGender?: string;
+} | null {
+  const pdfPath = String(process.env.TEST_INDIVIDUAL_FORM_PDF_PATH || '').trim();
+  const cn = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_CN || '').trim();
+  const sn = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SN || '').trim();
+  const gn = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_GN || '').trim();
+  const serialNumber = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim();
+  const country = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_COUNTRY || '').trim();
+  const email = String(process.env.TEST_INDIVIDUAL_CONTROLLER_EMAIL || '').trim().toLowerCase();
+  const alternateName = String(process.env.TEST_INDIVIDUAL_ORGANIZATION_ALTNAME || '').trim();
+  const birthDate = String(process.env.TEST_INDIVIDUAL_CONTROLLER_BIRTHDATE || '').trim();
+  const gender = String(process.env.TEST_INDIVIDUAL_CONTROLLER_GENDER || '').trim();
+
+  if (!pdfPath || !cn || !sn || !gn || !serialNumber || !country || !email || !alternateName) {
+    return null;
+  }
+
+  return {
+    pdfPath,
+    expectedSignerSubjectDn: `CN=${cn},SN=${sn},GN=${gn},serialNumber=${serialNumber},C=${country}`,
+    expectedControllerEmail: email,
+    expectedOrganizationAlternateName: alternateName,
+    ...(birthDate ? { expectedControllerBirthDate: birthDate } : {}),
+    ...(gender ? { expectedControllerGender: gender } : {}),
   };
 }
 
@@ -207,12 +349,106 @@ describe('FamilyManager', () => {
         COLLECTION_NAME,
         expect.objectContaining({
           where: expect.arrayContaining([
-            expect.objectContaining({ name: 'org.schema.Organization.owner.telephone', value: '+34600000001' }),
-            expect.objectContaining({ name: 'org.schema.Organization.alternateName', value: 'Ana' }),
+            expect.objectContaining({ name: ClaimsOrganizationSchemaorg.ownerTelephone, value: '+34600000001' }),
+            expect.objectContaining({ name: ClaimsOrganizationSchemaorg.alternateName, value: 'Ana' }),
           ]),
         }),
       );
     });
+
+    it('individual-form-pdf-cert-signed maps the real signed PDF into valid CORE family claims', async () => {
+        const fixture = getIndividualPdfFixtureConfig();
+        if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
+          return;
+        }
+
+        mockVaultRepository.query.mockResolvedValue([]);
+        mockVaultRepository.put.mockResolvedValue(true);
+
+        const pdfFields = await extractPdfFormFieldsFromFixture(fixture.pdfPath);
+        const signerSubjectDn = extractNaturalPersonSignerSubjectFromPdf(fixture.pdfPath);
+        const mapped = buildClaimsFromIndividualFormPdf(pdfFields, signerSubjectDn);
+
+        const response = await manager.process(makeBatchJob({
+          [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+          [ClaimsPersonSchemaorg.telephone]: '',
+          ...mapped,
+        }));
+        const body = response.body as BundleJsonApi;
+        const entry = body.data[0] as BundleEntry;
+
+        expect(pdfFields.email).toBe(fixture.expectedControllerEmail);
+        expect(pdfFields.alternateName).toBe(fixture.expectedOrganizationAlternateName);
+        expect(signerSubjectDn).toBe(fixture.expectedSignerSubjectDn);
+
+        expect(mapped).toEqual(expect.objectContaining({
+          '@context': 'org.schema',
+          [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
+          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+          [ClaimsPersonSchemaorg.email]: fixture.expectedControllerEmail,
+          [ClaimsPersonSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
+          [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+          [ClaimsOrganizationSchemaorg.addressCountry]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_COUNTRY || '').trim(),
+        }));
+        expect(mapped[ClaimsPersonSchemaorg.givenName]).toBe(String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_GN || '').trim());
+        expect(mapped[ClaimsPersonSchemaorg.familyName]).toBe(String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SN || '').trim());
+        expect(mapped[ClaimsPersonSchemaorg.name]).toBe(
+          `${String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_GN || '').trim()} ${String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SN || '').trim()}`.trim(),
+        );
+        if (fixture.expectedControllerBirthDate) {
+          expect(mapped[ClaimsPersonSchemaorg.birthDate]).toBe(fixture.expectedControllerBirthDate);
+        }
+        if (fixture.expectedControllerGender) {
+          expect(mapped[ClaimsPersonSchemaorg.gender]).toBe(fixture.expectedControllerGender);
+        }
+
+        expect(entry.meta?.claims).toEqual(expect.objectContaining({
+          'org.schema.FamilyRegistration.status': 'new_created',
+          [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
+          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+          [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+        }));
+      });
+
+    it('individual-form-pdf attachment flow accepts _transaction alias and completes claims from signed PDF', async () => {
+        const fixture = getIndividualPdfFixtureConfig();
+        if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
+          return;
+        }
+
+        mockVaultRepository.query.mockResolvedValue([]);
+        mockVaultRepository.put.mockResolvedValue(true);
+
+        const pdfBase64 = readFileSync(fixture.pdfPath).toString('base64');
+        const response = await manager.process(makeTransactionJob(
+          {
+            [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+            [ClaimsPersonSchemaorg.telephone]: '',
+            [ClaimsServiceSchemaorg.category]: SECTOR,
+            [ClaimsServiceSchemaorg.identifier]: 'did:web:provider.example.com',
+            [ClaimsServiceSchemaorg.serviceType]: 'http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC',
+            [ClaimsServiceSchemaorg.termsOfService]: 'https://example.com/terms',
+          },
+          [{
+            id: 'signed-individual-form',
+            media_type: 'application/pdf',
+            data: { base64: pdfBase64 },
+          }],
+        ));
+        const body = response.body as BundleJsonApi;
+        const entry = body.data[0] as BundleEntry;
+
+        expect(body.type).toBe('transaction-response');
+        expect(entry.meta?.claims).toEqual(expect.objectContaining({
+          'org.schema.FamilyRegistration.status': 'new_created',
+          [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
+          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+          [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+        }));
+      });
   });
 
   // -------------------------------------------------------------------------
@@ -234,8 +470,8 @@ describe('FamilyManager', () => {
       const existingContent = {
         status: EntityLifecycleStatus.Active,
         claims: {
-          'org.schema.Organization.owner.telephone': '+34600000001',
-          'org.schema.Organization.alternateName': 'Ana',
+          [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
+          [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
         },
         contained: [],
       };
@@ -253,8 +489,8 @@ describe('FamilyManager', () => {
       const existingContent = {
         status: EntityLifecycleStatus.Pending,
         claims: {
-          'org.schema.Organization.owner.telephone': '+34600000001',
-          'org.schema.Organization.alternateName': 'Ana',
+          [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
+          [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
         },
         contained: [],
       };

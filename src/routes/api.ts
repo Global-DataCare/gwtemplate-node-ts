@@ -597,11 +597,17 @@ export function createApiRouter(
    *       - 3.1 Employee Role
    *     summary: Create a new Professional (Employee)
    *     description: |
-   *       Submits an asynchronous job to create a new professional (employee) within an existing tenant.
+   *       Submits an asynchronous job to create or reactivate a professional (employee) within an existing tenant.
    *       The `tenantId` in the path specifies the organization under which the employee is being created.
    *       Prerequisite: controller device/client must already be active (`Token/_exchange` + `Device/_dcr`).
    *       Creating an employee profile does not automatically activate employee devices.
    *       For additional employees/devices, use `License/_issue` and then run `_exchange` + `_dcr`.
+   *       
+   *       V1 lifecycle semantics:
+   *       - business identity is the combination `email + role`
+   *       - if the same `email + role` already exists and is active, the gateway returns the existing employee instead of creating a duplicate
+   *       - if the same `email + role` exists and is inactive, the gateway reactivates that employee record
+   *       - employee suspension does not implicitly release the reserved license seat
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -686,6 +692,11 @@ export function createApiRouter(
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
    *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         With `@context: "org.schema"`, clients may send contextualized keys such as `Organization.identifier.value`
+   *         or `Service.category` without the `org.schema.` prefix; that is the documented default mode.
+   *         If the service enables `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, equivalent fully-qualified `org.schema.*`
+   *         keys remain valid. `Service.termsOfService` may be an HTTPS URL or an embedded PDF data URL; Swagger uses
+   *         the HTTPS URL form as the default example.
    *       required: true
    *       content:
    *         application/didcomm-plaintext+json:
@@ -1624,6 +1635,14 @@ export function createApiRouter(
    *     description: |
   *       Legacy compatibility endpoint for hosted individual onboarding.
   *       The current portal flow uses tenant organization activation from signed proof and individual indexing in the hosted tenant.
+  *
+  *       This route also accepts a signed individual onboarding PDF as a DIDComm attachment.
+  *       When present, the gateway verifies the PDF signature, extracts the signer certificate
+  *       subject, reads the additional form fields, and completes the individual registration claims
+  *       without overwriting certificate-derived person identity data.
+  *
+  *       New integrations should prefer the `_transaction` alias below. `_batch` is kept for compatibility
+  *       and will be deprecated after clients migrate.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1653,11 +1672,91 @@ export function createApiRouter(
    *     responses:
    *       '202': { description: Accepted. Poll the Location URL for the Offer result. }
    *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_transaction:
+   *   post:
+   *     tags:
+   *       - 4.1 Family Registration
+  *     summary: Register an individual organization transaction with optional signed PDF attachment
+   *     description: |
+  *       Canonical successor of `.../Organization/_batch` for individual organization onboarding.
+  *       The payload shape is the same as `_batch`, but the semantic contract is transactional:
+  *       the individual organization, the legal representative/controller claims, and the signed PDF
+  *       attachment travel together as one business transaction.
+  *
+  *       When the DIDComm message includes a PDF attachment (`media_type: application/pdf`), the gateway:
+  *       - validates the PDF signature,
+  *       - extracts the natural-person certificate subject,
+  *       - reads the form fields,
+  *       - derives CORE claims from certificate + form,
+  *       - and merges them with request claims, preserving certificate-derived identity values as authoritative.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       description: |
+   *         Same payload contract as `_batch`. Production: only `application/x-www-form-urlencoded`
+   *         is accepted (secure JWE envelope with `request=`). Demo/Test-Network:
+   *         `application/didcomm-plaintext+json` is canonical, and `application/json`
+   *         is also accepted for simplicity.
+   *         With `@context: "org.schema"`, clients may send contextualized keys such as `Organization.identifier.value`
+   *         or `Service.category` without the `org.schema.` prefix; that is the documented default mode.
+   *         If the service enables `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, equivalent fully-qualified `org.schema.*`
+   *         keys remain valid. `Service.termsOfService` may be an HTTPS URL or an embedded PDF data URL; Swagger uses
+   *         the HTTPS URL form as the default example.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/FamilyRegistrationPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the transaction result. }
+   *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response:
    *   post:
    *     tags:
    *       - 4.1 Family Registration
   *     summary: Poll the legacy individual registration result (Offer)
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_transaction-response:
+   *   post:
+   *     tags:
+   *       - 4.1 Family Registration
+  *     summary: Poll the individual registration transaction result
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'

@@ -123,6 +123,15 @@ describe('Service Initialization Utilities', () => {
       expect(individualService!.serviceEndpoint).toContain('Person');
       expect(individualService!.serviceEndpoint).toContain('Patient');
 
+      const individualTransactionService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'individual' &&
+          (s as any).selector?.format === 'org.schema' &&
+          s.serviceEndpoint === 'Organization' &&
+          (s.actions || []).includes('_transaction'),
+      );
+      expect(individualTransactionService).toBeDefined();
+
       const fhirR4Service = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'individual' &&

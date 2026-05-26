@@ -217,4 +217,41 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
     expect(response.headers.location).toContain(`${url.replace('/_batch', '/_batch-response')}`);
     expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
   });
+
+  it('should return 202 Accepted for the _transaction alias on family registration', async () => {
+    const tenantId = 'acme';
+    const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_transaction`;
+
+    const decodedJob: JobRequest = {
+      id: 'job-family-transaction-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_transaction',
+      resourceType: 'Organization',
+      content: FAMILY_REGISTRATION_REQUEST as any,
+    };
+    mockKmsService.decodeRequest.mockResolvedValueOnce(decodedJob as any);
+
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'App-ID': 'test-app',
+        'App-Version': '1.0.0',
+        Authorization: 'Bearer fake-oidc-id-token',
+      },
+      body: { request: 'fake.encrypted.payload' },
+    });
+
+    expect(response.status).toBe(202);
+    expect(response.headers.location).toBeDefined();
+    expect(response.headers.location).toContain(`${url.replace('/_transaction', '/_transaction-response')}`);
+    expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
+  });
 });

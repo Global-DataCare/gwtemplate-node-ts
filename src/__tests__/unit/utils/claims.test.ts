@@ -70,6 +70,16 @@ describe('processResponseModesClaim', () => {
 });
 
 describe('normalizeContextualizedClaims', () => {
+  const originalIdentityStorageMode = process.env.CLAIMS_IDENTITY_STORAGE_MODE;
+
+  afterEach(() => {
+    if (originalIdentityStorageMode === undefined) {
+      delete process.env.CLAIMS_IDENTITY_STORAGE_MODE;
+      return;
+    }
+    process.env.CLAIMS_IDENTITY_STORAGE_MODE = originalIdentityStorageMode;
+  });
+
   test('should prefix contextual claims and preserve fully-qualified keys and context fields', () => {
     const claims = normalizeContextualizedClaims({
       '@context': 'org.schema',
@@ -98,5 +108,23 @@ describe('normalizeContextualizedClaims', () => {
 
     expect(getClaimValue(claims, 'Consent.action')).toBe('LOINC|48765-2');
     expect(getClaimValue(claims, 'Consent.actor-role')).toBe('ISCO-08|2211');
+  });
+
+  test('should strip the org.schema prefix when identity storage mode is canonical', () => {
+    process.env.CLAIMS_IDENTITY_STORAGE_MODE = 'canonical';
+
+    const claims = normalizeContextualizedClaims({
+      '@context': 'org.schema',
+      '@type': 'template',
+      'org.schema.Organization.identifier.value': 'A12345678',
+      'Service.category': 'health-care',
+    });
+
+    expect(claims).toEqual({
+      '@context': 'org.schema',
+      '@type': 'template',
+      'Organization.identifier.value': 'A12345678',
+      'Service.category': 'health-care',
+    });
   });
 });

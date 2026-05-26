@@ -136,7 +136,7 @@ export const ORGANIZATION_REGISTRATION_REQUEST = {
         "claims": {
           "@context": "org.schema",
           "@type": "template",
-          ...testClaimsRegisterTenantExpanded,
+          ...((({ "org.schema.Organization.alternateName": _alternateName, ...legalClaims }) => legalClaims)(testClaimsRegisterTenantExpanded)),
           "org.schema.Service.termsOfService": pdfEmbeddedData,
         },
       },
@@ -461,7 +461,7 @@ export const SMART_TOKEN_REQUEST = {
     "token_type": "Bearer",
     "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
     "purpose": "TREAT",
-    "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=LOINC|48765-2 patient/Consent.cruds"
+    "scope": "patient/Composition.rs?subject={{individualDid}}&section=LOINC|48765-2 patient/Consent.cruds"
   },
   "meta": { ...metaRequestBodyOnlyKidHeader }
 };
@@ -610,6 +610,13 @@ export const FAMILY_REGISTRATION_REQUEST = {
   "iss": "adult1@example.com",
   "aud": "did:web:api.acme.org",
   "type": "application/api+json",
+  "attachments": [{
+    "id": "signed-individual-form-pdf",
+    "media_type": "application/pdf",
+    "data": {
+      "base64": "{{signedIndividualFormPdfBase64}}"
+    }
+  }],
   "body": {
     "data": [{
       "type": "Family-registration-form-v1.0",
@@ -618,12 +625,24 @@ export const FAMILY_REGISTRATION_REQUEST = {
           "@context": "org.schema",
           "@type": "template",
           ...testFamilyRegisterExpanded,
-          "org.schema.Service.termsOfService": pdfEmbeddedData,
+          "Service.termsOfService": "https://provider.example.com/terms.pdf",
         }
       }
     }]
   },
   "meta": { ...metaRequestBodyFullJWK }
+};
+
+/**
+ * Canonical successor of `FAMILY_REGISTRATION_REQUEST`.
+ *
+ * The transport payload is the same; the only difference is the route action:
+ * `.../Organization/_transaction` instead of `.../Organization/_batch`.
+ */
+export const FAMILY_REGISTRATION_TRANSACTION_REQUEST = {
+  ...FAMILY_REGISTRATION_REQUEST,
+  jti: 'family-registration-transaction-request-<test-id>',
+  thid: 'family-registration-transaction-thread-<test-id>',
 };
 
 /**
@@ -711,13 +730,13 @@ export const CONSENT_CREATION_MESSAGE = {
         claims: {
           "@context": "org.hl7.fhir.api",
           "Consent.decision": "permit",
-          "Consent.subject": "unified-health-id",
+          "Consent.subject": "{{individualDid}}",
           "Consent.identifier": "urn:uuid:patient-consent-uuid",
-          "Consent.grantee": "did:web:hospital.example.com",
+          "Consent.grantee": "{{physicianOrg}}",
           "Consent.date": "2025-11-25",
           "Consent.purpose": "TREAT",
           "Consent.action": "LOINC|48765-2",
-          "Consent.actor-identifier": "did:web:hospital.example.com",
+          "Consent.actor-identifier": "{{physicianDid}}",
           "Consent.actor-role": "ISCO-08|2211",
           "Consent.attachment-contentType": "application/odrl+json",
           "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
@@ -743,8 +762,8 @@ export const CONSENT_CREATION_MESSAGE = {
             code: "TREAT"
           }]
         }],
-        patient: { reference: "unified-health-id" },
-        performer: [{ reference: "did:web:hospital.example.com" }],
+        patient: { reference: "{{individualDid}}" },
+        performer: [{ reference: "{{physicianDid}}" }],
         provision: { type: "permit" },
         sourceAttachment: {
           contentType: "application/odrl+json",
@@ -776,10 +795,10 @@ export const COMMUNICATION_CREATION_MESSAGE = {
           "Communication.content-attachment-type": "text/calendar",
           "Communication.content-reference": "https://url-to-appointment-source.com/some-uuid",
           "Communication.part-of": "urn:uuid:communication-channel-id",
-          "Communication.recipient": "{CUSTOMER_DID_WEB}",
-          "Communication.sender": "{ORGANIZATION_DID_WEB}",
+          "Communication.recipient": "{{individualDid}}",
+          "Communication.sender": "{{physicianDid}}",
           "Communication.sent": "2025-10-15T14:30:00Z",
-          "Communication.subject": "{CUSTOMER_DID_WEB}",
+          "Communication.subject": "{{individualDid}}",
           "Communication.text": "This is your new appointment. Best regards."
         }
       },
@@ -797,8 +816,8 @@ export const COMMUNICATION_CREATION_MESSAGE = {
             system: "http://terminology.hl7.org/CodeSystem/communication-category"
           }]
         }],
-        recipient: [{ reference: "{CUSTOMER_DID_WEB}" }],
-        sender: { reference: "{ORGANIZATION_DID_WEB}" },
+        recipient: [{ reference: "{{individualDid}}" }],
+        sender: { reference: "{{physicianDid}}" },
         sent: "2025-10-15T14:30:00Z",
         note: [{ text: "This is your new appointment. Best regards." }],
         payload: [
@@ -827,7 +846,7 @@ export const COMMUNICATION_CREATION_MESSAGE = {
 export const COMPOSITION_UPDATE_MESSAGE = {
   "jti": "composition-update-request-<test-id>",
   "thid": "composition-update-thread-<test-id>",
-  "iss": "did:web:hospital.example.com",
+  "iss": "{{physicianDid}}",
   "aud": "did:web:api.acme.org",
   "exp": 1678886460,
   "iat": 1678886400,
@@ -842,11 +861,11 @@ export const COMPOSITION_UPDATE_MESSAGE = {
         "claims": {
           "@context": "org.hl7.fhir.api",
           "@type": "Composition:IndexEntry",
-          "Composition.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+          "Composition.subject": "{{individualDid}}",
           "Composition.section": "LOINC|48765-2",
           "Composition.entry": "https://ehr.hospital.example.com/fhir/AllergyIntolerance/12345,https://ehr.hospital.example.com/fhir/DiagnosticReport/67890",
           "Composition.date": "2025-11-26T10:00:00Z",
-          "Composition.author": "did:web:hospital.example.com",
+          "Composition.author": "{{physicianDid}}",
           "Composition.title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
           "Composition.type": "LOINC|60591-5"
         }
@@ -858,9 +877,9 @@ export const COMPOSITION_UPDATE_MESSAGE = {
       "resource": {
         "resourceType": "Composition",
         "status": "final",
-        "subject": { "reference": "did:web:api.acme.org:individual:<unified-health-identifier>" },
+        "subject": { "reference": "{{individualDid}}" },
         "date": "2025-11-26T10:00:00Z",
-        "author": [{ "reference": "did:web:hospital.example.com" }],
+        "author": [{ "reference": "{{physicianDid}}" }],
         "title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
         "type": { "coding": [{ "system": "http://loinc.org", "code": "60591-5" }] },
         "section": [{
@@ -965,7 +984,7 @@ export const RESEARCH_COMPOSITION_INGESTION_MESSAGE = {
 export const PERSONAL_OBSERVATION_MESSAGE = {
   jti: "personal-observation-message-<test-id>",
   thid: "thid-personal-observation",
-  iss: "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+  iss: "{{individualDid}}:device:<uuid>",
   aud: "did:web:api.acme.org",
   type: "org.hl7.fhir.r4.Bundle",
   body: {
@@ -977,7 +996,7 @@ export const PERSONAL_OBSERVATION_MESSAGE = {
         claims: {
           "@context": "org.hl7.fhir.api",
           "@type": "Observation:SelfReported",
-          "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+          "Observation.subject": "{{individualDid}}",
           "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
           // User-selected code (e.g., from a picker based on a curated SNOMED IPS ValueSet).
           // NOTE:
@@ -1007,7 +1026,7 @@ export const PERSONAL_OBSERVATION_MESSAGE = {
 export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
   jti: "personal-preferences-mds-message-<test-id>",
   thid: "thid-personal-preferences-mds",
-  iss: "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+  iss: "{{individualDid}}:device:<uuid>",
   aud: "did:web:api.acme.org",
   type: "org.hl7.fhir.r4.Bundle",
   body: {
@@ -1020,7 +1039,7 @@ export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
           claims: {
             "@context": "org.hl7.fhir.api",
             "@type": "Observation:SelfReported",
-            "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+            "Observation.subject": "{{individualDid}}",
             "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
             "Observation.code": "LOINC|54728-1",
             "Observation.code-userselected": true,
@@ -1037,7 +1056,7 @@ export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
           claims: {
             "@context": "org.hl7.fhir.api",
             "@type": "Observation:SelfReported",
-            "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+            "Observation.subject": "{{individualDid}}",
             "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
             "Observation.code": "LOINC|54723-2",
             "Observation.code-userselected": true,
@@ -1055,7 +1074,7 @@ export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
 export const FAMILY_MEMBER_RELATIONSHIP_MESSAGE = {
   jti: "family-relationship-message-<test-id>",
   thid: "thid-family-relationship",
-  iss: "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+  iss: "{{individualControllerDid}}:device:<uuid>",
   aud: "did:web:api.acme.org",
   type: "org.hl7.fhir.r4.Bundle",
   body: {
@@ -1067,7 +1086,7 @@ export const FAMILY_MEMBER_RELATIONSHIP_MESSAGE = {
         claims: {
           "@context": "org.hl7.fhir.api",
           "@type": "RelatedPerson:EmergencyContact",
-          "RelatedPerson.patient": "did:web:api.acme.org:individual:<unified-health-identifier>",
+          "RelatedPerson.patient": "{{individualDid}}",
           "RelatedPerson.identifier": "urn:uuid:related-person-uuid",
           "RelatedPerson.relationship": "http://terminology.hl7.org/CodeSystem/v3-RoleCode|PRN",
           "RelatedPerson.telecom": "tel:+34600123456",

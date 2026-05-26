@@ -8,13 +8,24 @@ export function createApiDocsSetupOptions(
   const globalContextScript = `
     (() => {
       const KEY_PREFIX = 'gw-api-docs:';
+      const PANEL_VERSION = '2026-05-25-individual-did-v3';
       const fields = [
         { key: 'testId', label: 'test id', placeholder: '01' },
-        { key: 'tenantId', label: 'tenantId', placeholder: 'acme' },
-        { key: 'taxId', label: 'tax id', placeholder: 'default: TaxNumber-<tenantId>, e.g. TaxNumber-acme' },
+        { key: 'taxTenantId', label: 'taxTenantId', placeholder: 'acme-id' },
         { key: 'jurisdiction', label: 'jurisdiction', placeholder: 'ES' },
         { key: 'sector', label: 'sector', placeholder: 'health-care' },
         { key: 'hostSector', label: 'network type', placeholder: 'test' },
+        { key: 'portalNamespace', label: 'portal namespace', placeholder: 'globaldatacare.es' },
+        { key: 'individualUuid', label: 'individualUuid', placeholder: 'a87e5b15-aea4-4475-9c7c-40aa88354b6f' },
+        { key: 'individualDid', label: 'individualDid', placeholder: 'did:web:globaldatacare.es:<sector>:individual:multibase:<derived>' },
+        { key: 'individualControllerEmail', label: 'individualControllerEmail', placeholder: 'guardian@example.org' },
+        { key: 'individualControllerRole', label: 'individualControllerRole', placeholder: 'v3-RoleCode|RESPRSN' },
+        { key: 'individualControllerDid', label: 'individualControllerDid', placeholder: 'did:web:globaldatacare.es:<sector>:individual:multibase:<derived>:family:<derived>:v3-RoleCode|RESPRSN' },
+        { key: 'physicianEmail', label: 'physicianEmail', placeholder: 'doctor1@acme.org' },
+        { key: 'physicianRole', label: 'physicianRole', placeholder: 'ISCO-08|2211' },
+        { key: 'sectionsAllowed', label: 'sectionsAllowed', placeholder: 'LOINC|48765-2' },
+        { key: 'physicianOrg', label: 'physicianOrg', placeholder: 'did:web:globaldatacare.es:<sector>:organization:taxid:<taxTenantId>' },
+        { key: 'physicianDid', label: 'physicianDid', placeholder: 'did:web:globaldatacare.es:<sector>:organization:taxid:<taxTenantId>:member:<derived>:ISCO-08|2211' },
         { key: 'offerId', label: 'offerId', placeholder: 'urn:...:Offer:...' },
         { key: 'activationCode', label: 'activationCode', placeholder: 'lic-...' },
         { key: 'licenseId', label: 'licenseId', placeholder: 'lic-...' },
@@ -22,14 +33,197 @@ export function createApiDocsSetupOptions(
 
       function getValue(key) { return localStorage.getItem(KEY_PREFIX + key) || ''; }
       function setValue(key, value) { localStorage.setItem(KEY_PREFIX + key, value || ''); }
+      function removeValue(key) { localStorage.removeItem(KEY_PREFIX + key); }
+      function getDerivedValue(key) { return localStorage.getItem(KEY_PREFIX + '__derived__:' + key) || ''; }
+      function setDerivedValue(key, value) { localStorage.setItem(KEY_PREFIX + '__derived__:' + key, value || ''); }
       const paramDefaults = {
-        tenantId: 'acme',
+        tenantId: 'acme-id',
         jurisdiction: 'ES',
         sector: 'health-care',
       };
 
+      function normalizeLegacyCanonicalTenantId(value) {
+        const current = String(value || '').trim();
+        if (!current || current === 'acme' || current === 'TaxNumber-acme') return 'acme-id';
+        return current;
+      }
+
+      function getCanonicalTenantId() {
+        return normalizeLegacyCanonicalTenantId(
+          getValue('taxTenantId') || getValue('tenantId') || getValue('taxId') || 'acme-id'
+        );
+      }
+
+      function isLegacyTenantLike(value) {
+        const current = String(value || '').trim();
+        return !current || current === 'acme' || current === 'TaxNumber-acme';
+      }
+
+      function isLegacyIndividualDid(value) {
+        const current = String(value || '').trim();
+        if (!current) return true;
+        return current.includes('<derived>')
+          || current.includes('<unified-health-identifier>')
+          || current.includes('did:web:api.acme.org:individual:');
+      }
+
+      function isLegacyPhysicianOrgDid(value) {
+        const current = String(value || '').trim();
+        if (!current) return true;
+        return current.includes('<taxTenantId>')
+          || current.includes('TaxNumber-acme')
+          || current.includes('did:web:hospital.example.com')
+          || current.includes('did:web:api.acme.org:organization:');
+      }
+      function isLegacyPhysicianDid(value) {
+        const current = String(value || '').trim();
+        if (!current) return true;
+        return current.includes('doctor1@acme.org')
+          || current.includes('did:web:api.acme.org:employee:')
+          || current.includes('<derived>')
+          || current.includes(':employee:')
+          || current.includes('did:web:hospital.example.com');
+      }
+      function isLegacyIndividualControllerDid(value) {
+        const current = String(value || '').trim();
+        if (!current) return true;
+        return current.includes('guardian@example.org')
+          || current.includes('did:web:api.acme.org:family:')
+          || current.includes('<derived>')
+          || current.includes('did:web:hospital.example.com');
+      }
+      const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+      function hexToBytes(hex) {
+        const clean = String(hex || '').trim();
+        if (!clean || clean.length % 2 !== 0) return null;
+        const bytes = [];
+        for (let i = 0; i < clean.length; i += 2) {
+          const value = Number.parseInt(clean.slice(i, i + 2), 16);
+          if (!Number.isFinite(value)) return null;
+          bytes.push(value);
+        }
+        return bytes;
+      }
+
+      function encodeBase58(bytes) {
+        if (!Array.isArray(bytes) || bytes.length === 0) return '';
+        let digits = [0];
+        for (const byte of bytes) {
+          let carry = byte;
+          for (let i = 0; i < digits.length; i += 1) {
+            const value = (digits[i] << 8) + carry;
+            digits[i] = value % 58;
+            carry = Math.floor(value / 58);
+          }
+          while (carry > 0) {
+            digits.push(carry % 58);
+            carry = Math.floor(carry / 58);
+          }
+        }
+        let leadingZeroes = 0;
+        while (leadingZeroes < bytes.length && bytes[leadingZeroes] === 0) leadingZeroes += 1;
+        let result = '';
+        for (let i = 0; i < leadingZeroes; i += 1) result += BASE58_ALPHABET[0];
+        for (let i = digits.length - 1; i >= 0; i -= 1) result += BASE58_ALPHABET[digits[i]];
+        return result;
+      }
+
+      async function sha256Multibase58btc(inputValue) {
+        const normalized = String(inputValue || '').trim().toLowerCase();
+        if (!normalized || !globalThis.crypto || !globalThis.crypto.subtle) return '';
+        const digestBuffer = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+        const digestBytes = Array.from(new Uint8Array(digestBuffer));
+        return 'z' + encodeBase58([0x12, 0x20, ...digestBytes]);
+      }
+
+      function uuidToMultibase58btc(uuidValue) {
+        const normalized = String(uuidValue || '').trim().toLowerCase();
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(normalized)) {
+          return '';
+        }
+        const bytes = hexToBytes(normalized.replace(/-/g, ''));
+        if (!bytes) return '';
+        return 'z' + encodeBase58(bytes);
+      }
+
+      function buildPhysicianOrgDid() {
+        const portalNamespace = getValue('portalNamespace');
+        const sector = getValue('sector');
+        const taxId = getCanonicalTenantId();
+        if (!portalNamespace || !sector || !taxId) return '';
+        return 'did:web:' + portalNamespace + ':' + sector + ':organization:taxid:' + taxId;
+      }
+
+      function buildMemberDid(ownerDid, memberId, roleCode) {
+        if (!ownerDid || !memberId || !roleCode) return '';
+        return ownerDid + ':member:' + memberId + ':' + roleCode;
+      }
+
+      function buildIndividualControllerDid(subjectDid, controllerId, roleCode) {
+        if (!subjectDid || !controllerId || !roleCode) return '';
+        return subjectDid + ':family:' + controllerId + ':' + roleCode;
+      }
+
+      function buildIndividualDid(individualIdOverride) {
+        const portalNamespace = getValue('portalNamespace');
+        const sector = getValue('sector');
+        const individualId = individualIdOverride || getDerivedValue('individualId');
+        if (!portalNamespace || !sector || !individualId) return '';
+        return 'did:web:' + portalNamespace + ':' + sector + ':individual:multibase:' + individualId;
+      }
+
+      function getCurrentIndividualId() {
+        const explicitDid = getValue('individualDid');
+        const match = String(explicitDid || '').match(/:multibase:([^:/?#]+)$/);
+        if (match && match[1]) return match[1];
+        return getDerivedValue('individualId') || '';
+      }
+
+      function syncDerivedField(key, nextValue) {
+        if (!nextValue) return;
+        const currentValue = getValue(key);
+        const previousDerived = getDerivedValue(key);
+        const shouldReplaceLegacyValue =
+          (key === 'tenantId' || key === 'taxId') && isLegacyTenantLike(currentValue)
+          || (key === 'individualDid' && isLegacyIndividualDid(currentValue))
+          || (key === 'physicianOrg' && isLegacyPhysicianOrgDid(currentValue))
+          || (key === 'physicianDid' && isLegacyPhysicianDid(currentValue))
+          || (key === 'individualControllerDid' && isLegacyIndividualControllerDid(currentValue));
+        if (!currentValue || currentValue === previousDerived || shouldReplaceLegacyValue) {
+          setValue(key, nextValue);
+          refreshInputIfEmpty(key, nextValue);
+        }
+        setDerivedValue(key, nextValue);
+      }
+
+      function migrateLegacyContextValues() {
+        const canonicalTenantId = getCanonicalTenantId();
+        setValue('taxTenantId', canonicalTenantId);
+        setValue('tenantId', canonicalTenantId);
+        setValue('taxId', canonicalTenantId);
+        removeValue('__derived__:tenantId');
+        removeValue('__derived__:taxId');
+      }
+
+      async function refreshDerivedContextValues() {
+        const canonicalId = getCanonicalTenantId();
+        syncDerivedField('tenantId', canonicalId);
+        syncDerivedField('taxId', canonicalId);
+        const derivedIndividualId = uuidToMultibase58btc(getValue('individualUuid'));
+        syncDerivedField('individualId', derivedIndividualId);
+        const physicianOrgDid = buildPhysicianOrgDid();
+        const individualDid = buildIndividualDid(derivedIndividualId);
+        syncDerivedField('individualDid', individualDid);
+        syncDerivedField('physicianOrg', physicianOrgDid);
+        const physicianMemberId = await sha256Multibase58btc(getValue('physicianEmail'));
+        syncDerivedField('physicianDid', buildMemberDid(physicianOrgDid, physicianMemberId, getValue('physicianRole')));
+        const individualControllerId = await sha256Multibase58btc(getValue('individualControllerEmail'));
+        syncDerivedField('individualControllerDid', buildIndividualControllerDid(individualDid, individualControllerId, getValue('individualControllerRole')));
+      }
+
       function getContextValueForParam(paramName) {
-        if (paramName === 'tenantId') return getValue('tenantId');
+        if (paramName === 'tenantId') return getCanonicalTenantId();
         if (paramName === 'jurisdiction') return getValue('jurisdiction');
         if (paramName === 'sector') return getValue('sector');
         return '';
@@ -37,9 +231,19 @@ export function createApiDocsSetupOptions(
 
       function buildTemplateReplacements() {
         const testId = getValue('testId');
-        const tenantId = getValue('tenantId');
-        const taxId = getValue('taxId');
+        const tenantId = getCanonicalTenantId();
+        const taxId = tenantId;
         const sector = getValue('sector');
+        const individualId = getCurrentIndividualId();
+        const individualControllerEmail = getValue('individualControllerEmail');
+        const individualControllerRole = getValue('individualControllerRole');
+        const individualControllerDid = getValue('individualControllerDid');
+        const physicianEmail = getValue('physicianEmail');
+        const physicianRole = getValue('physicianRole');
+        const sectionsAllowed = getValue('sectionsAllowed');
+        const physicianOrg = getValue('physicianOrg');
+        const physicianDid = getValue('physicianDid');
+        const individualDid = getValue('individualDid') || buildIndividualDid(individualId);
         const offerId = getValue('offerId');
         const activationCode = getValue('activationCode');
         const licenseId = getValue('licenseId');
@@ -50,11 +254,23 @@ export function createApiDocsSetupOptions(
           '{{tenantId}}': tenantId,
           '{{taxId}}': taxId,
           '{{sector}}': sector,
+          '{{individualId}}': individualId,
+          '{{individualDid}}': individualDid,
+          '{{individualControllerEmail}}': individualControllerEmail,
+          '{{individualControllerRole}}': individualControllerRole,
+          '{{individualControllerDid}}': individualControllerDid,
+          '{{physicianEmail}}': physicianEmail,
+          '{{physicianRole}}': physicianRole,
+          '{{sectionsAllowed}}': sectionsAllowed,
+          '{{physicianOrg}}': physicianOrg,
+          '{{physicianDid}}': physicianDid,
           '{{offerId}}': offerId,
           '<offer-id>': offerId,
           '{{activationCode}}': activationCode,
           '<license-activation-code>': activationCode,
           '{{licenseId}}': licenseId,
+          '{CUSTOMER_DID_WEB}': individualDid,
+          '{ORGANIZATION_DID_WEB}': physicianOrg,
         };
       }
 
@@ -92,10 +308,20 @@ export function createApiDocsSetupOptions(
 
       function syncSwaggerRequestBodyEditors() {
         const testId = getValue('testId');
-        const tenantId = getValue('tenantId');
-        const taxId = getValue('taxId');
+        const tenantId = getCanonicalTenantId();
+        const taxId = tenantId;
         const sector = getValue('sector');
         const activationCode = getValue('activationCode');
+        const individualId = getCurrentIndividualId();
+        const individualControllerEmail = getValue('individualControllerEmail');
+        const individualControllerRole = getValue('individualControllerRole');
+        const individualControllerDid = getValue('individualControllerDid');
+        const physicianEmail = getValue('physicianEmail');
+        const physicianRole = getValue('physicianRole');
+        const sectionsAllowed = getValue('sectionsAllowed');
+        const physicianOrg = getValue('physicianOrg');
+        const physicianDid = getValue('physicianDid');
+        const individualDid = getValue('individualDid') || buildIndividualDid(individualId);
         const withTestId = (value) => {
           if (!testId || typeof value !== 'string') return value;
           if (value.includes('{{testId}}')) return value.split('{{testId}}').join(testId);
@@ -118,6 +344,14 @@ export function createApiDocsSetupOptions(
           if ('jti' in node) node.jti = withTestId(node.jti);
           if ('thid' in node) node.thid = withTestId(node.thid);
           if (activationCode && typeof node.subject_token === 'string') node.subject_token = activationCode;
+          if (physicianEmail && typeof node.iss === 'string') node.iss = String(node.iss).replaceAll('doctor1@acme.org', physicianEmail);
+          if (physicianRole && typeof node.iss === 'string') node.iss = String(node.iss).replaceAll('ISCO-08|2211', physicianRole);
+          if (physicianEmail && typeof node.sub === 'string') node.sub = String(node.sub).replaceAll('doctor1@acme.org', physicianEmail);
+          if (physicianRole && typeof node.sub === 'string') node.sub = String(node.sub).replaceAll('ISCO-08|2211', physicianRole);
+          if (physicianEmail && typeof node.client_id === 'string') node.client_id = String(node.client_id).replaceAll('doctor1@acme.org', physicianEmail);
+          if (individualControllerEmail && typeof node.sub === 'string') node.sub = String(node.sub).replaceAll('guardian@example.org', individualControllerEmail);
+          if (individualControllerRole && typeof node.sub === 'string') node.sub = String(node.sub).replaceAll('v3-RoleCode|RESPRSN', individualControllerRole);
+          if (sectionsAllowed && typeof node.scope === 'string') node.scope = String(node.scope).replace(/section=[^\\s]+/g, 'section=' + sectionsAllowed);
 
           const claims = node.claims;
           if (claims && typeof claims === 'object') {
@@ -135,10 +369,54 @@ export function createApiDocsSetupOptions(
               if ('org.schema.Service.category' in claims) claims['org.schema.Service.category'] = sector;
               if ('Service.category' in claims) claims['Service.category'] = sector;
             }
+            if (physicianEmail) {
+              if ('org.schema.Person.email' in claims) claims['org.schema.Person.email'] = String(claims['org.schema.Person.email']).replaceAll('doctor1@acme.org', physicianEmail);
+              if ('Person.email' in claims) claims['Person.email'] = String(claims['Person.email']).replaceAll('doctor1@acme.org', physicianEmail);
+            }
+            if (physicianRole) {
+              if ('org.schema.Person.hasOccupation.identifier.value' in claims) claims['org.schema.Person.hasOccupation.identifier.value'] = physicianRole;
+              if ('Consent.actor-role' in claims) claims['Consent.actor-role'] = physicianRole;
+            }
+            if (individualControllerRole && 'RelatedPerson.relationship' in claims) {
+              claims['RelatedPerson.relationship'] = individualControllerRole;
+            }
+            if (sectionsAllowed) {
+              if ('Consent.action' in claims) claims['Consent.action'] = sectionsAllowed;
+              if ('Composition.section' in claims) claims['Composition.section'] = sectionsAllowed;
+            }
+            if (individualId && 'Consent.subject' in claims && String(claims['Consent.subject']) === 'unified-health-id') {
+              claims['Consent.subject'] = individualDid || individualId;
+            }
+            if (physicianOrg && 'Consent.grantee' in claims) claims['Consent.grantee'] = physicianOrg;
+            if (physicianDid) {
+              if ('Consent.actor-identifier' in claims) claims['Consent.actor-identifier'] = physicianDid;
+              if ('Composition.author' in claims) claims['Composition.author'] = physicianDid;
+            }
           }
 
-          for (const value of Object.values(node)) {
-            if (value && typeof value === 'object') applyKnownOverrides(value);
+          for (const [key, value] of Object.entries(node)) {
+            if (typeof value === 'string') {
+              let nextValue = value;
+              if (individualId) nextValue = nextValue.replaceAll('<unified-health-identifier>', individualId);
+              if (individualDid) nextValue = nextValue.replaceAll('{CUSTOMER_DID_WEB}', individualDid);
+              if (individualControllerDid) nextValue = nextValue.replaceAll('{INDIVIDUAL_CONTROLLER_DID_WEB}', individualControllerDid);
+              if (physicianDid) nextValue = nextValue.replaceAll('{PROFESSIONAL_DID_WEB}', physicianDid);
+              if (physicianOrg) {
+                nextValue = nextValue.replaceAll('{ORGANIZATION_DID_WEB}', physicianOrg);
+                nextValue = nextValue.replaceAll('did:web:hospital.example.com', physicianOrg);
+              }
+              if (individualControllerDid) nextValue = nextValue.replaceAll('{{individualControllerDid}}', individualControllerDid);
+              if (individualControllerEmail) nextValue = nextValue.replaceAll('guardian@example.org', individualControllerEmail);
+              if (individualControllerRole) nextValue = nextValue.replaceAll('v3-RoleCode|RESPRSN', individualControllerRole);
+              if (physicianDid) nextValue = nextValue.replaceAll('{{physicianDid}}', physicianDid);
+              if (individualDid && nextValue === 'unified-health-id') nextValue = individualDid;
+              if (sectionsAllowed) nextValue = nextValue.replaceAll('LOINC|48765-2', sectionsAllowed);
+              if (physicianEmail) nextValue = nextValue.replaceAll('doctor1@acme.org', physicianEmail);
+              if (physicianRole) nextValue = nextValue.replaceAll('ISCO-08|2211', physicianRole);
+              node[key] = nextValue;
+            } else if (value && typeof value === 'object') {
+              applyKnownOverrides(value);
+            }
           }
         };
 
@@ -172,9 +450,13 @@ export function createApiDocsSetupOptions(
       }
 
       function ensureDefaultContextValues() {
-        const tenantId = getValue('tenantId') || 'acme';
-        if (!getValue('tenantId')) {
-          setValue('tenantId', tenantId);
+        migrateLegacyContextValues();
+        const canonicalTenantId = getCanonicalTenantId();
+        if (!getValue('taxTenantId')) {
+          setValue('taxTenantId', canonicalTenantId);
+        }
+        if (!getValue('jurisdiction')) {
+          setValue('jurisdiction', 'ES');
         }
         if (!getValue('sector')) {
           setValue('sector', 'health-care');
@@ -182,18 +464,43 @@ export function createApiDocsSetupOptions(
         if (!getValue('hostSector')) {
           setValue('hostSector', 'test');
         }
-        if (!getValue('taxId')) {
-          setValue('taxId', 'TaxNumber-' + tenantId);
+        if (!getValue('portalNamespace')) {
+          setValue('portalNamespace', 'globaldatacare.es');
+        }
+        if (!getValue('individualUuid')) {
+          setValue('individualUuid', 'a87e5b15-aea4-4475-9c7c-40aa88354b6f');
+        }
+        if (!getValue('individualControllerEmail')) {
+          setValue('individualControllerEmail', 'guardian@example.org');
+        }
+        if (!getValue('individualControllerRole')) {
+          setValue('individualControllerRole', 'v3-RoleCode|RESPRSN');
+        }
+        if (!getValue('physicianEmail')) {
+          setValue('physicianEmail', 'doctor1@acme.org');
+        }
+        if (!getValue('physicianRole')) {
+          setValue('physicianRole', 'ISCO-08|2211');
+        }
+        if (!getValue('sectionsAllowed')) {
+          setValue('sectionsAllowed', 'LOINC|48765-2');
         }
         if (!getValue('testId')) {
           setValue('testId', nowTestId());
         }
+        refreshDerivedContextValues();
       }
 
       function upsertGlobalContextPanel() {
-        if (document.getElementById('gw-api-global-context')) return;
+        const existingPanel = document.getElementById('gw-api-global-context');
+        if (existingPanel) {
+          const version = existingPanel.getAttribute('data-version') || '';
+          if (version === PANEL_VERSION) return;
+          existingPanel.remove();
+        }
         const panel = document.createElement('div');
         panel.id = 'gw-api-global-context';
+        panel.setAttribute('data-version', PANEL_VERSION);
         panel.style.position = 'fixed';
         panel.style.right = '12px';
         panel.style.bottom = '12px';
@@ -231,7 +538,8 @@ export function createApiDocsSetupOptions(
           input.style.borderRadius = '4px';
           input.addEventListener('input', () => {
             setValue(field.key, input.value.trim());
-            if (field.key === 'tenantId' || field.key === 'jurisdiction' || field.key === 'sector') {
+            refreshDerivedContextValues();
+            if (field.key === 'taxTenantId' || field.key === 'jurisdiction' || field.key === 'sector') {
               syncSwaggerParameterInputs(true);
             }
             syncSwaggerRequestBodyEditors();
@@ -247,7 +555,7 @@ export function createApiDocsSetupOptions(
         hint.style.color = '#555';
         hint.style.marginTop = '4px';
         hint.textContent =
-          'Values are auto-applied to path params, placeholders ({{testId}}, {{id}}, <test-id>, {{offerId}}, {{activationCode}}), and template jti/thid fields.';
+          'Values are auto-applied to path params, tenant/individual/physician helpers, SMART scopes, placeholders, and template jti/thid fields.';
         panel.appendChild(hint);
         document.body.appendChild(panel);
       }
@@ -435,12 +743,36 @@ export function createApiDocsSetupOptions(
         const browser: any = globalThis as any;
         const getCtx = (key: string) =>
           browser?.localStorage?.getItem ? browser.localStorage.getItem('gw-api-docs:' + key) || '' : '';
+        const normalizeLegacyCtxTenantId = (value: string) => {
+          const current = String(value || '').trim();
+          if (!current || current === 'acme' || current === 'TaxNumber-acme') return 'acme-id';
+          return current;
+        };
+        const getCanonicalCtxTenantId = () => normalizeLegacyCtxTenantId(getCtx('taxTenantId') || getCtx('tenantId') || getCtx('taxId') || 'acme-id');
         const testId = getCtx('testId');
-        const tenantId = getCtx('tenantId');
+        const tenantId = getCanonicalCtxTenantId();
         const jurisdiction = getCtx('jurisdiction');
-        const taxId = getCtx('taxId');
+        const taxId = tenantId;
         const sector = getCtx('sector');
         const hostSector = getCtx('hostSector');
+        const portalNamespace = getCtx('portalNamespace');
+        const individualDidInput = getCtx('individualDid');
+        const individualIdMatch = String(individualDidInput || '').match(/:multibase:([^:/?#]+)$/);
+        const individualId = (individualIdMatch && individualIdMatch[1]) || getCtx('individualId');
+        const individualControllerEmail = getCtx('individualControllerEmail');
+        const individualControllerRole = getCtx('individualControllerRole');
+        const individualControllerDid = getCtx('individualControllerDid');
+        const physicianEmail = getCtx('physicianEmail');
+        const physicianRole = getCtx('physicianRole');
+        const sectionsAllowed = getCtx('sectionsAllowed');
+        const physicianOrg = getCtx('physicianOrg')
+          || (portalNamespace && sector && tenantId
+            ? `did:web:${portalNamespace}:${sector}:organization:taxid:${tenantId}`
+            : '');
+        const physicianDid = getCtx('physicianDid');
+        const individualDid = individualDidInput || (portalNamespace && sector && individualId
+          ? `did:web:${portalNamespace}:${sector}:individual:multibase:${individualId}`
+          : '');
         const offerId = getCtx('offerId');
         const activationCode = getCtx('activationCode');
 
@@ -465,11 +797,23 @@ export function createApiDocsSetupOptions(
           '{{tenantId}}': tenantId,
           '{{taxId}}': taxId,
           '{{sector}}': sector,
+          '{{individualId}}': individualId,
+          '{{individualDid}}': individualDid,
+          '{{individualControllerEmail}}': individualControllerEmail,
+          '{{individualControllerRole}}': individualControllerRole,
+          '{{individualControllerDid}}': individualControllerDid,
+          '{{physicianEmail}}': physicianEmail,
+          '{{physicianRole}}': physicianRole,
+          '{{sectionsAllowed}}': sectionsAllowed,
+          '{{physicianOrg}}': physicianOrg,
+          '{{physicianDid}}': physicianDid,
           '{{offerId}}': offerId,
           '<offer-id>': offerId,
           '{{activationCode}}': activationCode,
           '<license-activation-code>': activationCode,
           '{{licenseId}}': getCtx('licenseId'),
+          '{CUSTOMER_DID_WEB}': individualDid,
+          '{ORGANIZATION_DID_WEB}': physicianOrg,
         };
 
         const applyKnownOverrides = (node: any) => {
@@ -503,6 +847,30 @@ export function createApiDocsSetupOptions(
 
           if (activationCode && typeof node.subject_token === 'string') {
             node.subject_token = activationCode;
+          }
+          if (physicianEmail && typeof node.iss === 'string') {
+            node.iss = String(node.iss).replaceAll('doctor1@acme.org', physicianEmail);
+          }
+          if (physicianRole && typeof node.iss === 'string') {
+            node.iss = String(node.iss).replaceAll('ISCO-08|2211', physicianRole);
+          }
+          if (physicianEmail && typeof node.sub === 'string') {
+            node.sub = String(node.sub).replaceAll('doctor1@acme.org', physicianEmail);
+          }
+          if (physicianRole && typeof node.sub === 'string') {
+            node.sub = String(node.sub).replaceAll('ISCO-08|2211', physicianRole);
+          }
+          if (physicianEmail && typeof node.client_id === 'string') {
+            node.client_id = String(node.client_id).replaceAll('doctor1@acme.org', physicianEmail);
+          }
+          if (individualControllerEmail && typeof node.sub === 'string') {
+            node.sub = String(node.sub).replaceAll('guardian@example.org', individualControllerEmail);
+          }
+          if (individualControllerRole && typeof node.sub === 'string') {
+            node.sub = String(node.sub).replaceAll('v3-RoleCode|RESPRSN', individualControllerRole);
+          }
+          if (sectionsAllowed && typeof node.scope === 'string') {
+            node.scope = String(node.scope).replace(/section=[^\s]+/g, 'section=' + sectionsAllowed);
           }
 
           const claims = node.claims;
@@ -545,10 +913,72 @@ export function createApiDocsSetupOptions(
                 claims['org.schema.Order.acceptedOffer.identifier'] = offerId;
               }
             }
+            if (physicianEmail) {
+              if ('org.schema.Person.email' in claims) {
+                claims['org.schema.Person.email'] = String(claims['org.schema.Person.email']).replaceAll('doctor1@acme.org', physicianEmail);
+              }
+              if ('Person.email' in claims) {
+                claims['Person.email'] = String(claims['Person.email']).replaceAll('doctor1@acme.org', physicianEmail);
+              }
+            }
+            if (physicianRole) {
+              if ('org.schema.Person.hasOccupation.identifier.value' in claims) {
+                claims['org.schema.Person.hasOccupation.identifier.value'] = physicianRole;
+              }
+              if ('Consent.actor-role' in claims) {
+                claims['Consent.actor-role'] = physicianRole;
+              }
+            }
+            if (individualControllerRole && 'RelatedPerson.relationship' in claims) {
+              claims['RelatedPerson.relationship'] = individualControllerRole;
+            }
+            if (sectionsAllowed) {
+              if ('Consent.action' in claims) {
+                claims['Consent.action'] = sectionsAllowed;
+              }
+              if ('Composition.section' in claims) {
+                claims['Composition.section'] = sectionsAllowed;
+              }
+            }
+            if (individualId && 'Consent.subject' in claims && String(claims['Consent.subject']) === 'unified-health-id') {
+              claims['Consent.subject'] = individualDid || individualId;
+            }
+            if (physicianOrg && 'Consent.grantee' in claims) {
+              claims['Consent.grantee'] = physicianOrg;
+            }
+            if (physicianDid) {
+              if ('Consent.actor-identifier' in claims) {
+                claims['Consent.actor-identifier'] = physicianDid;
+              }
+              if ('Composition.author' in claims) {
+                claims['Composition.author'] = physicianDid;
+              }
+            }
           }
 
-          for (const value of Object.values(node)) {
-            if (value && typeof value === 'object') applyKnownOverrides(value);
+          for (const [key, value] of Object.entries(node)) {
+            if (typeof value === 'string') {
+              let nextValue = value;
+              if (individualId) nextValue = nextValue.replaceAll('<unified-health-identifier>', individualId);
+              if (individualDid) nextValue = nextValue.replaceAll('{CUSTOMER_DID_WEB}', individualDid);
+              if (individualControllerDid) nextValue = nextValue.replaceAll('{INDIVIDUAL_CONTROLLER_DID_WEB}', individualControllerDid);
+              if (physicianDid) nextValue = nextValue.replaceAll('{PROFESSIONAL_DID_WEB}', physicianDid);
+              if (physicianOrg) {
+                nextValue = nextValue.replaceAll('{ORGANIZATION_DID_WEB}', physicianOrg);
+                nextValue = nextValue.replaceAll('did:web:hospital.example.com', physicianOrg);
+              }
+              if (individualControllerDid) nextValue = nextValue.replaceAll('{{individualControllerDid}}', individualControllerDid);
+              if (individualControllerEmail) nextValue = nextValue.replaceAll('guardian@example.org', individualControllerEmail);
+              if (individualControllerRole) nextValue = nextValue.replaceAll('v3-RoleCode|RESPRSN', individualControllerRole);
+              if (physicianDid) nextValue = nextValue.replaceAll('{{physicianDid}}', physicianDid);
+              if (individualDid && nextValue === 'unified-health-id') nextValue = individualDid;
+              if (sectionsAllowed) nextValue = nextValue.replaceAll('LOINC|48765-2', sectionsAllowed);
+              if (physicianEmail) nextValue = nextValue.replaceAll('doctor1@acme.org', physicianEmail);
+              if (physicianRole) nextValue = nextValue.replaceAll('ISCO-08|2211', physicianRole);
+              node[key] = nextValue;
+            } else if (value && typeof value === 'object') {
+              applyKnownOverrides(value);
+            }
           }
         };
 

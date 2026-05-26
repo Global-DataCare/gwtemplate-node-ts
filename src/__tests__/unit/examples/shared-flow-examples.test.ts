@@ -1,4 +1,6 @@
 import {
+  EXAMPLE_INDIVIDUAL_ORGANIZATION_START_INPUT,
+  EXAMPLE_LIVE_CONSENT_GRANT_INPUT,
   EXAMPLE_EMPLOYEE_DEVICE_ACTIVATION_INPUT,
   EXAMPLE_GW_ORGANIZATION_ACTIVATE_PAYLOAD,
   EXAMPLE_OPENID_SMART_TOKEN_INPUT,
@@ -7,6 +9,8 @@ import {
 } from 'gdc-common-utils-ts/examples/api-flow-examples';
 
 import {
+  CONSENT_CREATION_MESSAGE,
+  FAMILY_REGISTRATION_REQUEST,
   DCR_REQUEST_BODY,
   EMPLOYEE_REGISTRATION_REQUEST,
   ORGANIZATION_ACTIVATION_REQUEST,
@@ -26,6 +30,19 @@ describe('shared flow examples conformance', () => {
   it('keeps SMART OpenID example aligned with shared professional flow examples', () => {
     expect(SMART_TOKEN_REQUEST.body.vp_token).toBe(EXAMPLE_OPENID_SMART_TOKEN_INPUT.vpToken);
     expect(SMART_TOKEN_REQUEST.body.presentation_submission).toEqual(EXAMPLE_SMART_PRESENTATION_SUBMISSION);
+  });
+
+  it('keeps individual onboarding and consent examples on shared individual-controller semantics', () => {
+    const familyClaims = FAMILY_REGISTRATION_REQUEST.body.data[0].meta.claims as Record<string, unknown>;
+    const consentClaims = CONSENT_CREATION_MESSAGE.body.entry[0].meta.claims as Record<string, unknown>;
+
+    expect(typeof FAMILY_REGISTRATION_REQUEST.iss).toBe('string');
+    expect(FAMILY_REGISTRATION_REQUEST.iss).toBe(familyClaims['Organization.owner.email']);
+    expect(consentClaims['Consent.subject']).toBe('{{individualDid}}');
+    expect(consentClaims['Consent.actor-role']).toBe(EXAMPLE_LIVE_CONSENT_GRANT_INPUT.actorRole);
+    expect(typeof familyClaims['Organization.owner.email']).toBe('string');
+    expect(String(familyClaims['Organization.owner.email'])).toContain('@');
+    expect(typeof EXAMPLE_INDIVIDUAL_ORGANIZATION_START_INPUT.controllerEmail).toBe('string');
   });
 
   it('keeps employee example on canonical role claim key', () => {

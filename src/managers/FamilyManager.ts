@@ -30,6 +30,7 @@ import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { getPersonOccupationClaim } from '../utils/occupation';
+import { buildClaimsFromIndividualRegistrationPdfAttachment } from '../utils/individual-registration-pdf-attachment';
 
 type FamilyRegistrationContent = {
   status: EntityLifecycleStatus;
@@ -93,7 +94,14 @@ export class FamilyManager {
   private async processFamilyRegistrationEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
     const entryType = entry.type || 'Family-registration-form-v1.0';
     const rawClaims = entry?.meta?.claims;
-    const claims: ClaimsRecord | undefined = rawClaims ? (normalizeContextualizedClaims(rawClaims) as ClaimsRecord) : rawClaims;
+    const attachmentClaims = await this.resolveIndividualRegistrationAttachmentClaims(job);
+    const mergedClaims = {
+      ...((rawClaims && typeof rawClaims === 'object') ? rawClaims : {}),
+      ...(attachmentClaims || {}),
+    };
+    const claims: ClaimsRecord | undefined = Object.keys(mergedClaims).length > 0
+      ? (normalizeContextualizedClaims(mergedClaims) as ClaimsRecord)
+      : undefined;
     if (!claims) {
       throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
     }
@@ -242,6 +250,15 @@ export class FamilyManager {
       resource: { resourceType: 'Organization', id: familyDocId },
       response: { status: '201' },
     };
+  }
+
+  private async resolveIndividualRegistrationAttachmentClaims(job: JobRequest): Promise<ClaimsRecord | undefined> {
+    const decodedContent = job.content as Record<string, any> | undefined;
+    const attachmentResult = await buildClaimsFromIndividualRegistrationPdfAttachment(
+      decodedContent?.attachments || decodedContent?.body?.attachments,
+    );
+    if (!attachmentResult) return undefined;
+    return attachmentResult.claims as ClaimsRecord;
   }
 
   private async processFamilyOrderEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {

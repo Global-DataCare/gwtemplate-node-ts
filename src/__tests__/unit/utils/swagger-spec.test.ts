@@ -17,6 +17,8 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_transaction']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_transaction-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch']).toBeDefined();
@@ -114,5 +116,21 @@ describe('Swagger Spec Generation', () => {
       expect(spec.components.examples[key]?.value).toBeDefined();
       expect(Object.keys(spec.components.examples[key].value || {}).length).toBeGreaterThan(0);
     }
+
+    const familyClaims =
+      spec.components.examples.FamilyRegistrationPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
+    const organizationClaims =
+      spec.components.examples.OrganizationRegistrationPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
+    expect(organizationClaims).toBeDefined();
+    expect(organizationClaims['org.schema.Organization.identifier.value']).toBe('acme-id');
+    expect(organizationClaims['org.schema.Organization.alternateName']).toBeUndefined();
+
+    expect(familyClaims).toBeDefined();
+    expect(familyClaims['Service.termsOfService']).toBe('https://provider.example.com/terms.pdf');
+    expect(familyClaims['org.schema.Service.termsOfService']).toBeUndefined();
+    expect(familyClaims['Organization.identifier.value']).toBeDefined();
+    expect(familyClaims['org.schema.Organization.identifier.value']).toBeUndefined();
+    expect(familyClaims['Organization.owner.identifier.value']).toBe('IDCES-<controller-serialNumber>');
+    expect(familyClaims['Organization.owner.identifier.value']).not.toBe('adult1@example.com');
   });
 });

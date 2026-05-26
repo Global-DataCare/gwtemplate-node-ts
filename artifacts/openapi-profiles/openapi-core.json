@@ -4,7 +4,7 @@
     "title": "Gateway API - SEDIA CORE",
     "version": "1.0.3",
     "description": "SEDIA CORE API documentation for the secure gateway canonical flow.",
-    "x-profile-generated-at": "2026-05-24T01:41:34.618Z",
+    "x-profile-generated-at": "2026-05-26T02:48:59.955Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -118,7 +118,7 @@
         "required": true,
         "schema": {
           "type": "string",
-          "example": "acme"
+          "example": "acme-id"
         },
         "description": "Canonical tenant identifier (`Organization.identifier.value`). For legal organizations this is typically TAX/VATES; for individual organizations use UUID."
       },
@@ -191,9 +191,8 @@
                     "@context": "org.schema",
                     "@type": "template",
                     "org.schema.Organization.address.addressCountry": "ES",
-                    "org.schema.Organization.alternateName": "acme",
                     "org.schema.Organization.identifier.additionalType": "TAX",
-                    "org.schema.Organization.identifier.value": "A123456789",
+                    "org.schema.Organization.identifier.value": "acme-id",
                     "org.schema.Organization.legalName": "Acme Organization SL",
                     "org.schema.Organization.name": "Acme Org",
                     "org.schema.Organization.numberOfEmployees.value": 2,
@@ -293,9 +292,9 @@
                     "@context": "org.schema",
                     "@type": "template",
                     "org.schema.Organization.address.addressCountry": "ES",
-                    "org.schema.Organization.alternateName": "acme",
+                    "org.schema.Organization.alternateName": "acme-id",
                     "org.schema.Organization.identifier.additionalType": "TAX",
-                    "org.schema.Organization.identifier.value": "A123456789",
+                    "org.schema.Organization.identifier.value": "acme-id",
                     "org.schema.Organization.legalName": "Acme Organization SL",
                     "org.schema.Organization.name": "Acme Org",
                     "org.schema.Organization.numberOfEmployees.value": 2,
@@ -617,7 +616,7 @@
             "token_type": "Bearer",
             "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
             "purpose": "TREAT",
-            "scope": "patient/Composition.rs?subject=did:web:api.acme.org:individual:<unified-health-identifier>&section=LOINC|48765-2 patient/Consent.cruds"
+            "scope": "patient/Composition.rs?subject={{individualDid}}&section=LOINC|48765-2 patient/Consent.cruds"
           },
           "meta": {
             "jwe": {
@@ -691,13 +690,22 @@
       },
       "FamilyRegistrationPlaintextMessage": {
         "summary": "Plaintext Message for Family Registration",
-        "description": "A DIDComm-like message wrapper containing the family organization claims.",
+        "description": "A DIDComm-like message wrapper containing the family organization claims. Default examples use contextualized `org.schema` claim keys such as `Organization.identifier.value` and `Service.category` because the gateway default claim-storage mode accepts omitted `org.schema.` prefixes when `@context` is `org.schema`. If the service is configured with `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, the same logical claims may also be sent fully qualified as `org.schema.*`. For signed-PDF onboarding, `Organization.owner.identifier.value` is expected to come from the signer certificate `serialNumber` (for example `IDCES-...`), not from the controller email. `Service.termsOfService` accepts either an HTTPS URL or an embedded `data:application/pdf;base64,...` payload; Swagger shows the URL form by default.",
         "value": {
           "jti": "family-registration-request-<test-id>",
           "thid": "family-registration-thread-<test-id>",
           "iss": "adult1@example.com",
           "aud": "did:web:api.acme.org",
           "type": "application/api+json",
+          "attachments": [
+            {
+              "id": "signed-individual-form-pdf",
+              "media_type": "application/pdf",
+              "data": {
+                "base64": "{{signedIndividualFormPdfBase64}}"
+              }
+            }
+          ],
           "body": {
             "data": [
               {
@@ -710,14 +718,14 @@
                     "Organization.identifier.additionalType": "UUID",
                     "Organization.identifier.value": "<UUID>",
                     "Organization.owner.email": "adult1@example.com",
-                    "Organization.owner.identifier.value": "adult1@example.com",
+                    "Organization.owner.identifier.value": "IDCES-<controller-serialNumber>",
                     "Person.email": "child1@example.com",
                     "Person.identifier.additionalType": "UUID",
                     "Person.identifier.value": "<child1-ID>",
                     "Service.category": "health-care",
                     "Service.identifier": "did:web:api-provider.example.com",
                     "Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
-                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                    "Service.termsOfService": "https://provider.example.com/terms.pdf"
                   }
                 }
               }
@@ -819,13 +827,13 @@
                   "claims": {
                     "@context": "org.hl7.fhir.api",
                     "Consent.decision": "permit",
-                    "Consent.subject": "unified-health-id",
+                    "Consent.subject": "{{individualDid}}",
                     "Consent.identifier": "urn:uuid:patient-consent-uuid",
-                    "Consent.grantee": "did:web:hospital.example.com",
+                    "Consent.grantee": "{{physicianOrg}}",
                     "Consent.date": "2025-11-25",
                     "Consent.purpose": "TREAT",
                     "Consent.action": "LOINC|48765-2",
-                    "Consent.actor-identifier": "did:web:hospital.example.com",
+                    "Consent.actor-identifier": "{{physicianOrg}}",
                     "Consent.actor-role": "ISCO-08|2211",
                     "Consent.attachment-contentType": "application/odrl+json",
                     "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
@@ -858,11 +866,11 @@
                     }
                   ],
                   "patient": {
-                    "reference": "unified-health-id"
+                    "reference": "{{individualDid}}"
                   },
                   "performer": [
                     {
-                      "reference": "did:web:hospital.example.com"
+                      "reference": "{{physicianOrg}}"
                     }
                   ],
                   "provision": {
@@ -949,7 +957,7 @@
         "value": {
           "jti": "composition-update-request-<test-id>",
           "thid": "composition-update-thread-<test-id>",
-          "iss": "did:web:hospital.example.com",
+          "iss": "{{physicianOrg}}",
           "aud": "did:web:api.acme.org",
           "exp": 1678886460,
           "iat": 1678886400,
@@ -965,11 +973,11 @@
                   "claims": {
                     "@context": "org.hl7.fhir.api",
                     "@type": "Composition:IndexEntry",
-                    "Composition.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "Composition.subject": "{{individualDid}}",
                     "Composition.section": "LOINC|48765-2",
                     "Composition.entry": "https://ehr.hospital.example.com/fhir/AllergyIntolerance/12345,https://ehr.hospital.example.com/fhir/DiagnosticReport/67890",
                     "Composition.date": "2025-11-26T10:00:00Z",
-                    "Composition.author": "did:web:hospital.example.com",
+                    "Composition.author": "{{physicianOrg}}",
                     "Composition.title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
                     "Composition.type": "LOINC|60591-5"
                   }
@@ -982,12 +990,12 @@
                   "resourceType": "Composition",
                   "status": "final",
                   "subject": {
-                    "reference": "did:web:api.acme.org:individual:<unified-health-identifier>"
+                    "reference": "{{individualDid}}"
                   },
                   "date": "2025-11-26T10:00:00Z",
                   "author": [
                     {
-                      "reference": "did:web:hospital.example.com"
+                      "reference": "{{physicianOrg}}"
                     }
                   ],
                   "title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
@@ -1108,7 +1116,7 @@
         "value": {
           "jti": "family-relationship-message-<test-id>",
           "thid": "thid-family-relationship",
-          "iss": "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+          "iss": "{{individualDid}}:device:<uuid>",
           "aud": "did:web:api.acme.org",
           "type": "org.hl7.fhir.r4.Bundle",
           "body": {
@@ -1121,7 +1129,7 @@
                   "claims": {
                     "@context": "org.hl7.fhir.api",
                     "@type": "RelatedPerson:EmergencyContact",
-                    "RelatedPerson.patient": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "RelatedPerson.patient": "{{individualDid}}",
                     "RelatedPerson.identifier": "urn:uuid:related-person-uuid",
                     "RelatedPerson.relationship": "http://terminology.hl7.org/CodeSystem/v3-RoleCode|PRN",
                     "RelatedPerson.telecom": "tel:+34600123456",
@@ -1146,7 +1154,7 @@
         "value": {
           "jti": "personal-observation-message-<test-id>",
           "thid": "thid-personal-observation",
-          "iss": "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+          "iss": "{{individualDid}}:device:<uuid>",
           "aud": "did:web:api.acme.org",
           "type": "org.hl7.fhir.r4.Bundle",
           "body": {
@@ -1159,7 +1167,7 @@
                   "claims": {
                     "@context": "org.hl7.fhir.api",
                     "@type": "Observation:SelfReported",
-                    "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "Observation.subject": "{{individualDid}}",
                     "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
                     "Observation.code": "SNOMED|48694002",
                     "Observation.code-userselected": true,
@@ -1660,9 +1668,8 @@
                     "@context": "org.schema",
                     "@type": "template",
                     "org.schema.Organization.address.addressCountry": "ES",
-                    "org.schema.Organization.alternateName": "acme",
                     "org.schema.Organization.identifier.additionalType": "TAX",
-                    "org.schema.Organization.identifier.value": "A123456789",
+                    "org.schema.Organization.identifier.value": "acme-id",
                     "org.schema.Organization.legalName": "Acme Organization SL",
                     "org.schema.Organization.name": "Acme Org",
                     "org.schema.Organization.numberOfEmployees.value": 2,
@@ -1928,13 +1935,13 @@
                   "claims": {
                     "@context": "org.hl7.fhir.api",
                     "Consent.decision": "permit",
-                    "Consent.subject": "unified-health-id",
+                    "Consent.subject": "{{individualDid}}",
                     "Consent.identifier": "urn:uuid:patient-consent-uuid",
-                    "Consent.grantee": "did:web:hospital.example.com",
+                    "Consent.grantee": "{{physicianOrg}}",
                     "Consent.date": "2025-11-25",
                     "Consent.purpose": "TREAT",
                     "Consent.action": "LOINC|48765-2",
-                    "Consent.actor-identifier": "did:web:hospital.example.com",
+                    "Consent.actor-identifier": "{{physicianOrg}}",
                     "Consent.actor-role": "ISCO-08|2211",
                     "Consent.attachment-contentType": "application/odrl+json",
                     "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
@@ -1967,11 +1974,11 @@
                     }
                   ],
                   "patient": {
-                    "reference": "unified-health-id"
+                    "reference": "{{individualDid}}"
                   },
                   "performer": [
                     {
-                      "reference": "did:web:hospital.example.com"
+                      "reference": "{{physicianOrg}}"
                     }
                   ],
                   "provision": {
@@ -2084,7 +2091,7 @@
         "example": {
           "jti": "family-relationship-message-<test-id>",
           "thid": "thid-family-relationship",
-          "iss": "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+          "iss": "{{individualDid}}:device:<uuid>",
           "aud": "did:web:api.acme.org",
           "type": "org.hl7.fhir.r4.Bundle",
           "body": {
@@ -2097,7 +2104,7 @@
                   "claims": {
                     "@context": "org.hl7.fhir.api",
                     "@type": "RelatedPerson:EmergencyContact",
-                    "RelatedPerson.patient": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "RelatedPerson.patient": "{{individualDid}}",
                     "RelatedPerson.identifier": "urn:uuid:related-person-uuid",
                     "RelatedPerson.relationship": "http://terminology.hl7.org/CodeSystem/v3-RoleCode|PRN",
                     "RelatedPerson.telecom": "tel:+34600123456",
@@ -2135,7 +2142,7 @@
         "example": {
           "jti": "personal-observation-message-<test-id>",
           "thid": "thid-personal-observation",
-          "iss": "did:web:api.acme.org:individual:multibase:<id>:device:<uuid>",
+          "iss": "{{individualDid}}:device:<uuid>",
           "aud": "did:web:api.acme.org",
           "type": "org.hl7.fhir.r4.Bundle",
           "body": {
@@ -2148,7 +2155,7 @@
                   "claims": {
                     "@context": "org.hl7.fhir.api",
                     "@type": "Observation:SelfReported",
-                    "Observation.subject": "did:web:api.acme.org:individual:<unified-health-identifier>",
+                    "Observation.subject": "{{individualDid}}",
                     "Observation.category": "http://terminology.hl7.org/CodeSystem/observation-category|social-history",
                     "Observation.code": "SNOMED|48694002",
                     "Observation.code-userselected": true,
@@ -2761,7 +2768,7 @@
           "Core Flow (SDK E2E Use Cases)"
         ],
         "summary": "[Step 4.1] Register a legacy individual organization offer",
-        "description": "[Step 4.1]\n\nLegacy compatibility endpoint for hosted individual onboarding.\nThe current portal flow uses tenant organization activation from signed proof and individual indexing in the hosted tenant.",
+        "description": "[Step 4.1]\n\nLegacy compatibility endpoint for hosted individual onboarding.\nThe current portal flow uses tenant organization activation from signed proof and individual indexing in the hosted tenant.\n\nThis route also accepts a signed individual onboarding PDF as a DIDComm attachment.\nWhen present, the gateway verifies the PDF signature, extracts the signer certificate\nsubject, reads the additional form fields, and completes the individual registration claims\nwithout overwriting certificate-derived person identity data.\n\nNew integrations should prefer the `_transaction` alias below. `_batch` is kept for compatibility\nand will be deprecated after clients migrate.",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

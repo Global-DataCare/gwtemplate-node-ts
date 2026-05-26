@@ -117,6 +117,21 @@ export class HostingManager {
     await this.persistHostConfig(organization, allClaims, [person, processedService!]);
   }
 
+  private applyLegalOrganizationAlternateNameCompatibility(claims: ClaimsRecord): ClaimsRecord {
+    const processedClaims = { ...claims };
+    const alternateName = String(processedClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+    if (alternateName) return processedClaims;
+
+    const isIndividualOrg = !!processedClaims['org.schema.Organization.owner.telephone'];
+    if (isIndividualOrg) return processedClaims;
+
+    const identifierValue = String(processedClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
+    if (identifierValue) {
+      processedClaims[ClaimsOrganizationSchemaorg.alternateName] = identifierValue;
+    }
+    return processedClaims;
+  }
+
   /**
    * Maps a host registry sector string to a NetworkName enum value.
    *
@@ -798,6 +813,12 @@ export class HostingManager {
    * 2. Verify organization + representative credentials issued by ICA.
    * 3. Verify that the submitted backend/conector DID document matches the ICA-issued organization DID.
    * 4. Activate/provision the tenant backend in the selected host network.
+   *
+   * TODO(ica-deactivation-v1):
+   * Add the symmetric host/portal `/_deactivate` flow for ICA-backed lifecycle changes.
+   * GW local `disable` means suspension only. Authoritative VC suspension/revocation
+   * must come from ICA/ledger `credentialStatus`, and the corresponding update must
+   * not purge historical tenant/controller/license evidence.
    */
   private async processOrganizationActivation(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
     const jobEntries = job?.content?.body?.data || [];
@@ -864,8 +885,9 @@ export class HostingManager {
       throw new ManagerError('Malformed activation entry: missing meta.claims', IssueType.Required);
     }
 
-    validateNewOrganizationClaims(claims);
-    const alternateName = claims[ClaimsOrganizationSchemaorg.alternateName] as string;
+    const normalizedClaims = this.applyLegalOrganizationAlternateNameCompatibility(claims);
+    validateNewOrganizationClaims(normalizedClaims);
+    const alternateName = normalizedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
     if (!alternateName) {
       throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
     }
@@ -873,7 +895,7 @@ export class HostingManager {
       throw new ManagerError(`Invalid alternateName format: '${alternateName}'`, IssueType.Value);
     }
 
-    const requestedSector = claims[ClaimsServiceSchemaorg.category] as Sector;
+    const requestedSector = normalizedClaims[ClaimsServiceSchemaorg.category] as Sector;
     if (!requestedSector) {
       throw new ManagerError(`Missing required claim for activation: '${ClaimsServiceSchemaorg.category}'`, IssueType.Required);
     }
@@ -889,9 +911,9 @@ export class HostingManager {
       throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
     }
 
-    const { organization, person, service } = this.extractResources(claims, environment);
+    const { organization, person, service } = this.extractResources(normalizedClaims, environment);
     const processedService = await this._handleServiceAttachment(service);
-    const processedClaims = { ...claims, ...(processedService?.meta.claims || {}) };
+    const processedClaims = { ...normalizedClaims, ...(processedService?.meta.claims || {}) };
     const normalizedPublicUrl = this.normalizeTenantPublicUrl(
       activation.publicTenantUrl
       || (processedClaims[ClaimsOrganizationSchemaorg.url] as string | undefined),
@@ -1597,8 +1619,9 @@ export class HostingManager {
     }
 
     try {
-      validateNewOrganizationClaims(claims);
-      const alternateName = claims[ClaimsOrganizationSchemaorg.alternateName] as string;
+      const normalizedClaims = this.applyLegalOrganizationAlternateNameCompatibility(claims);
+      validateNewOrganizationClaims(normalizedClaims);
+      const alternateName = normalizedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
 
       if (!alternateName) {
         throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
@@ -1611,7 +1634,7 @@ export class HostingManager {
           throw new ManagerError(`Invalid alternateName format: '${alternateName}'`, IssueType.Value);
         }
 
-        const requestedSector = claims[ClaimsServiceSchemaorg.category] as Sector;
+        const requestedSector = normalizedClaims[ClaimsServiceSchemaorg.category] as Sector;
         if (!requestedSector) {
           throw new ManagerError(`Missing required claim for new tenant: '${ClaimsServiceSchemaorg.category}'`, IssueType.Required);
         }
@@ -1631,9 +1654,9 @@ export class HostingManager {
         }
       }
 
-      const { organization, person, service } = this.extractResources(claims, environment);
+      const { organization, person, service } = this.extractResources(normalizedClaims, environment);
       const processedService = await this._handleServiceAttachment(service);
-      let processedClaims = { ...claims, ...(processedService?.meta.claims || {}) };
+      let processedClaims = { ...normalizedClaims, ...(processedService?.meta.claims || {}) };
 
       if (alternateName === 'host') {
         await this.persistHostConfig(organization, processedClaims, [person, processedService!]);
@@ -1641,7 +1664,7 @@ export class HostingManager {
         const registrationKeys = this.extractRegistrationKeys(jobMeta);
         const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
         const jurisdiction = processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;
-        const isIndividualOrg = !!claims['org.schema.Organization.owner.telephone'];
+        const isIndividualOrg = !!normalizedClaims['org.schema.Organization.owner.telephone'];
 
         let tenantUrn: string | undefined = undefined;
         if (!isIndividualOrg) {

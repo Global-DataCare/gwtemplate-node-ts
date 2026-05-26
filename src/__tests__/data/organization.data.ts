@@ -25,9 +25,9 @@ import { testHostDidWeb, testRootOrgDidWeb, testHostDomain, testTenant1Identifie
  */
 export const testClaimsRegisterTenantExpanded = {
   [ClaimsOrganizationSchemaorg.addressCountry]: "ES",
-  [ClaimsOrganizationSchemaorg.alternateName]: "acme",
+  [ClaimsOrganizationSchemaorg.alternateName]: "acme-id",
   [ClaimsOrganizationSchemaorg.identifierType]: "TAX",
-  [ClaimsOrganizationSchemaorg.identifierValue]: "A123456789",
+  [ClaimsOrganizationSchemaorg.identifierValue]: "acme-id",
   [ClaimsOrganizationSchemaorg.legalName]: "Acme Organization SL",
   [ClaimsOrganizationSchemaorg.name]: "Acme Org",
   [ClaimsOrganizationSchemaorg.numberOfEmployees]: 2,

@@ -186,7 +186,7 @@ const swaggerDefinition = {
         name: 'tenantId',
         in: 'path',
         required: true,
-        schema: { type: 'string', example: 'acme' },
+        schema: { type: 'string', example: 'acme-id' },
         description: "Canonical tenant identifier (`Organization.identifier.value`). For legal organizations this is typically TAX/VATES; for individual organizations use UUID.",
       },
       Jurisdiction: {
@@ -285,7 +285,14 @@ const swaggerDefinition = {
       },
       FamilyRegistrationPlaintextMessage: {
         summary: 'Plaintext Message for Family Registration',
-        description: 'A DIDComm-like message wrapper containing the family organization claims.',
+        description:
+          [
+            'A DIDComm-like message wrapper containing the family organization claims.',
+            'Default examples use contextualized `org.schema` claim keys such as `Organization.identifier.value` and `Service.category` because the gateway default claim-storage mode accepts omitted `org.schema.` prefixes when `@context` is `org.schema`.',
+            'If the service is configured with `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, the same logical claims may also be sent fully qualified as `org.schema.*`.',
+            'For signed-PDF onboarding, `Organization.owner.identifier.value` is expected to come from the signer certificate `serialNumber` (for example `IDCES-...`), not from the controller email.',
+            '`Service.termsOfService` accepts either an HTTPS URL or an embedded `data:application/pdf;base64,...` payload; Swagger shows the URL form by default.',
+          ].join(' '),
         value: {},
       },
       FamilyOrderPlaintextMessage: {

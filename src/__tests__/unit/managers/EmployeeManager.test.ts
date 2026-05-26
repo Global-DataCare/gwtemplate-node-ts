@@ -16,6 +16,7 @@ import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
 import { normalizeCodeSystemAndValue } from '../../../utils/normalize-codeAndSystem';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getEnvSectionId } from '../../../utils/section-env';
+import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -55,6 +56,14 @@ describe('EmployeeManager', () => {
         return secureDoc;
       },
     );
+    mockKmsService.unprotectConfidentialData.mockImplementation(
+      async <T>(doc: ConfidentialStorageDoc): Promise<T> => {
+        if ((doc as any).content !== undefined) {
+          return (doc as any).content as T;
+        }
+        return doc as unknown as T;
+      },
+    );
     
     // Mock for the new secure indexing flow
     mockKmsService.protectAttributesNameAndValue.mockImplementation(async (attributes) => {
@@ -86,7 +95,8 @@ describe('EmployeeManager', () => {
       const email = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email];
       const roleCode = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.hasOccupation];
 
-      expect(mockKmsService.protectAttributesNameAndValue).toHaveBeenCalledWith(
+      expect(mockKmsService.protectAttributesNameAndValue).toHaveBeenNthCalledWith(
+        2,
         [
           { name: 'email', value: email, unique: true, type: 'string'},
           { name: 'role', value: normalizeCodeSystemAndValue(roleCode as string), unique: false, type: 'token'},
@@ -182,9 +192,103 @@ describe('EmployeeManager', () => {
 
       expect(response.body.data[0].response.status).toBe('201');
     });
+
+    it('should return the existing active employee for the same email and role without consuming another license', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      const existingEmployee: EntityConfig = {
+        id: 'existing-employee-id',
+        type: EntityType.Person,
+        status: EntityLifecycleStatus.Active,
+        claims: testClaimsTenant1Receptionist1,
+        meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+      };
+      const existingSecureDoc: ConfidentialStorageDoc = {
+        id: existingEmployee.id,
+        status: existingEmployee.status,
+        sequence: 2,
+        content: existingEmployee,
+      };
+      mockVaultRepository.query.mockResolvedValue([existingSecureDoc]);
+      mockVaultRepository.put.mockResolvedValue(true);
+
+      const response = await employeeManager.process(job);
+
+      expect(mockVaultRepository.query).toHaveBeenCalledTimes(1);
+      expect(mockVaultRepository.put).not.toHaveBeenCalled();
+      expect(response.body.data[0].response.status).toBe('200');
+      expect((response.body.data[0] as any).resource.id).toBe(existingEmployee.id);
+    });
+
+    it('should reactivate an existing inactive employee for the same email and role without consuming another license', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      const existingEmployee: EntityConfig = {
+        id: 'inactive-employee-id',
+        type: EntityType.Person,
+        status: EntityLifecycleStatus.Inactive,
+        claims: testClaimsTenant1Receptionist1,
+        meta: { lastUpdated: '2026-05-24T00:00:00.000Z' },
+      };
+      const existingSecureDoc: ConfidentialStorageDoc = {
+        id: existingEmployee.id,
+        status: existingEmployee.status,
+        sequence: 3,
+        content: existingEmployee,
+      };
+      mockVaultRepository.query.mockResolvedValue([existingSecureDoc]);
+      mockVaultRepository.put.mockResolvedValue(true);
+
+      const response = await employeeManager.process(job);
+
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+      const updatedDocs = mockVaultRepository.put.mock.calls[0][1] as ConfidentialStorageDoc[];
+      expect(updatedDocs[0].sequence).toBe(4);
+      expect(updatedDocs[0].status).toBe(EntityLifecycleStatus.Active);
+      expect(response.body.data[0].response.status).toBe('200');
+      expect((response.body.data[0] as any).resource.id).toBe(existingEmployee.id);
+    });
   });
 
   describe('Employee Deactivation (DELETE)', () => {
-    it('should be true', () => expect(true).toBe(true));
+    it('should suspend the employee without releasing or mutating device licenses', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      job.content!.body!.data[0].request.method = 'DELETE';
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      const existingEmployee: EntityConfig = {
+        id: 'employee-to-disable',
+        type: EntityType.Person,
+        status: EntityLifecycleStatus.Active,
+        claims: testClaimsTenant1Receptionist1,
+        meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+      };
+      const existingSecureDoc: ConfidentialStorageDoc = {
+        id: existingEmployee.id,
+        status: existingEmployee.status,
+        sequence: 1,
+        content: existingEmployee,
+      };
+
+      mockVaultRepository.get.mockResolvedValue(existingSecureDoc);
+      mockVaultRepository.put.mockResolvedValue(true);
+
+      const response = await employeeManager.process(job);
+
+      expect(mockVaultRepository.get).toHaveBeenCalledWith(
+        TENANT_VAULT_ID,
+        MOCKED_OCCUPATION_UUID,
+        getEnvSectionId('employees'),
+      );
+      expect(mockVaultRepository.getContainersInSection).not.toHaveBeenCalledWith(
+        TENANT_VAULT_ID,
+        getEnvSectionId('device-licenses'),
+      );
+      const updatedDocs = mockVaultRepository.put.mock.calls[0][1] as ConfidentialStorageDoc[];
+      expect(updatedDocs[0].status).toBe(EntityLifecycleStatus.Inactive);
+      expect(response.body.data[0].response.status).toBe('200');
+    });
   });
 });

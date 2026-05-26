@@ -107,6 +107,12 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     ['_batch']
   ));
 
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'individual', format: 'org.schema' },
+    ['Organization'],
+    ['_transaction']
+  ));
+
   // Family/onboarding flows query the household organization via org.schema.
   services.push(createDidEndpointConfigFromSelector(
     { sector, section: 'individual', format: 'org.schema' },
