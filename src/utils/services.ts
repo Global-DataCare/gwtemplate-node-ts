@@ -1,9 +1,14 @@
 // src/utils/services.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { DidService, ServiceEndpointSelector } from 'gdc-common-utils-ts/models/did';
+import {
+  ServiceCapabilityFamily,
+  hasServiceCapabilityFamily,
+} from 'gdc-common-utils-ts/constants/service-capabilities';
 import { isFhirSector, isResearchSector } from './sector';
 
 export type HostRegistrySector = 'test' | 'test-network' | 'network';
@@ -229,12 +234,51 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   return services;
 }
 
+function filterBusinessServicesByCapabilityClaim(
+  services: DidService[],
+  sector: Sector,
+  serviceCapabilityClaim?: string,
+): DidService[] {
+  const hasExplicitClaim = String(serviceCapabilityClaim || '').trim().length > 0;
+  if (!hasExplicitClaim) {
+    return services;
+  }
+
+  const indexingEnabled = hasServiceCapabilityFamily(serviceCapabilityClaim, ServiceCapabilityFamily.Indexing);
+  const digitalTwinEnabled = hasServiceCapabilityFamily(serviceCapabilityClaim, ServiceCapabilityFamily.DigitalTwin);
+
+  return services.filter((service) => {
+    const selector = (service as any).selector as ServiceEndpointSelector | undefined;
+    if (!selector?.section) {
+      return true;
+    }
+
+    if (selector.section === 'digitaltwin') {
+      return digitalTwinEnabled;
+    }
+
+    if (selector.section === 'entity' || selector.section === 'individual') {
+      return indexingEnabled;
+    }
+
+    return true;
+  });
+}
+
 /**
  * Generates the business logic service CONFIGURATION for a new tenant.
  * This defines the services for `didConfig.service`.
  */
-export function initializeTenantServicesConfig(sector: Sector, customServices: DidService[] = []): DidService[] {
-  const defaultBusinessServices = generateDefaultBusinessServices(sector);
+export function initializeTenantServicesConfig(
+  sector: Sector,
+  customServices: DidService[] = [],
+  serviceCapabilityClaim?: string,
+): DidService[] {
+  const defaultBusinessServices = filterBusinessServicesByCapabilityClaim(
+    generateDefaultBusinessServices(sector),
+    sector,
+    serviceCapabilityClaim,
+  );
   
   const defaultNetworkServices: DidService[] = [
       {

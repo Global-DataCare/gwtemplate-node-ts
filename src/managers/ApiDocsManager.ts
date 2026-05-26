@@ -8,7 +8,8 @@ export function createApiDocsSetupOptions(
   const globalContextScript = `
     (() => {
       const KEY_PREFIX = 'gw-api-docs:';
-      const PANEL_VERSION = '2026-05-25-individual-did-v3';
+      const PANEL_VERSION = '2026-05-25-individual-did-v5';
+      const DESKTOP_PANEL_WIDTH = 360;
       const fields = [
         { key: 'testId', label: 'test id', placeholder: '01' },
         { key: 'taxTenantId', label: 'taxTenantId', placeholder: 'acme-id' },
@@ -36,6 +37,8 @@ export function createApiDocsSetupOptions(
       function removeValue(key) { localStorage.removeItem(KEY_PREFIX + key); }
       function getDerivedValue(key) { return localStorage.getItem(KEY_PREFIX + '__derived__:' + key) || ''; }
       function setDerivedValue(key, value) { localStorage.setItem(KEY_PREFIX + '__derived__:' + key, value || ''); }
+      function getPanelOpen() { return localStorage.getItem(KEY_PREFIX + '__panelOpen') === '1'; }
+      function setPanelOpen(nextValue) { localStorage.setItem(KEY_PREFIX + '__panelOpen', nextValue ? '1' : '0'); }
       const paramDefaults = {
         tenantId: 'acme-id',
         jurisdiction: 'ES',
@@ -492,40 +495,101 @@ export function createApiDocsSetupOptions(
       }
 
       function upsertGlobalContextPanel() {
+        const existingLauncher = document.getElementById('gw-api-global-context-launcher');
+        if (existingLauncher) existingLauncher.remove();
         const existingPanel = document.getElementById('gw-api-global-context');
         if (existingPanel) {
           const version = existingPanel.getAttribute('data-version') || '';
-          if (version === PANEL_VERSION) return;
+          if (version === PANEL_VERSION) {
+            syncGlobalContextPanelState();
+            return;
+          }
           existingPanel.remove();
         }
+        const launcher = document.createElement('button');
+        launcher.type = 'button';
+        launcher.id = 'gw-api-global-context-launcher';
+        launcher.textContent = 'Flow Context';
+        launcher.style.position = 'fixed';
+        launcher.style.top = '12px';
+        launcher.style.right = '12px';
+        launcher.style.zIndex = '10000';
+        launcher.style.border = '1px solid #c9c9c9';
+        launcher.style.background = '#f8f8f8';
+        launcher.style.borderRadius = '999px';
+        launcher.style.padding = '8px 12px';
+        launcher.style.fontSize = '12px';
+        launcher.style.fontWeight = '600';
+        launcher.style.cursor = 'pointer';
+        launcher.style.boxShadow = '0 2px 10px rgba(15,23,42,0.10)';
+        launcher.addEventListener('click', () => {
+          setPanelOpen(!getPanelOpen());
+          syncGlobalContextPanelState();
+        });
+        document.body.appendChild(launcher);
+
         const panel = document.createElement('div');
         panel.id = 'gw-api-global-context';
         panel.setAttribute('data-version', PANEL_VERSION);
-        panel.style.position = 'fixed';
-        panel.style.right = '12px';
-        panel.style.bottom = '12px';
+        panel.style.boxSizing = 'border-box';
         panel.style.zIndex = '9999';
         panel.style.background = '#ffffff';
         panel.style.border = '1px solid #d9d9d9';
-        panel.style.borderRadius = '8px';
-        panel.style.padding = '10px';
-        panel.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-        panel.style.width = '320px';
-        panel.style.maxHeight = '70vh';
+        panel.style.borderRadius = '12px';
+        panel.style.padding = '16px';
+        panel.style.boxShadow = '0 12px 36px rgba(15,23,42,0.18)';
+        panel.style.width = DESKTOP_PANEL_WIDTH + 'px';
+        panel.style.maxHeight = 'calc(100vh - 80px)';
         panel.style.overflow = 'auto';
-        panel.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">Global Flow Context</div>';
+        panel.style.display = 'none';
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.alignItems = 'center';
+        header.style.justifyContent = 'space-between';
+        header.style.gap = '12px';
+        header.style.marginBottom = '12px';
+
+        const title = document.createElement('div');
+        title.id = 'gw-api-global-context-title';
+        title.textContent = 'Global Flow Context';
+        title.style.fontWeight = '700';
+        title.style.fontSize = '14px';
+
+        const toggleButton = document.createElement('button');
+        toggleButton.type = 'button';
+        toggleButton.id = 'gw-api-global-context-toggle';
+        toggleButton.style.border = '1px solid #c9c9c9';
+        toggleButton.style.background = '#f8f8f8';
+        toggleButton.style.borderRadius = '999px';
+        toggleButton.style.padding = '6px 10px';
+        toggleButton.style.fontSize = '12px';
+        toggleButton.style.fontWeight = '600';
+        toggleButton.style.cursor = 'pointer';
+        toggleButton.addEventListener('click', () => {
+          setPanelOpen(false);
+          syncGlobalContextPanelState();
+        });
+
+        header.appendChild(title);
+        header.appendChild(toggleButton);
+        panel.appendChild(header);
+
+        const body = document.createElement('div');
+        body.id = 'gw-api-global-context-body';
 
         for (const field of fields) {
           const row = document.createElement('div');
           row.style.display = 'grid';
-          row.style.gridTemplateColumns = '110px 1fr';
-          row.style.gap = '6px';
+          row.style.gridTemplateColumns = '120px 1fr';
+          row.style.gap = '8px';
           row.style.alignItems = 'center';
-          row.style.marginBottom = '6px';
+          row.style.marginBottom = '8px';
 
           const label = document.createElement('label');
           label.textContent = field.label;
           label.style.fontSize = '12px';
+          label.style.fontWeight = '600';
 
           const input = document.createElement('input');
           input.type = 'text';
@@ -533,7 +597,7 @@ export function createApiDocsSetupOptions(
           input.value = getValue(field.key);
           input.placeholder = field.placeholder;
           input.style.fontSize = '12px';
-          input.style.padding = '4px 6px';
+          input.style.padding = '6px 8px';
           input.style.border = '1px solid #d9d9d9';
           input.style.borderRadius = '4px';
           input.addEventListener('input', () => {
@@ -547,17 +611,59 @@ export function createApiDocsSetupOptions(
 
           row.appendChild(label);
           row.appendChild(input);
-          panel.appendChild(row);
+          body.appendChild(row);
         }
 
         const hint = document.createElement('div');
         hint.style.fontSize = '11px';
         hint.style.color = '#555';
-        hint.style.marginTop = '4px';
+        hint.style.marginTop = '10px';
+        hint.style.lineHeight = '1.45';
         hint.textContent =
           'Values are auto-applied to path params, tenant/individual/physician helpers, SMART scopes, placeholders, and template jti/thid fields.';
-        panel.appendChild(hint);
+        body.appendChild(hint);
+        panel.appendChild(body);
         document.body.appendChild(panel);
+        syncGlobalContextPanelState();
+      }
+
+      function syncGlobalContextPanelState() {
+        const launcher = document.getElementById('gw-api-global-context-launcher');
+        const panel = document.getElementById('gw-api-global-context');
+        const body = document.getElementById('gw-api-global-context-body');
+        const toggleButton = document.getElementById('gw-api-global-context-toggle');
+        const title = document.getElementById('gw-api-global-context-title');
+        if (!launcher || !panel || !body || !toggleButton || !title) return;
+
+        const open = getPanelOpen();
+        panel.setAttribute('data-open', open ? '1' : '0');
+        panel.style.display = open ? 'block' : 'none';
+        body.style.display = 'block';
+        title.textContent = 'Global Flow Context';
+        toggleButton.textContent = 'Hide';
+        launcher.textContent = open ? 'Hide Context' : 'Flow Context';
+        launcher.setAttribute('aria-expanded', open ? 'true' : 'false');
+        applyGlobalContextLayout();
+      }
+
+      function applyGlobalContextLayout() {
+        const panel = document.getElementById('gw-api-global-context');
+        if (!panel) return;
+
+        const desktopWidth = Math.min(420, Math.max(300, Math.floor(window.innerWidth * 0.3)));
+        panel.style.position = 'fixed';
+        panel.style.top = '56px';
+        panel.style.right = '12px';
+        panel.style.left = 'auto';
+        panel.style.bottom = 'auto';
+        panel.style.height = 'auto';
+        panel.style.width = window.innerWidth >= 900 ? desktopWidth + 'px' : 'calc(100vw - 24px)';
+        panel.style.maxWidth = 'calc(100vw - 24px)';
+        panel.style.border = '1px solid #d9d9d9';
+        panel.style.borderRadius = '12px';
+        panel.style.margin = '0';
+        panel.style.padding = '16px';
+        document.body.style.paddingRight = '0';
       }
 
       function refreshInputIfEmpty(key, nextValue) {
@@ -611,6 +717,8 @@ export function createApiDocsSetupOptions(
           const style = document.createElement('style');
           style.id = 'gw-api-docs-inline-code-fix';
           style.textContent = [
+            'body { overflow-x: hidden; }',
+            '.swagger-ui { box-sizing: border-box; }',
             '.swagger-ui .markdown p,',
             '.swagger-ui .markdown li,',
             '.swagger-ui .opblock-description-wrapper p,',
@@ -658,6 +766,7 @@ export function createApiDocsSetupOptions(
             '.gw-api-docs-dark .swagger-ui .response-col_headers,',
             '.gw-api-docs-dark .swagger-ui .headers-wrapper,',
             '.gw-api-docs-dark .swagger-ui .headers-wrapper * { color: #e8e8e8 !important; }',
+            '.swagger-ui { max-width: none !important; width: 100% !important; }',
           ].join('\\n');
           document.head.appendChild(style);
         }
@@ -665,16 +774,19 @@ export function createApiDocsSetupOptions(
         syncThemeContrastClass();
         ensureDefaultContextValues();
         upsertGlobalContextPanel();
+        applyGlobalContextLayout();
         wireAutoFillFromResponses();
         syncSwaggerParameterInputs(false);
         syncSwaggerRequestBodyEditors();
 
         const observer = new MutationObserver(() => {
           syncThemeContrastClass();
+          applyGlobalContextLayout();
           syncSwaggerParameterInputs(false);
           syncSwaggerRequestBodyEditors();
         });
         observer.observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('resize', applyGlobalContextLayout);
       }
 
       if (document.readyState === 'loading') {

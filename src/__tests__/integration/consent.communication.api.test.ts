@@ -14,6 +14,7 @@ import { getEnvSectionId } from '../../utils/section-env';
 import { getIndividualSectionId, getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { getClaimValue } from '../../utils/claims';
+import { testTenant1TenantId } from '../data/organization.data';
 
 describe('Consent via Communication API (integration)', () => {
   afterEach(() => {
@@ -51,7 +52,7 @@ describe('Consent via Communication API (integration)', () => {
       const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
       const tenantVaultId = getTenantVaultId(
         tenantClaims[ClaimsServiceSchemaorg.category],
-        tenantClaims[ClaimsOrganizationSchemaorg.alternateName],
+        testTenant1TenantId,
       );
 
       const tenantConfig = {
@@ -95,11 +96,12 @@ describe('Consent via Communication API (integration)', () => {
 
       const consent1 = makeConsentResource('urn:uuid:patient-consent-001', 'did:web:hospital.example.com', attachment1);
       const consent2 = makeConsentResource('urn:uuid:patient-consent-002', 'did:web:clinic.example.com', attachment2);
+      const tenantRoutePrefix = `/${testTenant1TenantId}/cds-ES/v1/health-care`;
 
       const thidBatch = 'communication-consent-batch-001';
       const submitResp = await invokeExpress(app, {
         method: 'POST',
-        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch',
+        url: `${tenantRoutePrefix}/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidBatch,
@@ -153,7 +155,7 @@ describe('Consent via Communication API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response',
+          url: `${tenantRoutePrefix}/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidBatch },
         });

@@ -284,15 +284,22 @@ const swaggerDefinition = {
         value: {},
       },
       FamilyRegistrationPlaintextMessage: {
-        summary: 'Plaintext Message for Family Registration',
+        summary: 'Plaintext Message for Family Registration with online PDF link',
         description:
           [
             'A DIDComm-like message wrapper containing the family organization claims.',
             'Default examples use contextualized `org.schema` claim keys such as `Organization.identifier.value` and `Service.category` because the gateway default claim-storage mode accepts omitted `org.schema.` prefixes when `@context` is `org.schema`.',
             'If the service is configured with `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, the same logical claims may also be sent fully qualified as `org.schema.*`.',
             'For signed-PDF onboarding, `Organization.owner.identifier.value` is expected to come from the signer certificate `serialNumber` (for example `IDCES-...`), not from the controller email.',
+            'The signed individual PDF attachment accepts either `attachments[].data.links[0]` (preferred online URL form) or `attachments[].data.base64` (embedded legacy form).',
             '`Service.termsOfService` accepts either an HTTPS URL or an embedded `data:application/pdf;base64,...` payload; Swagger shows the URL form by default.',
           ].join(' '),
+        value: {},
+      },
+      FamilyRegistrationPlaintextMessageInlineBase64: {
+        summary: 'Plaintext Message for Family Registration with inline base64 PDF',
+        description:
+          'Same family registration payload, but the signed PDF travels inline in attachments[].data.base64 instead of attachments[].data.links[0]. Use this only when you really need embedded transport.',
         value: {},
       },
       FamilyOrderPlaintextMessage: {

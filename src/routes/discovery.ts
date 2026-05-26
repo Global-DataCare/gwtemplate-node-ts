@@ -1,5 +1,6 @@
 // src/routes/discovery.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import * as express from 'express';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
@@ -10,8 +11,15 @@ import { signVerifiableCredential } from '../utils/vc-signer';
 import { findSigningMethod } from '../utils/did-backend';
 import { buildStatusListCredential, buildStatusListEntry, createStatusListEncodedList } from '../utils/status-list';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import {
+  getServiceCapabilityFamily,
+  hasServiceCapabilityFamily,
+  parseServiceCapabilityTokens,
+  ServiceCapabilityFamily,
+  ServiceCapabilityTokenValue,
+} from 'gdc-common-utils-ts/constants/service-capabilities';
 import { getBaseUrlFromDidWeb } from '../utils/did-backend';
-import { isFhirSector } from '../utils/sector';
+import { isFhirSector, isResearchSector } from '../utils/sector';
 
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ILogger } from '../loggers/ILogger';
@@ -41,8 +49,24 @@ export function createDiscoveryRouter(
     publisherDid: string;
     title: string;
     baseUrl: string;
+    operationalUrl: string;
+    alternateName?: string;
     sector?: string;
     jurisdiction?: string;
+    serviceTypeClaim?: string;
+  };
+
+  type ServiceOfferingKind = 'index' | 'research';
+
+  type ProviderServiceOffering = {
+    id: string;
+    kind: ServiceOfferingKind;
+    publisherDid: string;
+    title: string;
+    endpointUrl: string;
+    sector?: string;
+    jurisdiction?: string;
+    serviceTypes: ServiceCapabilityTokenValue[];
   };
 
   const parseCategory = (value: unknown): string => {
@@ -65,19 +89,97 @@ export function createDiscoveryRouter(
       (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.alternateName] as string | undefined) ||
       publisherDid;
     const baseUrl = getBaseUrlFromDidWeb(publisherDid);
+    const operationalUrl =
+      (tenantConfig?.claims?.[ClaimsServiceSchemaorg.url] as string | undefined)?.trim() ||
+      baseUrl;
+    const alternateName = (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.alternateName] as string | undefined)?.trim();
     const sector = parseCategory(tenantConfig?.claims?.[ClaimsServiceSchemaorg.category]);
     const jurisdiction = parseJurisdiction(tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.addressCountry]);
+    const serviceTypeClaim = tenantConfig?.claims?.[ClaimsServiceSchemaorg.serviceType] as string | undefined;
     return {
       datasetId: toDatasetId(publisherDid),
       publisherDid,
       title,
       baseUrl,
+      operationalUrl,
+      alternateName,
       sector,
       jurisdiction,
+      serviceTypeClaim,
     };
   };
 
-  const buildCatalog = (catalogBaseUrl: string, datasets: ProviderDataset[]) => ({
+  const buildTenantContextPath = (dataset: ProviderDataset): string | undefined => {
+    if (!dataset.alternateName || !dataset.sector || !dataset.jurisdiction) {
+      return undefined;
+    }
+    return `/${dataset.alternateName}/cds-${dataset.jurisdiction.toLowerCase()}/v1/${dataset.sector}`;
+  };
+
+  const buildServiceOfferingUrl = (
+    publicOrigin: string,
+    dataset: ProviderDataset,
+    kind: ServiceOfferingKind,
+  ): string => {
+    const contextualPath = buildTenantContextPath(dataset);
+    if (contextualPath) {
+      return `${publicOrigin}${contextualPath}/.well-known/service-offering-${kind}.json`;
+    }
+    return `${dataset.baseUrl}/.well-known/service-offering-${kind}.json`;
+  };
+
+  const buildServiceOfferingTypeLabel = (kind: ServiceOfferingKind): string =>
+    kind === 'index' ? 'Index' : 'Research Digital Twin';
+
+  const resolveDefaultOfferingKinds = (dataset: ProviderDataset): ServiceOfferingKind[] => {
+    const kinds: ServiceOfferingKind[] = ['index'];
+    if (dataset.sector && isResearchSector(dataset.sector as any)) {
+      kinds.push('research');
+    }
+    return kinds;
+  };
+
+  const buildServiceOfferings = (
+    dataset: ProviderDataset,
+    publicOrigin: string,
+  ): ProviderServiceOffering[] => {
+    const explicitCapabilityClaim = String(dataset.serviceTypeClaim || '').trim();
+    const explicitTokens = parseServiceCapabilityTokens(explicitCapabilityClaim) as ServiceCapabilityTokenValue[];
+    const kinds: ServiceOfferingKind[] = explicitTokens.length > 0
+      ? [
+          ...(hasServiceCapabilityFamily(explicitCapabilityClaim, ServiceCapabilityFamily.Indexing) ? ['index' as const] : []),
+          ...(hasServiceCapabilityFamily(explicitCapabilityClaim, ServiceCapabilityFamily.DigitalTwin) ? ['research' as const] : []),
+        ]
+      : resolveDefaultOfferingKinds(dataset);
+
+    return kinds.map((kind) => {
+      const family = kind === 'index' ? ServiceCapabilityFamily.Indexing : ServiceCapabilityFamily.DigitalTwin;
+      const serviceTypes = explicitTokens.filter((token) => getServiceCapabilityFamily(token) === family);
+      return {
+        id: buildServiceOfferingUrl(publicOrigin, dataset, kind),
+        kind,
+        publisherDid: dataset.publisherDid,
+        title: `${dataset.title} ${buildServiceOfferingTypeLabel(kind)} Service Offering`,
+        endpointUrl: dataset.operationalUrl,
+        sector: dataset.sector,
+        jurisdiction: dataset.jurisdiction,
+        serviceTypes,
+      };
+    });
+  };
+
+  const toServiceOfferingNode = (offering: ProviderServiceOffering) => ({
+    '@id': offering.id,
+    '@type': 'dcat:DataService',
+    'dcterms:title': offering.title,
+    'dcterms:publisher': { '@id': offering.publisherDid },
+    'dcat:endpointURL': offering.endpointUrl,
+    'dcat:theme': offering.sector || undefined,
+    'dcterms:spatial': offering.jurisdiction || undefined,
+    'dcat:keyword': offering.serviceTypes.length ? offering.serviceTypes : undefined,
+  });
+
+  const buildCatalog = (catalogBaseUrl: string, publicOrigin: string, datasets: ProviderDataset[]) => ({
     '@context': {
       dcat: 'https://www.w3.org/ns/dcat#',
       dcterms: 'http://purl.org/dc/terms/',
@@ -85,6 +187,7 @@ export function createDiscoveryRouter(
     },
     '@id': `${catalogBaseUrl}`,
     '@type': 'dcat:Catalog',
+    'dcat:service': datasets.flatMap((dataset) => buildServiceOfferings(dataset, publicOrigin).map(toServiceOfferingNode)),
     'dcat:dataset': datasets.map((dataset) => ({
       '@id': `${catalogBaseUrl}/datasets/${dataset.datasetId}`,
       '@type': 'dcat:Dataset',
@@ -93,6 +196,7 @@ export function createDiscoveryRouter(
       'dcterms:publisher': { '@id': dataset.publisherDid },
       'dcat:theme': dataset.sector || undefined,
       'dcterms:spatial': dataset.jurisdiction || undefined,
+      'dcat:service': buildServiceOfferings(dataset, publicOrigin).map((offering) => ({ '@id': offering.id })),
       'dcat:distribution': [
         {
           '@type': 'dcat:Distribution',
@@ -114,6 +218,22 @@ export function createDiscoveryRouter(
       if (jurisdictionFilter && (dataset.jurisdiction || '').toUpperCase() !== jurisdictionFilter) return false;
       return true;
     });
+  };
+
+  const buildServiceOfferingArtifact = (
+    dataset: ProviderDataset,
+    kind: ServiceOfferingKind,
+    publicOrigin: string,
+  ) => {
+    const offering = buildServiceOfferings(dataset, publicOrigin).find((candidate) => candidate.kind === kind);
+    if (!offering) return undefined;
+    return {
+      '@context': {
+        dcat: 'https://www.w3.org/ns/dcat#',
+        dcterms: 'http://purl.org/dc/terms/',
+      },
+      ...toServiceOfferingNode(offering),
+    };
   };
 
   /**
@@ -232,6 +352,32 @@ export function createDiscoveryRouter(
    *   get:
    *     tags: [Discovery]
    *     summary: Gaia-X Legal Participant VC (tenant)
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: DCAT3 index service offering (tenant)
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: DCAT3 research service offering (tenant)
    *     parameters:
    *       - $ref: '#/components/parameters/TenantId'
    *       - $ref: '#/components/parameters/Jurisdiction'
@@ -444,6 +590,22 @@ export function createDiscoveryRouter(
     res.json(vc);
   });
 
+  router.get(`${tenantWellKnownPrefix}/service-offering-index.json`, resolveTenant, async (req, res) => {
+    const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    const dataset = tenantConfig ? toProviderDataset(tenantConfig) : null;
+    const artifact = dataset ? buildServiceOfferingArtifact(dataset, 'index', `${req.protocol}://${req.get('host')}`) : undefined;
+    if (!artifact) return res.status(404).type('text').send('Not Found');
+    res.json(artifact);
+  });
+
+  router.get(`${tenantWellKnownPrefix}/service-offering-research.json`, resolveTenant, async (req, res) => {
+    const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    const dataset = tenantConfig ? toProviderDataset(tenantConfig) : null;
+    const artifact = dataset ? buildServiceOfferingArtifact(dataset, 'research', `${req.protocol}://${req.get('host')}`) : undefined;
+    if (!artifact) return res.status(404).type('text').send('Not Found');
+    res.json(artifact);
+  });
+
   router.get([`${hostWellKnownPrefix}/openid-configuration`, `${tenantWellKnownPrefix}/openid-configuration`], resolveTenant, (req, res) => {
     const config = discoveryService.getOpenIdConfiguration(res.locals.vaultId);
     if (config) {
@@ -485,6 +647,14 @@ export function createDiscoveryRouter(
    *       '200': { description: DSP catalog response }
    *       '503': { description: Host not available }
    *
+   * /dcat3/catalog/dcat.json:
+   *   get:
+   *     tags: [Data Catalog Discovery]
+   *     summary: Operator catalog artifact (DCAT-3)
+   *     responses:
+   *       '200': { description: DCAT catalog artifact }
+   *       '503': { description: Host not available }
+   *
    * /dcat3/catalog/datasets/{id}:
    *   get:
    *     tags: [Data Catalog Discovery]
@@ -509,6 +679,19 @@ export function createDiscoveryRouter(
    *       - $ref: '#/components/parameters/Sector'
    *     responses:
    *       '200': { description: DSP catalog response }
+   *       '404': { description: Tenant not found }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/dcat.json:
+   *   get:
+   *     tags: [Data Catalog Discovery]
+   *     summary: Hosted provider catalog artifact (DCAT-3)
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: DCAT catalog artifact }
    *       '404': { description: Tenant not found }
    *
    * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/datasets/{id}:
@@ -540,7 +723,19 @@ export function createDiscoveryRouter(
 
     const filtered = filterDatasets(datasets, req.body?.filters);
     const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
-    res.json(buildCatalog(catalogBaseUrl, filtered));
+    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, filtered));
+  });
+
+  router.get('/dcat3/catalog/dcat.json', async (req, res) => {
+    const hostDid = await tenantsCacheManager.getDidDocument('host');
+    if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
+
+    const allTenants = await tenantsCacheManager.listRegisteredTenants();
+    const datasets = allTenants
+      .map(toProviderDataset)
+      .filter((d): d is ProviderDataset => !!d);
+    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
+    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, datasets));
   });
 
   router.get('/dcat3/catalog/datasets/:id', async (req, res) => {
@@ -555,7 +750,7 @@ export function createDiscoveryRouter(
     if (!dataset) return res.status(404).type('text').send('Not Found');
 
     const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
-    const [single] = buildCatalog(catalogBaseUrl, [dataset])['dcat:dataset'];
+    const [single] = buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, [dataset])['dcat:dataset'];
     res.json(single);
   });
 
@@ -568,7 +763,18 @@ export function createDiscoveryRouter(
     const filtered = filterDatasets([dataset], req.body?.filters);
 
     const catalogBaseUrl = `${req.protocol}://${req.get('host')}/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/dcat3/catalog`;
-    res.json(buildCatalog(catalogBaseUrl, filtered));
+    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, filtered));
+  });
+
+  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/dcat3/catalog/dcat.json', resolveTenant, async (req, res) => {
+    const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
+
+    const dataset = toProviderDataset(tenantConfig);
+    if (!dataset) return res.status(404).type('text').send('Not Found');
+
+    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/dcat3/catalog`;
+    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, [dataset]));
   });
 
   router.get('/:tenantId/cds-:jurisdiction/:version/:sector/dcat3/catalog/datasets/:id', resolveTenant, async (req, res) => {
@@ -579,7 +785,7 @@ export function createDiscoveryRouter(
     if (!dataset || dataset.datasetId !== req.params.id) return res.status(404).type('text').send('Not Found');
 
     const catalogBaseUrl = `${req.protocol}://${req.get('host')}/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/dcat3/catalog`;
-    const [single] = buildCatalog(catalogBaseUrl, [dataset])['dcat:dataset'];
+    const [single] = buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, [dataset])['dcat:dataset'];
     res.json(single);
   });
 

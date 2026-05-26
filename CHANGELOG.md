@@ -1,6 +1,10 @@
-## [Unreleased]
+## [1.6.0] - 2026-05-26
 
 ### Changed
+- Core Swagger family-registration request bodies now expose two named examples in the selector: online PDF link and inline base64 PDF, so integrators can compare the two transport forms directly.
+- Family registration signed-PDF onboarding now accepts HTTPS attachment links via `attachments[].data.links[0]` in addition to embedded base64, and the canonical Swagger/example fixture defaults to the online-link form.
+- Demo/smoke shell scripts no longer define copied business payload JSON inline when a canonical TypeScript fixture/helper exists; portal route smoke and medication/IPS demo flows now render their payloads from shared TS sources and only apply runtime overrides in Bash.
+- Portal web go/no-go automation/docs now explicitly describe the command as a route smoke check backed by canonical example fixtures, instead of ad-hoc handwritten payload snippets or local `dummy-*` values.
 - Updated SMART token authorization to evaluate the full active consent set for the subject instead of the previous single-rule MVP match.
 - Added explicit deny precedence over broader organization/jurisdiction coverage in the live SMART path.
 - Extended subject-scoped `Bundle/_search` handling so `Communication` permission requests can be recovered by:
@@ -22,11 +26,15 @@
 - Employee onboarding now behaves as canonical upsert/reactivation by `Organization.owner.email + Organization.owner.hasOccupation.identifier.value`, returning an already-existing active member directly and reactivating an inactive matching member instead of creating duplicates.
 - Family onboarding now accepts and normalizes the signed individual-registration PDF attachment into canonical claims before building the stored registration artifacts.
 - Added a canonical `_transaction` alias for `individual/org.schema/Organization` service discovery and Swagger so individual organization flows can be exercised with the same onboarding semantics as the existing batch route.
+- Legal-organization activation/discovery now treats `org.schema.Service.serviceType` as the canonical capability source for tenant DID publication and DCAT3 service offerings, with the docs and examples aligned around mandatory activation capabilities.
 - Regenerated Swagger/OpenAPI profile artifacts and aligned route descriptions, bootstrap scripts, env defaults, and curl examples around canonical `acme-id`, contextualized `org.schema` claims, and the synchronized local example fixtures.
 - Reorganized legacy top-level guides under `docs/`, expanded reading-order/README guidance, and documented the local example-sync workflow so the repo reflects the current source-of-truth layout.
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.7.0`.
 
 ### Testing
 - Added/updated focused tests for:
+  - family signed-PDF onboarding via remote HTTPS attachment link download
+  - shell-script payload contract conformance (`dummy-*` regression guard + fixture-renderer usage)
   - SMART consent evaluation precedence
   - related-person SMART access
   - `Communication` lookup by identifier, thread id, and linked CID

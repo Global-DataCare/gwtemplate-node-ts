@@ -1,5 +1,6 @@
 // src/__tests__/integration/wellKnownApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import { jest } from '@jest/globals';
 import express from 'express';
@@ -13,11 +14,14 @@ import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confiden
 import { parseTenantUrn } from '../../utils/urn';
 import { ILogger } from '../../loggers/ILogger';
 import { invokeExpress } from './helpers/invokeExpress';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ServiceCapabilityToken, serializeServiceCapabilityTokens } from 'gdc-common-utils-ts/constants/service-capabilities';
 
 const mockTenantsCacheManager = {
   getDidDocument: jest.fn(),
   getTenant: jest.fn(),
   getTenantDomainUrl: jest.fn(async () => 'https://host.example.com'),
+  listRegisteredTenants: jest.fn(),
 } as unknown as jest.Mocked<TenantsCacheManager>;
 
 // Create a fully typed mock of the IKmsService to satisfy the interface
@@ -193,6 +197,63 @@ describe('Well-Known Tenant Artifacts API', () => {
     expect(JSON.parse(response.text)).toEqual(expectedSelfDesc);
     expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith(testTenant1VaultId);
   });
+
+  it('should return the index service offering artifact for a hosted tenant when indexing is enabled', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const tenantId = testTenant1AlternateName;
+    const expectedUrl = `/${tenantId}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/service-offering-index.json`;
+
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({
+      didDocument: { id: testTenant1IdentifierUrn },
+      claims: {
+        [ClaimsOrganizationSchemaorg.legalName]: 'ACME Hospital',
+        [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+        [ClaimsServiceSchemaorg.category]: urnParts.sector,
+        [ClaimsServiceSchemaorg.url]: 'https://gateway.example.com/acme/cds-es/v1/health-care',
+        [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
+          ServiceCapabilityToken.IndexingCruds,
+          ServiceCapabilityToken.IndexingReadSearch,
+        ]),
+      },
+    } as any);
+
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const parsed = JSON.parse(response.text);
+
+    expect(response.status).toBe(200);
+    expect(parsed['@type']).toBe('dcat:DataService');
+    expect(parsed['dcat:endpointURL']).toBe('https://gateway.example.com/acme/cds-es/v1/health-care');
+    expect(parsed['dcat:keyword']).toEqual([
+      ServiceCapabilityToken.IndexingCruds,
+      ServiceCapabilityToken.IndexingReadSearch,
+    ]);
+  });
+
+  it('should return 404 for the research service offering artifact when digital twin is not enabled', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const tenantId = testTenant1AlternateName;
+    const expectedUrl = `/${tenantId}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/service-offering-research.json`;
+
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({
+      didDocument: { id: testTenant1IdentifierUrn },
+      claims: {
+        [ClaimsOrganizationSchemaorg.legalName]: 'ACME Hospital',
+        [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+        [ClaimsServiceSchemaorg.category]: urnParts.sector,
+        [ClaimsServiceSchemaorg.url]: 'https://gateway.example.com/acme/cds-es/v1/health-care',
+        [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
+          ServiceCapabilityToken.IndexingCruds,
+          ServiceCapabilityToken.IndexingReadSearch,
+        ]),
+      },
+    } as any);
+
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+
+    expect(response.status).toBe(404);
+  });
 });
 
 describe('Well-Known Legal Participant VC API', () => {
@@ -217,5 +278,60 @@ describe('Well-Known Legal Participant VC API', () => {
     const parsed = JSON.parse(response.text);
     expect(parsed).toEqual(hostEntityConfig.governanceVc);
     expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith('host');
+  });
+});
+
+describe('DCAT3 Discovery API', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return a catalog artifact with dcat:service entries derived from serviceType capabilities', async () => {
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
+    mockTenantsCacheManager.listRegisteredTenants.mockResolvedValue([
+      {
+        didDocument: { id: testTenant1DidWebHosted },
+        claims: {
+          [ClaimsOrganizationSchemaorg.alternateName]: testTenant1AlternateName,
+          [ClaimsOrganizationSchemaorg.legalName]: 'ACME Research',
+          [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+          [ClaimsServiceSchemaorg.category]: 'research-study',
+          [ClaimsServiceSchemaorg.url]: 'https://gateway.example.com/acme/cds-es/v1/research-study',
+          [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
+            ServiceCapabilityToken.IndexingReadSearch,
+            ServiceCapabilityToken.DigitalTwinReadSearch,
+          ]),
+        },
+      },
+    ] as any);
+
+    const response = await invokeExpress(app, {
+      method: 'GET',
+      url: '/dcat3/catalog/dcat.json',
+      headers: { host: 'host.example.com' },
+    });
+    const parsed = JSON.parse(response.text);
+
+    expect(response.status).toBe(200);
+    expect(parsed['@type']).toBe('dcat:Catalog');
+    expect(Array.isArray(parsed['dcat:service'])).toBe(true);
+    expect(parsed['dcat:service']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          '@id': `http://host.example.com/${testTenant1AlternateName}/cds-es/v1/research-study/.well-known/service-offering-index.json`,
+          '@type': 'dcat:DataService',
+        }),
+        expect.objectContaining({
+          '@id': `http://host.example.com/${testTenant1AlternateName}/cds-es/v1/research-study/.well-known/service-offering-research.json`,
+          '@type': 'dcat:DataService',
+        }),
+      ]),
+    );
+    expect(parsed['dcat:dataset'][0]['dcat:service']).toEqual(
+      expect.arrayContaining([
+        { '@id': `http://host.example.com/${testTenant1AlternateName}/cds-es/v1/research-study/.well-known/service-offering-index.json` },
+        { '@id': `http://host.example.com/${testTenant1AlternateName}/cds-es/v1/research-study/.well-known/service-offering-research.json` },
+      ]),
+    );
   });
 });

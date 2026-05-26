@@ -33,6 +33,17 @@ Short coverage summary for memory/thesis justification:
   - `body.controller.jwks`
 - Claim-teaching rule:
   - examples should prefer shared `ClaimsOrganizationSchemaorg`, `ClaimsPersonSchemaorg`, and `ClaimsServiceSchemaorg` constants instead of hardcoded claim-key strings
+- Service capability rule:
+  - legal-organization `_activate` must declare service capabilities in `org.schema.Service.serviceType`
+  - example values: `indexing.rs`, `indexing.cruds`, `digitaltwin.rs`, `digitaltwin.cruds`
+  - GW persists those claims and now uses them to decide which tenant API endpoints are published in DID discovery
+  - the same persisted capability claim also drives DCAT3 discovery artifacts:
+    - `GET /dcat3/catalog/dcat.json`
+    - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/dcat.json`
+    - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json`
+    - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json`
+  - `org.schema.Service.category` remains the sector, not the capability vocabulary
+  - if the activation omits the service capability claim, the legal-organization onboarding example is incomplete and should be treated as invalid teaching material
 - Legal-organization teaching rule:
   - do not start the first legal-organization example from `org.schema.Organization.alternateName`
   - center it on legal name, `Organization.identifier.value` / tax-id linkage returned by ICA, controller binding, and provider service identity

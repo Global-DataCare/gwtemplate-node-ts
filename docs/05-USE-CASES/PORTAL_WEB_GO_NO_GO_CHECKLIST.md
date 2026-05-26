@@ -1,6 +1,6 @@
 # Portal Web Go/No-Go Checklist (5 minutes, 14 calls)
 
-Purpose: quickly validate `gwtemplate-node-ts` readiness before testing `gdc-sdk-client-ts` from `apptemplate` web.
+Purpose: quickly validate portal-facing route readiness in `gwtemplate-node-ts` before testing `gdc-sdk-client-ts` from `apptemplate` web.
 
 Note on route conventions:
 
@@ -13,7 +13,13 @@ Automated version:
 npm run check:portal-web-go-no-go
 ```
 
-This runs the same 14-call route readiness checks and returns `GO`/`NO-GO`.
+This runs the same 14-call route smoke checks and returns `GO`/`NO-GO`.
+
+Important:
+
+- This checklist is a route smoke test, not a substitute for the full onboarding/auth/business flow.
+- The automated script renders canonical GW fixtures (`src/__tests__/data/example-payloads.ts`) and only applies runtime overrides such as `thid`, tenant/jurisdiction, or subject-specific values.
+- If you need the full validated journey, use `npm run docs:flow-report` or the live E2E orchestration script.
 
 ## 0) Variables
 
@@ -44,14 +50,15 @@ Expected: HTTP `200`.
 
 ```bash
 THID_ACTIVATE="thid-activate-$(date +%s)"
+ACTIVATE_REQ="$(
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node ./scripts/render-example-payload.mts ORGANIZATION_ACTIVATION_REQUEST "$(jq -n --arg thid "$THID_ACTIVATE" '{"/thid":$thid}')"
+)"
 curl -sS -i -X POST \
   "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_activate" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"thid\":\"$THID_ACTIVATE\",
-    \"body\":{\"data\":[{\"type\":\"Organization-activation-request-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"vp_token\":\"<vp-token>\"}}}]}
-  }"
+  -d "$ACTIVATE_REQ"
 ```
 
 Expected: HTTP `202` (or domain `4xx` if payload invalid, but route exists).
@@ -76,14 +83,15 @@ Expected: HTTP `202|200|500`, never `404 route not found`.
 
 ```bash
 THID_ORG_OFFER="thid-org-offer-$(date +%s)"
+ORG_OFFER_REQ="$(
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node ./scripts/render-example-payload.mts ORGANIZATION_REGISTRATION_REQUEST "$(jq -n --arg thid "$THID_ORG_OFFER" --arg tenantId "$TENANT_ID" --arg jurisdiction "$JURISDICTION" --arg sector "$SECTOR" '{"/thid":$thid,"/body/data/0/meta/claims/org.schema.Organization.identifier.value":$tenantId,"/body/data/0/meta/claims/org.schema.Organization.address.addressCountry":$jurisdiction,"/body/data/0/meta/claims/org.schema.Service.category":$sector}')"
+)"
 curl -sS -i -X POST \
   "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"thid\":\"$THID_ORG_OFFER\",
-    \"body\":{\"data\":[{\"type\":\"Organization-registration-form-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"org.schema.Organization.name\":\"Org Offer Test\"},\"attachments\":[{\"id\":\"sanitary-registry-pdf\",\"description\":\"Sanitary registry proof\",\"media_type\":\"application/pdf\",\"data\":{\"base64\":\"JVBERi0xLjQKJcTl8uXrCg==\"}}]}}]}
-  }"
+  -d "$ORG_OFFER_REQ"
 ```
 
 Expected: HTTP `202` (or domain `4xx`, but route exists).  
@@ -109,14 +117,15 @@ Expected: HTTP `202|200|500`, never `404 route not found`.
 
 ```bash
 THID_ORG_ORDER="thid-org-order-$(date +%s)"
+ORG_ORDER_REQ="$(
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node ./scripts/render-example-payload.mts ORGANIZATION_ORDER_REQUEST "$(jq -n --arg thid "$THID_ORG_ORDER" '{"/thid":$thid}')"
+)"
 curl -sS -i -X POST \
   "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"thid\":\"$THID_ORG_ORDER\",
-    \"body\":{\"data\":[{\"type\":\"Order-registration-request-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"org.schema.Order.acceptedOffer.identifier\":\"dummy-offer-id\"}}}]}
-  }"
+  -d "$ORG_ORDER_REQ"
 ```
 
 Expected: HTTP `202` (or domain `4xx`, but route exists).
@@ -141,14 +150,15 @@ Expected: HTTP `202|200|500`, never `404 route not found`.
 
 ```bash
 THID_EMP="thid-employee-$(date +%s)"
+EMPLOYEE_REQ="$(
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node ./scripts/render-example-payload.mts EMPLOYEE_REGISTRATION_REQUEST "$(jq -n --arg thid "$THID_EMP" '{"/thid":$thid}')"
+)"
 curl -sS -i -X POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/entity/org.schema/Employee/_batch" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"thid\":\"$THID_EMP\",
-    \"body\":{\"data\":[{\"type\":\"Employee-create-request-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"org.schema.Person.email\":\"doctor1@example.com\",\"org.schema.Person.hasOccupation\":\"ISCO-08|2211\"}}}]}
-  }"
+  -d "$EMPLOYEE_REQ"
 ```
 
 Expected: HTTP `202` (or domain `4xx`, but route exists).
@@ -173,11 +183,15 @@ Expected: HTTP `202|200|500`, never `404 route not found`.
 
 ```bash
 THID_EXCHANGE="thid-exchange-$(date +%s)"
+TOKEN_EXCHANGE_REQ="$(
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node ./scripts/render-example-payload.mts INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST "$(jq -n --arg thid "$THID_EXCHANGE" '{"/thid":$thid}')"
+)"
 curl -sS -i -X POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/identity/openid/Token/_exchange" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \
-  -d "{\"thid\":\"$THID_EXCHANGE\",\"subject_token\":\"dummy-license-code\"}"
+  -d "$TOKEN_EXCHANGE_REQ"
 ```
 
 Expected: HTTP `202` (or domain `4xx`, but route exists).
@@ -202,11 +216,15 @@ Expected: HTTP `202|200|500`, never `404 route not found`.
 
 ```bash
 THID_DCR="thid-dcr-$(date +%s)"
+DEVICE_DCR_REQ="$(
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node ./scripts/render-example-payload.mts DEVICE_REGISTRATION_REQUEST "$(jq -n --arg thid "$THID_DCR" '{"/thid":$thid}')"
+)"
 curl -sS -i -X POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/identity/openid/Device/_dcr" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \
-  -d "{\"thid\":\"$THID_DCR\",\"client_name\":\"web-portal-test\",\"jwks\":{\"keys\":[]}}"
+  -d "$DEVICE_DCR_REQ"
 ```
 
 Expected: HTTP `202` (or domain `4xx`, but route exists).
@@ -217,11 +235,15 @@ Expected: HTTP `202` (or domain `4xx`, but route exists).
 
 ```bash
 THID_SMART="thid-smart-$(date +%s)"
+SMART_REQ="$(
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node ./scripts/render-example-payload.mts SMART_TOKEN_REQUEST "$(jq -n --arg thid "$THID_SMART" '{"/thid":$thid}')"
+)"
 curl -sS -i -X POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/identity/openid/smart/token" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \
-  -d "{\"thid\":\"$THID_SMART\",\"scope\":\"individual.onboard\"}"
+  -d "$SMART_REQ"
 ```
 
 Expected: HTTP `202` (or domain `4xx`, but route exists).
@@ -232,14 +254,15 @@ Expected: HTTP `202` (or domain `4xx`, but route exists).
 
 ```bash
 THID_FAMILY="thid-family-$(date +%s)"
+FAMILY_REQ="$(
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node ./scripts/render-example-payload.mts FAMILY_REGISTRATION_REQUEST "$(jq -n --arg thid "$THID_FAMILY" '{"/thid":$thid}')"
+)"
 curl -sS -i -X POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/individual/org.schema/Organization/_batch" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"thid\":\"$THID_FAMILY\",
-    \"body\":{\"data\":[{\"type\":\"Family-registration-form-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"org.schema.Organization.name\":\"Family Test\",\"org.schema.Person.email\":\"family@example.com\"}}}]}
-  }"
+  -d "$FAMILY_REQ"
 ```
 
 Expected: HTTP `202` (or domain `4xx`, but route exists).

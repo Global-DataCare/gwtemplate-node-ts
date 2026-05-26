@@ -52,6 +52,10 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
     examples.EMPLOYEE_REGISTRATION_REQUEST;
   swaggerDefinition.components.examples.FamilyRegistrationPlaintextMessage.value =
     examples.FAMILY_REGISTRATION_REQUEST;
+  if (swaggerDefinition.components.examples.FamilyRegistrationPlaintextMessageInlineBase64) {
+    swaggerDefinition.components.examples.FamilyRegistrationPlaintextMessageInlineBase64.value =
+      examples.FAMILY_REGISTRATION_REQUEST_INLINE_BASE64;
+  }
   swaggerDefinition.components.examples.FamilyOrderPlaintextMessage.value =
     examples.FAMILY_ORDER_REQUEST;
   swaggerDefinition.components.examples.CustomerOnboardingPlaintextMessage.value =

@@ -159,8 +159,8 @@ function deriveSpec(spec, targetProfile) {
   clone.paths = kept;
   clone.info = clone.info || {};
   if (targetProfile === 'core') {
-    clone.info.title = 'Gateway API - SEDIA CORE';
-    clone.info.description = 'SEDIA CORE API documentation for the secure gateway canonical flow.';
+    clone.info.title = 'Gateway API - CORE';
+    clone.info.description = 'CORE API documentation for the secure gateway canonical flow.';
   } else if (targetProfile === 'compat') {
     clone.info.title = 'Gateway API - COMPAT';
     clone.info.description = 'Compatibility profile including legacy and alias routes on top of the core flow.';
@@ -174,7 +174,7 @@ function deriveSpec(spec, targetProfile) {
     clone.tags = [
       {
         name: 'Core Flow (SDK E2E Use Cases)',
-        description: 'Canonical SEDIA flow aligned with dataspace-client-sdk-node/tests/live-gw-uc5.e2e.test.mjs',
+        description: 'Canonical CORE flow aligned with dataspace-client-sdk-node/tests/live-gw-uc5.e2e.test.mjs',
       },
     ];
   }

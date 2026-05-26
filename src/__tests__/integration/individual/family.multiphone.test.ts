@@ -1,4 +1,5 @@
 // src/__tests__/integration/individual/family.multiphone.test.ts
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import express from 'express';
 import { createApiRouter } from '../../../routes/api';
@@ -16,6 +17,7 @@ import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg, ClaimsOrganizationSchemaor
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
+import { testDefaultTenantServiceTypeClaim, testTenant1TenantId } from '../../data/organization.data';
 
 async function invokeExpress(
   handler: any,
@@ -172,30 +174,30 @@ describe('FamilyManager multi-phone integration', () => {
   });
 
   it('should create two organizations with same owner (multi-phone) and recover one by apodo and phone', async () => {
-    const tenantId = 'acme';
+    const tenantId = testTenant1TenantId;
     const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_batch`;
 
     // Org 1: apodo "FAMILIA-UNO", phones: "+34600000001,+34600000002"
     // Org 2: apodo "FAMILIA-DOS", phones: "+34600000001,+34600000003"
     const org1Phones = '+34600000001,+34600000002';
     const org2Phones = '+34600000001,+34600000003';
-    const ownerName1 = 'FAMILIA-UNO';
-    const ownerName2 = 'FAMILIA-DOS';
+    const individualNickname1 = 'FAMILIA-UNO';
+    const individualNickname2 = 'FAMILIA-DOS';
 
     const baseClaims = {
       'org.schema.Organization.owner.telephone': org1Phones,
       'org.schema.Organization.owner.email': 'parent@example.com',
       'org.schema.Organization.owner.identifier.value': 'parent@example.com',
-      'org.schema.Organization.alternateName': ownerName1, // Use alternateName as nickname/local name
+      'org.schema.Organization.alternateName': individualNickname1,
       'org.schema.Service.identifier': 'did:web:provider.example.com',
-      'org.schema.Service.serviceType': 'http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC',
+      'org.schema.Service.serviceType': testDefaultTenantServiceTypeClaim,
       'org.schema.Service.category': 'health-care',
       'org.schema.Organization.addressCountry': 'ES',
     };
     const baseClaims2 = {
       ...baseClaims,
       'org.schema.Organization.owner.telephone': org2Phones,
-      'org.schema.Organization.alternateName': ownerName2,
+      'org.schema.Organization.alternateName': individualNickname2,
     };
 
     // Create org1
@@ -270,7 +272,7 @@ describe('FamilyManager multi-phone integration', () => {
             type: 'Family-registration-form-v1.0',
             meta: { claims: {
               'org.schema.Organization.owner.telephone': '+34600000003',
-              'org.schema.Organization.alternateName': ownerName2,
+              'org.schema.Organization.alternateName': individualNickname2,
               'org.schema.Service.category': 'health-care',
             } },
           }],
@@ -279,7 +281,7 @@ describe('FamilyManager multi-phone integration', () => {
     };
     const searchResult = await hostingManager.process(searchJob);
     const found = searchResult.body.data[0];
-    expect(found.meta.claims['org.schema.Organization.alternateName']).toBe(ownerName2);
+    expect(found.meta.claims['org.schema.Organization.alternateName']).toBe(individualNickname2);
     expect(found.meta.claims['org.schema.Organization.owner.telephone']).toContain('+34600000003');
     expect(found.meta.claims['org.schema.FamilyRegistration.status']).toBe('already_exists');
   });

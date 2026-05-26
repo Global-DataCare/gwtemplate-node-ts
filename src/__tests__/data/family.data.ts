@@ -1,4 +1,7 @@
 
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
+import { testDefaultTenantServiceTypeClaim } from "./organization.data";
+
 /** Test Claims for example-payloads */
 export const testFamilyRegisterExpanded = {
   "Organization.address.addressCountry": "ES",
@@ -11,5 +14,5 @@ export const testFamilyRegisterExpanded = {
   "Person.identifier.value": "<child1-ID>",
   "Service.category": "health-care",
   "Service.identifier": "did:web:api-provider.example.com",
-  "Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+  "Service.serviceType": testDefaultTenantServiceTypeClaim,
 }

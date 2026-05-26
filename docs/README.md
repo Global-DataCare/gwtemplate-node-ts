@@ -68,6 +68,14 @@ Practical rule:
 npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.ts src/__tests__/unit/examples/shared-flow-examples.test.ts src/__tests__/unit/utils/swagger-spec.test.ts
 ```
 
+## Shell Script Payload Policy
+
+- Bash scripts may orchestrate requests, polling, and response extraction, but they must not become the source of truth for business payload contracts.
+- If a `.sh` submits onboarding/auth/resource JSON that already has a canonical GW fixture, the script must render it through `scripts/render-example-payload.mts` and only apply explicit runtime overrides such as `thid`, tenant ids, subject ids, emails, or other execution-specific values.
+- If a script needs synthetic demo payloads that do not belong in `example-payloads.ts`, keep those payload builders in TypeScript data/render helpers and have the `.sh` call the renderer instead of embedding large heredoc JSON bodies.
+- Route smoke scripts must be labeled as smoke checks and may reuse canonical placeholder values from fixtures, but they must not invent local `dummy-*` contract fields.
+- Full-flow scripts must extract step-dependent values from previous responses or required environment variables instead of fabricating them inline.
+
 ### 📂 01-OVERVIEW-AND-GUIDES
 *   **[01.A-ARCHITECTURE-OVERVIEW.md](01-OVERVIEW-AND-GUIDES/01.A-ARCHITECTURE-OVERVIEW.md)**: **(START HERE)** The main document outlining the core architectural patterns, data flows, and principles.
 *   **[01.B-CREDENTIAL-ARCHITECTURE.md](01-OVERVIEW-AND-GUIDES/01.B-CREDENTIAL-ARCHITECTURE.md)**: Describes the architecture for handling digital credentials and claims.

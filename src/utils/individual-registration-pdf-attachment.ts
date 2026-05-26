@@ -39,6 +39,37 @@ function normalizeAttachmentBase64(base64Value: string): string {
   return normalized.replace(/-/g, '+').replace(/_/g, '/');
 }
 
+function normalizeAttachmentLinks(linksValue: unknown): string[] {
+  if (!Array.isArray(linksValue)) return [];
+  return linksValue
+    .map((entry) => String(entry || '').trim())
+    .filter((entry) => /^https:\/\//i.test(entry));
+}
+
+async function resolveAttachmentPdfBytes(pdfAttachment: DidCommAttachmentLike): Promise<Buffer> {
+  const embeddedBase64 = String(pdfAttachment.data?.base64 || '').trim();
+  if (embeddedBase64) {
+    return Buffer.from(normalizeAttachmentBase64(embeddedBase64), 'base64');
+  }
+
+  const remoteLinks = normalizeAttachmentLinks(pdfAttachment.data?.links);
+  const remoteUrl = remoteLinks[0];
+  if (remoteUrl) {
+    const response = await fetch(remoteUrl, { redirect: 'follow' });
+    if (!response.ok) {
+      throw new Error(`PDF attachment download failed with HTTP ${response.status} for ${remoteUrl}.`);
+    }
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length) {
+      throw new Error(`PDF attachment download returned empty content for ${remoteUrl}.`);
+    }
+    return bytes;
+  }
+
+  throw new Error('PDF attachment must provide either data.base64 or data.links[0] with an HTTPS URL.');
+}
+
 function escapeDnValue(value: string): string {
   return String(value || '').replace(/\\/g, '\\\\').replace(/,/g, '\\,');
 }
@@ -127,7 +158,7 @@ export async function buildClaimsFromIndividualRegistrationPdfAttachment(
   const pdfAttachment = candidates.find((attachment) => isPdfMediaType(attachment?.media_type));
   if (!pdfAttachment) return undefined;
 
-  const pdfBytes = Buffer.from(normalizeAttachmentBase64(String(pdfAttachment.data?.base64 || '')), 'base64');
+  const pdfBytes = await resolveAttachmentPdfBytes(pdfAttachment);
   const fields = await extractPdfFormFields(pdfBytes);
   const signerSubjectDn = extractSignerSubjectDnFromPdf(pdfBytes);
   const claims = buildClaimsFromIndividualFormPdf(fields, signerSubjectDn);

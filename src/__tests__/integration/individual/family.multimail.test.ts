@@ -1,3 +1,4 @@
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 import express from 'express';
 import { createApiRouter } from '../../../routes/api';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
@@ -13,6 +14,7 @@ import { testClaimsHostInitialization } from '../../data/end-to-end.data';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
+import { testDefaultTenantServiceTypeClaim, testTenant1TenantId } from '../../data/organization.data';
 
 describe('FamilyManager multi-email integration (web/app)', () => {
   const mockQueueAdapter = { addJob: jest.fn() };
@@ -88,30 +90,30 @@ describe('FamilyManager multi-email integration (web/app)', () => {
   });
 
   it('should create two organizations with same owner (multi-email) and recover one by apodo and email', async () => {
-    const tenantId = 'acme';
+    const tenantId = testTenant1TenantId;
     const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_batch`;
 
     // Org 1: apodo "FAMILIA-UNO", emails: "parent1@example.com,parent2@example.com"
     // Org 2: apodo "FAMILIA-DOS", emails: "parent1@example.com,parent3@example.com"
     const org1Emails = 'parent1@example.com,parent2@example.com';
     const org2Emails = 'parent1@example.com,parent3@example.com';
-    const ownerName1 = 'FAMILIA-UNO';
-    const ownerName2 = 'FAMILIA-DOS';
+    const individualNickname1 = 'FAMILIA-UNO';
+    const individualNickname2 = 'FAMILIA-DOS';
 
     const baseClaims = {
       'org.schema.Organization.owner.telephone': '+34600000001',
       'org.schema.Organization.owner.email': org1Emails,
       'org.schema.Organization.owner.identifier.value': 'parent1@example.com',
-      'org.schema.Organization.alternateName': ownerName1,
+      'org.schema.Organization.alternateName': individualNickname1,
       'org.schema.Service.identifier': 'did:web:provider.example.com',
-      'org.schema.Service.serviceType': 'http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC',
+      'org.schema.Service.serviceType': testDefaultTenantServiceTypeClaim,
       'org.schema.Service.category': 'health-care',
       'org.schema.Organization.addressCountry': 'ES',
     };
     const baseClaims2 = {
       ...baseClaims,
       'org.schema.Organization.owner.email': org2Emails,
-      'org.schema.Organization.alternateName': ownerName2,
+      'org.schema.Organization.alternateName': individualNickname2,
     };
 
     // Create org1
@@ -187,7 +189,7 @@ describe('FamilyManager multi-email integration (web/app)', () => {
             type: 'Family-registration-form-v1.0',
             meta: { claims: {
               'org.schema.Organization.owner.email': 'parent3@example.com',
-              'org.schema.Organization.alternateName': ownerName2,
+              'org.schema.Organization.alternateName': individualNickname2,
               'org.schema.Service.category': 'health-care',
             } },
           }],
@@ -196,7 +198,7 @@ describe('FamilyManager multi-email integration (web/app)', () => {
     };
     const searchResult = await hostingManager.process(searchJob);
     const found = searchResult.body.data[0];
-    expect(found.meta.claims['org.schema.Organization.alternateName']).toBe(ownerName2);
+    expect(found.meta.claims['org.schema.Organization.alternateName']).toBe(individualNickname2);
     expect(found.meta.claims['org.schema.Organization.owner.email']).toContain('parent3@example.com');
     expect(found.meta.claims['org.schema.FamilyRegistration.status']).toBe('already_exists');
   });

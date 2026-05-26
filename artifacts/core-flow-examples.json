@@ -27,7 +27,7 @@
               "org.schema.Person.hasOccupation": "ISCO-08|1120",
               "org.schema.Service.category": "health-care",
               "org.schema.Service.identifier": "did:web:api-provider.example.com",
-              "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+              "org.schema.Service.serviceType": "indexing.cruds,indexing.rs,digitaltwin.rs",
               "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
             }
           }
@@ -125,7 +125,8 @@
               "org.schema.Person.hasOccupation": "ISCO-08|1120",
               "org.schema.Service.category": "health-care",
               "org.schema.Service.identifier": "did:web:api-provider.example.com",
-              "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+              "org.schema.Service.serviceType": "indexing.cruds,indexing.rs,digitaltwin.rs",
+              "org.schema.Service.url": "https://connector.example.net/acme/cds-es/v1/health-care",
               "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
             }
           }
@@ -229,7 +230,7 @@
               "Consent.date": "2025-11-25",
               "Consent.purpose": "TREAT",
               "Consent.action": "LOINC|48765-2",
-              "Consent.actor-identifier": "{{physicianOrg}}",
+              "Consent.actor-identifier": "{{physicianDid}}",
               "Consent.actor-role": "ISCO-08|2211",
               "Consent.attachment-contentType": "application/odrl+json",
               "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
@@ -266,7 +267,7 @@
             },
             "performer": [
               {
-                "reference": "{{physicianOrg}}"
+                "reference": "{{physicianDid}}"
               }
             ],
             "provision": {
@@ -304,7 +305,7 @@
               "Communication.content-reference": "https://url-to-appointment-source.com/some-uuid",
               "Communication.part-of": "urn:uuid:communication-channel-id",
               "Communication.recipient": "{{individualDid}}",
-              "Communication.sender": "{{physicianOrg}}",
+              "Communication.sender": "{{physicianDid}}",
               "Communication.sent": "2025-10-15T14:30:00Z",
               "Communication.subject": "{{individualDid}}",
               "Communication.text": "This is your new appointment. Best regards."
@@ -338,7 +339,7 @@
               }
             ],
             "sender": {
-              "reference": "{{physicianOrg}}"
+              "reference": "{{physicianDid}}"
             },
             "sent": "2025-10-15T14:30:00Z",
             "note": [
@@ -368,7 +369,7 @@
   "COMPOSITION_UPDATE_MESSAGE": {
     "jti": "composition-update-request-<test-id>",
     "thid": "composition-update-thread-<test-id>",
-    "iss": "{{physicianOrg}}",
+    "iss": "{{physicianDid}}",
     "aud": "did:web:api.acme.org",
     "exp": 1678886460,
     "iat": 1678886400,
@@ -388,7 +389,7 @@
               "Composition.section": "LOINC|48765-2",
               "Composition.entry": "https://ehr.hospital.example.com/fhir/AllergyIntolerance/12345,https://ehr.hospital.example.com/fhir/DiagnosticReport/67890",
               "Composition.date": "2025-11-26T10:00:00Z",
-              "Composition.author": "{{physicianOrg}}",
+              "Composition.author": "{{physicianDid}}",
               "Composition.title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
               "Composition.type": "LOINC|60591-5"
             }
@@ -406,7 +407,7 @@
             "date": "2025-11-26T10:00:00Z",
             "author": [
               {
-                "reference": "{{physicianOrg}}"
+                "reference": "{{physicianDid}}"
               }
             ],
             "title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",

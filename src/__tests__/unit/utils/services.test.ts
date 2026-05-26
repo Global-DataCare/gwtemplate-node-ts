@@ -1,11 +1,16 @@
 // src/__tests__/unit/utils/services.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../../../utils/services';
 import { OrganizationConfig } from '../../../gdc-backend-utils-node/models/entity';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { IServerConfig } from '../../../config';
 import { DidService } from 'gdc-common-utils-ts/models/did';
+import {
+  ServiceCapabilityToken,
+  serializeServiceCapabilityTokens,
+} from 'gdc-common-utils-ts/constants/service-capabilities';
 import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
 
 // Create a mock config object for the tests.
@@ -189,6 +194,42 @@ describe('Service Initialization Utilities', () => {
       expect(digitalTwinR4Service).toBeDefined();
       expect(digitalTwinR4Service!.serviceEndpoint).toContain('Composition');
       expect(digitalTwinR4Service!.actions).toEqual(['_batch']);
+    });
+
+    it('should filter tenant discovery endpoints to indexing-only capabilities when serviceType excludes digital twin', () => {
+      const services = initializeTenantServicesConfig(
+        Sector.RESEARCH,
+        [],
+        serializeServiceCapabilityTokens([ServiceCapabilityToken.IndexingReadSearch]),
+      );
+
+      expect(services.some(
+        (s: DidService) => (s as any).selector?.section === 'entity',
+      )).toBe(true);
+      expect(services.some(
+        (s: DidService) => (s as any).selector?.section === 'individual',
+      )).toBe(true);
+      expect(services.some(
+        (s: DidService) => (s as any).selector?.section === 'digitaltwin',
+      )).toBe(false);
+    });
+
+    it('should filter tenant discovery endpoints to digital twin-only capabilities when serviceType excludes indexing', () => {
+      const services = initializeTenantServicesConfig(
+        Sector.RESEARCH,
+        [],
+        serializeServiceCapabilityTokens([ServiceCapabilityToken.DigitalTwinReadSearch]),
+      );
+
+      expect(services.some(
+        (s: DidService) => (s as any).selector?.section === 'entity',
+      )).toBe(false);
+      expect(services.some(
+        (s: DidService) => (s as any).selector?.section === 'individual',
+      )).toBe(false);
+      expect(services.some(
+        (s: DidService) => (s as any).selector?.section === 'digitaltwin',
+      )).toBe(true);
     });
 
     it('should not include standard discovery endpoints', () => {
