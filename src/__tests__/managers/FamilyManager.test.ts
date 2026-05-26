@@ -1,5 +1,6 @@
 // src/__tests__/managers/FamilyManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import { randomUUID } from 'crypto';
 import { execFileSync } from 'child_process';
@@ -24,6 +25,7 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { mockKmsService } from '../mocks/kms.mock';
 import { buildClaimsFromIndividualFormPdf } from '../../utils/individual-form-pdf';
+import { testDefaultTenantServiceTypeClaim } from '../data/organization.data';
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -55,7 +57,7 @@ const BASE_CLAIMS: Record<string, unknown> = {
   [ClaimsPersonSchemaorg.telephone]: '+34600000001',
   [ClaimsPersonSchemaorg.alternateName]: 'Ana',
   [ClaimsServiceSchemaorg.identifier]: 'did:web:provider.example.com',
-  [ClaimsServiceSchemaorg.serviceType]: 'http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC',
+  [ClaimsServiceSchemaorg.serviceType]: testDefaultTenantServiceTypeClaim,
   [ClaimsServiceSchemaorg.termsOfService]: 'https://example.com/terms',
 };
 
@@ -428,7 +430,7 @@ describe('FamilyManager', () => {
             [ClaimsPersonSchemaorg.telephone]: '',
             [ClaimsServiceSchemaorg.category]: SECTOR,
             [ClaimsServiceSchemaorg.identifier]: 'did:web:provider.example.com',
-            [ClaimsServiceSchemaorg.serviceType]: 'http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC',
+            [ClaimsServiceSchemaorg.serviceType]: testDefaultTenantServiceTypeClaim,
             [ClaimsServiceSchemaorg.termsOfService]: 'https://example.com/terms',
           },
           [{
@@ -448,6 +450,57 @@ describe('FamilyManager', () => {
           [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
           [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
         }));
+      });
+
+    it('individual-form-pdf attachment flow also accepts HTTPS links[] and downloads the PDF before extracting claims', async () => {
+        const fixture = getIndividualPdfFixtureConfig();
+        if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
+          return;
+        }
+
+        mockVaultRepository.query.mockResolvedValue([]);
+        mockVaultRepository.put.mockResolvedValue(true);
+
+        const pdfBytes = readFileSync(fixture.pdfPath);
+        const fetchSpy = jest.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
+          ok: true,
+          status: 200,
+          arrayBuffer: async () => pdfBytes,
+        } as any);
+
+        try {
+          const response = await manager.process(makeTransactionJob(
+            {
+              [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+              [ClaimsPersonSchemaorg.telephone]: '',
+              [ClaimsServiceSchemaorg.category]: SECTOR,
+              [ClaimsServiceSchemaorg.identifier]: 'did:web:provider.example.com',
+              [ClaimsServiceSchemaorg.serviceType]: testDefaultTenantServiceTypeClaim,
+              [ClaimsServiceSchemaorg.termsOfService]: 'https://example.com/terms',
+            },
+            [{
+              id: 'signed-individual-form',
+              media_type: 'application/pdf',
+              data: { links: ['https://www.dropbox.com/scl/fi/example/signed-individual-form.pdf?dl=1'] },
+            }],
+          ));
+          const body = response.body as BundleJsonApi;
+          const entry = body.data[0] as BundleEntry;
+
+          expect(fetchSpy).toHaveBeenCalledWith(
+            'https://www.dropbox.com/scl/fi/example/signed-individual-form.pdf?dl=1',
+            { redirect: 'follow' },
+          );
+          expect(entry.meta?.claims).toEqual(expect.objectContaining({
+            'org.schema.FamilyRegistration.status': 'new_created',
+            [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
+            [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
+            [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+            [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+          }));
+        } finally {
+          fetchSpy.mockRestore();
+        }
       });
   });
 

@@ -68,6 +68,8 @@ TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test n
 
 ## 6) Ingest medications via Communication and retrieve IPS search views (Terminal 2)
 
+The shell script only orchestrates the flow. The synthetic demo payloads now live in TypeScript render helpers so the `.sh` does not duplicate FHIR/Communication contract JSON.
+
 Default mode (`didcomm`):
 
 ```bash
@@ -358,6 +360,8 @@ Automated check command:
 ```bash
 npm run check:portal-web-go-no-go
 ```
+
+This command is a route smoke check. It renders canonical GW example fixtures and verifies that the portal-facing routes exist and accept the expected payload shapes; it is not a replacement for the full flow runner or live E2E validation.
 
 ## API Integrators Flow Runner
 

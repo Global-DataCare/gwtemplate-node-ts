@@ -99,7 +99,7 @@ function loadSwaggerSpecFromDisk(): any {
 let swaggerSpec: any = loadSwaggerSpecFromDisk();
 
 const OPENAPI_PROFILE_DOCS = [
-  { name: 'SEDIA CORE', url: '/artifacts/openapi-profiles/openapi-core.json' },
+  { name: 'CORE', url: '/artifacts/openapi-profiles/openapi-core.json' },
   { name: 'COMPAT', url: '/artifacts/openapi-profiles/openapi-compat.json' },
   { name: 'EXTENSIONS', url: '/artifacts/openapi-profiles/openapi-extension.json' },
   { name: 'RUNTIME', url: '/swagger-spec.json' },

@@ -1,9 +1,15 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 // File: src/__tests__/data/example-payloads.ts
 
 import { testClaimsOfferEntityExpanded, testClaimsOfferFamilyExpanded } from './offer.data';
 import { testClaimsRegisterTenantExpanded } from './organization.data';
 import { testFamilyRegisterExpanded } from './family.data';
+import {
+  HealthcareActorRoles,
+  HealthcareConsentActions,
+  HealthcareConsentPurposes,
+} from '../../shared/healthcare-constants';
 
 
 /**
@@ -296,6 +302,8 @@ export const ORGANIZATION_ACTIVATION_REQUEST = {
           "@context": "org.schema",
           "@type": "template",
           ...testClaimsRegisterTenantExpanded,
+          "org.schema.Service.url": "https://connector.example.net/acme/cds-es/v1/health-care",
+          "org.schema.Service.serviceType": "indexing.cruds,indexing.rs,digitaltwin.rs",
           "org.schema.Service.termsOfService": pdfEmbeddedData
         }
       }
@@ -460,8 +468,8 @@ export const SMART_TOKEN_REQUEST = {
     "expires_in": 300,
     "token_type": "Bearer",
     "sub": "did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211",
-    "purpose": "TREAT",
-    "scope": "patient/Composition.rs?subject={{individualDid}}&section=LOINC|48765-2 patient/Consent.cruds"
+    "purpose": HealthcareConsentPurposes.Treatment,
+    "scope": `patient/Composition.rs?subject={{individualDid}}&section=${HealthcareConsentActions.AllergiesAndIntolerances} patient/Consent.cruds`
   },
   "meta": { ...metaRequestBodyOnlyKidHeader }
 };
@@ -614,7 +622,7 @@ export const FAMILY_REGISTRATION_REQUEST = {
     "id": "signed-individual-form-pdf",
     "media_type": "application/pdf",
     "data": {
-      "base64": "{{signedIndividualFormPdfBase64}}"
+      "links": ["{{signedIndividualFormPdfUrl}}"]
     }
   }],
   "body": {
@@ -631,6 +639,17 @@ export const FAMILY_REGISTRATION_REQUEST = {
     }]
   },
   "meta": { ...metaRequestBodyFullJWK }
+};
+
+export const FAMILY_REGISTRATION_REQUEST_INLINE_BASE64 = {
+  ...FAMILY_REGISTRATION_REQUEST,
+  attachments: [{
+    id: 'signed-individual-form-pdf',
+    media_type: 'application/pdf',
+    data: {
+      base64: '{{signedIndividualFormPdfBase64}}',
+    },
+  }],
 };
 
 /**
@@ -734,10 +753,10 @@ export const CONSENT_CREATION_MESSAGE = {
           "Consent.identifier": "urn:uuid:patient-consent-uuid",
           "Consent.grantee": "{{physicianOrg}}",
           "Consent.date": "2025-11-25",
-          "Consent.purpose": "TREAT",
-          "Consent.action": "LOINC|48765-2",
+          "Consent.purpose": HealthcareConsentPurposes.Treatment,
+          "Consent.action": HealthcareConsentActions.AllergiesAndIntolerances,
           "Consent.actor-identifier": "{{physicianDid}}",
-          "Consent.actor-role": "ISCO-08|2211",
+          "Consent.actor-role": HealthcareActorRoles.Physician,
           "Consent.attachment-contentType": "application/odrl+json",
           "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
         }
@@ -759,7 +778,7 @@ export const CONSENT_CREATION_MESSAGE = {
         category: [{
           coding: [{
             system: "http://terminology.hl7.org/CodeSystem/consentcategorycodes",
-            code: "TREAT"
+            code: HealthcareConsentPurposes.Treatment
           }]
         }],
         patient: { reference: "{{individualDid}}" },

@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-05-26T02:48:59.974Z",
+    "x-profile-generated-at": "2026-05-26T08:04:53.776Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -285,7 +285,7 @@
                     "org.schema.Person.hasOccupation": "ISCO-08|1120",
                     "org.schema.Service.category": "health-care",
                     "org.schema.Service.identifier": "did:web:api-provider.example.com",
-                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+                    "org.schema.Service.serviceType": "indexing.cruds,indexing.rs,digitaltwin.rs",
                     "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
                   }
                 }
@@ -387,7 +387,8 @@
                     "org.schema.Person.hasOccupation": "ISCO-08|1120",
                     "org.schema.Service.category": "health-care",
                     "org.schema.Service.identifier": "did:web:api-provider.example.com",
-                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+                    "org.schema.Service.serviceType": "indexing.cruds,indexing.rs,digitaltwin.rs",
+                    "org.schema.Service.url": "https://connector.example.net/acme/cds-es/v1/health-care",
                     "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
                   }
                 }
@@ -773,8 +774,8 @@
         }
       },
       "FamilyRegistrationPlaintextMessage": {
-        "summary": "Plaintext Message for Family Registration",
-        "description": "A DIDComm-like message wrapper containing the family organization claims. Default examples use contextualized `org.schema` claim keys such as `Organization.identifier.value` and `Service.category` because the gateway default claim-storage mode accepts omitted `org.schema.` prefixes when `@context` is `org.schema`. If the service is configured with `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, the same logical claims may also be sent fully qualified as `org.schema.*`. For signed-PDF onboarding, `Organization.owner.identifier.value` is expected to come from the signer certificate `serialNumber` (for example `IDCES-...`), not from the controller email. `Service.termsOfService` accepts either an HTTPS URL or an embedded `data:application/pdf;base64,...` payload; Swagger shows the URL form by default.",
+        "summary": "Plaintext Message for Family Registration with online PDF link",
+        "description": "A DIDComm-like message wrapper containing the family organization claims. Default examples use contextualized `org.schema` claim keys such as `Organization.identifier.value` and `Service.category` because the gateway default claim-storage mode accepts omitted `org.schema.` prefixes when `@context` is `org.schema`. If the service is configured with `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, the same logical claims may also be sent fully qualified as `org.schema.*`. For signed-PDF onboarding, `Organization.owner.identifier.value` is expected to come from the signer certificate `serialNumber` (for example `IDCES-...`), not from the controller email. The signed individual PDF attachment accepts either `attachments[].data.links[0]` (preferred online URL form) or `attachments[].data.base64` (embedded legacy form). `Service.termsOfService` accepts either an HTTPS URL or an embedded `data:application/pdf;base64,...` payload; Swagger shows the URL form by default.",
         "value": {
           "jti": "family-registration-request-<test-id>",
           "thid": "family-registration-thread-<test-id>",
@@ -786,7 +787,9 @@
               "id": "signed-individual-form-pdf",
               "media_type": "application/pdf",
               "data": {
-                "base64": "{{signedIndividualFormPdfBase64}}"
+                "links": [
+                  "{{signedIndividualFormPdfUrl}}"
+                ]
               }
             }
           ],
@@ -808,7 +811,7 @@
                     "Person.identifier.value": "<child1-ID>",
                     "Service.category": "health-care",
                     "Service.identifier": "did:web:api-provider.example.com",
-                    "Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+                    "Service.serviceType": "indexing.cruds,indexing.rs,digitaltwin.rs",
                     "Service.termsOfService": "https://provider.example.com/terms.pdf"
                   }
                 }
@@ -846,6 +849,11 @@
             }
           }
         }
+      },
+      "FamilyRegistrationPlaintextMessageInlineBase64": {
+        "summary": "Plaintext Message for Family Registration with inline base64 PDF",
+        "description": "Same family registration payload, but the signed PDF travels inline in attachments[].data.base64 instead of attachments[].data.links[0]. Use this only when you really need embedded transport.",
+        "value": {}
       },
       "FamilyOrderPlaintextMessage": {
         "summary": "Plaintext Message for Family Order",
@@ -917,7 +925,7 @@
                     "Consent.date": "2025-11-25",
                     "Consent.purpose": "TREAT",
                     "Consent.action": "LOINC|48765-2",
-                    "Consent.actor-identifier": "{{physicianOrg}}",
+                    "Consent.actor-identifier": "{{physicianDid}}",
                     "Consent.actor-role": "ISCO-08|2211",
                     "Consent.attachment-contentType": "application/odrl+json",
                     "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
@@ -954,7 +962,7 @@
                   },
                   "performer": [
                     {
-                      "reference": "{{physicianOrg}}"
+                      "reference": "{{physicianDid}}"
                     }
                   ],
                   "provision": {
@@ -1041,7 +1049,7 @@
         "value": {
           "jti": "composition-update-request-<test-id>",
           "thid": "composition-update-thread-<test-id>",
-          "iss": "{{physicianOrg}}",
+          "iss": "{{physicianDid}}",
           "aud": "did:web:api.acme.org",
           "exp": 1678886460,
           "iat": 1678886400,
@@ -1061,7 +1069,7 @@
                     "Composition.section": "LOINC|48765-2",
                     "Composition.entry": "https://ehr.hospital.example.com/fhir/AllergyIntolerance/12345,https://ehr.hospital.example.com/fhir/DiagnosticReport/67890",
                     "Composition.date": "2025-11-26T10:00:00Z",
-                    "Composition.author": "{{physicianOrg}}",
+                    "Composition.author": "{{physicianDid}}",
                     "Composition.title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
                     "Composition.type": "LOINC|60591-5"
                   }
@@ -1079,7 +1087,7 @@
                   "date": "2025-11-26T10:00:00Z",
                   "author": [
                     {
-                      "reference": "{{physicianOrg}}"
+                      "reference": "{{physicianDid}}"
                     }
                   ],
                   "title": "Allergies and Intolerances: hospital.example.com (2025-11-26T10:00:00Z)",
@@ -1200,7 +1208,7 @@
         "value": {
           "jti": "family-relationship-message-<test-id>",
           "thid": "thid-family-relationship",
-          "iss": "{{individualDid}}:device:<uuid>",
+          "iss": "{{individualControllerDid}}:device:<uuid>",
           "aud": "did:web:api.acme.org",
           "type": "org.hl7.fhir.r4.Bundle",
           "body": {
@@ -1762,7 +1770,7 @@
                     "org.schema.Person.hasOccupation": "ISCO-08|1120",
                     "org.schema.Service.category": "health-care",
                     "org.schema.Service.identifier": "did:web:api-provider.example.com",
-                    "org.schema.Service.serviceType": "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+                    "org.schema.Service.serviceType": "indexing.cruds,indexing.rs,digitaltwin.rs",
                     "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
                   }
                 }
@@ -2025,7 +2033,7 @@
                     "Consent.date": "2025-11-25",
                     "Consent.purpose": "TREAT",
                     "Consent.action": "LOINC|48765-2",
-                    "Consent.actor-identifier": "{{physicianOrg}}",
+                    "Consent.actor-identifier": "{{physicianDid}}",
                     "Consent.actor-role": "ISCO-08|2211",
                     "Consent.attachment-contentType": "application/odrl+json",
                     "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
@@ -2062,7 +2070,7 @@
                   },
                   "performer": [
                     {
-                      "reference": "{{physicianOrg}}"
+                      "reference": "{{physicianDid}}"
                     }
                   ],
                   "provision": {
@@ -2175,7 +2183,7 @@
         "example": {
           "jti": "family-relationship-message-<test-id>",
           "thid": "thid-family-relationship",
-          "iss": "{{individualDid}}:device:<uuid>",
+          "iss": "{{individualControllerDid}}:device:<uuid>",
           "aud": "did:web:api.acme.org",
           "type": "org.hl7.fhir.r4.Bundle",
           "body": {
@@ -4024,8 +4032,11 @@
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               },
               "examples": {
-                "message": {
+                "viaOnlinePdfLink": {
                   "$ref": "#/components/examples/FamilyRegistrationPlaintextMessage"
+                },
+                "viaInlineBase64Pdf": {
+                  "$ref": "#/components/examples/FamilyRegistrationPlaintextMessageInlineBase64"
                 }
               }
             },
@@ -4087,8 +4098,11 @@
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               },
               "examples": {
-                "message": {
+                "viaOnlinePdfLink": {
                   "$ref": "#/components/examples/FamilyRegistrationPlaintextMessage"
+                },
+                "viaInlineBase64Pdf": {
+                  "$ref": "#/components/examples/FamilyRegistrationPlaintextMessageInlineBase64"
                 }
               }
             },
@@ -4946,6 +4960,68 @@
         "x-profile": "core"
       }
     },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "DCAT3 index service offering (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "DCAT3 research service offering (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata": {
       "get": {
         "tags": [
@@ -5019,6 +5095,23 @@
         "x-profile": "core"
       }
     },
+    "/dcat3/catalog/dcat.json": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Operator catalog artifact (DCAT-3)",
+        "responses": {
+          "200": {
+            "description": "DCAT catalog artifact"
+          },
+          "503": {
+            "description": "Host not available"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/dcat3/catalog/datasets/{id}": {
       "get": {
         "tags": [
@@ -5069,6 +5162,37 @@
         "responses": {
           "200": {
             "description": "DSP catalog response"
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/dcat.json": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Hosted provider catalog artifact (DCAT-3)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DCAT catalog artifact"
           },
           "404": {
             "description": "Tenant not found"

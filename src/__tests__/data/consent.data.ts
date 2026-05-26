@@ -1,6 +1,8 @@
 // src/__tests__/consent.data.ts
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import { testUserEmail, testUserFullNameICAO } from "./common.data";
+import { HealthcareConsentPurposes } from "gdc-common-utils-ts/constants/healthcare";
 
 /*
     "givenName": "Given Name(s)", // local given name(s) and middle name (s) with special characters
@@ -46,5 +48,8 @@ export const testConsentRegisterOrganizationSchemaJsonLD = {
     "identifier": "TAX:<country>:" // no previously registered on the federated network
   },
   "instrument": "https://example.org/consent/form.pdf",
-  "purpose": "https://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC" // provision of a service to an individual or organization
+  // Legacy JSON-LD example kept outside the canonical FHIR Consent flow.
+  // Do not use `SRVC` here; the shared healthcare purpose vocabulary already
+  // models the current consent contract with explicit purpose codes.
+  "purpose": `https://terminology.hl7.org/CodeSystem/v3-ActReason|${HealthcareConsentPurposes.Operations}`
 }

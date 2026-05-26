@@ -1,9 +1,11 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 // File: src/__tests__/data/organization.data.ts
 
 import { OrganizationConfig } from "../../gdc-backend-utils-node/models/entity";
 import { URN_NAMESPACE, URN_NETWORK, URN_VERSION } from "./urn.data";
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from "gdc-common-utils-ts/constants/schemaorg";
+import { serializeServiceCapabilityTokens, ServiceCapabilityToken } from "gdc-common-utils-ts/constants/service-capabilities";
 import { Sector } from "gdc-common-utils-ts/models/urlPath";
 import { EntityLifecycleStatus, EntityType } from "../../gdc-backend-utils-node/models/enums";
 import { testTenant1Vc } from "./credential.data";
@@ -23,6 +25,12 @@ import { testHostDidWeb, testRootOrgDidWeb, testHostDomain, testTenant1Identifie
  * The canonical set of claims for registering a new tenant.
  * This is the source of truth for values used in ORGANIZATION_REGISTRATION_REQUEST.
  */
+export const testDefaultTenantServiceTypeClaim = serializeServiceCapabilityTokens([
+  ServiceCapabilityToken.IndexingCruds,
+  ServiceCapabilityToken.IndexingReadSearch,
+  ServiceCapabilityToken.DigitalTwinReadSearch,
+]) as string;
+
 export const testClaimsRegisterTenantExpanded = {
   [ClaimsOrganizationSchemaorg.addressCountry]: "ES",
   [ClaimsOrganizationSchemaorg.alternateName]: "acme-id",
@@ -36,7 +44,7 @@ export const testClaimsRegisterTenantExpanded = {
   [ClaimsPersonSchemaorg.hasOccupation]: "ISCO-08|1120",
   [ClaimsServiceSchemaorg.category]: "health-care",
   [ClaimsServiceSchemaorg.identifier]: "did:web:api-provider.example.com",
-  [ClaimsServiceSchemaorg.serviceType]: "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC",
+  [ClaimsServiceSchemaorg.serviceType]: testDefaultTenantServiceTypeClaim,
 };
 
 // ===================================================================================
@@ -52,7 +60,7 @@ export { testHostDomain, testHostDidWeb };
 const testServiceManufacturerDidWebIdentifier = `urn:web:<manufacturer>`;
 const testServiceManufacturerCategory = "system";
 const testServiceManufacturerTerms = "https://github.com/<manufacturer>/<software>/terms";
-const testServiceManufacturerPurposeType = "http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC";
+const testServiceManufacturerPurposeType = testDefaultTenantServiceTypeClaim;
 export { testRootOrgDidWeb }; // https://testca.unid.es/.well-known/did.json
 
 export const testConfigDataHost: OrganizationConfig = {
@@ -89,7 +97,17 @@ export const testTenant1LegalName = testClaimsRegisterTenantExpanded[ClaimsOrgan
 export const testTenant1AddressCountry = testClaimsRegisterTenantExpanded[ClaimsOrganizationSchemaorg.addressCountry];
 export const testTenant1IdType = testClaimsRegisterTenantExpanded[ClaimsOrganizationSchemaorg.identifierType];
 export const testTenant1IdValue = testClaimsRegisterTenantExpanded[ClaimsOrganizationSchemaorg.identifierValue];
-export const testTenant1AlternateName = testClaimsRegisterTenantExpanded[ClaimsOrganizationSchemaorg.alternateName];
+/**
+ * Canonical tenant id used across legal-organization tests.
+ *
+ * For legal organizations in the current contract, tests should anchor on the
+ * tax-id / identifier value (`acme-id` here), not on a separate marketing alias.
+ */
+export const testTenant1TenantId = testClaimsRegisterTenantExpanded[ClaimsOrganizationSchemaorg.identifierValue];
+/**
+ * Legacy compatibility alias. Prefer `testTenant1TenantId` in new tests.
+ */
+export const testTenant1AlternateName = testTenant1TenantId;
 export const testTenant1Domain = testClaimsRegisterTenantExpanded[ClaimsOrganizationSchemaorg.url];
 export const testTenant1ServiceProviderCategory = testClaimsRegisterTenantExpanded[ClaimsServiceSchemaorg.category] as Sector;
 export const testTenant1Admin1Email = testClaimsRegisterTenantExpanded[ClaimsPersonSchemaorg.email] as string;

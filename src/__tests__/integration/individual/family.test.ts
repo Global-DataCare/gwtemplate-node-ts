@@ -1,4 +1,5 @@
 // src/__tests__/integration/individual/family.test.ts
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import express from 'express';
 import { createApiRouter } from '../../../routes/api';
@@ -18,6 +19,7 @@ import { FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
+import { testTenant1TenantId } from '../../data/organization.data';
 
 async function invokeExpress(
   handler: any,
@@ -182,7 +184,7 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
   });
 
   it('should return 202 Accepted for a valid family registration request', async () => {
-    const tenantId = 'acme';
+    const tenantId = testTenant1TenantId;
     const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_batch`;
 
 	    const decodedJob: JobRequest = {
@@ -219,7 +221,7 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
   });
 
   it('should return 202 Accepted for the _transaction alias on family registration', async () => {
-    const tenantId = 'acme';
+    const tenantId = testTenant1TenantId;
     const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_transaction`;
 
     const decodedJob: JobRequest = {

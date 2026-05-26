@@ -1,3 +1,4 @@
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 import { generateSwaggerSpec } from '../../../utils/swagger-spec';
 
 describe('Swagger Spec Generation', () => {
@@ -34,6 +35,10 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/jwks.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/openid-configuration']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/smart-configuration']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json']).toBeDefined();
+    expect(spec.paths['/dcat3/catalog/dcat.json']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/dcat.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata']).toBeDefined();
 
     // Swagger tags are intentionally numbered progressively (1..N) for readability in Swagger UI,
@@ -119,6 +124,10 @@ describe('Swagger Spec Generation', () => {
 
     const familyClaims =
       spec.components.examples.FamilyRegistrationPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
+    const familyAttachmentData =
+      spec.components.examples.FamilyRegistrationPlaintextMessage?.value?.attachments?.[0]?.data;
+    const familyInlineAttachmentData =
+      spec.components.examples.FamilyRegistrationPlaintextMessageInlineBase64?.value?.attachments?.[0]?.data;
     const organizationClaims =
       spec.components.examples.OrganizationRegistrationPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
     expect(organizationClaims).toBeDefined();
@@ -127,6 +136,8 @@ describe('Swagger Spec Generation', () => {
 
     expect(familyClaims).toBeDefined();
     expect(familyClaims['Service.termsOfService']).toBe('https://provider.example.com/terms.pdf');
+    expect(familyAttachmentData).toEqual({ links: ['{{signedIndividualFormPdfUrl}}'] });
+    expect(familyInlineAttachmentData).toEqual({ base64: '{{signedIndividualFormPdfBase64}}' });
     expect(familyClaims['org.schema.Service.termsOfService']).toBeUndefined();
     expect(familyClaims['Organization.identifier.value']).toBeDefined();
     expect(familyClaims['org.schema.Organization.identifier.value']).toBeUndefined();

@@ -1,5 +1,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/HostingManager.ts
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import { v4 as uuidv4 } from 'uuid';
 import { IServerConfig } from '../config';
@@ -2108,7 +2109,11 @@ export class HostingManager {
       hostedPublicUrl: isHosted ? hostedPublicUrl : undefined,
     });
     const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: primaryDid, alsoKnownAs: alsoKnownAs };
-    const didConfigServices = initializeTenantServicesConfig(sector);
+    const didConfigServices = initializeTenantServicesConfig(
+      sector,
+      [],
+      allClaims[ClaimsServiceSchemaorg.serviceType] as string | undefined,
+    );
     const publicBaseUrl = isHosted ? this.config.apiBaseUrl : (publicTenantUrl || this.config.apiBaseUrl);
     const serviceBaseUrl = operationalTenantUrl || publicBaseUrl;
     const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/payload-helpers.sh"
+
 BASE_URL="${BASE_URL:-http://localhost:3000}"
 AUTH_BEARER="${AUTH_BEARER:-demo-token}"
 CONTENT_TYPE="${CONTENT_TYPE:-application/json}"
@@ -34,14 +36,6 @@ poll_async() {
   local url="$1"
   local thid="$2"
   post_json "$url" "$(jq -n --arg thid "$thid" '{thid:$thid}')"
-}
-
-render_example_payload() {
-  local fixture_name="$1"
-  local overrides_json="${2:-\{\}}"
-  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
-    node --loader ts-node/esm --experimental-specifier-resolution=node \
-    ./scripts/render-example-payload.mts "$fixture_name" "$overrides_json"
 }
 
 echo "[bootstrap] ping: $BASE_URL/host/.well-known/ping"

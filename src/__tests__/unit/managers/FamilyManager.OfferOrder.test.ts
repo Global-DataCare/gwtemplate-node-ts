@@ -7,6 +7,7 @@
  * WARNING: Never mix these in the test setup or assertions. If you use the wrong sector, onboarding will fail or produce inconsistent results.
  */
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+// Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 // File: src/__tests__/unit/managers/FamilyManager.OfferOrder.test.ts
 
 import { jest } from '@jest/globals';
@@ -26,6 +27,7 @@ import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-j
 import { getEnvSectionId } from '../../../utils/section-env';
 import { HostingManager } from '../../../managers/HostingManager';
 import { FamilyManager } from '../../../managers/FamilyManager';
+import { testDefaultTenantServiceTypeClaim, testTenant1TenantId } from '../../data/organization.data';
 
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
@@ -69,6 +71,12 @@ describe('FamilyManager - Offer/Order Flow', () => {
   let hostCollectionName: string;
   let config: IServerConfig;
 
+  function buildFamilyRegistrationRequestWithoutPdfAttachment() {
+    const payload = structuredClone(FAMILY_REGISTRATION_REQUEST) as any;
+    delete payload.attachments;
+    return payload;
+  }
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -86,7 +94,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       'org.schema.Person.email': 'admin1@host.example.com',
       'org.schema.Service.category': 'system',
       'org.schema.Service.identifier': 'urn:web:<manufacturer>',
-      'org.schema.Service.serviceType': 'http://terminology.hl7.org/CodeSystem/v3-ActReason|SRVC',
+      'org.schema.Service.serviceType': testDefaultTenantServiceTypeClaim,
       'org.schema.Service.termsOfService': 'https://github.com/<manufacturer>/<software>/terms',
     };
     hostCollectionName = tenantUtils.generateTenantCollectionNameFromClaims(hostClaims as any);
@@ -159,7 +167,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
   });
 
   it('should create a pending family record and return an Offer', async () => {
-    const tenantId = 'acme';
+    const tenantId = testTenant1TenantId;
     const familyRegistrationJob: JobRequest = {
       id: 'job-family-1',
       status: JobStatus.DRAFT,
@@ -171,7 +179,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       format: 'org.schema',
       action: '_batch',
       resourceType: 'Organization',
-      content: FAMILY_REGISTRATION_REQUEST as any,
+      content: buildFamilyRegistrationRequestWithoutPdfAttachment(),
     };
 
     const responsePayload = await familyManager.process(familyRegistrationJob);
@@ -185,7 +193,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
   });
 
   it('should process a family Order and finalize the family registration', async () => {
-    const tenantId = 'acme';
+    const tenantId = testTenant1TenantId;
     const familyRegistrationJob: JobRequest = {
       id: 'job-family-1',
       status: JobStatus.DRAFT,
@@ -197,7 +205,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       format: 'org.schema',
       action: '_batch',
       resourceType: 'Organization',
-      content: FAMILY_REGISTRATION_REQUEST as any,
+      content: buildFamilyRegistrationRequestWithoutPdfAttachment(),
     };
 
     const offerPayload = await familyManager.process(familyRegistrationJob);

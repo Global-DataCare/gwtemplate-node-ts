@@ -31,6 +31,11 @@ describe('ApiDocsManager Global Flow Context', () => {
     expect(script).toContain('migrateLegacyContextValues');
     expect(script).toContain('normalizeLegacyCanonicalTenantId');
     expect(script).toContain('PANEL_VERSION');
+    expect(script).toContain('getPanelOpen');
+    expect(script).toContain('setPanelOpen');
+    expect(script).toContain('syncGlobalContextPanelState');
+    expect(script).toContain('gw-api-global-context-toggle');
+    expect(script).toContain('gw-api-global-context-launcher');
     expect(script).toContain('uuidToMultibase58btc');
     expect(script).toContain('globaldatacare.es');
     expect(script).toContain('acme-id');

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/payload-helpers.sh"
+
 BASE_URL="${BASE_URL:-http://localhost:3000}"
 TENANT_ID="${TENANT_ID:-${E2E_TENANT_ID:-acme}}"
 JURISDICTION="${JURISDICTION:-${E2E_JURISDICTION:-ES}}"
@@ -50,155 +52,16 @@ poll_async() {
   return 1
 }
 
-echo "[1/4] Building FHIR document bundle with Composition + MedicationStatement..."
-DOC_BUNDLE_JSON="$(cat <<JSON
-{
-  "resourceType": "Bundle",
-  "type": "document",
-  "entry": [
-    {
-      "resource": {
-        "resourceType": "Composition",
-        "id": "ips-composition-001",
-        "status": "final",
-        "type": {
-          "coding": [{ "system": "http://loinc.org", "code": "60591-5", "display": "Patient summary Document" }]
-        },
-        "subject": { "reference": "$SUBJECT_ID" },
-        "date": "2026-05-22T10:00:00Z",
-        "title": "IPS Medication Summary",
-        "section": [
-          {
-            "code": { "coding": [{ "system": "http://loinc.org", "code": "10160-0", "display": "History of Medication Use" }] },
-            "entry": [{ "reference": "urn:uuid:medication-001" }]
-          }
-        ]
-      }
-    },
-    {
-      "resource": {
-        "resourceType": "MedicationStatement",
-        "id": "medication-001",
-        "status": "active",
-        "subject": { "reference": "$SUBJECT_ID" },
-        "effectiveDateTime": "2026-05-22T10:00:00Z",
-        "medicationCodeableConcept": {
-          "text": "Paracetamol 500mg"
-        },
-        "note": [{ "text": "Tomar una pastilla cada 8 horas" }],
-        "identifier": [{ "system": "urn:ietf:rfc:3986", "value": "urn:uuid:medication-001" }]
-      }
-    }
-  ]
+echo "[1/4] Rendering canonical synthetic demo payloads..."
+
+render_demo_payload_with_runtime() {
+  local payload_name="$1"
+  SUBJECT_ID="$SUBJECT_ID" THID_COMM="$THID_COMM" THID_MED_SEARCH="$THID_MED_SEARCH" THID_IPS_SEARCH="$THID_IPS_SEARCH" \
+    render_demo_payload "$payload_name"
 }
-JSON
-)"
 
-DOC_BUNDLE_B64="$(
-  DOC_BUNDLE_JSON="$DOC_BUNDLE_JSON" node -e "process.stdout.write(Buffer.from(process.env.DOC_BUNDLE_JSON || '', 'utf8').toString('base64'))"
-)"
-
-DOCREF_JSON="$(cat <<JSON
-{
-  "resourceType": "DocumentReference",
-  "id": "ips-document-reference-001",
-  "subject": { "reference": "$SUBJECT_ID" },
-  "date": "2026-05-22T10:00:00Z",
-  "description": "IPS Medication Summary",
-  "identifier": [{ "system": "urn:ietf:rfc:3986", "value": "urn:uuid:ips-document-reference-001" }],
-  "content": [
-    {
-      "attachment": {
-        "contentType": "application/fhir+json",
-        "title": "ips-medications.json",
-        "data": "$DOC_BUNDLE_B64"
-      }
-    }
-  ]
-}
-JSON
-)"
-
-DOCREF_B64="$(
-  DOCREF_JSON="$DOCREF_JSON" node -e "process.stdout.write(Buffer.from(process.env.DOCREF_JSON || '', 'utf8').toString('base64'))"
-)"
-
-echo "[2/4] Sending Communication/_batch with embedded DocumentReference (mode=$MODE)..."
-DIDCOMM_COMM_REQ="$(cat <<JSON
-{
-  "thid": "$THID_COMM",
-  "body": {
-    "resourceType": "Bundle",
-    "type": "batch",
-    "entry": [
-      {
-        "request": { "method": "POST", "url": "individual/org.hl7.fhir.r4/Communication" },
-        "meta": {
-          "claims": {
-            "@context": "org.hl7.fhir.r4",
-            "Communication.subject": "$SUBJECT_ID",
-            "Communication.sent": "2026-05-22T10:00:00Z",
-            "Composition.section": "LOINC|10160-0"
-          }
-        },
-        "resource": {
-          "resourceType": "Communication",
-          "status": "completed",
-          "subject": { "reference": "$SUBJECT_ID" },
-          "sent": "2026-05-22T10:00:00Z",
-          "payload": [
-            {
-              "contentAttachment": {
-                "contentType": "application/fhir+json",
-                "title": "ips-document-reference.json",
-                "data": "$DOCREF_B64"
-              }
-            }
-          ]
-        }
-      }
-    ]
-  }
-}
-JSON
-)"
-
-LEGACY_FHIR_COMM_REQ="$(cat <<JSON
-{
-  "thid": "$THID_COMM",
-  "resourceType": "Bundle",
-  "type": "batch",
-  "entry": [
-    {
-      "request": { "method": "POST", "url": "individual/org.hl7.fhir.r4/Communication" },
-      "meta": {
-        "claims": {
-          "@context": "org.hl7.fhir.r4",
-          "Communication.subject": "$SUBJECT_ID",
-          "Communication.sent": "2026-05-22T10:00:00Z",
-          "Composition.section": "LOINC|10160-0"
-        }
-      },
-      "resource": {
-        "resourceType": "Communication",
-        "status": "completed",
-        "subject": { "reference": "$SUBJECT_ID" },
-        "sent": "2026-05-22T10:00:00Z",
-        "payload": [
-          {
-            "contentAttachment": {
-              "contentType": "application/fhir+json",
-              "title": "ips-document-reference.json",
-              "data": "$DOCREF_B64"
-            }
-          }
-        ]
-      }
-    }
-  ]
-}
-JSON
-)"
+DIDCOMM_COMM_REQ="$(render_demo_payload_with_runtime COMMUNICATION_DIDCOMM)"
+LEGACY_FHIR_COMM_REQ="$(render_demo_payload_with_runtime COMMUNICATION_LEGACY_FHIR)"
 
 COMM_CONTENT_TYPE="application/json"
 COMM_REQ="$DIDCOMM_COMM_REQ"
@@ -218,25 +81,7 @@ COMM_DONE="$(poll_async "$COMM_POLL_URL" "$THID_COMM")"
 echo "$COMM_DONE" | jq '.'
 
 echo "[3/4] Searching MedicationStatement/_search..."
-MED_SEARCH_REQ="$(cat <<JSON
-{
-  "thid": "$THID_MED_SEARCH",
-  "body": {
-    "data": [
-      {
-        "type": "MedicationStatement-search-request-v1.0",
-        "meta": {
-          "claims": {
-            "@context": "org.hl7.fhir.api",
-            "MedicationStatement.subject": "$SUBJECT_ID"
-          }
-        }
-      }
-    ]
-  }
-}
-JSON
-)"
+MED_SEARCH_REQ="$(render_demo_payload_with_runtime MEDICATION_SEARCH)"
 MED_SUBMIT="$(curl -sS -X POST "$MED_SEARCH_URL" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \
@@ -248,24 +93,7 @@ MED_DONE="$(poll_async "$MED_SEARCH_POLL_URL" "$THID_MED_SEARCH")"
 echo "$MED_DONE" | jq '.'
 
 echo "[4/4] Searching IPS Bundle/_search by subject + medication section..."
-IPS_SEARCH_REQ="$(cat <<JSON
-{
-  "thid": "$THID_IPS_SEARCH",
-  "body": {
-    "resourceType": "Bundle",
-    "type": "batch",
-    "entry": [
-      {
-        "request": {
-          "method": "GET",
-          "url": "Bundle?type=document&composition.subject=$(printf '%s' "$SUBJECT_ID" | jq -sRr @uri)&composition.section=LOINC%7C10160-0"
-        }
-      }
-    ]
-  }
-}
-JSON
-)"
+IPS_SEARCH_REQ="$(render_demo_payload_with_runtime IPS_SEARCH)"
 IPS_SUBMIT="$(curl -sS -X POST "$IPS_SEARCH_URL" \
   -H "Authorization: Bearer $AUTH_BEARER" \
   -H "Content-Type: application/json" \

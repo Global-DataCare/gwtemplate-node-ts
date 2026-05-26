@@ -1659,8 +1659,10 @@ export function createApiRouter(
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
-   *             message:
+   *             viaOnlinePdfLink:
    *               $ref: '#/components/examples/FamilyRegistrationPlaintextMessage'
+   *             viaInlineBase64Pdf:
+   *               $ref: '#/components/examples/FamilyRegistrationPlaintextMessageInlineBase64'
    *         application/json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
@@ -1712,8 +1714,10 @@ export function createApiRouter(
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
-   *             message:
+   *             viaOnlinePdfLink:
    *               $ref: '#/components/examples/FamilyRegistrationPlaintextMessage'
+   *             viaInlineBase64Pdf:
+   *               $ref: '#/components/examples/FamilyRegistrationPlaintextMessageInlineBase64'
    *         application/json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
