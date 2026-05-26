@@ -44,6 +44,8 @@ require_cmd() {
 }
 
 require_cmd curl
+require_cmd node
+require_cmd jq
 
 call_api() {
   local method="$1"
@@ -71,6 +73,14 @@ assert_ping() {
     snippet="$(head -c 180 /tmp/gw_check_body.out 2>/dev/null || true)"
     print_result "FAIL" "$name" "$code" "expected=200 body='${snippet}'"
   fi
+}
+
+render_example_payload() {
+  local fixture_name="$1"
+  local overrides_json="${2:-\{\}}"
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node \
+    ./scripts/render-example-payload.mts "$fixture_name" "$overrides_json"
 }
 
 assert_route_available() {
@@ -107,9 +117,21 @@ CODE="$(call_api POST \
 assert_route_available "Organization _activate poll" "$CODE"
 
 # 4) Organization offer submit (legacy _batch flow)
+ORG_OFFER_REQ="$(render_example_payload ORGANIZATION_REGISTRATION_REQUEST "$(jq -n \
+  --arg thid "$THID_ORG_OFFER" \
+  --arg tenantId "$TENANT_ID" \
+  --arg jurisdiction "$JURISDICTION" \
+  --arg sector "$SECTOR" \
+  '{
+    "/thid": $thid,
+    "/iss": "admin1@acme.org",
+    "/body/data/0/meta/claims/org.schema.Organization.identifier.value": $tenantId,
+    "/body/data/0/meta/claims/org.schema.Organization.address.addressCountry": $jurisdiction,
+    "/body/data/0/meta/claims/org.schema.Service.category": $sector
+  }' )")"
 CODE="$(call_api POST \
   "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch" \
-  "{\"thid\":\"$THID_ORG_OFFER\",\"body\":{\"data\":[{\"type\":\"Organization-registration-form-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"org.schema.Organization.name\":\"Org Offer Test\"},\"attachments\":[{\"id\":\"sanitary-registry-pdf\",\"description\":\"Sanitary registry proof\",\"media_type\":\"application/pdf\",\"data\":{\"base64\":\"JVBERi0xLjQKJcTl8uXrCg==\"}}]}}]}}")"
+  "$ORG_OFFER_REQ")"
 assert_route_available "Organization _batch submit (Offer)" "$CODE"
 
 # 5) Organization offer poll
@@ -119,9 +141,13 @@ CODE="$(call_api POST \
 assert_route_available "Organization _batch poll (Offer)" "$CODE"
 
 # 6) Organization order submit
+ORG_ORDER_REQ="$(render_example_payload ORGANIZATION_ORDER_REQUEST "$(jq -n --arg thid "$THID_ORG_ORDER" '{
+  "/thid": $thid,
+  "/body/data/0/meta/claims/Order.acceptedOffer.identifier": "dummy-offer-id"
+}')")"
 CODE="$(call_api POST \
   "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch" \
-  "{\"thid\":\"$THID_ORG_ORDER\",\"body\":{\"data\":[{\"type\":\"Order-registration-request-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"org.schema.Order.acceptedOffer.identifier\":\"dummy-offer-id\"}}}]}}")"
+  "$ORG_ORDER_REQ")"
 assert_route_available "Organization Order _batch submit" "$CODE"
 
 # 7) Organization order poll
@@ -131,9 +157,14 @@ CODE="$(call_api POST \
 assert_route_available "Organization Order _batch poll" "$CODE"
 
 # 8) Employee submit
+EMPLOYEE_REQ="$(render_example_payload EMPLOYEE_REGISTRATION_REQUEST "$(jq -n --arg thid "$THID_EMPLOYEE" '{
+  "/thid": $thid,
+  "/body/data/0/meta/claims/org.schema.Person.email": "doctor1@example.com",
+  "/body/data/0/meta/claims/org.schema.Person.hasOccupation.identifier.value": "ISCO-08|2211"
+}')")"
 CODE="$(call_api POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/entity/org.schema/Employee/_batch" \
-  "{\"thid\":\"$THID_EMPLOYEE\",\"body\":{\"data\":[{\"type\":\"Employee-create-request-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"org.schema.Person.email\":\"doctor1@example.com\",\"org.schema.Person.hasOccupation\":\"ISCO-08|2211\"}}}]}}")"
+  "$EMPLOYEE_REQ")"
 assert_route_available "Employee _batch submit" "$CODE"
 
 # 9) Employee poll
@@ -143,9 +174,13 @@ CODE="$(call_api POST \
 assert_route_available "Employee _batch poll" "$CODE"
 
 # 10) Token exchange submit
+TOKEN_EXCHANGE_REQ="$(render_example_payload INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST "$(jq -n --arg thid "$THID_EXCHANGE" '{
+  "/thid": $thid,
+  "/body/subject_token": "dummy-license-code"
+}')")"
 CODE="$(call_api POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/identity/openid/Token/_exchange" \
-  "{\"thid\":\"$THID_EXCHANGE\",\"subject_token\":\"dummy-license-code\"}")"
+  "$TOKEN_EXCHANGE_REQ")"
 assert_route_available "Token _exchange submit" "$CODE"
 
 # 11) Token exchange poll
@@ -155,21 +190,36 @@ CODE="$(call_api POST \
 assert_route_available "Token _exchange poll" "$CODE"
 
 # 12) Device DCR submit
+DEVICE_DCR_REQ="$(render_example_payload DEVICE_REGISTRATION_REQUEST "$(jq -n --arg thid "$THID_DCR" '{
+  "/thid": $thid,
+  "/body/client_name": "web-portal-test",
+  "/body/jwks/keys": []
+}')")"
 CODE="$(call_api POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/identity/openid/Device/_dcr" \
-  "{\"thid\":\"$THID_DCR\",\"client_name\":\"web-portal-test\",\"jwks\":{\"keys\":[]}}")"
+  "$DEVICE_DCR_REQ")"
 assert_route_available "Device _dcr submit" "$CODE"
 
 # 13) SMART token submit
+SMART_REQ="$(render_example_payload SMART_TOKEN_REQUEST "$(jq -n --arg thid "$THID_SMART" '{
+  "/thid": $thid,
+  "/body/scope": "individual.onboard"
+}')")"
 CODE="$(call_api POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/identity/openid/smart/token" \
-  "{\"thid\":\"$THID_SMART\",\"scope\":\"individual.onboard\"}")"
+  "$SMART_REQ")"
 assert_route_available "SMART token submit" "$CODE"
 
 # 14) Family organization submit
+FAMILY_REQ="$(render_example_payload FAMILY_REGISTRATION_REQUEST "$(jq -n \
+  --arg thid "$THID_FAMILY" \
+  '{
+    "/thid": $thid,
+    "/body/data/0/meta/claims/Organization.owner.email": "family@example.com"
+  }' )")"
 CODE="$(call_api POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/individual/org.schema/Organization/_batch" \
-  "{\"thid\":\"$THID_FAMILY\",\"body\":{\"data\":[{\"type\":\"Family-registration-form-v1.0\",\"meta\":{\"claims\":{\"@context\":\"org.schema\",\"org.schema.Organization.name\":\"Family Test\",\"org.schema.Person.email\":\"family@example.com\"}}}]}}")"
+  "$FAMILY_REQ")"
 assert_route_available "Family Organization _batch submit" "$CODE"
 
 echo

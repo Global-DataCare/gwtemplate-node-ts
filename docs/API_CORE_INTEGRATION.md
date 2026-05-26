@@ -20,6 +20,9 @@ Short coverage summary for memory/thesis justification:
 - Submit: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
 - Poll: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
 - SDK method: `activateOrganizationInGatewayFromIcaProof(...)`
+- Host routing note:
+  - the SDK host route object is a host/operator routing context
+  - do not teach it as if it were the identity of the legal controller
 - Required proof input: `body.data[].vp_token` (JWT) or `body.data[].vp` (JSON VP)
 - Canonical proof is `body.vp_token`.
 - `organizationCredential` / `representativeCredential` are deprecated legacy compatibility side-fields and must not be treated as the primary proof contract.
@@ -28,6 +31,12 @@ Short coverage summary for memory/thesis justification:
   - `body.controller.sameAs`
   - `body.controller.publicKeyJwk`
   - `body.controller.jwks`
+- Claim-teaching rule:
+  - examples should prefer shared `ClaimsOrganizationSchemaorg`, `ClaimsPersonSchemaorg`, and `ClaimsServiceSchemaorg` constants instead of hardcoded claim-key strings
+- Legal-organization teaching rule:
+  - do not start the first legal-organization example from `org.schema.Organization.alternateName`
+  - center it on legal name, `Organization.identifier.value` / tax-id linkage returned by ICA, controller binding, and provider service identity
+  - in `v1.x`, GW CORE may still derive an internal compatibility alias from that canonical identifier when `alternateName` is omitted
 - Runtime rule:
   - organization/provider DID publication uses GW/operator transport keys and real `serviceEndpoint` URLs
   - controller person DID publication uses explicit controller key material when provided
@@ -77,6 +86,9 @@ Note:
 - Poll: `.../smart/token-response`
 - SDK method: `requestSmartTokenSimple(...)`
 - Token must be single-subject and section-scoped by requested scopes.
+- Minimal teaching rule:
+  - first show the composition read scope built from `subjectDid`
+  - only add `organization/Consent.cruds` when the actor also needs consent management operations
 
 7. IPS import and index update through Communication bundle
 - Ingest: `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Communication/_batch`
@@ -84,6 +96,9 @@ Note:
 - This is the canonical index-update entrypoint in core (bundle-driven ingestion).
 - Search (Bundle batch GET): indexed `Composition`/`DocumentReference` retrieval
 - SDK method: `ingestCommunicationAndUpdateIndex(...)`
+- Draft/outbox teaching rule:
+  - if SDK docs show `createOutboxJobFromDraft(...)`, they must say explicitly that it only freezes the local payload/envelope
+  - network submission starts later when the runtime client posts the communication
 
 8. RelatedPerson baseline (emergency contact)
 - Submit: `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch`

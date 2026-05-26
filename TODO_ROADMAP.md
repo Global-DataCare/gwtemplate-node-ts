@@ -9,6 +9,17 @@ Version:
 - [ ] Pending repository-specific roadmap definition.
 - [ ] Align auth actor terms: service-controller, tenant-controller, tenant-runtime-client.
 - [ ] Link this file updates back to orchestrator chronology.
+- [ ] Complete ICA-aligned lifecycle `v1` for suspend/deactivate semantics:
+  - `disable` in GW must mean operational suspension, not purge and not license release.
+  - suspended `employee`, `individual`, and `tenant` records must remain auditable and reactivatable.
+  - employee seat/license remains suspended/reserved while the identity is suspended unless ICA/ledger state explicitly changes.
+  - GW must not locally invent credential revocation; authoritative VC `credentialStatus` changes belong to ICA/ledger.
+  - define host/portal `/_deactivate` flow as the canonical entry point for ICA-backed suspension/revocation updates.
+  - keep `purge` as an internal retention/admin concern, never the normal public lifecycle.
+- [ ] Add `/_deactivate` documentation and tests for ICA-driven status updates:
+  - host receives ICA evidence/status update for organization, legal representative, employee, or individual.
+  - GW persists local suspended state without deleting historical DID/DCR/license artifacts.
+  - verifiers and portal flows must read authoritative `credentialStatus` from ICA/ledger, not infer it only from local GW status.
 - [ ] Implement cross-operator/cross-ICA catalog aggregation (CA/operator plane):
   - discover ICA endpoints by jurisdiction/policy
   - discover node-operator offerings

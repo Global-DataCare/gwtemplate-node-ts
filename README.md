@@ -17,8 +17,9 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 
 - Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
 - Main docs index: [docs/README.md](docs/README.md)
+- Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
 - Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
-- Repo briefing: [BRIEFING_DATASPACE_EN.md](BRIEFING_DATASPACE_EN.md)
+- Repo briefing: [docs/BRIEFING_DATASPACE_EN.md](docs/BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
 - Firestore demo template: [env.firestore-demo.example](env.firestore-demo.example)
 - Local PostgreSQL overrides: [.env.local.postgres](.env.local.postgres)
@@ -62,7 +63,7 @@ npm run api:local-demo
 Command:
 
 ```bash
-TENANT_ID=acme JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
+TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
 ```
 
 ## 6) Ingest medications via Communication and retrieve IPS search views (Terminal 2)
@@ -101,6 +102,29 @@ This project follows a Test-Driven Development (TDD) approach. This means that t
 4.  **Repeat:** Repeat this cycle for each feature or functionality you want to add.
 
 Following TDD helps to ensure that the code is well-tested, maintainable, and meets the specified requirements.
+
+## Example Data And Docs Sync
+
+Canonical payload examples are not maintained separately in Swagger, markdown, and tests.
+
+- GW fixture source of truth: [`src/__tests__/data/example-payloads.ts`](src/__tests__/data/example-payloads.ts)
+- Swagger/OpenAPI generation: [`src/utils/swagger-spec.ts`](src/utils/swagger-spec.ts) and [`scripts/generate-swagger-spec.mts`](scripts/generate-swagger-spec.mts)
+- Script payload rendering from the same fixtures: [`scripts/render-example-payload.mts`](scripts/render-example-payload.mts)
+- GW markdown conformance test: [`src/__tests__/unit/examples/markdown-examples.test.ts`](src/__tests__/unit/examples/markdown-examples.test.ts)
+- GW to shared `gdc-common-utils-ts` conformance test: [`src/__tests__/unit/examples/shared-flow-examples.test.ts`](src/__tests__/unit/examples/shared-flow-examples.test.ts)
+
+Current rule:
+
+- If a markdown example in `docs/90.A-API_INTEGRATORS_GUIDE.md` is canonical, mark it with `<!-- sync-example: EXAMPLE_NAME -->`.
+- The markdown block must then match the exported payload from `example-payloads.ts` exactly.
+- Demo/incremental flow scripts should render from `example-payloads.ts` and only apply explicit overrides for values such as tenant id, tax id, legal name, employee email, role, or subject id.
+- If shared examples in `gdc-common-utils-ts` change, the GW conformance test must still pass.
+
+Useful checks:
+
+```bash
+npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.ts src/__tests__/unit/examples/shared-flow-examples.test.ts src/__tests__/unit/utils/swagger-spec.test.ts
+```
 
 ## Project Documentation
 
@@ -486,21 +510,24 @@ Local (minikube/k3s) is test-only and documented in:
 - `private-deploy.local.config`
 
 ## Roadmap and Briefing
-- `BRIEFING_DATASPACE_EN.md`
+- `docs/BRIEFING_DATASPACE_EN.md`
 - `TODO_ROADMAP.md`
 
 ## Pending Compatibility TODO
 - See [SMART EHR compatibility TODO](docs/TODO_SMART_EHR_COMPAT.md).
+- See [Tenant identifier and vault migration TODO (v2.0)](docs/90.K-TODO_TENANT_IDENTIFIER_V2.md).
 
-## Local Single-Tenant Bootstrap (acme)
-Run this when you need tenant `acme` ready for activation, employee, consent, and FHIR flows:
+## Local Single-Tenant Bootstrap (acme-id)
+Run this when you need tenant `acme-id` ready for activation, employee, consent, and FHIR flows:
 
 ```bash
-TENANT_ID=acme JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
+TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
 ```
 
 Notes:
-- This registers/ensures tenant `acme` via host registry Offer/Order flow.
+- This registers/ensures tenant `acme-id` via host registry Offer/Order flow.
+- In `v1.x`, legal-organization bootstrap sends `Organization.identifier.value` (`taxId`) as the canonical external identifier.
+- `alternateName` is reserved for individual/family-style onboarding examples. For legal organizations, GW CORE currently derives its internal compatibility alias from `taxId` when omitted.
 - `host` is reserved for platform-level routes and well-known endpoints.
 
 ### Compatibility Matrix: Legacy/Plaintext Support

@@ -75,7 +75,7 @@ This is a separate, more rigorous flow that begins only after Phase 1 is complet
 
 To move forward, we will execute the following steps in order:
 
-1.  **Codify This Blueprint:** Create this `ONBOARDING_ARCHITECTURE_BLUEPRINT.md` file in the root directory.
+1.  **Codify This Blueprint:** Maintain this `docs/ONBOARDING_ARCHITECTURE_BLUEPRINT.md` file as the architectural source of truth.
 2.  **Implement the Data Model:** Refactor `src/models/entity.ts` to match the `EntityConfig`/`OrganizationConfig` structure defined above.
 3.  **Implement the `HostingManager`:** Perform a full-file replacement of `src/managers/HostingManager.ts` to correctly implement its role as defined in **Phase 1**. The code will be heavily commented to make the architectural boundaries and the handoff to the production enrollment flow explicitly clear.
 4.  **Verify:** Run `npx tsc --noEmit` and then the `organizationApi.test.ts` integration test to confirm that the entire Phase 1 flow is working correctly and the data is persisted in the new, correct format.

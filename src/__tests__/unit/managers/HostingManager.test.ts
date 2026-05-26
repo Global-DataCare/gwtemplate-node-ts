@@ -227,6 +227,34 @@ describe('HostingManager', () => {
     expect(mockKmsService.provisionKeys).not.toHaveBeenCalledWith(tenantVaultId);
   });
 
+  it('[5.1 TENANT] derives alternateName from identifier.value for legal organizations when omitted', async () => {
+    await hostingManager.bootstrapHost(testClaimsHostInitialization);
+    await mockTenantsCacheManager.loadHost();
+
+    const { [ClaimsOrganizationSchemaorg.alternateName]: _ignored, ...claimsWithoutAlternateName } = testClaimsTenant1Registration;
+    const job = testBaseJobForClaims(claimsWithoutAlternateName as ClaimsRecord);
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+    expect(entry.response.status).toBe('201');
+
+    const expectedAlternateName = String(claimsWithoutAlternateName[ClaimsOrganizationSchemaorg.identifierValue]);
+    expect(entry.meta?.claims?.[ClaimsOrganizationSchemaorg.alternateName]).toBe(expectedAlternateName);
+
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      claimsWithoutAlternateName[ClaimsServiceSchemaorg.category] as Sector,
+      expectedAlternateName,
+    );
+    const provisionalDoc = await vaultRepository.get(
+      await mockTenantsCacheManager.getCollectionName('host') as string,
+      tenantVaultId,
+      getEnvSectionId('tenants')
+    ) as ConfidentialStorageDoc;
+
+    expect(provisionalDoc).toBeDefined();
+    expect(provisionalDoc.content?.claims?.[ClaimsOrganizationSchemaorg.alternateName]).toBe(expectedAlternateName);
+  });
+
   it("[3 DEMO: should use a non-UUID identifier directly in 'demo' mode", async () => {
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await mockTenantsCacheManager.loadHost();

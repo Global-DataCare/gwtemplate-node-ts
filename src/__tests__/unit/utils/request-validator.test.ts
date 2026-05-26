@@ -27,6 +27,13 @@ describe('isRequestValid', () => {
       serviceEndpoint: 'Organization',
       actions: ['_batch', '_activate'],
       selector: { section: 'registry', format: 'org.schema' },
+    },
+    {
+      id: '#individual:org.schema',
+      type: 'ApiService',
+      serviceEndpoint: 'Organization',
+      actions: ['_transaction'],
+      selector: { section: 'individual', format: 'org.schema' },
     }
   ];
 
@@ -70,6 +77,17 @@ describe('isRequestValid', () => {
       format: 'org.schema',
       resourceType: 'Organization',
       action: '_activate',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for individual organization _transaction alias', () => {
+    const params = {
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      resourceType: 'Organization',
+      action: '_transaction',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
   });

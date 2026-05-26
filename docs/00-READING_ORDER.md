@@ -33,3 +33,4 @@ These docs are transitional and should not be used as primary onboarding sequenc
 - `docs/90.H-END_TO_END_DEVICE_FLOW.md`
 - `docs/90.I-IDENTITY-FABRIC.md`
 - `docs/90.J-KEY_CUSTODY_RUNBOOK.md`
+- `docs/90.K-TODO_TENANT_IDENTIFIER_V2.md`

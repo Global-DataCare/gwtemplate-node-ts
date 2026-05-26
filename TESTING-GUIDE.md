@@ -125,3 +125,24 @@ npm run test:e2e:real
 If authentication is missing, the command prints:
 1. `gcloud auth login`
 2. rerun `npm run test:e2e:real`
+
+## Real signed individual PDF fixture
+
+Some local tests can validate mapping from a real signed individual onboarding PDF into CORE claims.
+Those tests must not embed personal data in the repository. Configure the fixture only through environment
+variables such as:
+
+```shell
+TEST_INDIVIDUAL_FORM_PDF_PATH=/absolute/path/to/your/signed-form.pdf
+TEST_INDIVIDUAL_CONTROLLER_CERT_CN=
+TEST_INDIVIDUAL_CONTROLLER_CERT_SN=
+TEST_INDIVIDUAL_CONTROLLER_CERT_GN=
+TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER=
+TEST_INDIVIDUAL_CONTROLLER_CERT_COUNTRY=
+TEST_INDIVIDUAL_CONTROLLER_EMAIL=
+TEST_INDIVIDUAL_ORGANIZATION_ALTNAME=
+TEST_INDIVIDUAL_CONTROLLER_BIRTHDATE=
+TEST_INDIVIDUAL_CONTROLLER_GENDER=
+```
+
+If these variables are not defined, the real-fixture assertion path is skipped and the rest of the suite still runs.

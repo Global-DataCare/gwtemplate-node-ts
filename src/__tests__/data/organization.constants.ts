@@ -10,5 +10,4 @@ export const testRootOrgDidWeb = 'did:web:testca.unid.es';
 
 // Keep this stable across tests to avoid circular imports between organization.data.ts and credential.data.ts.
 export const testTenant1IdentifierUrn =
-  `urn:${URN_NAMESPACE}:${URN_NETWORK}:ES:${URN_VERSION}:health-care:entity:TAX:A123456789`;
-
+  `urn:${URN_NAMESPACE}:${URN_NETWORK}:ES:${URN_VERSION}:health-care:entity:TAX:acme-id`;

@@ -389,6 +389,69 @@ describe('Organization Registration API', () => {
       expect(responseClaims[ClaimsOfferSchemaorg.offeredBy]).toBe('did:web:host.example.com');
     });
 
+    it('should accept a legal registration request without alternateName and derive it from identifier.value', async () => {
+      const orgCreationPayload = structuredClone(ORGANIZATION_REGISTRATION_REQUEST);
+      delete (orgCreationPayload.body.data[0].meta.claims as Record<string, unknown>)['org.schema.Organization.alternateName'];
+      const { thid } = orgCreationPayload;
+
+      const decodedJobForManager: JobRequest = {
+        ...ORGANIZATION_REGISTRATION_JOB,
+        id: uuidv4(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        content: orgCreationPayload,
+      };
+      mockKmsService.decodeRequest.mockResolvedValue(decodedJobForManager);
+
+      let capturedJob: JobRequest | undefined;
+      mockQueueAdapter.addJob.mockImplementation(async (_jobName, jobData) => {
+        capturedJob = jobData;
+      });
+
+      const registrationUrl = `/host/cds-es/v1/test/registry/org.schema/Organization/_batch`;
+      const postResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: registrationUrl,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+          Authorization: 'Bearer fake-oidc-id-token',
+        },
+        body: { request: 'fake-jwe-no-alt' },
+      });
+
+      expect(postResponse.status).toBe(202);
+      expect(capturedJob).toBeDefined();
+
+      const workerResultPayload = await hostingManager.process(capturedJob!);
+      const encryptedWorkerResult = await mockKmsService.encodeResponse(workerResultPayload, [externalEncrypter as unknown as JWK], 'host');
+      await asyncResponseStore.set(thid, { status: 'COMPLETED', result: encryptedWorkerResult });
+
+      const pollingPath = new URL(postResponse.headers.location).pathname;
+      const pollResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: pollingPath,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+          Authorization: 'Bearer fake-oidc-id-token',
+        },
+        body: { thid },
+      });
+
+      expect(pollResponse.status).toBe(200);
+      const encryptedFinalResponse = pollResponse.text.replace('response=', '');
+      const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
+      const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
+      const responseClaims = finalResponse.body.data[0].meta.claims;
+
+      expect(responseClaims['org.schema.Organization.identifier.value']).toBe('acme-id');
+      expect(responseClaims['org.schema.Organization.alternateName']).toBe('acme-id');
+    });
+
     it('should process an Order and return a payment Communication', async () => {
       // --- ARRANGE (Phase 1: Initial Registration & Offer) ---
       const orgCreationPayload = { ...ORGANIZATION_REGISTRATION_REQUEST };
