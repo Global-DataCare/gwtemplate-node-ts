@@ -66,6 +66,71 @@ Command:
 TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
 ```
 
+## 5.A) Docker local + Swagger family-registration flow
+
+Build the local image:
+
+```bash
+./docker_build_local.sh
+```
+
+Run the container on a host port of your choice:
+
+```bash
+HOST_PORT=8080 FORCE_RECREATE=true ./docker_run_local.sh
+```
+
+Bootstrap the tenant against that Docker URL:
+
+```bash
+BASE_URL=http://localhost:8080 TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
+```
+
+Then open `http://localhost:8080/api-docs`, select `CORE`, and use the `Family Registration` request example named `Plaintext Message for Family Registration with online PDF link`.
+
+Replace `{{signedIndividualFormPdfUrl}}` with:
+
+```text
+https://www.dropbox.com/scl/fi/gum7m1psy59jicisk6ke2/Prueba-fernando-Formulario_alta_servicio_indice_salud-firmado.pdf?rlkey=79s2dey287h4lx9568j4b5hl2&st=qbn7rx73&dl=1
+```
+
+That is the clean local repro path for the individual onboarding flow through Swagger. If you want the same flow from the Node SDK, it should be exercised from `gdc-sdk-client-ts` against the same `BASE_URL=http://localhost:<HOST_PORT>`.
+
+## 5.B) GKE demo deployment from the repo root
+
+For the current non-Fabric demo path, the root deploy entrypoint also supports GKE:
+
+```bash
+source demo-deploy.config
+./cloud_deploy.sh gke-demo demo-deploy.config
+```
+
+That path:
+- reuses `.env.local` semantics through `demo-deploy.config`
+- keeps `DB_PROVIDER=mem` and `STORAGE_PROVIDER=mem`
+- builds and pushes the GW image
+- fetches GKE credentials
+- applies the GW manifests behind a static-IP `LoadBalancer` Service
+
+If the local image `gwtemplate` is already built and you want to avoid rebuilding it:
+
+```bash
+source demo-deploy.config
+SKIP_BUILD=true LOCAL_IMAGE_NAME=gwtemplate ./cloud_deploy.sh gke-demo demo-deploy.config
+```
+
+The GKE demo deploy should always use an immutable image tag.
+Do not keep `GDC_IMAGE` on mutable tags such as `:demo` or `:latest`.
+Use a versioned tag such as `:1.6.1-8b0539b`.
+If `GDC_IMAGE` still ends in `:demo` or `:latest`, `cloud_deploy.sh gke-demo` now rewrites it automatically to `<package-version>-<short-git-sha>`.
+
+For the current demo path you do not need DNS or a domain. Use the public static IP directly in
+`GDC_PUBLIC_URL`, for example `http://34.x.y.z`.
+
+Recommended shortcut:
+
+If you already ran `./docker_build_local.sh`, prefer the `SKIP_BUILD=true` variant above so the GKE demo deploy re-tags and pushes the existing local image instead of rebuilding it again.
+
 ## 6) Ingest medications via Communication and retrieve IPS search views (Terminal 2)
 
 The shell script only orchestrates the flow. The synthetic demo payloads now live in TypeScript render helpers so the `.sh` does not duplicate FHIR/Communication contract JSON.

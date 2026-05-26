@@ -1,3 +1,11 @@
+## [1.6.1] - 2026-05-26
+
+### Fixed
+- Docker runtime image now includes `artifacts/openapi-profiles`, so the published Swagger UI can fetch `openapi-core.json`, `openapi-compat.json`, and `openapi-extension.json` instead of failing with `Not Found`.
+
+### Changed
+- Added a root-level `gke-demo` deployment path for the current GW standalone demo, including IP-only `LoadBalancer` exposure, reusable local-image push with `SKIP_BUILD=true`, and minimal GKE manifests under `fabric-multicloud/k8s/gdc/`.
+
 ## [1.6.0] - 2026-05-26
 
 ### Changed
