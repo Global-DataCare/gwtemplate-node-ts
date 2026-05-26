@@ -130,7 +130,7 @@ describe('Swagger Spec Generation', () => {
     expect(familyClaims['org.schema.Service.termsOfService']).toBeUndefined();
     expect(familyClaims['Organization.identifier.value']).toBeDefined();
     expect(familyClaims['org.schema.Organization.identifier.value']).toBeUndefined();
-    expect(familyClaims['Organization.owner.identifier.value']).toBe('IDCES-<controller-serialNumber>');
+    expect(familyClaims['Organization.owner.identifier.value']).toBe('<cert-serialnumber>');
     expect(familyClaims['Organization.owner.identifier.value']).not.toBe('adult1@example.com');
   });
 });

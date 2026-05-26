@@ -18,6 +18,8 @@ import {
 } from '../../data/example-payloads';
 
 describe('shared flow examples conformance', () => {
+  it.todo('consumes canonical lifecycle examples from gdc-common-utils-ts/examples/lifecycle once the installed shared package includes that subpath');
+
   it('keeps organization-controller activation example aligned with shared organization-controller flow examples', () => {
     expect(ORGANIZATION_ACTIVATION_REQUEST.body.vp_token).toBe(EXAMPLE_GW_ORGANIZATION_ACTIVATE_PAYLOAD.vp_token);
     expect(ORGANIZATION_ACTIVATION_REQUEST.body.controller).toEqual(EXAMPLE_GW_ORGANIZATION_ACTIVATE_PAYLOAD.controller);
