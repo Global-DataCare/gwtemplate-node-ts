@@ -30,8 +30,8 @@ The reason for using both is simple:
 | GW unit contract | `src/__tests__/unit/managers/CommunicationManager.unit.test.ts` | `Communication` handling, channel-record persistence, canonical claim usage, and atomic `DocumentReference` extraction behavior remain stable | unit test output in GW repo |
 | GW unit contract | `src/__tests__/unit/managers/DocumentReferenceManager.test.ts` | Atomic `DocumentReference` behavior uses canonical claims and expected storage semantics | unit test output in GW repo |
 | GW integration contract | `src/__tests__/integration/composition.bundle-search.api.test.ts` | Bundle-based search behavior and async route semantics match the documented core retrieval contract | integration test output in GW repo |
-| SDK live core proof | `../dataspace-client-sdk-node/tests/live-gw-uc5.e2e.test.mjs` | The documented GW core flow is executable end to end from the legacy Node SDK | SDK JSONL traces + pass/fail status |
-| SDK live new-runtime proof | `../gdc-sdk-node-ts/tests/live-gw-node-runtime.e2e.test.mjs` | The new actor-scoped Node runtime already interoperates with real GW core | SDK JSONL traces + pass/fail status |
+| SDK live core proof | `https://github.com/Global-DataCare/dataspace-client-sdk-node/blob/main/tests/live-gw-uc5.e2e.test.mjs` | The documented GW core flow is executable end to end from the legacy Node SDK | SDK JSONL traces + pass/fail status |
+| SDK live new-runtime proof | `https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/tests/live-gw-node-runtime.e2e.test.mjs` | The new actor-scoped Node runtime already interoperates with real GW core | SDK JSONL traces + pass/fail status |
 
 ## Core flow covered end to end through SDK live tests
 

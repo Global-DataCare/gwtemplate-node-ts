@@ -53,6 +53,8 @@ docs/
 - Swagger/OpenAPI examples are injected from those fixtures by `src/utils/swagger-spec.ts` and `scripts/generate-swagger-spec.mts`.
 - Demo/incremental flow scripts should render from those same fixtures via `scripts/render-example-payload.mts`, applying only explicit overrides.
 - Shared cross-repo examples from `gdc-common-utils-ts/examples/...` are checked by `src/__tests__/unit/examples/shared-flow-examples.test.ts`.
+- Canonical lifecycle examples now live in `gdc-common-utils-ts/examples/lifecycle` and are documented in `https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md`.
+  GW must consume those shared examples instead of introducing local lifecycle payload copies.
 - Canonical markdown examples in `docs/90.A-API_INTEGRATORS_GUIDE.md` are marked with `<!-- sync-example: ... -->` and checked by `src/__tests__/unit/examples/markdown-examples.test.ts`.
 
 Practical rule:

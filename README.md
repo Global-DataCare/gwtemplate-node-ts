@@ -112,6 +112,8 @@ Canonical payload examples are not maintained separately in Swagger, markdown, a
 - Script payload rendering from the same fixtures: [`scripts/render-example-payload.mts`](scripts/render-example-payload.mts)
 - GW markdown conformance test: [`src/__tests__/unit/examples/markdown-examples.test.ts`](src/__tests__/unit/examples/markdown-examples.test.ts)
 - GW to shared `gdc-common-utils-ts` conformance test: [`src/__tests__/unit/examples/shared-flow-examples.test.ts`](src/__tests__/unit/examples/shared-flow-examples.test.ts)
+- Shared lifecycle source of truth: [`gdc-common-utils-ts/src/examples/lifecycle.ts`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/examples/lifecycle.ts)
+- Shared lifecycle guide "for torpes": [`gdc-common-utils-ts/docs/LIFECYCLE_101.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md)
 
 Current rule:
 
@@ -119,6 +121,7 @@ Current rule:
 - The markdown block must then match the exported payload from `example-payloads.ts` exactly.
 - Demo/incremental flow scripts should render from `example-payloads.ts` and only apply explicit overrides for values such as tenant id, tax id, legal name, employee email, role, or subject id.
 - If shared examples in `gdc-common-utils-ts` change, the GW conformance test must still pass.
+- Lifecycle payloads must not be hardcoded independently in GW, SDK core, SDK node, SDK front, or Swagger once the shared package export is available locally.
 
 Useful checks:
 
@@ -289,9 +292,9 @@ Use this order to avoid drift between implementations:
 1. GW readiness and route compatibility:
    - [docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
 2. Frontend SDK use cases and exact calls (`gdc-sdk-client-ts`):
-   - [../gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md](../gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md)
+   - [gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md](https://github.com/Global-DataCare/gdc-sdk-client-ts/blob/main/docs/DEVELOPER_USE_CASES.md)
 3. Backend Node SDK use cases and exact calls (`dataspace-client-sdk-node`):
-   - [../dataspace-client-sdk-node/docs/DEVELOPER_USE_CASES.md](../dataspace-client-sdk-node/docs/DEVELOPER_USE_CASES.md)
+   - [dataspace-client-sdk-node/docs/DEVELOPER_USE_CASES.md](https://github.com/Global-DataCare/dataspace-client-sdk-node/blob/main/docs/DEVELOPER_USE_CASES.md)
 
 Flow contract to keep aligned:
 

@@ -78,7 +78,7 @@ Note:
 - Poll: `.../Consent/_batch-response`
 - SDK method: `grantProfessionalAccessSimple(...)`
 - Follow-up authorization matrix task:
-  - [../../gdc-common-utils-ts/docs/consent-access-matrix-task.md](../../gdc-common-utils-ts/docs/consent-access-matrix-task.md)
+  - [gdc-common-utils-ts/docs/consent-access-matrix-task.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/consent-access-matrix-task.md)
   - covers active consent aggregation, explicit deny precedence, controller views, permission-request communications, and final SMART scope evaluation
 
 6. SMART token with consent/scope enforcement
