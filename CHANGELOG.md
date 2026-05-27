@@ -1,6 +1,17 @@
 ## [1.6.0] - 2026-05-26
 
 ### Changed
+- Added `STORAGE_PROVIDER=supabase` support so GW can keep confidential indexed storage in PostgreSQL while storing uploaded files in Supabase Storage via `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_STORAGE_BUCKET`.
+- Standardized env template naming around visible `env.*.example` files, leaving `.env.*` names for private local copies only, with local runtime variants using `local-*` (`.env.local-demo`, `.env.local-postgres`) and the Supabase runtime using `cloud-*` (`.env.cloud-supabase`) to match the `npm run api:*` commands.
+- Switched local and cloud runtime scripts from layered dotenv overlays to single full-profile `.env.*` files so each `npm run api:*` command now maps to one complete environment file.
+- `docker_run_local.sh` now accepts `HOST_PORT`, `ENV_FILE`, `CONTAINER_NAME`, `IMAGE_NAME`, and `FORCE_RECREATE`, so local Docker runs no longer require hardcoded `8080` / `.env.local` edits.
+- Added a first GKE deployment skeleton for the GW host/connector under `fabric-multicloud/k8s/gdc/`, explicitly separated from Fabric components and from `dataspace-ica-ts`, with a render/apply script driven by `K8S_NAMESPACE_GDC`, `GDC_IMAGE`, and `ICA_URL_*`.
+- Extended the GKE GW skeleton to support the ICA-style public edge pattern: reserved static IP, GKE ingress, and Google-managed certificate.
+- Added `demo-deploy.config.example` plus env-driven GKE GW rendering so demo deployments can reuse `.env.local` and stay on `mem` providers instead of forcing Firestore/GCS.
+- Simplified the demo GKE GW deployment model so `dataspace-ica-ts` is no longer assumed to be co-deployed or reachable internally; only an optional external ICA URL remains.
+- Extended the root `cloud_deploy.sh` entrypoint with a `gke-demo` mode so the current demo GKE deployment can be launched from the repo root instead of going through `fabric-multicloud` manually.
+- Added `SKIP_BUILD=true` support to the root `cloud_deploy.sh` GKE demo path so an already-built local Docker image can be retagged and pushed without rebuilding.
+- Simplified the GKE demo path to IP-only HTTP for the current phase: `LoadBalancer` Service with a reserved static IP, no domain, no managed certificate, and no ingress dependency.
 - Core Swagger family-registration request bodies now expose two named examples in the selector: online PDF link and inline base64 PDF, so integrators can compare the two transport forms directly.
 - Family registration signed-PDF onboarding now accepts HTTPS attachment links via `attachments[].data.links[0]` in addition to embedded base64, and the canonical Swagger/example fixture defaults to the online-link form.
 - Demo/smoke shell scripts no longer define copied business payload JSON inline when a canonical TypeScript fixture/helper exists; portal route smoke and medication/IPS demo flows now render their payloads from shared TS sources and only apply runtime overrides in Bash.
@@ -33,6 +44,7 @@
 
 ### Testing
 - Added/updated focused tests for:
+  - Supabase storage adapter hashing, upload wiring, and configuration parsing
   - family signed-PDF onboarding via remote HTTPS attachment link download
   - shell-script payload contract conformance (`dummy-*` regression guard + fixture-renderer usage)
   - SMART consent evaluation precedence

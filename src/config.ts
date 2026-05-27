@@ -50,6 +50,12 @@ export interface IServerConfig {
     maxPoolSize?: number;
   };
   gcsBucketName?: string;
+  supabase?: {
+    url?: string;
+    serviceRoleKey?: string;
+    storageBucket?: string;
+    storagePublic?: boolean;
+  };
   kekSecret?: string;
   host: {
     legalName?: string;

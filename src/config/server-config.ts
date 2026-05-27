@@ -190,6 +190,12 @@ export function getConfig(): IServerConfig {
         maxPoolSize: process.env.POSTGRES_MAX_POOL_SIZE ? parseInt(process.env.POSTGRES_MAX_POOL_SIZE, 10) : undefined,
       },
       gcsBucketName: process.env.GCS_BUCKET_NAME,
+      supabase: {
+        url: process.env.SUPABASE_URL,
+        serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        storageBucket: process.env.SUPABASE_STORAGE_BUCKET,
+        storagePublic: parseBooleanEnv(process.env.SUPABASE_STORAGE_PUBLIC, true),
+      },
       kekSecret: process.env.KEK_SECRET,
       host: {
         legalName: getHostEnv('LEGAL_NAME'),

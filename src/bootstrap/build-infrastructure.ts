@@ -5,6 +5,7 @@ import { FirestoreVaultRepository } from '../database/repositories/firestore/fir
 import { createPostgresPool } from '../database/repositories/postgres/postgres.client';
 import { ensurePostgresVaultSchema } from '../database/repositories/postgres/postgres.schema';
 import { PostgresVaultRepository } from '../database/repositories/postgres/postgres.vault.repository';
+import { SupabaseStorageAdapter } from '../database/storage/supabase.storage.adapter';
 import { VaultMemRepository } from '../database/repositories/vault/vault.mem.repository';
 import type { IStorageAdapter } from '../database/storage/IStorageAdapter';
 import { GcsStorageAdapter } from '../database/storage/gcs.storage.adapter';
@@ -54,6 +55,23 @@ export async function buildInfrastructure(options: {
     }
     storageAdapter = new GcsStorageAdapter(config.gcsBucketName);
     console.log(`[GW-API] Using GCS Storage Adapter with bucket: ${config.gcsBucketName}`);
+  } else if (config.storageProvider === 'supabase') {
+    if (!config.supabase?.url) {
+      throw new Error("STORAGE_PROVIDER is 'supabase', but SUPABASE_URL is not configured.");
+    }
+    if (!config.supabase?.serviceRoleKey) {
+      throw new Error("STORAGE_PROVIDER is 'supabase', but SUPABASE_SERVICE_ROLE_KEY is not configured.");
+    }
+    if (!config.supabase?.storageBucket) {
+      throw new Error("STORAGE_PROVIDER is 'supabase', but SUPABASE_STORAGE_BUCKET is not configured.");
+    }
+    storageAdapter = new SupabaseStorageAdapter({
+      url: config.supabase.url,
+      serviceRoleKey: config.supabase.serviceRoleKey,
+      bucketName: config.supabase.storageBucket,
+      publicBucket: config.supabase.storagePublic !== false,
+    });
+    console.log(`[GW-API] Using Supabase Storage Adapter with bucket: ${config.supabase.storageBucket}`);
   } else {
     storageAdapter = new StorageMemAdapter();
     console.log('[GW-API] Using In-Memory Storage Adapter.');
@@ -76,4 +94,3 @@ export async function buildInfrastructure(options: {
 
   return { vaultRepository, storageAdapter, cryptographyService, logger, tenantManager, kmsService };
 }
-

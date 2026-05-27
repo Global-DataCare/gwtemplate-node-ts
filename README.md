@@ -21,8 +21,10 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 - Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
 - Repo briefing: [docs/BRIEFING_DATASPACE_EN.md](docs/BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
+- Local demo template: [env.local-demo.example](env.local-demo.example)
 - Firestore demo template: [env.firestore-demo.example](env.firestore-demo.example)
-- Local PostgreSQL overrides: [.env.local.postgres](.env.local.postgres)
+- Local PostgreSQL overrides template: [env.local-postgres.example](env.local-postgres.example)
+- Cloud Supabase overrides template: [env.cloud-supabase.example](env.cloud-supabase.example)
 - Local PostgreSQL container: [docker-compose.postgres.yml](docker-compose.postgres.yml)
 
 ## Quick test
@@ -44,10 +46,10 @@ npm install
 
 ## 3) Preparing the environment
 
-Copy the file `env.local-example` as `.env.local`
+Copy the file `env.local-demo.example` as `.env.local-demo`
 
 ```bash
-cp env.local-example .env.local
+cp env.local-demo.example .env.local-demo
 ```
 
 ## 4) Start backend in demo mode (Terminal 1)
@@ -65,6 +67,66 @@ Command:
 ```bash
 TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
 ```
+
+## 5.A) Docker local + Swagger family-registration flow
+
+Build the local image:
+
+```bash
+./docker_build_local.sh
+```
+
+Run the container on a host port of your choice:
+
+```bash
+HOST_PORT=8080 FORCE_RECREATE=true ./docker_run_local.sh
+```
+
+Bootstrap the tenant against that Docker URL:
+
+```bash
+BASE_URL=http://localhost:8080 TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
+```
+
+Then open `http://localhost:8080/api-docs`, select `CORE`, and use the `Family Registration` request example named `Plaintext Message for Family Registration with online PDF link`.
+
+Replace `{{signedIndividualFormPdfUrl}}` with:
+
+```text
+https://www.dropbox.com/scl/fi/gum7m1psy59jicisk6ke2/Prueba-fernando-Formulario_alta_servicio_indice_salud-firmado.pdf?rlkey=79s2dey287h4lx9568j4b5hl2&st=qbn7rx73&dl=1
+```
+
+That is the clean local repro path for the individual onboarding flow through Swagger. If you want the same flow from the Node SDK, it should be exercised from `gdc-sdk-client-ts` against the same `BASE_URL=http://localhost:<HOST_PORT>`.
+
+## 5.B) GKE demo deployment from the repo root
+
+For the current non-Fabric demo path, the root deploy entrypoint also supports GKE:
+
+```bash
+source demo-deploy.config
+./cloud_deploy.sh gke-demo demo-deploy.config
+```
+
+That path:
+- reuses `.env.local` semantics through `demo-deploy.config`
+- keeps `DB_PROVIDER=mem` and `STORAGE_PROVIDER=mem`
+- builds and pushes the GW image
+- fetches GKE credentials
+- applies the GW manifests behind a static-IP `LoadBalancer` Service
+
+If the local image `gwtemplate` is already built and you want to avoid rebuilding it:
+
+```bash
+source demo-deploy.config
+SKIP_BUILD=true LOCAL_IMAGE_NAME=gwtemplate ./cloud_deploy.sh gke-demo demo-deploy.config
+```
+
+For the current demo path you do not need DNS or a domain. Use the public static IP directly in
+`GDC_PUBLIC_URL`, for example `http://34.x.y.z`.
+
+Recommended shortcut:
+
+If you already ran `./docker_build_local.sh`, prefer the `SKIP_BUILD=true` variant above so the GKE demo deploy re-tags and pushes the existing local image instead of rebuilding it again.
 
 ## 6) Ingest medications via Communication and retrieve IPS search views (Terminal 2)
 
@@ -115,7 +177,7 @@ Canonical payload examples are not maintained separately in Swagger, markdown, a
 - GW markdown conformance test: [`src/__tests__/unit/examples/markdown-examples.test.ts`](src/__tests__/unit/examples/markdown-examples.test.ts)
 - GW to shared `gdc-common-utils-ts` conformance test: [`src/__tests__/unit/examples/shared-flow-examples.test.ts`](src/__tests__/unit/examples/shared-flow-examples.test.ts)
 - Shared lifecycle source of truth: [`gdc-common-utils-ts/src/examples/lifecycle.ts`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/examples/lifecycle.ts)
-- Shared lifecycle guide "for torpes": [`gdc-common-utils-ts/docs/LIFECYCLE_101.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md)
+- Shared lifecycle `101` guide: [`gdc-common-utils-ts/docs/LIFECYCLE_101.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md)
 
 Current rule:
 
@@ -147,16 +209,18 @@ Follow these steps to get your local development environment up and running.
 
 ### 1. Configure Your Local Environment
 
-The server's configuration for local development is managed through a `.env.local` file. This file is **not** tracked in Git, ensuring your local settings and secrets are kept private.
+The server's configuration for local development is managed through explicit profile files such as `.env.local-demo`, `.env.local-postgres`, and `.env.cloud-supabase`. These files are **not** tracked in Git, ensuring your local settings and secrets are kept private.
 
-First, copy the template file to create your local configuration (same file used in Quick test):
+First, copy the demo template file to create your local configuration (same file used in Quick test):
 ```bash
-cp env.local-example .env.local
+cp env.local-demo.example .env.local-demo
 ```
 
-Next, open `.env.local` and review its contents. For basic local development, the default values are often sufficient. The key variable for local testing is `DB_PROVIDER`, which is pre-configured to `mem` for an in-memory database, requiring no external setup.
+Next, open `.env.local-demo` and review its contents. For basic local development, the default values are often sufficient. The key variable for local testing is `DB_PROVIDER`, which is pre-configured to `mem` for an in-memory database, requiring no external setup.
 
-If you want to run the vault against PostgreSQL locally, keep `.env.local` as your base file and use the overrides in `.env.local.postgres`.
+If you want to run the vault against PostgreSQL locally, copy `env.local-postgres.example` to `.env.local-postgres`.
+
+If you want PostgreSQL plus Supabase Storage, copy `env.cloud-supabase.example` to `.env.cloud-supabase`.
 
 ### 2. Install Dependencies
 
@@ -179,14 +243,19 @@ The server will be available at `http://localhost:3000`.
 
 #### Option B: Using Node.js with Local PostgreSQL (Optional, not validated yet in this guide)
 
-This method starts a dedicated local PostgreSQL container and runs the API with `.env.local.postgres` layered on top of `.env.local`.
+This method starts a dedicated local PostgreSQL container and runs the API with the full `.env.local-postgres` profile.
 
 1. Start PostgreSQL:
 ```bash
 npm run db:local-postgres:up
 ```
 
-2. Run the API with PostgreSQL:
+2. Create your private overrides file:
+```bash
+cp env.local-postgres.example .env.local-postgres
+```
+
+3. Run the API with PostgreSQL:
 ```bash
 npm run api:local-postgres
 ```
@@ -199,6 +268,31 @@ npm run db:local-postgres:down
 ```
 
 The vault schema is created automatically by the API on startup.
+
+#### Option B1: Using Node.js with Local PostgreSQL + Supabase Storage
+
+This method keeps the confidential vault in PostgreSQL and stores uploaded files in Supabase Storage.
+
+1. Start PostgreSQL:
+```bash
+npm run db:local-postgres:up
+```
+
+2. Create your private Supabase overrides file:
+```bash
+cp env.cloud-supabase.example .env.cloud-supabase
+```
+
+3. Fill `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_STORAGE_BUCKET` in `.env.cloud-supabase`.
+
+4. Run the API with Supabase Storage:
+```bash
+npm run api:cloud-supabase
+```
+
+Notes:
+- `POSTGRES_*` should point at your Supabase/PostgreSQL database if you are not using the local container.
+- `SUPABASE_STORAGE_PUBLIC=true` is the expected mode for this adapter because the current storage contract persists stable `publicUrl` values.
 
 #### Option B2: Using Node.js with Firestore Demo
 
