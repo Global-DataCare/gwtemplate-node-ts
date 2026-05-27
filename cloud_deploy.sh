@@ -1,217 +1,258 @@
-#!/bin/bash
-# A script to build and deploy the gwtemplate to Google Cloud Run.
+#!/usr/bin/env bash
+# Root deployment entrypoint for Cloud Run and GKE demo.
 
-set -e # Exit immediately if a command exits with a non-zero status.
+set -euo pipefail
 
-# --- Environment Selection ---
-
-# Check if an environment argument is provided
-if [ -z "$1" ]; then
-  echo "❌ ERROR: Deployment environment not specified."
-  echo "Usage: ./cloud_deploy.sh [staging|production]"
-  exit 1
-fi
-
-ENV=$1
-ENV_FILE=".env.deploy.$ENV"
-
-# --- Configuration Loading ---
-
-# Check if the environment file exists
-if [ ! -f "$ENV_FILE" ]; then
-  echo "❌ ERROR: Configuration file for '$ENV' not found."
-  echo "Please create '$ENV_FILE' from the example template and configure it."
-  exit 1
-fi
-
-# Load environment variables from the specified file securely
-set -a # automatically export all variables
-source "$ENV_FILE"
-set +a # stop automatically exporting
-
-# --- Pre-deployment Confirmation ---
-
-echo "--- 🚀 Preparing for GCP Deployment to '$ENV' ---"
-echo "Please review the following critical configuration values:"
-echo "--------------------------------------------------"
-echo "  Service Name:       $DEPLOY_SERVICE_NAME"
-echo "  Project ID:         $FIRESTORE_PROJECT_ID"
-echo "  Region:             $DEPLOY_REGION"
-echo "  External Domain:    $HOST_EXTERNAL_DOMAIN"
-echo "  External Port:      $HOST_EXTERNAL_PORT"
-echo "  Database Provider:  $DB_PROVIDER"
-echo "  Queue Provider:     $QUEUE_PROVIDER"
-echo "  Storage Provider:   $STORAGE_PROVIDER"
-echo "  GCS Bucket Name:    $GCS_BUCKET_NAME"
-echo "--------------------------------------------------"
-read -p "Are you sure you want to proceed with the deployment? (y/n): " -n 1 -r
-echo "" # move to a new line
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-  echo "🛑 Deployment cancelled by user."
-  exit 1
-fi
-
-
-
-# --- Variable Validation ---
-
-# Check for required deployment variables
-if [ -z "$FIRESTORE_PROJECT_ID" ] || [ -z "$DEPLOY_REGION" ] || [ -z "$DEPLOY_SERVICE_NAME" ] || [ -z "$ARTIFACT_REGISTRY_NAME" ]; then
-  echo "ERROR: One or more required variables are not set in your .env file."
-  echo "Please ensure FIRESTORE_PROJECT_ID, DEPLOY_REGION, DEPLOY_SERVICE_NAME, and ARTIFACT_REGISTRY_NAME are defined."
-  exit 1
-fi
-
-# --- GCP and Docker Configuration ---
-
-# The Google Artifact Registry repository name.
-REPO_NAME="$ARTIFACT_REGISTRY_NAME"
-
-# The full image path in Artifact Registry.
-IMAGE_PATH="${DEPLOY_REGION}-docker.pkg.dev/${FIRESTORE_PROJECT_ID}/${REPO_NAME}/${DEPLOY_SERVICE_NAME}:latest"
-
-# --- Script ---
-
-echo "--- 🚀 Starting GCP Deployment ---"
-
-# --- Pre-flight Checks ---
-echo "⚙️  Checking prerequisites..."
-
-# Check if Docker is running
-if ! docker info > /dev/null 2>&1; then
-  echo "❌ ERROR: Docker is not running."
-  echo "Please start the Docker daemon and try again."
-  exit 1
-fi
-echo "✅ Docker is running."
-
-# Check for TypeScript errors
-echo "⚙️  Checking for TypeScript errors..."
-if ! npx tsc --noEmit; then
-  echo "❌ ERROR: TypeScript compilation failed. Please fix the errors above before deploying."
-  exit 1
-fi
-echo "✅ No TypeScript errors found."
-
-# Configure gcloud to use the specified project
-echo "⚙️  Configuring gcloud for project: $FIRESTORE_PROJECT_ID"
-gcloud config set project "$FIRESTORE_PROJECT_ID"
-
-# Enable required Google Cloud services
-echo "⚙️  Enabling required services (run, artifactregistry)..."
-gcloud services enable run.googleapis.com
-gcloud services enable artifactregistry.googleapis.com
-
-# Create a repository in Artifact Registry if it doesn't exist
-if ! gcloud artifacts repositories describe "$REPO_NAME" --location="$DEPLOY_REGION" &> /dev/null; then
-  echo "⚙️  Creating Artifact Registry repository: $REPO_NAME in $DEPLOY_REGION"
-  gcloud artifacts repositories create "$REPO_NAME" \
-    --repository-format=docker \
-    --location="$DEPLOY_REGION" \
-    --description="Docker repository for $DEPLOY_SERVICE_NAME"
-else
-  echo "✅ Artifact Registry repository '$REPO_NAME' already exists."
-fi
-
-# Authenticate Docker with Artifact Registry
-echo "⚙️  Configuring Docker to authenticate with GCP..."
-gcloud auth configure-docker "${DEPLOY_REGION}-docker.pkg.dev"
-
-# Build the Docker image, passing NPM_TOKEN if it exists.
-# Use the workspace root as build context so sibling repos are available.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
 
-echo "⚙️  Building the Docker image: $IMAGE_PATH"
-if [ -n "$NPM_TOKEN" ]; then
-  echo "(NPM_TOKEN found, passing it as a build argument)"
-  docker build --build-arg NPM_TOKEN="$NPM_TOKEN" -t "$IMAGE_PATH" -f "$SCRIPT_DIR/Dockerfile" "$WORKSPACE_ROOT"
-else
-  echo "(NPM_TOKEN not found, building without it)"
-  docker build -t "$IMAGE_PATH" -f "$SCRIPT_DIR/Dockerfile" "$WORKSPACE_ROOT"
-fi
+usage() {
+  cat <<'EOF'
+Usage:
+  ./cloud_deploy.sh <staging|production|...>     Deploy to Cloud Run using .env.deploy.<env>
+  ./cloud_deploy.sh gke-demo [config-file]       Deploy demo GW to GKE using demo-deploy.config
+EOF
+}
 
-# Push the Docker image to Artifact Registry
-echo "⚙️  Pushing the image to Artifact Registry..."
-docker push "$IMAGE_PATH"
-
-# --- Environment Variable Preparation ---
-echo "⚙️  Preparing runtime environment variables for Cloud Run..."
-
-# Define the temporary file for environment variables
-TEMP_ENV_FILE="temp_env.yaml"
-
-# Ensure the temporary file is cleaned up on exit, even if the script fails
-trap 'rm -f "$TEMP_ENV_FILE"' EXIT
-
-# Create a clean temporary file
-> "$TEMP_ENV_FILE"
-
-# List of runtime variables from .env to pass to the Cloud Run instance.
-# CRITICAL: For production, sensitive values should be moved to Google Secret Manager.
-RUNTIME_VARS=(
-  "NODE_ENV"
-  "HOST_EXTERNAL_DOMAIN" "HOST_EXTERNAL_PORT"
-  "ICA_EXTERNAL_DOMAIN" "CA_EXTERNAL_DOMAIN"
-  "DEV_SEED" "SECTORS_ALLOWED"
-  # Preferred host identity keys
-  "HOST_LEGAL_NAME" "HOST_JURISDICTION" "HOST_ID_TYPE" "HOST_ID_VALUE"
-  "HOST_ADMIN_EMAIL" "HOST_ADMIN_UID" "HOST_ADMIN_ROLE" "HOST_TERMS_URL"
-  # Legacy host identity keys (backward compatibility)
-  "ORG_HOST_LEGAL_NAME" "ORG_HOST_JURISDICTION" "ORG_HOST_ID_TYPE" "ORG_HOST_ID_VALUE"
-  "ORG_HOST_ADMIN_EMAIL" "ORG_HOST_ADMIN_UID" "ORG_HOST_ADMIN_ROLE" "ORG_HOST_TERMS_URL"
-  "KEK_SECRET" "QUEUE_PROVIDER" "DB_PROVIDER" "STORAGE_PROVIDER" "FIRESTORE_PROJECT_ID"
-  "GCS_BUCKET_NAME" "FIREBASE_API_KEY"
-)
-
-# Write the variables to the YAML file
-for VAR_NAME in "${RUNTIME_VARS[@]}"; do
-  # Using indirect expansion to get the value of the variable whose name is VAR_NAME
-  VAR_VALUE="${!VAR_NAME}"
-  
-  if [ -n "$VAR_VALUE" ]; then
-    # Write in YAML format: KEY: "VALUE"
-    # The quotes around VAR_VALUE are crucial for handling special characters correctly.
-    echo "$VAR_NAME: \"$VAR_VALUE\"" >> "$TEMP_ENV_FILE"
+confirm_or_exit() {
+  read -p "Are you sure you want to proceed with the deployment? (y/n): " -n 1 -r
+  echo ""
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "🛑 Deployment cancelled by user."
+    exit 1
   fi
-done
+}
 
-# Deploy the image to Cloud Run
-echo "⚙️  Deploying to Cloud Run service: $DEPLOY_SERVICE_NAME in $DEPLOY_REGION"
-gcloud run deploy "$DEPLOY_SERVICE_NAME" \
-  --image="$IMAGE_PATH" \
-  --platform="managed" \
-  --region="$DEPLOY_REGION" \
-  --port="3000" \
-  --env-vars-file="$TEMP_ENV_FILE" \
-  --allow-unauthenticated # WARNING: This makes the service publicly accessible.
+check_prereqs() {
+  echo "⚙️  Checking prerequisites..."
+  if ! docker info >/dev/null 2>&1; then
+    echo "❌ ERROR: Docker is not running."
+    exit 1
+  fi
+  echo "✅ Docker is running."
 
-echo "--- ✅ Deployment Successful ---"
-SERVICE_URL=$(gcloud run services describe "$DEPLOY_SERVICE_NAME" --platform="managed" --region="$DEPLOY_REGION" --format='value(status.url)')
-echo "Service Name: $DEPLOY_SERVICE_NAME"
-echo "Service URL: $SERVICE_URL"
-echo "-----------------------------------"
+  echo "⚙️  Checking for TypeScript errors..."
+  if ! npx tsc --noEmit; then
+    echo "❌ ERROR: TypeScript compilation failed."
+    exit 1
+  fi
+  echo "✅ No TypeScript errors found."
+}
 
-echo ""
-echo "--- 🔍 Performing post-deployment health check ---"
-echo "Waiting 5 seconds for the service to initialize..."
-sleep 5
+build_and_push_image() {
+  local project_id="$1"
+  local region="$2"
+  local image_path="$3"
+  local repo_name="$4"
+  local service_hint="$5"
+  local source_image="${6:-}"
 
-HEALTH_CHECK_URL="${SERVICE_URL}/host/.well-known/did.json"
-echo "Attempting to fetch the host's DID document from: $HEALTH_CHECK_URL"
-echo ""
+  echo "⚙️  Configuring gcloud for project: $project_id"
+  gcloud config set project "$project_id"
 
-# Use curl with -f to fail on server errors (like 404 or 500), -s for silent mode,
-# and -o /dev/null to discard the body. We only care about the status code.
-if curl -s -f -o /dev/null "$HEALTH_CHECK_URL"; then
-  echo "✅ Health check PASSED. The host's DID document was retrieved successfully."
-  echo "Your service is up and running correctly."
-else
-  echo "⚠️  Health check FAILED. Could not retrieve the host's DID document."
-  echo "The service might be running but is not correctly configured or has failed to start."
-  echo "Please check the logs for the service '$DEPLOY_SERVICE_NAME' in the Google Cloud Console."
-fi
+  echo "⚙️  Enabling required services..."
+  gcloud services enable artifactregistry.googleapis.com
 
-echo ""
-echo "You can check the interactive API docs at: ${SERVICE_URL}/api-docs"
-echo "-----------------------------------"
+  if ! gcloud artifacts repositories describe "$repo_name" --location="$region" >/dev/null 2>&1; then
+    echo "⚙️  Creating Artifact Registry repository: $repo_name in $region"
+    gcloud artifacts repositories create "$repo_name" \
+      --repository-format=docker \
+      --location="$region" \
+      --description="Docker repository for $service_hint"
+  else
+    echo "✅ Artifact Registry repository '$repo_name' already exists."
+  fi
+
+  echo "⚙️  Configuring Docker to authenticate with GCP..."
+  gcloud auth configure-docker "${region}-docker.pkg.dev"
+
+  if [[ "${SKIP_BUILD:-false}" == "true" ]]; then
+    local local_image="${source_image:-gwtemplate}"
+    echo "⚙️  SKIP_BUILD=true, reusing local image '$local_image'"
+    if ! docker image inspect "$local_image" >/dev/null 2>&1; then
+      echo "❌ ERROR: local image '$local_image' not found."
+      echo "Build it first, for example with ./docker_build_local.sh"
+      exit 1
+    fi
+    docker tag "$local_image" "$image_path"
+  else
+    echo "⚙️  Building the Docker image: $image_path"
+    if [[ -n "${NPM_TOKEN:-}" ]]; then
+      echo "(NPM_TOKEN found, passing it as a build argument)"
+      docker build --build-arg NPM_TOKEN="$NPM_TOKEN" -t "$image_path" -f "$SCRIPT_DIR/Dockerfile" "$WORKSPACE_ROOT"
+    else
+      echo "(NPM_TOKEN not found, building without it)"
+      docker build -t "$image_path" -f "$SCRIPT_DIR/Dockerfile" "$WORKSPACE_ROOT"
+    fi
+  fi
+
+  echo "⚙️  Pushing the image to Artifact Registry..."
+  docker push "$image_path"
+}
+
+deploy_cloud_run() {
+  local env_name="$1"
+  local env_file=".env.deploy.${env_name}"
+
+  if [[ ! -f "$env_file" ]]; then
+    echo "❌ ERROR: Configuration file for '$env_name' not found."
+    exit 1
+  fi
+
+  set -a
+  source "$env_file"
+  set +a
+
+  if [[ -z "${FIRESTORE_PROJECT_ID:-}" || -z "${DEPLOY_REGION:-}" || -z "${DEPLOY_SERVICE_NAME:-}" || -z "${ARTIFACT_REGISTRY_NAME:-}" ]]; then
+    echo "ERROR: Missing FIRESTORE_PROJECT_ID, DEPLOY_REGION, DEPLOY_SERVICE_NAME, or ARTIFACT_REGISTRY_NAME."
+    exit 1
+  fi
+
+  local repo_name="$ARTIFACT_REGISTRY_NAME"
+  local image_path="${DEPLOY_REGION}-docker.pkg.dev/${FIRESTORE_PROJECT_ID}/${repo_name}/${DEPLOY_SERVICE_NAME}:latest"
+
+  echo "--- 🚀 Preparing for GCP Deployment to '$env_name' ---"
+  echo "  Service Name:       $DEPLOY_SERVICE_NAME"
+  echo "  Project ID:         $FIRESTORE_PROJECT_ID"
+  echo "  Region:             $DEPLOY_REGION"
+  echo "  External Domain:    ${HOST_EXTERNAL_DOMAIN:-}"
+  echo "  External Port:      ${HOST_EXTERNAL_PORT:-}"
+  echo "  Database Provider:  ${DB_PROVIDER:-}"
+  echo "  Queue Provider:     ${QUEUE_PROVIDER:-}"
+  echo "  Storage Provider:   ${STORAGE_PROVIDER:-}"
+  echo "  GCS Bucket Name:    ${GCS_BUCKET_NAME:-}"
+  confirm_or_exit
+
+  check_prereqs
+
+  echo "⚙️  Enabling required Cloud Run services..."
+  gcloud config set project "$FIRESTORE_PROJECT_ID"
+  gcloud services enable run.googleapis.com artifactregistry.googleapis.com
+
+  build_and_push_image "$FIRESTORE_PROJECT_ID" "$DEPLOY_REGION" "$image_path" "$repo_name" "$DEPLOY_SERVICE_NAME"
+
+  echo "⚙️  Preparing runtime environment variables for Cloud Run..."
+  local temp_env_file="temp_env.yaml"
+  trap 'rm -f "$temp_env_file"' EXIT
+  > "$temp_env_file"
+
+  local runtime_vars=(
+    "NODE_ENV"
+    "HOST_EXTERNAL_DOMAIN" "HOST_EXTERNAL_PORT"
+    "ICA_EXTERNAL_DOMAIN" "CA_EXTERNAL_DOMAIN"
+    "DEV_SEED" "SECTORS_ALLOWED"
+    "HOST_LEGAL_NAME" "HOST_JURISDICTION" "HOST_ID_TYPE" "HOST_ID_VALUE"
+    "HOST_ADMIN_EMAIL" "HOST_ADMIN_UID" "HOST_ADMIN_ROLE" "HOST_TERMS_URL"
+    "ORG_HOST_LEGAL_NAME" "ORG_HOST_JURISDICTION" "ORG_HOST_ID_TYPE" "ORG_HOST_ID_VALUE"
+    "ORG_HOST_ADMIN_EMAIL" "ORG_HOST_ADMIN_UID" "ORG_HOST_ADMIN_ROLE" "ORG_HOST_TERMS_URL"
+    "KEK_SECRET" "QUEUE_PROVIDER" "DB_PROVIDER" "STORAGE_PROVIDER" "FIRESTORE_PROJECT_ID"
+    "GCS_BUCKET_NAME" "FIREBASE_API_KEY"
+  )
+
+  local var_name
+  for var_name in "${runtime_vars[@]}"; do
+    local var_value="${!var_name:-}"
+    if [[ -n "$var_value" ]]; then
+      echo "$var_name: \"$var_value\"" >> "$temp_env_file"
+    fi
+  done
+
+  echo "⚙️  Deploying to Cloud Run service: $DEPLOY_SERVICE_NAME in $DEPLOY_REGION"
+  gcloud run deploy "$DEPLOY_SERVICE_NAME" \
+    --image="$image_path" \
+    --platform="managed" \
+    --region="$DEPLOY_REGION" \
+    --port="3000" \
+    --env-vars-file="$temp_env_file" \
+    --allow-unauthenticated
+
+  local service_url
+  service_url="$(gcloud run services describe "$DEPLOY_SERVICE_NAME" --platform="managed" --region="$DEPLOY_REGION" --format='value(status.url)')"
+  echo "--- ✅ Deployment Successful ---"
+  echo "Service Name: $DEPLOY_SERVICE_NAME"
+  echo "Service URL: $service_url"
+  echo "You can check the interactive API docs at: ${service_url}/api-docs"
+}
+
+deploy_gke_demo() {
+  local config_file="${1:-demo-deploy.config}"
+  if [[ ! -f "$config_file" ]]; then
+    echo "❌ ERROR: GKE demo config file not found: $config_file"
+    echo "Create it from demo-deploy.config.example first."
+    exit 1
+  fi
+
+  set -a
+  source "$config_file"
+  set +a
+
+  local required_vars=(
+    GCP_PROJECT_ID GCP_REGION GKE_CLUSTER
+    K8S_NAMESPACE_GDC GDC_IMAGE GDC_PUBLIC_URL GDC_STATIC_IP_NAME GDC_GSA_EMAIL
+  )
+  local var_name
+  for var_name in "${required_vars[@]}"; do
+    if [[ -z "${!var_name:-}" ]]; then
+      echo "ERROR: Missing required variable in $config_file: $var_name"
+      exit 1
+    fi
+  done
+
+  local image_host_and_project remainder repo_name
+  image_host_and_project="${GDC_IMAGE#*/}"
+  remainder="${image_host_and_project#*/}"
+  repo_name="${remainder%%/*}"
+
+  echo "--- 🚀 Preparing for GKE demo deployment ---"
+  echo "  Project ID:         $GCP_PROJECT_ID"
+  echo "  Region:             $GCP_REGION"
+  echo "  Cluster:            $GKE_CLUSTER"
+  echo "  Namespace:          $K8S_NAMESPACE_GDC"
+  echo "  Image:              $GDC_IMAGE"
+  echo "  Public URL:         $GDC_PUBLIC_URL"
+  echo "  Static IP Name:     $GDC_STATIC_IP_NAME"
+  echo "  Runtime Providers:  DB=${DB_PROVIDER:-} STORAGE=${STORAGE_PROVIDER:-} QUEUE=${QUEUE_PROVIDER:-}"
+  confirm_or_exit
+
+  check_prereqs
+
+  echo "⚙️  Configuring gcloud for project: $GCP_PROJECT_ID"
+  gcloud config set project "$GCP_PROJECT_ID"
+  echo "⚙️  Enabling required GKE services..."
+  gcloud services enable container.googleapis.com artifactregistry.googleapis.com
+
+  build_and_push_image "$GCP_PROJECT_ID" "$GCP_REGION" "$GDC_IMAGE" "$repo_name" "gwtemplate-gke-demo" "${LOCAL_IMAGE_NAME:-gwtemplate}"
+
+  echo "⚙️  Fetching GKE credentials for cluster: $GKE_CLUSTER"
+  gcloud container clusters get-credentials "$GKE_CLUSTER" --region "$GCP_REGION"
+
+  echo "⚙️  Applying GW GKE manifests..."
+  bash "$SCRIPT_DIR/fabric-multicloud/scripts/05-k8s-deploy-gdc.sh"
+
+  echo "--- ✅ GKE demo deployment submitted ---"
+  echo "Public URL: $GDC_PUBLIC_URL"
+  echo "Once the LoadBalancer service is ready, test:"
+  echo "  ${GDC_PUBLIC_URL}/host/.well-known/ping"
+  echo "  ${GDC_PUBLIC_URL}/api-docs"
+}
+
+main() {
+  if [[ $# -lt 1 ]]; then
+    usage
+    exit 1
+  fi
+
+  local mode="$1"
+  shift || true
+
+  case "$mode" in
+    gke-demo)
+      deploy_gke_demo "${1:-demo-deploy.config}"
+      ;;
+    *)
+      deploy_cloud_run "$mode"
+      ;;
+  esac
+}
+
+main "$@"

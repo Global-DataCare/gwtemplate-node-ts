@@ -100,6 +100,7 @@ build
 
 # Local deploy config / secrets (never commit)
 private-deploy.config
+demo-deploy.config
 secrets/
 *.secrets
 

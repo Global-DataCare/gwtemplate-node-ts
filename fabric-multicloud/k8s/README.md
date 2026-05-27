@@ -8,7 +8,28 @@ Typical flow:
 1) Create namespaces (`test-fabric-v3`, `prod-fabric-v3`, `test-gdc-v1`, `prod-gdc-v1`).
 2) Create secrets for MSP and TLS material.
 3) Deploy Fabric CA, orderer, peers, and optional CouchDB.
-4) Deploy gdc host/connector separately in `*-gdc-v1`.
+4) Deploy GW host/connector separately in `*-gdc-v1`.
+5) If you also run `dataspace-ica-ts`, keep it separate from both Fabric and GW even if it shares the same GCP project.
+
+## GW host/connector on GKE
+
+The GW deployment skeleton now lives under `fabric-multicloud/k8s/gdc/`.
+
+It assumes:
+- separate namespace such as `test-gdc-v1`
+- separate secret/config from Fabric
+- `ICA_URL_EXTERNAL` is optional and points to a public `dataspace-ica-ts` endpoint only if that integration is enabled
+- Workload Identity or equivalent GCP auth for Firestore/GCS
+- reserved static IP + `LoadBalancer` Service for the current IP-only demo path
+
+Apply it with:
+
+```bash
+source demo-deploy.config
+bash fabric-multicloud/scripts/05-k8s-deploy-gdc.sh
+```
+
+Before applying, create `gwtemplate-secret` from the template in `fabric-multicloud/k8s/gdc/secret.template.yaml`.
 
 ## Fabric v3.1.3 channel artifacts (local toolchain)
 

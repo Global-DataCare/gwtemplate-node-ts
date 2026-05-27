@@ -1,30 +1,44 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-# -d: Run the container in detached mode (in the background)
-# --env-file ./.env.local: Load environment variables from the local env file
-# -p 8080:3000: Map port 8080 on the host to port 3000 in the container
-# --name gwtemplate: Give the running container a convenient name
-EXISTING_CONTAINER_ID="$(docker ps -aq -f name=^/gwtemplate$)"
-RUNNING_CONTAINER_ID="$(docker ps -q -f name=^/gwtemplate$)"
+HOST_PORT="${HOST_PORT:-8080}"
+ENV_FILE="${ENV_FILE:-./.env.local}"
+CONTAINER_NAME="${CONTAINER_NAME:-gwtemplate}"
+IMAGE_NAME="${IMAGE_NAME:-gwtemplate}"
+FORCE_RECREATE="${FORCE_RECREATE:-false}"
 
-if [ -n "$RUNNING_CONTAINER_ID" ]; then
-  read -p "Container 'gwtemplate' is running. Stop and remove it? (y/n): " -n 1 -r
-  echo ""
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Aborting."
-    exit 1
+confirm_or_force() {
+  local message="$1"
+  if [[ "$FORCE_RECREATE" == "true" ]]; then
+    return 0
   fi
-  docker stop gwtemplate
-  docker rm gwtemplate
-elif [ -n "$EXISTING_CONTAINER_ID" ]; then
-  read -p "Container 'gwtemplate' exists (stopped). Remove it? (y/n): " -n 1 -r
-  echo ""
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Aborting."
-    exit 1
+
+  if [[ ! -t 0 ]]; then
+    echo "Aborting: $message Set FORCE_RECREATE=true for non-interactive runs."
+    return 1
   fi
-  docker rm gwtemplate
+
+  read -p "$message (y/n): " -n 1 -r
+  echo ""
+  [[ $REPLY =~ ^[Yy]$ ]]
+}
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "ERROR: env file not found: $ENV_FILE"
+  exit 1
 fi
 
-docker run -d --env-file ./.env.local -p 8080:3000 --name gwtemplate gwtemplate
+EXISTING_CONTAINER_ID="$(docker ps -aq -f name=^/${CONTAINER_NAME}$)"
+RUNNING_CONTAINER_ID="$(docker ps -q -f name=^/${CONTAINER_NAME}$)"
+
+if [ -n "$RUNNING_CONTAINER_ID" ]; then
+  confirm_or_force "Container '${CONTAINER_NAME}' is running. Stop and remove it?" || exit 1
+  docker stop "$CONTAINER_NAME"
+  docker rm "$CONTAINER_NAME"
+elif [ -n "$EXISTING_CONTAINER_ID" ]; then
+  confirm_or_force "Container '${CONTAINER_NAME}' exists (stopped). Remove it?" || exit 1
+  docker rm "$CONTAINER_NAME"
+fi
+
+docker run -d --env-file "$ENV_FILE" -p "${HOST_PORT}:3000" --name "$CONTAINER_NAME" "$IMAGE_NAME"
+echo "Container '${CONTAINER_NAME}' listening on http://localhost:${HOST_PORT}"
