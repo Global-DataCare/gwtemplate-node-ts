@@ -15,7 +15,7 @@ import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import { createApiRouter } from '../../routes/api';
 import { QueueAdapter } from '../../adapters/queue';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
-import { testClaimsHostInitialization } from '../data/end-to-end.data';
+import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../data/end-to-end.data';
 import { testEncryptedJwe1 } from '../data/async-response.data';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { mockKmsService } from '../mocks/kms.mock';
@@ -36,6 +36,7 @@ import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { JWK } from 'gdc-common-utils-ts/models/jwk';
 import { HostingManager } from '../../managers/HostingManager';
 import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 
 type InMemoryResponse = {
   status: number;
@@ -190,8 +191,17 @@ describe('Organization Registration API', () => {
   } as MlkemPublicJwk;
 
   let hostingManager: HostingManager;
+  const originalSecurityMode = process.env.SECURITY_MODE;
+  const originalDidcommPlain = process.env.DIDCOMM_PLAIN;
+  const originalJsonLegacy = process.env.JSON_LEGACY;
+  const originalDemoAllowInsecureBearer = process.env.DEMO_ALLOW_INSECURE_BEARER;
 
   beforeAll(async () => {
+    process.env.SECURITY_MODE = 'demo';
+    process.env.DIDCOMM_PLAIN = 'true';
+    process.env.JSON_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+
     const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
     vaultRepository = new VaultMemRepository();
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
@@ -274,8 +284,196 @@ describe('Organization Registration API', () => {
     await tenantsCacheManager.loadHost();
   });
 
+  async function activateTenantDirectly(): Promise<{ tenantId: string; sector: string }> {
+    const vpTokenCompact = [
+      Buffer.from(JSON.stringify({ alg: 'ML-DSA-44', typ: 'JWT' })).toString('base64url'),
+      Buffer.from(JSON.stringify({
+        sub: 'did:web:controller.example.com',
+        vp: { verifiableCredential: [] },
+      })).toString('base64url'),
+      'mock-signature',
+    ].join('.');
+
+    const job: JobRequest = {
+      id: uuidv4(),
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId: 'host',
+      jurisdiction: 'es',
+      sector: 'test' as Sector,
+      section: 'registry',
+      format: 'org.schema',
+      action: '_activate',
+      resourceType: 'Organization',
+      content: {
+        iss: 'did:web:controller.example.com',
+        aud: 'did:web:host.example.com',
+        thid: 'activation-thid',
+        jti: 'activation-jti',
+        type: 'json',
+        body: {
+          vp_token: vpTokenCompact,
+          organizationCredential: {
+            '@context': ['https://www.w3.org/2018/credentials/v1'],
+            type: ['VerifiableCredential'],
+            credentialSubject: { id: 'did:web:api.acme.org' },
+          },
+          representativeCredential: {
+            '@context': ['https://www.w3.org/2018/credentials/v1'],
+            type: ['VerifiableCredential'],
+            credentialSubject: {
+              id: 'did:web:controller.example.com',
+              hasOccupation: { identifier: { value: 'RESPRSN' } },
+              hasCredential: { material: 'controller-sig-kid' },
+            },
+          },
+          data: [
+            {
+              type: 'Organization-activation-request-v1.0',
+              meta: { claims: { ...testClaimsTenant1Registration } },
+              request: { method: 'POST' },
+              resource: {},
+            },
+          ],
+        },
+        meta: {
+          jws: { protected: { alg: 'ML-DSA-44', kid: 'controller-sig-kid', jwk: { kty: 'AKP', alg: 'ML-DSA-44', pub: 'controller-sig-pub' } } },
+          jwe: { header: { enc: 'A256GCM', skid: 'controller-enc-kid', jwk: { kty: 'OKP', crv: 'ML-KEM-768', x: 'controller-enc-x' } } },
+        } as any,
+      } as any,
+      httpMethod: 'POST',
+      requestUrl: '/host/cds-es/v1/test/registry/org.schema/Organization/_activate',
+    };
+
+    const response = await hostingManager.process(job);
+    expect(response.body.data[0].response.status).toBe('201');
+    return {
+      tenantId: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.alternateName]),
+      sector: String(testClaimsTenant1Registration[ClaimsServiceSchemaorg.category]),
+    };
+  }
+
   afterAll(async () => {
+    process.env.SECURITY_MODE = originalSecurityMode;
+    process.env.DIDCOMM_PLAIN = originalDidcommPlain;
+    process.env.JSON_LEGACY = originalJsonLegacy;
+    process.env.DEMO_ALLOW_INSECURE_BEARER = originalDemoAllowInsecureBearer;
     jest.clearAllMocks();
+  });
+
+  describe('tenant lifecycle authorization gating', () => {
+    it('should block tenant onboarding flows while disabled and allow them again after enable', async () => {
+      const tenant = await activateTenantDirectly();
+
+      const disablePayload = {
+        thid: 'disable-thid',
+        body: {
+          data: [
+            {
+              type: 'Organization-disable-request-v1.0',
+              meta: {
+                claims: {
+                  [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
+                },
+              },
+            },
+          ],
+        },
+      };
+
+      const disableResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: '/host/cds-es/v1/test/registry/org.schema/Organization/_disable',
+        headers: {
+          'Content-Type': 'application/json',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+        },
+        body: disablePayload,
+      });
+      expect(disableResponse.status).toBe(202);
+      const disableJob = (mockQueueAdapter.addJob as jest.Mock).mock.calls[0][1] as JobRequest;
+      await hostingManager.process(disableJob);
+
+      const employeeUrl = `/${tenant.tenantId}/cds-es/v1/${tenant.sector}/entity/org.schema/Employee/_batch`;
+      const employeePayload = {
+        thid: 'employee-thid-1',
+        body: {
+          data: [
+            {
+              type: 'Employee-registration-request-v1.0',
+              meta: {
+                claims: {
+                  'Organization.owner.email': 'doctor@example.com',
+                  'Organization.owner.hasOccupation.identifier.value': 'RESPRSN',
+                },
+              },
+              request: { method: 'POST' },
+              resource: {},
+            },
+          ],
+        },
+      };
+
+      const blockedResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: employeeUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+        },
+        body: employeePayload,
+      });
+      expect(blockedResponse.status).toBe(403);
+      expect(blockedResponse.text).toContain('suspended');
+      expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
+
+      const enableResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: '/host/cds-es/v1/test/registry/org.schema/Organization/_enable',
+        headers: {
+          'Content-Type': 'application/json',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+        },
+        body: {
+          thid: 'enable-thid',
+          body: {
+            data: [
+              {
+                type: 'Organization-enable-request-v1.0',
+                meta: {
+                  claims: {
+                    [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(enableResponse.status).toBe(202);
+      const enableJob = (mockQueueAdapter.addJob as jest.Mock).mock.calls[1][1] as JobRequest;
+      await hostingManager.process(enableJob);
+
+      const allowedResponse = await invokeExpress(app, {
+        method: 'POST',
+        url: employeeUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+        },
+        body: {
+          ...employeePayload,
+          thid: 'employee-thid-2',
+        },
+      });
+      expect(allowedResponse.status).toBe(202);
+      expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(3);
+    });
   });
 
   describe('POST /host/.../_batch (Job Submission)', () => {

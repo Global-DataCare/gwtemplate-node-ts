@@ -291,4 +291,94 @@ describe('EmployeeManager', () => {
       expect(response.body.data[0].response.status).toBe('200');
     });
   });
+
+  describe('Employee Purge', () => {
+    it('should reject purge unless the employee is already inactive', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      job.action = '_purge';
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      const existingEmployee: EntityConfig = {
+        id: 'employee-to-purge',
+        type: EntityType.Person,
+        status: EntityLifecycleStatus.Active,
+        claims: testClaimsTenant1Receptionist1,
+        meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+      };
+      const existingSecureDoc: ConfidentialStorageDoc = {
+        id: existingEmployee.id,
+        status: existingEmployee.status,
+        sequence: 1,
+        content: existingEmployee,
+      };
+
+      mockVaultRepository.get.mockResolvedValue(existingSecureDoc);
+
+      const response = await employeeManager.process(job);
+      const entry = response.body.data[0] as any;
+      expect(entry.response.status).toBe('409');
+      expect(entry.response.outcome.issue[0].diagnostics).toContain('disabled before purge');
+    });
+
+    it('should keep the employee record and release associated licenses on purge', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      job.action = '_purge';
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      const existingEmployee: EntityConfig = {
+        id: 'employee-to-purge',
+        type: EntityType.Person,
+        status: EntityLifecycleStatus.Inactive,
+        claims: testClaimsTenant1Receptionist1,
+        meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+      };
+      const existingSecureDoc: ConfidentialStorageDoc = {
+        id: existingEmployee.id,
+        status: existingEmployee.status,
+        sequence: 1,
+        content: existingEmployee,
+      };
+      const activeLicense: DeviceLicense = {
+        id: 'license-1',
+        tenantId: TENANT_ALTERNATE_NAME,
+        orderId: 'order-1',
+        userClass: 'employee',
+        userCategory: 'default',
+        type: 'mobile',
+        status: 'active',
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        subjectId: 'employee-to-purge',
+        activationCode: 'lic-123',
+        issuedToEmail: String(testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email]),
+        issuedToRole: 'ISCO-08|4226',
+      } as any;
+      const licenseDoc: ConfidentialStorageDoc = {
+        id: activeLicense.id,
+        status: activeLicense.status,
+        sequence: 2,
+        content: activeLicense,
+      };
+
+      mockVaultRepository.get.mockResolvedValue(existingSecureDoc);
+      mockVaultRepository.getContainersInSection.mockResolvedValue([licenseDoc]);
+      mockVaultRepository.put.mockResolvedValue(true);
+
+      const response = await employeeManager.process(job);
+
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(2);
+      const updatedLicenseDocs = mockVaultRepository.put.mock.calls[0][1] as ConfidentialStorageDoc[];
+      expect(updatedLicenseDocs[0].status).toBe('available');
+      expect((updatedLicenseDocs[0].content as any).activationCode).toBeUndefined();
+      expect((updatedLicenseDocs[0].content as any).subjectId).toBeUndefined();
+
+      const protectedEmployeeDocInput = mockKmsService.protectConfidentialData.mock.calls.at(-1)?.[0] as ConfidentialStorageDoc;
+      expect((protectedEmployeeDocInput.content as any).meta.licensingPurgedAt).toBeDefined();
+      const updatedEmployeeDocs = mockVaultRepository.put.mock.calls[1][1] as ConfidentialStorageDoc[];
+      expect(updatedEmployeeDocs[0].status).toBe(EntityLifecycleStatus.Inactive);
+      expect(response.body.data[0].response.status).toBe('200');
+    });
+  });
 });

@@ -20,6 +20,15 @@ import { IssueLevel } from 'gdc-common-utils-ts/models/issue';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { getEnvSectionId } from '../utils/section-env';
 import { getPersonOccupationClaim } from '../utils/occupation';
+import {
+  LICENSE_CATEGORY_INDIVIDUAL,
+  LICENSE_CATEGORY_PROFESSIONAL,
+  LICENSE_STATUS_AVAILABLE,
+  LICENSE_TYPE_MOBILE,
+  LICENSE_TYPE_WEB,
+  LICENSE_USER_CLASS_EMPLOYEE,
+  LICENSE_USER_CLASS_INDIVIDUAL,
+} from '../constants/domain';
 
 /**
  * Manages the business logic for creating device activation licenses.
@@ -71,13 +80,19 @@ export class LicenseManager implements IJobProcessor {
     if (!quantity || typeof quantity !== 'number' || quantity <= 0) {
       throw new ManagerError('License quantity must be a positive number.', IssueType.Value);
     }
-    if (!userClass || (userClass !== 'employee' && userClass !== 'individual')) {
-      throw new ManagerError("userClass must be either 'employee' or 'individual'.", IssueType.Value);
+    if (!userClass || (userClass !== LICENSE_USER_CLASS_EMPLOYEE && userClass !== LICENSE_USER_CLASS_INDIVIDUAL)) {
+      throw new ManagerError(
+        `userClass must be either '${LICENSE_USER_CLASS_EMPLOYEE}' or '${LICENSE_USER_CLASS_INDIVIDUAL}'.`,
+        IssueType.Value,
+      );
     }
-    if (!type || (type !== 'mobile' && type !== 'web')) {
-      throw new ManagerError("type must be either 'mobile' or 'web'.", IssueType.Value);
+    if (!type || (type !== LICENSE_TYPE_MOBILE && type !== LICENSE_TYPE_WEB)) {
+      throw new ManagerError(
+        `type must be either '${LICENSE_TYPE_MOBILE}' or '${LICENSE_TYPE_WEB}'.`,
+        IssueType.Value,
+      );
     }
-    if (userClass === 'employee' && (typeof userCategory !== 'string' || !userCategory)) {
+    if (userClass === LICENSE_USER_CLASS_EMPLOYEE && (typeof userCategory !== 'string' || !userCategory)) {
       throw new ManagerError("A non-empty 'userCategory' is required for employee licenses.", IssueType.Value);
     }
 
@@ -98,9 +113,9 @@ export class LicenseManager implements IJobProcessor {
         tenantId: targetTenantId,
         orderId: orderId,
         userClass: userClass,
-        userCategory: userClass === 'employee' ? userCategory : undefined,
+        userCategory: userClass === LICENSE_USER_CLASS_EMPLOYEE ? userCategory : undefined,
         type: type,
-        status: 'available',
+        status: LICENSE_STATUS_AVAILABLE,
         plan: plan || 'default',
         renewalCycle: renewalCycle || null,
         reactivationEnabled: reactivationEnabled === true, // Default to false
@@ -141,7 +156,7 @@ export class LicenseManager implements IJobProcessor {
             issue: [{
               severity: 'information',
               code: 'informational',
-              diagnostics: `${quantity} licenses of class '${userClass}'${userClass === 'employee' ? ` and category '${userCategory}'` : ''} of type '${type}' created successfully for tenant '${targetTenantId}'.`,
+              diagnostics: `${quantity} licenses of class '${userClass}'${userClass === LICENSE_USER_CLASS_EMPLOYEE ? ` and category '${userCategory}'` : ''} of type '${type}' created successfully for tenant '${targetTenantId}'.`,
             }]
           }
         }]
@@ -185,14 +200,18 @@ export class LicenseManager implements IJobProcessor {
         const category =
           getClaimValue<string>(claims, 'org.schema.IndividualProduct.category') ||
           getClaimValue<string>(claims, 'License.userClass') ||
-          'professional';
+          LICENSE_CATEGORY_PROFESSIONAL;
         const licenseUserClass =
-          category === 'individual' ? 'individual' : category === 'professional' ? 'employee' : 'employee';
+          category === LICENSE_CATEGORY_INDIVIDUAL
+            ? LICENSE_USER_CLASS_INDIVIDUAL
+            : category === LICENSE_CATEGORY_PROFESSIONAL
+              ? LICENSE_USER_CLASS_EMPLOYEE
+              : LICENSE_USER_CLASS_EMPLOYEE;
 
         const licenseType =
           getClaimValue<string>(claims, 'org.schema.IndividualProduct.additionalType') ||
           getClaimValue<string>(claims, 'License.type') ||
-          'mobile';
+          LICENSE_TYPE_MOBILE;
         const inviteEmail =
           getClaimValue<string>(claims, 'org.schema.Person.email') ||
           getClaimValue<string>(claims, 'License.email');
@@ -214,7 +233,11 @@ export class LicenseManager implements IJobProcessor {
         });
 
         const issuedCategory =
-          licenseUserClass === 'individual' ? 'individual' : licenseUserClass === 'employee' ? 'professional' : 'device';
+          licenseUserClass === LICENSE_USER_CLASS_INDIVIDUAL
+            ? LICENSE_CATEGORY_INDIVIDUAL
+            : licenseUserClass === LICENSE_USER_CLASS_EMPLOYEE
+              ? LICENSE_CATEGORY_PROFESSIONAL
+              : 'device';
         const responseClaims = {
           ...(rawClaims as any),
           'org.schema.IndividualProduct.serialNumber': activationCode,

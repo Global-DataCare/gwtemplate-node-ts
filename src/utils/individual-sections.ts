@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { getEnvSectionId } from './section-env';
+import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 
 /**
  * Builds a Firestore/SQL-safe section id for storing per-individual data inside a tenant vault.
@@ -10,10 +11,12 @@ import { getEnvSectionId } from './section-env';
  * - We want stable, deterministic section ids without leaking the full subject identifier.
  */
 export function getIndividualSectionId(subjectDid: string, section: string): string {
-  return getSubjectScopedSectionId(subjectDid, 'individual', section);
+  return getSubjectScopedSectionId(subjectDid, SUBJECT_SECTION_INDIVIDUAL, section);
 }
 
-export type SubjectSectionScope = 'individual' | 'digitaltwin';
+export type SubjectSectionScope =
+  | typeof SUBJECT_SECTION_INDIVIDUAL
+  | typeof SUBJECT_SECTION_DIGITAL_TWIN;
 
 export function getSubjectScopedSectionId(subjectDid: string, scope: SubjectSectionScope, section: string): string {
   const normalized = (subjectDid || '').trim();
@@ -38,5 +41,5 @@ export function getIndividualDictionarySectionId(subjectDid: string): string {
   const normalized = (subjectDid || '').trim();
   if (!normalized) throw new Error('subjectDid is required');
   const subjectHash = createHash('sha256').update(normalized, 'utf8').digest('hex');
-  return getEnvSectionId(`individual_dictionary_${subjectHash}`);
+  return getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_dictionary_${subjectHash}`);
 }

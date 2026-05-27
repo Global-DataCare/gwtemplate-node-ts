@@ -8,6 +8,7 @@ import { IAccessTokenClaims } from 'gdc-common-utils-ts/models/auth';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { validOrNewUuidv4 } from '../../../utils/uuid';
+import { SUBJECT_SECTION_INDIVIDUAL } from '../../../constants/domain';
 import { v4 as uuidv4 } from 'uuid';
 import { sendDidcommEarlyError } from '../../../utils/didcomm-error-response';
 
@@ -58,7 +59,7 @@ export class FhirController {
       sequence: 0,
       status: 'DRAFT' as any,
       createdAtTimestamp: Date.now(),
-      section: 'individual',
+      section: SUBJECT_SECTION_INDIVIDUAL,
       format: 'org.hl7.fhir.r4',
       action: 'create',
       resourceType: 'Communication',

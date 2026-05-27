@@ -20,6 +20,7 @@ import {
 } from '../utils/fhir-ingestion';
 import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
+import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -61,11 +62,12 @@ export class ObservationManager implements IJobProcessor {
     if (!jurisdiction || !normalizedSection || !normalizedFormatRaw || !normalizedAction) {
       throw new ManagerError('Missing jurisdiction, section, format, or action.', IssueType.Required);
     }
-    if (normalizedSection !== 'individual' && normalizedSection !== 'digitaltwin') {
+    if (normalizedSection !== SUBJECT_SECTION_INDIVIDUAL && normalizedSection !== SUBJECT_SECTION_DIGITAL_TWIN) {
       throw new ManagerError(`Unsupported section '${normalizedSection}'.`, IssueType.NotSupported);
     }
     const normalizedFormat = normalizeFhirIngestionFormat(normalizedFormatRaw);
-    const scope: SubjectSectionScope = normalizedSection === 'digitaltwin' ? 'digitaltwin' : 'individual';
+    const scope: SubjectSectionScope =
+      normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN ? SUBJECT_SECTION_DIGITAL_TWIN : SUBJECT_SECTION_INDIVIDUAL;
 
     const bundle = (job.content?.body || {}) as any;
 

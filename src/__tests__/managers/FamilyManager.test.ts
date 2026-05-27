@@ -10,6 +10,7 @@ import { tmpdir } from 'os';
 import path from 'path';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { BundleJsonApi, BundleEntry } from 'gdc-common-utils-ts/models/bundle';
+import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { PDFDocument } from 'pdf-lib';
 import {
   ClaimsOrganizationSchemaorg,
@@ -142,6 +143,78 @@ function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest
       body: {
         data: [{
           type: 'Family-search-v1.0',
+          meta: {
+            claims: {
+              [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
+              [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent@example.com',
+              [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+              [ClaimsServiceSchemaorg.category]: SECTOR,
+              ...overrideClaims,
+            },
+          },
+        }],
+      },
+    },
+  };
+}
+
+function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
+  return {
+    id: randomUUID(),
+    status: JobStatus.DRAFT,
+    sequence: 0,
+    createdAtTimestamp: Date.now(),
+    tenantId: TENANT_ID,
+    sector: SECTOR,
+    section: 'individual',
+    format: 'org.schema',
+    action: '_purge',
+    resourceType: 'Organization',
+    content: {
+      jti: randomUUID(),
+      thid: randomUUID(),
+      iss: 'did:web:client.example.com',
+      aud: `did:web:${TENANT_ID}.example.com`,
+      type: 'application/api+json',
+      body: {
+        data: [{
+          type: 'Family-purge-request-v1.0',
+          meta: {
+            claims: {
+              [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
+              [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent@example.com',
+              [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+              [ClaimsServiceSchemaorg.category]: SECTOR,
+              ...overrideClaims,
+            },
+          },
+        }],
+      },
+    },
+  };
+}
+
+function makeDisableJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
+  return {
+    id: randomUUID(),
+    status: JobStatus.DRAFT,
+    sequence: 0,
+    createdAtTimestamp: Date.now(),
+    tenantId: TENANT_ID,
+    sector: SECTOR,
+    section: 'individual',
+    format: 'org.schema',
+    action: '_disable',
+    resourceType: 'Organization',
+    content: {
+      jti: randomUUID(),
+      thid: randomUUID(),
+      iss: 'did:web:client.example.com',
+      aud: `did:web:${TENANT_ID}.example.com`,
+      type: 'application/api+json',
+      body: {
+        data: [{
+          type: 'Family-disable-request-v1.0',
           meta: {
             claims: {
               [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
@@ -555,6 +628,86 @@ describe('FamilyManager', () => {
       const entry = body.data[0] as BundleEntry;
 
       expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('resume_required');
+    });
+  });
+
+  describe('_purge / processFamilyPurgeEntry', () => {
+    it('disabled: marks the family registration inactive without touching licenses', async () => {
+      const existingContent = {
+        status: EntityLifecycleStatus.Active,
+        claims: { ...BASE_CLAIMS },
+        contained: [],
+      };
+      mockVaultRepository.query.mockResolvedValue([{ id: 'family-doc-1', status: 'active', sequence: 1, jwe: { ciphertext: '' } } as any]);
+      mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
+      mockVaultRepository.put.mockResolvedValue(true);
+
+      const response = await manager.process(makeDisableJob());
+      const body = response.body as BundleJsonApi;
+      const entry = body.data[0] as BundleEntry;
+
+      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('disabled');
+      expect(entry.response?.status).toBe('200');
+      const updatedDocs = mockVaultRepository.put.mock.calls[0][1] as ConfidentialStorageDoc[];
+      expect(updatedDocs[0].status).toBe(EntityLifecycleStatus.Inactive);
+    });
+
+    it('purged: keeps the family record and releases associated licenses only after disable', async () => {
+      const existingContent = {
+        status: EntityLifecycleStatus.Inactive,
+        claims: {
+          ...BASE_CLAIMS,
+          'org.schema.IndividualProduct.serialNumber': 'lic-123',
+        },
+        contained: [],
+      };
+      const licenseDoc: ConfidentialStorageDoc = {
+        id: 'license-1',
+        status: 'issued',
+        sequence: 2,
+        content: {
+          id: 'license-1',
+          userClass: 'individual',
+          status: 'issued',
+          activationCode: 'lic-123',
+          issuedToEmail: 'child@example.com',
+        } as any,
+      };
+
+      mockVaultRepository.query.mockResolvedValue([{ id: 'family-doc-1', status: 'inactive', sequence: 1, jwe: { ciphertext: '' } } as any]);
+      mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
+      mockVaultRepository.getContainersInSection.mockResolvedValue([licenseDoc]);
+      mockVaultRepository.put.mockResolvedValue(true);
+
+      const response = await manager.process(makePurgeJob());
+      const body = response.body as BundleJsonApi;
+      const entry = body.data[0] as BundleEntry;
+
+      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('purged');
+      expect(entry.response?.status).toBe('200');
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(2);
+      const updatedLicenseDocs = mockVaultRepository.put.mock.calls[0][1] as ConfidentialStorageDoc[];
+      expect(updatedLicenseDocs[0].status).toBe('available');
+      expect((updatedLicenseDocs[0].content as any).activationCode).toBeUndefined();
+      const updatedFamilyDocs = mockVaultRepository.put.mock.calls[1][1] as ConfidentialStorageDoc[];
+      expect(updatedFamilyDocs[0].status).toBe(EntityLifecycleStatus.Inactive);
+    });
+
+    it('returns 409 when family registration is still active during purge', async () => {
+      const existingContent = {
+        status: EntityLifecycleStatus.Active,
+        claims: { ...BASE_CLAIMS },
+        contained: [],
+      };
+      mockVaultRepository.query.mockResolvedValue([{ id: 'family-doc-1', status: 'active', sequence: 1, jwe: { ciphertext: '' } } as any]);
+      mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
+
+      const response = await manager.process(makePurgeJob());
+      const body = response.body as BundleJsonApi;
+      const entry = body.data[0] as BundleEntry;
+
+      expect(entry.response?.status).toBe('409');
+      expect(mockVaultRepository.put).not.toHaveBeenCalled();
     });
   });
 });

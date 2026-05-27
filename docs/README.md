@@ -36,6 +36,8 @@ docs/
 - **Core integration bible**: [API_CORE_INTEGRATION.md](API_CORE_INTEGRATION.md) defines the canonical SEDIA-aligned flow used by SDK live core tests.
 - **Consent access status**: [90.E-TODO_SMART_EHR_COMPAT.md](90.E-TODO_SMART_EHR_COMPAT.md) also records the current live SMART consent-evaluation behavior, including deny precedence and permission-request lookup identifiers.
 - **Tenant identifier migration note**: [90.K-TODO_TENANT_IDENTIFIER_V2.md](90.K-TODO_TENANT_IDENTIFIER_V2.md) tracks the deferred `v2.0` redesign away from `alternateName`-based hosted compatibility.
+- **GW lifecycle 101**: [01.I-LIFECYCLE-101.md](01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md) explains the local GW CORE lifecycle model, including `status`, `audit`, and `/_purge`.
+- **GW lifecycle current vs target**: [90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md) separates what is already implemented from the target normalized `PATCH`-based contract for SDK alignment.
 - **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
   - `artifacts/openapi-profiles/openapi-core.json`
@@ -85,6 +87,7 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 *   **[01.F-TENANCY-AND-VAULT.md](01-OVERVIEW-AND-GUIDES/01.F-TENANCY-AND-VAULT.md)**: Explains the multi-tenancy model and the concept of a secure "Vault" for each tenant.
 *   **[01.G-TESTING-PATTERNS.md](01-OVERVIEW-AND-GUIDES/01.G-TESTING-PATTERNS.md)**: Outlines the project's testing philosophy and strategies.
 *   **[01.H-DEPLOYMENT-GUIDE.md](01-OVERVIEW-AND-GUIDES/01.H-DEPLOYMENT-GUIDE.md)**: Step-by-step instructions for deploying the application to Google Cloud Run.
+*   **[01.I-LIFECYCLE-101.md](01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md)**: Local lifecycle semantics for GW CORE, including `status` vs `audit`, `PATCH` target semantics, and `/_purge`.
 
 ### 📂 02-API-AND-ENDPOINTS
 *   **[02.A-API-ENDPOINTS.md](02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md)**: A summary of the primary API endpoints available.
@@ -118,5 +121,6 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 *   Core use cases only. Legacy/extension use-case docs were moved to transitional `90.*` files.
 
 ### 📂 Transitional Scenarios (Not Core Baseline)
+*   **[90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md)**: Transitional mapping between current GW lifecycle endpoints and the target normalized contract for SDK/shared-package alignment.
 *   **[90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md](90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md)**: Legacy appointment-notification narrative (not part of current core baseline).
 *   **[90.O-END_TO_END_LEGACY_FLOW.md](90.O-END_TO_END_LEGACY_FLOW.md)**: Legacy end-to-end flow reference (transitional).

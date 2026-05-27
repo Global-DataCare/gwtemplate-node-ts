@@ -9,6 +9,7 @@ import { composeHostDidWebId } from './utils/did-backend';
 import { IKmsService } from './gdc-backend-utils-node/models/IKmsService';
 import { getTenantVaultId } from './utils/tenant';
 import { JWK } from 'gdc-common-utils-ts/models/jwk';
+import { SUBJECT_SECTION_INDIVIDUAL } from './constants/domain';
 
 /**
  * The Worker is the heart of the background processing logic.
@@ -51,11 +52,11 @@ export class Worker {
           // Organization is overloaded:
           // - `registry/*/Organization` => host onboarding
           // - `individual/*/Organization` => family onboarding (household modeled as Organization)
-          manager = job.section === 'individual' ? this.managers.familyManager : this.managers.hostingManager;
+          manager = job.section === SUBJECT_SECTION_INDIVIDUAL ? this.managers.familyManager : this.managers.hostingManager;
           break;
         case 'Order':
           // Orders follow the same routing as their corresponding onboarding flow.
-          manager = job.section === 'individual' ? this.managers.familyManager : this.managers.hostingManager;
+          manager = job.section === SUBJECT_SECTION_INDIVIDUAL ? this.managers.familyManager : this.managers.hostingManager;
           break;
         case 'Practitioner':
         case 'Employee':

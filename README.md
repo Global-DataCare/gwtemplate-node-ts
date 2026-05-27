@@ -181,6 +181,8 @@ Canonical payload examples are not maintained separately in Swagger, markdown, a
 - GW to shared `gdc-common-utils-ts` conformance test: [`src/__tests__/unit/examples/shared-flow-examples.test.ts`](src/__tests__/unit/examples/shared-flow-examples.test.ts)
 - Shared lifecycle source of truth: [`gdc-common-utils-ts/src/examples/lifecycle.ts`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/examples/lifecycle.ts)
 - Shared lifecycle guide "for torpes": [`gdc-common-utils-ts/docs/LIFECYCLE_101.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md)
+- GW lifecycle 101 for current local contract and SDK prompts: [`docs/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md`](docs/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md)
+- GW lifecycle current-vs-target note: [`docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md`](docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md)
 
 Current rule:
 

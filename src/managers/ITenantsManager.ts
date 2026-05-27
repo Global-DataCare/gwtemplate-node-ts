@@ -2,6 +2,7 @@
 // File: src/managers/ITenantsManager.ts
 
 import { DidDocument, DidService } from "../gdc-backend-utils-node/models/did";
+import { TenantAuthorizationLifecycleStatus } from '../utils/tenant-lifecycle';
 
 /**
  * Defines the contract for the Tenants Manager cache.
@@ -26,5 +27,9 @@ export interface ITenantsManager {
    * @returns The URN string or undefined if not found.
    */
   getTenantIdentifierUrn(vaultId: string): Promise<string | undefined>;
+
+  getTenantAuthorizationStatus(vaultId: string): Promise<TenantAuthorizationLifecycleStatus | undefined>;
+
+  isTenantOperational(vaultId: string): Promise<boolean>;
   
 }

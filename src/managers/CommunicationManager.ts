@@ -19,6 +19,7 @@ import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import { applyFhirCidVersioningToEntry, fhirResourceToCid } from '../utils/fhir-versioning';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { persistConsentRuleAndAttachment } from '../utils/consent-storage';
+import { SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -287,7 +288,7 @@ export class CommunicationManager implements IJobProcessor {
       'Composition.type': sectionCode,
       'Composition.source': 'Communication',
     });
-    const sectionId = getSubjectScopedSectionId(subject, 'individual', 'composition');
+    const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
     await this.vaultRepository.put(tenantVaultId, [{ id: recordId, ...claims } as any], sectionId);
   }
 
@@ -355,7 +356,7 @@ export class CommunicationManager implements IJobProcessor {
       record['Communication.content-reference'] = contentReferences.join(',');
     }
 
-    const sectionId = getSubjectScopedSectionId(subject, 'individual', 'communications');
+    const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'communications');
     await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
   }
 
@@ -448,7 +449,7 @@ export class CommunicationManager implements IJobProcessor {
         (claims as Record<string, string>)['DocumentReference.description'] = description;
       }
 
-      const sectionId = getSubjectScopedSectionId(subject, 'individual', 'document-references');
+      const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'document-references');
       await this.vaultRepository.put(tenantVaultId, [{ id: recordId, ...claims } as any], sectionId);
     }
   }
@@ -534,7 +535,7 @@ export class CommunicationManager implements IJobProcessor {
         });
 
         const recordId = String(resource?.id || fallbackId);
-        const sectionId = getSubjectScopedSectionId(subjectRef, 'individual', config.section);
+        const sectionId = getSubjectScopedSectionId(subjectRef, SUBJECT_SECTION_INDIVIDUAL, config.section);
         const record: Record<string, any> = {
           id: recordId,
           ...claims,

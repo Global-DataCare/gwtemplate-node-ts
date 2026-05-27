@@ -7,13 +7,21 @@ import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { getEnvSectionId } from './section-env';
+import {
+  LICENSE_STATUS_AVAILABLE,
+  LICENSE_STATUS_ISSUED,
+  LICENSE_TYPE_MOBILE,
+  LICENSE_TYPE_WEB,
+  LICENSE_USER_CLASS_EMPLOYEE,
+  LICENSE_USER_CLASS_INDIVIDUAL,
+} from '../constants/domain';
 
 export type IssueActivationCodeParams = {
   vaultRepository: IVaultRepository;
   kmsService?: IKmsService;
   tenantVaultId: string;
-  userClass: 'employee' | 'individual';
-  type: 'mobile' | 'web';
+  userClass: typeof LICENSE_USER_CLASS_EMPLOYEE | typeof LICENSE_USER_CLASS_INDIVIDUAL;
+  type: typeof LICENSE_TYPE_MOBILE | typeof LICENSE_TYPE_WEB;
   email: string;
   role: string;
 };
@@ -40,7 +48,7 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
       license &&
       license.userClass === userClass &&
       license.type === type &&
-      status === 'available' &&
+      status === LICENSE_STATUS_AVAILABLE &&
       !license.activationCode
     );
   });
@@ -57,9 +65,9 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
   license.issuedToEmail = email;
   license.issuedToRole = role;
   license.issuedAt = now;
-  license.status = 'issued';
+  license.status = LICENSE_STATUS_ISSUED;
 
-  match.status = 'issued';
+  match.status = LICENSE_STATUS_ISSUED;
   match.sequence = (match.sequence || 0) + 1;
 
   if (kmsService) {

@@ -31,12 +31,25 @@ import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import { buildClaimsFromIndividualRegistrationPdfAttachment } from '../utils/individual-registration-pdf-attachment';
+import {
+  ACTION_DISABLE,
+  ACTION_PURGE,
+  LICENSE_CATEGORY_INDIVIDUAL,
+  LICENSE_STATUS_AVAILABLE,
+  LICENSE_TYPE_MOBILE,
+  LICENSE_USER_CLASS_CUSTOMER,
+  LICENSE_USER_CLASS_INDIVIDUAL,
+  SUBJECT_SECTION_INDIVIDUAL,
+} from '../constants/domain';
 
 type FamilyRegistrationContent = {
   status: EntityLifecycleStatus;
   claims: ClaimsRecord;
   contained: IncludedResource[];
 };
+
+const INDIVIDUAL_SECTION = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
+const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
 
 export class FamilyManager {
   constructor(
@@ -57,6 +70,10 @@ export class FamilyManager {
         try {
           if (job.action === '_search' && job.resourceType === 'Organization') {
             responseEntries.push(await this.processFamilySearchEntry(job, entry, environment));
+          } else if (job.action === ACTION_DISABLE && job.resourceType === 'Organization') {
+            responseEntries.push(await this.processFamilyDisableEntry(job, entry));
+          } else if (job.action === ACTION_PURGE && job.resourceType === 'Organization') {
+            responseEntries.push(await this.processFamilyPurgeEntry(job, entry));
           } else if (job.resourceType === 'Organization') {
             responseEntries.push(await this.processFamilyRegistrationEntry(job, entry, environment));
           } else if (job.resourceType === 'Order') {
@@ -141,7 +158,7 @@ export class FamilyManager {
     // Idempotency: owner+alternateName must be unique.
     for (const phone of ownerPhones) {
         const existing = await this.vaultRepository.query(tenantCollectionName, {
-          sectionId: getEnvSectionId('individual'),
+          sectionId: INDIVIDUAL_SECTION,
           where: [
             { name: 'org.schema.Organization.owner.telephone', value: phone },
             { name: ClaimsOrganizationSchemaorg.alternateName, value: apodo },
@@ -166,7 +183,7 @@ export class FamilyManager {
     }
     for (const email of ownerEmails) {
       const existing = await this.vaultRepository.query(tenantCollectionName, {
-        sectionId: getEnvSectionId('individual'),
+        sectionId: INDIVIDUAL_SECTION,
         where: [
           { name: 'org.schema.Organization.owner.email', value: email },
           { name: ClaimsOrganizationSchemaorg.alternateName, value: apodo },
@@ -202,7 +219,7 @@ export class FamilyManager {
       jurisdiction,
       requestedSector,
       this.config.allowedPaymentMethods,
-      'individual',
+      LICENSE_CATEGORY_INDIVIDUAL,
     );
 
     const processedClaims: ClaimsRecord = {
@@ -242,7 +259,7 @@ export class FamilyManager {
       } satisfies FamilyRegistrationContent,
     };
     const secureDoc = await this.kmsService.protectConfidentialData(registrationDoc, tenantVaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureDoc], getEnvSectionId('individual'));
+    await this.vaultRepository.put(tenantCollectionName, [secureDoc], INDIVIDUAL_SECTION);
 
     return {
       type: 'Family-registration-offer-v1.0',
@@ -287,7 +304,7 @@ export class FamilyManager {
     }
 
     const results = await this.vaultRepository.query(tenantCollectionName, {
-      sectionId: getEnvSectionId('individual'),
+      sectionId: INDIVIDUAL_SECTION,
       where: [{ name: ClaimsOfferSchemaorg.identifier, value: offerId }],
     });
 
@@ -318,7 +335,7 @@ export class FamilyManager {
       content: finalizedContent,
     };
     const secureUpdatedDoc = await this.kmsService.protectConfidentialData(updatedDoc, tenantVaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], getEnvSectionId('individual'));
+    await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], INDIVIDUAL_SECTION);
 
     // Create individual (family member) license seats purchased via the family registration Offer and auto-issue one for the controller.
     const familySeats = finalizedContent.claims[ClaimsOfferSchemaorg.eligibleQuantityValue] as number | undefined;
@@ -336,9 +353,9 @@ export class FamilyManager {
           id: licenseId,
           tenantId,
           orderId: familyOfferIdentifier,
-          userClass: 'individual',
-          type: 'mobile',
-          status: 'available',
+          userClass: LICENSE_USER_CLASS_INDIVIDUAL,
+          type: LICENSE_TYPE_MOBILE,
+          status: LICENSE_STATUS_AVAILABLE,
           plan: 'default',
           renewalCycle: '12m',
           reactivationEnabled: false,
@@ -346,7 +363,7 @@ export class FamilyManager {
         } as any;
         licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
       }
-      await this.vaultRepository.put(tenantVaultId, licenseDocs, getEnvSectionId('device-licenses'));
+      await this.vaultRepository.put(tenantVaultId, licenseDocs, DEVICE_LICENSE_SECTION);
 
       const controllerEmail = finalizedContent.claims[ClaimsPersonSchemaorg.email] as string | undefined;
       const controllerPhoneForActivation = finalizedContent.claims[ClaimsPersonSchemaorg.telephone] as string | undefined;
@@ -358,13 +375,13 @@ export class FamilyManager {
             vaultRepository: this.vaultRepository,
             kmsService: this.kmsService,
             tenantVaultId,
-            userClass: 'individual',
-            type: 'mobile',
+            userClass: LICENSE_USER_CLASS_INDIVIDUAL,
+            type: LICENSE_TYPE_MOBILE,
             email: controllerContact,
             role: controllerRole,
           });
           (finalizedContent.claims as any)['org.schema.IndividualProduct.serialNumber'] = activationCode;
-          (finalizedContent.claims as any)['org.schema.IndividualProduct.category'] = 'individual';
+          (finalizedContent.claims as any)['org.schema.IndividualProduct.category'] = LICENSE_CATEGORY_INDIVIDUAL;
         } catch (e: any) {
           this.logger.warn?.(`[FamilyManager] Failed to auto-issue family controller activation code: ${String(e?.message || e)}`);
         }
@@ -461,33 +478,7 @@ export class FamilyManager {
       );
     }
 
-    let foundResult: ConfidentialStorageDoc | undefined;
-    for (const phone of ownerPhones) {
-      const results = await this.vaultRepository.query(tenantCollectionName, {
-        sectionId: getEnvSectionId('individual'),
-        where: [
-          { name: 'org.schema.Organization.owner.telephone', value: phone },
-          { name: ClaimsOrganizationSchemaorg.alternateName, value: nickname },
-        ],
-      });
-      if (results.length > 0) {
-        foundResult = results[0] as ConfidentialStorageDoc;
-        break;
-      }
-    }
-    for (const email of ownerEmails) {
-      const results = await this.vaultRepository.query(tenantCollectionName, {
-        sectionId: getEnvSectionId('individual'),
-        where: [
-          { name: 'org.schema.Organization.owner.email', value: email },
-          { name: ClaimsOrganizationSchemaorg.alternateName, value: nickname },
-        ],
-      });
-      if (results.length > 0) {
-        foundResult = results[0] as ConfidentialStorageDoc;
-        break;
-      }
-    }
+    const foundResult = await this.findFamilyRegistrationDoc(tenantCollectionName, ownerPhones, ownerEmails, nickname);
 
     if (!foundResult) {
       return {
@@ -516,6 +507,222 @@ export class FamilyManager {
       resource: { resourceType: 'Organization', id: foundResult.id },
       response: { status: '200' },
     };
+  }
+
+  private async processFamilyPurgeEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry | ErrorEntry> {
+    const rawClaims = entry?.meta?.claims;
+    const claims: ClaimsRecord | undefined = rawClaims ? (normalizeContextualizedClaims(rawClaims) as ClaimsRecord) : rawClaims;
+    if (!claims) {
+      throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
+    }
+
+    const requestedSector = (job.sector || claims[ClaimsServiceSchemaorg.category]) as Sector | undefined;
+    if (!requestedSector || !job.tenantId) {
+      throw new ManagerError('Job is missing tenantId or sector.', IssueType.Required);
+    }
+    const tenantVaultId = getTenantVaultId(requestedSector, job.tenantId);
+    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(tenantVaultId);
+    if (!tenantCollectionName) {
+      throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
+    }
+
+    const ownerPhoneRaw = claims['org.schema.Organization.owner.telephone'] as string | undefined;
+    const ownerEmailRaw = claims['org.schema.Organization.owner.email'] as string | undefined;
+    const ownerPhones = ownerPhoneRaw ? ownerPhoneRaw.split(',').map(p => p.trim()).filter(Boolean) : [];
+    const ownerEmails = ownerEmailRaw ? ownerEmailRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
+    const nickname = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
+    if ((ownerPhones.length === 0 && ownerEmails.length === 0) || !nickname) {
+      throw new ManagerError(
+        `Missing required claims for purge: '${ClaimsOrganizationSchemaorg.alternateName}' and one of owner.telephone/owner.email`,
+        IssueType.Required,
+      );
+    }
+
+    const foundResult = await this.findFamilyRegistrationDoc(tenantCollectionName, ownerPhones, ownerEmails, nickname);
+    if (!foundResult) {
+      throw new ManagerError('Family registration not found for purge.', IssueType.NotFound);
+    }
+
+    const familyContent = await this.kmsService.unprotectConfidentialData<FamilyRegistrationContent>(foundResult, tenantVaultId);
+    if (familyContent.status !== EntityLifecycleStatus.Inactive) {
+      throw new ManagerError('Family registration must be disabled before purge.', IssueType.Conflict);
+    }
+
+    await this.releaseFamilyLicenses(tenantVaultId, familyContent);
+
+    const updatedContent: FamilyRegistrationContent = {
+      ...familyContent,
+      status: EntityLifecycleStatus.Inactive,
+      claims: {
+        ...familyContent.claims,
+        'org.schema.FamilyRegistration.status': 'purged',
+      } as ClaimsRecord,
+    };
+    const updatedDoc: ConfidentialStorageDoc = {
+      ...foundResult,
+      status: EntityLifecycleStatus.Inactive,
+      sequence: (foundResult.sequence || 0) + 1,
+      content: updatedContent,
+    };
+    const secureUpdatedDoc = await this.kmsService.protectConfidentialData(updatedDoc, tenantVaultId);
+    await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], INDIVIDUAL_SECTION);
+
+    return {
+      type: 'Family-purge-response-v1.0',
+      meta: {
+        claims: {
+          [ClaimsOrganizationSchemaorg.alternateName]: nickname,
+          'org.schema.FamilyRegistration.status': 'purged',
+        },
+      },
+      resource: { resourceType: 'Organization', id: foundResult.id },
+      response: { status: '200' },
+    };
+  }
+
+  private async processFamilyDisableEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry | ErrorEntry> {
+    const rawClaims = entry?.meta?.claims;
+    const claims: ClaimsRecord | undefined = rawClaims ? (normalizeContextualizedClaims(rawClaims) as ClaimsRecord) : rawClaims;
+    if (!claims) {
+      throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
+    }
+
+    const requestedSector = (job.sector || claims[ClaimsServiceSchemaorg.category]) as Sector | undefined;
+    if (!requestedSector || !job.tenantId) {
+      throw new ManagerError('Job is missing tenantId or sector.', IssueType.Required);
+    }
+    const tenantVaultId = getTenantVaultId(requestedSector, job.tenantId);
+    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(tenantVaultId);
+    if (!tenantCollectionName) {
+      throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
+    }
+
+    const ownerPhoneRaw = claims['org.schema.Organization.owner.telephone'] as string | undefined;
+    const ownerEmailRaw = claims['org.schema.Organization.owner.email'] as string | undefined;
+    const ownerPhones = ownerPhoneRaw ? ownerPhoneRaw.split(',').map(p => p.trim()).filter(Boolean) : [];
+    const ownerEmails = ownerEmailRaw ? ownerEmailRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
+    const nickname = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
+    if ((ownerPhones.length === 0 && ownerEmails.length === 0) || !nickname) {
+      throw new ManagerError(
+        `Missing required claims for disable: '${ClaimsOrganizationSchemaorg.alternateName}' and one of owner.telephone/owner.email`,
+        IssueType.Required,
+      );
+    }
+
+    const foundResult = await this.findFamilyRegistrationDoc(tenantCollectionName, ownerPhones, ownerEmails, nickname);
+    if (!foundResult) {
+      throw new ManagerError('Family registration not found for disable.', IssueType.NotFound);
+    }
+
+    const familyContent = await this.kmsService.unprotectConfidentialData<FamilyRegistrationContent>(foundResult, tenantVaultId);
+    familyContent.status = EntityLifecycleStatus.Inactive;
+    const updatedDoc: ConfidentialStorageDoc = {
+      ...foundResult,
+      status: EntityLifecycleStatus.Inactive,
+      sequence: (foundResult.sequence || 0) + 1,
+      content: familyContent,
+    };
+    const secureUpdatedDoc = await this.kmsService.protectConfidentialData(updatedDoc, tenantVaultId);
+    await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], INDIVIDUAL_SECTION);
+
+    return {
+      type: 'Family-disable-response-v1.0',
+      meta: {
+        claims: {
+          [ClaimsOrganizationSchemaorg.alternateName]: nickname,
+          'org.schema.FamilyRegistration.status': 'disabled',
+        },
+      },
+      resource: { resourceType: 'Organization', id: foundResult.id },
+      response: { status: '200' },
+    };
+  }
+
+  private async releaseFamilyLicenses(
+    tenantVaultId: string,
+    familyContent: FamilyRegistrationContent,
+  ): Promise<void> {
+    const activationCode = String((familyContent.claims as any)['org.schema.IndividualProduct.serialNumber'] || '').trim();
+    const email = String(
+      familyContent.claims[ClaimsPersonSchemaorg.email]
+      || familyContent.claims[ClaimsOrganizationSchemaorg.ownerEmail]
+      || '',
+    ).trim().toLowerCase();
+
+    const licenseDocs =
+      (await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(tenantVaultId, DEVICE_LICENSE_SECTION)) || [];
+    const updatedDocs: ConfidentialStorageDoc[] = [];
+
+    for (const doc of licenseDocs) {
+      const license = doc.content as (DeviceLicense & Record<string, any>) | undefined;
+      const userClass = String(license?.userClass || '');
+      if (!license || (userClass !== LICENSE_USER_CLASS_INDIVIDUAL && userClass !== LICENSE_USER_CLASS_CUSTOMER)) {
+        continue;
+      }
+
+      const matchesActivationCode = activationCode && String(license.activationCode || '').trim() === activationCode;
+      const matchesInviteEmail = email && String(license.issuedToEmail || '').trim().toLowerCase() === email;
+      if (!matchesActivationCode && !matchesInviteEmail) {
+        continue;
+      }
+
+      const resetLicense: DeviceLicense & Record<string, any> = {
+        ...license,
+        status: LICENSE_STATUS_AVAILABLE,
+      };
+      delete resetLicense.subjectId;
+      delete resetLicense.activationCode;
+      delete resetLicense.issuedAt;
+      delete resetLicense.issuedToEmail;
+      delete resetLicense.issuedToRole;
+      delete resetLicense.activatedAt;
+      delete resetLicense.deviceId;
+      delete resetLicense.deviceInfo;
+
+      updatedDocs.push({
+        ...doc,
+        status: LICENSE_STATUS_AVAILABLE,
+        sequence: (doc.sequence || 0) + 1,
+        content: resetLicense,
+      });
+    }
+
+    if (updatedDocs.length > 0) {
+      await this.vaultRepository.put(tenantVaultId, updatedDocs, DEVICE_LICENSE_SECTION);
+    }
+  }
+
+  private async findFamilyRegistrationDoc(
+    tenantCollectionName: string,
+    ownerPhones: string[],
+    ownerEmails: string[],
+    nickname: string,
+  ): Promise<ConfidentialStorageDoc | undefined> {
+    for (const phone of ownerPhones) {
+      const results = await this.vaultRepository.query(tenantCollectionName, {
+        sectionId: INDIVIDUAL_SECTION,
+        where: [
+          { name: 'org.schema.Organization.owner.telephone', value: phone },
+          { name: ClaimsOrganizationSchemaorg.alternateName, value: nickname },
+        ],
+      });
+      if (results.length > 0) {
+        return results[0] as ConfidentialStorageDoc;
+      }
+    }
+    for (const email of ownerEmails) {
+      const results = await this.vaultRepository.query(tenantCollectionName, {
+        sectionId: INDIVIDUAL_SECTION,
+        where: [
+          { name: 'org.schema.Organization.owner.email', value: email },
+          { name: ClaimsOrganizationSchemaorg.alternateName, value: nickname },
+        ],
+      });
+      if (results.length > 0) {
+        return results[0] as ConfidentialStorageDoc;
+      }
+    }
+    return undefined;
   }
 
   private async handleServiceAttachment(service?: IncludedResource): Promise<IncludedResource | undefined> {

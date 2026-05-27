@@ -3,6 +3,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { LICENSE_USER_CLASS_EMPLOYEE, LICENSE_USER_CLASS_INDIVIDUAL } from '../constants/domain';
 
 // Simple tier calculation for demonstration purposes.
 // In a real scenario, this would come from a more complex pricing engine or configuration.
@@ -31,7 +32,7 @@ export function generateLicenseOffer(
   jurisdiction: string,
   sector: string,
   allowedPaymentMethods: string[],
-  eligibleCustomerType: 'employee' | 'individual' = 'employee',
+  eligibleCustomerType: typeof LICENSE_USER_CLASS_EMPLOYEE | typeof LICENSE_USER_CLASS_INDIVIDUAL = LICENSE_USER_CLASS_EMPLOYEE,
 ): Record<string, any> {
   const tier = determineLicenseTier(employeeCount);
   const offerId = uuidv4();
