@@ -2,7 +2,17 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
-NPM_TOKEN_VALUE="$(grep NPM_TOKEN "$SCRIPT_DIR/.env.local" | cut -d '=' -f2)"
+ENV_TOKEN_FILE=""
+for candidate in ".env.local-demo" ".env.local-postgres" ".env.cloud-supabase"; do
+  if [[ -f "$SCRIPT_DIR/$candidate" ]]; then
+    ENV_TOKEN_FILE="$SCRIPT_DIR/$candidate"
+    break
+  fi
+done
+NPM_TOKEN_VALUE=""
+if [[ -n "$ENV_TOKEN_FILE" ]]; then
+  NPM_TOKEN_VALUE="$(grep NPM_TOKEN "$ENV_TOKEN_FILE" | cut -d '=' -f2)"
+fi
 FORCE_NO_CACHE=false
 CACHE_MARKER="$SCRIPT_DIR/.docker-build-deps.sha256"
 

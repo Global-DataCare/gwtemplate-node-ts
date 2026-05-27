@@ -21,8 +21,10 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 - Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
 - Repo briefing: [docs/BRIEFING_DATASPACE_EN.md](docs/BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
+- Local demo template: [env.local-demo.example](env.local-demo.example)
 - Firestore demo template: [env.firestore-demo.example](env.firestore-demo.example)
-- Local PostgreSQL overrides: [.env.local.postgres](.env.local.postgres)
+- Local PostgreSQL overrides template: [env.local-postgres.example](env.local-postgres.example)
+- Cloud Supabase overrides template: [env.cloud-supabase.example](env.cloud-supabase.example)
 - Local PostgreSQL container: [docker-compose.postgres.yml](docker-compose.postgres.yml)
 
 ## Quick test
@@ -44,10 +46,10 @@ npm install
 
 ## 3) Preparing the environment
 
-Copy the file `env.local-example` as `.env.local`
+Copy the file `env.local-demo.example` as `.env.local-demo`
 
 ```bash
-cp env.local-example .env.local
+cp env.local-demo.example .env.local-demo
 ```
 
 ## 4) Start backend in demo mode (Terminal 1)
@@ -123,7 +125,6 @@ The GKE demo deploy should always use an immutable image tag.
 Do not keep `GDC_IMAGE` on mutable tags such as `:demo` or `:latest`.
 Use a versioned tag such as `:1.6.1-8b0539b`.
 If `GDC_IMAGE` still ends in `:demo` or `:latest`, `cloud_deploy.sh gke-demo` now rewrites it automatically to `<package-version>-<short-git-sha>`.
-
 For the current demo path you do not need DNS or a domain. Use the public static IP directly in
 `GDC_PUBLIC_URL`, for example `http://34.x.y.z`.
 
@@ -183,6 +184,7 @@ Canonical payload examples are not maintained separately in Swagger, markdown, a
 - Shared lifecycle guide "for torpes": [`gdc-common-utils-ts/docs/LIFECYCLE_101.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md)
 - GW lifecycle 101 for current local contract and SDK prompts: [`docs/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md`](docs/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md)
 - GW lifecycle current-vs-target note: [`docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md`](docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md)
+- Shared lifecycle `101` guide: [`gdc-common-utils-ts/docs/LIFECYCLE_101.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md)
 
 Current rule:
 
@@ -214,16 +216,18 @@ Follow these steps to get your local development environment up and running.
 
 ### 1. Configure Your Local Environment
 
-The server's configuration for local development is managed through a `.env.local` file. This file is **not** tracked in Git, ensuring your local settings and secrets are kept private.
+The server's configuration for local development is managed through explicit profile files such as `.env.local-demo`, `.env.local-postgres`, and `.env.cloud-supabase`. These files are **not** tracked in Git, ensuring your local settings and secrets are kept private.
 
-First, copy the template file to create your local configuration (same file used in Quick test):
+First, copy the demo template file to create your local configuration (same file used in Quick test):
 ```bash
-cp env.local-example .env.local
+cp env.local-demo.example .env.local-demo
 ```
 
-Next, open `.env.local` and review its contents. For basic local development, the default values are often sufficient. The key variable for local testing is `DB_PROVIDER`, which is pre-configured to `mem` for an in-memory database, requiring no external setup.
+Next, open `.env.local-demo` and review its contents. For basic local development, the default values are often sufficient. The key variable for local testing is `DB_PROVIDER`, which is pre-configured to `mem` for an in-memory database, requiring no external setup.
 
-If you want to run the vault against PostgreSQL locally, keep `.env.local` as your base file and use the overrides in `.env.local.postgres`.
+If you want to run the vault against PostgreSQL locally, copy `env.local-postgres.example` to `.env.local-postgres`.
+
+If you want PostgreSQL plus Supabase Storage, copy `env.cloud-supabase.example` to `.env.cloud-supabase`.
 
 ### 2. Install Dependencies
 
@@ -246,14 +250,19 @@ The server will be available at `http://localhost:3000`.
 
 #### Option B: Using Node.js with Local PostgreSQL (Optional, not validated yet in this guide)
 
-This method starts a dedicated local PostgreSQL container and runs the API with `.env.local.postgres` layered on top of `.env.local`.
+This method starts a dedicated local PostgreSQL container and runs the API with the full `.env.local-postgres` profile.
 
 1. Start PostgreSQL:
 ```bash
 npm run db:local-postgres:up
 ```
 
-2. Run the API with PostgreSQL:
+2. Create your private overrides file:
+```bash
+cp env.local-postgres.example .env.local-postgres
+```
+
+3. Run the API with PostgreSQL:
 ```bash
 npm run api:local-postgres
 ```
@@ -266,6 +275,31 @@ npm run db:local-postgres:down
 ```
 
 The vault schema is created automatically by the API on startup.
+
+#### Option B1: Using Node.js with Local PostgreSQL + Supabase Storage
+
+This method keeps the confidential vault in PostgreSQL and stores uploaded files in Supabase Storage.
+
+1. Start PostgreSQL:
+```bash
+npm run db:local-postgres:up
+```
+
+2. Create your private Supabase overrides file:
+```bash
+cp env.cloud-supabase.example .env.cloud-supabase
+```
+
+3. Fill `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_STORAGE_BUCKET` in `.env.cloud-supabase`.
+
+4. Run the API with Supabase Storage:
+```bash
+npm run api:cloud-supabase
+```
+
+Notes:
+- `POSTGRES_*` should point at your Supabase/PostgreSQL database if you are not using the local container.
+- `SUPABASE_STORAGE_PUBLIC=true` is the expected mode for this adapter because the current storage contract persists stable `publicUrl` values.
 
 #### Option B2: Using Node.js with Firestore Demo
 
@@ -288,7 +322,7 @@ npm run api:local-firestore-demo
 This method runs the application inside a Docker container, which is a great way to ensure a consistent environment. This is the same image that will be deployed to the cloud.
 
 1.  **Build the Docker image:**
-    *(This script uses the `NPM_TOKEN` from your `.env.local` file if it exists)*
+    *(This script uses the `NPM_TOKEN` from the first available local profile file: `.env.local-demo`, `.env.local-postgres`, or `.env.cloud-supabase`)*
     ```bash
     ./docker_build_local.sh
     ```

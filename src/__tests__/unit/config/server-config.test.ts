@@ -143,6 +143,32 @@ describe('server-config sector resolution', () => {
     resetServerConfig();
   });
 
+  it('should expose Supabase storage settings from environment', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      STORAGE_PROVIDER: 'supabase',
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+      SUPABASE_STORAGE_BUCKET: 'gw-files',
+      SUPABASE_STORAGE_PUBLIC: 'true',
+    };
+
+    resetServerConfig();
+    const config = getConfig();
+
+    expect(config.storageProvider).toBe('supabase');
+    expect(config.supabase).toEqual({
+      url: 'https://example.supabase.co',
+      serviceRoleKey: 'service-role-key',
+      storageBucket: 'gw-files',
+      storagePublic: true,
+    });
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
   it('should accept every SECURITY_MODE x NETWORK_MODE pair independently', () => {
     const previousEnv = process.env;
     const securityModes = ['strict', 'compat', 'demo'] as const;
