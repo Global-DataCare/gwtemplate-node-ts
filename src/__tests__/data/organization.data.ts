@@ -26,9 +26,9 @@ import { testHostDidWeb, testRootOrgDidWeb, testHostDomain, testTenant1Identifie
  * This is the source of truth for values used in ORGANIZATION_REGISTRATION_REQUEST.
  */
 export const testDefaultTenantServiceTypeClaim = serializeServiceCapabilityTokens([
-  ServiceCapabilityToken.IndexingCruds,
-  ServiceCapabilityToken.IndexingReadSearch,
-  ServiceCapabilityToken.DigitalTwinReadSearch,
+  ServiceCapabilityToken.IndexProvider,
+  ServiceCapabilityToken.IndexReader,
+  ServiceCapabilityToken.DigitalTwinReader,
 ]) as string;
 
 export const testClaimsRegisterTenantExpanded = {

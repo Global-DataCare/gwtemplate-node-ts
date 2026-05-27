@@ -1,3 +1,11 @@
+## [1.7.1] - 2026-05-27
+
+### Changed
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.10.0`.
+- Aligned tenant service-capability fixtures and discovery tests with the
+  clearer shared `IndexReader` / `IndexProvider` naming while preserving the
+  persisted token contract.
+
 ## [1.6.1] - 2026-05-26
 
 ### Fixed

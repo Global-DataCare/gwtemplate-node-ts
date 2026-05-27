@@ -211,7 +211,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServicesConfig(
         Sector.RESEARCH,
         [],
-        serializeServiceCapabilityTokens([ServiceCapabilityToken.IndexingReadSearch]),
+        serializeServiceCapabilityTokens([ServiceCapabilityToken.IndexReader]),
       );
 
       expect(services.some(
@@ -229,7 +229,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServicesConfig(
         Sector.RESEARCH,
         [],
-        serializeServiceCapabilityTokens([ServiceCapabilityToken.DigitalTwinReadSearch]),
+        serializeServiceCapabilityTokens([ServiceCapabilityToken.DigitalTwinReader]),
       );
 
       expect(services.some(

@@ -212,8 +212,8 @@ describe('Well-Known Tenant Artifacts API', () => {
         [ClaimsServiceSchemaorg.category]: urnParts.sector,
         [ClaimsServiceSchemaorg.url]: 'https://gateway.example.com/acme/cds-es/v1/health-care',
         [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-          ServiceCapabilityToken.IndexingCruds,
-          ServiceCapabilityToken.IndexingReadSearch,
+          ServiceCapabilityToken.IndexProvider,
+          ServiceCapabilityToken.IndexReader,
         ]),
       },
     } as any);
@@ -225,8 +225,8 @@ describe('Well-Known Tenant Artifacts API', () => {
     expect(parsed['@type']).toBe('dcat:DataService');
     expect(parsed['dcat:endpointURL']).toBe('https://gateway.example.com/acme/cds-es/v1/health-care');
     expect(parsed['dcat:keyword']).toEqual([
-      ServiceCapabilityToken.IndexingCruds,
-      ServiceCapabilityToken.IndexingReadSearch,
+      ServiceCapabilityToken.IndexProvider,
+      ServiceCapabilityToken.IndexReader,
     ]);
   });
 
@@ -244,8 +244,8 @@ describe('Well-Known Tenant Artifacts API', () => {
         [ClaimsServiceSchemaorg.category]: urnParts.sector,
         [ClaimsServiceSchemaorg.url]: 'https://gateway.example.com/acme/cds-es/v1/health-care',
         [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-          ServiceCapabilityToken.IndexingCruds,
-          ServiceCapabilityToken.IndexingReadSearch,
+          ServiceCapabilityToken.IndexProvider,
+          ServiceCapabilityToken.IndexReader,
         ]),
       },
     } as any);
@@ -298,8 +298,8 @@ describe('DCAT3 Discovery API', () => {
           [ClaimsServiceSchemaorg.category]: 'research-study',
           [ClaimsServiceSchemaorg.url]: 'https://gateway.example.com/acme/cds-es/v1/research-study',
           [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-            ServiceCapabilityToken.IndexingReadSearch,
-            ServiceCapabilityToken.DigitalTwinReadSearch,
+            ServiceCapabilityToken.IndexReader,
+            ServiceCapabilityToken.DigitalTwinReader,
           ]),
         },
       },
