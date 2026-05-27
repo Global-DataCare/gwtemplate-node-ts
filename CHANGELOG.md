@@ -30,6 +30,20 @@
 - Regenerated Swagger/OpenAPI profile artifacts and aligned route descriptions, bootstrap scripts, env defaults, and curl examples around canonical `acme-id`, contextualized `org.schema` claims, and the synchronized local example fixtures.
 - Reorganized legacy top-level guides under `docs/`, expanded reading-order/README guidance, and documented the local example-sync workflow so the repo reflects the current source-of-truth layout.
 - Updated the shared dependency target to `gdc-common-utils-ts@^1.7.0`.
+- Added local GW lifecycle documentation for SDK alignment:
+  - `docs/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md`
+  - `docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md`
+- Clarified current GW CORE lifecycle semantics:
+  - `individual/org.schema/Organization/_disable` disables the hosted individual/family record without releasing licenses
+  - `individual/org.schema/Organization/_purge` requires prior inactive status, releases or disassociates licenses, and preserves the record for traceability
+  - `entity/org.schema/Employee/_purge` requires prior inactive status, releases or disassociates licenses, and preserves the employee record for traceability
+- Clarified target lifecycle normalization for future shared-package / SDK migration:
+  - `_batch + POST` create
+  - `_batch + PUT` resource update
+  - `_batch + PATCH` lifecycle or partial operational update
+  - `/_purge + POST` explicit purge command
+- Clarified that `ConfidentialStorageDoc.status` is the canonical current lifecycle state and that blockchain lifecycle anchoring should use a derived status-change event instead of the raw confidential storage document.
+- Centralized key domain lifecycle and license literals under `src/constants/domain.ts` to reduce hardcoded action, section, and licensing strings in managers and routing helpers.
 
 ### Testing
 - Added/updated focused tests for:

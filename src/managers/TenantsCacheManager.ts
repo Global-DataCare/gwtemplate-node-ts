@@ -12,6 +12,7 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 import { parseTenantUrn } from '../utils/urn';
 import { getEnvSectionId } from '../utils/section-env';
+import { getTenantAuthorizationStatus, isTenantAuthorizationOperational, TenantAuthorizationLifecycleStatus } from '../utils/tenant-lifecycle';
 
 const SERVICE_OPERATIONAL_URL_CLAIM = 'org.schema.Service.url';
 
@@ -108,6 +109,11 @@ export class TenantsCacheManager implements ITenantsManager {
     return await this._ensureTenantIsInCache(vaultId);
   }
 
+  public async refreshTenant(vaultId: string): Promise<any | undefined> {
+    this.tenantCacheByVaultId.delete(vaultId);
+    return await this._ensureTenantIsInCache(vaultId);
+  }
+
   /**
    * Resolves the canonical tenant vault id from an organization identifier value
    * (e.g. VAT/TAX id stored in `Organization.identifier.value`).
@@ -169,6 +175,22 @@ export class TenantsCacheManager implements ITenantsManager {
   public async getCollectionName(vaultId: string): Promise<string | undefined> {
     const tenantConfig = await this._ensureTenantIsInCache(vaultId);
     return tenantConfig?.collectionName;
+  }
+
+  public async getTenantAuthorizationStatus(vaultId: string): Promise<TenantAuthorizationLifecycleStatus | undefined> {
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
+    if (!tenantConfig) {
+      return undefined;
+    }
+    return getTenantAuthorizationStatus(tenantConfig);
+  }
+
+  public async isTenantOperational(vaultId: string): Promise<boolean> {
+    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
+    if (!tenantConfig) {
+      return false;
+    }
+    return isTenantAuthorizationOperational(tenantConfig);
   }
 
   /**

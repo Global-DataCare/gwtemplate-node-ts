@@ -10,6 +10,7 @@ import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { determineResourceId } from '../utils/resource';
 import { getTenantVaultId } from '../utils/tenant';
 import { getSubjectScopedSectionId, SubjectSectionScope } from '../utils/individual-sections';
+import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -38,14 +39,15 @@ export class MedicationStatementManager implements IJobProcessor {
     if (!jurisdiction || !normalizedSection || !normalizedAction) {
       throw new ManagerError('Missing jurisdiction, section, or action.', IssueType.Required);
     }
-    if (normalizedSection !== 'individual' && normalizedSection !== 'digitaltwin') {
+    if (normalizedSection !== SUBJECT_SECTION_INDIVIDUAL && normalizedSection !== SUBJECT_SECTION_DIGITAL_TWIN) {
       throw new ManagerError(`Unsupported section '${normalizedSection}'.`, IssueType.NotSupported);
     }
     if (normalizedAction !== '_batch' && normalizedAction !== '_search') {
       throw new ManagerError(`Unsupported action '${normalizedAction}' for MedicationStatement.`, IssueType.NotSupported);
     }
 
-    const scope: SubjectSectionScope = normalizedSection === 'digitaltwin' ? 'digitaltwin' : 'individual';
+    const scope: SubjectSectionScope =
+      normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN ? SUBJECT_SECTION_DIGITAL_TWIN : SUBJECT_SECTION_INDIVIDUAL;
     const bundle = (job.content?.body || {}) as any;
     const entries: FhirBundleEntryLike[] =
       (bundle as FhirBundleLike).entry ||
@@ -137,4 +139,3 @@ export class MedicationStatementManager implements IJobProcessor {
     };
   }
 }
-

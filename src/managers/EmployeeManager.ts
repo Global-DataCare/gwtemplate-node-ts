@@ -30,6 +30,13 @@ import { generateLicenseOffer } from '../utils/offer';
 import { getEnvSectionId } from '../utils/section-env';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import { createEmployeeUrn, parseTenantUrn } from '../utils/urn';
+import {
+  ACTION_PURGE,
+  LICENSE_STATUS_AVAILABLE,
+  LICENSE_STATUS_ISSUED,
+  LICENSE_TYPE_MOBILE,
+  LICENSE_USER_CLASS_EMPLOYEE,
+} from '../constants/domain';
 
 const EMPLOYEE_SECTION = getEnvSectionId('employees');
 const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
@@ -78,6 +85,7 @@ export class EmployeeManager {
         // Pass the fetched URN and the job metadata down to the entry processor.
         const resultEntry = await this.processEntry(
           entry,
+          job.action,
           vaultId,
           issuerUrn,
           job.content.meta,
@@ -114,6 +122,7 @@ export class EmployeeManager {
 
   private async processEntry(
     entry: BundleEntry,
+    action: string | undefined,
     vaultId: string,
     tenantUrn: string,
     meta: IDecodedDidcommPayload['meta'],
@@ -138,6 +147,9 @@ export class EmployeeManager {
 
     switch (request.method) {
       case 'POST':
+        if (action === ACTION_PURGE) {
+          return this.purgeEmployee(vaultId, employeeId, claims, type);
+        }
         return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction);
       case 'DELETE':
         return this.disableEmployee(vaultId, employeeId, type);
@@ -418,13 +430,13 @@ export class EmployeeManager {
         DEVICE_LICENSE_SECTION,
       )) || [];
 
-    const employeeLicenseDocs = licenseDocs.filter((doc) => (doc.content as DeviceLicense | undefined)?.userClass === 'employee');
+    const employeeLicenseDocs = licenseDocs.filter((doc) => (doc.content as DeviceLicense | undefined)?.userClass === LICENSE_USER_CLASS_EMPLOYEE);
     if (employeeLicenseDocs.length === 0) {
       // No employee licenses in the vault => licensing not configured; do not gate.
       return undefined;
     }
 
-    const availableDoc = employeeLicenseDocs.find((doc) => (doc.content as DeviceLicense).status === 'available');
+    const availableDoc = employeeLicenseDocs.find((doc) => (doc.content as DeviceLicense).status === LICENSE_STATUS_AVAILABLE);
     if (!availableDoc) {
       const hostDid = (await this.tenantsCacheManager.getTenantDid('host')) || 'did:web:host';
       const allowedPaymentMethods = (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(',').map(s => s.trim()).filter(Boolean);
@@ -434,7 +446,7 @@ export class EmployeeManager {
         params.jurisdiction,
         params.sector,
         allowedPaymentMethods,
-        'employee',
+        LICENSE_USER_CLASS_EMPLOYEE,
       );
 
       return {
@@ -447,7 +459,7 @@ export class EmployeeManager {
     const nowSec = Math.floor(Date.now() / 1000);
     const updatedLicense: DeviceLicense = {
       ...(availableDoc.content as DeviceLicense),
-      status: 'issued',
+      status: LICENSE_STATUS_ISSUED,
       subjectId: params.employeeId,
       issuedAt: nowSec,
     };
@@ -482,6 +494,109 @@ export class EmployeeManager {
       resource: { id: employeeId },
       response: { status: '200' },
     };
+  }
+
+  private async purgeEmployee(
+    vaultId: string,
+    employeeId: string,
+    claims: ClaimsRecord,
+    entryType: string,
+  ): Promise<BundleEntry> {
+    const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(vaultId, employeeId, EMPLOYEE_SECTION);
+    if (!employeeDoc) {
+      throw new ManagerError(`Employee with ID '${employeeId}' not found.`, IssueType.NotFound);
+    }
+
+    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
+    if (employee.status !== EntityLifecycleStatus.Inactive) {
+      throw new ManagerError('Employee must be disabled before purge.', IssueType.Conflict);
+    }
+
+    await this.releaseEmployeeLicenses(vaultId, employeeId, employee, claims);
+
+    employee.meta = {
+      ...(employee.meta || {}),
+      lastUpdated: new Date().toISOString(),
+      licensingPurgedAt: new Date().toISOString(),
+    };
+
+    const docToProtect: ConfidentialStorageDoc = {
+      ...employeeDoc,
+      status: employee.status,
+      sequence: (employeeDoc.sequence || 0) + 1,
+      content: employee,
+    };
+    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
+    await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);
+
+    return {
+      type: entryType,
+      resource: { id: employeeId },
+      response: { status: '200' },
+    };
+  }
+
+  private async releaseEmployeeLicenses(
+    vaultId: string,
+    employeeId: string,
+    employee: EntityConfig,
+    claims: ClaimsRecord,
+  ): Promise<void> {
+    const email = String(
+      employee.claims?.[ClaimsPersonSchemaorg.email]
+      || claims?.[ClaimsPersonSchemaorg.email]
+      || '',
+    ).trim().toLowerCase();
+    const roleCode = normalizeCodeSystemAndValue(
+      getPersonOccupationClaim(employee.claims as ClaimsRecord)
+      || getPersonOccupationClaim(claims)
+      || '',
+    );
+
+    const licenseDocs =
+      (await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(vaultId, DEVICE_LICENSE_SECTION)) || [];
+    const updatedDocs: ConfidentialStorageDoc[] = [];
+
+    for (const doc of licenseDocs) {
+      const license = doc.content as DeviceLicense & Record<string, any>;
+      if (!license || license.userClass !== LICENSE_USER_CLASS_EMPLOYEE) {
+        continue;
+      }
+
+      const matchesSubject = license.subjectId === employeeId;
+      const matchesInvite = email
+        && String(license.issuedToEmail || '').trim().toLowerCase() === email
+        && roleCode
+        && normalizeCodeSystemAndValue(String(license.issuedToRole || '')) === roleCode;
+
+      if (!matchesSubject && !matchesInvite) {
+        continue;
+      }
+
+      const resetLicense: DeviceLicense & Record<string, any> = {
+        ...license,
+        status: LICENSE_STATUS_AVAILABLE,
+      };
+      delete resetLicense.subjectId;
+      delete resetLicense.activationCode;
+      delete resetLicense.issuedAt;
+      delete resetLicense.issuedToEmail;
+      delete resetLicense.issuedToRole;
+      delete resetLicense.activatedAt;
+      delete resetLicense.deviceId;
+      delete resetLicense.deviceInfo;
+
+      updatedDocs.push({
+        ...doc,
+        status: LICENSE_STATUS_AVAILABLE,
+        sequence: (doc.sequence || 0) + 1,
+        content: resetLicense,
+      });
+    }
+
+    if (updatedDocs.length > 0) {
+      await this.vaultRepository.put(vaultId, updatedDocs, DEVICE_LICENSE_SECTION);
+    }
   }
 
   private handleError(error: any, entryType: string = 'unknown', meta?: any): ErrorEntry {

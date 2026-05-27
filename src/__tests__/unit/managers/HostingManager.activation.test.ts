@@ -12,6 +12,7 @@ import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
 import { getEnvSectionId } from '../../../utils/section-env';
+import { getTenantAuthorizationLifecycle } from '../../../utils/tenant-lifecycle';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -252,6 +253,46 @@ describe('HostingManager activation flow', () => {
     };
   }
 
+  function buildLifecycleJob(action: '_disable' | '_enable'): JobRequest {
+    return {
+      id: `${action}-job-id`,
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId: 'host',
+      jurisdiction: 'es',
+      sector: 'test-network' as Sector,
+      section: 'registry',
+      format: 'org.schema',
+      action,
+      resourceType: 'Organization',
+      content: {
+        iss: 'did:web:host.example.com',
+        aud: 'did:web:testhost.com',
+        thid: `${action}-thid`,
+        jti: `${action}-jti`,
+        type: 'json',
+        body: {
+          data: [
+            {
+              type: action === '_disable' ? 'Organization-disable-request-v1.0' : 'Organization-enable-request-v1.0',
+              meta: {
+                claims: {
+                  [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
+                },
+              },
+              request: { method: 'POST' },
+              resource: {},
+            },
+          ],
+        },
+        meta: {},
+      } as any,
+      httpMethod: 'POST',
+      requestUrl: `/host/cds-es/v1/test-network/registry/org.schema/Organization/${action}`,
+    };
+  }
+
   it('should activate a tenant from ICA proof and persist the final tenant config', async () => {
     const job = buildActivationJob();
 
@@ -280,6 +321,7 @@ describe('HostingManager activation flow', () => {
     expect(finalDoc.content!.status).toBe('active');
     expect(finalDoc.content!.didDocument.id).toBe('did:web:api.acme.org');
     expect(finalDoc.content!.networkStatus[0].networkName).toBe('test-network');
+    expect(getTenantAuthorizationLifecycle(finalDoc.content)?.status).toBe('active');
 
     const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
       ...claims,
@@ -490,5 +532,47 @@ describe('HostingManager activation flow', () => {
       getEnvSectionId('proofs'),
     );
     expect((proofDoc as any)?.content?.icaDidRegistration?.status).toBe('approved');
+  });
+
+  it('should disable and enable an activated tenant authorization', async () => {
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+
+    const disableResponse = await hostingManager.process(buildLifecycleJob('_disable'));
+    expect(disableResponse.body.data[0].response.status).toBe('200');
+    expect(disableResponse.body.data[0].meta.claims['org.schema.Action.tenantAuthorization.status']).toBe('suspended');
+
+    const claims = activationJob.content!.body!.data[0]!.meta!.claims;
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      claims[ClaimsServiceSchemaorg.category] as Sector,
+      claims[ClaimsOrganizationSchemaorg.alternateName],
+    );
+    const disabledDoc = await vaultRepository.get(
+      hostCollectionName,
+      tenantVaultId,
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc;
+    expect(getTenantAuthorizationLifecycle(disabledDoc.content)?.status).toBe('suspended');
+
+    const enableResponse = await hostingManager.process(buildLifecycleJob('_enable'));
+    expect(enableResponse.body.data[0].response.status).toBe('200');
+    expect(enableResponse.body.data[0].meta.claims['org.schema.Action.tenantAuthorization.status']).toBe('active');
+
+    const enabledDoc = await vaultRepository.get(
+      hostCollectionName,
+      tenantVaultId,
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc;
+    expect(getTenantAuthorizationLifecycle(enabledDoc.content)?.status).toBe('active');
+  });
+
+  it('should reject enable unless the tenant is currently disabled', async () => {
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+
+    const response = await hostingManager.process(buildLifecycleJob('_enable'));
+    const errorEntry = response.body.data[0];
+    expect(errorEntry.response.status).toBe('409');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('only be enabled from disabled');
   });
 });

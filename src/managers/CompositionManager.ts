@@ -21,6 +21,7 @@ import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMa
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IJobProcessor } from './registry';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
+import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 
 /**
  * Stores Unified Health Index updates as Composition-style flat claims.
@@ -62,13 +63,13 @@ export class CompositionManager implements IJobProcessor {
     if (normalizedAction !== '_batch' && normalizedAction !== '_search') {
       throw new Error(`Unsupported action '${normalizedAction}' for CompositionManager.`);
     }
-    if (normalizedSection !== 'individual' && normalizedSection !== 'digitaltwin') {
+    if (normalizedSection !== SUBJECT_SECTION_INDIVIDUAL && normalizedSection !== SUBJECT_SECTION_DIGITAL_TWIN) {
       throw new Error(`Unsupported section '${normalizedSection}' for CompositionManager.`);
     }
     const normalizedFormat = normalizeFhirIngestionFormat(normalizedFormatRaw);
 
     const scope: SubjectSectionScope =
-      normalizedSection === 'digitaltwin' ? 'digitaltwin' : 'individual';
+      normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN ? SUBJECT_SECTION_DIGITAL_TWIN : SUBJECT_SECTION_INDIVIDUAL;
 
     const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
     const cidMappings: FhirCidVersionMapping[] = [];

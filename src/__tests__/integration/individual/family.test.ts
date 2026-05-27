@@ -256,4 +256,56 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
     expect(response.headers.location).toContain(`${url.replace('/_transaction', '/_transaction-response')}`);
     expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
   });
+
+  it('should return 202 Accepted for the _purge action on individual organization', async () => {
+    const tenantId = testTenant1TenantId;
+    const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_purge`;
+
+    const decodedJob: JobRequest = {
+      id: 'job-family-purge-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_purge',
+      resourceType: 'Organization',
+      content: {
+        ...FAMILY_REGISTRATION_REQUEST,
+        body: {
+          data: [{
+            type: 'Family-purge-request-v1.0',
+            meta: {
+              claims: {
+                'org.schema.Organization.owner.telephone': '+34600000001',
+                'org.schema.Organization.owner.email': 'parent@example.com',
+                'org.schema.Organization.alternateName': 'Ana',
+                'org.schema.Service.category': Sector.HEALTH_CARE,
+              },
+            },
+          }],
+        },
+      } as any,
+    };
+    mockKmsService.decodeRequest.mockResolvedValueOnce(decodedJob as any);
+
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'App-ID': 'test-app',
+        'App-Version': '1.0.0',
+        Authorization: 'Bearer fake-oidc-id-token',
+      },
+      body: { request: 'fake.encrypted.payload' },
+    });
+
+    expect(response.status).toBe(202);
+    expect(response.headers.location).toBeDefined();
+    expect(response.headers.location).toContain(`${url.replace('/_purge', '/_purge-response')}`);
+    expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
+  });
 });

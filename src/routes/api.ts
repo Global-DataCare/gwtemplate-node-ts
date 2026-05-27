@@ -23,6 +23,8 @@ import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 import { getEnvSectionId } from '../utils/section-env';
 import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/replay-protection-store';
 import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
+import { getTenantAuthorizationStatus } from '../utils/tenant-lifecycle';
+import { ACTION_DISABLE, ACTION_ENABLE } from '../constants/domain';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -112,6 +114,42 @@ function isHostOrganizationActivateRoute(
     && String(format || '').toLowerCase() === 'org.schema'
     && String(resourceType || '').toLowerCase() === 'organization'
     && action === '_activate';
+}
+
+function isHostTenantLifecycleRoute(
+  tenantId: string,
+  section: string,
+  format: string,
+  resourceType: string,
+  action: string,
+): boolean {
+  return tenantId === 'host'
+    && section === 'registry'
+    && String(format || '').toLowerCase() === 'org.schema'
+    && String(resourceType || '').toLowerCase() === 'organization'
+    && (action === ACTION_DISABLE || action === ACTION_ENABLE);
+}
+
+function requiresActiveTenantAuthorization(
+  tenantId: string,
+  section: string,
+  format: string,
+  resourceType: string,
+  action: string,
+): boolean {
+  if (tenantId === 'host') {
+    return false;
+  }
+  if (section === 'ping') {
+    return false;
+  }
+  if (isHostOrganizationActivateRoute(tenantId, section, format, resourceType, action)) {
+    return false;
+  }
+  if (isHostTenantLifecycleRoute(tenantId, section, format, resourceType, action)) {
+    return false;
+  }
+  return true;
 }
 
 function getRequestBaseUrl(req: express.Request, fallback: string): string {
@@ -597,7 +635,7 @@ export function createApiRouter(
    *       - 3.1 Employee Role
    *     summary: Create a new Professional (Employee)
    *     description: |
-   *       Submits an asynchronous job to create or reactivate a professional (employee) within an existing tenant.
+   *       Submits an asynchronous job to create or enable again a professional (employee) within an existing tenant.
    *       The `tenantId` in the path specifies the organization under which the employee is being created.
    *       Prerequisite: controller device/client must already be active (`Token/_exchange` + `Device/_dcr`).
    *       Creating an employee profile does not automatically activate employee devices.
@@ -606,7 +644,7 @@ export function createApiRouter(
    *       V1 lifecycle semantics:
    *       - business identity is the combination `email + role`
    *       - if the same `email + role` already exists and is active, the gateway returns the existing employee instead of creating a duplicate
-   *       - if the same `email + role` exists and is inactive, the gateway reactivates that employee record
+   *       - if the same `email + role` exists and is inactive, the gateway enables that employee record again
    *       - employee suspension does not implicitly release the reserved license seat
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -2307,6 +2345,29 @@ export function createApiRouter(
         IssueType.NotFound,
         'The requested tenant or endpoint path does not exist.',
       );
+    }
+
+    if (requiresActiveTenantAuthorization(tenantId, section, req.params.format, resourceType, action)) {
+      const tenantConfig = await tenantsCacheManager.getTenant(vaultId);
+      if (!tenantConfig) {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          404,
+          IssueType.NotFound,
+          'The requested tenant or endpoint path does not exist.',
+        );
+      }
+      const authorizationStatus = getTenantAuthorizationStatus(tenantConfig);
+      if (authorizationStatus !== 'active') {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          403,
+          IssueType.Forbidden,
+          `Tenant authorization is ${authorizationStatus}.`,
+        );
+      }
     }
 
     // --- 4. Replay Protection (best-effort) ---

@@ -35,9 +35,17 @@ import { EntityLifecycleStatus, EntityType } from '../gdc-backend-utils-node/mod
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { generateLicenseOffer } from '../utils/offer';
 import { getEnvSectionId } from '../utils/section-env';
+import {
+  LICENSE_CATEGORY_INDIVIDUAL,
+  LICENSE_STATUS_AVAILABLE,
+  LICENSE_STATUS_ISSUED,
+  LICENSE_USER_CLASS_CUSTOMER,
+  LICENSE_USER_CLASS_INDIVIDUAL,
+  SUBJECT_SECTION_INDIVIDUAL,
+} from '../constants/domain';
 
 
-const INDIVIDUAL_SECTION = getEnvSectionId('individual');
+const INDIVIDUAL_SECTION = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
 const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
 
 export class IndividualManager {
@@ -387,14 +395,16 @@ export class IndividualManager {
     const individualLicenseDocs = licenseDocs.filter((doc) => {
       const cls = (doc.content as any)?.userClass;
       // Backward compatibility: old stored licenses used `customer`.
-      return cls === 'individual' || cls === 'customer';
+      return cls === LICENSE_USER_CLASS_INDIVIDUAL || cls === LICENSE_USER_CLASS_CUSTOMER;
     });
     if (individualLicenseDocs.length === 0) {
       // No individual licenses in the vault => licensing not configured; do not gate.
       return undefined;
     }
 
-    const availableDoc = individualLicenseDocs.find((doc) => (doc.content as DeviceLicense).status === 'available');
+    const availableDoc = individualLicenseDocs.find(
+      (doc) => (doc.content as DeviceLicense).status === LICENSE_STATUS_AVAILABLE,
+    );
     if (!availableDoc) {
       const hostDid = (await this.tenantsCacheManager.getTenantDid('host')) || 'did:web:host';
       const allowedPaymentMethods = (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(',').map(s => s.trim()).filter(Boolean);
@@ -404,7 +414,7 @@ export class IndividualManager {
         params.jurisdiction,
         params.sector,
         allowedPaymentMethods,
-        'individual',
+        LICENSE_CATEGORY_INDIVIDUAL,
       );
       return {
         type: 'Individual-license-offer-v1.0',
@@ -416,7 +426,7 @@ export class IndividualManager {
     const nowSec = Math.floor(Date.now() / 1000);
     const updatedLicense: DeviceLicense = {
       ...(availableDoc.content as DeviceLicense),
-      status: 'issued',
+      status: LICENSE_STATUS_ISSUED,
       subjectId: params.individualId,
       issuedAt: nowSec,
     };

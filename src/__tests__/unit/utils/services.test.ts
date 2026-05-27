@@ -136,6 +136,17 @@ describe('Service Initialization Utilities', () => {
           (s.actions || []).includes('_transaction'),
       );
       expect(individualTransactionService).toBeDefined();
+      expect(individualTransactionService?.actions).toContain('_disable');
+      expect(individualTransactionService?.actions).toContain('_purge');
+
+      const employeePurgeService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'entity' &&
+          (s as any).selector?.format === 'org.schema' &&
+          s.serviceEndpoint === 'Employee' &&
+          (s.actions || []).includes('_purge'),
+      );
+      expect(employeePurgeService).toBeDefined();
 
       const fhirR4Service = services.find(
         (s: DidService) =>
@@ -261,9 +272,12 @@ describe('Service Initialization Utilities', () => {
 
       // ASSERT
       const registryServices = services.filter((s: DidService) => (s as any).selector?.section === 'registry');
-      expect(registryServices).toHaveLength(1);
-      expect((registryServices[0] as any).selector?.sector).toBe('test');
-      expect(registryServices[0].actions).toEqual(['_batch', '_activate']);
+      expect(registryServices).toHaveLength(2);
+      const organizationRegistry = registryServices.find((s: DidService) => s.serviceEndpoint === 'Organization');
+      const orderRegistry = registryServices.find((s: DidService) => s.serviceEndpoint === 'Order');
+      expect((organizationRegistry as any)?.selector?.sector).toBe('test');
+      expect(organizationRegistry?.actions).toEqual(['_batch', '_activate', '_disable', '_enable']);
+      expect(orderRegistry?.actions).toEqual(['_batch']);
 
       const identityServices = services.filter((s: DidService) => (s as any).selector?.section === 'identity');
       expect(identityServices).toHaveLength(4); // (research + health-care) × (firebase + openid)
@@ -278,8 +292,9 @@ describe('Service Initialization Utilities', () => {
       );
 
       const registryServices = services.filter((s: DidService) => (s as any).selector?.section === 'registry');
-      expect(registryServices).toHaveLength(1);
+      expect(registryServices).toHaveLength(2);
       expect((registryServices[0] as any).selector?.sector).toBe('test-network');
+      expect((registryServices[1] as any).selector?.sector).toBe('test-network');
     });
   });
 });

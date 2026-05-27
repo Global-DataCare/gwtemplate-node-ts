@@ -15,6 +15,7 @@ import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-
 import { testConfigDataHost, testConfigTenant1 } from '../../data/organization.data';
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
+import { applyTenantAuthorizationStatus } from '../../../utils/tenant-lifecycle';
 
 describe('TenantsCacheManager', () => {
   let tenantsCacheManager: InstanceType<typeof TenantsCacheManager>;
@@ -46,6 +47,7 @@ describe('TenantsCacheManager', () => {
     didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: tenantUrn },
     meta: { lastUpdated: '' },
   };
+  const suspendedAcmeConfig = applyTenantAuthorizationStatus(acmeConfig, 'suspended');
 
   const acmeSector = (acmeConfig.claims as ClaimsRecord)[ClaimsServiceSchemaorg.category] as Sector;
   const acmeAlternateName = (acmeConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.alternateName];
@@ -167,6 +169,24 @@ describe('TenantsCacheManager', () => {
       mockKmsService.unprotectConfidentialData.mockResolvedValue(acmeConfig);
       const jurisdiction = await tenantsCacheManager.getTenantJurisdiction(acmeVaultId);
       expect(jurisdiction).toBe((acmeConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.addressCountry]);
+    });
+  });
+
+  describe('tenant authorization lifecycle', () => {
+    it('should expose tenant authorization status from cached config', async () => {
+      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId } as any);
+      mockKmsService.unprotectConfidentialData.mockResolvedValue(suspendedAcmeConfig);
+
+      await expect(tenantsCacheManager.getTenantAuthorizationStatus(acmeVaultId)).resolves.toBe('suspended');
+      await expect(tenantsCacheManager.isTenantOperational(acmeVaultId)).resolves.toBe(false);
+    });
+
+    it('should default a tenant without explicit authorization metadata to active', async () => {
+      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId } as any);
+      mockKmsService.unprotectConfidentialData.mockResolvedValue(acmeConfig);
+
+      await expect(tenantsCacheManager.getTenantAuthorizationStatus(acmeVaultId)).resolves.toBe('active');
+      await expect(tenantsCacheManager.isTenantOperational(acmeVaultId)).resolves.toBe(true);
     });
   });
 });

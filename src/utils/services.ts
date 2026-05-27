@@ -10,6 +10,12 @@ import {
   hasServiceCapabilityFamily,
 } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { isFhirSector, isResearchSector } from './sector';
+import {
+  ACTION_DISABLE,
+  ACTION_ENABLE,
+  ACTION_PURGE,
+  SUBJECT_SECTION_INDIVIDUAL,
+} from '../constants/domain';
 
 export type HostRegistrySector = 'test' | 'test-network' | 'network';
 
@@ -107,20 +113,26 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   ));
 
   services.push(createDidEndpointConfigFromSelector(
-    { sector, section: 'individual', format: 'org.schema' },
+    { sector, section: 'entity', format: 'org.schema' },
+    ['Employee'],
+    [ACTION_PURGE]
+  ));
+
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     individualResources,
     ['_batch']
   ));
 
   services.push(createDidEndpointConfigFromSelector(
-    { sector, section: 'individual', format: 'org.schema' },
+    { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     ['Organization'],
-    ['_transaction']
+    ['_transaction', ACTION_DISABLE, ACTION_PURGE]
   ));
 
   // Family/onboarding flows query the household organization via org.schema.
   services.push(createDidEndpointConfigFromSelector(
-    { sector, section: 'individual', format: 'org.schema' },
+    { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     ['Organization'],
     ['_search']
   ));
@@ -176,7 +188,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
 
     services.push(
       createDidEndpointConfigFromSelector(
-        { sector, section: 'individual', format: 'org.hl7.fhir.r4' },
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.r4' },
         fhirR4CoreBatchResources,
         ['_batch'],
       ),
@@ -184,28 +196,28 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     // Personal (non-clinical) data collection endpoints use the versionless `org.hl7.fhir.api` context.
     services.push(
       createDidEndpointConfigFromSelector(
-        { sector, section: 'individual', format: 'org.hl7.fhir.api' },
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
         [...fhirApiCoreBatchResources, ...fhirApiExtensionBatchResources],
         ['_batch'],
       ),
     );
     services.push(
       createDidEndpointConfigFromSelector(
-        { sector, section: 'individual', format: 'org.hl7.fhir.api' },
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
         ['MedicationStatement'],
         ['_search'],
       ),
     );
     services.push(
       createDidEndpointConfigFromSelector(
-        { sector, section: 'individual', format: 'org.hl7.fhir.api' },
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
         ['Composition', 'Bundle'],
         ['_search'],
       ),
     );
     services.push(
       createDidEndpointConfigFromSelector(
-        { sector, section: 'individual', format: 'org.hl7.fhir.r4' },
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.r4' },
         ['Composition', 'Bundle'],
         ['_search'],
       ),
@@ -257,7 +269,7 @@ function filterBusinessServicesByCapabilityClaim(
       return digitalTwinEnabled;
     }
 
-    if (selector.section === 'entity' || selector.section === 'individual') {
+    if (selector.section === 'entity' || selector.section === SUBJECT_SECTION_INDIVIDUAL) {
       return indexingEnabled;
     }
 
@@ -394,8 +406,15 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
   services.push(
     createDidEndpointConfigFromSelector(
       { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
-      ['Organization', 'Order'],
-      ['_batch', '_activate'],
+      ['Organization'],
+      ['_batch', '_activate', ACTION_DISABLE, ACTION_ENABLE],
+    ),
+  );
+  services.push(
+    createDidEndpointConfigFromSelector(
+      { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
+      ['Order'],
+      ['_batch'],
     ),
   );
 
@@ -447,7 +466,7 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
   if (hostExtensionResources.length > 0) {
     services.push(
       createDidEndpointConfigFromSelector(
-        { sector: Sector.TEST as any, section: 'individual', format: 'org.hl7.fhir.api' },
+        { sector: Sector.TEST as any, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
         hostExtensionResources,
         ['_batch', '_search'],
       ),
