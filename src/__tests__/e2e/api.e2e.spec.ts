@@ -1,9 +1,9 @@
 // src/__tests__/e2e/api.e2e.spec.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-// This E2E test runs against a LIVE Firestore instance, configured via .env.local
+// This E2E test runs against a LIVE Firestore instance, configured via a local env profile.
 // It validates the entire LEGACY API flow (unencrypted JSON) from HTTP request to database interaction.
-// NOTE: This test requires TEST_USER_EMAIL and TEST_USER_PASSWORD to be set in .env.local
+// NOTE: This test requires TEST_USER_EMAIL and TEST_USER_PASSWORD to be set in the active env profile
 //       and for that user to exist in the Firebase Auth project.
 
 import * as express from 'express';

@@ -71,9 +71,9 @@ The generator produces Root CA, ICA, and Host MSP artifacts (includes `x509-chai
 ```
 npm run pki:generate
 ```
-With `.env.local`:
+With `.env.local-demo`:
 ```
-DOTENV_CONFIG_PATH=.env.local npm run pki:generate
+DOTENV_CONFIG_PATH=.env.local-demo npm run pki:generate
 ```
 
 Required variables (see `env.example`):

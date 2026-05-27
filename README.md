@@ -315,7 +315,7 @@ npm run api:local-firestore-demo
 This method runs the application inside a Docker container, which is a great way to ensure a consistent environment. This is the same image that will be deployed to the cloud.
 
 1.  **Build the Docker image:**
-    *(This script uses the `NPM_TOKEN` from your `.env.local` file if it exists)*
+    *(This script uses the `NPM_TOKEN` from the first available local profile file: `.env.local-demo`, `.env.local-postgres`, or `.env.cloud-supabase`)*
     ```bash
     ./docker_build_local.sh
     ```
