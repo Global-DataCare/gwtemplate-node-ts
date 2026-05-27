@@ -31,6 +31,18 @@ bash fabric-multicloud/scripts/05-k8s-deploy-gdc.sh
 
 Before applying, create `gwtemplate-secret` from the template in `fabric-multicloud/k8s/gdc/secret.template.yaml`.
 
+Provider-specific GW deployment profiles are documented under:
+
+- `fabric-multicloud/k8s/gdc/profiles/cloud-supabase.configmap.yaml`
+- `fabric-multicloud/k8s/gdc/profiles/cloud-supabase.secret.template.yaml`
+- `fabric-multicloud/k8s/gdc/profiles/cloud-firestore.configmap.yaml`
+- `fabric-multicloud/k8s/gdc/profiles/cloud-firestore.secret.template.yaml`
+
+Matching full env examples live at repo root:
+
+- `env.cloud-supabase.example`
+- `env.cloud-firestore.example`
+
 ## Fabric v3.1.3 channel artifacts (local toolchain)
 
 Local generation is the recommended path for the demo and for IT teams that want to reproduce
