@@ -43,7 +43,6 @@ resolve_versioned_demo_image() {
 
   echo "$image_ref"
 }
-
 confirm_or_exit() {
   read -p "Are you sure you want to proceed with the deployment? (y/n): " -n 1 -r
   echo ""
@@ -82,7 +81,6 @@ build_and_push_image() {
 
   echo "⚙️  Enabling required services..."
   gcloud services enable artifactregistry.googleapis.com
-
   if ! gcloud artifacts repositories describe "$repo_name" --location="$region" >/dev/null 2>&1; then
     echo "⚙️  Creating Artifact Registry repository: $repo_name in $region"
     gcloud artifacts repositories create "$repo_name" \
@@ -218,7 +216,6 @@ deploy_gke_demo() {
 
   GDC_IMAGE="$(resolve_versioned_demo_image "${GDC_IMAGE:-}" "${GDC_IMAGE_TAG:-}")"
   export GDC_IMAGE
-
   local required_vars=(
     GCP_PROJECT_ID GCP_REGION GKE_CLUSTER
     K8S_NAMESPACE_GDC GDC_IMAGE GDC_PUBLIC_URL GDC_STATIC_IP_NAME GDC_GSA_EMAIL

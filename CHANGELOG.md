@@ -52,6 +52,10 @@
   - `/_purge + POST` explicit purge command
 - Clarified that `ConfidentialStorageDoc.status` is the canonical current lifecycle state and that blockchain lifecycle anchoring should use a derived status-change event instead of the raw confidential storage document.
 - Centralized key domain lifecycle and license literals under `src/constants/domain.ts` to reduce hardcoded action, section, and licensing strings in managers and routing helpers.
+- Added a deploy-path split in `cloud_deploy.sh` so the same entrypoint now supports both Cloud Run environments and a demo GKE deployment mode.
+- Added a minimal GW GKE deployment skeleton under `fabric-multicloud/k8s/gdc/`, plus templated rendering/apply support in `fabric-multicloud/scripts/05-k8s-deploy-gdc.sh`.
+- Added `demo-deploy.config.example` and updated local Docker/GKE helper scripts to support reproducible demo deployment inputs without hardcoding secrets into the repo.
+- Updated the runtime image packaging so generated OpenAPI profile artifacts are copied into the final container image for Swagger UI profile selection.
 
 ### Testing
 - Added/updated focused tests for:
