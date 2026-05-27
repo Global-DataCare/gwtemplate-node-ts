@@ -22,6 +22,9 @@ Roadmap references:
 2. Expand integration coverage for `api` vs fixed FHIR-version path behavior symmetry.
 3. Harden strict security-mode path documentation and tests.
 4. Add canonical list/query support for active individual-member relationships so portal/BFF code can resolve `related-profiles` without reimplementing GW semantics.
+5. Design mixed-collection semantic alias queries:
+   - support future candidate protected names across resource families (`Patient.*`, `Subject.*`, `Client.*`)
+   - keep current implementation scoped to per-resource aliases only
 
 ## LATER
 1. Advanced profile support (additional validator adapters/profiles).

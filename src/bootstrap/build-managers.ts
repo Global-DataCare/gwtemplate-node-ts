@@ -1,3 +1,11 @@
+// Copyright 2026 Antifraud Services Inc. under the Apache License, Version 2.0.
+/**
+ * @fileoverview Centralized manager wiring for GW runtime bootstrap.
+ *
+ * @architecture 101
+ * Composition lives here only; manager behavior stays inside each manager class.
+ */
+
 import type { IServerConfig } from '../config';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
@@ -126,7 +134,7 @@ export function buildManagers(options: {
   const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository, clearingHouseService);
   const observationManager = new ObservationManager(vaultRepository, blockchainAdapter);
   const medicationStatementManager = new MedicationStatementManager(vaultRepository);
-  const relatedPersonManager = new RelatedPersonManager(vaultRepository, blockchainAdapter);
+  const relatedPersonManager = new RelatedPersonManager(vaultRepository, kmsService, blockchainAdapter);
   const consentManager = new ConsentManager({ vaultRepository, blockchainAdapter });
   const discoveryService = new DiscoveryService(tenantManager);
 

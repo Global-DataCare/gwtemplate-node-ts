@@ -122,14 +122,25 @@ export class VaultMemRepository implements IVaultRepository {
   
   public async query<T extends RecordBase>(
     collectionName: string,
-    query: { sectionId: string; where: { name: string; value: string }[] },
+    query: {
+      sectionId?: string;
+      section?: string;
+      where?: { name: string; value: string }[];
+      equals?: { 'indexed.attributes'?: { name: string; value: string } };
+    },
     ): Promise<T[]> {
-      const section = this.dataVaults.get(collectionName)?.sections.get(query.sectionId);
+      const sectionId = query.sectionId || query.section || 'default';
+      const section = this.dataVaults.get(collectionName)?.sections.get(sectionId);
       if (!section) { return []; }
       const allDocs = Array.from(section.values()) as any[];
+      const conditions = Array.isArray(query.where) && query.where.length > 0
+        ? query.where
+        : query.equals?.['indexed.attributes']
+          ? [query.equals['indexed.attributes']]
+          : [];
       return allDocs.filter((doc) => {
         if (!doc.indexed?.attributes) { return false; }
-        return query.where.every((condition) => 
+        return conditions.every((condition) => 
           (doc.indexed.attributes as any[]).some(attr => attr.name === condition.name && attr.value === condition.value)
         );
       }) as T[];

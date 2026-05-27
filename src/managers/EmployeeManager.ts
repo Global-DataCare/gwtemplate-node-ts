@@ -26,6 +26,7 @@ import { DidDocument, VerificationMethod } from '../gdc-backend-utils-node/model
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { EntityLifecycleStatus, EntityType } from '../gdc-backend-utils-node/models/enums';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { buildEmployeeIdentityIndexParameters } from 'gdc-common-utils-ts/utils/gateway-index-params';
 import { generateLicenseOffer } from '../utils/offer';
 import { getEnvSectionId } from '../utils/section-env';
 import { getPersonOccupationClaim } from '../utils/occupation';
@@ -309,13 +310,11 @@ export class EmployeeManager {
       },
     };
 
-    const attributesToIndex: ParameterData[] = [
-      { name: 'email', value: email, unique: true, type: 'string'},
-      // The role code is normalized before HMAC to ensure consistent searching.
-      { name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token'},
-      { name: 'kid', value: signerJwk.kid, unique: false, type: 'string'},
-      { name: 'kid', value: encrypterJwk.kid, unique: false, type: 'string'},
-    ];
+    const attributesToIndex: ParameterData[] = buildEmployeeIdentityIndexParameters({
+      email,
+      roleCode: normalizeCodeSystemAndValue(roleCode),
+      kidValues: [signerJwk.kid, encrypterJwk.kid],
+    });
     
     const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(attributesToIndex, vaultId);
 
@@ -355,10 +354,10 @@ export class EmployeeManager {
     email: string,
     roleCode: string,
   ): Promise<ConfidentialStorageDoc | undefined> {
-    const queryAttributes: ParameterData[] = [
-      { name: 'email', value: email, unique: true, type: 'string' },
-      { name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token' },
-    ];
+    const queryAttributes: ParameterData[] = buildEmployeeIdentityIndexParameters({
+      email,
+      roleCode: normalizeCodeSystemAndValue(roleCode),
+    });
 
     const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(queryAttributes, vaultId);
     const results = await this.vaultRepository.query(vaultId, {

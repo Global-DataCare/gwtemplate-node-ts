@@ -11,11 +11,13 @@ import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { fullPersonParamsSchemaorg, fullServiceParamsSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { initializeCustomerServices } from '../utils/services'; 
 import { createOperationOutcome } from '../utils/outcome';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { ParameterData } from 'gdc-common-utils-ts/models/params'; // extends ParamAttribute with `type` and others
+import { buildClaimIndexParametersFromDefinitionList } from 'gdc-common-utils-ts/utils/gateway-index-params';
 import { CredentialManager } from './CredentialManager';
 import { TenantsCacheManager } from './TenantsCacheManager';
 import { parseTenantUrn } from '../utils/urn';
@@ -322,18 +324,21 @@ export class IndividualManager {
   }
 
   private _buildIndexParameters(claims: ClaimsRecord): ParameterData[] {
-    const parameters: ParameterData[] = [];
-    for (const [key, value] of Object.entries(claims)) {
-      if (key !== ClaimsPersonSchemaorg.birthDate) {
-        if (typeof value === 'object' && value !== null && 'additionalType' in value && 'value' in value) {
-          const val = value as any;
-          parameters.push({ name: val.additionalType, value: val.value, unique: true, type: 'token' });
-        } else if (key.startsWith('org.schema.')) {
-          parameters.push({ name: key, value: value as string, type: 'string' });
-        }
-      }
-    }
-    return parameters;
+    return buildClaimIndexParametersFromDefinitionList(
+      claims,
+      [
+        { name: ClaimsPersonSchemaorg.identifier, type: 'uri', value: undefined, unique: true },
+        { name: ClaimsPersonSchemaorg.identifierType, type: 'string', value: undefined },
+        { name: ClaimsPersonSchemaorg.identifierValue, type: 'string', value: undefined },
+        { name: ClaimsPersonSchemaorg.email, type: 'string', value: undefined },
+        { name: ClaimsPersonSchemaorg.telephone, type: 'string', value: undefined },
+        { name: ClaimsPersonSchemaorg.givenName, type: 'string', value: undefined },
+        { name: ClaimsPersonSchemaorg.familyName, type: 'string', value: undefined },
+        { name: ClaimsPersonSchemaorg.additionalName, type: 'string', value: undefined },
+        ...fullPersonParamsSchemaorg.filter((definition) => definition.name === ClaimsPersonSchemaorg.gender),
+        ...fullServiceParamsSchemaorg,
+      ],
+    );
   }
 
   /**

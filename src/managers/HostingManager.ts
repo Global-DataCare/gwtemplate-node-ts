@@ -38,6 +38,7 @@ import { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-cr
 import { EntityLifecycleStatus, EntityType, NetworkAccessStatus, NetworkName, BundleEntryType } from '../gdc-backend-utils-node/models/enums';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { ParameterData } from 'gdc-common-utils-ts/models/params';
+import { buildEmployeeIdentityIndexParameters } from 'gdc-common-utils-ts/utils/gateway-index-params';
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { VerificationMethod } from 'gdc-common-utils-ts/models/did';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
@@ -761,14 +762,13 @@ export class HostingManager {
     const email = controllerConfig.claims?.[ClaimsPersonSchemaorg.email] as string | undefined;
     const roleCode = getPersonOccupationClaim(controllerConfig.claims as Record<string, any> | undefined);
 
-    const attributesToIndex: ParameterData[] = [
-      ...(email ? [{ name: 'email', value: email, unique: true, type: 'string' } as ParameterData] : []),
-      ...(roleCode ? [{ name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token' } as ParameterData] : []),
-      ...verificationMethods
+    const attributesToIndex: ParameterData[] = buildEmployeeIdentityIndexParameters({
+      email,
+      roleCode: roleCode ? normalizeCodeSystemAndValue(roleCode) : undefined,
+      kidValues: verificationMethods
         .map((vm) => (vm.publicKeyJwk as PublicJwk | undefined)?.kid)
-        .filter((kid): kid is string => Boolean(kid))
-        .map((kid) => ({ name: 'kid', value: kid, unique: false, type: 'string' } as ParameterData)),
-    ];
+        .filter((kid): kid is string => Boolean(kid)),
+    });
     const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(attributesToIndex, vaultId);
 
     const employeeDoc: ConfidentialStorageDoc = {

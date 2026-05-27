@@ -99,7 +99,7 @@ export class FirestoreVaultRepository extends IVaultRepository {
   }
 
   async query<T extends RecordBase>(collectionName: string, q: any): Promise<T[]> {
-    const sectionId = q.section || DEFAULT_SECTION;
+    const sectionId = q.section || q.sectionId || DEFAULT_SECTION;
     let queryChain: admin.firestore.Query = this.documentsCollectionRef(collectionName, sectionId);
 
     if (q.equals && q.equals['indexed.attributes']) {

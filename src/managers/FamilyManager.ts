@@ -1,5 +1,11 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
-// File: src/managers/FamilyManager.ts
+/**
+ * @fileoverview Family/individual organization registration and order flows.
+ *
+ * @architecture 101
+ * Licensing, payment and relationship materialization remain separate concerns in
+ * this manager even when a free baseline bundle short-circuits payment issuance.
+ */
 
 import { v4 as uuidv4 } from 'uuid';
 import { IServerConfig } from '../config';
@@ -409,16 +415,37 @@ export class FamilyManager {
       activationCategory: (finalizedContent.claims as any)['org.schema.IndividualProduct.category'] as string | undefined,
       ...readOfferPaymentContext(finalizedContent.claims),
     };
-    const paymentCommunication = await buildPaymentCommunication(paymentContext);
+    const isFreeBaseline = Number(paymentContext.price || '0') <= 0;
+    const paymentCommunication = isFreeBaseline
+      ? {
+          communicationId: uuidv4(),
+          paymentUrl: '',
+          claims: {
+            '@context': 'org.schema',
+            '@type': 'Order:Invoice',
+            'org.schema.Order.acceptedOffer.identifier': offerId,
+            'org.schema.Order.paymentMethod': 'free-baseline',
+            'org.schema.Order.invoiceIssuedAt': new Date().toISOString(),
+            ...(paymentContext.activationCode
+              ? { 'org.schema.IndividualProduct.serialNumber': paymentContext.activationCode }
+              : {}),
+            ...(paymentContext.activationCategory
+              ? { 'org.schema.IndividualProduct.category': paymentContext.activationCategory }
+              : {}),
+          },
+        }
+      : await buildPaymentCommunication(paymentContext);
 
-    const communicationDoc: ConfidentialStorageDoc = {
-      id: paymentCommunication.communicationId,
-      status: EntityLifecycleStatus.Active,
-      sequence: 0,
-      content: { claims: paymentCommunication.claims },
-    };
-    const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, tenantVaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
+    if (!isFreeBaseline) {
+      const communicationDoc: ConfidentialStorageDoc = {
+        id: paymentCommunication.communicationId,
+        status: EntityLifecycleStatus.Active,
+        sequence: 0,
+        content: { claims: paymentCommunication.claims },
+      };
+      const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, tenantVaultId);
+      await this.vaultRepository.put(tenantCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
+    }
 
     return {
       type: 'Family-order-response-v1.0',

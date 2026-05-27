@@ -63,7 +63,14 @@ describe('IndividualManager', () => {
     (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
 
     mockTenantsCacheManager.getEntityClaims.mockResolvedValue({});
-    mockKmsService.protectAttributesNameAndValue.mockResolvedValue([]);
+    mockKmsService.protectAttributesNameAndValue.mockImplementation(async (attributes) => (
+      attributes.map((attribute) => ({
+        name: attribute.name,
+        value: String(attribute.value),
+        type: attribute.type,
+        unique: attribute.unique,
+      }))
+    ));
 
     mockKmsService.protectConfidentialData.mockImplementation(
       async (doc: ConfidentialStorageDoc): Promise<ConfidentialStorageDoc> => {
@@ -99,6 +106,26 @@ describe('IndividualManager', () => {
       const customerConfig = savedDoc.content as EntityConfig;
       expect(customerConfig.id).toBe(testCustomer1Uuid);
       expect((customerConfig.claims as any)[ClaimsPersonSchemaorg.identifierValue]).toBe((testIndividualOnboardingBatchEntries[1].meta.claims as any)[ClaimsPersonSchemaorg.identifierValue]);
+      expect(mockKmsService.protectAttributesNameAndValue).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: ClaimsPersonSchemaorg.identifier,
+            value: `urn:uuid:${testCustomer1Uuid}`,
+            type: 'uri',
+          }),
+          expect.objectContaining({
+            name: ClaimsPersonSchemaorg.email,
+            value: (testIndividualOnboardingBatchEntries[0].meta.claims as any)[ClaimsPersonSchemaorg.email],
+            type: 'string',
+          }),
+          expect.objectContaining({
+            name: ClaimsServiceSchemaorg.category,
+            value: (testIndividualOnboardingBatchEntries[0].meta.claims as any)[ClaimsServiceSchemaorg.category],
+            type: 'token',
+          }),
+        ]),
+        `${(job.sector as string)}_${(job.tenantId as string)}`,
+      );
 
       // 2. Verify response structure
       const responseEntry = response.body.data[0];
