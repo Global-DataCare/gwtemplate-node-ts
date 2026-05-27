@@ -4,7 +4,7 @@
     "title": "Gateway API - EXTENSIONS",
     "version": "1.0.3",
     "description": "Extension profile including non-core and vertical-specific capabilities on top of core and compat.",
-    "x-profile-generated-at": "2026-05-26T08:04:53.783Z",
+    "x-profile-generated-at": "2026-05-27T06:20:19.572Z",
     "x-profile-name": "extension"
   },
   "servers": [],
@@ -2512,7 +2512,7 @@
           "3.1 Employee Role"
         ],
         "summary": "Create a new Professional (Employee)",
-        "description": "Submits an asynchronous job to create or reactivate a professional (employee) within an existing tenant.\nThe `tenantId` in the path specifies the organization under which the employee is being created.\nPrerequisite: controller device/client must already be active (`Token/_exchange` + `Device/_dcr`).\nCreating an employee profile does not automatically activate employee devices.\nFor additional employees/devices, use `License/_issue` and then run `_exchange` + `_dcr`.\n\nV1 lifecycle semantics:\n- business identity is the combination `email + role`\n- if the same `email + role` already exists and is active, the gateway returns the existing employee instead of creating a duplicate\n- if the same `email + role` exists and is inactive, the gateway reactivates that employee record\n- employee suspension does not implicitly release the reserved license seat\n",
+        "description": "Submits an asynchronous job to create or enable again a professional (employee) within an existing tenant.\nThe `tenantId` in the path specifies the organization under which the employee is being created.\nPrerequisite: controller device/client must already be active (`Token/_exchange` + `Device/_dcr`).\nCreating an employee profile does not automatically activate employee devices.\nFor additional employees/devices, use `License/_issue` and then run `_exchange` + `_dcr`.\n\nV1 lifecycle semantics:\n- business identity is the combination `email + role`\n- if the same `email + role` already exists and is active, the gateway returns the existing employee instead of creating a duplicate\n- if the same `email + role` exists and is inactive, the gateway enables that employee record again\n- employee suspension does not implicitly release the reserved license seat\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
