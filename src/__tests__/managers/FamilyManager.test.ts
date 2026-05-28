@@ -424,7 +424,7 @@ describe('FamilyManager', () => {
         COLLECTION_NAME,
         expect.objectContaining({
           where: expect.arrayContaining([
-            expect.objectContaining({ name: ClaimsOrganizationSchemaorg.ownerTelephone, value: '+34600000001' }),
+            expect.objectContaining({ name: ClaimsOrganizationSchemaorg.ownerTelephone, value: 'tel:+34600000001' }),
             expect.objectContaining({ name: ClaimsOrganizationSchemaorg.alternateName, value: 'Ana' }),
           ]),
         }),

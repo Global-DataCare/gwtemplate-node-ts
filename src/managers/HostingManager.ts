@@ -50,6 +50,7 @@ import { ManageAssetOrganization } from '../blockchain/fabric/v3/manageAssetOrga
 import { resolveIdentityChannel } from '../utils/ledger';
 import { slugFromDomain } from '../utils/slug';
 import { getEnvSectionId } from '../utils/section-env';
+import { normalizeIndexedEmail, splitIndexedEmails, splitIndexedPhones } from '../utils/indexed-contact';
 import { ClearingHouseService, IClearingHouseService } from '../services/ClearingHouseService';
 import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
 import {
@@ -657,7 +658,7 @@ export class HostingManager {
     registrationKeys?: { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk },
     explicitBinding?: ActivationParticipantMaterial,
   ): Promise<EntityConfig> {
-    const email = legalRep.meta?.claims?.[ClaimsPersonSchemaorg.email] as string | undefined;
+    const email = normalizeIndexedEmail(legalRep.meta?.claims?.[ClaimsPersonSchemaorg.email]) as string | undefined;
     const roleCode = getPersonOccupationClaim(legalRep.meta?.claims as Record<string, any> | undefined);
     if (!email || !roleCode) {
       throw new ManagerError('Missing required admin Person claims (email, hasOccupation).', IssueType.Required);
@@ -758,7 +759,7 @@ export class HostingManager {
     vaultId: string,
   ): Promise<void> {
     const verificationMethods = controllerConfig.didDocument?.verificationMethod || [];
-    const email = controllerConfig.claims?.[ClaimsPersonSchemaorg.email] as string | undefined;
+    const email = normalizeIndexedEmail(controllerConfig.claims?.[ClaimsPersonSchemaorg.email]) as string | undefined;
     const roleCode = getPersonOccupationClaim(controllerConfig.claims as Record<string, any> | undefined);
 
     const attributesToIndex: ParameterData[] = [
@@ -1279,11 +1280,6 @@ export class HostingManager {
     };
   }
 
-  private splitOwnerValues(value?: string): string[] {
-    if (!value) return [];
-    return value.split(',').map((v) => v.trim()).filter(Boolean);
-  }
-
   private async resolveTenantCollectionForIndividuals(tenantVaultId: string, createIfMissing: boolean): Promise<string> {
     const cached = await this.tenantsCacheManager.getCollectionName(tenantVaultId);
     if (cached) return cached;
@@ -1320,8 +1316,8 @@ export class HostingManager {
     const tenantCollectionName = await this.resolveTenantCollectionForIndividuals(tenantVaultId, true);
 
     const apodo = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
-    const ownerPhones = this.splitOwnerValues(claims['org.schema.Organization.owner.telephone'] as string | undefined);
-    const ownerEmails = this.splitOwnerValues(claims['org.schema.Organization.owner.email'] as string | undefined);
+    const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
+    const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
     if (!apodo || (ownerPhones.length === 0 && ownerEmails.length === 0)) {
       throw new ManagerError(
         `Missing required claims: '${ClaimsOrganizationSchemaorg.alternateName}' and one of owner.telephone/owner.email`,
@@ -1421,8 +1417,8 @@ export class HostingManager {
     const tenantCollectionName = await this.resolveTenantCollectionForIndividuals(tenantVaultId, false);
 
     const apodo = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
-    const ownerPhones = this.splitOwnerValues(claims['org.schema.Organization.owner.telephone'] as string | undefined);
-    const ownerEmails = this.splitOwnerValues(claims['org.schema.Organization.owner.email'] as string | undefined);
+    const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
+    const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
     if (!apodo || (ownerPhones.length === 0 && ownerEmails.length === 0)) {
       throw new ManagerError(
         `Missing required claims for search: '${ClaimsOrganizationSchemaorg.alternateName}' and one of owner.telephone/owner.email`,

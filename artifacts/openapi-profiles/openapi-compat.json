@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-05-28T00:54:25.897Z",
+    "x-profile-generated-at": "2026-05-28T01:15:09.257Z",
     "x-profile-name": "compat"
   },
   "servers": [],

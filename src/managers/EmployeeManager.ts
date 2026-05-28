@@ -30,6 +30,7 @@ import { generateLicenseOffer } from '../utils/offer';
 import { getEnvSectionId } from '../utils/section-env';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import { createEmployeeUrn, parseTenantUrn } from '../utils/urn';
+import { normalizeIndexedEmail } from '../utils/indexed-contact';
 import {
   ACTION_PURGE,
   LICENSE_STATUS_AVAILABLE,
@@ -172,8 +173,8 @@ export class EmployeeManager {
     let signerJwk: PublicJwk | undefined;
     let encrypterJwk: PublicJwk | undefined;
 
-    const email = claims[ClaimsPersonSchemaorg.email];
-    if (!email || typeof email !== 'string') {
+    const email = normalizeIndexedEmail(claims[ClaimsPersonSchemaorg.email]);
+    if (!email) {
       throw new ManagerError('Missing or invalid email claim.', IssueType.Required);
     }
 
@@ -542,11 +543,11 @@ export class EmployeeManager {
     employee: EntityConfig,
     claims: ClaimsRecord,
   ): Promise<void> {
-    const email = String(
+    const email = normalizeIndexedEmail(
       employee.claims?.[ClaimsPersonSchemaorg.email]
       || claims?.[ClaimsPersonSchemaorg.email]
       || '',
-    ).trim().toLowerCase();
+    );
     const roleCode = normalizeCodeSystemAndValue(
       getPersonOccupationClaim(employee.claims as ClaimsRecord)
       || getPersonOccupationClaim(claims)
@@ -565,7 +566,7 @@ export class EmployeeManager {
 
       const matchesSubject = license.subjectId === employeeId;
       const matchesInvite = email
-        && String(license.issuedToEmail || '').trim().toLowerCase() === email
+        && normalizeIndexedEmail(String(license.issuedToEmail || '')) === email
         && roleCode
         && normalizeCodeSystemAndValue(String(license.issuedToRole || '')) === roleCode;
 

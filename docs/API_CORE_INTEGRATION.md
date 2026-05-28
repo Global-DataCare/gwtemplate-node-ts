@@ -31,6 +31,11 @@ Short coverage summary for memory/thesis justification:
   - `body.controller.sameAs`
   - `body.controller.publicKeyJwk`
   - `body.controller.jwks`
+- Indexed-contact canonicalization rule:
+  - public aliases may keep URI form such as `mailto:controller@example.org` in `controller.sameAs`
+  - indexed email attributes must be normalized to plain lowercase email without the `mailto:` prefix
+  - indexed phone attributes must be normalized to `tel:+<digits>` without formatting spaces or separators
+  - storage and query inputs must use the same canonicalization before HMAC/index protection
 - Claim-teaching rule:
   - examples should prefer shared `ClaimsOrganizationSchemaorg`, `ClaimsPersonSchemaorg`, and `ClaimsServiceSchemaorg` constants instead of hardcoded claim-key strings
 - Service capability rule:

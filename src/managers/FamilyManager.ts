@@ -31,6 +31,7 @@ import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import { buildClaimsFromIndividualRegistrationPdfAttachment } from '../utils/individual-registration-pdf-attachment';
+import { normalizeIndexedEmail, splitIndexedEmails, splitIndexedPhones } from '../utils/indexed-contact';
 import {
   ACTION_DISABLE,
   ACTION_PURGE,
@@ -143,10 +144,8 @@ export class FamilyManager {
     const processedService = await this.handleServiceAttachment(service);
 
     // Individual org attributes live in Organization claims.
-    const ownerPhonesRaw = claims['org.schema.Organization.owner.telephone'] as string | undefined;
-    const ownerEmailsRaw = claims['org.schema.Organization.owner.email'] as string | undefined;
-    const ownerPhones = ownerPhonesRaw ? ownerPhonesRaw.split(',').map(p => p.trim()).filter(Boolean) : [];
-    const ownerEmails = ownerEmailsRaw ? ownerEmailsRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
+    const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
+    const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
     const apodo = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
     if (!apodo || (ownerPhones.length === 0 && ownerEmails.length === 0)) {
       throw new ManagerError(
@@ -466,10 +465,8 @@ export class FamilyManager {
       throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
     }
 
-    const ownerPhoneRaw = claims['org.schema.Organization.owner.telephone'] as string | undefined;
-    const ownerEmailRaw = claims['org.schema.Organization.owner.email'] as string | undefined;
-    const ownerPhones = ownerPhoneRaw ? ownerPhoneRaw.split(',').map(p => p.trim()).filter(Boolean) : [];
-    const ownerEmails = ownerEmailRaw ? ownerEmailRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
+    const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
+    const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
     const nickname = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
     if ((ownerPhones.length === 0 && ownerEmails.length === 0) || !nickname) {
       throw new ManagerError(
@@ -526,10 +523,8 @@ export class FamilyManager {
       throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
     }
 
-    const ownerPhoneRaw = claims['org.schema.Organization.owner.telephone'] as string | undefined;
-    const ownerEmailRaw = claims['org.schema.Organization.owner.email'] as string | undefined;
-    const ownerPhones = ownerPhoneRaw ? ownerPhoneRaw.split(',').map(p => p.trim()).filter(Boolean) : [];
-    const ownerEmails = ownerEmailRaw ? ownerEmailRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
+    const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
+    const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
     const nickname = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
     if ((ownerPhones.length === 0 && ownerEmails.length === 0) || !nickname) {
       throw new ManagerError(
@@ -597,10 +592,8 @@ export class FamilyManager {
       throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
     }
 
-    const ownerPhoneRaw = claims['org.schema.Organization.owner.telephone'] as string | undefined;
-    const ownerEmailRaw = claims['org.schema.Organization.owner.email'] as string | undefined;
-    const ownerPhones = ownerPhoneRaw ? ownerPhoneRaw.split(',').map(p => p.trim()).filter(Boolean) : [];
-    const ownerEmails = ownerEmailRaw ? ownerEmailRaw.split(',').map(e => e.trim()).filter(Boolean) : [];
+    const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
+    const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
     const nickname = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
     if ((ownerPhones.length === 0 && ownerEmails.length === 0) || !nickname) {
       throw new ManagerError(
@@ -643,11 +636,11 @@ export class FamilyManager {
     familyContent: FamilyRegistrationContent,
   ): Promise<void> {
     const activationCode = String((familyContent.claims as any)['org.schema.IndividualProduct.serialNumber'] || '').trim();
-    const email = String(
+    const email = normalizeIndexedEmail(String(
       familyContent.claims[ClaimsPersonSchemaorg.email]
       || familyContent.claims[ClaimsOrganizationSchemaorg.ownerEmail]
       || '',
-    ).trim().toLowerCase();
+    ));
 
     const licenseDocs =
       (await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(tenantVaultId, DEVICE_LICENSE_SECTION)) || [];
@@ -661,7 +654,8 @@ export class FamilyManager {
       }
 
       const matchesActivationCode = activationCode && String(license.activationCode || '').trim() === activationCode;
-      const matchesInviteEmail = email && String(license.issuedToEmail || '').trim().toLowerCase() === email;
+      const matchesInviteEmail =
+        email && normalizeIndexedEmail(String(license.issuedToEmail || '')) === email;
       if (!matchesActivationCode && !matchesInviteEmail) {
         continue;
       }

@@ -4,7 +4,7 @@
     "title": "Gateway API - EXTENSIONS",
     "version": "1.0.3",
     "description": "Extension profile including non-core and vertical-specific capabilities on top of core and compat.",
-    "x-profile-generated-at": "2026-05-28T00:54:25.901Z",
+    "x-profile-generated-at": "2026-05-28T01:15:09.261Z",
     "x-profile-name": "extension"
   },
   "servers": [],
