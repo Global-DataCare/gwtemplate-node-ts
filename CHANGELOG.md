@@ -1,3 +1,15 @@
+## [1.7.2] - 2026-05-28
+
+### Changed
+- Clarified activation/OpenAPI guidance around key-binding semantics for:
+  - `Organization.hasCredential.material`
+  - `Person.hasCredential.material`
+  - `SoftwareApplication.material`
+- Clarified RFC 7638 JWK thumbprints and RFC 9278 URN representation in the
+  activation-proof and integrator-guide text.
+- Regenerated Swagger/OpenAPI profile artifacts after the documentation
+  alignment.
+
 ## [1.7.1] - 2026-05-27
 
 ### Changed

@@ -230,7 +230,7 @@ const swaggerDefinition = {
       OrganizationActivationPlaintextMessage: {
         summary: 'Plaintext Message for Organization Activation',
         description:
-          'A DIDComm-like message wrapper for `_activate`; canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields.',
+          'A DIDComm-like message wrapper for `_activate`; canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, `SoftwareApplication.material` denotes the public cryptographic material of the software application when ICA issues that VC, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields.',
         value: {},
       },
       OrganizationOrderPlaintextMessage: {

@@ -585,6 +585,9 @@ export function createApiRouter(
    *       Expected semantics:
    *       - canonical proof input is `body.vp_token`; the ICA organization + representative evidence belongs there
    *       - the VP carried by `body.vp_token` is built from the ICA-issued organization VC, ICA-issued legal representative VC, presenter signing key id, and target host operator id before external signing
+   *       - if ICA also issued a `SoftwareApplication` VC for the portal/backend, its `SoftwareApplication.material` field is the public cryptographic material of that software application, typically the communication signing key id bound during ICA registration
+   *       - when that key id is represented as a JWK thumbprint, RFC 7638 defines the canonical thumbprint calculation over the public signing / verification JWK and RFC 9278 defines the canonical URN form `urn:ietf:params:oauth:jwk-thumbprint:sha-256:<base64url>`
+   *       - the controller-side signature belongs to the prior ICA registration step; later operational app-service proofs should be signed by the app-service key itself
    *       - `org.schema.Service.url` is the hosting URL selected by the controller during onboarding; it identifies the chosen hosting operator / connector location and is separate from the tenant public `did:web`
    *       - `body.controller.*` is the explicit controller key-binding contract inherited from the ICA model and is used when GW must publish/bootstrap the controller person DID
    *       - `body.organizationCredential` / `body.representativeCredential` are deprecated compatibility fields and must not be treated as the canonical proof contract
