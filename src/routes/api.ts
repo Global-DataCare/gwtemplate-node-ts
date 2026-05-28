@@ -584,6 +584,8 @@ export function createApiRouter(
    *
    *       Expected semantics:
    *       - canonical proof input is `body.vp_token`; the ICA organization + representative evidence belongs there
+   *       - the VP carried by `body.vp_token` is built from the ICA-issued organization VC, ICA-issued legal representative VC, presenter signing key id, and target host operator id before external signing
+   *       - `org.schema.Service.url` is the hosting URL selected by the controller during onboarding; it identifies the chosen hosting operator / connector location and is separate from the tenant public `did:web`
    *       - `body.controller.*` is the explicit controller key-binding contract inherited from the ICA model and is used when GW must publish/bootstrap the controller person DID
    *       - `body.organizationCredential` / `body.representativeCredential` are deprecated compatibility fields and must not be treated as the canonical proof contract
    *       - the host validates the ICA proof and activates the tenant backend/connector

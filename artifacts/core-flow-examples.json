@@ -68,8 +68,8 @@
   "ORGANIZATION_ACTIVATION_REQUEST": {
     "jti": "org-activation-request-<test-id>",
     "thid": "org-activation-thread-<test-id>",
-    "iss": "did:web:controller.example.org",
-    "aud": "did:web:host.example.com",
+    "iss": "urn:ietf:params:oauth:jwk-thumbprint:sha-256:<controller-signing-thumbprint>",
+    "aud": "host:node-operator-es",
     "exp": 1678886460,
     "iat": 1678886400,
     "nbf": 1678886400,

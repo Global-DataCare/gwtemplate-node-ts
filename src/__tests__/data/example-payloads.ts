@@ -253,14 +253,20 @@ export const ORGANIZATION_ORDER_RESPONSE = {
  *
  * Contract priority:
  * - `vp_token` is the canonical proof carrier and should embed the ICA evidence
+ * - the VP inside `vp_token` is assembled from the ICA-issued organization VC,
+ *   ICA-issued legal-representative VC, presenter signing key id, and target
+ *   host operator id before external signing
+ * - `org.schema.Service.url` is the hosting URL selected by the controller
+ *   during onboarding; it points to the chosen hosting operator/connector
+ *   location and must not be confused with the tenant public `did:web`
  * - `controller.*` is explicit public key binding material for controller/person DID bootstrap
  * - `organizationCredential` / `representativeCredential` are deprecated compatibility fields
  */
 export const ORGANIZATION_ACTIVATION_REQUEST = {
   "jti": "org-activation-request-<test-id>",
   "thid": "org-activation-thread-<test-id>",
-  "iss": "did:web:controller.example.org",
-  "aud": "did:web:host.example.com",
+  "iss": "urn:ietf:params:oauth:jwk-thumbprint:sha-256:<controller-signing-thumbprint>",
+  "aud": "host:node-operator-es",
   "exp": 1678886460,
   "iat": 1678886400,
   "nbf": 1678886400,
