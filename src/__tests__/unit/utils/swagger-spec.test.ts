@@ -38,6 +38,7 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json']).toBeDefined();
     expect(spec.paths['/.well-known/dcat3/catalog']).toBeDefined();
+    expect(spec.paths['/api/dataspace-discovery/providers']).toBeDefined();
     expect(spec.paths['/dcat3/catalog/dcat.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/dcat.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata']).toBeDefined();

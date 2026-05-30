@@ -19,7 +19,9 @@ import { DataspaceSectors } from 'gdc-common-utils-ts/constants/sectors';
 import { ServiceCapabilityToken, serializeServiceCapabilityTokens } from 'gdc-common-utils-ts/constants/service-capabilities';
 import {
   buildExampleHostedTenantBaseUrl,
+  EXAMPLE_COVERAGE_SCOPE_EU,
   EXAMPLE_GATEWAY_PUBLIC_ORIGIN,
+  EXAMPLE_HOSTING_OPERATOR_DID,
   EXAMPLE_HOST_PUBLIC_HOSTNAME,
   EXAMPLE_PROVIDER_LEGAL_NAME,
   EXAMPLE_SECONDARY_PROVIDER_ALTERNATE_NAME,
@@ -382,5 +384,103 @@ describe('DCAT3 Discovery API', () => {
     );
     expect(parsed['dcat:dataset']).toHaveLength(1);
     expect(mockTenantsCacheManager.listAutodiscoverableTenants).toHaveBeenCalledTimes(1);
+  });
+
+  it('should return normalized published-provider discovery DTOs for backend consumers', async () => {
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: EXAMPLE_HOSTING_OPERATOR_DID } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({
+      didDocument: { id: EXAMPLE_HOSTING_OPERATOR_DID },
+      claims: {
+        [ClaimsOrganizationSchemaorg.legalName]: 'Host Operator Example',
+        [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+        [ClaimsServiceSchemaorg.category]: DataspaceSectors.HealthResearch,
+        [ClaimsServiceSchemaorg.areaServed]: `ES,${EXAMPLE_COVERAGE_SCOPE_EU}`,
+      },
+    } as any);
+    mockTenantsCacheManager.listAutodiscoverableTenants.mockResolvedValue([
+      {
+        didDocument: { id: testTenant1DidWebHosted },
+        claims: {
+          [ClaimsOrganizationSchemaorg.alternateName]: testTenant1AlternateName,
+          [ClaimsOrganizationSchemaorg.legalName]: EXAMPLE_PROVIDER_LEGAL_NAME,
+          [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+          [ClaimsServiceSchemaorg.category]: DataspaceSectors.HealthResearch,
+          [ClaimsServiceSchemaorg.url]: buildExampleHostedTenantBaseUrl({
+            alternateName: testTenant1AlternateName,
+            jurisdiction: 'ES',
+            version: 'v1',
+            sector: DataspaceSectors.HealthResearch,
+          }),
+          [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
+            ServiceCapabilityToken.IndexProvider,
+            ServiceCapabilityToken.DigitalTwinProvider,
+          ]),
+        },
+      },
+      {
+        didDocument: { id: EXAMPLE_SECONDARY_TENANT_SERVICE_DID },
+        claims: {
+          [ClaimsOrganizationSchemaorg.alternateName]: EXAMPLE_SECONDARY_PROVIDER_ALTERNATE_NAME,
+          [ClaimsOrganizationSchemaorg.legalName]: EXAMPLE_SECONDARY_PROVIDER_LEGAL_NAME,
+          [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+          [ClaimsServiceSchemaorg.category]: DataspaceSectors.HealthResearch,
+          [ClaimsServiceSchemaorg.url]: buildExampleHostedTenantBaseUrl({
+            alternateName: EXAMPLE_SECONDARY_PROVIDER_ALTERNATE_NAME,
+            jurisdiction: 'ES',
+            version: 'v1',
+            sector: DataspaceSectors.HealthResearch,
+          }),
+          [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
+            ServiceCapabilityToken.IndexReader,
+            ServiceCapabilityToken.DigitalTwinReader,
+          ]),
+        },
+      },
+    ] as any);
+
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: '/api/dataspace-discovery/providers',
+      headers: { host: EXAMPLE_HOST_PUBLIC_HOSTNAME, 'content-type': 'application/json' },
+      body: {
+        sector: DataspaceSectors.HealthResearch,
+        providerCapability: ServiceCapabilityToken.IndexProvider,
+        jurisdiction: 'ES',
+        coverageScope: EXAMPLE_COVERAGE_SCOPE_EU,
+      },
+    });
+
+    const parsed = JSON.parse(response.text);
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(parsed.providers)).toBe(true);
+    expect(parsed.providers).toHaveLength(1);
+    expect(parsed.providers[0]).toEqual(
+      expect.objectContaining({
+        providerDid: testTenant1DidWebHosted,
+        hostingOperatorDid: EXAMPLE_HOSTING_OPERATOR_DID,
+        title: EXAMPLE_PROVIDER_LEGAL_NAME,
+      }),
+    );
+    expect(parsed.providers[0].record).toEqual(
+      expect.objectContaining({
+        providerDid: testTenant1DidWebHosted,
+        serviceType: ServiceCapabilityToken.IndexProvider,
+        category: DataspaceSectors.HealthResearch,
+        areaServed: 'ES',
+      }),
+    );
+    expect(parsed.hostingOperators).toEqual([
+      expect.objectContaining({
+        operatorDid: EXAMPLE_HOSTING_OPERATOR_DID,
+        matchedCapabilities: [ServiceCapabilityToken.IndexProvider],
+      }),
+    ]);
+    expect(parsed.hostingOperators[0].record).toEqual(
+      expect.objectContaining({
+        subjectId: EXAMPLE_HOSTING_OPERATOR_DID,
+        coverageScope: EXAMPLE_COVERAGE_SCOPE_EU,
+      }),
+    );
   });
 });

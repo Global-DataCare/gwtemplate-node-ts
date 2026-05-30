@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-05-30T04:34:22.134Z",
+    "x-profile-generated-at": "2026-05-30T06:05:36.308Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -5249,6 +5249,33 @@
         "responses": {
           "200": {
             "description": "DCAT catalog returned"
+          },
+          "503": {
+            "description": "Host DID document is unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/api/dataspace-discovery/providers": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Resolve published service providers for backend/BFF consumption",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Normalized autodiscovery DTOs returned"
           },
           "503": {
             "description": "Host DID document is unavailable"

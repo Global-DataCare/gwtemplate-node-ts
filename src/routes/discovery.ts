@@ -11,6 +11,7 @@ import { signVerifiableCredential } from '../utils/vc-signer';
 import { findSigningMethod } from '../utils/did-backend';
 import { buildStatusListCredential, buildStatusListEntry, createStatusListEncodedList } from '../utils/status-list';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { isEuCountryCode, normalizeCountryCode } from 'gdc-common-utils-ts/constants/eu-countries';
 import {
   getServiceCapabilityFamily,
   hasServiceCapabilityFamily,
@@ -71,6 +72,38 @@ export function createDiscoveryRouter(
     serviceTypes: ServiceCapabilityTokenValue[];
   };
 
+  type NormalizedHostingOperatorDiscoveryMatch = {
+    operatorDid: string;
+    title?: string;
+    catalogUrl?: string;
+    matchedCapabilities: string[];
+    record: {
+      subjectId: string;
+      serviceTypes: string[];
+      categories: string[];
+      areaServed: string[];
+      addressCountry?: string;
+      coverageScope?: string;
+    };
+  };
+
+  type NormalizedPublishedProviderDiscoveryMatch = {
+    providerDid: string;
+    title?: string;
+    hostingOperatorDid: string;
+    hostingOperatorTitle?: string;
+    catalogUrl?: string;
+    record: {
+      providerDid: string;
+      serviceType: string;
+      category: string;
+      areaServed?: string;
+      endpointUrl?: string;
+      catalogUrl?: string;
+    };
+    hostingOperator: NormalizedHostingOperatorDiscoveryMatch['record'];
+  };
+
   const parseCategory = (value: unknown): string => {
     if (typeof value !== 'string') return '';
     const first = value.split(',')[0]?.trim() || '';
@@ -80,6 +113,23 @@ export function createDiscoveryRouter(
   const parseJurisdiction = (value: unknown): string => {
     if (typeof value !== 'string') return '';
     return value.trim().toUpperCase();
+  };
+
+  const parseAreaServedClaim = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+      return Array.from(new Set(value
+        .flatMap((entry) => parseAreaServedClaim(entry))
+        .map((entry) => entry.trim())
+        .filter(Boolean)));
+    }
+    if (typeof value !== 'string') return [];
+    return Array.from(new Set(value.split(',').map((entry) => entry.trim()).filter(Boolean)));
+  };
+
+  const inferCoverageScope = (countryCode: string | undefined): string | undefined => {
+    const normalized = normalizeCountryCode(countryCode);
+    if (!normalized) return undefined;
+    return isEuCountryCode(normalized) ? 'EU' : normalized;
   };
 
   const toProviderDataset = (tenantConfig: any): ProviderDataset | null => {
@@ -225,6 +275,104 @@ export function createDiscoveryRouter(
 
   const filterProviderDatasets = (datasets: ProviderDataset[]): ProviderDataset[] =>
     datasets.filter((dataset) => hasProviderServiceCapabilityClaim(dataset.serviceTypeClaim));
+
+  const matchesDiscoveryFilter = (
+    category: string | undefined,
+    jurisdiction: string | undefined,
+    areaServed: readonly string[],
+    input: { sector?: string; jurisdiction?: string; coverageScope?: string },
+  ): boolean => {
+    const normalizedSector = String(input.sector || '').trim().toLowerCase();
+    const normalizedJurisdiction = parseJurisdiction(input.jurisdiction);
+    const normalizedCoverageScope = String(input.coverageScope || '').trim().toUpperCase();
+    if (normalizedSector && String(category || '').trim().toLowerCase() !== normalizedSector) return false;
+    if (normalizedJurisdiction && !areaServed.map((entry) => entry.toUpperCase()).includes(normalizedJurisdiction)) return false;
+    if (normalizedCoverageScope && !areaServed.map((entry) => entry.toUpperCase()).includes(normalizedCoverageScope)) return false;
+    return true;
+  };
+
+  const buildHostDiscoveryMatch = async (
+    hostDid: string,
+    publicOrigin: string,
+    tenants: any[],
+    requiredCapabilities: readonly string[],
+  ): Promise<NormalizedHostingOperatorDiscoveryMatch> => {
+    const hostTenant = await tenantsCacheManager.getTenant('host');
+    const hostClaims = hostTenant?.claims || {};
+    const hostCountry = parseJurisdiction(hostClaims[ClaimsOrganizationSchemaorg.addressCountry]);
+    const hostCoverageScope = inferCoverageScope(hostCountry);
+    const aggregatedServiceTypes = Array.from(new Set(
+      tenants.flatMap((tenant) => parseServiceCapabilityTokens(String(tenant?.claims?.[ClaimsServiceSchemaorg.serviceType] || '')))
+        .filter((token) => isProviderServiceCapability(token)),
+    ));
+    const aggregatedCategories = Array.from(new Set(
+      tenants
+        .map((tenant) => parseCategory(tenant?.claims?.[ClaimsServiceSchemaorg.category]))
+        .filter(Boolean),
+    ));
+    const aggregatedAreaServed = Array.from(new Set([
+      ...parseAreaServedClaim(hostClaims[ClaimsServiceSchemaorg.areaServed]),
+      ...(hostCountry ? [hostCountry] : []),
+      ...(hostCoverageScope ? [hostCoverageScope] : []),
+    ]));
+
+    return {
+      operatorDid: hostDid,
+      title:
+        (hostClaims[ClaimsOrganizationSchemaorg.legalName] as string | undefined)?.trim() ||
+        (hostClaims[ClaimsOrganizationSchemaorg.name] as string | undefined)?.trim() ||
+        hostDid,
+      catalogUrl: `${publicOrigin}/.well-known/dcat3/catalog`,
+      matchedCapabilities: [...requiredCapabilities],
+      record: {
+        subjectId: hostDid,
+        serviceTypes: aggregatedServiceTypes,
+        categories: aggregatedCategories,
+        areaServed: aggregatedAreaServed,
+        addressCountry: hostCountry || undefined,
+        coverageScope: hostCoverageScope,
+      },
+    };
+  };
+
+  const buildNormalizedPublishedProviderMatches = (
+    datasets: ProviderDataset[],
+    hostMatch: NormalizedHostingOperatorDiscoveryMatch,
+    publicOrigin: string,
+    input: { sector?: string; providerCapability?: string; jurisdiction?: string; coverageScope?: string },
+  ): NormalizedPublishedProviderDiscoveryMatch[] =>
+    datasets.flatMap((dataset) => {
+      const offerings = buildServiceOfferings(dataset, publicOrigin);
+      return offerings.flatMap((offering) =>
+        offering.serviceTypes
+          .filter((serviceType) => isProviderServiceCapability(serviceType))
+          .filter((serviceType) => {
+            const requestedCapability = String(input.providerCapability || '').trim();
+            if (requestedCapability && serviceType !== requestedCapability) return false;
+            const coverageEntries = Array.from(new Set([
+              ...(dataset.jurisdiction ? [dataset.jurisdiction] : []),
+              ...(inferCoverageScope(dataset.jurisdiction) ? [inferCoverageScope(dataset.jurisdiction)!] : []),
+            ]));
+            return matchesDiscoveryFilter(dataset.sector, dataset.jurisdiction, coverageEntries, input);
+          })
+          .map((serviceType) => ({
+            providerDid: dataset.publisherDid,
+            title: dataset.title,
+            hostingOperatorDid: hostMatch.operatorDid,
+            hostingOperatorTitle: hostMatch.title,
+            catalogUrl: `${dataset.baseUrl}/.well-known/dcat3/catalog`,
+            record: {
+              providerDid: dataset.publisherDid,
+              serviceType,
+              category: dataset.sector || '',
+              areaServed: dataset.jurisdiction || inferCoverageScope(dataset.jurisdiction),
+              endpointUrl: offering.endpointUrl,
+              catalogUrl: `${dataset.baseUrl}/.well-known/dcat3/catalog`,
+            },
+            hostingOperator: hostMatch.record,
+          })),
+      );
+    });
 
   const buildServiceOfferingArtifact = (
     dataset: ProviderDataset,
@@ -753,6 +901,58 @@ export function createDiscoveryRouter(
       .filter((d): d is ProviderDataset => !!d));
     const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
     res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, datasets));
+  });
+
+  /**
+   * @openapi
+   * /api/dataspace-discovery/providers:
+   *   post:
+   *     tags:
+   *       - Discovery
+   *     summary: Resolve published service providers for backend/BFF consumption
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *     responses:
+   *       '200': { description: Normalized autodiscovery DTOs returned }
+   *       '503': { description: Host DID document is unavailable }
+   */
+  router.post('/api/dataspace-discovery/providers', async (req, res) => {
+    const hostDid = await tenantsCacheManager.getDidDocument('host');
+    if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
+
+    const publicOrigin = `${req.protocol}://${req.get('host')}`;
+    const autodiscoverableTenants = await tenantsCacheManager.listAutodiscoverableTenants();
+    const datasets = filterProviderDatasets(autodiscoverableTenants
+      .map(toProviderDataset)
+      .filter((d): d is ProviderDataset => !!d));
+
+    const providerCapability = String(req.body?.providerCapability || '').trim();
+    const hostMatch = await buildHostDiscoveryMatch(
+      hostDid.id,
+      publicOrigin,
+      autodiscoverableTenants,
+      providerCapability ? [providerCapability] : [],
+    );
+    const providers = buildNormalizedPublishedProviderMatches(
+      datasets,
+      hostMatch,
+      publicOrigin,
+      {
+        sector: req.body?.sector,
+        providerCapability,
+        jurisdiction: req.body?.jurisdiction,
+        coverageScope: req.body?.coverageScope,
+      },
+    );
+
+    res.json({
+      providers,
+      hostingOperators: [hostMatch],
+    });
   });
 
   router.get('/dcat3/catalog/dcat.json', async (req, res) => {
