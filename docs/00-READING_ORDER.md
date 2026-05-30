@@ -19,6 +19,12 @@ Status: Canonical
 - Deep dives: `docs/04-DEEP-DIVES/*`
 - Scenarios: `docs/05-USE-CASES/*`
 
+Recommended audit-specific read:
+
+1. `docs/03-IDENTITY-AND-TRUST/03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md`
+2. `docs/03-IDENTITY-AND-TRUST/03.H-ICA-CERTIFICATE-ISSUANCE.md`
+3. `docs/04-DEEP-DIVES/04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md`
+
 ## Transitional Top-Level Docs (not first-read)
 
 These docs are transitional and should not be used as primary onboarding sequence:
