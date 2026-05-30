@@ -119,6 +119,7 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 *   **[04.H-DATASPACE-PUBLICATION-ATTESTATION.md](04-DEEP-DIVES/04.H-DATASPACE-PUBLICATION-ATTESTATION.md)**: Clarifies what is published by link vs anchored on-ledger (hashes/tags), and how attestation/provenance fits.
 *   **[04.I-FABRIC-MULTICLOUD-BLUEPRINT.md](04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md)**: Multi-cloud Fabric deployment plan and channel governance.
 *   **[04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md](04-DEEP-DIVES/04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md)**: Separates host operator discovery from tenant sector catalog publication and distinguishes DSP standard paths from GW CORE local catalog bindings.
+*   **[04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md](04-DEEP-DIVES/04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md)**: Inventories the existing Fabric adapter/codebase and defines the additive dual-network target with Pontus-X.
 
 ### 📂 05-USE-CASES
 *   **[05.A-ALICE-BOB-AUTODISCOVERY-SMOKE.md](05-USE-CASES/05.A-ALICE-BOB-AUTODISCOVERY-SMOKE.md)**: Local two-host smoke for host catalogs and normalized provider discovery.
