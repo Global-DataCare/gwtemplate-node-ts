@@ -7,12 +7,13 @@ import { IVaultRepository } from '../database/repositories/vault/vault.repositor
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { getIdentifierUrnFromClaims, generateTenantCollectionNameFromClaims } from '../utils/tenant';
 import { DidDocument, DidService, VerificationMethod } from '../gdc-backend-utils-node/models/did';
-import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 import { parseTenantUrn } from '../utils/urn';
 import { getEnvSectionId } from '../utils/section-env';
 import { getTenantAuthorizationStatus, isTenantAuthorizationOperational, TenantAuthorizationLifecycleStatus } from '../utils/tenant-lifecycle';
+import { hasProviderServiceCapabilityClaim } from '../utils/services';
 
 const SERVICE_OPERATIONAL_URL_CLAIM = 'org.schema.Service.url';
 
@@ -164,6 +165,18 @@ export class TenantsCacheManager implements ITenantsManager {
       }
     }
     return tenants;
+  }
+
+  /**
+   * Returns only tenants that are both operational and provider-capable.
+   * This is the discovery surface used by host autodiscovery catalogs.
+   */
+  public async listAutodiscoverableTenants(): Promise<any[]> {
+    const tenants = await this.listRegisteredTenants();
+    return tenants.filter((tenant) => {
+      const serviceCapabilityClaim = tenant?.claims?.[ClaimsServiceSchemaorg.serviceType] as string | undefined;
+      return isTenantAuthorizationOperational(tenant) && hasProviderServiceCapabilityClaim(serviceCapabilityClaim);
+    });
   }
 
   /**

@@ -14,12 +14,14 @@ import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-
 import {
   getServiceCapabilityFamily,
   hasServiceCapabilityFamily,
+  isProviderServiceCapability,
   parseServiceCapabilityTokens,
   ServiceCapabilityFamily,
   ServiceCapabilityTokenValue,
 } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 import { isFhirSector, isResearchSector } from '../utils/sector';
+import { hasProviderServiceCapabilityClaim } from '../utils/services';
 
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ILogger } from '../loggers/ILogger';
@@ -144,7 +146,8 @@ export function createDiscoveryRouter(
     publicOrigin: string,
   ): ProviderServiceOffering[] => {
     const explicitCapabilityClaim = String(dataset.serviceTypeClaim || '').trim();
-    const explicitTokens = parseServiceCapabilityTokens(explicitCapabilityClaim) as ServiceCapabilityTokenValue[];
+    const explicitTokens = parseServiceCapabilityTokens(explicitCapabilityClaim)
+      .filter((token) => isProviderServiceCapability(token)) as ServiceCapabilityTokenValue[];
     const kinds: ServiceOfferingKind[] = explicitTokens.length > 0
       ? [
           ...(hasServiceCapabilityFamily(explicitCapabilityClaim, ServiceCapabilityFamily.Indexing) ? ['index' as const] : []),
@@ -165,7 +168,7 @@ export function createDiscoveryRouter(
         jurisdiction: dataset.jurisdiction,
         serviceTypes,
       };
-    });
+    }).filter((offering) => offering.serviceTypes.length > 0);
   };
 
   const toServiceOfferingNode = (offering: ProviderServiceOffering) => ({
@@ -219,6 +222,9 @@ export function createDiscoveryRouter(
       return true;
     });
   };
+
+  const filterProviderDatasets = (datasets: ProviderDataset[]): ProviderDataset[] =>
+    datasets.filter((dataset) => hasProviderServiceCapabilityClaim(dataset.serviceTypeClaim));
 
   const buildServiceOfferingArtifact = (
     dataset: ProviderDataset,
@@ -716,24 +722,47 @@ export function createDiscoveryRouter(
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
-    const allTenants = await tenantsCacheManager.listRegisteredTenants();
-    const datasets = allTenants
+    const allTenants = await tenantsCacheManager.listAutodiscoverableTenants();
+    const datasets = filterProviderDatasets(allTenants
       .map(toProviderDataset)
-      .filter((d): d is ProviderDataset => !!d);
+      .filter((d): d is ProviderDataset => !!d));
 
     const filtered = filterDatasets(datasets, req.body?.filters);
     const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
     res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, filtered));
   });
 
+  /**
+   * @openapi
+   * /.well-known/dcat3/catalog:
+   *   get:
+   *     tags:
+   *       - Discovery
+   *     summary: Read host operator public service autodiscovery catalog
+   *     responses:
+   *       '200': { description: DCAT catalog returned }
+   *       '503': { description: Host DID document is unavailable }
+   */
+  router.get('/.well-known/dcat3/catalog', async (req, res) => {
+    const hostDid = await tenantsCacheManager.getDidDocument('host');
+    if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
+
+    const allTenants = await tenantsCacheManager.listAutodiscoverableTenants();
+    const datasets = filterProviderDatasets(allTenants
+      .map(toProviderDataset)
+      .filter((d): d is ProviderDataset => !!d));
+    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
+    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, datasets));
+  });
+
   router.get('/dcat3/catalog/dcat.json', async (req, res) => {
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
-    const allTenants = await tenantsCacheManager.listRegisteredTenants();
-    const datasets = allTenants
+    const allTenants = await tenantsCacheManager.listAutodiscoverableTenants();
+    const datasets = filterProviderDatasets(allTenants
       .map(toProviderDataset)
-      .filter((d): d is ProviderDataset => !!d);
+      .filter((d): d is ProviderDataset => !!d));
     const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
     res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, datasets));
   });
@@ -742,10 +771,10 @@ export function createDiscoveryRouter(
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
-    const allTenants = await tenantsCacheManager.listRegisteredTenants();
-    const datasets = allTenants
+    const allTenants = await tenantsCacheManager.listAutodiscoverableTenants();
+    const datasets = filterProviderDatasets(allTenants
       .map(toProviderDataset)
-      .filter((d): d is ProviderDataset => !!d);
+      .filter((d): d is ProviderDataset => !!d));
     const dataset = datasets.find((d) => d.datasetId === req.params.id);
     if (!dataset) return res.status(404).type('text').send('Not Found');
 

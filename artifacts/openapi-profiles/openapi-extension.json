@@ -4,7 +4,7 @@
     "title": "Gateway API - EXTENSIONS",
     "version": "1.0.3",
     "description": "Extension profile including non-core and vertical-specific capabilities on top of core and compat.",
-    "x-profile-generated-at": "2026-05-28T17:04:05.379Z",
+    "x-profile-generated-at": "2026-05-30T04:34:22.139Z",
     "x-profile-name": "extension"
   },
   "servers": [],
@@ -5704,6 +5704,23 @@
           },
           "404": {
             "description": "Not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/.well-known/dcat3/catalog": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Read host operator public service autodiscovery catalog",
+        "responses": {
+          "200": {
+            "description": "DCAT catalog returned"
+          },
+          "503": {
+            "description": "Host DID document is unavailable"
           }
         },
         "x-profile": "core"

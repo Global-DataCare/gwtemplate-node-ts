@@ -2,8 +2,9 @@
 // File: src/__tests__/unit/utils/dataspace.did-services.compliance.test.ts
 
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { DidServiceIds, DidServiceTypes } from 'gdc-common-utils-ts/constants/did-services';
 import { populateDidDocumentServices } from '../../../utils/did-document';
-import { initializeTenantServicesConfig } from '../../../utils/services';
+import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../../../utils/services';
 
 describe('Dataspace DID Service Compliance (DSP/DCP)', () => {
   it('publishes DSP and DCP discovery services in tenant DID document', () => {
@@ -28,5 +29,24 @@ describe('Dataspace DID Service Compliance (DSP/DCP)', () => {
     expect(issuerService).toBeDefined();
     expect(issuerService?.type).toBe('IssuerService');
     expect(issuerService?.serviceEndpoint).toBe('https://gateway.example.com/acme/cds-es/v1/health-care/presentations/query');
+  });
+
+  it('publishes the host catalog service as a public well-known artifact', () => {
+    const did = 'did:web:gateway.example.com';
+    const baseUrl = 'https://gateway.example.com';
+    const businessConfig = initializeHostServicesConfig([Sector.HEALTH_CARE], 'test');
+
+    const services = populateDidDocumentServices(
+      did,
+      baseUrl,
+      businessConfig,
+      false,
+      { alternateName: 'host', jurisdiction: 'es', version: 'v1', sector: Sector.HEALTH_CARE },
+    );
+
+    const catalogService = services.find((service) => service.id === `${did}${DidServiceIds.Catalog}`);
+    expect(catalogService).toBeDefined();
+    expect(catalogService?.type).toBe(DidServiceTypes.CatalogService);
+    expect(catalogService?.serviceEndpoint).toBe('https://gateway.example.com/.well-known/dcat3/catalog');
   });
 });

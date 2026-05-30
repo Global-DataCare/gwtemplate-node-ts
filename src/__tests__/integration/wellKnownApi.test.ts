@@ -15,12 +15,23 @@ import { parseTenantUrn } from '../../utils/urn';
 import { ILogger } from '../../loggers/ILogger';
 import { invokeExpress } from './helpers/invokeExpress';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { DataspaceSectors } from 'gdc-common-utils-ts/constants/sectors';
 import { ServiceCapabilityToken, serializeServiceCapabilityTokens } from 'gdc-common-utils-ts/constants/service-capabilities';
+import {
+  buildExampleHostedTenantBaseUrl,
+  EXAMPLE_GATEWAY_PUBLIC_ORIGIN,
+  EXAMPLE_HOST_PUBLIC_HOSTNAME,
+  EXAMPLE_PROVIDER_LEGAL_NAME,
+  EXAMPLE_SECONDARY_PROVIDER_ALTERNATE_NAME,
+  EXAMPLE_SECONDARY_PROVIDER_LEGAL_NAME,
+  EXAMPLE_SECONDARY_TENANT_SERVICE_DID,
+} from 'gdc-common-utils-ts/examples/shared';
 
 const mockTenantsCacheManager = {
   getDidDocument: jest.fn(),
   getTenant: jest.fn(),
   getTenantDomainUrl: jest.fn(async () => 'https://host.example.com'),
+  listAutodiscoverableTenants: jest.fn(),
   listRegisteredTenants: jest.fn(),
 } as unknown as jest.Mocked<TenantsCacheManager>;
 
@@ -207,10 +218,15 @@ describe('Well-Known Tenant Artifacts API', () => {
     mockTenantsCacheManager.getTenant.mockResolvedValue({
       didDocument: { id: testTenant1IdentifierUrn },
       claims: {
-        [ClaimsOrganizationSchemaorg.legalName]: 'ACME Hospital',
+        [ClaimsOrganizationSchemaorg.legalName]: EXAMPLE_PROVIDER_LEGAL_NAME,
         [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
         [ClaimsServiceSchemaorg.category]: urnParts.sector,
-        [ClaimsServiceSchemaorg.url]: 'https://gateway.example.com/acme/cds-es/v1/health-care',
+        [ClaimsServiceSchemaorg.url]: buildExampleHostedTenantBaseUrl({
+          alternateName: tenantId,
+          jurisdiction: urnParts.jurisdiction,
+          version: urnParts.version,
+          sector: urnParts.sector,
+        }),
         [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
           ServiceCapabilityToken.IndexProvider,
           ServiceCapabilityToken.IndexReader,
@@ -223,11 +239,13 @@ describe('Well-Known Tenant Artifacts API', () => {
 
     expect(response.status).toBe(200);
     expect(parsed['@type']).toBe('dcat:DataService');
-    expect(parsed['dcat:endpointURL']).toBe('https://gateway.example.com/acme/cds-es/v1/health-care');
-    expect(parsed['dcat:keyword']).toEqual([
-      ServiceCapabilityToken.IndexProvider,
-      ServiceCapabilityToken.IndexReader,
-    ]);
+    expect(parsed['dcat:endpointURL']).toBe(buildExampleHostedTenantBaseUrl({
+      alternateName: tenantId,
+      jurisdiction: urnParts.jurisdiction,
+      version: urnParts.version,
+      sector: urnParts.sector,
+    }));
+    expect(parsed['dcat:keyword']).toEqual([ServiceCapabilityToken.IndexProvider]);
   });
 
   it('should return 404 for the research service offering artifact when digital twin is not enabled', async () => {
@@ -239,10 +257,15 @@ describe('Well-Known Tenant Artifacts API', () => {
     mockTenantsCacheManager.getTenant.mockResolvedValue({
       didDocument: { id: testTenant1IdentifierUrn },
       claims: {
-        [ClaimsOrganizationSchemaorg.legalName]: 'ACME Hospital',
+        [ClaimsOrganizationSchemaorg.legalName]: EXAMPLE_PROVIDER_LEGAL_NAME,
         [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
         [ClaimsServiceSchemaorg.category]: urnParts.sector,
-        [ClaimsServiceSchemaorg.url]: 'https://gateway.example.com/acme/cds-es/v1/health-care',
+        [ClaimsServiceSchemaorg.url]: buildExampleHostedTenantBaseUrl({
+          alternateName: tenantId,
+          jurisdiction: urnParts.jurisdiction,
+          version: urnParts.version,
+          sector: urnParts.sector,
+        }),
         [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
           ServiceCapabilityToken.IndexProvider,
           ServiceCapabilityToken.IndexReader,
@@ -288,15 +311,39 @@ describe('DCAT3 Discovery API', () => {
 
   it('should return a catalog artifact with dcat:service entries derived from serviceType capabilities', async () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
-    mockTenantsCacheManager.listRegisteredTenants.mockResolvedValue([
+    mockTenantsCacheManager.listAutodiscoverableTenants.mockResolvedValue([
       {
         didDocument: { id: testTenant1DidWebHosted },
         claims: {
           [ClaimsOrganizationSchemaorg.alternateName]: testTenant1AlternateName,
-          [ClaimsOrganizationSchemaorg.legalName]: 'ACME Research',
+          [ClaimsOrganizationSchemaorg.legalName]: EXAMPLE_PROVIDER_LEGAL_NAME,
           [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
-          [ClaimsServiceSchemaorg.category]: 'research-study',
-          [ClaimsServiceSchemaorg.url]: 'https://gateway.example.com/acme/cds-es/v1/research-study',
+          [ClaimsServiceSchemaorg.category]: DataspaceSectors.HealthResearch,
+          [ClaimsServiceSchemaorg.url]: buildExampleHostedTenantBaseUrl({
+            alternateName: testTenant1AlternateName,
+            jurisdiction: 'ES',
+            version: 'v1',
+            sector: DataspaceSectors.HealthResearch,
+          }),
+          [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
+            ServiceCapabilityToken.IndexProvider,
+            ServiceCapabilityToken.DigitalTwinProvider,
+          ]),
+        },
+      },
+      {
+        didDocument: { id: EXAMPLE_SECONDARY_TENANT_SERVICE_DID },
+        claims: {
+          [ClaimsOrganizationSchemaorg.alternateName]: EXAMPLE_SECONDARY_PROVIDER_ALTERNATE_NAME,
+          [ClaimsOrganizationSchemaorg.legalName]: EXAMPLE_SECONDARY_PROVIDER_LEGAL_NAME,
+          [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+          [ClaimsServiceSchemaorg.category]: DataspaceSectors.HealthResearch,
+          [ClaimsServiceSchemaorg.url]: buildExampleHostedTenantBaseUrl({
+            alternateName: EXAMPLE_SECONDARY_PROVIDER_ALTERNATE_NAME,
+            jurisdiction: 'ES',
+            version: 'v1',
+            sector: DataspaceSectors.HealthResearch,
+          }),
           [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
             ServiceCapabilityToken.IndexReader,
             ServiceCapabilityToken.DigitalTwinReader,
@@ -307,8 +354,8 @@ describe('DCAT3 Discovery API', () => {
 
     const response = await invokeExpress(app, {
       method: 'GET',
-      url: '/dcat3/catalog/dcat.json',
-      headers: { host: 'host.example.com' },
+      url: '/.well-known/dcat3/catalog',
+      headers: { host: EXAMPLE_HOST_PUBLIC_HOSTNAME },
     });
     const parsed = JSON.parse(response.text);
 
@@ -318,20 +365,22 @@ describe('DCAT3 Discovery API', () => {
     expect(parsed['dcat:service']).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          '@id': `http://host.example.com/${testTenant1AlternateName}/cds-es/v1/research-study/.well-known/service-offering-index.json`,
+          '@id': `http://${EXAMPLE_HOST_PUBLIC_HOSTNAME}/${testTenant1AlternateName}/cds-es/v1/${DataspaceSectors.HealthResearch}/.well-known/service-offering-index.json`,
           '@type': 'dcat:DataService',
         }),
         expect.objectContaining({
-          '@id': `http://host.example.com/${testTenant1AlternateName}/cds-es/v1/research-study/.well-known/service-offering-research.json`,
+          '@id': `http://${EXAMPLE_HOST_PUBLIC_HOSTNAME}/${testTenant1AlternateName}/cds-es/v1/${DataspaceSectors.HealthResearch}/.well-known/service-offering-research.json`,
           '@type': 'dcat:DataService',
         }),
       ]),
     );
     expect(parsed['dcat:dataset'][0]['dcat:service']).toEqual(
       expect.arrayContaining([
-        { '@id': `http://host.example.com/${testTenant1AlternateName}/cds-es/v1/research-study/.well-known/service-offering-index.json` },
-        { '@id': `http://host.example.com/${testTenant1AlternateName}/cds-es/v1/research-study/.well-known/service-offering-research.json` },
+        { '@id': `http://${EXAMPLE_HOST_PUBLIC_HOSTNAME}/${testTenant1AlternateName}/cds-es/v1/${DataspaceSectors.HealthResearch}/.well-known/service-offering-index.json` },
+        { '@id': `http://${EXAMPLE_HOST_PUBLIC_HOSTNAME}/${testTenant1AlternateName}/cds-es/v1/${DataspaceSectors.HealthResearch}/.well-known/service-offering-research.json` },
       ]),
     );
+    expect(parsed['dcat:dataset']).toHaveLength(1);
+    expect(mockTenantsCacheManager.listAutodiscoverableTenants).toHaveBeenCalledTimes(1);
   });
 });

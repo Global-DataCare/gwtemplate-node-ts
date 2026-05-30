@@ -7,6 +7,7 @@ import { OrganizationConfig } from '../../../gdc-backend-utils-node/models/entit
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { IServerConfig } from '../../../config';
 import { DidService } from 'gdc-common-utils-ts/models/did';
+import { DidServiceIds, DidServiceTypes } from 'gdc-common-utils-ts/constants/did-services';
 import {
   ServiceCapabilityToken,
   serializeServiceCapabilityTokens,
@@ -295,6 +296,16 @@ describe('Service Initialization Utilities', () => {
       expect(registryServices).toHaveLength(2);
       expect((registryServices[0] as any).selector?.sector).toBe('test-network');
       expect((registryServices[1] as any).selector?.sector).toBe('test-network');
+    });
+
+    it('should publish the host catalog service at the public well-known catalog endpoint', () => {
+      const services = initializeHostServicesConfig([Sector.RESEARCH], 'test');
+
+      const catalogService = services.find((service: DidService) => service.id === DidServiceIds.Catalog);
+
+      expect(catalogService).toBeDefined();
+      expect(catalogService?.type).toBe(DidServiceTypes.CatalogService);
+      expect(catalogService?.serviceEndpoint).toBe('/.well-known/dcat3/catalog');
     });
   });
 });

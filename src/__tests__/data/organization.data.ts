@@ -138,6 +138,7 @@ export const testConfigTenant1: OrganizationConfig = {
   provider: {
     service: {
       category: testTenant1ServiceProviderCategory,
+      serviceType: testDefaultTenantServiceTypeClaim,
     },
   },
   networkStatus: [], // This is populated by the manager during the registration flow.

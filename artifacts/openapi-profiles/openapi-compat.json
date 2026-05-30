@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-05-28T17:04:05.374Z",
+    "x-profile-generated-at": "2026-05-30T04:34:22.134Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -5235,6 +5235,23 @@
           },
           "404": {
             "description": "Not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/.well-known/dcat3/catalog": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Read host operator public service autodiscovery catalog",
+        "responses": {
+          "200": {
+            "description": "DCAT catalog returned"
+          },
+          "503": {
+            "description": "Host DID document is unavailable"
           }
         },
         "x-profile": "core"

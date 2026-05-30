@@ -86,7 +86,7 @@ export const testClaimsTenant1Registration: ClaimsRecord = {
   [ClaimsServiceSchemaorg.category]: testTenant1ServiceProviderCategory,
   [ClaimsServiceSchemaorg.identifier]: (testConfigTenant1.provider as any).service.identifier,
   [ClaimsServiceSchemaorg.termsOfService]: (testConfigTenant1.provider as any).service.termsOfService,
-  [ClaimsServiceSchemaorg.serviceType]: (testConfigTenant1.provider as any).service.serviceTypePurpose,
+  [ClaimsServiceSchemaorg.serviceType]: (testConfigTenant1.provider as any).service.serviceType,
 };
 
 /**

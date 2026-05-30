@@ -48,6 +48,13 @@ describe('TenantsCacheManager', () => {
     meta: { lastUpdated: '' },
   };
   const suspendedAcmeConfig = applyTenantAuthorizationStatus(acmeConfig, 'suspended');
+  const acmeConfigWithoutServiceType = {
+    ...acmeConfig,
+    claims: {
+      ...acmeConfig.claims,
+    },
+  } as EntityConfig;
+  delete (acmeConfigWithoutServiceType.claims as ClaimsRecord)[ClaimsServiceSchemaorg.serviceType];
 
   const acmeSector = (acmeConfig.claims as ClaimsRecord)[ClaimsServiceSchemaorg.category] as Sector;
   const acmeAlternateName = (acmeConfig.claims as ClaimsRecord)[ClaimsOrganizationSchemaorg.alternateName];
@@ -187,6 +194,34 @@ describe('TenantsCacheManager', () => {
 
       await expect(tenantsCacheManager.getTenantAuthorizationStatus(acmeVaultId)).resolves.toBe('active');
       await expect(tenantsCacheManager.isTenantOperational(acmeVaultId)).resolves.toBe(true);
+    });
+  });
+
+  describe('host autodiscovery tenancy', () => {
+    it('should return only operational provider-capable tenants for catalog publication', async () => {
+      const suspendedVaultId = `${acmeVaultId}-suspended`;
+      const nonProviderVaultId = `${acmeVaultId}-non-provider`;
+
+      mockVaultRepository.getContainersInSection.mockResolvedValue([
+        { id: acmeVaultId } as any,
+        { id: suspendedVaultId } as any,
+        { id: nonProviderVaultId } as any,
+      ]);
+      mockKmsService.unprotectConfidentialData.mockImplementation(async (_record: any) => {
+        if (_record.id === acmeVaultId) return acmeConfig;
+        if (_record.id === suspendedVaultId) return suspendedAcmeConfig;
+        if (_record.id === nonProviderVaultId) return acmeConfigWithoutServiceType;
+        return undefined;
+      });
+
+      const tenants = await tenantsCacheManager.listAutodiscoverableTenants();
+
+      expect(tenants).toHaveLength(1);
+      expect(tenants[0].didDocument.id).toBe(tenantUrn);
+      expect(mockVaultRepository.getContainersInSection).toHaveBeenCalledWith(
+        hostCollectionName,
+        getEnvSectionId('tenants'),
+      );
     });
   });
 });

@@ -6,8 +6,14 @@ import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { DidService, ServiceEndpointSelector } from 'gdc-common-utils-ts/models/did';
 import {
+  DidServiceIds,
+  DidServiceTypes,
+} from 'gdc-common-utils-ts/constants/did-services';
+import {
   ServiceCapabilityFamily,
   hasServiceCapabilityFamily,
+  isProviderServiceCapability,
+  parseServiceCapabilityTokens,
 } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { isFhirSector, isResearchSector } from './sector';
 import {
@@ -18,6 +24,17 @@ import {
 } from '../constants/domain';
 
 export type HostRegistrySector = 'test' | 'test-network' | 'network';
+
+/**
+ * Returns whether a service capability claim marks a tenant as provider-capable.
+ *
+ * This is used by autodiscovery to avoid publishing tenants that can only consume
+ * services but cannot act as providers.
+ */
+export function hasProviderServiceCapabilityClaim(serviceCapabilityClaim?: string): boolean {
+  const serviceTypes = parseServiceCapabilityTokens(String(serviceCapabilityClaim || ''));
+  return serviceTypes.some((token) => isProviderServiceCapability(token));
+}
 
 /**
  * Resolves which host "registry sector" to use based on runtime environment.
@@ -481,9 +498,9 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
       serviceEndpoint: '/.well-known/dspace-version',
     } as DidService,
     {
-      id: '#dsp-catalog-service',
-      type: 'CatalogService',
-      serviceEndpoint: '/dcat3/catalog/request',
+      id: DidServiceIds.Catalog,
+      type: DidServiceTypes.CatalogService,
+      serviceEndpoint: '/.well-known/dcat3/catalog',
     } as DidService,
     {
       id: '#dcp-issuer-service',
