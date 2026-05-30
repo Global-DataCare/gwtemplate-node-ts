@@ -17,6 +17,9 @@ ORG_URL="${ORG_URL:-api.acme.org}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin1@acme.org}"
 PERSON_OCCUPATION="${PERSON_OCCUPATION:-ISCO-08|1120}"
 SERVICE_IDENTIFIER="${SERVICE_IDENTIFIER:-did:web:api-provider.example.com}"
+SERVICE_URL="${SERVICE_URL:-${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION,,}/v1/${SECTOR}}"
+SERVICE_TYPE="${SERVICE_TYPE:-}"
+SERVICE_AREA_SERVED="${SERVICE_AREA_SERVED:-$JURISDICTION}"
 TERMS_OF_SERVICE="${TERMS_OF_SERVICE:-https://example.com/terms}"
 
 for cmd in curl jq node; do
@@ -59,6 +62,9 @@ org_payload_overrides="$(jq -n \
   --arg personOccupation "$PERSON_OCCUPATION" \
   --arg sector "$SECTOR" \
   --arg serviceIdentifier "$SERVICE_IDENTIFIER" \
+  --arg serviceUrl "$SERVICE_URL" \
+  --arg serviceType "$SERVICE_TYPE" \
+  --arg serviceAreaServed "$SERVICE_AREA_SERVED" \
   --arg termsOfService "$TERMS_OF_SERVICE" \
   '{
     "/thid": $thid,
@@ -72,8 +78,12 @@ org_payload_overrides="$(jq -n \
     "/body/data/0/meta/claims/org.schema.Person.hasOccupation": $personOccupation,
     "/body/data/0/meta/claims/org.schema.Service.category": $sector,
     "/body/data/0/meta/claims/org.schema.Service.identifier": $serviceIdentifier,
+    "/body/data/0/meta/claims/org.schema.Service.url": $serviceUrl,
+    "/body/data/0/meta/claims/org.schema.Service.areaServed": $serviceAreaServed,
     "/body/data/0/meta/claims/org.schema.Service.termsOfService": $termsOfService
-  }')"
+  } + (if $serviceType != \"\" then {
+    \"/body/data/0/meta/claims/org.schema.Service.serviceType\": $serviceType
+  } else {} end)')"
 org_payload="$(render_example_payload ORGANIZATION_REGISTRATION_REQUEST "$org_payload_overrides")"
 
 echo "[bootstrap] organization registration (taxId=$TAX_ID)"

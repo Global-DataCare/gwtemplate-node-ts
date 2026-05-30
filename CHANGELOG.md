@@ -1,3 +1,26 @@
+## [Unreleased]
+
+### Added
+- Added a dedicated two-host autodiscovery smoke runbook and scripts for local
+  `Alice` / `Bob` GW instances, including:
+  - versioned env templates `env.alice.example` and `env.bob.example`
+  - `scripts/run-alice-bob-local.sh`
+  - `scripts/bootstrap-alice-bob-discovery.sh`
+  - `scripts/smoke-alice-bob-autodiscovery.sh`
+
+### Changed
+- Extended `scripts/bootstrap-single-tenant.sh` so local smoke/bootstrap flows
+  can explicitly set:
+  - `org.schema.Service.url`
+  - `org.schema.Service.areaServed`
+  - `org.schema.Service.serviceType`
+- Clarified the GW-to-ICA lifecycle documentation for:
+  - hosting operator / tenant onboarding
+  - `Token/_exchange`
+  - `Device/_dcr`
+  - CSR enrollment with ICA
+  - tenant publication via host autodiscovery
+
 ## [1.7.2] - 2026-05-28
 
 ### Changed
