@@ -1609,15 +1609,6 @@ export class HostingManager {
     const secureSelfDescDoc = await this.kmsService.protectConfidentialData(selfDescDoc, vaultId);
     await this.vaultRepository.put(tenantCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], getEnvSectionId('.well-known'));
 
-    if (String(this.config.nodeEnv || '').toLowerCase() === 'demo') {
-      const serviceEvidence = this.extractServiceEvidence(containedService || service);
-      await this.requestIcaEnrollment({
-        organizationClaims: processedClaims,
-        evidence: serviceEvidence,
-        tenantVaultId: vaultId,
-      });
-    }
-
     const [legalRep, processedService] = [person, service];
     if (legalRep) {
       const storedKeys = (decryptedContent as any)?.registrationKeys as

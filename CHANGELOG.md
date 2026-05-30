@@ -20,6 +20,8 @@
   - `Device/_dcr`
   - CSR enrollment with ICA
   - tenant publication via host autodiscovery
+- Removed the transitional tenant demo ICA CSR enrollment call so the current
+  runtime model stays host-only for Fabric/X.509 enrollment.
 
 ## [1.7.2] - 2026-05-28
 
