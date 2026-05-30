@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 ALICE_BASE_URL="${ALICE_BASE_URL:-http://localhost:3000}"
 BOB_BASE_URL="${BOB_BASE_URL:-http://localhost:3001}"
 JURISDICTION="${JURISDICTION:-ES}"
+JURISDICTION_LOWER="$(printf '%s' "${JURISDICTION:-ES}" | tr '[:upper:]' '[:lower:]')"
 HOST_REGISTRY_SECTOR="${HOST_REGISTRY_SECTOR:-test}"
 SECTOR="${SECTOR:-health-care}"
 TERMS_OF_SERVICE="${TERMS_OF_SERVICE:-https://example.org/terms}"
@@ -20,7 +21,7 @@ bootstrap_tenant() {
   local admin_email="$6"
   local service_type="$7"
 
-  local tenant_url="${base_url}/${tenant_id}/cds-${JURISDICTION,,}/v1/${SECTOR}"
+  local tenant_url="${base_url}/${tenant_id}/cds-${JURISDICTION_LOWER}/v1/${SECTOR}"
   local service_identifier="did:web:${base_url#http://}:${tenant_id}"
 
   echo "[alice-bob-bootstrap] tenant=${tenant_id} base=${base_url} capability=${service_type}"
