@@ -116,6 +116,7 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 *   **[04.G-CONVERSATIONAL-AI-ANONYMIZATION-PIPELINE.md](04-DEEP-DIVES/04.G-CONVERSATIONAL-AI-ANONYMIZATION-PIPELINE.md)**: Design for conversation storage, anonymization, and derivation of Observations with ledger-safe tags.
 *   **[04.H-DATASPACE-PUBLICATION-ATTESTATION.md](04-DEEP-DIVES/04.H-DATASPACE-PUBLICATION-ATTESTATION.md)**: Clarifies what is published by link vs anchored on-ledger (hashes/tags), and how attestation/provenance fits.
 *   **[04.I-FABRIC-MULTICLOUD-BLUEPRINT.md](04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md)**: Multi-cloud Fabric deployment plan and channel governance.
+*   **[04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md](04-DEEP-DIVES/04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md)**: Separates host operator discovery from tenant sector catalog publication and distinguishes DSP standard paths from GW CORE local catalog bindings.
 
 ### 📂 05-USE-CASES
 *   Core use cases only. Legacy/extension use-case docs were moved to transitional `90.*` files.
@@ -124,3 +125,4 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 *   **[90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md)**: Transitional mapping between current GW lifecycle endpoints and the target normalized contract for SDK/shared-package alignment.
 *   **[90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md](90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md)**: Legacy appointment-notification narrative (not part of current core baseline).
 *   **[90.O-END_TO_END_LEGACY_FLOW.md](90.O-END_TO_END_LEGACY_FLOW.md)**: Legacy end-to-end flow reference (transitional).
+*   **[90.P-HOST_OPERATORS_REGISTRY_BACKLOG.md](90.P-HOST_OPERATORS_REGISTRY_BACKLOG.md)**: Concrete implementation backlog for host provider verification, host DCAT discovery, tenant sector catalog separation, and optional sector-profile work.
