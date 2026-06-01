@@ -3,6 +3,10 @@
 
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { DidServiceIds, DidServiceTypes } from 'gdc-common-utils-ts/constants/did-services';
+import {
+  buildGwCatalogRequestPath,
+  buildGwDspaceVersionWellKnownPath,
+} from 'gdc-common-utils-ts/utils/dataspace-protocol';
 import { populateDidDocumentServices } from '../../../utils/did-document';
 import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../../../utils/services';
 
@@ -18,12 +22,22 @@ describe('Dataspace DID Service Compliance (DSP/DCP)', () => {
     const dataService = services.find((s) => s.id === `${did}#dsp-data-service`);
     expect(dataService).toBeDefined();
     expect(dataService?.type).toBe('DataService');
-    expect(dataService?.serviceEndpoint).toBe('https://gateway.example.com/acme/cds-es/v1/health-care/.well-known/dspace-version');
+    expect(dataService?.serviceEndpoint).toBe(`https://gateway.example.com${buildGwDspaceVersionWellKnownPath({
+      tenantId: 'acme',
+      jurisdiction: 'es',
+      version: 'v1',
+      sector: 'health-care',
+    })}`);
 
     const catalogService = services.find((s) => s.id === `${did}#dsp-catalog-service`);
     expect(catalogService).toBeDefined();
     expect(catalogService?.type).toBe('CatalogService');
-    expect(catalogService?.serviceEndpoint).toBe('https://gateway.example.com/acme/cds-es/v1/health-care/dcat3/catalog/request');
+    expect(catalogService?.serviceEndpoint).toBe(`https://gateway.example.com${buildGwCatalogRequestPath({
+      tenantId: 'acme',
+      jurisdiction: 'es',
+      version: 'v1',
+      sector: 'health-care',
+    })}`);
 
     const issuerService = services.find((s) => s.id === `${did}#dcp-issuer-service`);
     expect(issuerService).toBeDefined();
@@ -31,7 +45,7 @@ describe('Dataspace DID Service Compliance (DSP/DCP)', () => {
     expect(issuerService?.serviceEndpoint).toBe('https://gateway.example.com/acme/cds-es/v1/health-care/presentations/query');
   });
 
-  it('publishes the host catalog service as a public well-known artifact', () => {
+  it('publishes the host catalog service as the operational DSP catalog endpoint', () => {
     const did = 'did:web:gateway.example.com';
     const baseUrl = 'https://gateway.example.com';
     const businessConfig = initializeHostServicesConfig([Sector.HEALTH_CARE], 'test');
@@ -47,6 +61,11 @@ describe('Dataspace DID Service Compliance (DSP/DCP)', () => {
     const catalogService = services.find((service) => service.id === `${did}${DidServiceIds.Catalog}`);
     expect(catalogService).toBeDefined();
     expect(catalogService?.type).toBe(DidServiceTypes.CatalogService);
-    expect(catalogService?.serviceEndpoint).toBe('https://gateway.example.com/.well-known/dcat3/catalog');
+    expect(catalogService?.serviceEndpoint).toBe(`https://gateway.example.com${buildGwCatalogRequestPath({
+      participantId: 'host',
+      jurisdiction: '{jurisdiction}',
+      version: 'v1',
+      hostNetwork: '{hostNetwork}',
+    })}`);
   });
 });

@@ -67,9 +67,12 @@ async function main() {
     true
   );
 
+  const repoRoot = path.resolve(__dirname, '..');
+  const workspaceRoot = path.resolve(repoRoot, '..');
+  const fabricMulticloudDir = process.env.FABRIC_MULTICLOUD_DIR || path.join(workspaceRoot, 'fabric-multicloud');
   const baseDir = path.join('artifacts', envName);
   const icaMspId = generateMSPID(icaAuthority);
-  const caServerDir = path.join(baseDir, 'fabric-ca-server-ica', icaMspId);
+  const caServerDir = path.join(fabricMulticloudDir, 'fabric-ca-server-ica', icaMspId);
 
   if (existsSync(caServerDir)) {
     await confirmOverwrite(caServerDir);

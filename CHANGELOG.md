@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.7.3] - 2026-06-01
+
 ### Added
 - Added a dedicated two-host autodiscovery smoke runbook and scripts for local
   `Alice` / `Bob` GW instances, including:
@@ -9,6 +11,19 @@
   - `scripts/smoke-alice-bob-autodiscovery.sh`
 
 ### Changed
+- Migrated the local two-host autodiscovery smoke from legacy `/.well-known/dcat3/catalog`
+  to the host-scoped DSP contract:
+  - `GET /host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/dspace-version`
+  - `GET /host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/dcat.json`
+- Clarified host ping semantics so GW CORE now documents two distinct checks:
+  - `GET /host/.well-known/ping` for global host runtime liveness/readiness
+  - `GET /host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/ping`
+    for the host-scoped hosting/autodiscovery surface
+- Extended the host discovery/runtime surface to accept the host-scoped ping
+  path while keeping `/host/.well-known/ping` as a compatibility alias.
+- Updated host autodiscovery publication to read `org.schema.Service.*` claims
+  from the persisted tenant provider-service shape as well as top-level claims,
+  so bootstrapped provider tenants are published correctly in live host catalogs.
 - Extended `scripts/bootstrap-single-tenant.sh` so local smoke/bootstrap flows
   can explicitly set:
   - `org.schema.Service.url`

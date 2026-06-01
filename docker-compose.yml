@@ -22,7 +22,7 @@ services:
       - FABRIC_CA_SERVER_ADMIN_USER=${ROOT_CA_ADMIN_USER}
       - FABRIC_CA_SERVER_ADMIN_PASSWORD=${ROOT_CA_ADMIN_PASS}
     volumes:
-      - ./fabric-ca-server-root:/etc/hyperledger/fabric-ca-server
+      - ../fabric-multicloud/fabric-ca-server-root:/etc/hyperledger/fabric-ca-server
     command: >
       sh -c 'fabric-ca-server start -b ${ROOT_CA_ADMIN_USER}:${ROOT_CA_ADMIN_PASS} --cfg.affiliations.allowremove'
 
@@ -46,7 +46,7 @@ services:
       # This service will enroll with the Root CA to establish the chain of trust
       - FABRIC_CA_SERVER_INTERMEDIATE_TLS_CERTFILES=/etc/hyperledger/fabric-ca-server/ca-chain.pem
     volumes:
-      - ./fabric-ca-server-ica:/etc/hyperledger/fabric-ca-server
+      - ../fabric-multicloud/fabric-ca-server-ica:/etc/hyperledger/fabric-ca-server
     command: >
       sh -c 'fabric-ca-server start -b ${ICA_ADMIN_USER}:${ICA_ADMIN_PASS} -U https://${ROOT_CA_ADMIN_USER}:${ROOT_CA_ADMIN_PASS}@root-ca:7054'
     depends_on:

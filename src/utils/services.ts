@@ -9,6 +9,11 @@ import {
   DidServiceIds,
   DidServiceTypes,
 } from 'gdc-common-utils-ts/constants/did-services';
+import { DataspaceWellKnownPaths } from 'gdc-common-utils-ts/constants/dataspace-protocol';
+import {
+  buildGwCatalogRequestPath,
+  buildGwDspaceVersionWellKnownPath,
+} from 'gdc-common-utils-ts/utils/dataspace-protocol';
 import {
   ServiceCapabilityFamily,
   hasServiceCapabilityFamily,
@@ -381,12 +386,12 @@ export function initializeTenantServicesConfig(
     {
       id: '#dsp-data-service',
       type: 'DataService',
-      serviceEndpoint: '/.well-known/dspace-version',
+      serviceEndpoint: DataspaceWellKnownPaths.VersionMetadata,
     } as DidService,
     {
       id: '#dsp-catalog-service',
-      type: 'CatalogService',
-      serviceEndpoint: '/dcat3/catalog/request',
+      type: DidServiceTypes.CatalogService,
+      serviceEndpoint: buildGwCatalogRequestPath(),
     } as DidService,
     {
       id: '#dcp-issuer-service',
@@ -495,12 +500,22 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
     {
       id: '#dsp-data-service',
       type: 'DataService',
-      serviceEndpoint: '/.well-known/dspace-version',
+      serviceEndpoint: buildGwDspaceVersionWellKnownPath({
+        participantId: 'host',
+        jurisdiction: '{jurisdiction}',
+        version: 'v1',
+        hostNetwork: '{hostNetwork}',
+      }),
     } as DidService,
     {
       id: DidServiceIds.Catalog,
       type: DidServiceTypes.CatalogService,
-      serviceEndpoint: '/.well-known/dcat3/catalog',
+      serviceEndpoint: buildGwCatalogRequestPath({
+        participantId: 'host',
+        jurisdiction: '{jurisdiction}',
+        version: 'v1',
+        hostNetwork: '{hostNetwork}',
+      }),
     } as DidService,
     {
       id: '#dcp-issuer-service',

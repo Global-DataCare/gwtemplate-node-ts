@@ -8,6 +8,7 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { IServerConfig } from '../../../config';
 import { DidService } from 'gdc-common-utils-ts/models/did';
 import { DidServiceIds, DidServiceTypes } from 'gdc-common-utils-ts/constants/did-services';
+import { buildGwCatalogRequestPath } from 'gdc-common-utils-ts/utils/dataspace-protocol';
 import {
   ServiceCapabilityToken,
   serializeServiceCapabilityTokens,
@@ -298,14 +299,19 @@ describe('Service Initialization Utilities', () => {
       expect((registryServices[1] as any).selector?.sector).toBe('test-network');
     });
 
-    it('should publish the host catalog service at the public well-known catalog endpoint', () => {
+    it('should publish the host catalog service at the host DSP catalog endpoint template', () => {
       const services = initializeHostServicesConfig([Sector.RESEARCH], 'test');
 
       const catalogService = services.find((service: DidService) => service.id === DidServiceIds.Catalog);
 
       expect(catalogService).toBeDefined();
       expect(catalogService?.type).toBe(DidServiceTypes.CatalogService);
-      expect(catalogService?.serviceEndpoint).toBe('/.well-known/dcat3/catalog');
+      expect(catalogService?.serviceEndpoint).toBe(buildGwCatalogRequestPath({
+        participantId: 'host',
+        jurisdiction: '{jurisdiction}',
+        version: 'v1',
+        hostNetwork: '{hostNetwork}',
+      }));
     });
   });
 });

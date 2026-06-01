@@ -5,6 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
+FABRIC_MULTICLOUD_DIR="${FABRIC_MULTICLOUD_DIR:-${WORKSPACE_ROOT}/fabric-multicloud}"
 
 usage() {
   cat <<'EOF'
@@ -257,7 +258,7 @@ deploy_gke_demo() {
   gcloud container clusters get-credentials "$GKE_CLUSTER" --region "$GCP_REGION"
 
   echo "⚙️  Applying GW GKE manifests..."
-  bash "$SCRIPT_DIR/fabric-multicloud/scripts/05-k8s-deploy-gdc.sh"
+  bash "$FABRIC_MULTICLOUD_DIR/scripts/05-k8s-deploy-gdc.sh"
 
   echo "--- ✅ GKE demo deployment submitted ---"
   echo "Public URL: $GDC_PUBLIC_URL"

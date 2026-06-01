@@ -6,6 +6,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/payload-helpers.sh"
 BASE_URL="${BASE_URL:-http://localhost:3000}"
 AUTH_BEARER="${AUTH_BEARER:-demo-token}"
 JURISDICTION="${JURISDICTION:-ES}"
+JURISDICTION_LOWER="$(printf '%s' "${JURISDICTION:-ES}" | tr '[:upper:]' '[:lower:]')"
+VERSION="${VERSION:-v1}"
+HOST_NETWORK="${HOST_NETWORK:-test}"
 HOST_REGISTRY_SECTOR="${HOST_REGISTRY_SECTOR:-test}"
 TENANT_ID="${TENANT_ID:-acme}"
 SECTOR="${SECTOR:-health-care}"
@@ -113,6 +116,9 @@ echo
 # 1) Ping
 CODE="$(call_api GET "$BASE_URL/host/.well-known/ping")"
 assert_ping "Ping host/.well-known/ping" "$CODE"
+
+CODE="$(call_api GET "$BASE_URL/host/cds-$JURISDICTION_LOWER/$VERSION/$HOST_NETWORK/.well-known/ping")"
+assert_ping "Ping host scoped .well-known/ping" "$CODE"
 
 # 2) Activate submit
 ACTIVATE_REQ="$(render_example_payload ORGANIZATION_ACTIVATION_REQUEST "$(jq -n \

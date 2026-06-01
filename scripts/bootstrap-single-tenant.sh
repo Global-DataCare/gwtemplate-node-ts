@@ -8,6 +8,8 @@ AUTH_BEARER="${AUTH_BEARER:-demo-token}"
 CONTENT_TYPE="${CONTENT_TYPE:-application/json}"
 JURISDICTION="${JURISDICTION:-ES}"
 JURISDICTION_LOWER="$(printf '%s' "${JURISDICTION:-ES}" | tr '[:upper:]' '[:lower:]')"
+VERSION="${VERSION:-v1}"
+HOST_NETWORK="${HOST_NETWORK:-test}"
 HOST_REGISTRY_SECTOR="${HOST_REGISTRY_SECTOR:-test}"
 SECTOR="${SECTOR:-health-care}"
 TENANT_ID="${TENANT_ID:-acme-id}"
@@ -43,7 +45,9 @@ poll_async() {
 }
 
 echo "[bootstrap] ping: $BASE_URL/host/.well-known/ping"
-code="$(curl -sS -o /tmp/bootstrap-tenant-ping.out -w "%{http_code}" "$BASE_URL/host/.well-known/ping" || true)"
+HOST_PING_URL="${BASE_URL}/host/cds-${JURISDICTION_LOWER}/${VERSION}/${HOST_NETWORK}/.well-known/ping"
+echo "[bootstrap] ping: $HOST_PING_URL"
+code="$(curl -sS -o /tmp/bootstrap-tenant-ping.out -w "%{http_code}" "$HOST_PING_URL" || true)"
 if [[ "$code" != "200" ]]; then
   echo "ERROR: gateway not reachable (status=$code)"
   [[ -s /tmp/bootstrap-tenant-ping.out ]] && head -c 220 /tmp/bootstrap-tenant-ping.out
@@ -82,8 +86,8 @@ org_payload_overrides="$(jq -n \
     "/body/data/0/meta/claims/org.schema.Service.url": $serviceUrl,
     "/body/data/0/meta/claims/org.schema.Service.areaServed": $serviceAreaServed,
     "/body/data/0/meta/claims/org.schema.Service.termsOfService": $termsOfService
-  } + (if $serviceType != \"\" then {
-    \"/body/data/0/meta/claims/org.schema.Service.serviceType\": $serviceType
+  } + (if $serviceType != "" then {
+    "/body/data/0/meta/claims/org.schema.Service.serviceType": $serviceType
   } else {} end)')"
 org_payload="$(render_example_payload ORGANIZATION_REGISTRATION_REQUEST "$org_payload_overrides")"
 

@@ -5,6 +5,9 @@ ALICE_BASE_URL="${ALICE_BASE_URL:-http://localhost:3000}"
 BOB_BASE_URL="${BOB_BASE_URL:-http://localhost:3001}"
 SECTOR="${SECTOR:-health-care}"
 JURISDICTION="${JURISDICTION:-ES}"
+JURISDICTION_LOWER="$(printf '%s' "${JURISDICTION:-ES}" | tr '[:upper:]' '[:lower:]')"
+VERSION="${VERSION:-v1}"
+HOST_NETWORK="${HOST_NETWORK:-test}"
 INDEX_PROVIDER="${INDEX_PROVIDER:-indexing.cruds}"
 DIGITAL_TWIN_PROVIDER="${DIGITAL_TWIN_PROVIDER:-digitaltwin.cruds}"
 READER_ONLY_TENANT="${READER_ONLY_TENANT:-Acme 4 Organization SL}"
@@ -45,11 +48,11 @@ assert_not_contains() {
 }
 
 echo "[smoke] GET Alice host catalog"
-alice_catalog="$(fetch_json "${ALICE_BASE_URL}/.well-known/dcat3/catalog")"
+alice_catalog="$(fetch_json "${ALICE_BASE_URL}/host/cds-${JURISDICTION_LOWER}/${VERSION}/${HOST_NETWORK}/dsp/catalog/dcat.json")"
 assert_eq "1" "$(echo "$alice_catalog" | jq '.["dcat:dataset"] | length')" "Alice should publish one provider dataset"
 
 echo "[smoke] GET Bob host catalog"
-bob_catalog="$(fetch_json "${BOB_BASE_URL}/.well-known/dcat3/catalog")"
+bob_catalog="$(fetch_json "${BOB_BASE_URL}/host/cds-${JURISDICTION_LOWER}/${VERSION}/${HOST_NETWORK}/dsp/catalog/dcat.json")"
 assert_eq "2" "$(echo "$bob_catalog" | jq '.["dcat:dataset"] | length')" "Bob should publish two provider datasets"
 assert_not_contains "$bob_catalog" "$READER_ONLY_TENANT" "Bob catalog must exclude reader-only tenants"
 

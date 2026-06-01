@@ -8,6 +8,10 @@ ALICE_ENV="${ALICE_ENV:-.env.alice}"
 BOB_ENV="${BOB_ENV:-.env.bob}"
 ALICE_BASE_URL="${ALICE_BASE_URL:-http://localhost:3000}"
 BOB_BASE_URL="${BOB_BASE_URL:-http://localhost:3001}"
+JURISDICTION="${JURISDICTION:-ES}"
+JURISDICTION_LOWER="$(printf '%s' "${JURISDICTION:-ES}" | tr '[:upper:]' '[:lower:]')"
+VERSION="${VERSION:-v1}"
+HOST_NETWORK="${HOST_NETWORK:-test}"
 PORTS_TO_CLOSE="${PORTS_TO_CLOSE:-3000,3001}"
 SKIP_BUILD="${SKIP_BUILD:-false}"
 SKIP_CLOSE="${SKIP_CLOSE:-false}"
@@ -54,7 +58,7 @@ start_instance() {
 wait_for_ping() {
   local label="$1"
   local base_url="$2"
-  local url="${base_url}/host/.well-known/ping"
+  local url="${base_url}/host/cds-${JURISDICTION_LOWER}/${VERSION}/${HOST_NETWORK}/.well-known/ping"
 
   for _ in $(seq 1 60); do
     local status
