@@ -588,7 +588,7 @@ export function createDiscoveryRouter(
    * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json:
    *   get:
    *     tags: [Discovery]
-   *     summary: DCAT3 index service offering (tenant)
+   *     summary: DSP index service offering (tenant)
    *     parameters:
    *       - $ref: '#/components/parameters/TenantId'
    *       - $ref: '#/components/parameters/Jurisdiction'
@@ -601,7 +601,7 @@ export function createDiscoveryRouter(
    * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json:
    *   get:
    *     tags: [Discovery]
-   *     summary: DCAT3 research service offering (tenant)
+   *     summary: DSP research service offering (tenant)
    *     parameters:
    *       - $ref: '#/components/parameters/TenantId'
    *       - $ref: '#/components/parameters/Jurisdiction'
@@ -879,7 +879,7 @@ export function createDiscoveryRouter(
    * /host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/request:
    *   post:
    *     tags: [Data Catalog Discovery]
-   *     summary: Operator catalog request (DSP/DCAT-3)
+   *     summary: Operator DSP catalog request
    *     description: Returns a `dcat:Catalog` with provider datasets discoverable by client apps.
    *     requestBody:
    *       required: false
@@ -900,7 +900,7 @@ export function createDiscoveryRouter(
    * /host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/dcat.json:
    *   get:
    *     tags: [Data Catalog Discovery]
-   *     summary: Operator catalog artifact (DCAT-3)
+   *     summary: Operator DSP catalog artifact
    *     responses:
    *       '200': { description: DCAT catalog artifact }
    *       '503': { description: Host not available }
@@ -934,7 +934,7 @@ export function createDiscoveryRouter(
    * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json:
    *   get:
    *     tags: [Data Catalog Discovery]
-   *     summary: Hosted provider catalog artifact (DCAT-3)
+   *     summary: Hosted provider DSP catalog artifact
    *     parameters:
    *       - $ref: '#/components/parameters/TenantId'
    *       - $ref: '#/components/parameters/Jurisdiction'
@@ -961,7 +961,7 @@ export function createDiscoveryRouter(
    *       '200': { description: Dataset found }
    *       '404': { description: Not found }
    */
-  // --- DSP DCAT-3 Catalog Endpoints (synchronous/public discovery) ---
+  // --- DSP catalog endpoints (synchronous/public discovery) ---
   router.post(buildGwCatalogRequestPath({
     participantId: 'host',
     jurisdiction: ':jurisdiction',

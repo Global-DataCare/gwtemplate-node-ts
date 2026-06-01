@@ -332,7 +332,7 @@ describe('Well-Known Legal Participant VC API', () => {
   });
 });
 
-describe('DCAT3 Discovery API', () => {
+describe('DSP Discovery API', () => {
   afterEach(() => {
     jest.clearAllMocks();
   });

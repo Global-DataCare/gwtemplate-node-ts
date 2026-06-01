@@ -88,7 +88,7 @@
     },
     {
       "name": "Data Catalog Discovery",
-      "description": "DCAT-3 catalog discovery endpoints (`/dcat3/catalog/...`) for operator/provider dataset lookup."
+      "description": "DSP catalog discovery endpoints (`/dsp/catalog/...`) for operator/provider dataset lookup."
     },
     {
       "name": "Async Polling",
@@ -4965,7 +4965,7 @@
         "tags": [
           "Discovery"
         ],
-        "summary": "DCAT3 index service offering (tenant)",
+        "summary": "DSP catalog index service offering (tenant)",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"
@@ -4996,7 +4996,7 @@
         "tags": [
           "Discovery"
         ],
-        "summary": "DCAT3 research service offering (tenant)",
+        "summary": "DSP catalog research service offering (tenant)",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"
@@ -5107,7 +5107,7 @@
         "tags": [
           "Data Catalog Discovery"
         ],
-        "summary": "Operator catalog request (DSP/DCAT-3)",
+        "summary": "Operator catalog request (DSP/DSP catalog)",
         "description": "Returns a `dcat:Catalog` with provider datasets discoverable by client apps.",
         "requestBody": {
           "required": false,
@@ -5148,7 +5148,7 @@
         "tags": [
           "Data Catalog Discovery"
         ],
-        "summary": "Operator catalog artifact (DCAT-3)",
+        "summary": "Operator catalog artifact (DSP catalog)",
         "responses": {
           "200": {
             "description": "DCAT catalog artifact"
@@ -5223,7 +5223,7 @@
         "tags": [
           "Data Catalog Discovery"
         ],
-        "summary": "Hosted provider catalog artifact (DCAT-3)",
+        "summary": "Hosted provider catalog artifact (DSP catalog)",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"

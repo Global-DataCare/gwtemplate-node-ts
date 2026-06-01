@@ -42,9 +42,11 @@ Short coverage summary for memory/thesis justification:
   - legal-organization `_activate` must declare service capabilities in `org.schema.Service.serviceType`
   - example values: `indexing.rs`, `indexing.cruds`, `digitaltwin.rs`, `digitaltwin.cruds`
   - GW persists those claims and now uses them to decide which tenant API endpoints are published in DID discovery
-  - the same persisted capability claim also drives DCAT3 discovery artifacts:
-    - `GET /dcat3/catalog/dcat.json`
-    - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/dcat.json`
+  - the same persisted capability claim also drives DSP discovery artifacts:
+    - `GET /host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/dspace-version`
+    - `GET /host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/dcat.json`
+    - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/dspace-version`
+    - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json`
     - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json`
     - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json`
   - `org.schema.Service.category` remains the sector, not the capability vocabulary
