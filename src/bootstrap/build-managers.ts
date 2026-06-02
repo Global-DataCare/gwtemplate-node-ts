@@ -111,7 +111,11 @@ export function buildManagers(options: {
 
   const compositionManager = new CompositionManager(vaultRepository, blockchainAdapter);
   const documentReferenceManager = new DocumentReferenceManager(vaultRepository, blockchainAdapter);
-  const communicationManager = new CommunicationManager({ tenantsCacheManager: tenantManager, vaultRepository });
+  const communicationManager = new CommunicationManager({
+    tenantsCacheManager: tenantManager,
+    vaultRepository,
+    compositionManager,
+  });
   const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService);
   const licenseManager = new LicenseManager(vaultRepository, kmsService);
   const tokenVerifier = resolveTokenVerifierFromEnv(isTestEnv);

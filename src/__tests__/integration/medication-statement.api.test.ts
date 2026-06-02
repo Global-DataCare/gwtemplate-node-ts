@@ -232,6 +232,7 @@ describe('MedicationStatement API (integration)', () => {
       expect(Array.isArray(searchPayload?.data?.[0]?.resource?.data)).toBe(true);
 
       const thidIpsSearch = 'ips-bundle-search-001';
+      const ipsSearchReference = `individual/org.hl7.fhir.r4/Bundle/_search?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.type=${encodeURIComponent(ipsDocumentTypeToken)}`;
       const ipsSearchResp = await invokeExpress(app, {
         method: 'POST',
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
@@ -278,6 +279,73 @@ describe('MedicationStatement API (integration)', () => {
       );
       expect(
         ipsSearchPayload?.data?.[0]?.resource?.entry
+          ?.filter((entry: any) => entry?.resource?.resourceType === 'MedicationStatement')
+          ?.length,
+      ).toBe(1);
+
+      const thidCommunicationSearch = 'communication-ips-search-001';
+      const communicationSearchResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: thidCommunicationSearch,
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.r4',
+                    'Communication.identifier': 'comm-ips-search-001',
+                    'Communication.subject': subjectDid,
+                    'Communication.sent': '2026-05-22T12:00:00Z',
+                  },
+                },
+                resource: {
+                  resourceType: 'Communication',
+                  status: 'completed',
+                  subject: { reference: subjectDid },
+                  sent: '2026-05-22T12:00:00Z',
+                  payload: [
+                    {
+                      contentReference: {
+                        reference: ipsSearchReference,
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(communicationSearchResp.status).toBe(202);
+
+      let communicationSearchPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: thidCommunicationSearch },
+        });
+        if (pollResp.status === 200) {
+          communicationSearchPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(communicationSearchPayload?.resourceType).toBe('Bundle');
+      expect(communicationSearchPayload?.data?.[0]?.type).toBe('Bundle-search-response-v1.0');
+      expect(communicationSearchPayload?.data?.[0]?.response?.status).toBe('200');
+      expect(communicationSearchPayload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
+      expect(communicationSearchPayload?.data?.[0]?.resource?.type).toBe('document');
+      expect(
+        communicationSearchPayload?.data?.[0]?.resource?.entry
           ?.filter((entry: any) => entry?.resource?.resourceType === 'MedicationStatement')
           ?.length,
       ).toBe(1);

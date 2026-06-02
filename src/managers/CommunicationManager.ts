@@ -120,6 +120,7 @@ const PROJECTED_RESOURCE_CONFIG: Record<SupportedProjectedResourceType, Projecti
 interface CommunicationManagerOptions {
   tenantsCacheManager: TenantsCacheManager;
   vaultRepository: IVaultRepository;
+  compositionManager?: IJobProcessor;
 }
 
 /**
@@ -129,10 +130,12 @@ interface CommunicationManagerOptions {
 export class CommunicationManager implements IJobProcessor {
   private readonly tenantsCacheManager: TenantsCacheManager;
   private readonly vaultRepository: IVaultRepository;
+  private readonly compositionManager?: IJobProcessor;
 
-  constructor({ tenantsCacheManager, vaultRepository }: CommunicationManagerOptions) {
+  constructor({ tenantsCacheManager, vaultRepository, compositionManager }: CommunicationManagerOptions) {
     this.tenantsCacheManager = tenantsCacheManager;
     this.vaultRepository = vaultRepository;
+    this.compositionManager = compositionManager;
   }
 
   /**
@@ -179,6 +182,12 @@ export class CommunicationManager implements IJobProcessor {
         await this.persistCompositionProjectionFromCommunication(job, entry as any, fhirResource, serverDid);
         await this.persistDocumentReferenceProjectionFromCommunication(job, entry as any, fhirResource);
         await this.persistProjectedResourcesFromCommunication(job, entry as any, fhirResource);
+
+        const embeddedSearchResponseEntries = await this.executeEmbeddedBundleSearchRequest(job, fhirResource);
+        if (embeddedSearchResponseEntries && embeddedSearchResponseEntries.length > 0) {
+          bundleEntries.push(...embeddedSearchResponseEntries);
+          continue;
+        }
 
         const identifierClaim =
           (entry as any)?.meta?.claims?.[CommunicationClaim.Identifier] ??
@@ -243,6 +252,100 @@ export class CommunicationManager implements IJobProcessor {
       body: responseBundle,
     };
     return result;
+  }
+
+  private async executeEmbeddedBundleSearchRequest(
+    job: JobRequest,
+    fhirResource: FhirCommunication,
+  ): Promise<Array<BundleEntryResponse | ErrorEntry> | undefined> {
+    if (!this.compositionManager) return undefined;
+
+    const references = this.buildCommunicationContentReferences(job, undefined, fhirResource)
+      .filter((reference) => this.isBundleSearchReference(reference));
+    if (references.length === 0) return undefined;
+
+    const responseEntries: Array<BundleEntryResponse | ErrorEntry> = [];
+    for (const reference of references) {
+      const parsed = this.parseBundleSearchReference(reference, job);
+      if (!parsed) continue;
+
+      const syntheticJob: JobRequest = {
+        ...job,
+        section: parsed.section,
+        format: parsed.format,
+        resourceType: 'Bundle',
+        action: '_search',
+        content: {
+          ...(job.content as any),
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: {
+                  method: 'GET',
+                  url: parsed.requestUrl,
+                },
+              },
+            ],
+          },
+        } as any,
+      };
+
+      const searchResponse = await this.compositionManager.process(syntheticJob);
+      const searchEntries = Array.isArray((searchResponse.body as any)?.data)
+        ? ((searchResponse.body as any).data as Array<BundleEntryResponse | ErrorEntry>)
+        : [];
+      responseEntries.push(...searchEntries);
+    }
+
+    return responseEntries.length > 0 ? responseEntries : undefined;
+  }
+
+  private isBundleSearchReference(reference: string): boolean {
+    const normalized = String(reference || '').trim().toLowerCase();
+    if (!normalized) return false;
+    return normalized.includes('/bundle/_search?') || normalized.startsWith('bundle/_search?') || normalized.startsWith('bundle?');
+  }
+
+  private parseBundleSearchReference(
+    reference: string,
+    fallbackJob: JobRequest,
+  ): { section: string; format: string; requestUrl: string } | undefined {
+    const normalized = String(reference || '').trim();
+    if (!normalized) return undefined;
+
+    let pathname = normalized;
+    let search = '';
+    if (/^https?:\/\//i.test(normalized)) {
+      const parsed = new URL(normalized);
+      pathname = parsed.pathname;
+      search = parsed.search || '';
+    } else {
+      const syntheticUrl = new URL(normalized.startsWith('/') ? normalized : `/${normalized}`, 'http://internal.local');
+      pathname = syntheticUrl.pathname;
+      search = syntheticUrl.search || '';
+    }
+
+    const cleanPath = pathname.replace(/^\/+/, '');
+    const segments = cleanPath.split('/').filter(Boolean);
+    if (segments.length < 2) return undefined;
+
+    let section = String(fallbackJob.section || '').trim() || SUBJECT_SECTION_INDIVIDUAL;
+    let format = String(fallbackJob.format || '').trim();
+
+    const directIndex = segments.findIndex((segment) => segment === SUBJECT_SECTION_INDIVIDUAL || segment === 'digitaltwin');
+    if (directIndex >= 0 && segments.length >= directIndex + 4) {
+      section = segments[directIndex];
+      format = segments[directIndex + 1];
+    } else if (segments.length >= 4) {
+      section = segments[0];
+      format = segments[1];
+    }
+
+    const query = search.startsWith('?') ? search.slice(1) : search;
+    const requestUrl = `Bundle${query ? `?${query}` : ''}`;
+    return { section, format, requestUrl };
   }
 
   private async persistCompositionProjectionFromCommunication(

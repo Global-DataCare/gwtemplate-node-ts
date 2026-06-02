@@ -17,6 +17,7 @@ describe('CommunicationManager Unit Tests', () => {
   let communicationManager: CommunicationManager;
   let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
   let mockVaultRepository: jest.Mocked<IVaultRepository>;
+  let mockCompositionManager: { process: jest.Mock };
   const testServerDid = 'did:web:test-server.com';
 
   beforeEach(() => {
@@ -28,10 +29,14 @@ describe('CommunicationManager Unit Tests', () => {
       vaultExists: jest.fn(async () => false),
       put: jest.fn(async () => undefined),
     } as unknown as jest.Mocked<IVaultRepository>;
+    mockCompositionManager = {
+      process: jest.fn(),
+    };
     
     communicationManager = new CommunicationManager({
       tenantsCacheManager: mockTenantsCacheManager,
       vaultRepository: mockVaultRepository,
+      compositionManager: mockCompositionManager as any,
     });
   });
 
@@ -739,6 +744,104 @@ describe('CommunicationManager Unit Tests', () => {
       expect(channelRecord.meta?.documentReferenceCount).toBe(1);
       expect(channelRecord['Communication.content-reference']).toContain('DocumentReference/documentreference-from-communication-');
       expect(channelRecord.resource?.body?.data?.some((item: DataEntry) => item.type === 'Attachment')).toBe(true);
+    });
+  });
+
+  describe('process (embedded Bundle/_search request)', () => {
+    const subjectDid = 'did:web:api.acme.org:individual:ips-search-subject-001';
+
+    it('executes Bundle/_search referenced in Communication.contentReference and returns the search response', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+      mockCompositionManager.process.mockImplementation(async () => ({
+        jti: randomUUID(),
+        iss: testServerDid,
+        aud: 'did:web:sender.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        thid: 'thread-ips-search-001',
+        type: 'transaction-response',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch-response',
+          data: [
+            {
+              type: 'Bundle-search-response-v1.0',
+              response: { status: '200' },
+              resource: {
+                resourceType: 'Bundle',
+                type: 'document',
+                entry: [{ resource: { resourceType: 'Composition' } }],
+              },
+            },
+          ],
+        },
+      }) as any);
+
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'thread-ips-search-001',
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [
+            {
+              type: 'Communication',
+              meta: {
+                claims: {
+                  '@context': 'org.hl7.fhir.r4',
+                  'Communication.identifier': 'comm-ips-search-001',
+                  'Communication.subject': subjectDid,
+                  'Communication.sent': '2026-06-02T10:00:00Z',
+                },
+              },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [
+                  {
+                    contentReference: {
+                      reference: `individual/org.hl7.fhir.r4/Bundle/_search?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.type=http%3A%2F%2Floinc.org%7C60591-5`,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as any,
+      };
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      const response = await communicationManager.process(job);
+      const data = (response.body as any)?.data;
+      expect(Array.isArray(data)).toBe(true);
+      expect(data[0]?.type).toBe('Bundle-search-response-v1.0');
+      expect(data[0]?.resource?.type).toBe('document');
+      expect(mockCompositionManager.process).toHaveBeenCalledTimes(1);
+      const forwardedJob = mockCompositionManager.process.mock.calls[0][0] as JobRequest;
+      expect(forwardedJob.resourceType).toBe('Bundle');
+      expect(forwardedJob.action).toBe('_search');
+      expect((forwardedJob.content as any)?.body?.entry?.[0]?.request?.url).toBe(
+        `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.type=http%3A%2F%2Floinc.org%7C60591-5`,
+      );
     });
   });
 });
