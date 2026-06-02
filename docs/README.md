@@ -105,6 +105,8 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 *   **[03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md](03-IDENTITY-AND-TRUST/03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md)**: Architecture for the user discovery and consent-driven data sharing mechanism.
 *   **[03.F-ENTITY-KEY-MANAGEMENT-LIFECYCLE.md](03-IDENTITY-AND-TRUST/03.F-ENTITY-KEY-MANAGEMENT-LIFECYCLE.md)**: Explains how cryptographic keys for entities are managed throughout their lifecycle.
 *   **[03.G-LEGACY-AND-MANAGED-KEYS.md](03-IDENTITY-AND-TRUST/03.G-LEGACY-AND-MANAGED-KEYS.md)**: Discusses strategies for handling both externally managed and system-managed keys.
+*   **[03.H-ICA-CERTIFICATE-ISSUANCE.md](03-IDENTITY-AND-TRUST/03.H-ICA-CERTIFICATE-ISSUANCE.md)**: Documents CSR enrollment with ICA, public certificate publication, and the boundary between certificate issuance and host autodiscovery.
+*   **[03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md](03-IDENTITY-AND-TRUST/03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md)**: Audit reference for the hosting-operator bootstrap boundary, including `env -> vault -> ICA` resolution order and the separation between controller onboarding and host technical bootstrap.
 
 ### 📂 04-DEEP-DIVES
 *   **[04.A-VC-ARCHITECTURE-DEEP-DIVE.md](04-DEEP-DIVES/04.A-VC-ARCHITECTURE-DEEP-DIVE.md)**: A deep dive into the Verifiable Credentials architecture.
@@ -117,8 +119,10 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 *   **[04.H-DATASPACE-PUBLICATION-ATTESTATION.md](04-DEEP-DIVES/04.H-DATASPACE-PUBLICATION-ATTESTATION.md)**: Clarifies what is published by link vs anchored on-ledger (hashes/tags), and how attestation/provenance fits.
 *   **[04.I-FABRIC-MULTICLOUD-BLUEPRINT.md](04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md)**: Multi-cloud Fabric deployment plan and channel governance.
 *   **[04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md](04-DEEP-DIVES/04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md)**: Separates host operator discovery from tenant sector catalog publication and distinguishes DSP standard paths from GW CORE local catalog bindings.
+*   **[04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md](04-DEEP-DIVES/04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md)**: Inventories the existing Fabric adapter/codebase and defines the additive dual-network target with Pontus-X.
 
 ### 📂 05-USE-CASES
+*   **[05.A-ALICE-BOB-AUTODISCOVERY-SMOKE.md](05-USE-CASES/05.A-ALICE-BOB-AUTODISCOVERY-SMOKE.md)**: Local two-host smoke for host catalogs and normalized provider discovery.
 *   Core use cases only. Legacy/extension use-case docs were moved to transitional `90.*` files.
 
 ### 📂 Transitional Scenarios (Not Core Baseline)

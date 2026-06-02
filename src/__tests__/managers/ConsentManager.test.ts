@@ -45,7 +45,7 @@ describe('ConsentManager', () => {
   const mockJurisdiction = 'au-nsw';
   const mockSector = 'test-sector';
   const mockIdentifier = CONSENT_CREATION_MESSAGE.body.entry[0].meta.claims['Consent.identifier'];
-  const mockGrantee = 'did:web:hospital.example.com';
+  const mockActorIdentifier = CONSENT_CREATION_MESSAGE.body.entry[0].meta.claims['Consent.actor-identifier'];
   const mockAttachmentData = CONSENT_CREATION_MESSAGE.body.entry[0].meta.claims['Consent.attachment-data'];
   const mockAttachmentHash = createHash('sha3-384')
     .update(Buffer.from(mockAttachmentData, 'base64'))
@@ -137,7 +137,7 @@ describe('ConsentManager', () => {
     const expectedRuleKey = buildConsentRuleKey({
       subjectId: mockSubjectId,
       sector: mockSector,
-      target: mockGrantee,
+      target: mockActorIdentifier,
       decision: 'permit',
       purpose: mockClaims[ClaimConsent.purpose] as string,
     });

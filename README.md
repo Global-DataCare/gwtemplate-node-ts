@@ -608,10 +608,10 @@ DEMO_ALLOW_INSECURE_BEARER=false
 ```
 
 For a deterministic Fabric v3 devnet (DEMO single-host or multi-org), see:
-- `devnet/fabric-v3/README.md`
+- `../fabric-multicloud/devnet/fabric-v3/README.md`
 
 For the multi-cloud Fabric deployment plan and scripts, see:
-- `fabric-multicloud/README.md`
+- `../fabric-multicloud/README.md`
 - `docs/04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md`
 
 Local (minikube/k3s) is test-only and documented in:

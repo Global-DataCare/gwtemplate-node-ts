@@ -10,6 +10,7 @@ import { pingHandler } from './handlers/discovery/ping.handler';
 import { signVerifiableCredential } from '../utils/vc-signer';
 import { findSigningMethod } from '../utils/did-backend';
 import { buildStatusListCredential, buildStatusListEntry, createStatusListEncodedList } from '../utils/status-list';
+import { DataspaceWellKnownPaths } from 'gdc-common-utils-ts/constants/dataspace-protocol';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { isEuCountryCode, normalizeCountryCode } from 'gdc-common-utils-ts/constants/eu-countries';
 import {
@@ -20,6 +21,15 @@ import {
   ServiceCapabilityFamily,
   ServiceCapabilityTokenValue,
 } from 'gdc-common-utils-ts/constants/service-capabilities';
+import {
+  buildDspaceVersionMetadata,
+  buildGwCatalogArtifactPath,
+  buildGwCatalogCollectionPath,
+  buildGwCatalogDatasetPath,
+  buildGwCatalogRequestPath,
+  buildGwDataspaceBasePath,
+  buildGwDspaceVersionWellKnownPath,
+} from 'gdc-common-utils-ts/utils/dataspace-protocol';
 import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 import { isFhirSector, isResearchSector } from '../utils/sector';
 import { hasProviderServiceCapabilityClaim } from '../utils/services';
@@ -75,6 +85,7 @@ export function createDiscoveryRouter(
   type NormalizedHostingOperatorDiscoveryMatch = {
     operatorDid: string;
     title?: string;
+    discoveryUrl?: string;
     catalogUrl?: string;
     matchedCapabilities: string[];
     record: {
@@ -92,6 +103,7 @@ export function createDiscoveryRouter(
     title?: string;
     hostingOperatorDid: string;
     hostingOperatorTitle?: string;
+    discoveryUrl?: string;
     catalogUrl?: string;
     record: {
       providerDid: string;
@@ -99,6 +111,7 @@ export function createDiscoveryRouter(
       category: string;
       areaServed?: string;
       endpointUrl?: string;
+      discoveryUrl?: string;
       catalogUrl?: string;
     };
     hostingOperator: NormalizedHostingOperatorDiscoveryMatch['record'];
@@ -132,6 +145,36 @@ export function createDiscoveryRouter(
     return isEuCountryCode(normalized) ? 'EU' : normalized;
   };
 
+  /**
+   * Builds the absolute public origin of the current request.
+   */
+  const buildPublicOrigin = (req: express.Request): string => `${req.protocol}://${req.get('host')}`;
+
+  /**
+   * Builds an absolute public URL from a GW CORE path contract.
+   */
+  const buildAbsoluteUrl = (publicOrigin: string, path: string): string =>
+    new URL(path, publicOrigin).toString();
+
+  /**
+   * Appends a path suffix to a tenant operational base URL while preserving the
+   * tenant-scoped DSP prefix already encoded in that base URL.
+   */
+  const appendTenantPath = (baseUrl: string, suffix: string): string =>
+    `${String(baseUrl).replace(/\/$/, '')}${suffix.startsWith('/') ? suffix : `/${suffix}`}`;
+
+  const getTenantServiceClaim = (tenantConfig: any, claimName: string): string | undefined => {
+    const topLevelClaim = tenantConfig?.claims?.[claimName];
+    if (typeof topLevelClaim === 'string' && topLevelClaim.trim()) {
+      return topLevelClaim;
+    }
+    const providerClaim = tenantConfig?.provider?.service?.[claimName];
+    if (typeof providerClaim === 'string' && providerClaim.trim()) {
+      return providerClaim;
+    }
+    return undefined;
+  };
+
   const toProviderDataset = (tenantConfig: any): ProviderDataset | null => {
     const publisherDid = tenantConfig?.didDocument?.id as string | undefined;
     if (!publisherDid) return null;
@@ -142,12 +185,12 @@ export function createDiscoveryRouter(
       publisherDid;
     const baseUrl = getBaseUrlFromDidWeb(publisherDid);
     const operationalUrl =
-      (tenantConfig?.claims?.[ClaimsServiceSchemaorg.url] as string | undefined)?.trim() ||
+      getTenantServiceClaim(tenantConfig, ClaimsServiceSchemaorg.url) ||
       baseUrl;
     const alternateName = (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.alternateName] as string | undefined)?.trim();
-    const sector = parseCategory(tenantConfig?.claims?.[ClaimsServiceSchemaorg.category]);
+    const sector = parseCategory(getTenantServiceClaim(tenantConfig, ClaimsServiceSchemaorg.category));
     const jurisdiction = parseJurisdiction(tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.addressCountry]);
-    const serviceTypeClaim = tenantConfig?.claims?.[ClaimsServiceSchemaorg.serviceType] as string | undefined;
+    const serviceTypeClaim = getTenantServiceClaim(tenantConfig, ClaimsServiceSchemaorg.serviceType);
     return {
       datasetId: toDatasetId(publisherDid),
       publisherDid,
@@ -296,18 +339,19 @@ export function createDiscoveryRouter(
     publicOrigin: string,
     tenants: any[],
     requiredCapabilities: readonly string[],
+    routeContext?: Readonly<{ jurisdiction?: string; sector?: string; version?: string }>,
   ): Promise<NormalizedHostingOperatorDiscoveryMatch> => {
     const hostTenant = await tenantsCacheManager.getTenant('host');
     const hostClaims = hostTenant?.claims || {};
     const hostCountry = parseJurisdiction(hostClaims[ClaimsOrganizationSchemaorg.addressCountry]);
     const hostCoverageScope = inferCoverageScope(hostCountry);
     const aggregatedServiceTypes = Array.from(new Set(
-      tenants.flatMap((tenant) => parseServiceCapabilityTokens(String(tenant?.claims?.[ClaimsServiceSchemaorg.serviceType] || '')))
+      tenants.flatMap((tenant) => parseServiceCapabilityTokens(String(getTenantServiceClaim(tenant, ClaimsServiceSchemaorg.serviceType) || '')))
         .filter((token) => isProviderServiceCapability(token)),
     ));
     const aggregatedCategories = Array.from(new Set(
       tenants
-        .map((tenant) => parseCategory(tenant?.claims?.[ClaimsServiceSchemaorg.category]))
+        .map((tenant) => parseCategory(getTenantServiceClaim(tenant, ClaimsServiceSchemaorg.category)))
         .filter(Boolean),
     ));
     const aggregatedAreaServed = Array.from(new Set([
@@ -322,7 +366,22 @@ export function createDiscoveryRouter(
         (hostClaims[ClaimsOrganizationSchemaorg.legalName] as string | undefined)?.trim() ||
         (hostClaims[ClaimsOrganizationSchemaorg.name] as string | undefined)?.trim() ||
         hostDid,
-      catalogUrl: `${publicOrigin}/.well-known/dcat3/catalog`,
+      discoveryUrl: routeContext?.jurisdiction && routeContext?.sector
+        ? buildAbsoluteUrl(publicOrigin, buildGwDspaceVersionWellKnownPath({
+          participantId: 'host',
+          jurisdiction: routeContext.jurisdiction,
+          version: routeContext.version || 'v1',
+          sector: routeContext.sector,
+        }))
+        : undefined,
+      catalogUrl: routeContext?.jurisdiction && routeContext?.sector
+        ? buildAbsoluteUrl(publicOrigin, buildGwCatalogArtifactPath({
+          participantId: 'host',
+          jurisdiction: routeContext.jurisdiction,
+          version: routeContext.version || 'v1',
+          sector: routeContext.sector,
+        }))
+        : undefined,
       matchedCapabilities: [...requiredCapabilities],
       record: {
         subjectId: hostDid,
@@ -360,14 +419,16 @@ export function createDiscoveryRouter(
             title: dataset.title,
             hostingOperatorDid: hostMatch.operatorDid,
             hostingOperatorTitle: hostMatch.title,
-            catalogUrl: `${dataset.baseUrl}/.well-known/dcat3/catalog`,
+            discoveryUrl: appendTenantPath(dataset.baseUrl, DataspaceWellKnownPaths.VersionMetadata),
+            catalogUrl: appendTenantPath(dataset.baseUrl, buildGwCatalogArtifactPath()),
             record: {
               providerDid: dataset.publisherDid,
               serviceType,
               category: dataset.sector || '',
               areaServed: dataset.jurisdiction || inferCoverageScope(dataset.jurisdiction),
               endpointUrl: offering.endpointUrl,
-              catalogUrl: `${dataset.baseUrl}/.well-known/dcat3/catalog`,
+              discoveryUrl: appendTenantPath(dataset.baseUrl, DataspaceWellKnownPaths.VersionMetadata),
+              catalogUrl: appendTenantPath(dataset.baseUrl, buildGwCatalogArtifactPath()),
             },
             hostingOperator: hostMatch.record,
           })),
@@ -395,8 +456,17 @@ export function createDiscoveryRouter(
    * /host/.well-known/ping:
    *   get:
    *     tags: [Discovery]
+   *     summary: Ping (host compatibility alias)
+   *     description: Backward-compatible health check alias for the host tenant.
+   *     responses:
+   *       '200': { description: OK }
+   *       '503': { description: Service Unavailable }
+   *
+   * /host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/ping:
+   *   get:
+   *     tags: [Discovery]
    *     summary: Ping (host)
-   *     description: Health check for the host tenant.
+   *     description: Canonical health check for the host runtime scoped by jurisdiction, version, and host network.
    *     responses:
    *       '200': { description: OK }
    *       '503': { description: Service Unavailable }
@@ -518,7 +588,7 @@ export function createDiscoveryRouter(
    * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json:
    *   get:
    *     tags: [Discovery]
-   *     summary: DCAT3 index service offering (tenant)
+   *     summary: DSP index service offering (tenant)
    *     parameters:
    *       - $ref: '#/components/parameters/TenantId'
    *       - $ref: '#/components/parameters/Jurisdiction'
@@ -531,7 +601,7 @@ export function createDiscoveryRouter(
    * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json:
    *   get:
    *     tags: [Discovery]
-   *     summary: DCAT3 research service offering (tenant)
+   *     summary: DSP research service offering (tenant)
    *     parameters:
    *       - $ref: '#/components/parameters/TenantId'
    *       - $ref: '#/components/parameters/Jurisdiction'
@@ -593,10 +663,15 @@ export function createDiscoveryRouter(
   // --- Route Definitions ---
   // Define separate, unambiguous route structures for host and tenants.
   const hostWellKnownPrefix = '/host/.well-known';
+  const hostScopedWellKnownPrefix = '/host/cds-:jurisdiction/:version/:hostNetwork/.well-known';
   // This new route aligns with the hosted DID web specification for tenants.
   const tenantWellKnownPrefix = '/:tenantId/cds-:jurisdiction/:version/:sector/.well-known';
 
-  router.get([`${hostWellKnownPrefix}/ping`, `${tenantWellKnownPrefix}/ping`], resolveTenant, pingHandler());
+  router.get(
+    [`${hostWellKnownPrefix}/ping`, `${hostScopedWellKnownPrefix}/ping`, `${tenantWellKnownPrefix}/ping`],
+    resolveTenant,
+    pingHandler(),
+  );
 
   router.get([`${hostWellKnownPrefix}/did.json`, `${tenantWellKnownPrefix}/did.json`], resolveTenant, async (req, res) => {
     // The final handler's responsibility is to fetch the specific document it needs.
@@ -780,10 +855,31 @@ export function createDiscoveryRouter(
 
   /**
    * @openapi
-   * /dcat3/catalog/request:
+   * /host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/dspace-version:
+   *   get:
+   *     tags: [Data Catalog Discovery]
+   *     summary: Host DSP version-discovery entrypoint
+   *     responses:
+   *       '200': { description: DSP version metadata returned }
+   *       '503': { description: Host not available }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/dspace-version:
+   *   get:
+   *     tags: [Data Catalog Discovery]
+   *     summary: Hosted tenant DSP version-discovery entrypoint
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: DSP version metadata returned }
+   *       '404': { description: Tenant not found }
+   *
+   * /host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/request:
    *   post:
    *     tags: [Data Catalog Discovery]
-   *     summary: Operator catalog request (DSP/DCAT-3)
+   *     summary: Operator DSP catalog request
    *     description: Returns a `dcat:Catalog` with provider datasets discoverable by client apps.
    *     requestBody:
    *       required: false
@@ -801,15 +897,15 @@ export function createDiscoveryRouter(
    *       '200': { description: DSP catalog response }
    *       '503': { description: Host not available }
    *
-   * /dcat3/catalog/dcat.json:
+   * /host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/dcat.json:
    *   get:
    *     tags: [Data Catalog Discovery]
-   *     summary: Operator catalog artifact (DCAT-3)
+   *     summary: Operator DSP catalog artifact
    *     responses:
    *       '200': { description: DCAT catalog artifact }
    *       '503': { description: Host not available }
    *
-   * /dcat3/catalog/datasets/{id}:
+   * /host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/datasets/{id}:
    *   get:
    *     tags: [Data Catalog Discovery]
    *     summary: Read one provider dataset from operator catalog
@@ -822,7 +918,7 @@ export function createDiscoveryRouter(
    *       '200': { description: Dataset found }
    *       '404': { description: Dataset not found }
    *
-   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/request:
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/request:
    *   post:
    *     tags: [Data Catalog Discovery]
    *     summary: Hosted provider catalog request (tenant scoped)
@@ -835,10 +931,10 @@ export function createDiscoveryRouter(
    *       '200': { description: DSP catalog response }
    *       '404': { description: Tenant not found }
    *
-   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/dcat.json:
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json:
    *   get:
    *     tags: [Data Catalog Discovery]
-   *     summary: Hosted provider catalog artifact (DCAT-3)
+   *     summary: Hosted provider DSP catalog artifact
    *     parameters:
    *       - $ref: '#/components/parameters/TenantId'
    *       - $ref: '#/components/parameters/Jurisdiction'
@@ -848,7 +944,7 @@ export function createDiscoveryRouter(
    *       '200': { description: DCAT catalog artifact }
    *       '404': { description: Tenant not found }
    *
-   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/datasets/{id}:
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/datasets/{id}:
    *   get:
    *     tags: [Data Catalog Discovery]
    *     summary: Read one provider dataset from hosted tenant catalog
@@ -865,8 +961,13 @@ export function createDiscoveryRouter(
    *       '200': { description: Dataset found }
    *       '404': { description: Not found }
    */
-  // --- DSP DCAT-3 Catalog Endpoints (synchronous/public discovery) ---
-  router.post('/dcat3/catalog/request', async (req, res) => {
+  // --- DSP catalog endpoints (synchronous/public discovery) ---
+  router.post(buildGwCatalogRequestPath({
+    participantId: 'host',
+    jurisdiction: ':jurisdiction',
+    version: ':version',
+    sector: ':sector',
+  }), async (req, res) => {
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
@@ -876,31 +977,31 @@ export function createDiscoveryRouter(
       .filter((d): d is ProviderDataset => !!d));
 
     const filtered = filterDatasets(datasets, req.body?.filters);
-    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
-    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, filtered));
+    const publicOrigin = buildPublicOrigin(req);
+    const catalogBaseUrl = buildAbsoluteUrl(publicOrigin, buildGwCatalogCollectionPath({
+      participantId: 'host',
+      jurisdiction: req.params.jurisdiction,
+      version: req.params.version,
+      sector: req.params.sector,
+    }));
+    res.json(buildCatalog(catalogBaseUrl, publicOrigin, filtered));
   });
 
-  /**
-   * @openapi
-   * /.well-known/dcat3/catalog:
-   *   get:
-   *     tags:
-   *       - Discovery
-   *     summary: Read host operator public service autodiscovery catalog
-   *     responses:
-   *       '200': { description: DCAT catalog returned }
-   *       '503': { description: Host DID document is unavailable }
-   */
-  router.get('/.well-known/dcat3/catalog', async (req, res) => {
+  router.get(buildGwDspaceVersionWellKnownPath({
+    participantId: 'host',
+    jurisdiction: ':jurisdiction',
+    version: ':version',
+    sector: ':sector',
+  }), async (req, res) => {
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
-    const allTenants = await tenantsCacheManager.listAutodiscoverableTenants();
-    const datasets = filterProviderDatasets(allTenants
-      .map(toProviderDataset)
-      .filter((d): d is ProviderDataset => !!d));
-    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
-    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, datasets));
+    res.json(buildDspaceVersionMetadata(buildGwDataspaceBasePath({
+      participantId: 'host',
+      jurisdiction: req.params.jurisdiction,
+      version: req.params.version,
+      sector: req.params.sector,
+    })));
   });
 
   /**
@@ -936,6 +1037,11 @@ export function createDiscoveryRouter(
       publicOrigin,
       autodiscoverableTenants,
       providerCapability ? [providerCapability] : [],
+      {
+        jurisdiction: req.body?.jurisdiction,
+        sector: req.body?.hostNetwork || req.body?.hostNetworkOrBusinessSector,
+        version: req.body?.version || 'v1',
+      },
     );
     const providers = buildNormalizedPublishedProviderMatches(
       datasets,
@@ -955,7 +1061,12 @@ export function createDiscoveryRouter(
     });
   });
 
-  router.get('/dcat3/catalog/dcat.json', async (req, res) => {
+  router.get(buildGwCatalogArtifactPath({
+    participantId: 'host',
+    jurisdiction: ':jurisdiction',
+    version: ':version',
+    sector: ':sector',
+  }), async (req, res) => {
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
@@ -963,11 +1074,22 @@ export function createDiscoveryRouter(
     const datasets = filterProviderDatasets(allTenants
       .map(toProviderDataset)
       .filter((d): d is ProviderDataset => !!d));
-    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
-    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, datasets));
+    const publicOrigin = buildPublicOrigin(req);
+    const catalogBaseUrl = buildAbsoluteUrl(publicOrigin, buildGwCatalogCollectionPath({
+      participantId: 'host',
+      jurisdiction: req.params.jurisdiction,
+      version: req.params.version,
+      sector: req.params.sector,
+    }));
+    res.json(buildCatalog(catalogBaseUrl, publicOrigin, datasets));
   });
 
-  router.get('/dcat3/catalog/datasets/:id', async (req, res) => {
+  router.get(buildGwCatalogDatasetPath({
+    participantId: 'host',
+    jurisdiction: ':jurisdiction',
+    version: ':version',
+    sector: ':sector',
+  }, ':id'), async (req, res) => {
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
@@ -978,12 +1100,40 @@ export function createDiscoveryRouter(
     const dataset = datasets.find((d) => d.datasetId === req.params.id);
     if (!dataset) return res.status(404).type('text').send('Not Found');
 
-    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/dcat3/catalog`;
-    const [single] = buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, [dataset])['dcat:dataset'];
+    const publicOrigin = buildPublicOrigin(req);
+    const catalogBaseUrl = buildAbsoluteUrl(publicOrigin, buildGwCatalogCollectionPath({
+      participantId: 'host',
+      jurisdiction: req.params.jurisdiction,
+      version: req.params.version,
+      sector: req.params.sector,
+    }));
+    const [single] = buildCatalog(catalogBaseUrl, publicOrigin, [dataset])['dcat:dataset'];
     res.json(single);
   });
 
-  router.post('/:tenantId/cds-:jurisdiction/:version/:sector/dcat3/catalog/request', resolveTenant, async (req, res) => {
+  router.get(buildGwDspaceVersionWellKnownPath({
+    tenantId: ':tenantId',
+    jurisdiction: ':jurisdiction',
+    version: ':version',
+    sector: ':sector',
+  }), resolveTenant, async (req, res) => {
+    const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
+
+    res.json(buildDspaceVersionMetadata(buildGwDataspaceBasePath({
+      tenantId: req.params.tenantId,
+      jurisdiction: req.params.jurisdiction,
+      version: req.params.version,
+      sector: req.params.sector,
+    })));
+  });
+
+  router.post(buildGwCatalogRequestPath({
+    tenantId: ':tenantId',
+    jurisdiction: ':jurisdiction',
+    version: ':version',
+    sector: ':sector',
+  }), resolveTenant, async (req, res) => {
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
 
@@ -991,30 +1141,58 @@ export function createDiscoveryRouter(
     if (!dataset) return res.status(404).type('text').send('Not Found');
     const filtered = filterDatasets([dataset], req.body?.filters);
 
-    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/dcat3/catalog`;
-    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, filtered));
+    const publicOrigin = buildPublicOrigin(req);
+    const catalogBaseUrl = buildAbsoluteUrl(publicOrigin, buildGwCatalogCollectionPath({
+      tenantId: req.params.tenantId,
+      jurisdiction: req.params.jurisdiction,
+      version: req.params.version,
+      sector: req.params.sector,
+    }));
+    res.json(buildCatalog(catalogBaseUrl, publicOrigin, filtered));
   });
 
-  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/dcat3/catalog/dcat.json', resolveTenant, async (req, res) => {
+  router.get(buildGwCatalogArtifactPath({
+    tenantId: ':tenantId',
+    jurisdiction: ':jurisdiction',
+    version: ':version',
+    sector: ':sector',
+  }), resolveTenant, async (req, res) => {
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
 
     const dataset = toProviderDataset(tenantConfig);
     if (!dataset) return res.status(404).type('text').send('Not Found');
 
-    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/dcat3/catalog`;
-    res.json(buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, [dataset]));
+    const publicOrigin = buildPublicOrigin(req);
+    const catalogBaseUrl = buildAbsoluteUrl(publicOrigin, buildGwCatalogCollectionPath({
+      tenantId: req.params.tenantId,
+      jurisdiction: req.params.jurisdiction,
+      version: req.params.version,
+      sector: req.params.sector,
+    }));
+    res.json(buildCatalog(catalogBaseUrl, publicOrigin, [dataset]));
   });
 
-  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/dcat3/catalog/datasets/:id', resolveTenant, async (req, res) => {
+  router.get(buildGwCatalogDatasetPath({
+    tenantId: ':tenantId',
+    jurisdiction: ':jurisdiction',
+    version: ':version',
+    sector: ':sector',
+  }, ':id'), resolveTenant, async (req, res) => {
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
 
     const dataset = toProviderDataset(tenantConfig);
     if (!dataset || dataset.datasetId !== req.params.id) return res.status(404).type('text').send('Not Found');
 
-    const catalogBaseUrl = `${req.protocol}://${req.get('host')}/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/dcat3/catalog`;
-    const [single] = buildCatalog(catalogBaseUrl, `${req.protocol}://${req.get('host')}`, [dataset])['dcat:dataset'];
+    const publicOrigin = buildPublicOrigin(req);
+    const catalogBaseUrl = buildAbsoluteUrl(publicOrigin, buildGwCatalogCollectionPath({
+      tenantId: req.params.tenantId,
+      jurisdiction: req.params.jurisdiction,
+      version: req.params.version,
+      sector: req.params.sector,
+    }));
+    const [single] = buildCatalog(catalogBaseUrl, publicOrigin, [dataset])['dcat:dataset'];
     res.json(single);
   });
 

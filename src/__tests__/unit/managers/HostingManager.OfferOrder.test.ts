@@ -168,9 +168,12 @@ describe('HostingManager - Offer/Order Flow', () => {
 
     const claims = job.content!.body!.data[0]!.meta!.claims;
     // BUSINESS sector is used for vaultId (never network sector)
+    const tenantAlternateName =
+      claims[ClaimsOrganizationSchemaorg.alternateName]
+      || claims[ClaimsOrganizationSchemaorg.identifierValue];
     const tenantVaultId = tenantUtils.getTenantVaultId(
       claims[ClaimsServiceSchemaorg.category] as Sector,
-      claims[ClaimsOrganizationSchemaorg.alternateName],
+      tenantAlternateName,
     );
 
     const provisionalDoc = (await vaultRepository.get(
@@ -208,15 +211,21 @@ describe('HostingManager - Offer/Order Flow', () => {
     expect(['201', '404']).toContain(finalEntry.response.status);
     expect(['Organization-order-response-v1.0', 'Organization-order-request-v1.0']).toContain(finalEntry.type);
     if (finalEntry.response.status === '201') {
-      expect(finalEntry.meta.claims['org.schema.Order.acceptedOffer.identifier']).toBe(offerId);
+      expect(
+        finalEntry.meta.claims['org.schema.Order.acceptedOffer.identifier']
+        || finalEntry.meta.claims['Order.acceptedOffer.identifier'],
+      ).toBe(offerId);
     }
 
     // Assert the state of the finalized tenant record in the host's vault
     const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;
     // BUSINESS sector is used for vaultId (never network sector)
+    const tenantAlternateName =
+      regClaims[ClaimsOrganizationSchemaorg.alternateName]
+      || regClaims[ClaimsOrganizationSchemaorg.identifierValue];
     const tenantVaultId = tenantUtils.getTenantVaultId(
       regClaims[ClaimsServiceSchemaorg.category] as Sector,
-      regClaims[ClaimsOrganizationSchemaorg.alternateName],
+      tenantAlternateName,
     );
     const finalDoc = (await vaultRepository.get(
       hostCollectionName,

@@ -54,6 +54,8 @@ describe('CryptographyService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     cryptoService = new CryptographyService(new AdapterCryptoSdkNode());
+    jest.spyOn(cryptoService as any, 'loadMlKem').mockResolvedValue(mlKemMock);
+    jest.spyOn(cryptoService as any, 'loadMlDsa').mockResolvedValue(mlDsaMock);
   });
 
   // --- Formatting & Parsing Utilities ---
@@ -253,6 +255,7 @@ describe('CryptographyService', () => {
     it('decapsulate should call noble ml_kem768.decapsulate', async () => {
       const cipherText = randomBytes(1088);
       const privKey = randomBytes(2400);
+      (mockMlKem768.decapsulate as jest.Mock).mockReturnValue(randomBytes(32));
       await cryptoService.decapsulate(cipherText, privKey);
       expect(mockMlKem768.decapsulate).toHaveBeenCalledWith(cipherText, privKey);
     });
@@ -260,6 +263,7 @@ describe('CryptographyService', () => {
     it(`signBytes should call noble for level 2 'ML-DSA-44'`, async () => {
         const data = randomBytes(32);
         const privKey = randomBytes(2560); // Correct size for ML-DSA-44
+        mockMlDsa.sign.mockReturnValue(randomBytes(2420) as any);
         await cryptoService.signBytes(data, privKey, 'ML-DSA-44');
         expect(mockMlDsa.sign).toHaveBeenCalledWith(data, privKey);
       });
@@ -268,6 +272,7 @@ describe('CryptographyService', () => {
         const sig = randomBytes(2144); // Correct size for ML-DSA-44
         const data = randomBytes(32);
         const pubKey: MldsaPublicJwk = { kty: 'AKP', alg: 'ML-DSA-44', pub: 'pub-key-b64' };
+        mockMlDsa.verify.mockReturnValue(true as any);
         await cryptoService.verifyBytes(sig, data, pubKey);
         expect(mockMlDsa.verify).toHaveBeenCalledWith(sig, data, Content.base64ToBytes(pubKey.pub));
       });

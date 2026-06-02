@@ -87,8 +87,9 @@ describe('TenantsCacheManager - tenant urls', () => {
     // ASSERT
     const hostDomain = testHostDidWeb.replace('did:web:', '');
     const urnParts = testTenant1IdentifierUrn.split(':');
+    const tenantPath = String((testConfigTenant1.claims as any)[ClaimsOrganizationSchemaorg.alternateName]);
     // The jurisdiction (urnParts[3]) must be lower-cased to match the canonical URL format.
-    const expectedUrl = `https://${hostDomain}/acme/cds-${urnParts[3].toLowerCase()}/${urnParts[4]}/${urnParts[5]}`;
+    const expectedUrl = `https://${hostDomain}/${tenantPath}/cds-${urnParts[3].toLowerCase()}/${urnParts[4]}/${urnParts[5]}`;
     expect(url).toBe(expectedUrl);
   });
   
@@ -116,7 +117,8 @@ describe('TenantsCacheManager - tenant urls', () => {
     const url = await tenantsCacheManager.getTenantOperationalUrl('health-care_acme_no_url');
     const hostDomain = testHostDidWeb.replace('did:web:', '');
     const urnParts = testTenant1IdentifierUrn.split(':');
-    const expectedUrl = `https://${hostDomain}/acme/cds-${urnParts[3].toLowerCase()}/${urnParts[4]}/${urnParts[5]}`;
+    const tenantPath = String((testConfigTenant1.claims as any)[ClaimsOrganizationSchemaorg.alternateName]);
+    const expectedUrl = `https://${hostDomain}/${tenantPath}/cds-${urnParts[3].toLowerCase()}/${urnParts[4]}/${urnParts[5]}`;
     expect(url).toBe(expectedUrl);
   });
 });

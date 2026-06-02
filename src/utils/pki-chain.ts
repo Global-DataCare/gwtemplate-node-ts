@@ -1,6 +1,7 @@
 // src/utils/pki-chain.ts
 
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import path from 'path';
 import { Crypto } from '@peculiar/webcrypto';
 import * as pkijs from 'pkijs';
 import {
@@ -16,6 +17,8 @@ import {
 type PkiChainOptions = {
   cleanOutput?: boolean;
 };
+
+const FABRIC_MULTICLOUD_DIR = process.env.FABRIC_MULTICLOUD_DIR || path.resolve(process.cwd(), '..', 'fabric-multicloud');
 
 const EnvKeys = {
   ROOT_CA_DOMAIN: 'ROOT_CA_DOMAIN',
@@ -156,20 +159,20 @@ export async function generatePkiChainFromEnv(options?: PkiChainOptions): Promis
   };
 
   if (options?.cleanOutput) {
-    rmSync('fabric-ca-server-root', { recursive: true, force: true });
-    rmSync('fabric-ca-server-ica', { recursive: true, force: true });
+    rmSync(path.join(FABRIC_MULTICLOUD_DIR, 'fabric-ca-server-root'), { recursive: true, force: true });
+    rmSync(path.join(FABRIC_MULTICLOUD_DIR, 'fabric-ca-server-ica'), { recursive: true, force: true });
   }
 
-  mkdirSync('fabric-ca-server-root', { recursive: true });
-  mkdirSync('fabric-ca-server-ica', { recursive: true });
+  mkdirSync(path.join(FABRIC_MULTICLOUD_DIR, 'fabric-ca-server-root'), { recursive: true });
+  mkdirSync(path.join(FABRIC_MULTICLOUD_DIR, 'fabric-ca-server-ica'), { recursive: true });
 
   // Root CA
   const rootKeyPair = await deriveKeyPair(rootCA.seed as string, LEGACY_CURVE);
   const rootKey = await crypto.subtle.importKey('jwk', rootKeyPair.jwk, { name: 'ECDSA', namedCurve: LEGACY_CURVE }, true, ['sign']);
   const rootCert = await createCertificate(rootCA.subjectCN, rootCA.subjectCN, rootKey, rootKey, rootKeyPair.pub, 10, rootCA.legalRegistrationNumber, LEGACY_CURVE, true);
 
-  writeFileSync('fabric-ca-server-root/ca-cert.pem', bufferToPem(rootCert, 'CERTIFICATE'));
-  writeFileSync('fabric-ca-server-root/ca-key.pem', bufferToPem(Buffer.from(await crypto.subtle.exportKey('pkcs8', rootKey)), 'PRIVATE KEY'));
+  writeFileSync(path.join(FABRIC_MULTICLOUD_DIR, 'fabric-ca-server-root', 'ca-cert.pem'), bufferToPem(rootCert, 'CERTIFICATE'));
+  writeFileSync(path.join(FABRIC_MULTICLOUD_DIR, 'fabric-ca-server-root', 'ca-key.pem'), bufferToPem(Buffer.from(await crypto.subtle.exportKey('pkcs8', rootKey)), 'PRIVATE KEY'));
 
   const rootOut = resolveOutputDir('full-pki-chain-root-ca');
   writeFileSync(`${rootOut}/root-cert.pem`, bufferToPem(rootCert, 'CERTIFICATE'));
@@ -183,9 +186,9 @@ export async function generatePkiChainFromEnv(options?: PkiChainOptions): Promis
   const icaKey = await crypto.subtle.importKey('jwk', icaKeyPair.jwk, { name: 'ECDSA', namedCurve: LEGACY_CURVE }, true, ['sign']);
   const icaCert = await createCertificate(ica.subjectCN, rootCA.subjectCN, icaKey, rootKey, icaKeyPair.pub, 5, ica.legalRegistrationNumber, LEGACY_CURVE, true);
 
-  writeFileSync('fabric-ca-server-ica/ca-cert.pem', bufferToPem(icaCert, 'CERTIFICATE'));
-  writeFileSync('fabric-ca-server-ica/ca-key.pem', bufferToPem(Buffer.from(await crypto.subtle.exportKey('pkcs8', icaKey)), 'PRIVATE KEY'));
-  writeFileSync('fabric-ca-server-ica/ca-chain.pem', bufferToPem(rootCert, 'CERTIFICATE'));
+  writeFileSync(path.join(FABRIC_MULTICLOUD_DIR, 'fabric-ca-server-ica', 'ca-cert.pem'), bufferToPem(icaCert, 'CERTIFICATE'));
+  writeFileSync(path.join(FABRIC_MULTICLOUD_DIR, 'fabric-ca-server-ica', 'ca-key.pem'), bufferToPem(Buffer.from(await crypto.subtle.exportKey('pkcs8', icaKey)), 'PRIVATE KEY'));
+  writeFileSync(path.join(FABRIC_MULTICLOUD_DIR, 'fabric-ca-server-ica', 'ca-chain.pem'), bufferToPem(rootCert, 'CERTIFICATE'));
 
   const icaOut = resolveOutputDir('full-pki-chain-ica');
   writeFileSync(`${icaOut}/ica-cert.pem`, bufferToPem(icaCert, 'CERTIFICATE'));

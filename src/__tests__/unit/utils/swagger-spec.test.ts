@@ -30,6 +30,7 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response']).toBeDefined();
     expect(spec.paths['/host/.well-known/ping']).toBeDefined();
+    expect(spec.paths['/host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/ping']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/ping']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/did.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/jwks.json']).toBeDefined();
@@ -37,10 +38,11 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/smart-configuration']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json']).toBeDefined();
-    expect(spec.paths['/.well-known/dcat3/catalog']).toBeDefined();
+    expect(spec.paths['/host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/dspace-version']).toBeDefined();
     expect(spec.paths['/api/dataspace-discovery/providers']).toBeDefined();
-    expect(spec.paths['/dcat3/catalog/dcat.json']).toBeDefined();
-    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/dcat.json']).toBeDefined();
+    expect(spec.paths['/host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/dcat.json']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/dspace-version']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata']).toBeDefined();
 
     // Swagger tags are intentionally numbered progressively (1..N) for readability in Swagger UI,

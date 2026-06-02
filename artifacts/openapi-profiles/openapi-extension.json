@@ -4,7 +4,7 @@
     "title": "Gateway API - EXTENSIONS",
     "version": "1.0.3",
     "description": "Extension profile including non-core and vertical-specific capabilities on top of core and compat.",
-    "x-profile-generated-at": "2026-05-30T06:05:36.313Z",
+    "x-profile-generated-at": "2026-06-01T17:02:46.623Z",
     "x-profile-name": "extension"
   },
   "servers": [],
@@ -88,7 +88,7 @@
     },
     {
       "name": "Data Catalog Discovery",
-      "description": "DCAT-3 catalog discovery endpoints (`/dcat3/catalog/...`) for operator/provider dataset lookup."
+      "description": "DSP catalog discovery endpoints (`/dsp/catalog/...`) for operator/provider dataset lookup."
     },
     {
       "name": "Async Polling",
@@ -5434,7 +5434,7 @@
         "tags": [
           "Discovery"
         ],
-        "summary": "DCAT3 index service offering (tenant)",
+        "summary": "DSP catalog index service offering (tenant)",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"
@@ -5465,7 +5465,7 @@
         "tags": [
           "Discovery"
         ],
-        "summary": "DCAT3 research service offering (tenant)",
+        "summary": "DSP catalog research service offering (tenant)",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"
@@ -5523,12 +5523,60 @@
         "x-profile": "core"
       }
     },
-    "/dcat3/catalog/request": {
+    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/dspace-version": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Host DSP version-discovery entrypoint",
+        "responses": {
+          "200": {
+            "description": "DSP version metadata returned"
+          },
+          "503": {
+            "description": "Host not available"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/dspace-version": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Hosted tenant DSP version-discovery entrypoint",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DSP version metadata returned"
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/request": {
       "post": {
         "tags": [
           "Data Catalog Discovery"
         ],
-        "summary": "Operator catalog request (DSP/DCAT-3)",
+        "summary": "Operator catalog request (DSP/DSP catalog)",
         "description": "Returns a `dcat:Catalog` with provider datasets discoverable by client apps.",
         "requestBody": {
           "required": false,
@@ -5564,12 +5612,12 @@
         "x-profile": "core"
       }
     },
-    "/dcat3/catalog/dcat.json": {
+    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/dcat.json": {
       "get": {
         "tags": [
           "Data Catalog Discovery"
         ],
-        "summary": "Operator catalog artifact (DCAT-3)",
+        "summary": "Operator catalog artifact (DSP catalog)",
         "responses": {
           "200": {
             "description": "DCAT catalog artifact"
@@ -5581,7 +5629,7 @@
         "x-profile": "core"
       }
     },
-    "/dcat3/catalog/datasets/{id}": {
+    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/datasets/{id}": {
       "get": {
         "tags": [
           "Data Catalog Discovery"
@@ -5608,7 +5656,7 @@
         "x-profile": "core"
       }
     },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/request": {
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/request": {
       "post": {
         "tags": [
           "Data Catalog Discovery"
@@ -5639,12 +5687,12 @@
         "x-profile": "core"
       }
     },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/dcat.json": {
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json": {
       "get": {
         "tags": [
           "Data Catalog Discovery"
         ],
-        "summary": "Hosted provider catalog artifact (DCAT-3)",
+        "summary": "Hosted provider catalog artifact (DSP catalog)",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"
@@ -5670,7 +5718,7 @@
         "x-profile": "core"
       }
     },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dcat3/catalog/datasets/{id}": {
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/datasets/{id}": {
       "get": {
         "tags": [
           "Data Catalog Discovery"
@@ -5704,23 +5752,6 @@
           },
           "404": {
             "description": "Not found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/.well-known/dcat3/catalog": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Read host operator public service autodiscovery catalog",
-        "responses": {
-          "200": {
-            "description": "DCAT catalog returned"
-          },
-          "503": {
-            "description": "Host DID document is unavailable"
           }
         },
         "x-profile": "core"

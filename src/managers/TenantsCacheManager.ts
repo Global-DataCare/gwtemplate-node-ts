@@ -17,6 +17,18 @@ import { hasProviderServiceCapabilityClaim } from '../utils/services';
 
 const SERVICE_OPERATIONAL_URL_CLAIM = 'org.schema.Service.url';
 
+function getTenantServiceClaim(tenantConfig: any, claimName: string): string | undefined {
+  const topLevelClaim = tenantConfig?.claims?.[claimName];
+  if (typeof topLevelClaim === 'string' && topLevelClaim.trim()) {
+    return topLevelClaim;
+  }
+  const providerClaim = tenantConfig?.provider?.service?.[claimName];
+  if (typeof providerClaim === 'string' && providerClaim.trim()) {
+    return providerClaim;
+  }
+  return undefined;
+}
+
 /**
  * An in-memory cache implementation of the Tenant Manager.
  * Its primary role is to load all tenant configurations at startup and provide
@@ -174,7 +186,7 @@ export class TenantsCacheManager implements ITenantsManager {
   public async listAutodiscoverableTenants(): Promise<any[]> {
     const tenants = await this.listRegisteredTenants();
     return tenants.filter((tenant) => {
-      const serviceCapabilityClaim = tenant?.claims?.[ClaimsServiceSchemaorg.serviceType] as string | undefined;
+      const serviceCapabilityClaim = getTenantServiceClaim(tenant, ClaimsServiceSchemaorg.serviceType);
       return isTenantAuthorizationOperational(tenant) && hasProviderServiceCapabilityClaim(serviceCapabilityClaim);
     });
   }

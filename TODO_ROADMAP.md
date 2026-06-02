@@ -30,6 +30,10 @@ Version:
   - transport-plane credential (HTTP/API gateway) is not user identity
   - `_exchange` belongs to identity activation flow only
   - `_exchange` must not be used as catalog/discovery credential
+- [ ] Keep repo ownership boundaries explicit:
+  - GW CORE should stay agnostic to fine-grained veterinary network taxonomy
+  - ICA repo documents current onboarding scope
+  - `uhc-sdk-core-ts` owns future veterinary segmentation semantics
 - [ ] Evaluate/add intermediate and future secure message profiles:
   - optional standalone signed-only request profile (DIDComm signed without encryption) if required by policy.
   - CBOR-based transport/profile option in addition to current FAPI JAR/JARM `request=<jws/jwe>` / `response=<jws/jwe>`.

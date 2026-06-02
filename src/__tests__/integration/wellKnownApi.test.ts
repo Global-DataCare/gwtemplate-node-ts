@@ -15,6 +15,7 @@ import { parseTenantUrn } from '../../utils/urn';
 import { ILogger } from '../../loggers/ILogger';
 import { invokeExpress } from './helpers/invokeExpress';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { HostNetworkTypes } from 'gdc-common-utils-ts/constants/network';
 import { DataspaceSectors } from 'gdc-common-utils-ts/constants/sectors';
 import { ServiceCapabilityToken, serializeServiceCapabilityTokens } from 'gdc-common-utils-ts/constants/service-capabilities';
 import {
@@ -28,6 +29,10 @@ import {
   EXAMPLE_SECONDARY_PROVIDER_LEGAL_NAME,
   EXAMPLE_SECONDARY_TENANT_SERVICE_DID,
 } from 'gdc-common-utils-ts/examples/shared';
+import {
+  buildGwCatalogArtifactPath,
+  buildGwDspaceVersionWellKnownPath,
+} from 'gdc-common-utils-ts/utils/dataspace-protocol';
 
 const mockTenantsCacheManager = {
   getDidDocument: jest.fn(),
@@ -158,6 +163,27 @@ describe('Well-Known JWKS Discovery API', () => {
     expect(response.status).toBe(200);
     expect(JSON.parse(response.text)).toEqual(expectedJwks);
     expect(mockKmsService.getPublicJwks).toHaveBeenCalledWith(testTenant1VaultId);
+  });
+});
+
+describe('Well-Known Ping API', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return the host ping response via the host-scoped CDS path', async () => {
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
+
+    const response = await invokeExpress(app, {
+      method: 'GET',
+      url: `/host/cds-es/v1/${HostNetworkTypes.Test}/.well-known/ping`,
+    });
+    const parsed = JSON.parse(response.text);
+
+    expect(response.status).toBe(200);
+    expect(parsed.type).toBe('batch-response');
+    expect(parsed.data?.[0]?.issue?.[0]?.diagnostics).toBe('Ping successful');
+    expect(mockTenantsCacheManager.getDidDocument).toHaveBeenCalledWith('host');
   });
 });
 
@@ -306,12 +332,36 @@ describe('Well-Known Legal Participant VC API', () => {
   });
 });
 
-describe('DCAT3 Discovery API', () => {
+describe('DSP Discovery API', () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should return a catalog artifact with dcat:service entries derived from serviceType capabilities', async () => {
+  it('should return host DSP version metadata for a sector-scoped host catalog', async () => {
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
+
+    const response = await invokeExpress(app, {
+      method: 'GET',
+      url: buildGwDspaceVersionWellKnownPath({
+        participantId: 'host',
+        jurisdiction: 'es',
+        version: 'v1',
+        hostNetwork: HostNetworkTypes.Test,
+      }),
+      headers: { host: EXAMPLE_HOST_PUBLIC_HOSTNAME },
+    });
+    const parsed = JSON.parse(response.text);
+
+    expect(response.status).toBe(200);
+    expect(parsed.protocolVersions).toEqual([
+      {
+        version: '2025-1',
+        path: `/host/cds-es/v1/${HostNetworkTypes.Test}/dsp`,
+      },
+    ]);
+  });
+
+  it('should return a sector-scoped host catalog artifact with dcat:service entries derived from serviceType capabilities', async () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
     mockTenantsCacheManager.listAutodiscoverableTenants.mockResolvedValue([
       {
@@ -356,7 +406,12 @@ describe('DCAT3 Discovery API', () => {
 
     const response = await invokeExpress(app, {
       method: 'GET',
-      url: '/.well-known/dcat3/catalog',
+      url: buildGwCatalogArtifactPath({
+        participantId: 'host',
+        jurisdiction: 'es',
+        version: 'v1',
+        hostNetwork: HostNetworkTypes.Test,
+      }),
       headers: { host: EXAMPLE_HOST_PUBLIC_HOSTNAME },
     });
     const parsed = JSON.parse(response.text);
@@ -384,6 +439,57 @@ describe('DCAT3 Discovery API', () => {
     );
     expect(parsed['dcat:dataset']).toHaveLength(1);
     expect(mockTenantsCacheManager.listAutodiscoverableTenants).toHaveBeenCalledTimes(1);
+  });
+
+  it('should publish provider datasets when service claims are stored under provider.service', async () => {
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
+    mockTenantsCacheManager.listAutodiscoverableTenants.mockResolvedValue([
+      {
+        didDocument: { id: testTenant1DidWebHosted },
+        claims: {
+          [ClaimsOrganizationSchemaorg.alternateName]: testTenant1AlternateName,
+          [ClaimsOrganizationSchemaorg.legalName]: EXAMPLE_PROVIDER_LEGAL_NAME,
+          [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+        },
+        provider: {
+          service: {
+            [ClaimsServiceSchemaorg.category]: DataspaceSectors.HealthResearch,
+            [ClaimsServiceSchemaorg.url]: buildExampleHostedTenantBaseUrl({
+              alternateName: testTenant1AlternateName,
+              jurisdiction: 'ES',
+              version: 'v1',
+              sector: DataspaceSectors.HealthResearch,
+            }),
+            [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
+              ServiceCapabilityToken.IndexProvider,
+            ]),
+          },
+        },
+      },
+    ] as any);
+
+    const response = await invokeExpress(app, {
+      method: 'GET',
+      url: buildGwCatalogArtifactPath({
+        participantId: 'host',
+        jurisdiction: 'es',
+        version: 'v1',
+        hostNetwork: HostNetworkTypes.Test,
+      }),
+      headers: { host: EXAMPLE_HOST_PUBLIC_HOSTNAME },
+    });
+    const parsed = JSON.parse(response.text);
+
+    expect(response.status).toBe(200);
+    expect(parsed['dcat:dataset']).toHaveLength(1);
+    expect(parsed['dcat:service']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          '@type': 'dcat:DataService',
+          'dcat:keyword': [ServiceCapabilityToken.IndexProvider],
+        }),
+      ]),
+    );
   });
 
   it('should return normalized published-provider discovery DTOs for backend consumers', async () => {
