@@ -282,10 +282,13 @@ describe('Composition Bundle _search API (integration)', () => {
 
       expect(searchPayload?.resourceType).toBe('Bundle');
       expect(searchPayload?.data?.[0]?.response?.status).toBe('200');
-      expect(searchPayload?.data?.[0]?.resource?.total).toBe(1);
-      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.['Composition.section']).toBe(
-        HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-      );
+      expect(searchPayload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
+      expect(searchPayload?.data?.[0]?.resource?.type).toBe('document');
+      expect(searchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.resourceType).toBe('Composition');
+      expect(searchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.section).toHaveLength(1);
+      expect(
+        searchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.section?.[0]?.code?.coding?.[0]?.code,
+      ).toBe(HealthcareBasicSections.HistoryOfMedicationUse.code);
     } finally {
       queueAdapter.stop();
     }

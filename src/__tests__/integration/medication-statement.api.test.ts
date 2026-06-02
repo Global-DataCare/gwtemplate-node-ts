@@ -270,10 +270,17 @@ describe('MedicationStatement API (integration)', () => {
       }
       expect(ipsSearchPayload?.resourceType).toBe('Bundle');
       expect(ipsSearchPayload?.data?.[0]?.response?.status).toBe('200');
-      expect(ipsSearchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
-      expect(ipsSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.r4.Composition.type']).toBe(
-        ipsDocumentTypeToken,
+      expect(ipsSearchPayload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
+      expect(ipsSearchPayload?.data?.[0]?.resource?.type).toBe('document');
+      expect(ipsSearchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.resourceType).toBe('Composition');
+      expect(ipsSearchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.type?.coding?.[0]?.code).toBe(
+        HealthcareBasicSections.PatientSummaryDocument.code,
       );
+      expect(
+        ipsSearchPayload?.data?.[0]?.resource?.entry
+          ?.filter((entry: any) => entry?.resource?.resourceType === 'MedicationStatement')
+          ?.length,
+      ).toBe(1);
     } finally {
       queueAdapter.stop();
     }
