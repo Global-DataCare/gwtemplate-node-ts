@@ -7,6 +7,7 @@ import { initializeTenantServicesConfig } from '../../utils/services';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
+import { testTenant1TenantId } from '../data/organization.data';
 
 describe('MedicationStatement API (integration)', () => {
   afterEach(() => {
@@ -42,10 +43,7 @@ describe('MedicationStatement API (integration)', () => {
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
       const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
-      const tenantVaultId = getTenantVaultId(
-        tenantClaims[ClaimsServiceSchemaorg.category],
-        tenantClaims[ClaimsOrganizationSchemaorg.alternateName],
-      );
+      const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
         claims: tenantClaims,
@@ -62,6 +60,7 @@ describe('MedicationStatement API (integration)', () => {
       await tenantManager.getTenant(tenantVaultId);
 
       const subjectDid = 'did:web:api.acme.org:individual:subject-001';
+      const ipsDocumentTypeToken = `${HealthcareBasicSections.PatientSummaryDocument.system}|${HealthcareBasicSections.PatientSummaryDocument.code}`;
       const documentBundle = {
         resourceType: 'Bundle',
         type: 'document',
@@ -130,7 +129,7 @@ describe('MedicationStatement API (integration)', () => {
       const thidBatch = 'communication-medication-batch-001';
       const submitResp = await invokeExpress(app, {
         method: 'POST',
-        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidBatch,
@@ -145,7 +144,7 @@ describe('MedicationStatement API (integration)', () => {
                     '@context': 'org.hl7.fhir.r4',
                     'Communication.subject': subjectDid,
                     'Communication.sent': '2026-05-22T10:00:00Z',
-                    'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.claim,
+                    'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
                   },
                 },
                 resource: {
@@ -174,7 +173,7 @@ describe('MedicationStatement API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidBatch },
         });
@@ -191,7 +190,7 @@ describe('MedicationStatement API (integration)', () => {
       const thidSearch = 'medication-search-001';
       const searchResp = await invokeExpress(app, {
         method: 'POST',
-        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.api/MedicationStatement/_search',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/MedicationStatement/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidSearch,
@@ -216,7 +215,7 @@ describe('MedicationStatement API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.api/MedicationStatement/_batch-response',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/MedicationStatement/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidSearch },
         });
@@ -235,7 +234,7 @@ describe('MedicationStatement API (integration)', () => {
       const thidIpsSearch = 'ips-bundle-search-001';
       const ipsSearchResp = await invokeExpress(app, {
         method: 'POST',
-        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidIpsSearch,
@@ -246,7 +245,7 @@ describe('MedicationStatement API (integration)', () => {
               {
                 request: {
                   method: 'GET',
-                  url: `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.section=${encodeURIComponent(HealthcareBasicSections.HistoryOfMedicationUse.claim)}`,
+                  url: `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.type=${encodeURIComponent(ipsDocumentTypeToken)}`,
                 },
               },
             ],
@@ -259,7 +258,7 @@ describe('MedicationStatement API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidIpsSearch },
         });
@@ -272,6 +271,9 @@ describe('MedicationStatement API (integration)', () => {
       expect(ipsSearchPayload?.resourceType).toBe('Bundle');
       expect(ipsSearchPayload?.data?.[0]?.response?.status).toBe('200');
       expect(ipsSearchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
+      expect(ipsSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.r4.Composition.type']).toBe(
+        ipsDocumentTypeToken,
+      );
     } finally {
       queueAdapter.stop();
     }

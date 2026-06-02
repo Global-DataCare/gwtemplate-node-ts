@@ -42,7 +42,7 @@ describe('demo communication medications IPS fixtures', () => {
     expect(attachmentData?.length).toBeGreaterThan(20);
   });
 
-  it('keeps subject-scoped medication and IPS searches anchored to the same section', () => {
+  it('keeps subject-scoped medication and IPS searches anchored to the same subject and IPS document type', () => {
     const medicationSearch = buildDemoMedicationSearchRequest({
       ...demoCommunicationMedicationIpsDefaults,
       thidComm: 'comm-search',
@@ -62,7 +62,10 @@ describe('demo communication medications IPS fixtures', () => {
       demoCommunicationMedicationIpsDefaults.subjectId,
     );
     expect(ipsSearch.body.entry[0]?.request?.url).toContain(
-      encodeURIComponent(demoCommunicationMedicationIpsDefaults.loincSectionMedicationHistory),
+      encodeURIComponent(demoCommunicationMedicationIpsDefaults.subjectId),
+    );
+    expect(ipsSearch.body.entry[0]?.request?.url).toContain(
+      encodeURIComponent(demoCommunicationMedicationIpsDefaults.loincPatientSummaryDocument),
     );
   });
 });

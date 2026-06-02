@@ -87,6 +87,7 @@ export class CompositionManager implements IJobProcessor {
         throw new Error('Missing required subject search parameter for Composition search.');
       }
       const searchSections = this.extractSearchSections(body);
+      const searchTypes = this.extractSearchTypes(body);
       const documentReferenceFilters = this.extractDocumentReferenceSearchFilters(body);
       const communicationFilters = this.extractCommunicationSearchFilters(body);
 
@@ -100,7 +101,7 @@ export class CompositionManager implements IJobProcessor {
         ? this.filterDocumentReferenceMatches(matchesRaw, documentReferenceFilters)
         : useCommunicationSection
           ? await this.filterCommunicationMatches(tenantVaultId, searchSubject, scope, matchesRaw, communicationFilters)
-          : this.filterMatchesBySections(matchesRaw, searchSections);
+          : this.filterMatchesBySectionsAndTypes(matchesRaw, searchSections, searchTypes);
       const responseBundle: BundleJsonApi = {
         resourceType: 'Bundle',
         type: 'batch-response',
@@ -319,6 +320,46 @@ export class CompositionManager implements IJobProcessor {
     return Array.from(result);
   }
 
+  private extractSearchTypes(body: any): string[] {
+    const result = new Set<string>();
+
+    const parameters = Array.isArray(body?.parameter) ? body.parameter : [];
+    for (const p of parameters) {
+      const name = String(p?.name || '').toLowerCase();
+      if (name !== 'type' && name !== 'composition.type' && name !== 'document-type') continue;
+      const value = String(
+        p?.valueString
+          || p?.valueCode
+          || (p?.valueCoding?.system && p?.valueCoding?.code ? `${p.valueCoding.system}|${p.valueCoding.code}` : '')
+          || '',
+      ).trim();
+      if (!value) continue;
+      value.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
+    }
+
+    const wrappers = [
+      ...(Array.isArray(body?.entry) ? body.entry : []),
+      ...(Array.isArray(body?.data) ? body.data : []),
+    ];
+    for (const wrapper of wrappers) {
+      const requestUrl = String(wrapper?.request?.url || '').trim();
+      if (!requestUrl) continue;
+      const queryIndex = requestUrl.indexOf('?');
+      if (queryIndex < 0) continue;
+      const query = requestUrl.slice(queryIndex + 1);
+      const params = new URLSearchParams(query);
+      const typeRaw = String(
+        params.get('composition.type')
+          || params.get('type')
+          || '',
+      ).trim();
+      if (!typeRaw) continue;
+      typeRaw.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
+    }
+
+    return Array.from(result);
+  }
+
   private extractSearchResourceType(body: any): string {
     const wrappers = [
       ...(Array.isArray(body?.entry) ? body.entry : []),
@@ -442,33 +483,69 @@ export class CompositionManager implements IJobProcessor {
     });
   }
 
-  private filterMatchesBySections(matches: any[], requiredSections: string[]): any[] {
+  private filterMatchesBySectionsAndTypes(matches: any[], requiredSections: string[], requiredTypes: string[]): any[] {
     if (!Array.isArray(matches)) return [];
-    if (!requiredSections || requiredSections.length === 0) return matches;
+    const hasSectionFilter = Array.isArray(requiredSections) && requiredSections.length > 0;
+    const hasTypeFilter = Array.isArray(requiredTypes) && requiredTypes.length > 0;
+    if (!hasSectionFilter && !hasTypeFilter) return matches;
 
-    const required = new Set(requiredSections.map((s) => String(s || '').trim()).filter(Boolean));
-    if (required.size === 0) return matches;
+    const requiredSectionSet = new Set(requiredSections.map((s) => String(s || '').trim()).filter(Boolean));
+    const requiredTypeSet = new Set(requiredTypes.map((s) => String(s || '').trim()).filter(Boolean));
 
     return matches.filter((record: any) => {
-      const keys = [
-        'Composition.section',
-        'org.hl7.fhir.r4.Composition.section',
-        'org.hl7.fhir.api.Composition.section',
-      ];
-      let sectionValue = '';
-      for (const key of keys) {
-        const candidate = String(record?.[key] || '').trim();
-        if (candidate) {
-          sectionValue = candidate;
-          break;
+      if (hasSectionFilter) {
+        const sectionKeys = [
+          'Composition.section',
+          'org.hl7.fhir.r4.Composition.section',
+          'org.hl7.fhir.api.Composition.section',
+        ];
+        let sectionValue = '';
+        for (const key of sectionKeys) {
+          const candidate = String(record?.[key] || '').trim();
+          if (candidate) {
+            sectionValue = candidate;
+            break;
+          }
         }
+        if (!sectionValue) return false;
+        const gotSections = new Set(sectionValue.split(',').map((v: string) => v.trim()).filter(Boolean));
+        let sectionMatched = false;
+        for (const req of requiredSectionSet) {
+          if (gotSections.has(req)) {
+            sectionMatched = true;
+            break;
+          }
+        }
+        if (!sectionMatched) return false;
       }
-      if (!sectionValue) return false;
-      const got = new Set(sectionValue.split(',').map((v: string) => v.trim()).filter(Boolean));
-      for (const req of required) {
-        if (got.has(req)) return true;
+
+      if (hasTypeFilter) {
+        const typeKeys = [
+          'Composition.type',
+          'org.hl7.fhir.r4.Composition.type',
+          'org.hl7.fhir.api.Composition.type',
+        ];
+        let typeValue = '';
+        for (const key of typeKeys) {
+          const candidate = String(record?.[key] || '').trim();
+          if (candidate) {
+            typeValue = candidate;
+            break;
+          }
+        }
+        if (!typeValue) return false;
+        const gotTypes = new Set(typeValue.split(',').map((v: string) => v.trim()).filter(Boolean));
+        let typeMatched = false;
+        for (const req of requiredTypeSet) {
+          if (gotTypes.has(req)) {
+            typeMatched = true;
+            break;
+          }
+        }
+        if (!typeMatched) return false;
       }
-      return false;
+
+      return true;
     });
   }
 

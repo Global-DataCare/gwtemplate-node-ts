@@ -268,8 +268,15 @@ export class CommunicationManager implements IJobProcessor {
       || (entry?.resource?.meta?.claims?.['Composition.section'] as string | undefined)
       || '',
     ).trim();
+    const claimsType = String(
+      (entry?.meta?.claims?.['Composition.type'] as string | undefined)
+      || (entry?.resource?.meta?.claims?.['Composition.type'] as string | undefined)
+      || '',
+    ).trim();
     const payloadSection = this.extractCompositionSectionFromCommunicationPayload(fhirResource);
-    const sectionCode = claimsSection || payloadSection || HealthcareBasicSections.PatientSummaryDocument.claim;
+    const payloadType = this.extractCompositionTypeFromCommunicationPayload(fhirResource);
+    const sectionCode = claimsSection || payloadSection || HealthcareBasicSections.HistoryOfMedicationUse.attributeValue;
+    const typeCode = claimsType || payloadType || HealthcareBasicSections.PatientSummaryDocument.attributeValue;
 
     const sent = String(
       (entry?.meta?.claims?.[CommunicationClaim.Sent] as string | undefined)
@@ -286,7 +293,7 @@ export class CommunicationManager implements IJobProcessor {
       'Composition.section': sectionCode,
       'Composition.author': serverDid,
       'Composition.date': sent,
-      'Composition.type': sectionCode,
+      'Composition.type': typeCode,
       'Composition.source': 'Communication',
     });
     const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
@@ -378,6 +385,28 @@ export class CommunicationManager implements IJobProcessor {
       const parsed = this.parseDocumentBundle(decoded);
       if (!parsed) return undefined;
       const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
+      const sectionCoding = compositionEntry?.resource?.section?.[0]?.code?.coding?.[0];
+      if (sectionCoding?.system && sectionCoding?.code) {
+        return `${sectionCoding.system}|${sectionCoding.code}`;
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
+  }
+
+  private extractCompositionTypeFromCommunicationPayload(fhirResource: FhirCommunication): string | undefined {
+    const payload = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload[0] : undefined;
+    const resolvedAttachment = this.resolveCommunicationPayloadAttachment(payload);
+    const contentType = String(resolvedAttachment?.documentAttachment?.contentType || '').toLowerCase();
+    const encodedData = String(resolvedAttachment?.documentAttachment?.data || '').trim();
+    if (!encodedData || !contentType.includes('json')) return undefined;
+
+    try {
+      const decoded = Buffer.from(encodedData, 'base64').toString('utf8');
+      const parsed = this.parseDocumentBundle(decoded);
+      if (!parsed) return undefined;
+      const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
       const coding = compositionEntry?.resource?.type?.coding?.[0];
       if (coding?.system && coding?.code) {
         return `${coding.system}|${coding.code}`;
@@ -385,6 +414,7 @@ export class CommunicationManager implements IJobProcessor {
     } catch {
       return undefined;
     }
+
     return undefined;
   }
 

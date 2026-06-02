@@ -8,4 +8,4 @@ export {
   HealthcareBasicSections,
   HealthcareConsentActions,
   HealthcareConsentPurposes,
-} from 'gdc-common-utils-ts/constants';
+} from 'gdc-common-utils-ts/constants/index';

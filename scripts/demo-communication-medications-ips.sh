@@ -113,7 +113,7 @@ echo "[3/4] Polling MedicationStatement search..."
 MED_DONE="$(poll_async "$MED_SEARCH_POLL_URL" "$THID_MED_SEARCH")"
 echo "$MED_DONE" | jq '.'
 
-echo "[4/4] Searching IPS Bundle/_search by subject + medication section..."
+echo "[4/4] Searching IPS Bundle/_search by subject + IPS document type..."
 IPS_SEARCH_REQ="$(render_demo_payload_with_runtime IPS_SEARCH)"
 IPS_SUBMIT="$(curl -sS -X POST "$IPS_SEARCH_URL" \
   -H "Authorization: Bearer $AUTH_BEARER" \

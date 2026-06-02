@@ -13,6 +13,7 @@ export const demoCommunicationMedicationIpsDefaults = {
   claimCompositionSection: 'Composition.section',
   claimMedicationStatementSubject: 'MedicationStatement.subject',
   loincSectionMedicationHistory: 'LOINC|10160-0',
+  loincPatientSummaryDocument: 'http://loinc.org|60591-5',
   loincDocumentPatientSummarySystem: 'http://loinc.org',
   loincDocumentPatientSummaryCode: '60591-5',
   loincDocumentMedicationHistoryCode: '10160-0',
@@ -244,7 +245,7 @@ export function buildDemoIpsSearchRequest(config: DemoConfig) {
         {
           request: {
             method: 'GET',
-            url: `Bundle?type=${encodeURIComponent(config.fhirBundleDocument)}&composition.subject=${encodeURIComponent(config.subjectId)}&composition.section=${encodeURIComponent(config.loincSectionMedicationHistory)}`,
+            url: `Bundle?type=${encodeURIComponent(config.fhirBundleDocument)}&composition.subject=${encodeURIComponent(config.subjectId)}&composition.type=${encodeURIComponent(config.loincPatientSummaryDocument)}`,
           },
         },
       ],
