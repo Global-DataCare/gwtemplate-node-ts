@@ -19,10 +19,34 @@ export const demoCommunicationMedicationIpsDefaults = {
   demoTimestamp: '2026-05-22T10:00:00Z',
   demoCompositionId: 'ips-composition-001',
   demoCompositionTitle: 'IPS Medication Summary',
-  demoMedicationId: 'medication-001',
-  demoMedicationText: 'Paracetamol 500mg',
-  demoMedicationNote: 'Tomar una pastilla cada 8 horas',
-  demoMedicationIdentifier: 'urn:uuid:medication-001',
+  demoMedicationCases: [
+    {
+      demoMedicationId: 'medication-ibuprofen-001',
+      demoMedicationText: 'Ibuprofen 400 mg',
+      demoMedicationNote: 'Take every 8 hours as needed. Keep a 4 hour gap from paracetamol.',
+      demoMedicationIdentifier: 'urn:uuid:medication-ibuprofen-001',
+      demoMedicationEffective: '2026-06-01T08:00:00Z',
+      demoDoseQuantityValue: 400,
+      demoDoseQuantityUnit: 'mg',
+      demoTimingFrequency: 1,
+      demoTimingPeriod: 8,
+      demoTimingPeriodUnit: 'h',
+      demoDosageAsNeeded: true,
+    },
+    {
+      demoMedicationId: 'medication-paracetamol-001',
+      demoMedicationText: 'Paracetamol 600 mg',
+      demoMedicationNote: 'Take every 8 hours as needed. Keep a 4 hour gap from ibuprofen.',
+      demoMedicationIdentifier: 'urn:uuid:medication-paracetamol-001',
+      demoMedicationEffective: '2026-06-01T12:00:00Z',
+      demoDoseQuantityValue: 600,
+      demoDoseQuantityUnit: 'mg',
+      demoTimingFrequency: 1,
+      demoTimingPeriod: 8,
+      demoTimingPeriodUnit: 'h',
+      demoDosageAsNeeded: true,
+    },
+  ],
   demoDocumentReferenceId: 'ips-document-reference-001',
   demoDocumentReferenceIdentifier: 'urn:uuid:ips-document-reference-001',
   demoDocumentReferenceTitle: 'ips-medications.json',
@@ -35,15 +59,18 @@ export interface DemoCommunicationMedicationIpsRuntime {
   thidComm: string;
   thidMedSearch: string;
   thidIpsSearch: string;
+  medicationCaseIndex?: number;
 }
 
 type DemoConfig = typeof demoCommunicationMedicationIpsDefaults & DemoCommunicationMedicationIpsRuntime;
+type DemoMedicationCase = DemoConfig['demoMedicationCases'][number];
 
 function encodeBase64(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64');
 }
 
 export function buildDemoDocumentBundle(config: DemoConfig) {
+  const medicationCase = getDemoMedicationCase(config);
   return {
     resourceType: 'Bundle',
     type: config.fhirBundleDocument,
@@ -76,7 +103,7 @@ export function buildDemoDocumentBundle(config: DemoConfig) {
                   },
                 ],
               },
-              entry: [{ reference: config.demoMedicationIdentifier }],
+              entry: [{ reference: medicationCase.demoMedicationIdentifier }],
             },
           ],
         },
@@ -84,15 +111,33 @@ export function buildDemoDocumentBundle(config: DemoConfig) {
       {
         resource: {
           resourceType: config.medicationStatementResource,
-          id: config.demoMedicationId,
+          id: medicationCase.demoMedicationId,
           status: 'active',
           subject: { reference: config.subjectId },
-          effectiveDateTime: config.demoTimestamp,
+          effectiveDateTime: medicationCase.demoMedicationEffective,
           medicationCodeableConcept: {
-            text: config.demoMedicationText,
+            text: medicationCase.demoMedicationText,
           },
-          note: [{ text: config.demoMedicationNote }],
-          identifier: [{ system: config.urnIdentifierSystem, value: config.demoMedicationIdentifier }],
+          note: [{ text: medicationCase.demoMedicationNote }],
+          identifier: [{ system: config.urnIdentifierSystem, value: medicationCase.demoMedicationIdentifier }],
+          meta: {
+            claims: {
+              '@context': config.fhirContextApi,
+              'MedicationStatement.identifier': medicationCase.demoMedicationIdentifier,
+              'MedicationStatement.subject': config.subjectId,
+              'MedicationStatement.status': 'active',
+              'MedicationStatement.medication-text': medicationCase.demoMedicationText,
+              'MedicationStatement.effective': medicationCase.demoMedicationEffective,
+              'MedicationStatement.note': medicationCase.demoMedicationNote,
+              'MedicationStatement.category': config.loincSectionMedicationHistory,
+              'org.hl7.fhir.api.MedicationStatement.dose-quantity-value': medicationCase.demoDoseQuantityValue,
+              'org.hl7.fhir.api.MedicationStatement.dose-quantity-unit': medicationCase.demoDoseQuantityUnit,
+              'org.hl7.fhir.api.MedicationStatement.timing-frequency': medicationCase.demoTimingFrequency,
+              'org.hl7.fhir.api.MedicationStatement.timing-period': medicationCase.demoTimingPeriod,
+              'org.hl7.fhir.api.MedicationStatement.timing-period-unit': medicationCase.demoTimingPeriodUnit,
+              'org.hl7.fhir.api.MedicationStatement.dosage-asneeded': medicationCase.demoDosageAsNeeded,
+            },
+          },
         },
       },
     ],
@@ -100,12 +145,13 @@ export function buildDemoDocumentBundle(config: DemoConfig) {
 }
 
 export function buildDemoDocumentReference(config: DemoConfig) {
+  const medicationCase = getDemoMedicationCase(config);
   const documentBundle = buildDemoDocumentBundle(config);
   return {
     resourceType: config.documentReferenceResource,
     id: config.demoDocumentReferenceId,
     subject: { reference: config.subjectId },
-    date: config.demoTimestamp,
+    date: medicationCase.demoMedicationEffective,
     description: config.demoCompositionTitle,
     identifier: [{ system: config.urnIdentifierSystem, value: config.demoDocumentReferenceIdentifier }],
     content: [
@@ -134,7 +180,7 @@ export function buildDemoCommunicationDidcommRequest(config: DemoConfig) {
             claims: {
               '@context': config.fhirContextR4,
               [config.claimCommunicationSubject]: config.subjectId,
-              [config.claimCommunicationSent]: config.demoTimestamp,
+              [config.claimCommunicationSent]: getDemoMedicationCase(config).demoMedicationEffective,
               [config.claimCompositionSection]: config.loincSectionMedicationHistory,
             },
           },
@@ -142,7 +188,7 @@ export function buildDemoCommunicationDidcommRequest(config: DemoConfig) {
             resourceType: config.communicationResource,
             status: 'completed',
             subject: { reference: config.subjectId },
-            sent: config.demoTimestamp,
+            sent: getDemoMedicationCase(config).demoMedicationEffective,
             payload: [
               {
                 contentAttachment: {
@@ -204,4 +250,9 @@ export function buildDemoIpsSearchRequest(config: DemoConfig) {
       ],
     },
   };
+}
+
+export function getDemoMedicationCase(config: DemoConfig): DemoMedicationCase {
+  const index = Math.max(0, Math.min(config.demoMedicationCases.length - 1, Number(config.medicationCaseIndex || 0)));
+  return config.demoMedicationCases[index];
 }

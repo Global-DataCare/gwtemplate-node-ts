@@ -22,6 +22,7 @@ if [[ "$MODE" != "didcomm" && "$MODE" != "legacy-fhir" ]]; then
 fi
 
 THID_COMM="comm-medications-$(date +%s)"
+THID_COMM_2="comm-medications-2-$(date +%s)"
 THID_MED_SEARCH="medications-search-$(date +%s)"
 THID_IPS_SEARCH="ips-search-$(date +%s)"
 
@@ -41,8 +42,8 @@ poll_async() {
     local body
     body="$(curl -sS -X POST "$url" -H "Content-Type: application/json" -d "{\"thid\":\"$thid\"}")"
     local status
-    status="$(echo "$body" | jq -r '.status // empty')"
-    if [[ "$status" != "202" ]]; then
+    status="$(echo "$body" | jq -r '.status // .body.status // empty')"
+    if [[ "$status" != "202" && "$status" != "PENDING" && "$status" != "pending" ]]; then
       echo "$body"
       return 0
     fi
@@ -56,18 +57,30 @@ echo "[1/4] Rendering canonical synthetic demo payloads..."
 
 render_demo_payload_with_runtime() {
   local payload_name="$1"
-  SUBJECT_ID="$SUBJECT_ID" THID_COMM="$THID_COMM" THID_MED_SEARCH="$THID_MED_SEARCH" THID_IPS_SEARCH="$THID_IPS_SEARCH" \
+  local medication_case_index="${2:-0}"
+  SUBJECT_ID="$SUBJECT_ID" THID_COMM="$THID_COMM" THID_MED_SEARCH="$THID_MED_SEARCH" THID_IPS_SEARCH="$THID_IPS_SEARCH" MEDICATION_CASE_INDEX="$medication_case_index" \
+    render_demo_payload "$payload_name"
+}
+
+render_demo_payload_with_runtime_2() {
+  local payload_name="$1"
+  local medication_case_index="${2:-1}"
+  SUBJECT_ID="$SUBJECT_ID" THID_COMM="$THID_COMM_2" THID_MED_SEARCH="$THID_MED_SEARCH" THID_IPS_SEARCH="$THID_IPS_SEARCH" MEDICATION_CASE_INDEX="$medication_case_index" \
     render_demo_payload "$payload_name"
 }
 
 DIDCOMM_COMM_REQ="$(render_demo_payload_with_runtime COMMUNICATION_DIDCOMM)"
 LEGACY_FHIR_COMM_REQ="$(render_demo_payload_with_runtime COMMUNICATION_LEGACY_FHIR)"
+DIDCOMM_COMM_REQ_2="$(render_demo_payload_with_runtime_2 COMMUNICATION_DIDCOMM)"
+LEGACY_FHIR_COMM_REQ_2="$(render_demo_payload_with_runtime_2 COMMUNICATION_LEGACY_FHIR)"
 
 COMM_CONTENT_TYPE="application/json"
 COMM_REQ="$DIDCOMM_COMM_REQ"
+COMM_REQ_2="$DIDCOMM_COMM_REQ_2"
 if [[ "$MODE" == "legacy-fhir" ]]; then
   COMM_CONTENT_TYPE="application/fhir+json"
   COMM_REQ="$LEGACY_FHIR_COMM_REQ"
+  COMM_REQ_2="$LEGACY_FHIR_COMM_REQ_2"
 fi
 
 COMM_SUBMIT="$(curl -sS -X POST "$COMM_URL" \
@@ -76,9 +89,17 @@ COMM_SUBMIT="$(curl -sS -X POST "$COMM_URL" \
   -d "$COMM_REQ")"
 echo "$COMM_SUBMIT" | jq '.'
 
+COMM_SUBMIT_2="$(curl -sS -X POST "$COMM_URL" \
+  -H "Authorization: Bearer $AUTH_BEARER" \
+  -H "Content-Type: $COMM_CONTENT_TYPE" \
+  -d "$COMM_REQ_2")"
+echo "$COMM_SUBMIT_2" | jq '.'
+
 echo "[2/4] Polling Communication/_batch-response..."
 COMM_DONE="$(poll_async "$COMM_POLL_URL" "$THID_COMM")"
 echo "$COMM_DONE" | jq '.'
+COMM_DONE_2="$(poll_async "$COMM_POLL_URL" "$THID_COMM_2")"
+echo "$COMM_DONE_2" | jq '.'
 
 echo "[3/4] Searching MedicationStatement/_search..."
 MED_SEARCH_REQ="$(render_demo_payload_with_runtime MEDICATION_SEARCH)"
