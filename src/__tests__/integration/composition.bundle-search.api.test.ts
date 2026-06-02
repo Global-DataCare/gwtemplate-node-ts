@@ -7,6 +7,7 @@ import { initializeTenantServicesConfig } from '../../utils/services';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
+import { testTenant1AlternateName } from '../data/organization.data';
 
 describe('Composition Bundle _search API (integration)', () => {
   afterEach(() => {
@@ -67,7 +68,7 @@ describe('Composition Bundle _search API (integration)', () => {
       const thidBatch = 'composition-batch-001';
       const submitResp = await invokeExpress(app, {
         method: 'POST',
-        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch',
+        url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidBatch,
@@ -102,7 +103,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch-response',
+          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidBatch },
         });
@@ -118,7 +119,7 @@ describe('Composition Bundle _search API (integration)', () => {
       const thidSearch = 'bundle-search-001';
       const searchResp = await invokeExpress(app, {
         method: 'POST',
-        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search',
+        url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidSearch,
@@ -142,7 +143,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response',
+          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidSearch },
         });
@@ -230,7 +231,7 @@ describe('Composition Bundle _search API (integration)', () => {
       const thidSearch = 'bundle-search-docref-hash-001';
       const searchResp = await invokeExpress(app, {
         method: 'POST',
-        url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search',
+        url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidSearch,
@@ -254,7 +255,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response',
+          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidSearch },
         });
@@ -370,7 +371,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (const searchCase of searchCases) {
         const searchResp = await invokeExpress(app, {
           method: 'POST',
-          url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search',
+          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
           headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
           body: {
             thid: searchCase.thid,
@@ -394,7 +395,7 @@ describe('Composition Bundle _search API (integration)', () => {
         for (let i = 0; i < 50; i++) {
           const pollResp = await invokeExpress(app, {
             method: 'POST',
-            url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response',
+            url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
             headers: { 'content-type': 'application/json' },
             body: { thid: searchCase.thid },
           });

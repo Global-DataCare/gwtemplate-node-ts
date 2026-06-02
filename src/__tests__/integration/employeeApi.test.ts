@@ -82,6 +82,9 @@ describe('Employee Onboarding API', () => {
       },
     ];
     jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue(mockTenantServices);
+    jest.spyOn(tenantsCacheManager, 'getTenant').mockResolvedValue({
+      didConfig: { service: mockTenantServices },
+    } as any);
 
     // Mock decodeRequest to return a canonical, imported job fixture.
     const mockJob = { ...ORGANIZATION_REGISTRATION_JOB }; // Use a valid job as a template
@@ -99,7 +102,7 @@ describe('Employee Onboarding API', () => {
     expect(mockKmsService.decodeRequest).toHaveBeenCalledWith(testEncryptedJwe1);
     expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
     const [jobName, queuedJob] = (mockQueueAdapter.addJob as jest.Mock).mock.calls[0];
-    expect(jobName).toContain('health-care_acme:Employee:_batch');
+    expect(jobName).toContain(`health-care_${tenantId}:Employee:_batch`);
     expect(queuedJob.tenantId).toBe(tenantId);
     expect(queuedJob.sector).toBe(sector);
     expect(queuedJob.section).toBe(section);

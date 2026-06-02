@@ -11,6 +11,7 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getIndividualSectionId } from '../../../utils/individual-sections';
 import { startServer, resetServerConfig } from '../../../server';
 import { getEnvSectionId } from '../../../utils/section-env';
+import { testTenant1AlternateName, testTenant1VaultId } from '../../data/organization.data';
 
 describe('SMART token issuance (integration)', () => {
   it('should issue token when subject exists and rules match', async () => {
@@ -75,7 +76,7 @@ describe('SMART token issuance (integration)', () => {
       } as any], individualRulesSectionId);
 
       // Submit token request (legacy/plaintext)
-      const tokenUrl = `/acme/cds-ES/v1/health-care/identity/openid/smart/token`;
+      const tokenUrl = `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`;
       const submitResp = await invokeExpress(app, {
         method: 'POST',
         url: tokenUrl,
@@ -102,7 +103,7 @@ describe('SMART token issuance (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: `/acme/cds-ES/v1/health-care/identity/openid/smart/_batch-response`,
+          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'smart-token-thread-id' },
         });

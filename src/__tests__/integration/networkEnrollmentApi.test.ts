@@ -35,6 +35,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   
   jest.spyOn(tenantsCacheManager, 'getDidServiceConfig');
   jest.spyOn(tenantsCacheManager, 'getDidDocument');
+  jest.spyOn(tenantsCacheManager, 'getTenant');
 
   mockKmsService.init();
 
@@ -80,7 +81,10 @@ describe('Network Enrollment API', () => {
         actions: [action],
         selector: { section, format },
       }];
-      (tenantsCacheManager.getDidServiceConfig as jest.Mock).mockReturnValue(mockTenantServices);
+      (tenantsCacheManager.getDidServiceConfig as jest.Mock).mockResolvedValue(mockTenantServices);
+      (tenantsCacheManager.getTenant as jest.Mock).mockResolvedValue({
+        didConfig: { service: mockTenantServices },
+      });
 
 	      const mockJobRequest: JobRequest = {
 	        id: 'mock-job-id',
@@ -114,7 +118,7 @@ describe('Network Enrollment API', () => {
       };
       mockKmsService.decodeRequest.mockResolvedValue(mockJobRequest);
       
-      (tenantsCacheManager.getDidDocument as jest.Mock).mockReturnValue(testTenantC_DidDocument);
+      (tenantsCacheManager.getDidDocument as jest.Mock).mockResolvedValue(testTenantC_DidDocument);
 
       // --- Act ---
       const response = await invokeExpress(app, {
@@ -228,7 +232,10 @@ describe('Network Enrollment API', () => {
         actions: [action],
         selector: { section, format },
       }];
-      (tenantsCacheManager.getDidServiceConfig as jest.Mock).mockReturnValue(mockTenantServices);
+      (tenantsCacheManager.getDidServiceConfig as jest.Mock).mockResolvedValue(mockTenantServices);
+      (tenantsCacheManager.getTenant as jest.Mock).mockResolvedValue({
+        didConfig: { service: mockTenantServices },
+      });
 
       // We simulate a job signed by a legitimate but non-privileged employee.
       const employeeDid = `did:web:${tenantId}:employee:analyst@${tenantId}.org:analyst`;
@@ -269,7 +276,7 @@ describe('Network Enrollment API', () => {
       
       // The DID Document for the tenant does NOT contain the analyst's key in its assertionMethod.
       // The API controller IGNORES this; it's the worker's responsibility to check it.
-      (tenantsCacheManager.getDidDocument as jest.Mock).mockReturnValue(testTenantC_DidDocument);
+      (tenantsCacheManager.getDidDocument as jest.Mock).mockResolvedValue(testTenantC_DidDocument);
 
       // --- Act ---
       const response = await invokeExpress(app, {

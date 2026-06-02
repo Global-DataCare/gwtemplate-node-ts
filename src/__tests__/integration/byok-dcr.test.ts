@@ -26,7 +26,7 @@ import { Content } from 'gdc-common-utils-ts/utils/content';
 import { QueueAdapterMem } from '../../adapters/queue-mem';
 import { testPayloadCreateTenant1, testTenant1Data } from '../data/end-to-end.data';
 import { testClaimsTenant1Receptionist1, testTenant1Receptionist1DidExternal, testTenant1Receptionist1Urn } from '../data/employee.data';
-import { testTenant1AlternateName } from '../data/organization.data';
+import { testTenant1AlternateName, testTenant1VaultId } from '../data/organization.data';
 import { testIndividualOnboardingBatchEntries } from '../data/customer-onboarding.data';
 import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { generateUrnHash } from '../../utils/urn-hash';
@@ -299,7 +299,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     // Reload host + tenant caches after finalization to make subsequent tests deterministic.
     await tenantManager.loadHost();
-    const tenantDid = await tenantManager.getTenantDid('health-care_acme');
+    const tenantDid = await tenantManager.getTenantDid(testTenant1VaultId);
     if (orderFinalResponse.body?.data?.[0]?.response?.status === '201') {
       expect(tenantDid).toBeDefined();
     }
@@ -353,7 +353,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       hostEncryptionKey, // Using the key obtained from the server
     );
 
-    const registrationUrl = `/acme/cds-ES/v1/health-care/entity/org.schema/Employee/_batch`;
+    const registrationUrl = `/${testTenant1AlternateName}/cds-ES/v1/health-care/entity/org.schema/Employee/_batch`;
 
     const response = await invokeExpress(app, {
       method: 'POST',
@@ -385,7 +385,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     // The 'acme' tenant was created in 'ES' jurisdiction in Part 1. We must be consistent.
     const jurisdiction = 'es'; 
     // TODO: function for external url and did:web or hosted url and did:web is required instead of URN for the target audience
-    const targetDid = await tenantManager.getTenantDid('health-care_acme');
+    const targetDid = await tenantManager.getTenantDid(testTenant1VaultId);
     const issuerDid = testTenant1Receptionist1DidExternal;
     const thid = `thid-e2e-person-onboarding-${Date.now()}`;
 
@@ -474,7 +474,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const compositionPayload = {
       thid: `thid-e2e-composition-${Date.now()}`,
       iss: testTenant1Receptionist1DidExternal,
-      aud: await tenantManager.getTenantDid('health-care_acme'),
+      aud: await tenantManager.getTenantDid(testTenant1VaultId),
       body: {
         data: [
           {
@@ -507,7 +507,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     };
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
-    const registrationUrl = `/acme/cds-es/v1/health-care/individual/org.schema/Composition/_batch`;
+    const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Composition/_batch`;
     const response = await invokeExpress(app, {
       method: 'POST',
       url: registrationUrl,
@@ -529,7 +529,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const communicationPayload = {
       thid: appointmentThid,
       iss: testTenant1Receptionist1DidExternal,
-      aud: await tenantManager.getTenantDid('health-care_acme'),
+      aud: await tenantManager.getTenantDid(testTenant1VaultId),
       body: {
         data: [
           {
@@ -567,7 +567,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     };
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
-    const registrationUrl = `/acme/cds-es/v1/health-care/individual/org.schema/Communication/_batch`;
+    const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Communication/_batch`;
     const response = await invokeExpress(app, {
       method: 'POST',
       url: registrationUrl,
@@ -588,7 +588,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       pthid: '...original-appointment-thid...', // pthid links to the original message
       thid: `thid-e2e-response-${Date.now()}`,
       iss: `did:web:patient-app-instance-123`, // The patient's app instance DID
-      aud: await tenantManager.getTenantDid('health-care_acme'),
+      aud: await tenantManager.getTenantDid(testTenant1VaultId),
       body: {
         data: [{
           type: 'Communication-response-v1.0',
@@ -597,7 +597,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       }
     };
     
-    const registrationUrl = `/acme/cds-es/v1/health-care/individual/org.schema/Communication/_batch`;
+    const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Communication/_batch`;
     // const response = await ... POST the response ...
     // expect(response.status).toBe(202);
   });
@@ -609,7 +609,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const subscriptionPayload = {
       thid: `thid-e2e-subscription-${Date.now()}`,
       iss: testTenant1Receptionist1DidExternal,
-      aud: await tenantManager.getTenantDid('health-care_acme'),
+      aud: await tenantManager.getTenantDid(testTenant1VaultId),
       body: {
         data: [{
           type: 'Subscription-create-v1.0',
@@ -624,7 +624,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       }
     };
     
-    const registrationUrl = `/acme/cds-es/v1/health-care/individual/org.schema/Subscription/_batch`;
+    const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Subscription/_batch`;
     // const response = await ... POST the subscription ...
     // expect(response.status).toBe(202);
   });
@@ -636,7 +636,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const discoveryClaimValue = '987654321';
     
     // Manually replicate the URN generation logic from the manager to get the correct hash
-    const expectedUrn = `urn:antifraud:eu:identifier:${discoveryClaimType}:${discoveryClaimValue}`;
+    const expectedUrn = `urn:${process.env.URN_NAMESPACE || 'gdc'}:eu:identifier:${discoveryClaimType}:${discoveryClaimValue}`;
     const expectedHash = generateUrnHash(expectedUrn);
     (blockchainAdapter as InstanceType<typeof BlockchainAdapterMem>).addMapping(expectedHash, targetDid);
     
@@ -645,7 +645,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const discoveryPayload = {
         thid: thid,
         iss: testTenant1Receptionist1DidExternal,
-        aud: await tenantManager.getTenantDid('health-care_acme'),
+        aud: await tenantManager.getTenantDid(testTenant1VaultId),
         body: {
             data: [{
                 type: 'Person-discover-v1.0',
@@ -674,7 +674,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     };
     const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
 
-    const discoveryUrl = `/acme/cds-es/v1/health-care/test-network/org.schema/Person/_discovery`;
+    const discoveryUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/test-network/org.schema/Person/_discovery`;
     
     const postResponse = await invokeExpress(app, {
       method: 'POST',
