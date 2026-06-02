@@ -87,6 +87,7 @@ export class CompositionManager implements IJobProcessor {
         throw new Error('Missing required subject search parameter for Composition search.');
       }
       const searchSections = this.extractSearchSections(body);
+      const excludedSearchSections = this.extractExcludedSearchSections(body);
       const searchTypes = this.extractSearchTypes(body);
       const documentReferenceFilters = this.extractDocumentReferenceSearchFilters(body);
       const communicationFilters = this.extractCommunicationSearchFilters(body);
@@ -101,7 +102,7 @@ export class CompositionManager implements IJobProcessor {
         ? this.filterDocumentReferenceMatches(matchesRaw, documentReferenceFilters)
         : useCommunicationSection
           ? await this.filterCommunicationMatches(tenantVaultId, searchSubject, scope, matchesRaw, communicationFilters)
-          : this.filterMatchesBySectionsAndTypes(matchesRaw, searchSections, searchTypes);
+          : this.filterMatchesBySectionsAndTypes(matchesRaw, searchSections, excludedSearchSections, searchTypes);
       const responseBundle: BundleJsonApi = {
         resourceType: 'Bundle',
         type: 'batch-response',
@@ -320,13 +321,55 @@ export class CompositionManager implements IJobProcessor {
     return Array.from(result);
   }
 
+  private extractExcludedSearchSections(body: any): string[] {
+    const result = new Set<string>();
+
+    const parameters = Array.isArray(body?.parameter) ? body.parameter : [];
+    for (const p of parameters) {
+      const name = String(p?.name || '').toLowerCase();
+      if (
+        name !== 'section:not'
+        && name !== 'composition.section:not'
+        && name !== 'exclude-section'
+        && name !== 'exclude-sections'
+      ) continue;
+      const value = String(p?.valueString || p?.valueCode || p?.valueCoding?.code || '').trim();
+      if (!value) continue;
+      value.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
+    }
+
+    const wrappers = [
+      ...(Array.isArray(body?.entry) ? body.entry : []),
+      ...(Array.isArray(body?.data) ? body.data : []),
+    ];
+    for (const wrapper of wrappers) {
+      const requestUrl = String(wrapper?.request?.url || '').trim();
+      if (!requestUrl) continue;
+      const queryIndex = requestUrl.indexOf('?');
+      if (queryIndex < 0) continue;
+      const query = requestUrl.slice(queryIndex + 1);
+      const params = new URLSearchParams(query);
+      const excludedRaw = String(
+        params.get('section:not')
+          || params.get('composition.section:not')
+          || params.get('exclude-section')
+          || params.get('exclude-sections')
+          || '',
+      ).trim();
+      if (!excludedRaw) continue;
+      excludedRaw.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
+    }
+
+    return Array.from(result);
+  }
+
   private extractSearchTypes(body: any): string[] {
     const result = new Set<string>();
 
     const parameters = Array.isArray(body?.parameter) ? body.parameter : [];
     for (const p of parameters) {
       const name = String(p?.name || '').toLowerCase();
-      if (name !== 'type' && name !== 'composition.type' && name !== 'document-type') continue;
+      if (name !== 'composition.type' && name !== 'document-type') continue;
       const value = String(
         p?.valueString
           || p?.valueCode
@@ -350,7 +393,6 @@ export class CompositionManager implements IJobProcessor {
       const params = new URLSearchParams(query);
       const typeRaw = String(
         params.get('composition.type')
-          || params.get('type')
           || '',
       ).trim();
       if (!typeRaw) continue;
@@ -483,17 +525,24 @@ export class CompositionManager implements IJobProcessor {
     });
   }
 
-  private filterMatchesBySectionsAndTypes(matches: any[], requiredSections: string[], requiredTypes: string[]): any[] {
+  private filterMatchesBySectionsAndTypes(
+    matches: any[],
+    requiredSections: string[],
+    excludedSections: string[],
+    requiredTypes: string[],
+  ): any[] {
     if (!Array.isArray(matches)) return [];
     const hasSectionFilter = Array.isArray(requiredSections) && requiredSections.length > 0;
+    const hasExcludedSectionFilter = Array.isArray(excludedSections) && excludedSections.length > 0;
     const hasTypeFilter = Array.isArray(requiredTypes) && requiredTypes.length > 0;
-    if (!hasSectionFilter && !hasTypeFilter) return matches;
+    if (!hasSectionFilter && !hasExcludedSectionFilter && !hasTypeFilter) return matches;
 
     const requiredSectionSet = new Set(requiredSections.map((s) => String(s || '').trim()).filter(Boolean));
+    const excludedSectionSet = new Set(excludedSections.map((s) => String(s || '').trim()).filter(Boolean));
     const requiredTypeSet = new Set(requiredTypes.map((s) => String(s || '').trim()).filter(Boolean));
 
     return matches.filter((record: any) => {
-      if (hasSectionFilter) {
+      if (hasSectionFilter || hasExcludedSectionFilter) {
         const sectionKeys = [
           'Composition.section',
           'org.hl7.fhir.r4.Composition.section',
@@ -509,14 +558,25 @@ export class CompositionManager implements IJobProcessor {
         }
         if (!sectionValue) return false;
         const gotSections = new Set(sectionValue.split(',').map((v: string) => v.trim()).filter(Boolean));
-        let sectionMatched = false;
-        for (const req of requiredSectionSet) {
-          if (gotSections.has(req)) {
-            sectionMatched = true;
-            break;
+
+        if (hasExcludedSectionFilter) {
+          for (const excluded of excludedSectionSet) {
+            if (gotSections.has(excluded)) {
+              return false;
+            }
           }
         }
-        if (!sectionMatched) return false;
+
+        if (hasSectionFilter) {
+          let sectionMatched = false;
+          for (const req of requiredSectionSet) {
+            if (gotSections.has(req)) {
+              sectionMatched = true;
+              break;
+            }
+          }
+          if (!sectionMatched) return false;
+        }
       }
 
       if (hasTypeFilter) {
