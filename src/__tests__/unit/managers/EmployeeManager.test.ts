@@ -387,6 +387,53 @@ describe('EmployeeManager', () => {
         testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email],
       );
     });
+
+    it('should search employees via POST search entries carrying FHIR Parameters', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      job.action = '_search';
+      job.content!.body = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [
+          {
+            request: {
+              method: 'POST',
+              url: 'Employee/_search',
+            },
+            resource: {
+              resourceType: 'Parameters',
+              parameter: [
+                {
+                  name: ClaimsPersonSchemaorg.email,
+                  valueString: String(testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email]),
+                },
+              ],
+            },
+          },
+        ],
+      } as any;
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockVaultRepository.getContainersInSection.mockResolvedValue([
+        {
+          id: 'employee-search-hit',
+          status: EntityLifecycleStatus.Active,
+          sequence: 1,
+          content: {
+            id: 'employee-search-hit',
+            type: EntityType.Person,
+            status: EntityLifecycleStatus.Active,
+            claims: testClaimsTenant1Receptionist1,
+            meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+          } satisfies EntityConfig,
+        } as ConfidentialStorageDoc,
+      ]);
+
+      const response = await employeeManager.process(job);
+
+      expect(response.body.data[0].type).toBe('Employee-search-response-v1.0');
+      expect((response.body.data[0] as any).resource.total).toBe(1);
+      expect((response.body.data[0] as any).resource.data[0].id).toBe('employee-search-hit');
+    });
   });
 
   describe('Employee Purge', () => {

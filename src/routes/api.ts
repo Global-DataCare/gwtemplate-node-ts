@@ -723,10 +723,16 @@ export function createApiRouter(
    *     summary: Search employees within an existing tenant
    *     description: |
    *       Submits an asynchronous employee directory query.
-   *       Current request shape follows a Bundle search entry:
-   *       - `body.resourceType = Bundle`
-   *       - `body.entry[0].request.method = GET`
-   *       - `body.entry[0].request.url = Employee?...`
+   *       Supported request shapes:
+   *       - legacy Bundle search entry:
+   *         - `body.resourceType = Bundle`
+   *         - `body.entry[0].request.method = GET`
+   *         - `body.entry[0].request.url = Employee?...`
+   *       - preferred Bundle search entry:
+   *         - `body.resourceType = Bundle`
+   *         - `body.entry[0].request.method = POST`
+   *         - `body.entry[0].request.url = Employee/_search`
+   *         - `body.entry[0].resource.resourceType = Parameters`
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'

@@ -22,6 +22,12 @@ import type { IVaultRepository } from '../database/repositories/vault/vault.repo
 import type { IJobProcessor } from './registry';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
+import {
+  extractSearchFiltersFromParametersResource,
+  extractSearchFiltersFromRequestUrl,
+  extractSearchResourceTarget,
+  SearchFilters,
+} from '../utils/search-request';
 
 /**
  * Stores Unified Health Index updates as Composition-style flat claims.
@@ -247,76 +253,15 @@ export class CompositionManager implements IJobProcessor {
   }
 
   private extractSearchSubject(body: any): string {
-    // FHIR Parameters style:
-    // {
-    //   "resourceType":"Parameters",
-    //   "parameter":[{"name":"subject","valueString":"did:..." }]
-    // }
-    const parameters = Array.isArray(body?.parameter) ? body.parameter : [];
-    for (const p of parameters) {
-      if (String(p?.name || '').toLowerCase() !== 'subject') continue;
-      const value = String(p?.valueString || p?.valueUri || p?.valueReference?.reference || '').trim();
-      if (value) return value;
-    }
-
-    // FHIR Batch style search wrapper:
-    // body.entry[0].request.url === "Composition?subject=did:..."
-    // JSON:API compatibility can rename entry -> data, so accept both.
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-    for (const wrapper of wrappers) {
-      const requestUrl = String(wrapper?.request?.url || '').trim();
-      if (!requestUrl) continue;
-      const queryIndex = requestUrl.indexOf('?');
-      if (queryIndex < 0) continue;
-      const query = requestUrl.slice(queryIndex + 1);
-      const params = new URLSearchParams(query);
-      const subject = String(
-        params.get('subject')
-          || params.get('composition.subject')
-          || '',
-      ).trim();
-      if (subject) return subject;
-    }
-
-    return '';
+    return this.getFirstSearchFilter(body, ['subject', 'composition.subject']);
   }
 
   private extractSearchSections(body: any): string[] {
     const result = new Set<string>();
-
-    const parameters = Array.isArray(body?.parameter) ? body.parameter : [];
-    for (const p of parameters) {
-      const name = String(p?.name || '').toLowerCase();
-      if (name !== 'section' && name !== 'composition.section') continue;
-      const value = String(p?.valueString || p?.valueCode || p?.valueCoding?.code || '').trim();
-      if (!value) continue;
-      value.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
+    for (const value of this.getSearchFilterValues(body, ['section', 'composition.section'])) {
+      result.add(value);
     }
-
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-    for (const wrapper of wrappers) {
-      const requestUrl = String(wrapper?.request?.url || '').trim();
-      if (!requestUrl) continue;
-      const queryIndex = requestUrl.indexOf('?');
-      if (queryIndex < 0) continue;
-      const query = requestUrl.slice(queryIndex + 1);
-      const params = new URLSearchParams(query);
-      const sectionRaw = String(
-        params.get('section')
-          || params.get('composition.section')
-          || '',
-      ).trim();
-      if (!sectionRaw) continue;
-      sectionRaw.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
-    }
-
-    return Array.from(result);
+    return [...result];
   }
 
   private extractSearchResourceType(body: any): string {
@@ -327,7 +272,7 @@ export class CompositionManager implements IJobProcessor {
     for (const wrapper of wrappers) {
       const requestUrl = String(wrapper?.request?.url || '').trim();
       if (!requestUrl) continue;
-      const target = requestUrl.split('?')[0]?.trim();
+      const target = extractSearchResourceTarget(requestUrl);
       if (!target) continue;
       return target.toLowerCase();
     }
@@ -338,33 +283,12 @@ export class CompositionManager implements IJobProcessor {
     identifier?: string;
     attachmentHash?: string;
   } {
-    let identifier = '';
-    let attachmentHash = '';
-
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-    for (const wrapper of wrappers) {
-      const requestUrl = String(wrapper?.request?.url || '').trim();
-      if (!requestUrl) continue;
-      const queryIndex = requestUrl.indexOf('?');
-      if (queryIndex < 0) continue;
-      const query = requestUrl.slice(queryIndex + 1);
-      const params = new URLSearchParams(query);
-      identifier =
-        identifier
-        || String(params.get('identifier') || params.get('documentreference.identifier') || '').trim();
-      attachmentHash =
-        attachmentHash
-        || String(
-          params.get('contenthash')
-            || params.get('documentreference.contenthash')
-            || params.get('attachment.hash')
-            || '',
-        ).trim();
-    }
-
+    const identifier = this.getFirstSearchFilter(body, ['identifier', 'documentreference.identifier']);
+    const attachmentHash = this.getFirstSearchFilter(body, [
+      'contenthash',
+      'documentreference.contenthash',
+      'attachment.hash',
+    ]);
     return {
       identifier: identifier || undefined,
       attachmentHash: attachmentHash || undefined,
@@ -377,42 +301,63 @@ export class CompositionManager implements IJobProcessor {
     pthid?: string;
     attachmentHash?: string;
   } {
-    let identifier = '';
-    let thid = '';
-    let pthid = '';
-    let attachmentHash = '';
-
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-    for (const wrapper of wrappers) {
-      const requestUrl = String(wrapper?.request?.url || '').trim();
-      if (!requestUrl) continue;
-      const queryIndex = requestUrl.indexOf('?');
-      if (queryIndex < 0) continue;
-      const params = new URLSearchParams(requestUrl.slice(queryIndex + 1));
-      identifier =
-        identifier
-        || String(params.get('identifier') || params.get('communication.identifier') || '').trim();
-      thid = thid || String(params.get('thid') || '').trim();
-      pthid = pthid || String(params.get('pthid') || '').trim();
-      attachmentHash =
-        attachmentHash
-        || String(
-          params.get('contenthash')
-            || params.get('documentreference.contenthash')
-            || params.get('attachment.hash')
-            || '',
-        ).trim();
-    }
-
+    const identifier = this.getFirstSearchFilter(body, ['identifier', 'communication.identifier']);
+    const thid = this.getFirstSearchFilter(body, ['thid']);
+    const pthid = this.getFirstSearchFilter(body, ['pthid']);
+    const attachmentHash = this.getFirstSearchFilter(body, [
+      'contenthash',
+      'documentreference.contenthash',
+      'attachment.hash',
+    ]);
     return {
       identifier: identifier || undefined,
       thid: thid || undefined,
       pthid: pthid || undefined,
       attachmentHash: attachmentHash || undefined,
     };
+  }
+
+  private collectSearchFilters(body: any): SearchFilters {
+    const filters: SearchFilters = {};
+    const merge = (source: SearchFilters) => {
+      for (const [key, values] of Object.entries(source)) {
+        if (!filters[key]) {
+          filters[key] = [];
+        }
+        filters[key].push(...values);
+      }
+    };
+
+    if (Array.isArray(body?.parameter)) {
+      merge(extractSearchFiltersFromParametersResource({ resourceType: 'Parameters', parameter: body.parameter }));
+    }
+
+    const wrappers = [
+      ...(Array.isArray(body?.entry) ? body.entry : []),
+      ...(Array.isArray(body?.data) ? body.data : []),
+    ];
+
+    for (const wrapper of wrappers) {
+      merge(extractSearchFiltersFromRequestUrl(wrapper?.request?.url));
+      if (wrapper?.resource?.resourceType === 'Parameters') {
+        merge(extractSearchFiltersFromParametersResource(wrapper.resource));
+      }
+    }
+
+    return filters;
+  }
+
+  private getSearchFilterValues(body: any, names: string[]): string[] {
+    const filters = this.collectSearchFilters(body);
+    const values: string[] = [];
+    for (const name of names) {
+      values.push(...(filters[name] || []));
+    }
+    return values.map((value) => String(value).trim()).filter(Boolean);
+  }
+
+  private getFirstSearchFilter(body: any, names: string[]): string {
+    return this.getSearchFilterValues(body, names)[0] || '';
   }
 
   private filterDocumentReferenceMatches(

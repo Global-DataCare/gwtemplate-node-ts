@@ -152,4 +152,38 @@ describe('CompositionManager', () => {
     expect(data[0].resource.total).toBe(2);
     expect(data[0].resource.data).toHaveLength(2);
   });
+
+  it('supports _search with POST wrapper entries carrying FHIR Parameters', async () => {
+    mockVaultRepository.getContainersInSection.mockResolvedValue([{ id: 'comp-1' }] as any);
+    const job = createJob({
+      action: '_search',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          entry: [
+            {
+              request: {
+                method: 'POST',
+                url: 'Bundle/_search',
+              },
+              resource: {
+                resourceType: 'Parameters',
+                parameter: [
+                  ...COMPOSITION_SEARCH_PARAMETERS_EXAMPLE.parameter,
+                ],
+              },
+            },
+          ],
+        },
+      } as any,
+    });
+
+    const response = await manager.process(job);
+    const data = (response.body as any).data;
+    expect(data[0].type).toBe('Composition-search-response-v1.0');
+    expect(data[0].resource.total).toBe(1);
+    expect(data[0].resource.data).toHaveLength(1);
+  });
 });

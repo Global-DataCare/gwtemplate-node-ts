@@ -31,6 +31,7 @@ import { getEnvSectionId } from '../utils/section-env';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import { createEmployeeUrn, parseTenantUrn } from '../utils/urn';
 import { normalizeIndexedEmail } from '../utils/indexed-contact';
+import { extractSearchFiltersFromEntry } from '../utils/search-request';
 import {
   ACTION_PURGE,
   LICENSE_STATUS_AVAILABLE,
@@ -164,15 +165,7 @@ export class EmployeeManager {
   }
 
   private async processSearchEntry(vaultId: string, entry: any): Promise<BundleEntry> {
-    const request = entry?.request;
-    if (!request) {
-      throw new ManagerError('Employee search entry requires a request object.', IssueType.Required);
-    }
-    if (String(request.method || '').toUpperCase() !== 'GET') {
-      throw new ManagerError('Employee search only supports GET entry requests.', IssueType.NotSupported);
-    }
-
-    const filters = this.extractSearchFilters(request.url);
+    const filters = extractSearchFiltersFromEntry(entry, 'Employee');
     const matches = await this.searchEmployees(vaultId, filters);
 
     return {
@@ -183,27 +176,6 @@ export class EmployeeManager {
       } as any,
       response: { status: '200' },
     };
-  }
-
-  private extractSearchFilters(requestUrl: unknown): Record<string, string[]> {
-    const rawUrl = String(requestUrl || '').trim();
-    const [resourceName, queryString = ''] = rawUrl.split('?');
-    if (resourceName && resourceName !== 'Employee') {
-      throw new ManagerError(`Employee search expects request.url to target 'Employee', got '${resourceName}'.`, IssueType.Invalid);
-    }
-
-    const params = new URLSearchParams(queryString);
-    const filters: Record<string, string[]> = {};
-    for (const [key, value] of params.entries()) {
-      const values = String(value)
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
-      if (values.length > 0) {
-        filters[key] = values;
-      }
-    }
-    return filters;
   }
 
   private async searchEmployees(
