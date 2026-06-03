@@ -634,6 +634,8 @@ TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test n
 
 Notes:
 - This registers/ensures tenant `acme-id` via host registry Offer/Order flow.
+- With the default values of this script (`TENANT_ID=acme-id`, `ADMIN_EMAIL=admin1@acme.org`, etc.), `EMPLOYEE_COUNT=2` leaves one additional employee seat after bootstrap because the controller/admin consumes the first one.
+- Use `EMPLOYEE_COUNT=3` only when you want to run the local two-employee lifecycle smoke after bootstrap (`create employee 1`, `create employee 2`, `disable employee 2`, `purge both`).
 - In `v1.x`, legal-organization bootstrap sends `Organization.identifier.value` (`taxId`) as the canonical external identifier.
 - `alternateName` is reserved for individual/family-style onboarding examples. For legal organizations, GW CORE currently derives its internal compatibility alias from `taxId` when omitted.
 - `host` is reserved for platform-level routes and well-known endpoints.
