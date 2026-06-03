@@ -18,6 +18,7 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 - Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
 - Main docs index: [docs/README.md](docs/README.md)
 - Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
+- Employee bundle/lifecycle contract reference: `gdc-sdk-core-ts/docs/EMPLOYEES_101.md`
 - Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
 - Repo briefing: [docs/BRIEFING_DATASPACE_EN.md](docs/BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
