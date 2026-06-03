@@ -59,3 +59,4 @@ Recommended meaning:
 - Canonical flow: `docs/API_CORE_INTEGRATION.md`
 - Broader GW test taxonomy: `TEST_MATRIX.md`
 - Docs index: `docs/README.md`
+- Cross-repo local live command reference: `https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-LIVE_GW_LOCAL.md`

@@ -19,6 +19,7 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 - Main docs index: [docs/README.md](docs/README.md)
 - Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
 - Employee bundle/lifecycle contract reference: [gdc-sdk-core-ts/docs/101-EMPLOYEES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-EMPLOYEES.md)
+- SDK live local reference before running cross-repo E2E: [gdc-sdk-node-ts/docs/101-LIVE_GW_LOCAL.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-LIVE_GW_LOCAL.md)
 - Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
 - Repo briefing: [docs/BRIEFING_DATASPACE_EN.md](docs/BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
