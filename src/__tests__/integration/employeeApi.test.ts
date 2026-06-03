@@ -113,4 +113,51 @@ describe('Employee Onboarding API', () => {
     expect(response.status).toBe(202);
     expect(response.headers.location).toBe(expectedPollingUrl);
   });
+
+  it('should accept Employee/_search and return the async polling URL', async () => {
+    const asyncResponseStore = new AsyncResponseStoreMem();
+    const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
+
+    const tenantId = testTenant1AlternateName;
+    const jurisdiction = testTenant1AddressCountry.toLowerCase();
+    const sector = 'health-care';
+    const section = 'entity';
+    const format = 'org.schema';
+    const resourceType = 'Employee';
+    const action = '_search';
+
+    const searchUrl = `/${tenantId}/cds-${jurisdiction}/v1/${sector}/${section}/${format}/${resourceType}/${action}`;
+    const expectedPollingUrl = `http://localhost:3001${searchUrl}-response`;
+
+    const mockTenantServices: DidService[] = [
+      {
+        id: `#${section}:${format}:employee-search`,
+        type: 'EmployeeDirectoryService',
+        serviceEndpoint: resourceType,
+        actions: [action],
+        selector: { section, format },
+      },
+    ];
+    jest.spyOn(tenantsCacheManager, 'getDidServiceConfig').mockResolvedValue(mockTenantServices);
+    jest.spyOn(tenantsCacheManager, 'getTenant').mockResolvedValue({
+      didConfig: { service: mockTenantServices },
+    } as any);
+
+    const mockJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    mockKmsService.decodeRequest.mockResolvedValue(mockJob);
+
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: searchUrl,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { request: testEncryptedJwe1 },
+    });
+
+    expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
+    const [, queuedJob] = (mockQueueAdapter.addJob as jest.Mock).mock.calls[0];
+    expect(queuedJob.resourceType).toBe(resourceType);
+    expect(queuedJob.action).toBe(action);
+    expect(response.status).toBe(202);
+    expect(response.headers.location).toBe(expectedPollingUrl);
+  });
 });

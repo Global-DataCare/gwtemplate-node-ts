@@ -18,7 +18,7 @@ describe('isRequestValid', () => {
       id: '#entity:org.schema:employee',
       type: 'ApiService',
       serviceEndpoint: 'Employee',
-      actions: ['_purge'],
+      actions: ['_purge', '_search'],
       selector: { section: 'entity', format: 'org.schema' },
     },
     {
@@ -157,6 +157,17 @@ describe('isRequestValid', () => {
       format: 'org.schema',
       resourceType: 'Employee',
       action: '_purge',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for employee _search', () => {
+    const params = {
+      sector: Sector.HEALTH_CARE,
+      section: 'entity',
+      format: 'org.schema',
+      resourceType: 'Employee',
+      action: '_search',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
   });

@@ -150,6 +150,15 @@ describe('Service Initialization Utilities', () => {
       );
       expect(employeePurgeService).toBeDefined();
 
+      const employeeSearchService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'entity' &&
+          (s as any).selector?.format === 'org.schema' &&
+          s.serviceEndpoint === 'Employee' &&
+          (s.actions || []).includes('_search'),
+      );
+      expect(employeeSearchService).toBeDefined();
+
       const fhirR4Service = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'individual' &&

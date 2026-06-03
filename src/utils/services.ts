@@ -141,6 +141,12 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   ));
 
   services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'entity', format: 'org.schema' },
+    ['Employee'],
+    ['_search']
+  ));
+
+  services.push(createDidEndpointConfigFromSelector(
     { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     individualResources,
     ['_batch']

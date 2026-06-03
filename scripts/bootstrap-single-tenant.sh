@@ -19,6 +19,7 @@ DISPLAY_NAME="${DISPLAY_NAME:-Acme Org}"
 ORG_URL="${ORG_URL:-api.acme.org}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin1@acme.org}"
 PERSON_OCCUPATION="${PERSON_OCCUPATION:-ISCO-08|1120}"
+EMPLOYEE_COUNT="${EMPLOYEE_COUNT:-2}"
 SERVICE_IDENTIFIER="${SERVICE_IDENTIFIER:-did:web:api-provider.example.com}"
 SERVICE_URL="${SERVICE_URL:-${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION_LOWER}/v1/${SECTOR}}"
 SERVICE_TYPE="${SERVICE_TYPE:-}"
@@ -62,6 +63,7 @@ org_payload_overrides="$(jq -n \
   --arg taxId "$TAX_ID" \
   --arg legalName "$LEGAL_NAME" \
   --arg displayName "$DISPLAY_NAME" \
+  --argjson employeeCount "$EMPLOYEE_COUNT" \
   --arg orgUrl "$ORG_URL" \
   --arg adminEmail "$ADMIN_EMAIL" \
   --arg personOccupation "$PERSON_OCCUPATION" \
@@ -78,6 +80,7 @@ org_payload_overrides="$(jq -n \
     "/body/data/0/meta/claims/org.schema.Organization.identifier.value": $taxId,
     "/body/data/0/meta/claims/org.schema.Organization.legalName": $legalName,
     "/body/data/0/meta/claims/org.schema.Organization.name": $displayName,
+    "/body/data/0/meta/claims/org.schema.Organization.numberOfEmployees.value": $employeeCount,
     "/body/data/0/meta/claims/org.schema.Organization.url": $orgUrl,
     "/body/data/0/meta/claims/org.schema.Person.email": $adminEmail,
     "/body/data/0/meta/claims/org.schema.Person.hasOccupation": $personOccupation,

@@ -716,6 +716,71 @@ export function createApiRouter(
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }
    *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_search:
+   *   post:
+   *     tags:
+   *       - 3.1 Employee Role
+   *     summary: Search employees within an existing tenant
+   *     description: |
+   *       Submits an asynchronous employee directory query.
+   *       Current request shape follows a Bundle search entry:
+   *       - `body.resourceType = Bundle`
+   *       - `body.entry[0].request.method = GET`
+   *       - `body.entry[0].request.url = Employee?...`
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/LegacyMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/LegacyMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: Accepted. The search job has been queued.
+   *         headers:
+   *           Location:
+   *             schema: { type: string }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_search-response:
+   *   post:
+   *     tags:
+   *       - 3.1 Employee Role
+   *     summary: Poll the employee search job result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom:
    *   post:
    *     tags:

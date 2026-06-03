@@ -58,12 +58,11 @@ export class EmployeeManager {
   }
 
   public async process(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
-    const responseEntries: (BundleEntry | ErrorEntry)[] = [];
-    
     if (!job.content) {
       throw new ManagerError('Job content is missing', IssueType.Required);
     }
-    const entries = job.content.body?.data ?? [];
+    const body = job.content.body as any;
+    const entries = body?.data ?? [];
 
     if (!job.tenantId || !job.sector) {
       throw new ManagerError('Job is missing required tenantId or sector.', IssueType.Required);
@@ -80,6 +79,12 @@ export class EmployeeManager {
       // This should ideally never happen if the request passed through the security layer.
       throw new ManagerError('Job is missing cryptographic metadata.', IssueType.Invalid);
     }
+
+    if (job.action === '_search') {
+      return this.processSearch(job, vaultId, issuerUrn);
+    }
+
+    const responseEntries: (BundleEntry | ErrorEntry)[] = [];
 
     for (const entry of entries) {
       try {
@@ -119,6 +124,140 @@ export class EmployeeManager {
       body: responseBundle,
     };
     return result;
+  }
+
+  private async processSearch(
+    job: JobRequest,
+    vaultId: string,
+    issuerUrn: string,
+  ): Promise<IDecodedDidcommPayload> {
+    const body = job.content?.body as any;
+    const entries = Array.isArray(body?.entry) ? body.entry : [];
+    const responseEntries: (BundleEntry | ErrorEntry)[] = [];
+
+    if (entries.length === 0) {
+      throw new ManagerError('Employee search requires at least one Bundle.entry request.', IssueType.Required);
+    }
+
+    for (const entry of entries) {
+      try {
+        responseEntries.push(await this.processSearchEntry(vaultId, entry));
+      } catch (error: any) {
+        responseEntries.push(this.handleError(error, 'Employee-search-response-v1.0', entry?.meta));
+      }
+    }
+
+    return {
+      jti: uuidv4(),
+      thid: job.content?.thid as string,
+      iss: issuerUrn,
+      aud: job.content?.aud as string,
+      exp: Math.floor(Date.now() / 1000) + 300,
+      type: 'search-response',
+      body: {
+        data: responseEntries,
+        resourceType: 'Bundle',
+        total: responseEntries.length,
+        type: getBundleResponseTypeForAction(job.action),
+      },
+    };
+  }
+
+  private async processSearchEntry(vaultId: string, entry: any): Promise<BundleEntry> {
+    const request = entry?.request;
+    if (!request) {
+      throw new ManagerError('Employee search entry requires a request object.', IssueType.Required);
+    }
+    if (String(request.method || '').toUpperCase() !== 'GET') {
+      throw new ManagerError('Employee search only supports GET entry requests.', IssueType.NotSupported);
+    }
+
+    const filters = this.extractSearchFilters(request.url);
+    const matches = await this.searchEmployees(vaultId, filters);
+
+    return {
+      type: 'Employee-search-response-v1.0',
+      resource: {
+        total: matches.length,
+        data: matches,
+      } as any,
+      response: { status: '200' },
+    };
+  }
+
+  private extractSearchFilters(requestUrl: unknown): Record<string, string[]> {
+    const rawUrl = String(requestUrl || '').trim();
+    const [resourceName, queryString = ''] = rawUrl.split('?');
+    if (resourceName && resourceName !== 'Employee') {
+      throw new ManagerError(`Employee search expects request.url to target 'Employee', got '${resourceName}'.`, IssueType.Invalid);
+    }
+
+    const params = new URLSearchParams(queryString);
+    const filters: Record<string, string[]> = {};
+    for (const [key, value] of params.entries()) {
+      const values = String(value)
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (values.length > 0) {
+        filters[key] = values;
+      }
+    }
+    return filters;
+  }
+
+  private async searchEmployees(
+    vaultId: string,
+    filters: Record<string, string[]>,
+  ): Promise<Array<Record<string, unknown>>> {
+    const docs =
+      (await this.vaultRepository.getContainersInSection<any>(vaultId, EMPLOYEE_SECTION)) || [];
+    const matches: Array<Record<string, unknown>> = [];
+
+    for (const doc of docs) {
+      if (!doc?.content && !doc?.jwe) continue;
+      try {
+        const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(doc, vaultId);
+        if (!employee?.claims || employee.type !== EntityType.Person) continue;
+        if (!this.matchesEmployeeFilters(employee, filters)) continue;
+
+        matches.push({
+          id: employee.id,
+          status: employee.status,
+          claims: employee.claims,
+          meta: employee.meta,
+        });
+      } catch {
+        continue;
+      }
+    }
+
+    return matches;
+  }
+
+  private matchesEmployeeFilters(
+    employee: EntityConfig,
+    filters: Record<string, string[]>,
+  ): boolean {
+    const claims = (employee.claims || {}) as ClaimsRecord;
+    const entries = Object.entries(filters);
+    if (entries.length === 0) return true;
+
+    return entries.every(([key, expectedValues]) => {
+      const actualValue = this.resolveEmployeeSearchValue(claims, key);
+      if (!actualValue) return false;
+      return expectedValues.includes(actualValue);
+    });
+  }
+
+  private resolveEmployeeSearchValue(claims: ClaimsRecord, key: string): string | undefined {
+    if (key === ClaimsPersonSchemaorg.hasOccupation || key === ClaimsPersonSchemaorg.hasOccupationalRoleValue) {
+      return getPersonOccupationClaim(claims) || undefined;
+    }
+
+    const rawValue = claims[key];
+    if (rawValue === undefined || rawValue === null) return undefined;
+    return String(rawValue).trim() || undefined;
   }
 
   private async processEntry(

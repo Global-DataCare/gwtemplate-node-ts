@@ -8,7 +8,11 @@ import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsSer
 import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { RecordBase, ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { JwkSet } from '../../../gdc-backend-utils-node/models/jwk';
-import { testBaseJobForEmployeeClaims as testBaseJobForEmployeeClaims, testClaimsTenant1Receptionist1 } from '../../data/employee.data';
+import {
+  testBaseJobForEmployeeClaims as testBaseJobForEmployeeClaims,
+  testClaimsTenant1Nurse1,
+  testClaimsTenant1Receptionist1,
+} from '../../data/employee.data';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
@@ -292,6 +296,61 @@ describe('EmployeeManager', () => {
     });
   });
 
+  describe('Employee Search', () => {
+    it('should search employees via Bundle entry.request.url filters', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      job.action = '_search';
+      job.content!.body = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [
+          {
+            request: {
+              method: 'GET',
+              url: `Employee?${ClaimsPersonSchemaorg.email}=${encodeURIComponent(String(testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email]))}`,
+            },
+          },
+        ],
+      } as any;
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockVaultRepository.getContainersInSection.mockResolvedValue([
+        {
+          id: 'employee-search-hit',
+          status: EntityLifecycleStatus.Active,
+          sequence: 1,
+          content: {
+            id: 'employee-search-hit',
+            type: EntityType.Person,
+            status: EntityLifecycleStatus.Active,
+            claims: testClaimsTenant1Receptionist1,
+            meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+          } satisfies EntityConfig,
+        } as ConfidentialStorageDoc,
+        {
+          id: 'employee-search-miss',
+          status: EntityLifecycleStatus.Active,
+          sequence: 1,
+          content: {
+            id: 'employee-search-miss',
+            type: EntityType.Person,
+            status: EntityLifecycleStatus.Active,
+            claims: testClaimsTenant1Nurse1,
+            meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+          } satisfies EntityConfig,
+        } as ConfidentialStorageDoc,
+      ]);
+
+      const response = await employeeManager.process(job);
+
+      expect(response.body.data[0].type).toBe('Employee-search-response-v1.0');
+      expect((response.body.data[0] as any).resource.total).toBe(1);
+      expect((response.body.data[0] as any).resource.data[0].id).toBe('employee-search-hit');
+      expect((response.body.data[0] as any).resource.data[0].claims[ClaimsPersonSchemaorg.email]).toBe(
+        testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email],
+      );
+    });
+  });
+
   describe('Employee Purge', () => {
     it('should reject purge unless the employee is already inactive', async () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
@@ -379,6 +438,137 @@ describe('EmployeeManager', () => {
       const updatedEmployeeDocs = mockVaultRepository.put.mock.calls[1][1] as ConfidentialStorageDoc[];
       expect(updatedEmployeeDocs[0].status).toBe(EntityLifecycleStatus.Inactive);
       expect(response.body.data[0].response.status).toBe('200');
+    });
+
+    it('should return a per-entry conflict for active employees and purge disabled employees in the same bundle', async () => {
+      const activeEmployeeId = String(testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.identifier]);
+      const disabledEmployeeId = String(testClaimsTenant1Nurse1[ClaimsPersonSchemaorg.identifier]);
+      const disableJob = testBaseJobForEmployeeClaims(testClaimsTenant1Nurse1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      disableJob.content!.body!.data[0].request.method = 'DELETE';
+
+      const purgeJob = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      purgeJob.action = '_purge';
+      purgeJob.content!.body!.data = [
+        {
+          meta: { claims: testClaimsTenant1Receptionist1 },
+          request: { method: 'POST' },
+          type: 'Employee-purge-request-v1.0',
+        },
+        {
+          meta: { claims: testClaimsTenant1Nurse1 },
+          request: { method: 'POST' },
+          type: 'Employee-purge-request-v1.0',
+        },
+      ] as any;
+
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      const employeeDocs = new Map<string, ConfidentialStorageDoc>([
+        [
+          activeEmployeeId,
+          {
+            id: activeEmployeeId,
+            status: EntityLifecycleStatus.Active,
+            sequence: 1,
+            content: {
+              id: activeEmployeeId,
+              type: EntityType.Person,
+              status: EntityLifecycleStatus.Active,
+              claims: testClaimsTenant1Receptionist1,
+              meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+            } satisfies EntityConfig,
+          } as ConfidentialStorageDoc,
+        ],
+        [
+          disabledEmployeeId,
+          {
+            id: disabledEmployeeId,
+            status: EntityLifecycleStatus.Active,
+            sequence: 1,
+            content: {
+              id: disabledEmployeeId,
+              type: EntityType.Person,
+              status: EntityLifecycleStatus.Active,
+              claims: testClaimsTenant1Nurse1,
+              meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+            } satisfies EntityConfig,
+          } as ConfidentialStorageDoc,
+        ],
+      ]);
+
+      const licenseDocs = new Map<string, ConfidentialStorageDoc>([
+        [
+          'license-nurse-1',
+          {
+            id: 'license-nurse-1',
+            status: 'active',
+            sequence: 1,
+            content: {
+              id: 'license-nurse-1',
+              tenantId: TENANT_ALTERNATE_NAME,
+              orderId: 'order-1',
+              userClass: 'employee',
+              userCategory: 'default',
+              type: 'mobile',
+              status: 'active',
+              plan: 'default',
+              renewalCycle: '12m',
+              reactivationEnabled: false,
+              exp: Math.floor(Date.now() / 1000) + 3600,
+              subjectId: disabledEmployeeId,
+              activationCode: 'activation-code-1',
+              issuedToEmail: String(testClaimsTenant1Nurse1[ClaimsPersonSchemaorg.email]),
+              issuedToRole: String(testClaimsTenant1Nurse1[ClaimsPersonSchemaorg.hasOccupation]),
+            } as any,
+          } as ConfidentialStorageDoc,
+        ],
+      ]);
+
+      mockVaultRepository.get.mockImplementation(async (_vaultId, id, sectionId) => {
+        if (sectionId !== getEnvSectionId('employees')) return undefined as any;
+        return employeeDocs.get(String(id)) as any;
+      });
+      mockVaultRepository.getContainersInSection.mockImplementation(async (_vaultId, sectionId) => {
+        if (sectionId === getEnvSectionId('device-licenses')) {
+          return Array.from(licenseDocs.values()) as any;
+        }
+        return [] as any;
+      });
+      mockVaultRepository.put.mockImplementation(async (_vaultId, docs, sectionId) => {
+        if (sectionId === getEnvSectionId('employees')) {
+          for (const doc of docs as unknown as ConfidentialStorageDoc[]) {
+            employeeDocs.set(String(doc.id), doc);
+          }
+        }
+        if (sectionId === getEnvSectionId('device-licenses')) {
+          for (const doc of docs as unknown as ConfidentialStorageDoc[]) {
+            licenseDocs.set(String(doc.id), doc);
+          }
+        }
+        return true as any;
+      });
+
+      const disableResponse = await employeeManager.process(disableJob, 'demo');
+      expect(disableResponse.body.data[0].response.status).toBe('200');
+
+      const purgeResponse = await employeeManager.process(purgeJob, 'demo');
+      const firstEntry = purgeResponse.body.data[0] as any;
+      const secondEntry = purgeResponse.body.data[1] as any;
+
+      expect(firstEntry.response.status).toBe('409');
+      expect(firstEntry.response.outcome.issue[0].diagnostics).toContain('disabled before purge');
+      expect(secondEntry.response.status).toBe('200');
+      expect(secondEntry.response.outcome).toBeUndefined();
+
+      const purgedEmployeeDoc = employeeDocs.get(disabledEmployeeId)!;
+      expect(purgedEmployeeDoc.status).toBe(EntityLifecycleStatus.Inactive);
+      const protectedPurgedEmployeeInput = mockKmsService.protectConfidentialData.mock.calls.at(-1)?.[0] as ConfidentialStorageDoc;
+      expect((protectedPurgedEmployeeInput.content as EntityConfig).meta?.licensingPurgedAt).toBeDefined();
+
+      const releasedLicenseDoc = licenseDocs.get('license-nurse-1')!;
+      expect(releasedLicenseDoc.status).toBe('available');
+      expect((releasedLicenseDoc.content as any).subjectId).toBeUndefined();
+      expect((releasedLicenseDoc.content as any).activationCode).toBeUndefined();
     });
   });
 });

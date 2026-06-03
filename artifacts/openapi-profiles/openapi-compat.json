@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-06-01T17:02:46.618Z",
+    "x-profile-generated-at": "2026-06-03T17:00:44.508Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -88,7 +88,7 @@
     },
     {
       "name": "Data Catalog Discovery",
-      "description": "DSP catalog discovery endpoints (`/dsp/catalog/...`) for operator/provider dataset lookup."
+      "description": "DCAT-3 catalog discovery endpoints (`/dcat3/catalog/...`) for operator/provider dataset lookup."
     },
     {
       "name": "Async Polling",
@@ -2649,6 +2649,133 @@
         "x-profile": "core"
       }
     },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_search": {
+      "post": {
+        "tags": [
+          "3.1 Employee Role"
+        ],
+        "summary": "Search employees within an existing tenant",
+        "description": "Submits an asynchronous employee directory query.\nCurrent request shape follows a Bundle search entry:\n- `body.resourceType = Bundle`\n- `body.entry[0].request.method = GET`\n- `body.entry[0].request.url = Employee?...`\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegacyMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegacyMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. The search job has been queued.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_search-response": {
+      "post": {
+        "tags": [
+          "3.1 Employee Role"
+        ],
+        "summary": "Poll the employee search job result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom": {
       "post": {
         "tags": [
@@ -4690,8 +4817,26 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "Ping (host compatibility alias)",
+        "description": "Backward-compatible health check alias for the host tenant.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/ping": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
         "summary": "Ping (host)",
-        "description": "Health check for the host tenant.",
+        "description": "Canonical health check for the host runtime scoped by jurisdiction, version, and host network.",
         "responses": {
           "200": {
             "description": "OK"
@@ -4965,7 +5110,7 @@
         "tags": [
           "Discovery"
         ],
-        "summary": "DSP catalog index service offering (tenant)",
+        "summary": "DSP index service offering (tenant)",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"
@@ -4996,7 +5141,7 @@
         "tags": [
           "Discovery"
         ],
-        "summary": "DSP catalog research service offering (tenant)",
+        "summary": "DSP research service offering (tenant)",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"
@@ -5107,7 +5252,7 @@
         "tags": [
           "Data Catalog Discovery"
         ],
-        "summary": "Operator catalog request (DSP/DSP catalog)",
+        "summary": "Operator DSP catalog request",
         "description": "Returns a `dcat:Catalog` with provider datasets discoverable by client apps.",
         "requestBody": {
           "required": false,
@@ -5148,7 +5293,7 @@
         "tags": [
           "Data Catalog Discovery"
         ],
-        "summary": "Operator catalog artifact (DSP catalog)",
+        "summary": "Operator DSP catalog artifact",
         "responses": {
           "200": {
             "description": "DCAT catalog artifact"
@@ -5223,7 +5368,7 @@
         "tags": [
           "Data Catalog Discovery"
         ],
-        "summary": "Hosted provider catalog artifact (DSP catalog)",
+        "summary": "Hosted provider DSP catalog artifact",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"
