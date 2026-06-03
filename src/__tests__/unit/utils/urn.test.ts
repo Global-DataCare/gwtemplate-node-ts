@@ -44,6 +44,12 @@ describe('createEmployeeUrn', () => {
         const urn = createEmployeeUrn(params);
         expect(urn.endsWith(':role:customscheme|abc123')).toBe(true);
     });
+
+    it('should append a normalized employee instance id when provided', () => {
+        const params = { ...baseParams, role: '1120', instanceId: 'ABC-123' };
+        const urn = createEmployeeUrn(params);
+        expect(urn.endsWith(':role:1120:instance:abc-123')).toBe(true);
+    });
 });
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/utils/urn.test.ts

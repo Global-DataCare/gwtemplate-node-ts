@@ -341,6 +341,7 @@ export class EmployeeManager {
       idValue: parsedTenantUrn.idValue,
       email,
       role: roleCode,
+      instanceId: employeeId,
     });
 
     const licenseOffer = await this.tryConsumeEmployeeSeatOrOffer({
@@ -508,8 +509,22 @@ export class EmployeeManager {
         value: attribute.value,
       })),
     });
+    const candidates = ((results || []) as ConfidentialStorageDoc[])
+      .sort((left, right) => Number(right?.sequence || 0) - Number(left?.sequence || 0));
 
-    return ((results || [])[0] as ConfidentialStorageDoc | undefined) || undefined;
+    let inactiveMatch: ConfidentialStorageDoc | undefined;
+    for (const doc of candidates) {
+      try {
+        const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(doc, vaultId);
+        if (this.isPurgedEmployee(employee)) continue;
+        if (employee.status === EntityLifecycleStatus.Active) return doc;
+        if (!inactiveMatch) inactiveMatch = doc;
+      } catch {
+        continue;
+      }
+    }
+
+    return inactiveMatch;
   }
 
   /**
@@ -657,6 +672,8 @@ export class EmployeeManager {
     employee.meta = {
       ...(employee.meta || {}),
       lastUpdated: new Date().toISOString(),
+      lifecycleDisposition: 'purged',
+      purgedAt: new Date().toISOString(),
       licensingPurgedAt: new Date().toISOString(),
     };
 
@@ -737,6 +754,11 @@ export class EmployeeManager {
     if (updatedDocs.length > 0) {
       await this.vaultRepository.put(vaultId, updatedDocs, DEVICE_LICENSE_SECTION);
     }
+  }
+
+  private isPurgedEmployee(employee: EntityConfig | undefined): boolean {
+    if (!employee?.meta) return false;
+    return employee.meta.lifecycleDisposition === 'purged' || Boolean(employee.meta.licensingPurgedAt);
   }
 
   private handleError(error: any, entryType: string = 'unknown', meta?: any): ErrorEntry {

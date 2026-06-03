@@ -22,6 +22,7 @@ export interface OrganizationUrnParams extends EntityUrnBaseParams {
 export interface EmployeeUrnParams extends OrganizationUrnParams {
   email: string;
   role: string;
+  instanceId?: string;
 }
 
 function hashEmployeeEmail(email: string): string {
@@ -105,8 +106,10 @@ export function createOrganizationUrn(params: OrganizationUrnParams): string {
  */
 export function createEmployeeUrn(params: EmployeeUrnParams): string {
   const orgUrn = createOrganizationUrn(params);
-  const { email, role } = params;
-  return `${orgUrn}:employee:${hashEmployeeEmail(email)}:role:${normalizeEmployeeRole(role)}`;
+  const { email, role, instanceId } = params;
+  const normalizedInstanceId = String(instanceId || '').trim().toLowerCase();
+  const instanceSuffix = normalizedInstanceId ? `:instance:${normalizedInstanceId}` : '';
+  return `${orgUrn}:employee:${hashEmployeeEmail(email)}:role:${normalizeEmployeeRole(role)}${instanceSuffix}`;
 }
 
 /**

@@ -114,7 +114,7 @@ describe('EmployeeManager', () => {
       const employeeConfig = docToProtect.content as EntityConfig;
 
       expect(employeeConfig.didDocument!.id).toMatch(
-        new RegExp(`^${TENANT_URN}:employee:z[1-9A-HJ-NP-Za-km-z]+:role:isco-08\\|4226$`)
+        new RegExp(`^${TENANT_URN}:employee:z[1-9A-HJ-NP-Za-km-z]+:role:isco-08\\|4226:instance:${MOCKED_OCCUPATION_UUID}$`)
       );
 
       // Verify that the protected indexes from the mock were added to the document
@@ -253,6 +253,44 @@ describe('EmployeeManager', () => {
       expect(updatedDocs[0].status).toBe(EntityLifecycleStatus.Active);
       expect(response.body.data[0].response.status).toBe('200');
       expect((response.body.data[0] as any).resource.id).toBe(existingEmployee.id);
+    });
+
+    it('should create a brand new employee after purge for the same email and role', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      mockVaultRepository.put.mockResolvedValue(true);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockTenantsCacheManager.getEntityClaims.mockResolvedValue({});
+
+      const purgedEmployee: EntityConfig = {
+        id: 'historical-employee-id',
+        type: EntityType.Person,
+        status: EntityLifecycleStatus.Inactive,
+        claims: testClaimsTenant1Receptionist1,
+        didDocument: { id: `${TENANT_URN}:employee:old`, service: [] } as any,
+        didConfig: { service: [] },
+        meta: {
+          lastUpdated: '2026-05-20T00:00:00.000Z',
+          lifecycleDisposition: 'purged',
+          licensingPurgedAt: '2026-05-20T00:00:00.000Z',
+        },
+      };
+      const purgedSecureDoc: ConfidentialStorageDoc = {
+        id: purgedEmployee.id,
+        status: purgedEmployee.status,
+        sequence: 8,
+        content: purgedEmployee,
+      };
+      mockVaultRepository.query.mockResolvedValue([purgedSecureDoc]);
+
+      const response = await employeeManager.process(job);
+
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+      const docToProtect = mockKmsService.protectConfidentialData.mock.calls.at(-1)?.[0] as ConfidentialStorageDoc;
+      const createdEmployee = docToProtect.content as EntityConfig;
+      expect(createdEmployee.id).toBe(MOCKED_OCCUPATION_UUID);
+      expect(createdEmployee.didDocument?.id).not.toBe(purgedEmployee.didDocument?.id);
+      expect(createdEmployee.didDocument?.id).toContain(':instance:');
+      expect(response.body.data[0].response.status).toBe('201');
     });
   });
 
@@ -435,6 +473,7 @@ describe('EmployeeManager', () => {
 
       const protectedEmployeeDocInput = mockKmsService.protectConfidentialData.mock.calls.at(-1)?.[0] as ConfidentialStorageDoc;
       expect((protectedEmployeeDocInput.content as any).meta.licensingPurgedAt).toBeDefined();
+      expect((protectedEmployeeDocInput.content as any).meta.lifecycleDisposition).toBe('purged');
       const updatedEmployeeDocs = mockVaultRepository.put.mock.calls[1][1] as ConfidentialStorageDoc[];
       expect(updatedEmployeeDocs[0].status).toBe(EntityLifecycleStatus.Inactive);
       expect(response.body.data[0].response.status).toBe('200');
