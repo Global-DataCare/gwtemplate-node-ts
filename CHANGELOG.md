@@ -1,6 +1,7 @@
-## [1.7.2] - 2026-05-28
+## [1.7.2] - 2026-06-04
 
 ### Changed
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.16.0`.
 - Clarified activation/OpenAPI guidance around key-binding semantics for:
   - `Organization.hasCredential.material`
   - `Person.hasCredential.material`
@@ -70,7 +71,7 @@
 - Reorganized legacy top-level guides under `docs/`, expanded reading-order/README guidance, and documented the local example-sync workflow so the repo reflects the current source-of-truth layout.
 - Updated the shared dependency target to `gdc-common-utils-ts@^1.7.0`.
 - Added local GW lifecycle documentation for SDK alignment:
-  - `docs/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md`
+  - `docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md`
   - `docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md`
 - Clarified current GW CORE lifecycle semantics:
   - `individual/org.schema/Organization/_disable` disables the hosted individual/family record without releasing licenses

@@ -64,6 +64,15 @@ const IPS_SECTION_PROJECTION_CONFIG: Readonly<Record<string, readonly IpsSection
   [HealthcareBasicSections.MedicalDevices.attributeValue]: Object.freeze([]),
 });
 
+const SUMMARY_OPERATION_ACTION = '$summary';
+const SUMMARY_OPERATION_CANONICAL_RESOURCE_TYPE = 'subject';
+const SUMMARY_OPERATION_ALIAS_RESOURCE_TYPE = 'patient';
+const SUMMARY_OPERATION_ALLOWED_SECTOR_PREFIXES = Object.freeze([
+  'health-',
+  'animal-',
+  'onehealth-',
+] as const);
+
 /**
  * Stores Unified Health Index updates as Composition-style flat claims.
  *
@@ -84,7 +93,9 @@ export class CompositionManager implements IJobProcessor {
     const normalizedSection = String(job.section || '').trim().toLowerCase();
     const normalizedFormatRaw = String(job.format || '').trim();
     const normalizedAction = String(job.action || '').trim();
+    const normalizedResourceType = String(job.resourceType || '').trim().toLowerCase();
     const jurisdiction = String(job.jurisdiction || '').trim();
+    const isSummaryOperation = normalizedAction === SUMMARY_OPERATION_ACTION;
 
     if (!job.tenantId || !job.sector) {
       throw new Error('Missing tenantId or sector.');
@@ -101,11 +112,21 @@ export class CompositionManager implements IJobProcessor {
     if (!normalizedAction) {
       throw new Error('Missing required job.action.');
     }
-    if (normalizedAction !== '_batch' && normalizedAction !== '_search') {
+    if (normalizedAction !== '_batch' && normalizedAction !== '_search' && !isSummaryOperation) {
       throw new Error(`Unsupported action '${normalizedAction}' for CompositionManager.`);
+    }
+    if (
+      isSummaryOperation
+      && normalizedResourceType !== SUMMARY_OPERATION_CANONICAL_RESOURCE_TYPE
+      && normalizedResourceType !== SUMMARY_OPERATION_ALIAS_RESOURCE_TYPE
+    ) {
+      throw new Error(`Unsupported resourceType '${job.resourceType}' for CompositionManager summary operation.`);
     }
     if (normalizedSection !== SUBJECT_SECTION_INDIVIDUAL && normalizedSection !== SUBJECT_SECTION_DIGITAL_TWIN) {
       throw new Error(`Unsupported section '${normalizedSection}' for CompositionManager.`);
+    }
+    if (isSummaryOperation && !this.isSupportedSummarySector(String(job.sector || ''))) {
+      throw new Error(`Unsupported sector '${job.sector}' for summary operation.`);
     }
     const normalizedFormat = normalizeFhirIngestionFormat(normalizedFormatRaw);
 
@@ -115,12 +136,14 @@ export class CompositionManager implements IJobProcessor {
     const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
     const cidMappings: FhirCidVersionMapping[] = [];
 
-    if (normalizedAction === '_search') {
+    if (normalizedAction === '_search' || isSummaryOperation) {
       const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
       const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
       if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
-      const searchResourceType = this.extractSearchResourceType(body);
+      const searchResourceType = isSummaryOperation
+        ? 'bundle'
+        : this.extractSearchResourceType(body);
       const useDocumentReferenceSection = searchResourceType === 'documentreference';
       const useCommunicationSection = searchResourceType === 'communication';
       const searchSubject = this.extractSearchSubject(body);
@@ -129,8 +152,12 @@ export class CompositionManager implements IJobProcessor {
       }
       const searchSections = this.extractSearchSections(body);
       const excludedSearchSections = this.extractExcludedSearchSections(body);
-      const searchTypes = this.extractSearchTypes(body);
-      const requestedBundleType = this.extractRequestedBundleType(body);
+      const searchTypes = isSummaryOperation
+        ? this.extractSummaryTypes(body)
+        : this.extractSearchTypes(body);
+      const requestedBundleType = isSummaryOperation
+        ? 'document'
+        : this.extractRequestedBundleType(body);
       const documentReferenceFilters = this.extractDocumentReferenceSearchFilters(body);
       const communicationFilters = this.extractCommunicationSearchFilters(body);
 
@@ -148,7 +175,7 @@ export class CompositionManager implements IJobProcessor {
           resourceType: 'Bundle',
           type: 'batch-response',
           data: [{
-            type: 'Bundle-search-response-v1.0',
+            type: isSummaryOperation ? 'Bundle-summary-response-v1.0' : 'Bundle-search-response-v1.0',
             resource: consolidatedBundle,
             response: { status: '200' },
           } as any],
@@ -321,6 +348,11 @@ export class CompositionManager implements IJobProcessor {
     };
   }
 
+  private isSupportedSummarySector(sector: string): boolean {
+    const normalizedSector = String(sector || '').trim().toLowerCase();
+    return SUMMARY_OPERATION_ALLOWED_SECTOR_PREFIXES.some((prefix) => normalizedSector.startsWith(prefix));
+  }
+
   private extractSearchSubject(body: any): string {
     // FHIR Parameters style:
     // {
@@ -473,6 +505,12 @@ export class CompositionManager implements IJobProcessor {
     }
 
     return Array.from(result);
+  }
+
+  private extractSummaryTypes(body: any): string[] {
+    const explicitTypes = this.extractSearchTypes(body);
+    if (explicitTypes.length > 0) return explicitTypes;
+    return [HealthcareBasicSections.PatientSummaryDocument.attributeValue];
   }
 
   private extractRequestedBundleType(body: any): string {

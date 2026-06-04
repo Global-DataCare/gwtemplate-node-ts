@@ -33,10 +33,15 @@ docs/
 ## Generated Artifacts
 
 - **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
+- **V2 integrators guide**: [docs-v2/09-api-integrators-guide.md](../docs-v2/09-api-integrators-guide.md) is the clean onboarding path without legacy examples/endpoints.
 - **Core integration bible**: [API_CORE_INTEGRATION.md](API_CORE_INTEGRATION.md) defines the canonical SEDIA-aligned flow used by SDK live core tests.
+- **Communication layering source of truth**:
+  - [101-COMMUNICATION_LAYERING.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
+- **IPS communication outbox source of truth**:
+  - [101-IPS_COMMUNICATION_OUTBOX.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-IPS_COMMUNICATION_OUTBOX.md)
 - **Consent access status**: [90.E-TODO_SMART_EHR_COMPAT.md](90.E-TODO_SMART_EHR_COMPAT.md) also records the current live SMART consent-evaluation behavior, including deny precedence and permission-request lookup identifiers.
 - **Tenant identifier migration note**: [90.K-TODO_TENANT_IDENTIFIER_V2.md](90.K-TODO_TENANT_IDENTIFIER_V2.md) tracks the deferred `v2.0` redesign away from `alternateName`-based hosted compatibility.
-- **GW lifecycle 101**: [01.I-LIFECYCLE-101.md](01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md) explains the local GW CORE lifecycle model, including `status`, `audit`, and `/_purge`.
+- **GW lifecycle 101**: [101-01.I-LIFECYCLE.md](01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md) explains the local GW CORE lifecycle model, including `status`, `audit`, and `/_purge`.
 - **GW lifecycle current vs target**: [90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md) separates what is already implemented from the target normalized `PATCH`-based contract for SDK alignment.
 - **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
@@ -55,7 +60,7 @@ docs/
 - Swagger/OpenAPI examples are injected from those fixtures by `src/utils/swagger-spec.ts` and `scripts/generate-swagger-spec.mts`.
 - Demo/incremental flow scripts should render from those same fixtures via `scripts/render-example-payload.mts`, applying only explicit overrides.
 - Shared cross-repo examples from `gdc-common-utils-ts/examples/...` are checked by `src/__tests__/unit/examples/shared-flow-examples.test.ts`.
-- Canonical lifecycle examples now live in `gdc-common-utils-ts/examples/lifecycle` and are documented in `https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md`.
+- Canonical lifecycle examples now live in `gdc-common-utils-ts/examples/lifecycle` and are documented in `https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-LIFECYCLE.md`.
   GW must consume those shared examples instead of introducing local lifecycle payload copies.
 - Canonical markdown examples in `docs/90.A-API_INTEGRATORS_GUIDE.md` are marked with `<!-- sync-example: ... -->` and checked by `src/__tests__/unit/examples/markdown-examples.test.ts`.
 
@@ -69,6 +74,26 @@ Practical rule:
 ```bash
 npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.ts src/__tests__/unit/examples/shared-flow-examples.test.ts src/__tests__/unit/utils/swagger-spec.test.ts
 ```
+
+## Read This Before Authoring Payloads
+
+If you are new to GW CORE, read these before editing examples or OpenAPI descriptions:
+
+- Communication layering 101:
+  - [101-COMMUNICATION_LAYERING.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
+- Resource claims 101:
+  - [101-RESOURCE_CLAIMS.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-RESOURCE_CLAIMS.md)
+- IPS Communication outbox 101:
+  - [101-IPS_COMMUNICATION_OUTBOX.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-IPS_COMMUNICATION_OUTBOX.md)
+- SDK node integration 101:
+  - [101-SDK_INTEGRATION.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-SDK_INTEGRATION.md)
+
+Memory aid:
+
+- `DidComm.type` is the transport/protocol type.
+- `BundleEntry.type` is a project-specific internal message kind. It is not FHIR.
+- `resource.resourceType` is the FHIR-like resource type.
+- `resource.meta.claims` is a project-specific non-standard claims container. It is not part of base FHIR.
 
 ## Shell Script Payload Policy
 
@@ -87,7 +112,7 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 *   **[01.F-TENANCY-AND-VAULT.md](01-OVERVIEW-AND-GUIDES/01.F-TENANCY-AND-VAULT.md)**: Explains the multi-tenancy model and the concept of a secure "Vault" for each tenant.
 *   **[01.G-TESTING-PATTERNS.md](01-OVERVIEW-AND-GUIDES/01.G-TESTING-PATTERNS.md)**: Outlines the project's testing philosophy and strategies.
 *   **[01.H-DEPLOYMENT-GUIDE.md](01-OVERVIEW-AND-GUIDES/01.H-DEPLOYMENT-GUIDE.md)**: Step-by-step instructions for deploying the application to Google Cloud Run.
-*   **[01.I-LIFECYCLE-101.md](01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md)**: Local lifecycle semantics for GW CORE, including `status` vs `audit`, `PATCH` target semantics, and `/_purge`.
+*   **[101-01.I-LIFECYCLE.md](01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md)**: Local lifecycle semantics for GW CORE, including `status` vs `audit`, `PATCH` target semantics, and `/_purge`.
 
 ### 📂 02-API-AND-ENDPOINTS
 *   **[02.A-API-ENDPOINTS.md](02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md)**: A summary of the primary API endpoints available.

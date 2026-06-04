@@ -4,6 +4,7 @@
 
 import { CommMsgExtended, DataEntry, FhirCommunication } from 'gdc-common-utils-ts/models/comm';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
+import { claimsToContentCid } from 'gdc-common-utils-ts/utils/fhir-cid';
 import { HealthcareBasicSections } from '../shared/healthcare-constants';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
@@ -261,34 +262,23 @@ export class CommunicationManager implements IJobProcessor {
     if (!this.compositionManager) return undefined;
 
     const references = this.buildCommunicationContentReferences(job, undefined, fhirResource)
-      .filter((reference) => this.isBundleSearchReference(reference));
+      .filter((reference) => this.isEmbeddedSearchReference(reference));
     if (references.length === 0) return undefined;
 
     const responseEntries: Array<BundleEntryResponse | ErrorEntry> = [];
     for (const reference of references) {
-      const parsed = this.parseBundleSearchReference(reference, job);
+      const parsed = this.parseEmbeddedSearchReference(reference, job);
       if (!parsed) continue;
 
       const syntheticJob: JobRequest = {
         ...job,
         section: parsed.section,
         format: parsed.format,
-        resourceType: 'Bundle',
-        action: '_search',
+        resourceType: parsed.resourceType,
+        action: parsed.action,
         content: {
           ...(job.content as any),
-          body: {
-            resourceType: 'Bundle',
-            type: 'batch',
-            entry: [
-              {
-                request: {
-                  method: 'GET',
-                  url: parsed.requestUrl,
-                },
-              },
-            ],
-          },
+          body: parsed.body,
         } as any,
       };
 
@@ -302,16 +292,27 @@ export class CommunicationManager implements IJobProcessor {
     return responseEntries.length > 0 ? responseEntries : undefined;
   }
 
-  private isBundleSearchReference(reference: string): boolean {
+  private isEmbeddedSearchReference(reference: string): boolean {
     const normalized = String(reference || '').trim().toLowerCase();
     if (!normalized) return false;
-    return normalized.includes('/bundle/_search?') || normalized.startsWith('bundle/_search?') || normalized.startsWith('bundle?');
+    return this.isBundleSearchReference(normalized) || this.isSummaryOperationReference(normalized);
   }
 
-  private parseBundleSearchReference(
+  private isBundleSearchReference(reference: string): boolean {
+    return reference.includes('/bundle/_search?') || reference.startsWith('bundle/_search?') || reference.startsWith('bundle?');
+  }
+
+  private isSummaryOperationReference(reference: string): boolean {
+    return reference.includes('/subject/$summary')
+      || reference.includes('/patient/$summary')
+      || reference.startsWith('subject/$summary')
+      || reference.startsWith('patient/$summary');
+  }
+
+  private parseEmbeddedSearchReference(
     reference: string,
     fallbackJob: JobRequest,
-  ): { section: string; format: string; requestUrl: string } | undefined {
+  ): { section: string; format: string; resourceType: string; action: string; body: Record<string, unknown> } | undefined {
     const normalized = String(reference || '').trim();
     if (!normalized) return undefined;
 
@@ -344,8 +345,68 @@ export class CommunicationManager implements IJobProcessor {
     }
 
     const query = search.startsWith('?') ? search.slice(1) : search;
+    const normalizedPath = cleanPath.toLowerCase();
+    if (this.isSummaryOperationReference(normalizedPath)) {
+      return {
+        section,
+        format,
+        resourceType: 'Subject',
+        action: '$summary',
+        body: this.buildSummaryParametersBody(query),
+      };
+    }
+
     const requestUrl = `Bundle${query ? `?${query}` : ''}`;
-    return { section, format, requestUrl };
+    return {
+      section,
+      format,
+      resourceType: 'Bundle',
+      action: '_search',
+      body: {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [
+          {
+            request: {
+              method: 'GET',
+              url: requestUrl,
+            },
+          },
+        ],
+      },
+    };
+  }
+
+  private buildSummaryParametersBody(query: string): Record<string, unknown> {
+    const params = new URLSearchParams(query);
+    const parameter: Array<Record<string, unknown>> = [];
+    const parameterNameByQueryKey: Record<string, string> = {
+      subject: 'subject',
+      'composition.subject': 'subject',
+      'document-type': 'document-type',
+      'composition.type': 'document-type',
+      section: 'section',
+      'composition.section': 'section',
+      'section:not': 'exclude-section',
+      'composition.section:not': 'exclude-section',
+      'exclude-section': 'exclude-section',
+      'exclude-sections': 'exclude-section',
+    };
+
+    for (const [key, rawValue] of params.entries()) {
+      const parameterName = parameterNameByQueryKey[String(key || '').trim().toLowerCase()];
+      const value = String(rawValue || '').trim();
+      if (!parameterName || !value) continue;
+      parameter.push({
+        name: parameterName,
+        valueString: value,
+      });
+    }
+
+    return {
+      resourceType: 'Parameters',
+      parameter,
+    };
   }
 
   private async persistCompositionProjectionFromCommunication(
@@ -376,6 +437,10 @@ export class CommunicationManager implements IJobProcessor {
       || (entry?.resource?.meta?.claims?.['Composition.type'] as string | undefined)
       || '',
     ).trim();
+    const payloadComposition = this.extractCompositionResourceFromCommunicationPayload(fhirResource);
+    const embeddedClaims = payloadComposition?.meta?.claims && typeof payloadComposition.meta.claims === 'object'
+      ? normalizeContextualizedClaims(payloadComposition.meta.claims as Record<string, any>)
+      : undefined;
     const payloadSection = this.extractCompositionSectionFromCommunicationPayload(fhirResource);
     const payloadType = this.extractCompositionTypeFromCommunicationPayload(fhirResource);
     const sectionCode = claimsSection || payloadSection || HealthcareBasicSections.HistoryOfMedicationUse.attributeValue;
@@ -388,10 +453,14 @@ export class CommunicationManager implements IJobProcessor {
       || new Date().toISOString(),
     );
 
-    const recordId = `composition-from-communication-${determineResourceId(String(job.content?.thid || ''), process.env.NODE_ENV)}`;
+    const compositionIdentifier =
+      this.normalizeOptionalString(payloadComposition?.identifier?.[0]?.value)
+      || this.getFirstClaimValue(embeddedClaims || {}, ['Composition.identifier', 'Composition.identifier.value'])
+      || this.normalizeOptionalString(payloadComposition?.id)
+      || `urn:uuid:${uuidv4()}`;
     const claims = normalizeContextualizedClaims({
       '@context': 'org.hl7.fhir.r4',
-      'Composition.identifier': recordId,
+      'Composition.identifier': compositionIdentifier,
       'Composition.subject': subject,
       'Composition.section': sectionCode,
       'Composition.author': serverDid,
@@ -399,7 +468,33 @@ export class CommunicationManager implements IJobProcessor {
       'Composition.type': typeCode,
       'Composition.source': 'Communication',
     });
+    if (embeddedClaims) {
+      Object.assign(claims, embeddedClaims);
+    }
+    const fallbackId =
+      this.normalizeOptionalString(payloadComposition?.id)
+      || determineResourceId(compositionIdentifier, process.env.NODE_ENV);
+    applyFhirCidVersioningToEntry({
+      entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: 'Composition', id: fallbackId } },
+      claims,
+      resourceType: 'Composition',
+      resourceId: fallbackId,
+    });
+    const contentVersionId = claimsToContentCid(claims).cid;
+    claims['Composition.meta.versionId'] = contentVersionId;
+    claims['org.hl7.fhir.r4.Composition.meta.versionId'] = contentVersionId;
     const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
+    const versionId = this.normalizeOptionalString(
+      claims['Composition.meta.versionId']
+      || claims['org.hl7.fhir.r4.Composition.meta.versionId'],
+    );
+    if (versionId) {
+      const exists = await this.hasSectionRecordWithClaims(tenantVaultId, sectionId, [
+        { name: 'Composition.meta.versionId', value: versionId },
+      ]);
+      if (exists) return;
+    }
+    const recordId = this.buildStableProjectionRecordId('composition-from-communication', compositionIdentifier);
     await this.vaultRepository.put(tenantVaultId, [{ id: recordId, ...claims } as any], sectionId);
   }
 
@@ -554,7 +649,6 @@ export class CommunicationManager implements IJobProcessor {
       });
       if (!cid) continue;
 
-      const recordId = `documentreference-from-communication-${determineResourceId(String(cid), process.env.NODE_ENV)}`;
       const documentReference = resolvedAttachment.documentReference;
       const embeddedClaims = documentReference?.meta?.claims && typeof documentReference.meta.claims === 'object'
         ? normalizeContextualizedClaims(documentReference.meta.claims as Record<string, any>)
@@ -584,6 +678,11 @@ export class CommunicationManager implements IJobProcessor {
       }
 
       const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'document-references');
+      const alreadyIndexed = await this.hasSectionRecordWithClaims(tenantVaultId, sectionId, [
+        { name: 'DocumentReference.contenthash', value: cid },
+      ]);
+      if (alreadyIndexed) continue;
+      const recordId = this.buildStableProjectionRecordId('documentreference-from-communication', cid);
       await this.vaultRepository.put(tenantVaultId, [{ id: recordId, ...claims } as any], sectionId);
     }
   }
@@ -632,6 +731,21 @@ export class CommunicationManager implements IJobProcessor {
       multihash,
     ]);
     return encodeMultibase58btc(new Uint8Array(cidBytes));
+  }
+
+  private buildStableProjectionRecordId(prefix: string, identity: string): string {
+    const digest = createHash('sha256').update(String(identity || ''), 'utf8').digest('hex');
+    return `${prefix}-${digest}`;
+  }
+
+  private async hasSectionRecordWithClaims(
+    tenantVaultId: string,
+    sectionId: string,
+    where: Array<{ name: string; value: string }>,
+  ): Promise<boolean> {
+    if (!Array.isArray(where) || where.length === 0) return false;
+    const matches = await this.vaultRepository.query(tenantVaultId, { sectionId, where });
+    return Array.isArray(matches) && matches.length > 0;
   }
 
   private async persistProjectedResourcesFromCommunication(
@@ -1120,6 +1234,24 @@ export class CommunicationManager implements IJobProcessor {
       return [parsed as Record<string, any>];
     }
     return [];
+  }
+
+  private extractCompositionResourceFromCommunicationPayload(
+    fhirResource: FhirCommunication,
+  ): Record<string, any> | undefined {
+    const payloads = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload : [];
+    for (const payload of payloads) {
+      const attachment = this.resolveCommunicationPayloadAttachment(payload)?.documentAttachment;
+      if (!attachment || typeof attachment !== 'object') continue;
+      const parsed = this.parseAttachmentJson(attachment);
+      const documentBundle = this.asDocumentBundle(parsed);
+      if (!documentBundle) continue;
+      const composition = documentBundle.entry
+        .map((bundleEntry: any) => bundleEntry?.resource as Record<string, any> | undefined)
+        .find((resource: Record<string, any> | undefined) => resource?.resourceType === 'Composition');
+      if (composition) return composition;
+    }
+    return undefined;
   }
 
   private asDocumentBundle(parsed: any): any | undefined {

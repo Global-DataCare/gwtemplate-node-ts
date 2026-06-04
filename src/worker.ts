@@ -48,6 +48,10 @@ export class Worker {
 
       // 1. Route to the appropriate manager based on the parsed job name
       switch (resourceType) {
+        case 'Subject':
+        case 'Patient':
+          manager = job.action === '$summary' ? this.managers.compositionManager : undefined;
+          break;
         case 'Organization':
           // Organization is overloaded:
           // - `registry/*/Organization` => host onboarding
