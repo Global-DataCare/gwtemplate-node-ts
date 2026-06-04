@@ -11,6 +11,7 @@ import {
   COMPOSITION_SEARCH_BUNDLE_EXAMPLE,
   COMPOSITION_SEARCH_PARAMETERS_EXAMPLE,
 } from '../../../api-examples';
+import { HealthcareBasicSections } from '../../../shared/healthcare-constants';
 
 describe('CompositionManager', () => {
   const mockVaultRepository = {
@@ -185,5 +186,48 @@ describe('CompositionManager', () => {
     expect(data[0].type).toBe('Composition-search-response-v1.0');
     expect(data[0].resource.total).toBe(1);
     expect(data[0].resource.data).toHaveLength(1);
+  });
+
+  it('supports Subject/$summary with FHIR Parameters format in supported sectors', async () => {
+    const subjectDid = 'did:web:api.acme.org:individual:summary-subject-001';
+    mockVaultRepository.getContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', 'composition')) {
+        return [
+          {
+            id: 'composition-summary-001',
+            'Composition.identifier': 'composition-summary-001',
+            'Composition.subject': subjectDid,
+            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            'Composition.date': '2026-06-01T10:00:00Z',
+            'Composition.author': 'did:web:provider.example.org',
+            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+          },
+        ] as any;
+      }
+      return [] as any;
+    });
+
+    const job = createJob({
+      sector: 'health-care',
+      section: 'individual',
+      format: 'org.hl7.fhir.r4',
+      resourceType: 'Subject',
+      action: '$summary',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [
+            { name: 'subject', valueString: subjectDid },
+          ],
+        } as any,
+      } as any,
+    });
+
+    const response = await manager.process(job);
+    const data = (response.body as any).data;
+    expect(data[0].type).toBe('Bundle-summary-response-v1.0');
+    expect(data[0].resource.resourceType).toBe('Bundle');
+    expect(data[0].resource.type).toBe('document');
   });
 });

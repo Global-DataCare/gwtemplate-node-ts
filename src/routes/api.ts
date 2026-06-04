@@ -1270,16 +1270,23 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 9. Research Digital Twin
-   *     summary: Ingest pre-converted research claims (digital twin)
-   *     description: |
-   *       Submits an async research ingestion job for digital twin indexing.
-   *       This endpoint is intended for research sectors (e.g., `animal-research`, `health-research`).
-   *
-   *       Expected payload shape (adapter-ingestion-py output):
-   *       - DIDComm plaintext message
-   *       - `body.data[]` array
-   *       - each item is a Composition resource object with:
-   *         - `resource.meta.claims` for Composition claims
+  *     summary: Ingest pre-converted research claims (digital twin)
+  *     description: |
+  *       Submits an async research ingestion job for digital twin indexing.
+  *       This endpoint is intended for research sectors (e.g., `animal-research`, `health-research`).
+  *
+  *       Claims container note:
+  *       - `resource.meta.claims` is a project-specific non-standard claims container
+  *       - it is not part of base FHIR
+  *       - the resource remains FHIR-shaped, but business semantics are claims-first
+  *       - claims may be contextualized with `@context` such as `org.hl7.fhir.api`
+  *         or authored in a less-qualified form when that context already disambiguates them
+  *
+  *       Expected payload shape (adapter-ingestion-py output):
+  *       - DIDComm plaintext message
+  *       - `body.data[]` array
+  *       - each item is a Composition resource object with:
+  *         - `resource.meta.claims` for Composition claims
    *         - optional `resource.contained[].meta.claims` for source resources
    *           (`DocumentReference`, and future `Encounter` / `Patient`)
    *
@@ -1506,6 +1513,13 @@ export function createApiRouter(
   *     description: |
   *       Creates or updates One Health Subject profiles using contextualized flat claims (`@context: org.hl7.fhir.api`).
   *
+  *       Claims container note:
+  *       - `resource.meta.claims` is a project-specific non-standard claims container
+  *       - it is not part of base FHIR
+  *       - `@context` may be `org.hl7.fhir.api`, `org.schema`, or another supported context
+  *       - when `@context` is already present, keys may be written in a less-qualified form
+  *         instead of always repeating the full reverse-DNS prefix
+  *
   *       Contract notes:
   *       - Endpoint may autofill `@context` and `@type` if omitted.
   *       - `@type` (when provided) can be `Person`, `Animal`, or `Thing`.
@@ -1556,6 +1570,81 @@ export function createApiRouter(
   *     responses:
   *       '202': { description: Pending. Retry later. }
   *       '200': { description: Completed. }
+  *
+  * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary:
+  *   post:
+  *     tags:
+  *       - 8.1 Subject Profile
+  *     summary: Build the latest subject summary document
+  *     description: |
+  *       Returns the latest consolidated summary document for a subject in supported
+  *       one-health sectors.
+  *
+  *       Current enablement:
+  *       - sectors starting with `health-`
+  *       - sectors starting with `animal-`
+  *       - sectors starting with `onehealth-`
+  *
+  *       Contract notes:
+  *       - requests travel in the project DIDComm/FAPI envelope and batch conventions
+  *       - `resource.meta.claims` remains the canonical non-standard claims carrier for
+  *         FHIR-like resources in those envelopes
+  *       - `Subject/$summary` is the canonical route.
+  *       - `Patient/$summary` is a compatibility alias with the same behavior.
+  *       - request body should be a FHIR `Parameters` resource
+  *       - minimum required parameter is `subject`
+  *       - optional parameters include `document-type`, `section`, and `exclude-section`
+  *
+  *       See also:
+  *       - `gdc-common-utils-ts/docs/101-COMMUNICATION_LAYERING.md`
+  *       - `gdc-sdk-core-ts/docs/101-IPS_COMMUNICATION_OUTBOX.md`
+  *     parameters:
+  *       - $ref: '#/components/parameters/AppId'
+  *       - $ref: '#/components/parameters/AppVersion'
+  *       - $ref: "#/components/parameters/TenantId"
+  *       - $ref: "#/components/parameters/Jurisdiction"
+  *       - $ref: "#/components/parameters/Sector"
+  *     requestBody:
+  *       required: true
+  *       content:
+  *         application/didcomm-plaintext+json:
+  *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+  *         application/json:
+  *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+  *         application/x-www-form-urlencoded:
+  *           schema: { $ref: '#/components/schemas/SecureRequest' }
+  *     security:
+  *       - BearerAuth: []
+  *     responses:
+  *       '202': { description: Accepted. Poll the Location URL for the result. }
+  *
+  * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Patient/$summary:
+  *   post:
+  *     tags:
+  *       - 8.1 Subject Profile
+  *     summary: Compatibility alias for Subject summary
+  *     description: |
+  *       Alias of `Subject/$summary` kept for healthcare-oriented clients.
+  *       New cross-sector code should prefer `Subject/$summary`.
+  *     parameters:
+  *       - $ref: '#/components/parameters/AppId'
+  *       - $ref: '#/components/parameters/AppVersion'
+  *       - $ref: "#/components/parameters/TenantId"
+  *       - $ref: "#/components/parameters/Jurisdiction"
+  *       - $ref: "#/components/parameters/Sector"
+  *     requestBody:
+  *       required: true
+  *       content:
+  *         application/didcomm-plaintext+json:
+  *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+  *         application/json:
+  *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+  *         application/x-www-form-urlencoded:
+  *           schema: { $ref: '#/components/schemas/SecureRequest' }
+  *     security:
+  *       - BearerAuth: []
+  *     responses:
+  *       '202': { description: Accepted. Poll the Location URL for the result. }
    * 
    * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch:
    *   post:

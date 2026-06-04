@@ -13,6 +13,32 @@ Short coverage summary for memory/thesis justification:
 - GW full/reference OpenAPI served at: `/api-docs-reference` (`/swagger-spec.reference.json`).
 - SDK live core tests: `dataspace-client-sdk-node/tests/live-gw-uc5.e2e.test.mjs`.
 - Payload examples in GW OpenAPI are generated from GW test fixtures (`src/__tests__/data/example-payloads.ts`) and must stay semantically aligned with SDK examples.
+- Communication layering source of truth:
+  - [101-COMMUNICATION_LAYERING.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
+- IPS outbox/source flow:
+  - [101-IPS_COMMUNICATION_OUTBOX.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-IPS_COMMUNICATION_OUTBOX.md)
+
+## Wire Contract Memory Aid
+
+When integrating with GW CORE, keep these layers separate:
+
+1. DIDComm/FAPI envelope.
+2. Batch body.
+3. Resource payload whose canonical semantics live in `resource.meta.claims`.
+
+Important distinctions:
+
+- `DidComm.type` is the transport/protocol message type.
+- `BundleEntry.type` is a project-specific internal batch message kind. It is not FHIR.
+- `resource.resourceType` is the outer resource shape or projection.
+- `resource.meta.claims` is the canonical project-specific claims contract. It is not part of base FHIR.
+- `Communication.contentdata` is one of those claims when the communication carries embedded payload data.
+
+Teaching rule:
+
+- New developers should author canonical `resource.meta.claims` first.
+- FHIR-shaped payloads are optional projections or compatibility shapes around that canonical claims model.
+- Internal gateway models such as `CommMsgExtended` are derived/internal and are not the primary client contract.
 
 ## Canonical Flow (End-to-End)
 
@@ -95,6 +121,10 @@ Note:
 - Submit: `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent/_batch`
 - Poll: `.../Consent/_batch-response`
 - SDK method: `grantProfessionalAccessSimple(...)`
+- Boundary note:
+  - this step governs authorization and access policy
+  - it is not the canonical envelope for index mutation or index retrieval
+  - index-facing operations in the active core profile travel through `Communication/_batch`
 - Follow-up authorization matrix task:
   - [gdc-common-utils-ts/docs/consent-access-matrix-task.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/consent-access-matrix-task.md)
   - covers active consent aggregation, explicit deny precedence, controller views, permission-request communications, and final SMART scope evaluation
@@ -112,6 +142,10 @@ Note:
 - Ingest: `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Communication/_batch`
 - Poll: `.../Communication/_batch-response`
 - This is the canonical index-update entrypoint in core (bundle-driven ingestion).
+- Teaching rule:
+  - index operations are transported through `Communication`
+  - do not teach `Consent/_batch` as the main exchange envelope for index operations
+  - a single batch may carry one or more `Communication` entries depending on the flow
 - Search (Bundle batch GET): indexed `Composition`/`DocumentReference` retrieval
 - SDK method: `ingestCommunicationAndUpdateIndex(...)`
 - Draft/outbox teaching rule:

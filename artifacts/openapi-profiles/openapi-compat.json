@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-06-03T17:00:44.508Z",
+    "x-profile-generated-at": "2026-06-04T15:48:21.183Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -2655,7 +2655,7 @@
           "3.1 Employee Role"
         ],
         "summary": "Search employees within an existing tenant",
-        "description": "Submits an asynchronous employee directory query.\nCurrent request shape follows a Bundle search entry:\n- `body.resourceType = Bundle`\n- `body.entry[0].request.method = GET`\n- `body.entry[0].request.url = Employee?...`\n",
+        "description": "Submits an asynchronous employee directory query.\nSupported request shapes:\n- legacy Bundle search entry:\n  - `body.resourceType = Bundle`\n  - `body.entry[0].request.method = GET`\n  - `body.entry[0].request.url = Employee?...`\n- preferred Bundle search entry:\n  - `body.resourceType = Bundle`\n  - `body.entry[0].request.method = POST`\n  - `body.entry[0].request.url = Employee/_search`\n  - `body.entry[0].resource.resourceType = Parameters`\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -3789,6 +3789,120 @@
           },
           "202": {
             "description": "Pending. Retry later."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary": {
+      "post": {
+        "tags": [
+          "8.1 Subject Profile"
+        ],
+        "summary": "Build the latest subject summary document",
+        "description": "Returns the latest consolidated summary document for a subject in supported\none-health sectors.\n\nCurrent enablement:\n- sectors starting with `health-`\n- sectors starting with `animal-`\n- sectors starting with `onehealth-`\n\nContract notes:\n- requests travel in the project DIDComm/FAPI envelope and batch conventions\n- `resource.meta.claims` remains the canonical non-standard claims carrier for\n  FHIR-like resources in those envelopes\n- `Subject/$summary` is the canonical route.\n- `Patient/$summary` is a compatibility alias with the same behavior.\n- request body should be a FHIR `Parameters` resource\n- minimum required parameter is `subject`\n- optional parameters include `document-type`, `section`, and `exclude-section`\n\nSee also:\n- `gdc-common-utils-ts/docs/101-COMMUNICATION_LAYERING.md`\n- `gdc-sdk-core-ts/docs/101-IPS_COMMUNICATION_OUTBOX.md`\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Patient/$summary": {
+      "post": {
+        "tags": [
+          "8.1 Subject Profile"
+        ],
+        "summary": "Compatibility alias for Subject summary",
+        "description": "Alias of `Subject/$summary` kept for healthcare-oriented clients.\nNew cross-sector code should prefer `Subject/$summary`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
           }
         },
         "x-profile": "core"

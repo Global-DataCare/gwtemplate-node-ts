@@ -7,7 +7,9 @@ import { initializeTenantServicesConfig } from '../../utils/services';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
-import { testTenant1AlternateName } from '../data/organization.data';
+import { getSubjectScopedSectionId } from '../../utils/individual-sections';
+import { HealthcareBasicSections } from '../../shared/healthcare-constants';
+import { testTenant1TenantId } from '../data/organization.data';
 
 describe('Composition Bundle _search API (integration)', () => {
   afterEach(() => {
@@ -43,10 +45,7 @@ describe('Composition Bundle _search API (integration)', () => {
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
       const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
-      const tenantVaultId = getTenantVaultId(
-        tenantClaims[ClaimsServiceSchemaorg.category],
-        tenantClaims[ClaimsOrganizationSchemaorg.alternateName],
-      );
+      const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
         claims: tenantClaims,
@@ -68,7 +67,7 @@ describe('Composition Bundle _search API (integration)', () => {
       const thidBatch = 'composition-batch-001';
       const submitResp = await invokeExpress(app, {
         method: 'POST',
-        url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch`,
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidBatch,
@@ -103,7 +102,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch-response`,
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidBatch },
         });
@@ -119,7 +118,7 @@ describe('Composition Bundle _search API (integration)', () => {
       const thidSearch = 'bundle-search-001';
       const searchResp = await invokeExpress(app, {
         method: 'POST',
-        url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidSearch,
@@ -143,7 +142,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidSearch },
         });
@@ -159,6 +158,137 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
       expect(Array.isArray(searchPayload?.data?.[0]?.resource?.data)).toBe(true);
       expect(searchPayload?.data?.[0]?.resource?.data?.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      queueAdapter.stop();
+    }
+  });
+
+  it('supports Bundle/_search for IPS documents while excluding selected sections', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.DB_PROVIDER = 'mem';
+    process.env.STORAGE_PROVIDER = 'mem';
+    process.env.QUEUE_PROVIDER = 'mem';
+    process.env.SECTORS_ALLOWED = 'health-care';
+    process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
+    process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.ORG_HOST_ID_TYPE = 'TAX';
+    process.env.ORG_HOST_ID_VALUE = 'A0011223344';
+    process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
+    process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
+    process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.JSON_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+
+    resetServerConfig();
+
+    const { app, queueAdapter, tenantManager, vaultRepository, kmsService } = await startServer({ listen: false });
+    try {
+      const hostBootstrapClaims = {
+        [ClaimsOrganizationSchemaorg.addressCountry]: process.env.ORG_HOST_JURISDICTION,
+        [ClaimsOrganizationSchemaorg.identifierType]: process.env.ORG_HOST_ID_TYPE,
+        [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
+        [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+      };
+      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
+
+      const tenantConfig = {
+        claims: tenantClaims,
+        didConfig: { service: initializeTenantServicesConfig(Sector.HEALTH_CARE) },
+        didDocument: { id: 'did:web:api.acme.org', '@context': 'https://www.w3.org/ns/did/v1' },
+      };
+
+      await kmsService.provisionKeys(tenantVaultId);
+      const secureTenantRecord = await kmsService.protectConfidentialData(
+        { id: tenantVaultId, sequence: 0, content: tenantConfig } as any,
+        'host',
+      );
+      await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
+      await tenantManager.getTenant(tenantVaultId);
+
+      const subjectDid = 'did:web:api.acme.org:individual:ips-excluded-sections-001';
+      const ipsType = `${HealthcareBasicSections.PatientSummaryDocument.system}|${HealthcareBasicSections.PatientSummaryDocument.code}`;
+      const compositionSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'composition');
+
+      await vaultRepository.put(
+        tenantVaultId,
+        [
+          {
+            id: 'composition-medications-001',
+            '@context': 'org.hl7.fhir.r4',
+            'Composition.identifier': 'urn:uuid:composition-medications-001',
+            'Composition.subject': subjectDid,
+            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            'Composition.author': 'did:web:api.acme.org:employee:doctor1',
+            'Composition.date': '2026-05-16T10:00:00Z',
+            'Composition.type': ipsType,
+          } as any,
+          {
+            id: 'composition-allergies-001',
+            '@context': 'org.hl7.fhir.r4',
+            'Composition.identifier': 'urn:uuid:composition-allergies-001',
+            'Composition.subject': subjectDid,
+            'Composition.section': HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
+            'Composition.author': 'did:web:api.acme.org:employee:doctor1',
+            'Composition.date': '2026-05-16T11:00:00Z',
+            'Composition.type': ipsType,
+          } as any,
+        ],
+        compositionSectionId,
+      );
+
+      const thidSearch = 'bundle-search-ips-exclude-001';
+      const searchResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: thidSearch,
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: {
+                  method: 'GET',
+                  url:
+                    `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}`
+                    + `&composition.type=${encodeURIComponent(ipsType)}`
+                    + `&composition.section:not=${encodeURIComponent(HealthcareBasicSections.AllergiesAndIntolerances.attributeValue)}`,
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(searchResp.status).toBe(202);
+
+      let searchPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: thidSearch },
+        });
+        if (pollResp.status === 200) {
+          searchPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(searchPayload?.resourceType).toBe('Bundle');
+      expect(searchPayload?.data?.[0]?.response?.status).toBe('200');
+      expect(searchPayload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
+      expect(searchPayload?.data?.[0]?.resource?.type).toBe('document');
+      expect(searchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.resourceType).toBe('Composition');
+      expect(searchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.section).toHaveLength(1);
+      expect(
+        searchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.section?.[0]?.code?.coding?.[0]?.code,
+      ).toBe(HealthcareBasicSections.HistoryOfMedicationUse.code);
     } finally {
       queueAdapter.stop();
     }
@@ -193,10 +323,7 @@ describe('Composition Bundle _search API (integration)', () => {
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
       const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
-      const tenantVaultId = getTenantVaultId(
-        tenantClaims[ClaimsServiceSchemaorg.category],
-        tenantClaims[ClaimsOrganizationSchemaorg.alternateName],
-      );
+      const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
         claims: tenantClaims,
@@ -231,7 +358,7 @@ describe('Composition Bundle _search API (integration)', () => {
       const thidSearch = 'bundle-search-docref-hash-001';
       const searchResp = await invokeExpress(app, {
         method: 'POST',
-        url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidSearch,
@@ -255,7 +382,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidSearch },
         });
@@ -305,10 +432,7 @@ describe('Composition Bundle _search API (integration)', () => {
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
       const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
-      const tenantVaultId = getTenantVaultId(
-        tenantClaims[ClaimsServiceSchemaorg.category],
-        tenantClaims[ClaimsOrganizationSchemaorg.alternateName],
-      );
+      const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
         claims: tenantClaims,
@@ -371,7 +495,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (const searchCase of searchCases) {
         const searchResp = await invokeExpress(app, {
           method: 'POST',
-          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
           headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
           body: {
             thid: searchCase.thid,
@@ -395,7 +519,7 @@ describe('Composition Bundle _search API (integration)', () => {
         for (let i = 0; i < 50; i++) {
           const pollResp = await invokeExpress(app, {
             method: 'POST',
-            url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
+            url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
             headers: { 'content-type': 'application/json' },
             body: { thid: searchCase.thid },
           });

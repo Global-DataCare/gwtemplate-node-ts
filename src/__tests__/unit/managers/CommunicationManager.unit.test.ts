@@ -17,6 +17,7 @@ describe('CommunicationManager Unit Tests', () => {
   let communicationManager: CommunicationManager;
   let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
   let mockVaultRepository: jest.Mocked<IVaultRepository>;
+  let mockCompositionManager: { process: jest.Mock };
   const testServerDid = 'did:web:test-server.com';
 
   beforeEach(() => {
@@ -27,11 +28,16 @@ describe('CommunicationManager Unit Tests', () => {
     mockVaultRepository = {
       vaultExists: jest.fn(async () => false),
       put: jest.fn(async () => undefined),
+      query: jest.fn(async () => []),
     } as unknown as jest.Mocked<IVaultRepository>;
+    mockCompositionManager = {
+      process: jest.fn(),
+    };
     
     communicationManager = new CommunicationManager({
       tenantsCacheManager: mockTenantsCacheManager,
       vaultRepository: mockVaultRepository,
+      compositionManager: mockCompositionManager as any,
     });
   });
 
@@ -291,6 +297,81 @@ describe('CommunicationManager Unit Tests', () => {
       expect(record['DocumentReference.contenttype'] || record['org.hl7.fhir.r4.DocumentReference.contenttype']).toBe(contentType);
       expect(String(record['DocumentReference.identifier'] || record['org.hl7.fhir.r4.DocumentReference.identifier']).startsWith('urn:uuid:')).toBe(true);
       expect(String(record['DocumentReference.contenthash'] || record['org.hl7.fhir.r4.DocumentReference.contenthash']).startsWith('z')).toBe(true);
+    });
+
+    it('does not persist the same DocumentReference attachment twice when contenthash already exists', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+
+      const dataBase64 = Buffer.from('%PDF-1.7 fake', 'utf8').toString('base64');
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'thid-pdf-dedupe-1',
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [
+            {
+              type: 'Communication',
+              meta: {
+                claims: {
+                  '@context': 'org.hl7.fhir.r4',
+                  'Communication.subject': subjectDid,
+                  'Communication.sent': '2026-05-17T10:00:00Z',
+                },
+              },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [{ contentAttachment: { contentType: 'application/pdf', data: dataBase64, title: 'sample' } }],
+              },
+            },
+          ],
+        } as any,
+      };
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      await communicationManager.process(job);
+
+      const tenantVaultId = 'health-care_acme';
+      const docRefSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'document-references');
+      const firstDocRefPuts = mockVaultRepository.put.mock.calls.filter(
+        (args) => args[0] === tenantVaultId && args[2] === docRefSectionId,
+      );
+      expect(firstDocRefPuts).toHaveLength(1);
+
+      mockVaultRepository.put.mockClear();
+      mockVaultRepository.query.mockResolvedValue([{ id: 'existing-docref' }] as any);
+
+      await communicationManager.process({
+        ...job,
+        id: randomUUID(),
+        content: { ...decoded, thid: 'thid-pdf-dedupe-2' },
+      });
+
+      const secondDocRefPuts = mockVaultRepository.put.mock.calls.filter(
+        (args) => args[0] === tenantVaultId && args[2] === docRefSectionId,
+      );
+      expect(secondDocRefPuts).toHaveLength(0);
     });
 
     it('persists DocumentReference projection when Communication carries an embedded DocumentReference attachment', async () => {
@@ -650,6 +731,111 @@ describe('CommunicationManager Unit Tests', () => {
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.identifier'],
       ).toBe('urn:uuid:medication-embedded-001');
     });
+
+    it('does not persist the same Composition projection twice when the document is resent in another Communication thread', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+
+      const documentBundle = {
+        resourceType: 'Bundle',
+        type: 'document',
+        entry: [
+          {
+            resource: {
+              resourceType: 'Composition',
+              id: 'ips-composition-stable-001',
+              identifier: [{ value: 'urn:uuid:ips-composition-stable-001' }],
+              status: 'final',
+              subject: { reference: subjectDid },
+              type: { coding: [{ system: 'http://loinc.org', code: '60591-5' }] },
+              section: [{ code: { coding: [{ system: 'http://loinc.org', code: '10160-0' }] } }],
+            },
+          },
+        ],
+      };
+
+      const makeDecoded = (thid: string): IDecodedDidcommPayload => ({
+        jti: randomUUID(),
+        thid,
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [
+            {
+              type: 'Communication',
+              meta: {
+                claims: {
+                  '@context': 'org.hl7.fhir.r4',
+                  'Communication.subject': subjectDid,
+                  'Communication.sent': '2026-05-22T10:00:00Z',
+                },
+              },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [
+                  {
+                    contentAttachment: {
+                      contentType: 'application/fhir+json',
+                      title: 'ips-document.json',
+                      data: Buffer.from(JSON.stringify(documentBundle), 'utf8').toString('base64'),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as any,
+      });
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: makeDecoded('thread-composition-stable-1'),
+      };
+
+      await communicationManager.process(job);
+
+      const tenantVaultId = 'health-care_acme';
+      const compositionSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'composition');
+      const firstCompositionPuts = mockVaultRepository.put.mock.calls.filter(
+        (args) => args[0] === tenantVaultId && args[2] === compositionSectionId,
+      );
+      expect(firstCompositionPuts).toHaveLength(1);
+      const firstCompositionRecord = (firstCompositionPuts[0][1] as any[])[0];
+      expect(
+        firstCompositionRecord['Composition.identifier']
+        || firstCompositionRecord['org.hl7.fhir.r4.Composition.identifier'],
+      ).toBe('urn:uuid:ips-composition-stable-001');
+
+      mockVaultRepository.put.mockClear();
+      mockVaultRepository.query.mockResolvedValue([{ id: 'existing-composition' }] as any);
+
+      await communicationManager.process({
+        ...job,
+        id: randomUUID(),
+        content: makeDecoded('thread-composition-stable-2'),
+      });
+
+      const secondCompositionPuts = mockVaultRepository.put.mock.calls.filter(
+        (args) => args[0] === tenantVaultId && args[2] === compositionSectionId,
+      );
+      expect(secondCompositionPuts).toHaveLength(0);
+    });
   });
 
   describe('process (subject-scoped communication channel persistence)', () => {
@@ -739,6 +925,266 @@ describe('CommunicationManager Unit Tests', () => {
       expect(channelRecord.meta?.documentReferenceCount).toBe(1);
       expect(channelRecord['Communication.content-reference']).toContain('DocumentReference/documentreference-from-communication-');
       expect(channelRecord.resource?.body?.data?.some((item: DataEntry) => item.type === 'Attachment')).toBe(true);
+    });
+  });
+
+  describe('process (embedded Bundle/_search request)', () => {
+    const subjectDid = 'did:web:api.acme.org:individual:ips-search-subject-001';
+
+    it('executes Bundle/_search referenced in Communication.contentReference and returns the search response', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+      mockCompositionManager.process.mockImplementation(async () => ({
+        jti: randomUUID(),
+        iss: testServerDid,
+        aud: 'did:web:sender.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        thid: 'thread-ips-search-001',
+        type: 'transaction-response',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch-response',
+          data: [
+            {
+              type: 'Bundle-search-response-v1.0',
+              response: { status: '200' },
+              resource: {
+                resourceType: 'Bundle',
+                type: 'document',
+                entry: [{ resource: { resourceType: 'Composition' } }],
+              },
+            },
+          ],
+        },
+      }) as any);
+
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'thread-ips-search-001',
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [
+            {
+              type: 'Communication',
+              meta: {
+                claims: {
+                  '@context': 'org.hl7.fhir.r4',
+                  'Communication.identifier': 'comm-ips-search-001',
+                  'Communication.subject': subjectDid,
+                  'Communication.sent': '2026-06-02T10:00:00Z',
+                },
+              },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [
+                  {
+                    contentReference: {
+                      reference: `individual/org.hl7.fhir.r4/Bundle/_search?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.type=http%3A%2F%2Floinc.org%7C60591-5`,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as any,
+      };
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      const response = await communicationManager.process(job);
+      const data = (response.body as any)?.data;
+      expect(Array.isArray(data)).toBe(true);
+      expect(data[0]?.type).toBe('Bundle-search-response-v1.0');
+      expect(data[0]?.resource?.type).toBe('document');
+      expect(mockCompositionManager.process).toHaveBeenCalledTimes(1);
+      const forwardedJob = mockCompositionManager.process.mock.calls[0][0] as JobRequest;
+      expect(forwardedJob.resourceType).toBe('Bundle');
+      expect(forwardedJob.action).toBe('_search');
+      expect((forwardedJob.content as any)?.body?.entry?.[0]?.request?.url).toBe(
+        `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.type=http%3A%2F%2Floinc.org%7C60591-5`,
+      );
+    });
+
+    it('executes Subject/$summary referenced in Communication.contentReference as a summary operation', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+      mockCompositionManager.process.mockImplementation(async () => ({
+        jti: randomUUID(),
+        iss: testServerDid,
+        aud: 'did:web:sender.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        thid: 'thread-subject-summary-001',
+        type: 'transaction-response',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch-response',
+          data: [
+            {
+              type: 'Bundle-summary-response-v1.0',
+              response: { status: '200' },
+              resource: {
+                resourceType: 'Bundle',
+                type: 'document',
+              },
+            },
+          ],
+        },
+      }) as any);
+
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'thread-subject-summary-001',
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [
+            {
+              type: 'Communication',
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [
+                  {
+                    contentReference: {
+                      reference: `individual/org.hl7.fhir.r4/Subject/$summary?subject=${encodeURIComponent(subjectDid)}`,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as any,
+      };
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      const response = await communicationManager.process(job);
+      const data = (response.body as any)?.data;
+      expect(Array.isArray(data)).toBe(true);
+      expect(data[0]?.type).toBe('Bundle-summary-response-v1.0');
+      const forwardedJob = mockCompositionManager.process.mock.calls[0][0] as JobRequest;
+      expect(forwardedJob.resourceType).toBe('Subject');
+      expect(forwardedJob.action).toBe('$summary');
+      expect((forwardedJob.content as any)?.body?.resourceType).toBe('Parameters');
+      expect((forwardedJob.content as any)?.body?.parameter).toEqual([
+        { name: 'subject', valueString: subjectDid },
+      ]);
+    });
+
+    it('treats Patient/$summary as an alias of Subject/$summary', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+      mockCompositionManager.process.mockImplementation(async () => ({
+        jti: randomUUID(),
+        iss: testServerDid,
+        aud: 'did:web:sender.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        thid: 'thread-patient-summary-001',
+        type: 'transaction-response',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch-response',
+          data: [
+            {
+              type: 'Bundle-summary-response-v1.0',
+              response: { status: '200' },
+              resource: {
+                resourceType: 'Bundle',
+                type: 'document',
+              },
+            },
+          ],
+        },
+      }) as any);
+
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'thread-patient-summary-001',
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [
+            {
+              type: 'Communication',
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [
+                  {
+                    contentReference: {
+                      reference: `individual/org.hl7.fhir.r4/Patient/$summary?subject=${encodeURIComponent(subjectDid)}`,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as any,
+      };
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      await communicationManager.process(job);
+
+      const forwardedJob = mockCompositionManager.process.mock.calls[0][0] as JobRequest;
+      expect(forwardedJob.resourceType).toBe('Subject');
+      expect(forwardedJob.action).toBe('$summary');
     });
   });
 });

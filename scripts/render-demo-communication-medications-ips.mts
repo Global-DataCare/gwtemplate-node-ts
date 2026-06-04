@@ -24,6 +24,7 @@ const runtime = {
   thidComm: process.env.THID_COMM || 'comm-medications-demo',
   thidMedSearch: process.env.THID_MED_SEARCH || 'medications-search-demo',
   thidIpsSearch: process.env.THID_IPS_SEARCH || 'ips-search-demo',
+  medicationCaseIndex: Number(process.env.MEDICATION_CASE_INDEX || '0'),
 };
 
 const config = {
