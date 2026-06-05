@@ -15,8 +15,8 @@ import {
   buildGwDspaceVersionWellKnownPath,
 } from 'gdc-common-utils-ts/utils/dataspace-protocol';
 import {
-  ServiceCapabilityFamily as ServiceCapabilityKind,
-  hasServiceCapabilityFamily as hasServiceCapabilityKind,
+  ServiceCapabilityKind,
+  hasServiceCapabilityKind,
   isProviderServiceCapability,
   parseServiceCapabilityTokens,
 } from 'gdc-common-utils-ts/constants/service-capabilities';
@@ -517,7 +517,7 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
       type: 'DataService',
       serviceEndpoint: buildGwDspaceVersionWellKnownPath({
         participantId: 'host',
-        jurisdiction: '{jurisdiction}',
+        jurisdiction: '{hostCoverageScope}',
         version: 'v1',
         hostNetwork: '{hostNetwork}',
       }),
@@ -527,7 +527,7 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
       type: DidServiceTypes.CatalogService,
       serviceEndpoint: buildGwCatalogRequestPath({
         participantId: 'host',
-        jurisdiction: '{jurisdiction}',
+        jurisdiction: '{hostCoverageScope}',
         version: 'v1',
         hostNetwork: '{hostNetwork}',
       }),

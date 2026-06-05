@@ -4,7 +4,7 @@
     "title": "Gateway API - CORE",
     "version": "1.0.3",
     "description": "CORE API documentation for the secure gateway canonical flow.",
-    "x-profile-generated-at": "2026-06-05T22:25:09.835Z",
+    "x-profile-generated-at": "2026-06-05T22:40:33.195Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -131,6 +131,16 @@
           "example": "ES"
         },
         "description": "The provider/tenant jurisdiction code within the host-operated infrastructure (e.g., country code like 'ES' or a subdivision like 'ES-CT')."
+      },
+      "HostCoverageScope": {
+        "name": "hostCoverageScope",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "EU"
+        },
+        "description": "Host discovery coverage scope published by the hosting operator (for example 'EU' or 'ES'). This is not the host legal jurisdiction."
       },
       "Version": {
         "name": "version",

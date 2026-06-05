@@ -69,8 +69,8 @@ Teaching rule:
   - example values: `organization/Composition.rs`, `organization/Composition.cruds`, `organization/ResearchSubject.rs`, `organization/ResearchSubject.cruds`
   - GW persists those claims and now uses them to decide which tenant API endpoints are published in DID discovery
   - the same persisted capability claim also drives DSP discovery artifacts:
-    - `GET /host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/dspace-version`
-    - `GET /host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/dcat.json`
+    - `GET /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/dspace-version`
+    - `GET /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/dcat.json`
     - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/dspace-version`
     - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json`
     - `GET /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json`

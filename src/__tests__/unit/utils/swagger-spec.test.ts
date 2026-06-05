@@ -32,7 +32,7 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Patient/$summary']).toBeDefined();
     expect(spec.paths['/host/.well-known/ping']).toBeDefined();
-    expect(spec.paths['/host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/ping']).toBeDefined();
+    expect(spec.paths['/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/ping']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/ping']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/did.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/jwks.json']).toBeDefined();
@@ -40,9 +40,9 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/smart-configuration']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json']).toBeDefined();
-    expect(spec.paths['/host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/dspace-version']).toBeDefined();
+    expect(spec.paths['/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/dspace-version']).toBeDefined();
     expect(spec.paths['/api/dataspace-discovery/providers']).toBeDefined();
-    expect(spec.paths['/host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/dcat.json']).toBeDefined();
+    expect(spec.paths['/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/dcat.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/dspace-version']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata']).toBeDefined();
@@ -76,6 +76,7 @@ describe('Swagger Spec Generation', () => {
 
     // Host onboarding uses a dedicated "network environment" sector enum.
     expect(spec.components?.parameters?.HostRegistrySector).toBeDefined();
+    expect(spec.components?.parameters?.HostCoverageScope).toBeDefined();
     expect(spec.components?.parameters?.AppId).toBeDefined();
     expect(spec.components?.parameters?.AppVersion).toBeDefined();
 

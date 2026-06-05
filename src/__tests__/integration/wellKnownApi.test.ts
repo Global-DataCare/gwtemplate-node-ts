@@ -176,7 +176,7 @@ describe('Well-Known Ping API', () => {
 
     const response = await invokeExpress(app, {
       method: 'GET',
-      url: `/host/cds-es/v1/${HostNetworkTypes.Test}/.well-known/ping`,
+      url: `/host/cds-eu/v1/${HostNetworkTypes.Test}/.well-known/ping`,
     });
     const parsed = JSON.parse(response.text);
 
@@ -344,7 +344,7 @@ describe('DSP Discovery API', () => {
       method: 'GET',
       url: buildGwDspaceVersionWellKnownPath({
         participantId: 'host',
-        jurisdiction: 'es',
+        jurisdiction: 'eu',
         version: 'v1',
         hostNetwork: HostNetworkTypes.Test,
       }),
@@ -356,7 +356,7 @@ describe('DSP Discovery API', () => {
     expect(parsed.protocolVersions).toEqual([
       {
         version: '2025-1',
-        path: `/host/cds-es/v1/${HostNetworkTypes.Test}/dsp`,
+        path: `/host/cds-eu/v1/${HostNetworkTypes.Test}/dsp`,
       },
     ]);
   });
@@ -408,7 +408,7 @@ describe('DSP Discovery API', () => {
       method: 'GET',
       url: buildGwCatalogArtifactPath({
         participantId: 'host',
-        jurisdiction: 'es',
+        jurisdiction: 'eu',
         version: 'v1',
         hostNetwork: HostNetworkTypes.Test,
       }),
@@ -472,7 +472,7 @@ describe('DSP Discovery API', () => {
       method: 'GET',
       url: buildGwCatalogArtifactPath({
         participantId: 'host',
-        jurisdiction: 'es',
+        jurisdiction: 'eu',
         version: 'v1',
         hostNetwork: HostNetworkTypes.Test,
       }),

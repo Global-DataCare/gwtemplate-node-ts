@@ -3,6 +3,14 @@
 ### Changed
 - Added explicit host coverage-scope configuration with `HOST_COVERAGE_SCOPE`,
   defaulting to `EU` when unset.
+- Switched the host-scoped DSP discovery and ping surface from legal
+  `jurisdiction` semantics to `hostCoverageScope` semantics:
+  - `/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/ping`
+  - `/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/dspace-version`
+  - `/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/...`
+- Aligned the host DID service publication and backend discovery DTOs with the
+  same host coverage-scope contract while keeping tenant/provider discovery
+  tenant-jurisdiction scoped.
 - Updated all shipped env templates so deployments that previously used
   `HOST_JURISDICTION=EU` as a discovery scope now publish that meaning through
   `HOST_COVERAGE_SCOPE=EU`, while keeping `HOST_JURISDICTION` available for the
@@ -11,6 +19,7 @@
   the host coverage-scope configuration alignment.
 
 ### Testing
+- `npm test -- --watchman=false src/__tests__/integration/wellKnownApi.test.ts src/__tests__/unit/utils/swagger-spec.test.ts src/__tests__/unit/utils/dataspace.did-services.compliance.test.ts`
 - `npm run build`
 
 ## [1.8.0] - 2026-06-04

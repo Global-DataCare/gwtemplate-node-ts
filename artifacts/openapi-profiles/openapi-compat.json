@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-06-05T22:25:09.857Z",
+    "x-profile-generated-at": "2026-06-05T22:40:33.222Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -215,6 +215,16 @@
           "example": "ES"
         },
         "description": "The provider/tenant jurisdiction code within the host-operated infrastructure (e.g., country code like 'ES' or a subdivision like 'ES-CT')."
+      },
+      "HostCoverageScope": {
+        "name": "hostCoverageScope",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "EU"
+        },
+        "description": "Host discovery coverage scope published by the hosting operator (for example 'EU' or 'ES'). This is not the host legal jurisdiction."
       },
       "Version": {
         "name": "version",
@@ -4944,13 +4954,13 @@
         "x-profile": "core"
       }
     },
-    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/ping": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/ping": {
       "get": {
         "tags": [
           "Discovery"
         ],
         "summary": "Ping (host)",
-        "description": "Canonical health check for the host runtime scoped by jurisdiction, version, and host network.",
+        "description": "Canonical health check for the host runtime scoped by coverage scope, version, and host network.",
         "responses": {
           "200": {
             "description": "OK"
@@ -5313,12 +5323,23 @@
         "x-profile": "core"
       }
     },
-    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/dspace-version": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/dspace-version": {
       "get": {
         "tags": [
           "Data Catalog Discovery"
         ],
         "summary": "Host DSP version-discovery entrypoint",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
         "responses": {
           "200": {
             "description": "DSP version metadata returned"
@@ -5361,13 +5382,24 @@
         "x-profile": "core"
       }
     },
-    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/request": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/request": {
       "post": {
         "tags": [
           "Data Catalog Discovery"
         ],
         "summary": "Operator DSP catalog request",
         "description": "Returns a `dcat:Catalog` with provider datasets discoverable by client apps.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
         "requestBody": {
           "required": false,
           "content": {
@@ -5402,12 +5434,23 @@
         "x-profile": "core"
       }
     },
-    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/dcat.json": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/dcat.json": {
       "get": {
         "tags": [
           "Data Catalog Discovery"
         ],
         "summary": "Operator DSP catalog artifact",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
         "responses": {
           "200": {
             "description": "DCAT catalog artifact"
@@ -5419,13 +5462,22 @@
         "x-profile": "core"
       }
     },
-    "/host/cds-{jurisdiction}/{version}/{hostNetwork}/dsp/catalog/datasets/{id}": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/datasets/{id}": {
       "get": {
         "tags": [
           "Data Catalog Discovery"
         ],
         "summary": "Read one provider dataset from operator catalog",
         "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          },
           {
             "in": "path",
             "name": "id",

@@ -63,7 +63,7 @@ describe('Dataspace DID Service Compliance (DSP/DCP)', () => {
     expect(catalogService?.type).toBe(DidServiceTypes.CatalogService);
     expect(catalogService?.serviceEndpoint).toBe(`https://gateway.example.com${buildGwCatalogRequestPath({
       participantId: 'host',
-      jurisdiction: '{jurisdiction}',
+      jurisdiction: '{hostCoverageScope}',
       version: 'v1',
       hostNetwork: '{hostNetwork}',
     })}`);

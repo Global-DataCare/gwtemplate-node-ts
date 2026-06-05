@@ -197,6 +197,14 @@ const swaggerDefinition = {
         description:
           "The provider/tenant jurisdiction code within the host-operated infrastructure (e.g., country code like 'ES' or a subdivision like 'ES-CT').",
       },
+      HostCoverageScope: {
+        name: 'hostCoverageScope',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', example: 'EU' },
+        description:
+          "Host discovery coverage scope published by the hosting operator (for example 'EU' or 'ES'). This is not the host legal jurisdiction.",
+      },
       Version: {
         name: 'version',
         in: 'path',
