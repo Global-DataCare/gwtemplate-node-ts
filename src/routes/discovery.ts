@@ -14,12 +14,12 @@ import { DataspaceWellKnownPaths } from 'gdc-common-utils-ts/constants/dataspace
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { isEuCountryCode, normalizeCountryCode } from 'gdc-common-utils-ts/constants/eu-countries';
 import {
-  getServiceCapabilityFamily,
-  hasServiceCapabilityFamily,
+  getServiceCapabilityFamily as getServiceCapabilityKind,
+  hasServiceCapabilityFamily as hasServiceCapabilityKind,
   isProviderServiceCapability,
   parseServiceCapabilityTokens,
-  ServiceCapabilityFamily,
-  ServiceCapabilityTokenValue,
+  ServiceCapabilityFamily as ServiceCapabilityKind,
+  ServiceCapabilityTokenValue as ServiceCapabilityValue,
 } from 'gdc-common-utils-ts/constants/service-capabilities';
 import {
   buildDspaceVersionMetadata,
@@ -79,7 +79,7 @@ export function createDiscoveryRouter(
     endpointUrl: string;
     sector?: string;
     jurisdiction?: string;
-    serviceTypes: ServiceCapabilityTokenValue[];
+    serviceTypes: ServiceCapabilityValue[];
   };
 
   type NormalizedHostingOperatorDiscoveryMatch = {
@@ -240,17 +240,20 @@ export function createDiscoveryRouter(
   ): ProviderServiceOffering[] => {
     const explicitCapabilityClaim = String(dataset.serviceTypeClaim || '').trim();
     const explicitTokens = parseServiceCapabilityTokens(explicitCapabilityClaim)
-      .filter((token) => isProviderServiceCapability(token)) as ServiceCapabilityTokenValue[];
+      .filter((token) => isProviderServiceCapability(token)) as ServiceCapabilityValue[];
     const kinds: ServiceOfferingKind[] = explicitTokens.length > 0
       ? [
-          ...(hasServiceCapabilityFamily(explicitCapabilityClaim, ServiceCapabilityFamily.Indexing) ? ['index' as const] : []),
-          ...(hasServiceCapabilityFamily(explicitCapabilityClaim, ServiceCapabilityFamily.DigitalTwin) ? ['research' as const] : []),
+          ...(hasServiceCapabilityKind(explicitCapabilityClaim, ServiceCapabilityKind.Indexing) ? ['index' as const] : []),
+          ...(hasServiceCapabilityKind(explicitCapabilityClaim, ServiceCapabilityKind.DigitalTwin) ? ['research' as const] : []),
         ]
       : resolveDefaultOfferingKinds(dataset);
 
     return kinds.map((kind) => {
-      const family = kind === 'index' ? ServiceCapabilityFamily.Indexing : ServiceCapabilityFamily.DigitalTwin;
-      const serviceTypes = explicitTokens.filter((token) => getServiceCapabilityFamily(token) === family);
+      const capabilityKind =
+        kind === 'index'
+          ? ServiceCapabilityKind.Indexing
+          : ServiceCapabilityKind.DigitalTwin;
+      const serviceTypes = explicitTokens.filter((token) => getServiceCapabilityKind(token) === capabilityKind);
       return {
         id: buildServiceOfferingUrl(publicOrigin, dataset, kind),
         kind,

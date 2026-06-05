@@ -309,7 +309,7 @@ export const ORGANIZATION_ACTIVATION_REQUEST = {
           "@type": "template",
           ...testClaimsRegisterTenantExpanded,
           "org.schema.Service.url": "https://connector.example.net/acme/cds-es/v1/health-care",
-          "org.schema.Service.serviceType": "indexing.cruds,indexing.rs,digitaltwin.rs",
+          "org.schema.Service.serviceType": "organization/Composition.cruds,organization/Composition.rs,organization/ResearchSubject.rs",
           "org.schema.Service.termsOfService": pdfEmbeddedData
         }
       }

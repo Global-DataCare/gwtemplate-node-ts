@@ -10,7 +10,7 @@ import { DidService } from 'gdc-common-utils-ts/models/did';
 import { DidServiceIds, DidServiceTypes } from 'gdc-common-utils-ts/constants/did-services';
 import { buildGwCatalogRequestPath } from 'gdc-common-utils-ts/utils/dataspace-protocol';
 import {
-  ServiceCapabilityToken,
+  ServiceCapability,
   serializeServiceCapabilityTokens,
 } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
@@ -231,7 +231,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServicesConfig(
         Sector.RESEARCH,
         [],
-        serializeServiceCapabilityTokens([ServiceCapabilityToken.IndexReader]),
+        serializeServiceCapabilityTokens([ServiceCapability.IndexReader]),
       );
 
       expect(services.some(
@@ -249,7 +249,7 @@ describe('Service Initialization Utilities', () => {
       const services = initializeTenantServicesConfig(
         Sector.RESEARCH,
         [],
-        serializeServiceCapabilityTokens([ServiceCapabilityToken.DigitalTwinReader]),
+        serializeServiceCapabilityTokens([ServiceCapability.DigitalTwinReader]),
       );
 
       expect(services.some(

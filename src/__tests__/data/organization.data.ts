@@ -5,7 +5,7 @@
 import { OrganizationConfig } from "../../gdc-backend-utils-node/models/entity";
 import { URN_NAMESPACE, URN_NETWORK, URN_VERSION } from "./urn.data";
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from "gdc-common-utils-ts/constants/schemaorg";
-import { serializeServiceCapabilityTokens, ServiceCapabilityToken } from "gdc-common-utils-ts/constants/service-capabilities";
+import { serializeServiceCapabilityTokens, ServiceCapability } from "gdc-common-utils-ts/constants/service-capabilities";
 import { Sector } from "gdc-common-utils-ts/models/urlPath";
 import { EntityLifecycleStatus, EntityType } from "../../gdc-backend-utils-node/models/enums";
 import { testTenant1Vc } from "./credential.data";
@@ -26,9 +26,9 @@ import { testHostDidWeb, testRootOrgDidWeb, testHostDomain, testTenant1Identifie
  * This is the source of truth for values used in ORGANIZATION_REGISTRATION_REQUEST.
  */
 export const testDefaultTenantServiceTypeClaim = serializeServiceCapabilityTokens([
-  ServiceCapabilityToken.IndexProvider,
-  ServiceCapabilityToken.IndexReader,
-  ServiceCapabilityToken.DigitalTwinReader,
+  ServiceCapability.IndexProvider,
+  ServiceCapability.IndexReader,
+  ServiceCapability.DigitalTwinReader,
 ]) as string;
 
 export const testClaimsRegisterTenantExpanded = {

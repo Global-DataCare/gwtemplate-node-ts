@@ -43,9 +43,9 @@ bootstrap_tenant() {
   ./scripts/bootstrap-single-tenant.sh
 }
 
-bootstrap_tenant "$ALICE_BASE_URL" "acme-1" "acme-1" "Acme 1 Organization SL" "Acme 1" "admin1@acme1.example.org" "indexing.cruds"
-bootstrap_tenant "$BOB_BASE_URL" "acme-2" "acme-2" "Acme 2 Organization SL" "Acme 2" "admin1@acme2.example.org" "indexing.cruds"
-bootstrap_tenant "$BOB_BASE_URL" "acme-3" "acme-3" "Acme 3 Organization SL" "Acme 3" "admin1@acme3.example.org" "digitaltwin.cruds"
-bootstrap_tenant "$BOB_BASE_URL" "acme-4" "acme-4" "Acme 4 Organization SL" "Acme 4" "admin1@acme4.example.org" "indexing.rs"
+bootstrap_tenant "$ALICE_BASE_URL" "acme-1" "acme-1" "Acme 1 Organization SL" "Acme 1" "admin1@acme1.example.org" "organization/Composition.cruds"
+bootstrap_tenant "$BOB_BASE_URL" "acme-2" "acme-2" "Acme 2 Organization SL" "Acme 2" "admin1@acme2.example.org" "organization/Composition.cruds"
+bootstrap_tenant "$BOB_BASE_URL" "acme-3" "acme-3" "Acme 3 Organization SL" "Acme 3" "admin1@acme3.example.org" "organization/ResearchSubject.cruds"
+bootstrap_tenant "$BOB_BASE_URL" "acme-4" "acme-4" "Acme 4 Organization SL" "Acme 4" "admin1@acme4.example.org" "organization/Composition.rs"
 
 echo "[alice-bob-bootstrap] completed"

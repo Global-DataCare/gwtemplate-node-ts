@@ -15,8 +15,8 @@ import {
   buildGwDspaceVersionWellKnownPath,
 } from 'gdc-common-utils-ts/utils/dataspace-protocol';
 import {
-  ServiceCapabilityFamily,
-  hasServiceCapabilityFamily,
+  ServiceCapabilityFamily as ServiceCapabilityKind,
+  hasServiceCapabilityFamily as hasServiceCapabilityKind,
   isProviderServiceCapability,
   parseServiceCapabilityTokens,
 } from 'gdc-common-utils-ts/constants/service-capabilities';
@@ -291,8 +291,10 @@ function filterBusinessServicesByCapabilityClaim(
     return services;
   }
 
-  const indexingEnabled = hasServiceCapabilityFamily(serviceCapabilityClaim, ServiceCapabilityFamily.Indexing);
-  const digitalTwinEnabled = hasServiceCapabilityFamily(serviceCapabilityClaim, ServiceCapabilityFamily.DigitalTwin);
+  const compositionCapabilityEnabled =
+    hasServiceCapabilityKind(serviceCapabilityClaim, ServiceCapabilityKind.Indexing);
+  const researchSubjectCapabilityEnabled =
+    hasServiceCapabilityKind(serviceCapabilityClaim, ServiceCapabilityKind.DigitalTwin);
 
   return services.filter((service) => {
     const selector = (service as any).selector as ServiceEndpointSelector | undefined;
@@ -301,11 +303,11 @@ function filterBusinessServicesByCapabilityClaim(
     }
 
     if (selector.section === 'digitaltwin') {
-      return digitalTwinEnabled;
+      return researchSubjectCapabilityEnabled;
     }
 
     if (selector.section === 'entity' || selector.section === SUBJECT_SECTION_INDIVIDUAL) {
-      return indexingEnabled;
+      return compositionCapabilityEnabled;
     }
 
     return true;

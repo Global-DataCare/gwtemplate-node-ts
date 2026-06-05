@@ -17,7 +17,7 @@ import { invokeExpress } from './helpers/invokeExpress';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { HostNetworkTypes } from 'gdc-common-utils-ts/constants/network';
 import { DataspaceSectors } from 'gdc-common-utils-ts/constants/sectors';
-import { ServiceCapabilityToken, serializeServiceCapabilityTokens } from 'gdc-common-utils-ts/constants/service-capabilities';
+import { ServiceCapability, serializeServiceCapabilityTokens } from 'gdc-common-utils-ts/constants/service-capabilities';
 import {
   buildExampleHostedTenantBaseUrl,
   EXAMPLE_COVERAGE_SCOPE_EU,
@@ -256,8 +256,8 @@ describe('Well-Known Tenant Artifacts API', () => {
           sector: urnParts.sector,
         }),
         [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-          ServiceCapabilityToken.IndexProvider,
-          ServiceCapabilityToken.IndexReader,
+          ServiceCapability.IndexProvider,
+          ServiceCapability.IndexReader,
         ]),
       },
     } as any);
@@ -273,7 +273,7 @@ describe('Well-Known Tenant Artifacts API', () => {
       version: urnParts.version,
       sector: urnParts.sector,
     }));
-    expect(parsed['dcat:keyword']).toEqual([ServiceCapabilityToken.IndexProvider]);
+    expect(parsed['dcat:keyword']).toEqual([ServiceCapability.IndexProvider]);
   });
 
   it('should return 404 for the research service offering artifact when digital twin is not enabled', async () => {
@@ -295,8 +295,8 @@ describe('Well-Known Tenant Artifacts API', () => {
           sector: urnParts.sector,
         }),
         [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-          ServiceCapabilityToken.IndexProvider,
-          ServiceCapabilityToken.IndexReader,
+          ServiceCapability.IndexProvider,
+          ServiceCapability.IndexReader,
         ]),
       },
     } as any);
@@ -378,8 +378,8 @@ describe('DSP Discovery API', () => {
             sector: DataspaceSectors.HealthResearch,
           }),
           [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-            ServiceCapabilityToken.IndexProvider,
-            ServiceCapabilityToken.DigitalTwinProvider,
+            ServiceCapability.IndexProvider,
+            ServiceCapability.DigitalTwinProvider,
           ]),
         },
       },
@@ -397,8 +397,8 @@ describe('DSP Discovery API', () => {
             sector: DataspaceSectors.HealthResearch,
           }),
           [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-            ServiceCapabilityToken.IndexReader,
-            ServiceCapabilityToken.DigitalTwinReader,
+            ServiceCapability.IndexReader,
+            ServiceCapability.DigitalTwinReader,
           ]),
         },
       },
@@ -461,7 +461,7 @@ describe('DSP Discovery API', () => {
               sector: DataspaceSectors.HealthResearch,
             }),
             [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-              ServiceCapabilityToken.IndexProvider,
+              ServiceCapability.IndexProvider,
             ]),
           },
         },
@@ -486,7 +486,7 @@ describe('DSP Discovery API', () => {
       expect.arrayContaining([
         expect.objectContaining({
           '@type': 'dcat:DataService',
-          'dcat:keyword': [ServiceCapabilityToken.IndexProvider],
+          'dcat:keyword': [ServiceCapability.IndexProvider],
         }),
       ]),
     );
@@ -518,8 +518,8 @@ describe('DSP Discovery API', () => {
             sector: DataspaceSectors.HealthResearch,
           }),
           [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-            ServiceCapabilityToken.IndexProvider,
-            ServiceCapabilityToken.DigitalTwinProvider,
+            ServiceCapability.IndexProvider,
+            ServiceCapability.DigitalTwinProvider,
           ]),
         },
       },
@@ -537,8 +537,8 @@ describe('DSP Discovery API', () => {
             sector: DataspaceSectors.HealthResearch,
           }),
           [ClaimsServiceSchemaorg.serviceType]: serializeServiceCapabilityTokens([
-            ServiceCapabilityToken.IndexReader,
-            ServiceCapabilityToken.DigitalTwinReader,
+            ServiceCapability.IndexReader,
+            ServiceCapability.DigitalTwinReader,
           ]),
         },
       },
@@ -550,7 +550,7 @@ describe('DSP Discovery API', () => {
       headers: { host: EXAMPLE_HOST_PUBLIC_HOSTNAME, 'content-type': 'application/json' },
       body: {
         sector: DataspaceSectors.HealthResearch,
-        providerCapability: ServiceCapabilityToken.IndexProvider,
+        providerCapability: ServiceCapability.IndexProvider,
         jurisdiction: 'ES',
         coverageScope: EXAMPLE_COVERAGE_SCOPE_EU,
       },
@@ -571,7 +571,7 @@ describe('DSP Discovery API', () => {
     expect(parsed.providers[0].record).toEqual(
       expect.objectContaining({
         providerDid: testTenant1DidWebHosted,
-        serviceType: ServiceCapabilityToken.IndexProvider,
+        serviceType: ServiceCapability.IndexProvider,
         category: DataspaceSectors.HealthResearch,
         areaServed: 'ES',
       }),
@@ -579,7 +579,7 @@ describe('DSP Discovery API', () => {
     expect(parsed.hostingOperators).toEqual([
       expect.objectContaining({
         operatorDid: EXAMPLE_HOSTING_OPERATOR_DID,
-        matchedCapabilities: [ServiceCapabilityToken.IndexProvider],
+        matchedCapabilities: [ServiceCapability.IndexProvider],
       }),
     ]);
     expect(parsed.hostingOperators[0].record).toEqual(

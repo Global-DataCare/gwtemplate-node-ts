@@ -8,8 +8,8 @@ JURISDICTION="${JURISDICTION:-ES}"
 JURISDICTION_LOWER="$(printf '%s' "${JURISDICTION:-ES}" | tr '[:upper:]' '[:lower:]')"
 VERSION="${VERSION:-v1}"
 HOST_NETWORK="${HOST_NETWORK:-test}"
-INDEX_PROVIDER="${INDEX_PROVIDER:-indexing.cruds}"
-DIGITAL_TWIN_PROVIDER="${DIGITAL_TWIN_PROVIDER:-digitaltwin.cruds}"
+INDEX_PROVIDER="${INDEX_PROVIDER:-organization/Composition.cruds}"
+DIGITAL_TWIN_PROVIDER="${DIGITAL_TWIN_PROVIDER:-organization/ResearchSubject.cruds}"
 READER_ONLY_TENANT="${READER_ONLY_TENANT:-Acme 4 Organization SL}"
 
 for cmd in curl jq; do

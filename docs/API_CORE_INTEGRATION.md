@@ -66,7 +66,7 @@ Teaching rule:
   - examples should prefer shared `ClaimsOrganizationSchemaorg`, `ClaimsPersonSchemaorg`, and `ClaimsServiceSchemaorg` constants instead of hardcoded claim-key strings
 - Service capability rule:
   - legal-organization `_activate` must declare service capabilities in `org.schema.Service.serviceType`
-  - example values: `indexing.rs`, `indexing.cruds`, `digitaltwin.rs`, `digitaltwin.cruds`
+  - example values: `organization/Composition.rs`, `organization/Composition.cruds`, `organization/ResearchSubject.rs`, `organization/ResearchSubject.cruds`
   - GW persists those claims and now uses them to decide which tenant API endpoints are published in DID discovery
   - the same persisted capability claim also drives DSP discovery artifacts:
     - `GET /host/cds-{jurisdiction}/{version}/{hostNetwork}/.well-known/dspace-version`
