@@ -11,11 +11,19 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 - FHIR SearchParameter names are canonical FHIR names only: lowercase and `-` where applicable.
 - No invented camelCase for FHIR claims/search keys (example: use `Communication.part-of`, never `Communication.partOf`).
 - Custom parameter names are allowed only when FHIR has no defined parameter.
-- `resource.meta.claims` is the canonical interoperable claims carrier in a Bundle document (or JSON:API Primary document embedded in a DIDComm message) and must always be persisted/propagated.
+- `resource.meta.claims` is the canonical project-specific claims carrier in a Bundle document (or JSON:API Primary document embedded in a DIDComm message) and must always be persisted/propagated.
+- `resource.meta.claims` is not part of base FHIR. It is a claims-first extension used by GW/SDK contracts on top of FHIR-like resources.
+- Those claims are often contextualized with `@context` such as `org.schema` or `org.hl7.fhir.api`, but may also use less-contextualized keys when the active `@context` already disambiguates them.
+
+If you are new and confused by DIDComm envelope vs batch body vs entry type vs
+FHIR-like `Communication` vs internal `CommMsgExtended`, read first:
+
+- [`gdc-common-utils-ts/docs/101-COMMUNICATION_LAYERING.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
 
 ## Repository Navigation
 
 - Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
+- Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)
 - Main docs index: [docs/README.md](docs/README.md)
 - Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
 - Employee bundle/lifecycle contract reference: [gdc-sdk-core-ts/docs/101-EMPLOYEES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-EMPLOYEES.md)
@@ -183,10 +191,10 @@ Canonical payload examples are not maintained separately in Swagger, markdown, a
 - GW markdown conformance test: [`src/__tests__/unit/examples/markdown-examples.test.ts`](src/__tests__/unit/examples/markdown-examples.test.ts)
 - GW to shared `gdc-common-utils-ts` conformance test: [`src/__tests__/unit/examples/shared-flow-examples.test.ts`](src/__tests__/unit/examples/shared-flow-examples.test.ts)
 - Shared lifecycle source of truth: [`gdc-common-utils-ts/src/examples/lifecycle.ts`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/examples/lifecycle.ts)
-- Shared lifecycle guide "for torpes": [`gdc-common-utils-ts/docs/LIFECYCLE_101.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md)
-- GW lifecycle 101 for current local contract and SDK prompts: [`docs/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md`](docs/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE-101.md)
+- Shared lifecycle guide "for torpes": [`gdc-common-utils-ts/docs/101-LIFECYCLE.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-LIFECYCLE.md)
+- GW lifecycle 101 for current local contract and SDK prompts: [`docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md`](docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md)
 - GW lifecycle current-vs-target note: [`docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md`](docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md)
-- Shared lifecycle `101` guide: [`gdc-common-utils-ts/docs/LIFECYCLE_101.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/LIFECYCLE_101.md)
+- Shared lifecycle `101` guide: [`gdc-common-utils-ts/docs/101-LIFECYCLE.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-LIFECYCLE.md)
 
 Current rule:
 

@@ -28,6 +28,17 @@ Rule:
 - compatibility aliases are temporary and must be tracked as TODO,
 - no new feature should be designed only around legacy shapes.
 
+## Why claims-first, FHIR-shaped
+
+The platform needs two things at the same time:
+
+- interoperable resource shapes that developers can recognize,
+- a stable canonical claim layer that survives cross-sector, cross-runtime, and legacy translation boundaries.
+
+That is why the project uses FHIR-shaped resources plus a project-specific `resource.meta.claims` container instead of requiring FHIR-pure payloads for every operational flow.
+
+This is also why new clients are taught to construct `Communication` FHIR-like resources, not internal gateway-only models such as `CommMsgExtended`.
+
 ## Threat model summary
 
 Primary threats considered:
@@ -41,3 +52,8 @@ Controls are distributed across:
 - scoped routing/contracts,
 - cryptographic verification paths,
 - auditable async submit/poll model.
+
+Read next:
+
+- [Communication layering 101](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
+- [API_CORE_INTEGRATION.md](../docs/API_CORE_INTEGRATION.md)

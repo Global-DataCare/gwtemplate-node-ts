@@ -4,6 +4,7 @@
 
 import { CommMsgExtended, DataEntry, FhirCommunication } from 'gdc-common-utils-ts/models/comm';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
+import { claimsToContentCid } from 'gdc-common-utils-ts/utils/fhir-cid';
 import { HealthcareBasicSections } from '../shared/healthcare-constants';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
@@ -261,16 +262,15 @@ export class CommunicationManager implements IJobProcessor {
     job: JobRequest,
     fhirResource: FhirCommunication,
   ): Promise<Array<BundleEntryResponse | ErrorEntry> | undefined> {
-    const contentReferences = this.buildCommunicationContentReferences(job, undefined, fhirResource)
+    const references = this.buildCommunicationContentReferences(job, undefined, fhirResource)
       .filter((reference) => this.isEmbeddedSearchReference(reference));
-    if (contentReferences.length === 0) return undefined;
+    if (references.length === 0) return undefined;
 
     const responseEntries: Array<BundleEntryResponse | ErrorEntry> = [];
-    for (const reference of contentReferences) {
+    for (const reference of references) {
       const parsed = this.parseEmbeddedSearchReference(reference, job, fhirResource);
       if (!parsed) continue;
-
-      const targetManager = parsed.resourceType === 'Subject'
+      const targetManager = parsed.resourceType === 'Subject' && parsed.action === '_search'
         ? this.individualManager
         : this.compositionManager;
       if (!targetManager) continue;
@@ -300,11 +300,20 @@ export class CommunicationManager implements IJobProcessor {
   private isEmbeddedSearchReference(reference: string): boolean {
     const normalized = String(reference || '').trim().toLowerCase();
     if (!normalized) return false;
-    return this.isBundleSearchReference(normalized) || this.isSubjectSearchReference(normalized);
+    return this.isBundleSearchReference(normalized)
+      || this.isSummaryOperationReference(normalized)
+      || this.isSubjectSearchReference(normalized);
   }
 
   private isBundleSearchReference(reference: string): boolean {
     return reference.includes('/bundle/_search?') || reference.startsWith('bundle/_search?') || reference.startsWith('bundle?');
+  }
+
+  private isSummaryOperationReference(reference: string): boolean {
+    return reference.includes('/subject/$summary')
+      || reference.includes('/patient/$summary')
+      || reference.startsWith('subject/$summary')
+      || reference.startsWith('patient/$summary');
   }
 
   private isSubjectSearchReference(reference: string): boolean {
@@ -352,6 +361,15 @@ export class CommunicationManager implements IJobProcessor {
 
     const query = search.startsWith('?') ? search.slice(1) : search;
     const normalizedPath = cleanPath.toLowerCase();
+    if (this.isSummaryOperationReference(normalizedPath)) {
+      return {
+        section,
+        format,
+        resourceType: 'Subject',
+        action: '$summary',
+        body: this.buildSummaryParametersBody(query),
+      };
+    }
 
     if (this.isSubjectSearchReference(normalizedPath)) {
       return {
@@ -384,6 +402,38 @@ export class CommunicationManager implements IJobProcessor {
     };
   }
 
+  private buildSummaryParametersBody(query: string): Record<string, unknown> {
+    const params = new URLSearchParams(query);
+    const parameter: Array<Record<string, unknown>> = [];
+    const parameterNameByQueryKey: Record<string, string> = {
+      subject: 'subject',
+      'composition.subject': 'subject',
+      'document-type': 'document-type',
+      'composition.type': 'document-type',
+      section: 'section',
+      'composition.section': 'section',
+      'section:not': 'exclude-section',
+      'composition.section:not': 'exclude-section',
+      'exclude-section': 'exclude-section',
+      'exclude-sections': 'exclude-section',
+    };
+
+    for (const [key, rawValue] of params.entries()) {
+      const parameterName = parameterNameByQueryKey[String(key || '').trim().toLowerCase()];
+      const value = String(rawValue || '').trim();
+      if (!parameterName || !value) continue;
+      parameter.push({
+        name: parameterName,
+        valueString: value,
+      });
+    }
+
+    return {
+      resourceType: 'Parameters',
+      parameter,
+    };
+  }
+
   private buildSubjectSearchBody(query: string, fhirResource: FhirCommunication): Record<string, unknown> {
     const payload = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload[0] : undefined;
     const attachment = payload?.contentAttachment;
@@ -392,7 +442,7 @@ export class CommunicationManager implements IJobProcessor {
       try {
         return JSON.parse(Buffer.from(dataBase64, 'base64').toString('utf8'));
       } catch {
-        // Fall back to query string conversion below.
+        // Fall through to query-string conversion.
       }
     }
 
@@ -425,8 +475,8 @@ export class CommunicationManager implements IJobProcessor {
     if (!tenantExists) return;
 
     const rawSubject =
-      (entry?.meta?.claims?.['Communication.subject'] as string | undefined)
-      || (entry?.resource?.meta?.claims?.['Communication.subject'] as string | undefined)
+      (entry?.meta?.claims?.[CommunicationClaim.Subject] as string | undefined)
+      || (entry?.resource?.meta?.claims?.[CommunicationClaim.Subject] as string | undefined)
       || (fhirResource?.subject as any)?.reference
       || '';
     const subject = String(rawSubject || '').replace(/^Patient\//i, '').trim();
@@ -437,28 +487,69 @@ export class CommunicationManager implements IJobProcessor {
       || (entry?.resource?.meta?.claims?.['Composition.section'] as string | undefined)
       || '',
     ).trim();
+    const claimsType = String(
+      (entry?.meta?.claims?.['Composition.type'] as string | undefined)
+      || (entry?.resource?.meta?.claims?.['Composition.type'] as string | undefined)
+      || '',
+    ).trim();
+    const payloadComposition = this.extractCompositionResourceFromCommunicationPayload(fhirResource);
+    const embeddedClaims = payloadComposition?.meta?.claims && typeof payloadComposition.meta.claims === 'object'
+      ? normalizeContextualizedClaims(payloadComposition.meta.claims as Record<string, any>)
+      : undefined;
     const payloadSection = this.extractCompositionSectionFromCommunicationPayload(fhirResource);
-    const sectionCode = claimsSection || payloadSection || HealthcareBasicSections.PatientSummaryDocument.claim;
+    const payloadType = this.extractCompositionTypeFromCommunicationPayload(fhirResource);
+    const sectionCode = claimsSection || payloadSection || HealthcareBasicSections.HistoryOfMedicationUse.attributeValue;
+    const typeCode = claimsType || payloadType || HealthcareBasicSections.PatientSummaryDocument.attributeValue;
 
     const sent = String(
-      (entry?.meta?.claims?.['Communication.sent'] as string | undefined)
-      || (entry?.resource?.meta?.claims?.['Communication.sent'] as string | undefined)
+      (entry?.meta?.claims?.[CommunicationClaim.Sent] as string | undefined)
+      || (entry?.resource?.meta?.claims?.[CommunicationClaim.Sent] as string | undefined)
       || fhirResource?.sent
       || new Date().toISOString(),
     );
 
-    const recordId = `composition-from-communication-${determineResourceId(String(job.content?.thid || ''), process.env.NODE_ENV)}`;
+    const compositionIdentifier =
+      this.normalizeOptionalString(payloadComposition?.identifier?.[0]?.value)
+      || this.getFirstClaimValue(embeddedClaims || {}, ['Composition.identifier', 'Composition.identifier.value'])
+      || this.normalizeOptionalString(payloadComposition?.id)
+      || `urn:uuid:${uuidv4()}`;
     const claims = normalizeContextualizedClaims({
       '@context': 'org.hl7.fhir.r4',
-      'Composition.identifier': recordId,
+      'Composition.identifier': compositionIdentifier,
       'Composition.subject': subject,
       'Composition.section': sectionCode,
       'Composition.author': serverDid,
       'Composition.date': sent,
-      'Composition.type': sectionCode,
+      'Composition.type': typeCode,
       'Composition.source': 'Communication',
     });
+    if (embeddedClaims) {
+      Object.assign(claims, embeddedClaims);
+    }
+    const fallbackId =
+      this.normalizeOptionalString(payloadComposition?.id)
+      || determineResourceId(compositionIdentifier, process.env.NODE_ENV);
+    applyFhirCidVersioningToEntry({
+      entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: 'Composition', id: fallbackId } },
+      claims,
+      resourceType: 'Composition',
+      resourceId: fallbackId,
+    });
+    const contentVersionId = claimsToContentCid(claims).cid;
+    claims['Composition.meta.versionId'] = contentVersionId;
+    claims['org.hl7.fhir.r4.Composition.meta.versionId'] = contentVersionId;
     const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
+    const versionId = this.normalizeOptionalString(
+      claims['Composition.meta.versionId']
+      || claims['org.hl7.fhir.r4.Composition.meta.versionId'],
+    );
+    if (versionId) {
+      const exists = await this.hasSectionRecordWithClaims(tenantVaultId, sectionId, [
+        { name: 'Composition.meta.versionId', value: versionId },
+      ]);
+      if (exists) return;
+    }
+    const recordId = this.buildStableProjectionRecordId('composition-from-communication', compositionIdentifier);
     await this.vaultRepository.put(tenantVaultId, [{ id: recordId, ...claims } as any], sectionId);
   }
 
@@ -511,19 +602,19 @@ export class CommunicationManager implements IJobProcessor {
         channel: 'communication',
       },
       resource: commMsg,
-      'Communication.identifier': this.resolveCommunicationIdentifier(entry, fhirResource),
-      'Communication.subject': subject,
-      'Communication.recipient': this.resolveCommunicationRecipient(entry, fhirResource),
-      'Communication.sender': this.resolveCommunicationSender(entry, fhirResource),
-      'Communication.sent': sent,
-      'Communication.note-text': noteText || undefined,
+      [CommunicationClaim.Identifier]: this.resolveCommunicationIdentifier(entry, fhirResource),
+      [CommunicationClaim.Subject]: subject,
+      [CommunicationClaim.Recipient]: this.resolveCommunicationRecipient(entry, fhirResource),
+      [CommunicationClaim.Sender]: this.resolveCommunicationSender(entry, fhirResource),
+      [CommunicationClaim.Sent]: sent,
+      [CommunicationClaim.NoteText]: noteText || undefined,
       meta: {
         payloadCount: payloads.length,
         documentReferenceCount: attachmentCount,
       },
     };
     if (contentReferences.length > 0) {
-      record['Communication.content-reference'] = contentReferences.join(',');
+      record[CommunicationClaim.ContentReference] = contentReferences.join(',');
     }
 
     const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'communications');
@@ -547,6 +638,28 @@ export class CommunicationManager implements IJobProcessor {
       const parsed = this.parseDocumentBundle(decoded);
       if (!parsed) return undefined;
       const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
+      const sectionCoding = compositionEntry?.resource?.section?.[0]?.code?.coding?.[0];
+      if (sectionCoding?.system && sectionCoding?.code) {
+        return `${sectionCoding.system}|${sectionCoding.code}`;
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
+  }
+
+  private extractCompositionTypeFromCommunicationPayload(fhirResource: FhirCommunication): string | undefined {
+    const payload = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload[0] : undefined;
+    const resolvedAttachment = this.resolveCommunicationPayloadAttachment(payload);
+    const contentType = String(resolvedAttachment?.documentAttachment?.contentType || '').toLowerCase();
+    const encodedData = String(resolvedAttachment?.documentAttachment?.data || '').trim();
+    if (!encodedData || !contentType.includes('json')) return undefined;
+
+    try {
+      const decoded = Buffer.from(encodedData, 'base64').toString('utf8');
+      const parsed = this.parseDocumentBundle(decoded);
+      if (!parsed) return undefined;
+      const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
       const coding = compositionEntry?.resource?.type?.coding?.[0];
       if (coding?.system && coding?.code) {
         return `${coding.system}|${coding.code}`;
@@ -554,6 +667,7 @@ export class CommunicationManager implements IJobProcessor {
     } catch {
       return undefined;
     }
+
     return undefined;
   }
 
@@ -590,7 +704,6 @@ export class CommunicationManager implements IJobProcessor {
       });
       if (!cid) continue;
 
-      const recordId = `documentreference-from-communication-${determineResourceId(String(cid), process.env.NODE_ENV)}`;
       const documentReference = resolvedAttachment.documentReference;
       const embeddedClaims = documentReference?.meta?.claims && typeof documentReference.meta.claims === 'object'
         ? normalizeContextualizedClaims(documentReference.meta.claims as Record<string, any>)
@@ -620,6 +733,11 @@ export class CommunicationManager implements IJobProcessor {
       }
 
       const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'document-references');
+      const alreadyIndexed = await this.hasSectionRecordWithClaims(tenantVaultId, sectionId, [
+        { name: 'DocumentReference.contenthash', value: cid },
+      ]);
+      if (alreadyIndexed) continue;
+      const recordId = this.buildStableProjectionRecordId('documentreference-from-communication', cid);
       await this.vaultRepository.put(tenantVaultId, [{ id: recordId, ...claims } as any], sectionId);
     }
   }
@@ -668,6 +786,21 @@ export class CommunicationManager implements IJobProcessor {
       multihash,
     ]);
     return encodeMultibase58btc(new Uint8Array(cidBytes));
+  }
+
+  private buildStableProjectionRecordId(prefix: string, identity: string): string {
+    const digest = createHash('sha256').update(String(identity || ''), 'utf8').digest('hex');
+    return `${prefix}-${digest}`;
+  }
+
+  private async hasSectionRecordWithClaims(
+    tenantVaultId: string,
+    sectionId: string,
+    where: Array<{ name: string; value: string }>,
+  ): Promise<boolean> {
+    if (!Array.isArray(where) || where.length === 0) return false;
+    const matches = await this.vaultRepository.query(tenantVaultId, { sectionId, where });
+    return Array.isArray(matches) && matches.length > 0;
   }
 
   private async persistProjectedResourcesFromCommunication(
@@ -882,8 +1015,8 @@ export class CommunicationManager implements IJobProcessor {
     const entryResource = { ...resource };
     const claims: Record<string, any> = {};
     if (noteText) {
-      claims['Communication.note-text'] = noteText;
-      claims['Communication.text'] = noteText;
+      claims[CommunicationClaim.NoteText] = noteText;
+      claims[CommunicationClaim.Text] = noteText;
     }
 
     return {
@@ -939,8 +1072,8 @@ export class CommunicationManager implements IJobProcessor {
           resource: { text: noteText },
           meta: {
             claims: {
-              'Communication.note-text': noteText,
-              'Communication.text': noteText,
+              [CommunicationClaim.NoteText]: noteText,
+              [CommunicationClaim.Text]: noteText,
             },
           },
         });
@@ -990,11 +1123,11 @@ export class CommunicationManager implements IJobProcessor {
   private buildFhirCommunicationFromClaims(claims: Record<string, any> | undefined): FhirCommunication | undefined {
     if (!claims || typeof claims !== 'object') return undefined;
 
-    const sent = claims['Communication.sent'];
-    const subject = claims['Communication.subject'];
-    const recipient = claims['Communication.recipient'];
-    const sender = claims['Communication.sender'];
-    const text = claims['Communication.text'];
+    const sent = claims[CommunicationClaim.Sent];
+    const subject = claims[CommunicationClaim.Subject];
+    const recipient = claims[CommunicationClaim.Recipient];
+    const sender = claims[CommunicationClaim.Sender];
+    const text = claims[CommunicationClaim.Text];
 
     const toRefs = typeof recipient === 'string'
       ? recipient.split(',').map((r: string) => r.trim()).filter(Boolean).map((reference: string) => ({ reference }))
@@ -1025,8 +1158,8 @@ export class CommunicationManager implements IJobProcessor {
       ? (fhirResource as any).identifier.find((item: any) => typeof item?.value === 'string')?.value
       : undefined;
     return this.normalizeOptionalString(
-      entry?.meta?.claims?.['Communication.identifier']
-      || entry?.resource?.meta?.claims?.['Communication.identifier']
+      entry?.meta?.claims?.[CommunicationClaim.Identifier]
+      || entry?.resource?.meta?.claims?.[CommunicationClaim.Identifier]
       || resourceIdentifier
       || (fhirResource as any)?.id,
     );
@@ -1034,15 +1167,15 @@ export class CommunicationManager implements IJobProcessor {
 
   private resolveCommunicationSubject(entry: any, fhirResource: FhirCommunication): string | undefined {
     const raw = this.normalizeOptionalString(
-      entry?.meta?.claims?.['Communication.subject']
-      || entry?.resource?.meta?.claims?.['Communication.subject']
+      entry?.meta?.claims?.[CommunicationClaim.Subject]
+      || entry?.resource?.meta?.claims?.[CommunicationClaim.Subject]
       || (fhirResource?.subject as any)?.reference,
     );
     return raw?.replace(/^Patient\//i, '').trim();
   }
 
   private resolveCommunicationRecipient(entry: any, fhirResource: FhirCommunication): string | undefined {
-    const claimValue = entry?.meta?.claims?.['Communication.recipient'] || entry?.resource?.meta?.claims?.['Communication.recipient'];
+    const claimValue = entry?.meta?.claims?.[CommunicationClaim.Recipient] || entry?.resource?.meta?.claims?.[CommunicationClaim.Recipient];
     if (typeof claimValue === 'string' && claimValue.trim()) return claimValue.trim();
     const recipients = Array.isArray(fhirResource?.recipient)
       ? fhirResource.recipient.map((recipient) => String(recipient?.reference || '').trim()).filter(Boolean)
@@ -1052,16 +1185,16 @@ export class CommunicationManager implements IJobProcessor {
 
   private resolveCommunicationSender(entry: any, fhirResource: FhirCommunication): string | undefined {
     return this.normalizeOptionalString(
-      entry?.meta?.claims?.['Communication.sender']
-      || entry?.resource?.meta?.claims?.['Communication.sender']
+      entry?.meta?.claims?.[CommunicationClaim.Sender]
+      || entry?.resource?.meta?.claims?.[CommunicationClaim.Sender]
       || (fhirResource?.sender as any)?.reference,
     );
   }
 
   private resolveCommunicationSent(entry: any, fhirResource: FhirCommunication): string | undefined {
     return this.normalizeOptionalString(
-      entry?.meta?.claims?.['Communication.sent']
-      || entry?.resource?.meta?.claims?.['Communication.sent']
+      entry?.meta?.claims?.[CommunicationClaim.Sent]
+      || entry?.resource?.meta?.claims?.[CommunicationClaim.Sent]
       || (fhirResource as any)?.sent,
     );
   }
@@ -1156,6 +1289,24 @@ export class CommunicationManager implements IJobProcessor {
       return [parsed as Record<string, any>];
     }
     return [];
+  }
+
+  private extractCompositionResourceFromCommunicationPayload(
+    fhirResource: FhirCommunication,
+  ): Record<string, any> | undefined {
+    const payloads = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload : [];
+    for (const payload of payloads) {
+      const attachment = this.resolveCommunicationPayloadAttachment(payload)?.documentAttachment;
+      if (!attachment || typeof attachment !== 'object') continue;
+      const parsed = this.parseAttachmentJson(attachment);
+      const documentBundle = this.asDocumentBundle(parsed);
+      if (!documentBundle) continue;
+      const composition = documentBundle.entry
+        .map((bundleEntry: any) => bundleEntry?.resource as Record<string, any> | undefined)
+        .find((resource: Record<string, any> | undefined) => resource?.resourceType === 'Composition');
+      if (composition) return composition;
+    }
+    return undefined;
   }
 
   private asDocumentBundle(parsed: any): any | undefined {
