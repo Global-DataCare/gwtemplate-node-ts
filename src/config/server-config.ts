@@ -200,6 +200,7 @@ export function getConfig(): IServerConfig {
       host: {
         legalName: getHostEnv('LEGAL_NAME'),
         jurisdiction: getHostEnv('JURISDICTION'),
+        coverageScope: process.env.HOST_COVERAGE_SCOPE || 'EU',
         idType: getHostEnv('ID_TYPE'),
         idValue: getHostEnv('ID_VALUE'),
         adminEmail: getHostEnv('ADMIN_EMAIL'),

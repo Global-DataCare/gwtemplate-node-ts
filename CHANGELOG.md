@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+### Changed
+- Added explicit host coverage-scope configuration with `HOST_COVERAGE_SCOPE`,
+  defaulting to `EU` when unset.
+- Updated all shipped env templates so deployments that previously used
+  `HOST_JURISDICTION=EU` as a discovery scope now publish that meaning through
+  `HOST_COVERAGE_SCOPE=EU`, while keeping `HOST_JURISDICTION` available for the
+  host legal jurisdiction.
+- Regenerated the local core-flow and Swagger/OpenAPI profile artifacts after
+  the host coverage-scope configuration alignment.
+
+### Testing
+- `npm run build`
+
 ## [1.8.0] - 2026-06-04
 
 ### Added

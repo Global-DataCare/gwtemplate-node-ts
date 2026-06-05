@@ -60,6 +60,7 @@ export interface IServerConfig {
   host: {
     legalName?: string;
     jurisdiction?: string;
+    coverageScope?: string;
     idType?: string;
     idValue?: string;
     adminEmail?: string;
