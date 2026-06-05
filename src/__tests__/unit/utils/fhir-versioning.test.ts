@@ -7,18 +7,20 @@ import {
 } from '../../../utils/fhir-versioning';
 
 describe('fhir-versioning utils', () => {
-  it('builds deterministic CID while ignoring pre-existing meta.versionId', () => {
+  it('builds deterministic CID while ignoring top-level id, meta, and narrative text', () => {
     const a = {
       resourceType: 'Patient',
       id: '68a78f38-7d7d-4f6e-b6ef-0d0066f8c241',
-      meta: { versionId: 'old' },
+      meta: { versionId: 'old', lastUpdated: '2026-06-05T10:00:00Z' },
+      text: { status: 'generated', div: '<div xmlns="http://www.w3.org/1999/xhtml">Alpha</div>' },
       name: [{ family: 'Lopez', given: ['Ana'] }],
     };
     const b = {
       name: [{ given: ['Ana'], family: 'Lopez' }],
       resourceType: 'Patient',
-      id: '68a78f38-7d7d-4f6e-b6ef-0d0066f8c241',
-      meta: { versionId: 'new' },
+      id: 'patient-replayed-002',
+      meta: { versionId: 'new', source: 'ips-replay' },
+      text: { status: 'generated', div: '<div xmlns="http://www.w3.org/1999/xhtml">Beta</div>' },
     };
 
     const cidA = fhirResourceToCid(a);
@@ -69,6 +71,9 @@ describe('fhir-versioning utils', () => {
 
   it('canonicalizes recursively', () => {
     const canonical = canonicalizeFhirResource({
+      id: 'ignored',
+      meta: { versionId: 'ignored', source: 'ignored' },
+      text: { div: '<div>ignored</div>' },
       b: { z: 1, a: 2 },
       a: [{ d: 1, c: 2 }],
     });

@@ -1,7 +1,14 @@
-## [Unreleased]
+## [1.8.2] - 2026-06-05
 
 ### Changed
 - Updated the shared dependency target to `gdc-common-utils-ts@^1.18.1`.
+- Aligned FHIR resource versioning with the clinical replay contract:
+  - resource canonicalization for `versionId` now excludes top-level `id`,
+    `meta`, and narrative `text`
+  - the hash now uses multibase58btc SHA3-384 multihash bytes
+  - `Communication` IPS projections now skip duplicate clinical section
+    entries by resource `meta.versionId`, even when the replayed IPS changes
+    document/container ids or dates
 - Added explicit host coverage-scope configuration with `HOST_COVERAGE_SCOPE`,
   defaulting to `EU` when unset.
 - Switched the host-scoped DSP discovery and ping surface from legal
@@ -20,6 +27,7 @@
   the host coverage-scope configuration alignment.
 
 ### Testing
+- `npm test -- --watchman=false src/__tests__/unit/utils/fhir-versioning.test.ts src/__tests__/unit/managers/CommunicationManager.unit.test.ts src/__tests__/integration/medication-statement.api.test.ts`
 - `npm test -- --watchman=false src/__tests__/integration/wellKnownApi.test.ts src/__tests__/unit/utils/swagger-spec.test.ts src/__tests__/unit/utils/dataspace.did-services.compliance.test.ts`
 - `npm run build`
 

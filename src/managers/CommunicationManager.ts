@@ -830,15 +830,25 @@ export class CommunicationManager implements IJobProcessor {
           this.getFirstClaimValue(claims, config.identifierClaimKeys)
           || `urn:uuid:${uuidv4()}`;
         const fallbackId = determineResourceId(identifier, process.env.NODE_ENV);
-        applyFhirCidVersioningToEntry({
+        const versioning = applyFhirCidVersioningToEntry({
           entry: { resource },
           claims,
           resourceType,
           resourceId: fallbackId,
         });
+        const versionId = this.getFirstClaimValue(claims, [
+          `${resourceType}.meta.versionId`,
+        ]);
 
-        const recordId = String(resource?.id || fallbackId);
         const sectionId = getSubjectScopedSectionId(subjectRef, SUBJECT_SECTION_INDIVIDUAL, config.section);
+        if (versionId) {
+          const alreadyIndexed = await this.hasSectionRecordWithClaims(tenantVaultId, sectionId, [
+            { name: `${resourceType}.meta.versionId`, value: versionId },
+          ]);
+          if (alreadyIndexed) continue;
+        }
+
+        const recordId = String(resource?.id || versioning.versionId || fallbackId);
         const record: Record<string, any> = {
           id: recordId,
           ...claims,

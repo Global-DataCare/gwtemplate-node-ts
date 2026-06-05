@@ -737,6 +737,184 @@ describe('CommunicationManager Unit Tests', () => {
       ).toBe('urn:uuid:medication-embedded-001');
     });
 
+    it('does not project duplicate clinical resources when the replayed IPS changes container ids, dates, and narrative text', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+
+      const buildDocumentBundle = (suffix: string, compositionDate: string) => ({
+        resourceType: 'Bundle',
+        type: 'document',
+        entry: [
+          {
+            resource: {
+              resourceType: 'Composition',
+              id: `ips-composition-${suffix}`,
+              status: 'final',
+              date: compositionDate,
+              text: {
+                status: 'generated',
+                div: `<div xmlns="http://www.w3.org/1999/xhtml">Narrative ${suffix}</div>`,
+              },
+              subject: { reference: subjectDid },
+              type: { coding: [{ system: 'http://loinc.org', code: '60591-5' }] },
+              section: [{ code: { coding: [{ system: 'http://loinc.org', code: '10160-0' }] } }],
+            },
+          },
+          {
+            resource: {
+              resourceType: 'MedicationStatement',
+              id: `medication-${suffix}`,
+              status: 'active',
+              subject: { reference: subjectDid },
+              effectiveDateTime: '2026-05-22T10:00:00Z',
+              medicationCodeableConcept: {
+                text: 'Paracetamol 500mg',
+                coding: [{ system: 'http://www.nlm.nih.gov/research/umls/rxnorm', code: '161' }],
+              },
+              identifier: [{ value: 'urn:uuid:medication-stable-001' }],
+              meta: {
+                source: `ips-${suffix}`,
+              },
+              text: {
+                status: 'generated',
+                div: `<div xmlns="http://www.w3.org/1999/xhtml">Medication ${suffix}</div>`,
+              },
+            },
+          },
+          {
+            resource: {
+              resourceType: 'Observation',
+              id: `observation-${suffix}`,
+              status: 'final',
+              subject: { reference: subjectDid },
+              effectiveDateTime: '2026-05-22T11:00:00Z',
+              code: {
+                coding: [{ system: 'http://loinc.org', code: '8310-5' }],
+                text: 'Body temperature',
+              },
+              identifier: [{ value: 'urn:uuid:observation-stable-001' }],
+              meta: {
+                tag: [{ code: `ips-${suffix}` }],
+              },
+              text: {
+                status: 'generated',
+                div: `<div xmlns="http://www.w3.org/1999/xhtml">Observation ${suffix}</div>`,
+              },
+            },
+          },
+        ],
+      });
+
+      const makeDecoded = (thid: string, suffix: string, sent: string): IDecodedDidcommPayload => ({
+        jti: randomUUID(),
+        thid,
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [
+            {
+              type: 'Communication',
+              meta: {
+                claims: {
+                  '@context': 'org.hl7.fhir.r4',
+                  'Communication.identifier': `comm-${suffix}`,
+                  'Communication.subject': subjectDid,
+                  'Communication.sent': sent,
+                  'Composition.section': 'LOINC|10160-0',
+                },
+              },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                sent,
+                payload: [
+                  {
+                    contentAttachment: {
+                      contentType: 'application/fhir+json',
+                      title: `ips-${suffix}.json`,
+                      data: Buffer.from(JSON.stringify(buildDocumentBundle(suffix, sent)), 'utf8').toString('base64'),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as any,
+      });
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: makeDecoded('thread-ips-replay-1', 'v1', '2026-05-22T10:00:00Z'),
+      };
+
+      await communicationManager.process(job);
+
+      const tenantVaultId = 'health-care_acme';
+      const medicationsSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'medications');
+      const observationsSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'observations');
+      const firstMedicationPut = mockVaultRepository.put.mock.calls.find(
+        (args) => args[0] === tenantVaultId && args[2] === medicationsSectionId,
+      );
+      const firstObservationPut = mockVaultRepository.put.mock.calls.find(
+        (args) => args[0] === tenantVaultId && args[2] === observationsSectionId,
+      );
+      expect(firstMedicationPut).toBeDefined();
+      expect(firstObservationPut).toBeDefined();
+
+      const firstMedicationRecord = (firstMedicationPut?.[1] as any[])[0];
+      const firstObservationRecord = (firstObservationPut?.[1] as any[])[0];
+      const medicationVersionId =
+        firstMedicationRecord['MedicationStatement.meta.versionId']
+        || firstMedicationRecord['org.hl7.fhir.api.MedicationStatement.meta.versionId'];
+      const observationVersionId =
+        firstObservationRecord['Observation.meta.versionId']
+        || firstObservationRecord['org.hl7.fhir.api.Observation.meta.versionId'];
+      expect(typeof medicationVersionId).toBe('string');
+      expect(typeof observationVersionId).toBe('string');
+
+      mockVaultRepository.put.mockClear();
+      mockVaultRepository.query.mockImplementation(async (_tenantVaultId, query) => {
+        const where = Array.isArray(query?.where) ? query.where : [];
+        const matchesMedication = where.some(
+          (condition: any) => condition?.name === 'MedicationStatement.meta.versionId' && condition?.value === medicationVersionId,
+        );
+        const matchesObservation = where.some(
+          (condition: any) => condition?.name === 'Observation.meta.versionId' && condition?.value === observationVersionId,
+        );
+        return matchesMedication || matchesObservation ? [{ id: 'existing-projection' }] as any : [];
+      });
+
+      await communicationManager.process({
+        ...job,
+        id: randomUUID(),
+        content: makeDecoded('thread-ips-replay-2', 'v2', '2026-06-01T09:30:00Z'),
+      });
+
+      const secondMedicationPuts = mockVaultRepository.put.mock.calls.filter(
+        (args) => args[0] === tenantVaultId && args[2] === medicationsSectionId,
+      );
+      const secondObservationPuts = mockVaultRepository.put.mock.calls.filter(
+        (args) => args[0] === tenantVaultId && args[2] === observationsSectionId,
+      );
+      expect(secondMedicationPuts).toHaveLength(0);
+      expect(secondObservationPuts).toHaveLength(0);
+    });
+
     it('does not persist the same Composition projection twice when the document is resent in another Communication thread', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);

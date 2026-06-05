@@ -11,11 +11,332 @@ import { initializeTenantServicesConfig } from '../../utils/services';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
+import { getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { testTenant1TenantId } from '../data/organization.data';
 
 describe('MedicationStatement API (integration)', () => {
   afterEach(() => {
     resetServerConfig();
+  });
+
+  it('does not create an IPS index section and does not duplicate extracted clinical sections when a replayed IPS changes only container metadata', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.DB_PROVIDER = 'mem';
+    process.env.STORAGE_PROVIDER = 'mem';
+    process.env.QUEUE_PROVIDER = 'mem';
+    process.env.SECTORS_ALLOWED = 'health-care';
+    process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
+    process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.HOST_COVERAGE_SCOPE = 'EU';
+    process.env.ORG_HOST_ID_TYPE = 'TAX';
+    process.env.ORG_HOST_ID_VALUE = 'A0011223344';
+    process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
+    process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
+    process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.JSON_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+
+    resetServerConfig();
+
+    const { app, queueAdapter, tenantManager, vaultRepository, kmsService } = await startServer({ listen: false });
+    try {
+      const hostBootstrapClaims = {
+        [ClaimsOrganizationSchemaorg.addressCountry]: process.env.ORG_HOST_JURISDICTION,
+        [ClaimsOrganizationSchemaorg.identifierType]: process.env.ORG_HOST_ID_TYPE,
+        [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
+        [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+      };
+      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
+
+      const tenantConfig = {
+        claims: tenantClaims,
+        didConfig: { service: initializeTenantServicesConfig(Sector.HEALTH_CARE) },
+        didDocument: { id: 'did:web:api.acme.org', '@context': 'https://www.w3.org/ns/did/v1' },
+      };
+
+      await kmsService.provisionKeys(tenantVaultId);
+      const secureTenantRecord = await kmsService.protectConfidentialData(
+        { id: tenantVaultId, sequence: 0, content: tenantConfig } as any,
+        'host',
+      );
+      await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
+      await tenantManager.getTenant(tenantVaultId);
+
+      const subjectDid = 'did:web:api.acme.org:individual:replay-clinical-001';
+      const canonicalSectionIds = {
+        communications: getSubjectScopedSectionId(subjectDid, 'individual', 'communications'),
+        composition: getSubjectScopedSectionId(subjectDid, 'individual', 'composition'),
+        documentReferences: getSubjectScopedSectionId(subjectDid, 'individual', 'document-references'),
+        medications: getSubjectScopedSectionId(subjectDid, 'individual', 'medications'),
+        conditions: getSubjectScopedSectionId(subjectDid, 'individual', 'conditions'),
+        allergies: getSubjectScopedSectionId(subjectDid, 'individual', 'allergies'),
+        observations: getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
+      };
+
+      const buildIpsDocumentReference = (suffix: string, sent: string) => {
+        const documentBundle = {
+          resourceType: 'Bundle',
+          type: 'document',
+          entry: [
+            {
+              resource: {
+                resourceType: 'Composition',
+                id: `ips-composition-${suffix}`,
+                status: 'final',
+                date: sent,
+                text: {
+                  status: 'generated',
+                  div: `<div xmlns="http://www.w3.org/1999/xhtml">IPS ${suffix}</div>`,
+                },
+                type: {
+                  coding: [{
+                    system: HealthcareBasicSections.PatientSummaryDocument.system,
+                    code: HealthcareBasicSections.PatientSummaryDocument.code,
+                    display: 'Patient summary Document',
+                  }],
+                },
+                subject: { reference: subjectDid },
+                section: [
+                  {
+                    code: {
+                      coding: [{
+                        system: HealthcareBasicSections.HistoryOfMedicationUse.system,
+                        code: HealthcareBasicSections.HistoryOfMedicationUse.code,
+                      }],
+                    },
+                    entry: [{ reference: `MedicationStatement/medication-${suffix}` }],
+                  },
+                  {
+                    code: {
+                      coding: [{
+                        system: HealthcareBasicSections.ProblemList.system,
+                        code: HealthcareBasicSections.ProblemList.code,
+                      }],
+                    },
+                    entry: [{ reference: `Condition/condition-${suffix}` }],
+                  },
+                  {
+                    code: {
+                      coding: [{
+                        system: HealthcareBasicSections.AllergiesAndIntolerances.system,
+                        code: HealthcareBasicSections.AllergiesAndIntolerances.code,
+                      }],
+                    },
+                    entry: [{ reference: `AllergyIntolerance/allergy-${suffix}` }],
+                  },
+                  {
+                    code: {
+                      coding: [{
+                        system: HealthcareBasicSections.Results.system,
+                        code: HealthcareBasicSections.Results.code,
+                      }],
+                    },
+                    entry: [{ reference: `Observation/observation-${suffix}` }],
+                  },
+                ],
+              },
+            },
+            {
+              resource: {
+                resourceType: 'MedicationStatement',
+                id: `medication-${suffix}`,
+                status: 'active',
+                subject: { reference: subjectDid },
+                effectiveDateTime: '2026-05-22T10:00:00Z',
+                medicationCodeableConcept: {
+                  text: 'Paracetamol 500 mg',
+                  coding: [{ system: 'http://www.nlm.nih.gov/research/umls/rxnorm', code: '161' }],
+                },
+                identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:medication-stable-001' }],
+                text: {
+                  status: 'generated',
+                  div: `<div xmlns="http://www.w3.org/1999/xhtml">Medication ${suffix}</div>`,
+                },
+              },
+            },
+            {
+              resource: {
+                resourceType: 'Condition',
+                id: `condition-${suffix}`,
+                clinicalStatus: {
+                  coding: [{ system: 'http://terminology.hl7.org/CodeSystem/condition-clinical', code: 'active' }],
+                },
+                subject: { reference: subjectDid },
+                code: {
+                  coding: [{ system: 'http://snomed.info/sct', code: '38341003' }],
+                  text: 'Hypertension',
+                },
+                identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:condition-stable-001' }],
+                recordedDate: '2026-05-22T10:00:00Z',
+                text: {
+                  status: 'generated',
+                  div: `<div xmlns="http://www.w3.org/1999/xhtml">Condition ${suffix}</div>`,
+                },
+              },
+            },
+            {
+              resource: {
+                resourceType: 'AllergyIntolerance',
+                id: `allergy-${suffix}`,
+                clinicalStatus: {
+                  coding: [{ system: 'http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical', code: 'active' }],
+                },
+                patient: { reference: subjectDid },
+                code: {
+                  coding: [{ system: 'http://snomed.info/sct', code: '91936005' }],
+                  text: 'Allergy to penicillin',
+                },
+                identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:allergy-stable-001' }],
+                recordedDate: '2026-05-22T10:00:00Z',
+                text: {
+                  status: 'generated',
+                  div: `<div xmlns="http://www.w3.org/1999/xhtml">Allergy ${suffix}</div>`,
+                },
+              },
+            },
+            {
+              resource: {
+                resourceType: 'Observation',
+                id: `observation-${suffix}`,
+                status: 'final',
+                subject: { reference: subjectDid },
+                effectiveDateTime: '2026-05-22T11:00:00Z',
+                code: {
+                  coding: [{ system: 'http://loinc.org', code: '8310-5' }],
+                  text: 'Body temperature',
+                },
+                identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:observation-stable-001' }],
+                text: {
+                  status: 'generated',
+                  div: `<div xmlns="http://www.w3.org/1999/xhtml">Observation ${suffix}</div>`,
+                },
+              },
+            },
+          ],
+        };
+
+        return {
+          resourceType: 'DocumentReference',
+          id: `ips-document-reference-${suffix}`,
+          subject: { reference: subjectDid },
+          date: sent,
+          description: `IPS replay ${suffix}`,
+          identifier: [{ system: 'urn:ietf:rfc:3986', value: `urn:uuid:ips-document-reference-${suffix}` }],
+          content: [
+            {
+              attachment: {
+                contentType: 'application/fhir+json',
+                title: `ips-${suffix}.json`,
+                data: Buffer.from(JSON.stringify(documentBundle), 'utf8').toString('base64'),
+              },
+            },
+          ],
+        };
+      };
+
+      const waitForBatch = async (thid: string) => {
+        for (let i = 0; i < 50; i++) {
+          const pollResp = await invokeExpress(app, {
+            method: 'POST',
+            url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+            headers: { 'content-type': 'application/json' },
+            body: { thid },
+          });
+          if (pollResp.status === 200) return JSON.parse(pollResp.text);
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        return undefined;
+      };
+
+      const submitReplay = async (suffix: string, sent: string) => {
+        const embeddedDocumentReference = buildIpsDocumentReference(suffix, sent);
+        const submitResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
+          headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+          body: {
+            thid: `communication-replay-${suffix}`,
+            body: {
+              resourceType: 'Bundle',
+              type: 'batch',
+              entry: [
+                {
+                  request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                  meta: {
+                    claims: {
+                      '@context': 'org.hl7.fhir.r4',
+                      'Communication.identifier': `comm-replay-${suffix}`,
+                      'Communication.subject': subjectDid,
+                      'Communication.sent': sent,
+                      'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+                    },
+                  },
+                  resource: {
+                    resourceType: 'Communication',
+                    status: 'completed',
+                    subject: { reference: subjectDid },
+                    sent,
+                    payload: [
+                      {
+                        contentAttachment: {
+                          contentType: 'application/fhir+json',
+                          title: `ips-document-reference-${suffix}.json`,
+                          data: Buffer.from(JSON.stringify(embeddedDocumentReference), 'utf8').toString('base64'),
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        });
+        expect(submitResp.status).toBe(202);
+        const payload = await waitForBatch(`communication-replay-${suffix}`);
+        expect(payload?.resourceType).toBe('Bundle');
+        expect(payload?.data?.[0]?.response?.status).toBe('200');
+      };
+
+      await submitReplay('v1', '2026-05-22T10:00:00Z');
+
+      const countsAfterFirst = {
+        medications: (await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.medications)).length,
+        conditions: (await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.conditions)).length,
+        allergies: (await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.allergies)).length,
+        observations: (await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.observations)).length,
+      };
+      expect(countsAfterFirst).toEqual({
+        medications: 1,
+        conditions: 1,
+        allergies: 1,
+        observations: 1,
+      });
+
+      const allSectionsAfterFirst = await vaultRepository.getAllSections(tenantVaultId);
+      const knownSubjectScopedSections = new Set(Object.values(canonicalSectionIds));
+      const unexpectedSubjectSections = allSectionsAfterFirst.filter((sectionId) =>
+        sectionId.includes('individual_') && !knownSubjectScopedSections.has(sectionId),
+      );
+      expect(unexpectedSubjectSections).toEqual([]);
+
+      await submitReplay('v2', '2026-06-01T09:30:00Z');
+
+      const countsAfterSecond = {
+        medications: (await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.medications)).length,
+        conditions: (await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.conditions)).length,
+        allergies: (await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.allergies)).length,
+        observations: (await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.observations)).length,
+      };
+      expect(countsAfterSecond).toEqual(countsAfterFirst);
+      expect((await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.communications)).length).toBe(2);
+      expect((await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.documentReferences)).length).toBe(2);
+      expect((await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.composition)).length).toBeGreaterThanOrEqual(1);
+    } finally {
+      queueAdapter.stop();
+    }
   });
 
   it('ingests medications via Communication and retrieves them via MedicationStatement/_search and Bundle/_search', async () => {
@@ -26,6 +347,7 @@ describe('MedicationStatement API (integration)', () => {
     process.env.SECTORS_ALLOWED = 'health-care';
     process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
     process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.HOST_COVERAGE_SCOPE = 'EU';
     process.env.ORG_HOST_ID_TYPE = 'TAX';
     process.env.ORG_HOST_ID_VALUE = 'A0011223344';
     process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
@@ -366,6 +688,7 @@ describe('MedicationStatement API (integration)', () => {
     process.env.SECTORS_ALLOWED = 'health-care';
     process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
     process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.HOST_COVERAGE_SCOPE = 'EU';
     process.env.ORG_HOST_ID_TYPE = 'TAX';
     process.env.ORG_HOST_ID_VALUE = 'A0011223344';
     process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';

@@ -1,7 +1,7 @@
 // src/utils/fhir-versioning.ts
 // Copyright 2026 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { sha256 } from '@noble/hashes/sha2.js';
+import { sha3_384 } from '@noble/hashes/sha3.js';
 import { utf8ToBytes } from '@noble/hashes/utils.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 
@@ -13,10 +13,8 @@ export type FhirCidVersionMapping = {
   versionId: string;
 };
 
-const MULTIHASH_SHA2_256_CODE = 0x12;
-const MULTIHASH_SHA2_256_LEN = 32;
-const CID_V1 = 0x01;
-const DEFAULT_MULTICODEC_DAG_JSON = 0x0129;
+const MULTIHASH_SHA3_384_CODE = 0x15;
+const MULTIHASH_SHA3_384_LEN = 48;
 
 function concatBytes(...parts: Uint8Array[]): Uint8Array {
   const total = parts.reduce((acc, p) => acc + p.length, 0);
@@ -48,10 +46,7 @@ function canonicalizeValue(value: unknown, depth = 0): unknown {
     const keys = Object.keys(asRecord).sort();
     const out: Record<string, unknown> = {};
     for (const key of keys) {
-      if (key === 'meta' && asRecord[key] && typeof asRecord[key] === 'object' && !Array.isArray(asRecord[key])) {
-        const meta = { ...(asRecord[key] as Record<string, unknown>) };
-        delete meta.versionId;
-        out[key] = canonicalizeValue(meta, depth + 1);
+      if (depth === 0 && (key === 'id' || key === 'meta' || key === 'text')) {
         continue;
       }
       out[key] = canonicalizeValue(asRecord[key], depth + 1);
@@ -67,15 +62,10 @@ export function canonicalizeFhirResource(resource: Record<string, unknown>): str
 
 export function fhirResourceToCid(resource: Record<string, unknown>): { cid: string; versionId: string } {
   const canonicalJson = canonicalizeFhirResource(resource);
-  const digest = sha256(utf8ToBytes(canonicalJson));
-  const multihash = concatBytes(Uint8Array.from([MULTIHASH_SHA2_256_CODE, MULTIHASH_SHA2_256_LEN]), digest);
-  const cidBytes = concatBytes(
-    encodeVarint(CID_V1),
-    encodeVarint(DEFAULT_MULTICODEC_DAG_JSON),
-    multihash,
-  );
-  const cid = encodeMultibase58btc(cidBytes);
-  return { cid, versionId: cid };
+  const digest = sha3_384(utf8ToBytes(canonicalJson));
+  const multihash = concatBytes(Uint8Array.from([MULTIHASH_SHA3_384_CODE, MULTIHASH_SHA3_384_LEN]), digest);
+  const versionId = encodeMultibase58btc(multihash);
+  return { cid: versionId, versionId };
 }
 
 export function applyFhirCidVersioningToEntry(params: {
