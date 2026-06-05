@@ -1197,7 +1197,7 @@ describe('CommunicationManager Unit Tests', () => {
     it('forwards Subject/_search referenced in Communication payload with attached Parameters', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
-      mockIndividualManager.process.mockResolvedValue({
+      (mockIndividualManager.process as any).mockResolvedValue({
         jti: randomUUID(),
         iss: testServerDid,
         aud: 'did:web:sender.example',
