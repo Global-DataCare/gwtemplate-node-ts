@@ -39,7 +39,7 @@ Use the same values as your frontend profile (`apptemplate` env).
 ## 1) Health/ping
 
 ```bash
-curl -sS -i "$BASE_URL/host/.well-known/ping"
+curl -sS -i "$BASE_URL/host/ping"
 ```
 
 Expected: HTTP `200`.

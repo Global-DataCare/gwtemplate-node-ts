@@ -62,6 +62,7 @@ export function createDiscoveryRouter(
     publisherDid: string;
     title: string;
     baseUrl: string;
+    didDocumentUrl: string;
     operationalUrl: string;
     alternateName?: string;
     sector?: string;
@@ -178,12 +179,16 @@ export function createDiscoveryRouter(
   const toProviderDataset = (tenantConfig: any): ProviderDataset | null => {
     const publisherDid = tenantConfig?.didDocument?.id as string | undefined;
     if (!publisherDid) return null;
+    const didDocumentUrl =
+      tenantConfig?.didDocument?.service?.find((service: any) => service.id === `${publisherDid}#did-document`)?.serviceEndpoint as string | undefined;
     const title =
       (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.legalName] as string | undefined) ||
       (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.name] as string | undefined) ||
       (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.alternateName] as string | undefined) ||
       publisherDid;
-    const baseUrl = getBaseUrlFromDidWeb(publisherDid);
+    const baseUrl = didDocumentUrl
+      ? didDocumentUrl.replace(/\/\.well-known\/did\.json$/, '')
+      : getBaseUrlFromDidWeb(publisherDid);
     const operationalUrl =
       getTenantServiceClaim(tenantConfig, ClaimsServiceSchemaorg.url) ||
       baseUrl;
@@ -196,6 +201,7 @@ export function createDiscoveryRouter(
       publisherDid,
       title,
       baseUrl,
+      didDocumentUrl: didDocumentUrl || `${baseUrl}/.well-known/did.json`,
       operationalUrl,
       alternateName,
       sector,
@@ -299,7 +305,7 @@ export function createDiscoveryRouter(
       'dcat:distribution': [
         {
           '@type': 'dcat:Distribution',
-          'dcat:accessURL': `${dataset.baseUrl}/.well-known/did.json`,
+          'dcat:accessURL': dataset.didDocumentUrl,
         },
       ],
       'odrl:hasPolicy': {
@@ -456,11 +462,11 @@ export function createDiscoveryRouter(
 
   /**
    * @openapi
-   * /host/.well-known/ping:
+   * /host/ping:
    *   get:
    *     tags: [Discovery]
-   *     summary: Ping (host compatibility alias)
-   *     description: Backward-compatible health check alias for the host tenant.
+   *     summary: Ping (host root)
+   *     description: Root-level liveness check for the host runtime.
    *     responses:
    *       '200': { description: OK }
    *       '503': { description: Service Unavailable }
@@ -488,10 +494,14 @@ export function createDiscoveryRouter(
    *       '200': { description: OK }
    *       '404': { description: Not Found }
    *
-   * /host/.well-known/did.json:
+   * /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/did.json:
    *   get:
    *     tags: [Discovery]
    *     summary: DID document (host)
+   *     parameters:
+   *       - $ref: '#/components/parameters/HostCoverageScope'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
    *     responses:
    *       '200': { description: OK }
    *
@@ -508,10 +518,14 @@ export function createDiscoveryRouter(
    *       '200': { description: OK }
    *       '404': { description: Not Found }
    *
-   * /host/.well-known/jwks.json:
+   * /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/jwks.json:
    *   get:
    *     tags: [Discovery]
    *     summary: JWKS (host)
+   *     parameters:
+   *       - $ref: '#/components/parameters/HostCoverageScope'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
    *     responses:
    *       '200': { description: OK }
    *
@@ -528,10 +542,14 @@ export function createDiscoveryRouter(
    *       '200': { description: OK }
    *       '404': { description: Not Found }
    *
-   * /host/.well-known/openid-configuration:
+   * /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/openid-configuration:
    *   get:
    *     tags: [Discovery]
    *     summary: OpenID configuration (host)
+   *     parameters:
+   *       - $ref: '#/components/parameters/HostCoverageScope'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
    *     responses:
    *       '200': { description: OK }
    *
@@ -548,10 +566,14 @@ export function createDiscoveryRouter(
    *       '200': { description: OK }
    *       '404': { description: Not Found }
    *
-   * /host/.well-known/smart-configuration:
+   * /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/smart-configuration:
    *   get:
    *     tags: [Discovery]
    *     summary: SMART configuration (host)
+   *     parameters:
+   *       - $ref: '#/components/parameters/HostCoverageScope'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
    *     responses:
    *       '200': { description: OK }
    *
@@ -568,10 +590,14 @@ export function createDiscoveryRouter(
    *       '200': { description: OK }
    *       '404': { description: Not Found }
    *
-   * /host/.well-known/legal-participant.vc.json:
+   * /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/legal-participant.vc.json:
    *   get:
    *     tags: [Discovery]
    *     summary: Gaia-X Legal Participant VC (host)
+   *     parameters:
+   *       - $ref: '#/components/parameters/HostCoverageScope'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
    *     responses:
    *       '200': { description: OK }
    *
@@ -665,25 +691,25 @@ export function createDiscoveryRouter(
   
   // --- Route Definitions ---
   // Define separate, unambiguous route structures for host and tenants.
-  const hostWellKnownPrefix = '/host/.well-known';
+  const hostPingPrefix = '/host';
   const hostScopedWellKnownPrefix = '/host/cds-:hostCoverageScope/:version/:hostNetwork/.well-known';
   // This new route aligns with the hosted DID web specification for tenants.
   const tenantWellKnownPrefix = '/:tenantId/cds-:jurisdiction/:version/:sector/.well-known';
 
   router.get(
-    [`${hostWellKnownPrefix}/ping`, `${hostScopedWellKnownPrefix}/ping`, `${tenantWellKnownPrefix}/ping`],
+    [`${hostPingPrefix}/ping`, `${hostScopedWellKnownPrefix}/ping`, `${tenantWellKnownPrefix}/ping`],
     resolveTenant,
     pingHandler(),
   );
 
-  router.get([`${hostWellKnownPrefix}/did.json`, `${tenantWellKnownPrefix}/did.json`], resolveTenant, async (req, res) => {
+  router.get([`${hostScopedWellKnownPrefix}/did.json`, `${tenantWellKnownPrefix}/did.json`], resolveTenant, async (req, res) => {
     // The final handler's responsibility is to fetch the specific document it needs.
     const didDocument = await tenantsCacheManager.getDidDocument(res.locals.vaultId);
     // The existence check was already done in resolveTenant, so we can be confident it exists.
     res.json(didDocument);
   });
 
-  router.get([`${hostWellKnownPrefix}/jwks.json`, `${tenantWellKnownPrefix}/jwks.json`], resolveTenant, async (req, res) => {
+  router.get([`${hostScopedWellKnownPrefix}/jwks.json`, `${tenantWellKnownPrefix}/jwks.json`], resolveTenant, async (req, res) => {
     try {
       const vaultId = res.locals.vaultId;
       const jwks = await kmsService.getPublicJwks(vaultId);
@@ -695,7 +721,7 @@ export function createDiscoveryRouter(
       const legacyDerBase64 = entityConfig?.legacyX509DerBase64;
       if (legacySignAlg && legacyDerBase64 && jwks?.keys?.length) {
         const wellKnownBase = vaultId === 'host'
-          ? hostWellKnownPrefix
+          ? `/host/cds-${req.params.hostCoverageScope}/${req.params.version}/${req.params.hostNetwork}/.well-known`
           : `/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/.well-known`;
         const legacyX5u = `${req.protocol}://${req.get('host')}${wellKnownBase}/x509.der`;
         const combinedChain = legacyDerBase64
@@ -719,7 +745,7 @@ export function createDiscoveryRouter(
     }
   });
 
-  router.get([`${hostWellKnownPrefix}/x509.der`, `${tenantWellKnownPrefix}/x509.der`], resolveTenant, async (req, res) => {
+  router.get([`${hostScopedWellKnownPrefix}/x509.der`, `${tenantWellKnownPrefix}/x509.der`], resolveTenant, async (req, res) => {
     const vaultId = res.locals.vaultId;
     const entityConfig = await tenantsCacheManager.getTenant(vaultId);
     const derBase64 = entityConfig?.legacyX509DerBase64;
@@ -736,7 +762,7 @@ export function createDiscoveryRouter(
 
   // Legacy/dev-friendly: return the tenant's stored legal-participant VC and self-description (if present).
   // Some clients rely on vc.json; serve it as a deprecated alias.
-  router.get([`${hostWellKnownPrefix}/vc.json`, `${tenantWellKnownPrefix}/vc.json`], resolveTenant, async (req, res) => {
+  router.get([`${hostScopedWellKnownPrefix}/vc.json`, `${tenantWellKnownPrefix}/vc.json`], resolveTenant, async (req, res) => {
     const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     const vc = entityConfig?.governanceVc;
     if (!vc) return res.status(404).type('text').send('Not Found');
@@ -744,7 +770,7 @@ export function createDiscoveryRouter(
   });
 
   router.get(
-    [`${hostWellKnownPrefix}/self-description.json`, `${tenantWellKnownPrefix}/self-description.json`],
+    [`${hostScopedWellKnownPrefix}/self-description.json`, `${tenantWellKnownPrefix}/self-description.json`],
     resolveTenant,
     async (req, res) => {
       const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
@@ -754,7 +780,7 @@ export function createDiscoveryRouter(
     },
   );
 
-  router.get([`${hostWellKnownPrefix}/status-list.json`, `${tenantWellKnownPrefix}/status-list.json`], resolveTenant, async (req, res) => {
+  router.get([`${hostScopedWellKnownPrefix}/status-list.json`, `${tenantWellKnownPrefix}/status-list.json`], resolveTenant, async (req, res) => {
     try {
       const vaultId = res.locals.vaultId;
       const entityConfig = await tenantsCacheManager.getTenant(vaultId);
@@ -776,7 +802,7 @@ export function createDiscoveryRouter(
       }
 
       const wellKnownBase = vaultId === 'host'
-        ? hostWellKnownPrefix
+        ? `/host/cds-${req.params.hostCoverageScope}/${req.params.version}/${req.params.hostNetwork}/.well-known`
         : `/${req.params.tenantId}/cds-${req.params.jurisdiction}/${req.params.version}/${req.params.sector}/.well-known`;
       const listUrl = `${req.protocol}://${req.get('host')}${wellKnownBase}/status-list.json`;
       const encodedList = createStatusListEncodedList(STATUS_LIST_BITS);
@@ -815,7 +841,7 @@ export function createDiscoveryRouter(
     }
   });
 
-  router.get([`${hostWellKnownPrefix}/legal-participant.vc.json`, `${tenantWellKnownPrefix}/legal-participant.vc.json`], resolveTenant, async (req, res) => {
+  router.get([`${hostScopedWellKnownPrefix}/legal-participant.vc.json`, `${tenantWellKnownPrefix}/legal-participant.vc.json`], resolveTenant, async (req, res) => {
     const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     const vc = entityConfig?.governanceVc;
     if (!vc) return res.status(404).type('text').send('Not Found');
@@ -838,7 +864,7 @@ export function createDiscoveryRouter(
     res.json(artifact);
   });
 
-  router.get([`${hostWellKnownPrefix}/openid-configuration`, `${tenantWellKnownPrefix}/openid-configuration`], resolveTenant, (req, res) => {
+  router.get([`${hostScopedWellKnownPrefix}/openid-configuration`, `${tenantWellKnownPrefix}/openid-configuration`], resolveTenant, (req, res) => {
     const config = discoveryService.getOpenIdConfiguration(res.locals.vaultId);
     if (config) {
       res.json(config);
@@ -847,7 +873,7 @@ export function createDiscoveryRouter(
     }
   });
 
-  router.get([`${hostWellKnownPrefix}/openid-credential-issuer`, `${tenantWellKnownPrefix}/openid-credential-issuer`], resolveTenant, async (req, res) => {
+  router.get([`${hostScopedWellKnownPrefix}/openid-credential-issuer`, `${tenantWellKnownPrefix}/openid-credential-issuer`], resolveTenant, async (req, res) => {
     const config = await discoveryService.getOpenIdCredentialIssuerMetadata(res.locals.vaultId);
     if (config) {
       res.json(config);
@@ -1223,7 +1249,7 @@ export function createDiscoveryRouter(
     res.status(404).type('text').send('Not Found');
   };
 
-  router.get([`${hostWellKnownPrefix}/smart-configuration`, `${tenantWellKnownPrefix}/smart-configuration`], resolveTenant, checkFhirSector, (req, res) => {
+  router.get([`${hostScopedWellKnownPrefix}/smart-configuration`, `${tenantWellKnownPrefix}/smart-configuration`], resolveTenant, checkFhirSector, (req, res) => {
     const config = discoveryService.getSmartConfiguration(res.locals.vaultId);
     if (config) {
       res.json(config);

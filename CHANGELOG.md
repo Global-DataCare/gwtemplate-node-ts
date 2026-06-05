@@ -1,3 +1,23 @@
+## [1.8.3] - 2026-06-05
+
+### Changed
+- Removed root host `/.well-known` discovery aliases from GW CORE.
+- Host discovery artifacts now publish only under the scoped path:
+  `/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/...`
+- Reserved `/host/ping` as the only root-level host liveness endpoint.
+- Fixed hosted DID/DCAT publication so the public discovery surface no longer
+  falls back to `localhost` when the deployment provides a public URL.
+- Fixed hosted tenant service endpoint generation so operational URLs that
+  already include `/{tenantId}/cds-{jurisdiction}/{version}/{sector}` do not
+  duplicate that path in published DID services.
+- Updated the demo GKE deploy config to export `HOST_DEPLOY_URL` from the
+  static public edge URL, so host and tenant discovery artifacts publish the
+  real public origin after deployment.
+
+### Testing
+- `npm test -- --watchman=false src/__tests__/integration/wellKnownApi.test.ts src/__tests__/integration/hostDemoWellKnown.test.ts src/__tests__/unit/utils/swagger-spec.test.ts`
+- `npm test -- --watchman=false src/__tests__/unit/utils/did-document.test.ts src/__tests__/unit/managers/TenantsCacheManager.url.test.ts src/__tests__/integration/wellKnownApi.test.ts`
+
 ## [1.8.2] - 2026-06-05
 
 ### Changed

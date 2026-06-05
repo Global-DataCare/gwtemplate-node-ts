@@ -114,8 +114,8 @@ echo "  mode=route-smoke payloads=canonical-fixtures"
 echo
 
 # 1) Ping
-CODE="$(call_api GET "$BASE_URL/host/.well-known/ping")"
-assert_ping "Ping host/.well-known/ping" "$CODE"
+CODE="$(call_api GET "$BASE_URL/host/ping")"
+assert_ping "Ping host/ping" "$CODE"
 
 CODE="$(call_api GET "$BASE_URL/host/cds-$JURISDICTION_LOWER/$VERSION/$HOST_NETWORK/.well-known/ping")"
 assert_ping "Ping host scoped .well-known/ping" "$CODE"

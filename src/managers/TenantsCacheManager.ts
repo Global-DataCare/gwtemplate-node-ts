@@ -17,6 +17,18 @@ import { hasProviderServiceCapabilityClaim } from '../utils/services';
 
 const SERVICE_OPERATIONAL_URL_CLAIM = 'org.schema.Service.url';
 
+function getDidDocumentServiceEndpointBaseUrl(didDocument: DidDocument | undefined, suffix: string): string | undefined {
+  const endpoint = didDocument?.service?.find((service) => service.id === `${didDocument.id}${suffix}`)?.serviceEndpoint as string | undefined;
+  if (!endpoint || typeof endpoint !== 'string') {
+    return undefined;
+  }
+  const parsed = new URL(endpoint);
+  const normalizedPath = suffix === '#did-document'
+    ? parsed.pathname.replace(/\/\.well-known\/did\.json$/, '')
+    : parsed.pathname.replace(/\/jwks\.json$/, '');
+  return `${parsed.protocol}//${parsed.host}${normalizedPath}`.replace(/\/$/, '');
+}
+
 function getTenantServiceClaim(tenantConfig: any, claimName: string): string | undefined {
   const topLevelClaim = tenantConfig?.claims?.[claimName];
   if (typeof topLevelClaim === 'string' && topLevelClaim.trim()) {
@@ -355,7 +367,8 @@ export class TenantsCacheManager implements ITenantsManager {
   public async getTenantDomainUrl(vaultId: string): Promise<string | undefined> {
     if (vaultId === 'host') {
       const hostDidDoc = await this.getDidDocument('host');
-      return hostDidDoc ? getBaseUrlFromDidWeb(hostDidDoc.id) : undefined;
+      return getDidDocumentServiceEndpointBaseUrl(hostDidDoc, '#did-document')
+        || (hostDidDoc ? getBaseUrlFromDidWeb(hostDidDoc.id) : undefined);
     }
 
     const tenantConfig = await this._ensureTenantIsInCache(vaultId);
@@ -377,7 +390,8 @@ export class TenantsCacheManager implements ITenantsManager {
   public async getTenantOperationalUrl(vaultId: string): Promise<string | undefined> {
     if (vaultId === 'host') {
       const hostDidDoc = await this.getDidDocument('host');
-      return hostDidDoc ? getBaseUrlFromDidWeb(hostDidDoc.id) : undefined;
+      return getDidDocumentServiceEndpointBaseUrl(hostDidDoc, '#did-document')
+        || (hostDidDoc ? getBaseUrlFromDidWeb(hostDidDoc.id) : undefined);
     }
 
     const tenantConfig = await this._ensureTenantIsInCache(vaultId);
@@ -405,6 +419,7 @@ export class TenantsCacheManager implements ITenantsManager {
     }
 
     const baseUrl = getBaseUrlFromDidWeb(hostDidDoc.id);
+    const hostPublicBaseUrl = getDidDocumentServiceEndpointBaseUrl(hostDidDoc, '#did-document') || baseUrl;
 
     const alternateName = config.claims[ClaimsOrganizationSchemaorg.alternateName];
     // The URN is the single source of truth for jurisdiction, version, and sector.
@@ -416,6 +431,6 @@ export class TenantsCacheManager implements ITenantsManager {
       return undefined;
     }
     
-    return `${baseUrl}/${alternateName}/cds-${parsedUrn.jurisdiction.toLowerCase()}/${parsedUrn.version}/${parsedUrn.sector}`;
+    return `${hostPublicBaseUrl}/${alternateName}/cds-${parsedUrn.jurisdiction.toLowerCase()}/${parsedUrn.version}/${parsedUrn.sector}`;
   }
 }

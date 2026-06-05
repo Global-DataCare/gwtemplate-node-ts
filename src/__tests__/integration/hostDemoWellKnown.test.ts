@@ -5,6 +5,7 @@ import { invokeExpress } from './helpers/invokeExpress';
 import { startServer, resetServerConfig } from '../../server';
 
 const HOST_DID = 'did:web:localhost%3A3000';
+const HOST_WELL_KNOWN_PREFIX = '/host/cds-EU/v1/test/.well-known';
 
 describe('Host well-known endpoints (demo, mem)', () => {
   it('should expose host VC artifacts and legacy key when running in demo mode', async () => {
@@ -34,22 +35,25 @@ describe('Host well-known endpoints (demo, mem)', () => {
 
     const { app, queueAdapter } = await startServer({ listen: false });
     try {
-      const selfDesc = await invokeExpress(app, { method: 'GET', url: '/host/.well-known/self-description.json' });
+      process.env.HOST_COVERAGE_SCOPE = 'EU';
+      process.env.NETWORK_MODE = 'test';
+
+      const selfDesc = await invokeExpress(app, { method: 'GET', url: `${HOST_WELL_KNOWN_PREFIX}/self-description.json` });
       expect(selfDesc.status).toBe(200);
       const selfDescJson = JSON.parse(selfDesc.text);
       expect(selfDescJson.issuer).toBe(HOST_DID);
 
-      const legalParticipant = await invokeExpress(app, { method: 'GET', url: '/host/.well-known/legal-participant.vc.json' });
+      const legalParticipant = await invokeExpress(app, { method: 'GET', url: `${HOST_WELL_KNOWN_PREFIX}/legal-participant.vc.json` });
       expect(legalParticipant.status).toBe(200);
       const legalParticipantJson = JSON.parse(legalParticipant.text);
       expect(legalParticipantJson.issuer).toBe(HOST_DID);
 
-      const jwks = await invokeExpress(app, { method: 'GET', url: '/host/.well-known/jwks.json' });
+      const jwks = await invokeExpress(app, { method: 'GET', url: `${HOST_WELL_KNOWN_PREFIX}/jwks.json` });
       expect(jwks.status).toBe(200);
       const jwksJson = JSON.parse(jwks.text);
       expect(jwksJson.keys.find((key: any) => key.alg === 'ES384')).toBeDefined();
 
-      const openidIssuer = await invokeExpress(app, { method: 'GET', url: '/host/.well-known/openid-credential-issuer' });
+      const openidIssuer = await invokeExpress(app, { method: 'GET', url: `${HOST_WELL_KNOWN_PREFIX}/openid-credential-issuer` });
       expect(openidIssuer.status).toBe(200);
       const openidIssuerJson = JSON.parse(openidIssuer.text);
       expect(openidIssuerJson.credential_issuer).toContain('http://localhost:3000');

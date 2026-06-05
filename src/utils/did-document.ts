@@ -29,6 +29,18 @@ function stripTrailingSlash(url: string): string {
   return url.endsWith('/') ? url.slice(0, -1) : url;
 }
 
+function ensureHostedContextBaseUrl(baseUrl: string, contextualPath: string): string {
+  const normalizedBaseUrl = stripTrailingSlash(baseUrl);
+  const normalizedContextualPath = contextualPath.replace(/^\/+/, '');
+  if (!normalizedContextualPath) {
+    return normalizedBaseUrl;
+  }
+  const contextualSuffix = `/${normalizedContextualPath}`;
+  return normalizedBaseUrl.endsWith(contextualSuffix)
+    ? normalizedBaseUrl
+    : `${normalizedBaseUrl}${contextualSuffix}`;
+}
+
 function buildTenantContextPath(tenantContext: { alternateName: string; jurisdiction: string; version: string; sector: string; }): string {
   return `${tenantContext.alternateName}/cds-${tenantContext.jurisdiction}/${tenantContext.version}/${tenantContext.sector}`;
 }
@@ -63,7 +75,7 @@ export function populateDidDocumentServices(
   // For hosted tenants, the well-known endpoints are at the root of their full contextual path.
   // For own-domain tenants, they are at the root of their domain.
   const wellKnownBaseUrl = isHosted
-    ? `${normalizedPublicBaseUrl}/${contextualPath}`
+    ? ensureHostedContextBaseUrl(normalizedPublicBaseUrl, contextualPath)
     : normalizedPublicBaseUrl;
 
   // 1. Create the standard, W3C-compliant well-known services.
@@ -117,7 +129,7 @@ export function populateDidDocumentServices(
         let serviceEndpointUrl: string;
         if (isHosted) {
           // A hosted tenant's public DID may resolve on one domain while the callable API lives on another.
-          serviceEndpointUrl = `${normalizedOperationalBaseUrl}/${contextualPath}/${functionalPath}`;
+          serviceEndpointUrl = `${ensureHostedContextBaseUrl(normalizedOperationalBaseUrl, contextualPath)}/${functionalPath}`;
         } else {
           // An own-domain tenant's URL is simple and functional.
           serviceEndpointUrl = `${normalizedOperationalBaseUrl}/${functionalPath}`;

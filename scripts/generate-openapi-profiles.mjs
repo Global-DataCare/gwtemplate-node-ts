@@ -39,7 +39,7 @@ function classifyPath(p) {
 }
 
 const CORE_FLOW_PATHS = [
-  '/host/.well-known/ping',
+  '/host/ping',
   '/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate',
   '/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response',
   '/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch',

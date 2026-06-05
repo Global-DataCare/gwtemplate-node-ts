@@ -45,7 +45,7 @@ poll_async() {
   post_json "$url" "$(jq -n --arg thid "$thid" '{thid:$thid}')"
 }
 
-echo "[bootstrap] ping: $BASE_URL/host/.well-known/ping"
+echo "[bootstrap] ping: $BASE_URL/host/ping"
 HOST_PING_URL="${BASE_URL}/host/cds-${JURISDICTION_LOWER}/${VERSION}/${HOST_NETWORK}/.well-known/ping"
 echo "[bootstrap] ping: $HOST_PING_URL"
 code="$(curl -sS -o /tmp/bootstrap-tenant-ping.out -w "%{http_code}" "$HOST_PING_URL" || true)"

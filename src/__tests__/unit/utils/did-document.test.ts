@@ -82,4 +82,26 @@ describe('populateDidDocumentServices', () => {
       'https://operator.gateway.net/acme/cds-es/v1/health-care/identity/openid/smart/token',
     );
   });
+
+  it('should not duplicate the hosted tenant context when operationalBaseUrl already includes it', () => {
+    const did = 'did:web:gateway.com:acme:cds-es:v1:health-care';
+    const publicBaseUrl = 'https://gateway.com';
+    const operationalBaseUrl = 'https://34.175.78.233/acme/cds-es/v1/health-care';
+    const businessConfig = initializeTenantServicesConfig(Sector.HEALTH_CARE);
+    const tenantContext = { alternateName: 'acme', jurisdiction: 'es', version: 'v1', sector: Sector.HEALTH_CARE };
+
+    const allServices = populateDidDocumentServices(
+      did,
+      publicBaseUrl,
+      businessConfig,
+      true,
+      tenantContext,
+      operationalBaseUrl,
+    );
+
+    const smartTokenService = allServices.find(s => s.id.endsWith('#identity:openid:smart:token'));
+    expect(smartTokenService?.serviceEndpoint).toBe(
+      'https://34.175.78.233/acme/cds-es/v1/health-care/identity/openid/smart/token',
+    );
+  });
 });

@@ -1887,7 +1887,7 @@ export class HostingManager {
     const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
     const legacySignAlg = this.config.legacySignAlg;
     const legacyX5u = legacySignAlg && this.config.legacyX509DerBase64
-      ? `${baseUrl}/host/.well-known/x509.der`
+      ? `${baseUrl}/host/cds-${this.config.host.coverageScope || 'EU'}/v1/${this.config.networkMode}/.well-known/x509.der`
       : undefined;
     const legacyChain = this.config.legacyX509DerBase64
       ? [this.config.legacyX509DerBase64, ...(this.config.legacyX509ChainBase64 || [])]

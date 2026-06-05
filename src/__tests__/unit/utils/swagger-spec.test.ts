@@ -31,7 +31,7 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Patient/$summary']).toBeDefined();
-    expect(spec.paths['/host/.well-known/ping']).toBeDefined();
+    expect(spec.paths['/host/ping']).toBeDefined();
     expect(spec.paths['/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/ping']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/ping']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/did.json']).toBeDefined();

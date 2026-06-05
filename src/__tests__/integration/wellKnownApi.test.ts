@@ -128,7 +128,7 @@ describe('Well-Known JWKS Discovery API', () => {
   it('should return the JWKSet for the host', async () => {
     // --- Arrange ---
     const expectedJwks = { keys: [{ kid: 'host-key-1', kty: 'AKP' }] };
-    const expectedUrl = '/host/.well-known/jwks.json';
+    const expectedUrl = `/host/cds-${EXAMPLE_COVERAGE_SCOPE_EU}/v1/${HostNetworkTypes.Test}/.well-known/jwks.json`;
 
     // Mock the KMS service directly
     mockKmsService.getPublicJwks.mockResolvedValue(expectedJwks);
@@ -323,7 +323,10 @@ describe('Well-Known Legal Participant VC API', () => {
     mockTenantsCacheManager.getTenant.mockResolvedValue(hostEntityConfig);
     mockTenantsCacheManager.getDidDocument.mockResolvedValue(hostDidDoc as any);
 
-    const response = await invokeExpress(app, { method: 'GET', url: '/host/.well-known/legal-participant.vc.json' });
+    const response = await invokeExpress(app, {
+      method: 'GET',
+      url: `/host/cds-${EXAMPLE_COVERAGE_SCOPE_EU}/v1/${HostNetworkTypes.Test}/.well-known/legal-participant.vc.json`,
+    });
 
     expect(response.status).toBe(200);
     const parsed = JSON.parse(response.text);
@@ -436,6 +439,9 @@ describe('DSP Discovery API', () => {
         { '@id': `http://${EXAMPLE_HOST_PUBLIC_HOSTNAME}/${testTenant1AlternateName}/cds-es/v1/${DataspaceSectors.HealthResearch}/.well-known/service-offering-index.json` },
         { '@id': `http://${EXAMPLE_HOST_PUBLIC_HOSTNAME}/${testTenant1AlternateName}/cds-es/v1/${DataspaceSectors.HealthResearch}/.well-known/service-offering-research.json` },
       ]),
+    );
+    expect(parsed['dcat:dataset'][0]['dcat:distribution'][0]['dcat:accessURL']).toBe(
+      `https://${EXAMPLE_HOST_PUBLIC_HOSTNAME}/.well-known/did.json`,
     );
     expect(parsed['dcat:dataset']).toHaveLength(1);
     expect(mockTenantsCacheManager.listAutodiscoverableTenants).toHaveBeenCalledTimes(1);

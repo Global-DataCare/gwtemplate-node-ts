@@ -155,10 +155,10 @@ async function main() {
 
     // --- Discovery (sync) ---
     for (const url of [
-      '/host/.well-known/ping',
-      '/host/.well-known/did.json',
-      '/host/.well-known/jwks.json',
-      '/host/.well-known/openid-configuration',
+      '/host/ping',
+      '/host/cds-eu/v1/test/.well-known/did.json',
+      '/host/cds-eu/v1/test/.well-known/jwks.json',
+      '/host/cds-eu/v1/test/.well-known/openid-configuration',
     ]) {
       const resp = await invokeExpress(app, { method: 'GET', url });
       report.steps.push({
