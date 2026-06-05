@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 ### Changed
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.18.1`.
 - Added explicit host coverage-scope configuration with `HOST_COVERAGE_SCOPE`,
   defaulting to `EU` when unset.
 - Switched the host-scoped DSP discovery and ping surface from legal
