@@ -176,6 +176,15 @@ describe('Service Initialization Utilities', () => {
       expect(fhirApiService).toBeDefined();
       expect(fhirApiService!.serviceEndpoint).toContain('Consent');
       expect(fhirApiService!.serviceEndpoint).toContain('DocumentReference');
+
+      const subjectSearchService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'individual' &&
+          (s as any).selector?.format === 'org.hl7.fhir.api' &&
+          s.serviceEndpoint === 'Subject' &&
+          (s.actions || []).includes('_search'),
+      );
+      expect(subjectSearchService).toBeDefined();
     });
 
     it('should treat synthetic animal-tech as FHIR-enabled', () => {

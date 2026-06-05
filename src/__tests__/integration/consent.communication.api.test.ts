@@ -2,7 +2,6 @@ import { invokeExpress } from './helpers/invokeExpress';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import {
-  HealthcareActorRoles,
   HealthcareConsentActions,
   HealthcareConsentPurposes,
 } from '../../shared/healthcare-constants';
@@ -13,15 +12,47 @@ import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
 import { getIndividualSectionId, getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
+import { ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import { getClaimValue } from '../../utils/claims';
 import { testTenant1TenantId } from '../data/organization.data';
+import { knownDomainsReversedEnum } from 'gdc-common-utils-ts/models/urlPath';
+import {
+  EXAMPLE_CONSENT_DATE,
+  EXAMPLE_EMAIL_PROFESSIONAL,
+  EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
+  EXAMPLE_HEALTHCARE_JURISDICTION,
+  EXAMPLE_PROVIDER_ORGANIZATION_DID,
+  EXAMPLE_SECONDARY_EU_COUNTRY,
+  EXAMPLE_SUBJECT_DID,
+} from 'gdc-common-utils-ts/examples/shared';
+
+const ODRL_MEDIA_TYPE = 'application/odrl+json';
+const FHIR_JSON_MEDIA_TYPE = 'application/fhir+json';
+
+function buildCommunicationBatchPath(
+  tenantId: string,
+  jurisdiction: string,
+  sector: string,
+  format: string,
+  action: '_batch' | '_batch-response',
+): string {
+  return `/${tenantId}/cds-${jurisdiction}/v1/${sector}/individual/${format}/Communication/${action}`;
+}
+
+function buildIdentifierUuidForTesting(
+  resourceType: 'consent',
+  qualifier: 'professional' | 'organization' | 'jurisdictions',
+  sequence: number,
+): string {
+  return `urn:uuid:${resourceType}-${qualifier}-${String(sequence).padStart(3, '0')}`;
+}
 
 describe('Consent via Communication API (integration)', () => {
   afterEach(() => {
     resetServerConfig();
   });
 
-  it('ingests one or more Consent resources via Communication and persists rules, attachments, and consent projections', async () => {
+  it('ingests three separate consent permissions via Communication and persists readable consent projections', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -69,39 +100,74 @@ describe('Consent via Communication API (integration)', () => {
       await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
       await tenantManager.getTenant(tenantVaultId);
 
-      const subjectDid = 'did:web:api.acme.org:individual:subject-consent-001';
-      const attachment1 = Buffer.from(JSON.stringify({ agreement: 'permit treatment 1' }), 'utf8').toString('base64');
-      const attachment2 = Buffer.from(JSON.stringify({ agreement: 'permit treatment 2' }), 'utf8').toString('base64');
-
-      const makeConsentResource = (identifier: string, actor: string, attachmentData: string) => ({
+      const subjectDid = EXAMPLE_SUBJECT_DID;
+      const consentBundleSummaryNote = 'Bundle of Consents containing: 0 personal consents, 1 professional consent, 1 organizational consent, 1 jurisdictional consent.';
+      const allSectionsWildcard = '*';
+      const communicationFormat = knownDomainsReversedEnum['org.hl7.fhir.r4'];
+      const consentClaimsContext = knownDomainsReversedEnum['org.hl7.fhir.api'];
+      const makeAttachment = (agreement: string) => Buffer.from(
+        JSON.stringify({ agreement }),
+        'utf8',
+      ).toString('base64');
+      const makeConsentResource = (
+        identifier: string,
+        actorIdentifier: string,
+        purpose: string,
+        action: string,
+        attachmentData: string,
+      ) => ({
         resourceType: 'Consent',
         status: 'active',
         meta: {
           claims: {
-            '@context': 'org.hl7.fhir.api',
-            [ClaimConsent.decision]: 'permit',
+            '@context': consentClaimsContext,
+            [ClaimConsent.decision]: ConsentDecisions.Permit,
             [ClaimConsent.subject]: subjectDid,
             [ClaimConsent.identifier]: identifier,
-            [ClaimConsent.grantee]: actor,
-            [ClaimConsent.date]: '2026-05-22',
-            [ClaimConsent.purpose]: HealthcareConsentPurposes.Treatment,
-            [ClaimConsent.action]: HealthcareConsentActions.AllergiesAndIntolerances,
-            [ClaimConsent.actorIdentifier]: actor,
-            [ClaimConsent.actorRole]: HealthcareActorRoles.Physician,
-            [ClaimConsent.attachmentContentType]: 'application/odrl+json',
+            [ClaimConsent.grantee]: actorIdentifier,
+            [ClaimConsent.date]: EXAMPLE_CONSENT_DATE,
+            [ClaimConsent.purpose]: purpose,
+            [ClaimConsent.action]: action,
+            [ClaimConsent.actorIdentifier]: actorIdentifier,
+            [ClaimConsent.actorRole]: EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
+            [ClaimConsent.attachmentContentType]: ODRL_MEDIA_TYPE,
             [ClaimConsent.attachmentData]: attachmentData,
           },
         },
       });
 
-      const consent1 = makeConsentResource('urn:uuid:patient-consent-001', 'did:web:hospital.example.com', attachment1);
-      const consent2 = makeConsentResource('urn:uuid:patient-consent-002', 'did:web:clinic.example.com', attachment2);
-      const tenantRoutePrefix = `/${testTenant1TenantId}/cds-ES/v1/health-care`;
+      const consent1 = makeConsentResource(
+        buildIdentifierUuidForTesting('consent', 'professional', 1),
+        EXAMPLE_EMAIL_PROFESSIONAL,
+        HealthcareConsentPurposes.Treatment,
+        allSectionsWildcard,
+        makeAttachment('professional full IPS access'),
+      );
+      const consent2 = makeConsentResource(
+        buildIdentifierUuidForTesting('consent', 'organization', 1),
+        EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        HealthcareConsentPurposes.EmergencyTreatment,
+        HealthcareConsentActions.PatientSummaryDocument,
+        makeAttachment('organization emergency treatment access'),
+      );
+      const consent3 = makeConsentResource(
+        buildIdentifierUuidForTesting('consent', 'jurisdictions', 1),
+        `${EXAMPLE_HEALTHCARE_JURISDICTION},${EXAMPLE_SECONDARY_EU_COUNTRY}`,
+        HealthcareConsentPurposes.EmergencyTreatment,
+        HealthcareConsentActions.PatientSummaryDocument,
+        makeAttachment('jurisdiction emergency treatment access'),
+      );
 
       const thidBatch = 'communication-consent-batch-001';
       const submitResp = await invokeExpress(app, {
         method: 'POST',
-        url: `${tenantRoutePrefix}/individual/org.hl7.fhir.r4/Communication/_batch`,
+        url: buildCommunicationBatchPath(
+          testTenant1TenantId,
+          EXAMPLE_HEALTHCARE_JURISDICTION,
+          Sector.HEALTH_CARE,
+          communicationFormat,
+          '_batch',
+        ),
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidBatch,
@@ -111,35 +177,39 @@ describe('Consent via Communication API (integration)', () => {
             entry: [
               {
                 request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
-                meta: {
-                  claims: {
-                    '@context': 'org.hl7.fhir.r4',
-                    'Communication.subject': subjectDid,
-                    'Communication.sent': '2026-05-22T10:00:00Z',
-                  },
-                },
                 resource: {
                   resourceType: 'Communication',
                   status: 'completed',
+                  meta: {
+                    claims: {
+                      '@context': communicationFormat,
+                      'Communication.subject': subjectDid,
+                      'Communication.sent': '2026-05-22T10:00:00Z',
+                    },
+                  },
                   subject: { reference: subjectDid },
                   sent: '2026-05-22T10:00:00Z',
-                  note: [
-                    { text: 'Consent 1 note' },
-                    { text: 'Consent 2 note' },
-                  ],
+                  note: [{ text: consentBundleSummaryNote }],
                   payload: [
                     {
                       contentAttachment: {
-                        contentType: 'application/fhir+json',
-                        title: 'consent-001.json',
+                        contentType: FHIR_JSON_MEDIA_TYPE,
+                        title: 'consent-professional.json',
                         data: Buffer.from(JSON.stringify(consent1), 'utf8').toString('base64'),
                       },
                     },
                     {
                       contentAttachment: {
-                        contentType: 'application/fhir+json',
-                        title: 'consent-002.json',
+                        contentType: FHIR_JSON_MEDIA_TYPE,
+                        title: 'consent-organization.json',
                         data: Buffer.from(JSON.stringify(consent2), 'utf8').toString('base64'),
+                      },
+                    },
+                    {
+                      contentAttachment: {
+                        contentType: FHIR_JSON_MEDIA_TYPE,
+                        title: 'consent-jurisdictions.json',
+                        data: Buffer.from(JSON.stringify(consent3), 'utf8').toString('base64'),
                       },
                     },
                   ],
@@ -155,7 +225,13 @@ describe('Consent via Communication API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: `${tenantRoutePrefix}/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+          url: buildCommunicationBatchPath(
+            testTenant1TenantId,
+            EXAMPLE_HEALTHCARE_JURISDICTION,
+            Sector.HEALTH_CARE,
+            communicationFormat,
+            '_batch-response',
+          ),
           headers: { 'content-type': 'application/json' },
           body: { thid: thidBatch },
         });
@@ -182,18 +258,119 @@ describe('Consent via Communication API (integration)', () => {
         getSubjectScopedSectionId(subjectDid, 'individual', 'consents'),
       );
 
-      expect(attachments).toHaveLength(2);
-      expect(rules).toHaveLength(2);
-      expect(consents).toHaveLength(2);
+      expect(attachments).toHaveLength(3);
+      expect(rules).toHaveLength(3);
+      expect(consents).toHaveLength(3);
       expect(rules.map((rule: any) => getClaimValue(rule, ClaimConsent.identifier)).sort()).toEqual([
-        'urn:uuid:patient-consent-001',
-        'urn:uuid:patient-consent-002',
+        buildIdentifierUuidForTesting('consent', 'jurisdictions', 1),
+        buildIdentifierUuidForTesting('consent', 'organization', 1),
+        buildIdentifierUuidForTesting('consent', 'professional', 1),
       ]);
       expect(rules.every((rule: any) => !getClaimValue(rule, ClaimConsent.attachmentData))).toBe(true);
       expect(consents.map((consent: any) => getClaimValue(consent, ClaimConsent.identifier)).sort()).toEqual([
-        'urn:uuid:patient-consent-001',
-        'urn:uuid:patient-consent-002',
+        buildIdentifierUuidForTesting('consent', 'jurisdictions', 1),
+        buildIdentifierUuidForTesting('consent', 'organization', 1),
+        buildIdentifierUuidForTesting('consent', 'professional', 1),
       ]);
+      expect(consents.map((consent: any) => getClaimValue(consent, ClaimConsent.actorIdentifier)).sort()).toEqual([
+        `${EXAMPLE_HEALTHCARE_JURISDICTION},${EXAMPLE_SECONDARY_EU_COUNTRY}`,
+        EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        EXAMPLE_EMAIL_PROFESSIONAL,
+      ]);
+      expect(consents.map((consent: any) => getClaimValue(consent, ClaimConsent.purpose)).sort()).toEqual([
+        HealthcareConsentPurposes.EmergencyTreatment,
+        HealthcareConsentPurposes.EmergencyTreatment,
+        HealthcareConsentPurposes.Treatment,
+      ].sort());
+      expect(consents.map((consent: any) => getClaimValue(consent, ClaimConsent.actorRole))).toEqual([
+        EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
+        EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
+        EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
+      ]);
+
+      const thidRead = 'communication-consent-read-001';
+      const readResp = await invokeExpress(app, {
+        method: 'POST',
+        url: buildCommunicationBatchPath(
+          testTenant1TenantId,
+          EXAMPLE_HEALTHCARE_JURISDICTION,
+          Sector.HEALTH_CARE,
+          communicationFormat,
+          '_batch',
+        ),
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: thidRead,
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                resource: {
+                  resourceType: 'Communication',
+                  status: 'completed',
+                  subject: { reference: subjectDid },
+                  payload: [
+                    {
+                      contentReference: {
+                        reference: 'individual/org.hl7.fhir.api/Subject/_search',
+                      },
+                      contentAttachment: {
+                        contentType: FHIR_JSON_MEDIA_TYPE,
+                        title: 'subject-consent-search-parameters.json',
+                        data: Buffer.from(JSON.stringify({
+                          resourceType: 'Parameters',
+                          parameter: [
+                            { name: 'subject', valueString: subjectDid },
+                          ],
+                        }), 'utf8').toString('base64'),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(readResp.status).toBe(202);
+
+      let readPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: buildCommunicationBatchPath(
+            testTenant1TenantId,
+            EXAMPLE_HEALTHCARE_JURISDICTION,
+            Sector.HEALTH_CARE,
+            communicationFormat,
+            '_batch-response',
+          ),
+          headers: { 'content-type': 'application/json' },
+          body: { thid: thidRead },
+        });
+        if (pollResp.status === 200) {
+          readPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(readPayload?.resourceType).toBe('Bundle');
+      expect(readPayload?.data?.[0]?.response?.status).toBe('200');
+      expect(readPayload?.data?.[0]?.type).toBe('Subject-search-response-v1.0');
+      expect(readPayload?.data?.[0]?.resource?.total).toBe(3);
+      expect(Array.isArray(readPayload?.data?.[0]?.resource?.data)).toBe(true);
+
+      const communications = await vaultRepository.getContainersInSection(
+        tenantVaultId,
+        getSubjectScopedSectionId(subjectDid, 'individual', 'communications'),
+      );
+      expect(communications).toHaveLength(2);
+      expect(
+        communications.some((communication: any) => communication['Communication.note-text'] === consentBundleSummaryNote),
+      ).toBe(true);
     } finally {
       queueAdapter.stop();
     }

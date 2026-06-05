@@ -22,6 +22,7 @@ import {
 } from '../../data/customer-onboarding.data';
 import { BundleEntry, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
 
 
 const uuidMock = {
@@ -298,6 +299,74 @@ describe('IndividualManager', () => {
       expect((response.body.data[1] as BundleEntryResponse).response.status).toBe('200');
       expect((response.body.data[1] as BundleEntryResponse).response.location).toBe('did:web:phone-did');
       expect((response.body.data[2] as ErrorEntry).response.status).toBe('404');
+    });
+  });
+
+  describe('Subject search', () => {
+    it('returns projected consents from the individual consents section', async () => {
+      const subjectDid = 'did:web:api.acme.org:individual:subject-consent-001';
+      const tenantVaultId = 'health-care_acme';
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockVaultRepository.vaultExists.mockResolvedValue(true);
+      mockVaultRepository.getContainersInSection.mockResolvedValue([
+        {
+          id: 'consent-1',
+          'Consent.subject': subjectDid,
+          'Consent.identifier': 'urn:uuid:consent-professional-001',
+          'Consent.actorIdentifier': 'doctor.oncall@example.org',
+          'Consent.purpose': 'TREAT',
+          'Consent.actorRole': 'ISCO-08|2211',
+        },
+        {
+          id: 'consent-2',
+          'Consent.subject': subjectDid,
+          'Consent.identifier': 'urn:uuid:consent-organization-001',
+          'Consent.actorIdentifier': 'did:web:hospital.acme.org',
+          'Consent.purpose': 'ETREAT',
+          'Consent.actorRole': 'ISCO-08|2211',
+        },
+      ] as any);
+
+      const job: JobRequest = {
+        id: 'subject-search-job-001',
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.api' as any,
+        resourceType: 'Subject',
+        action: '_search',
+        content: {
+          jti: 'subject-search-jti-001',
+          thid: 'subject-search-thid-001',
+          iss: 'did:web:sender.example',
+          aud: 'did:web:receiver.example',
+          exp: Math.floor(Date.now() / 1000) + 300,
+          type: 'api+json',
+          body: {
+            resourceType: 'Parameters',
+            parameter: [
+              { name: 'subject', valueString: subjectDid },
+            ],
+          },
+        } as any,
+      };
+
+      const response = await individualManager.process(job);
+      const responseEntry = response.body.data[0] as any;
+
+      expect(mockVaultRepository.getContainersInSection).toHaveBeenCalledWith(
+        tenantVaultId,
+        getSubjectScopedSectionId(subjectDid, 'individual', 'consents'),
+      );
+      expect(responseEntry.type).toBe('Subject-search-response-v1.0');
+      expect(responseEntry.response.status).toBe('200');
+      expect(responseEntry.resource.resourceType).toBe('Bundle');
+      expect(responseEntry.resource.total).toBe(2);
+      expect(responseEntry.resource.data).toHaveLength(2);
     });
   });
 });

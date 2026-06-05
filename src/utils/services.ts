@@ -245,6 +245,13 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     );
     services.push(
       createDidEndpointConfigFromSelector(
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
+        ['Subject'],
+        ['_search'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
         { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.r4' },
         ['Composition', 'Bundle'],
         ['_search'],

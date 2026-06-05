@@ -35,6 +35,8 @@ import { EntityLifecycleStatus, EntityType } from '../gdc-backend-utils-node/mod
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { generateLicenseOffer } from '../utils/offer';
 import { getEnvSectionId } from '../utils/section-env';
+import { extractSearchFiltersFromEntry, extractSearchFiltersFromParametersResource } from '../utils/search-request';
+import { getSubjectScopedSectionId } from '../utils/individual-sections';
 import {
   LICENSE_CATEGORY_INDIVIDUAL,
   LICENSE_STATUS_AVAILABLE,
@@ -101,6 +103,15 @@ export class IndividualManager {
       case '_discovery':
         const discoveryResults = await this.processDiscoveryBatch(entries, job.sector!, job.resourceType!);
         responseEntries.push(...discoveryResults);
+        break;
+      case '_search':
+        try {
+          const resultEntry = await this.processSubjectSearch(job, tenantVaultId);
+          responseEntries.push(resultEntry);
+        } catch (error: any) {
+          const errorEntry = this.handleError(error, 'Subject-search-response-v1.0', job.content?.body);
+          responseEntries.push(errorEntry);
+        }
         break;
 
       default:
@@ -271,6 +282,79 @@ export class IndividualManager {
     });
 
     return sortedResults;
+  }
+
+  private async processSubjectSearch(
+    job: JobRequest,
+    tenantVaultId: string,
+  ): Promise<BundleEntry> {
+    const body = job.content?.body as any;
+    const filters = this.extractSubjectSearchFilters(body);
+    const subject = String(filters.subject?.[0] || '').trim();
+    if (!subject) {
+      throw new ManagerError("Missing required search parameter 'subject'.", IssueType.Required);
+    }
+
+    const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+    if (!tenantExists) {
+      throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
+    }
+
+    const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'consents');
+    const matchesRaw = await this.vaultRepository.getContainersInSection(tenantVaultId, sectionId);
+    const matches = this.filterConsentMatches(matchesRaw, filters);
+
+    return {
+      type: 'Subject-search-response-v1.0',
+      resource: {
+        resourceType: 'Bundle',
+        type: 'searchset',
+        total: matches.length,
+        data: matches,
+      },
+      response: { status: '200' },
+    };
+  }
+
+  private extractSubjectSearchFilters(body: any): Record<string, string[]> {
+    if (body?.resourceType === 'Parameters') {
+      return extractSearchFiltersFromParametersResource(body);
+    }
+
+    const entries: any[] =
+      (Array.isArray(body?.entry) && body.entry)
+      || (Array.isArray(body?.data) && body.data)
+      || [];
+    if (entries.length > 0) {
+      return extractSearchFiltersFromEntry(entries[0], 'Subject');
+    }
+
+    throw new ManagerError('Subject search requires FHIR Parameters or a Bundle search wrapper.', IssueType.Required);
+  }
+
+  private filterConsentMatches(
+    matches: any[],
+    filters: Record<string, string[]>,
+  ): any[] {
+    if (!Array.isArray(matches)) return [];
+
+    const identifiers = new Set(filters.identifier || []);
+    const actorIdentifiers = new Set(filters['actor-identifier'] || filters.actorIdentifier || []);
+    const purposes = new Set(filters.purpose || []);
+    const actorRoles = new Set(filters['actor-role'] || filters.actorRole || []);
+
+    return matches.filter((record: any) => {
+      const identifier = String(record?.['Consent.identifier'] || '').trim();
+      const actorIdentifier = String(record?.['Consent.actorIdentifier'] || '').trim();
+      const purpose = String(record?.['Consent.purpose'] || '').trim();
+      const actorRole = String(record?.['Consent.actorRole'] || '').trim();
+
+      if (identifiers.size > 0 && !identifiers.has(identifier)) return false;
+      if (actorIdentifiers.size > 0 && !actorIdentifiers.has(actorIdentifier)) return false;
+      if (purposes.size > 0 && !purposes.has(purpose)) return false;
+      if (actorRoles.size > 0 && !actorRoles.has(actorRole)) return false;
+      return true;
+    });
   }
 
   private prepareUrnAndJurisdiction(claims: ClaimsRecord): { urn?: string; jurisdictionGroup: 'eu' | 'global' } {

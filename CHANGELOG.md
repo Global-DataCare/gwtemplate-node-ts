@@ -1,5 +1,28 @@
 ## [Unreleased]
 
+## [1.8.0] - 2026-06-04
+
+### Added
+- Added frontend-style `Communication` embedded consent readback coverage via
+  `individual/org.hl7.fhir.api/Subject/_search` with attached FHIR `Parameters`,
+  so one `Communication` can retrieve the subject-scoped `Consent` projections
+  previously persisted from bundled consent attachments.
+- Added reproducible local consent flow artifacts for:
+  - bundled consent creation
+  - consent readback through embedded `Subject/_search`
+
+### Changed
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.17.0`.
+- Extended the local consent live artifacts to cover both:
+  - bundled consent creation via `Communication/_batch`
+  - consent readback via `Communication/_batch` forwarding to `Subject/_search`
+- Aligned the canonical consent communication example with
+  `resource.meta.claims` instead of legacy `entry.meta.claims`.
+
+### Testing
+- `npm test -- --watchman=false src/__tests__/unit/managers/CommunicationManager.unit.test.ts src/__tests__/unit/managers/IndividualManager.test.ts src/__tests__/unit/utils/services.test.ts src/__tests__/integration/consent.communication.api.test.ts`
+- live/local `api:local-demo` + `demo:bootstrap-single-tenant` consent write/read verification via `Communication/_batch`
+
 ## [1.7.3] - 2026-06-01
 
 ### Added

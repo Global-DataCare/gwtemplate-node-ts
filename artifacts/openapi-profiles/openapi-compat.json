@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-06-03T17:00:44.508Z",
+    "x-profile-generated-at": "2026-06-05T05:56:50.267Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -2655,7 +2655,7 @@
           "3.1 Employee Role"
         ],
         "summary": "Search employees within an existing tenant",
-        "description": "Submits an asynchronous employee directory query.\nCurrent request shape follows a Bundle search entry:\n- `body.resourceType = Bundle`\n- `body.entry[0].request.method = GET`\n- `body.entry[0].request.url = Employee?...`\n",
+        "description": "Submits an asynchronous employee directory query.\nSupported request shapes:\n- legacy Bundle search entry:\n  - `body.resourceType = Bundle`\n  - `body.entry[0].request.method = GET`\n  - `body.entry[0].request.url = Employee?...`\n- preferred Bundle search entry:\n  - `body.resourceType = Bundle`\n  - `body.entry[0].request.method = POST`\n  - `body.entry[0].request.url = Employee/_search`\n  - `body.entry[0].resource.resourceType = Parameters`\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

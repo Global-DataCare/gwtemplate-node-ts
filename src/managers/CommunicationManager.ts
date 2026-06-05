@@ -3,6 +3,7 @@
 // Description: Manager for handling business logic related to FHIR Communications.
 
 import { CommMsgExtended, DataEntry, FhirCommunication } from 'gdc-common-utils-ts/models/comm';
+import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
 import { HealthcareBasicSections } from '../shared/healthcare-constants';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
@@ -119,6 +120,8 @@ const PROJECTED_RESOURCE_CONFIG: Record<SupportedProjectedResourceType, Projecti
 interface CommunicationManagerOptions {
   tenantsCacheManager: TenantsCacheManager;
   vaultRepository: IVaultRepository;
+  compositionManager?: IJobProcessor;
+  individualManager?: IJobProcessor;
 }
 
 /**
@@ -128,10 +131,14 @@ interface CommunicationManagerOptions {
 export class CommunicationManager implements IJobProcessor {
   private readonly tenantsCacheManager: TenantsCacheManager;
   private readonly vaultRepository: IVaultRepository;
+  private readonly compositionManager?: IJobProcessor;
+  private readonly individualManager?: IJobProcessor;
 
-  constructor({ tenantsCacheManager, vaultRepository }: CommunicationManagerOptions) {
+  constructor({ tenantsCacheManager, vaultRepository, compositionManager, individualManager }: CommunicationManagerOptions) {
     this.tenantsCacheManager = tenantsCacheManager;
     this.vaultRepository = vaultRepository;
+    this.compositionManager = compositionManager;
+    this.individualManager = individualManager;
   }
 
   /**
@@ -179,8 +186,14 @@ export class CommunicationManager implements IJobProcessor {
         await this.persistDocumentReferenceProjectionFromCommunication(job, entry as any, fhirResource);
         await this.persistProjectedResourcesFromCommunication(job, entry as any, fhirResource);
 
+        const embeddedSearchResponseEntries = await this.executeEmbeddedSearchRequest(job, fhirResource);
+        if (embeddedSearchResponseEntries && embeddedSearchResponseEntries.length > 0) {
+          bundleEntries.push(...embeddedSearchResponseEntries);
+          continue;
+        }
+
         const identifierClaim =
-          (entry as any)?.meta?.claims?.['Communication.identifier'] ??
+          (entry as any)?.meta?.claims?.[CommunicationClaim.Identifier] ??
           (entry as any)?.resource?.id;
         const resourceId = determineResourceId(identifierClaim, process.env.NODE_ENV);
         
@@ -193,7 +206,7 @@ export class CommunicationManager implements IJobProcessor {
 
       } catch (error) {
         const identifierClaim =
-          (entry as any)?.meta?.claims?.['Communication.identifier'] ??
+          (entry as any)?.meta?.claims?.[CommunicationClaim.Identifier] ??
           (entry as any)?.resource?.id;
         const resourceId = determineResourceId(identifierClaim, process.env.NODE_ENV);
         bundleEntries.push({
@@ -242,6 +255,163 @@ export class CommunicationManager implements IJobProcessor {
       body: responseBundle,
     };
     return result;
+  }
+
+  private async executeEmbeddedSearchRequest(
+    job: JobRequest,
+    fhirResource: FhirCommunication,
+  ): Promise<Array<BundleEntryResponse | ErrorEntry> | undefined> {
+    const contentReferences = this.buildCommunicationContentReferences(job, undefined, fhirResource)
+      .filter((reference) => this.isEmbeddedSearchReference(reference));
+    if (contentReferences.length === 0) return undefined;
+
+    const responseEntries: Array<BundleEntryResponse | ErrorEntry> = [];
+    for (const reference of contentReferences) {
+      const parsed = this.parseEmbeddedSearchReference(reference, job, fhirResource);
+      if (!parsed) continue;
+
+      const targetManager = parsed.resourceType === 'Subject'
+        ? this.individualManager
+        : this.compositionManager;
+      if (!targetManager) continue;
+
+      const syntheticJob: JobRequest = {
+        ...job,
+        section: parsed.section,
+        format: parsed.format,
+        resourceType: parsed.resourceType,
+        action: parsed.action,
+        content: {
+          ...(job.content as any),
+          body: parsed.body,
+        } as any,
+      };
+
+      const searchResponse = await targetManager.process(syntheticJob);
+      const searchEntries = Array.isArray((searchResponse.body as any)?.data)
+        ? ((searchResponse.body as any).data as Array<BundleEntryResponse | ErrorEntry>)
+        : [];
+      responseEntries.push(...searchEntries);
+    }
+
+    return responseEntries.length > 0 ? responseEntries : undefined;
+  }
+
+  private isEmbeddedSearchReference(reference: string): boolean {
+    const normalized = String(reference || '').trim().toLowerCase();
+    if (!normalized) return false;
+    return this.isBundleSearchReference(normalized) || this.isSubjectSearchReference(normalized);
+  }
+
+  private isBundleSearchReference(reference: string): boolean {
+    return reference.includes('/bundle/_search?') || reference.startsWith('bundle/_search?') || reference.startsWith('bundle?');
+  }
+
+  private isSubjectSearchReference(reference: string): boolean {
+    return reference.includes('/subject/_search')
+      || reference.startsWith('subject/_search')
+      || reference.includes('/patient/_search')
+      || reference.startsWith('patient/_search');
+  }
+
+  private parseEmbeddedSearchReference(
+    reference: string,
+    fallbackJob: JobRequest,
+    fhirResource: FhirCommunication,
+  ): { section: string; format: string; resourceType: string; action: string; body: Record<string, unknown> } | undefined {
+    const normalized = String(reference || '').trim();
+    if (!normalized) return undefined;
+
+    let pathname = normalized;
+    let search = '';
+    if (/^https?:\/\//i.test(normalized)) {
+      const parsed = new URL(normalized);
+      pathname = parsed.pathname;
+      search = parsed.search || '';
+    } else {
+      const syntheticUrl = new URL(normalized.startsWith('/') ? normalized : `/${normalized}`, 'http://internal.local');
+      pathname = syntheticUrl.pathname;
+      search = syntheticUrl.search || '';
+    }
+
+    const cleanPath = pathname.replace(/^\/+/, '');
+    const segments = cleanPath.split('/').filter(Boolean);
+    if (segments.length < 2) return undefined;
+
+    let section = String(fallbackJob.section || '').trim() || SUBJECT_SECTION_INDIVIDUAL;
+    let format = String(fallbackJob.format || '').trim();
+
+    const directIndex = segments.findIndex((segment) => segment === SUBJECT_SECTION_INDIVIDUAL || segment === 'digitaltwin');
+    if (directIndex >= 0 && segments.length >= directIndex + 4) {
+      section = segments[directIndex];
+      format = segments[directIndex + 1];
+    } else if (segments.length >= 4) {
+      section = segments[0];
+      format = segments[1];
+    }
+
+    const query = search.startsWith('?') ? search.slice(1) : search;
+    const normalizedPath = cleanPath.toLowerCase();
+
+    if (this.isSubjectSearchReference(normalizedPath)) {
+      return {
+        section,
+        format,
+        resourceType: 'Subject',
+        action: '_search',
+        body: this.buildSubjectSearchBody(query, fhirResource),
+      };
+    }
+
+    const requestUrl = `Bundle${query ? `?${query}` : ''}`;
+    return {
+      section,
+      format,
+      resourceType: 'Bundle',
+      action: '_search',
+      body: {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [
+          {
+            request: {
+              method: 'GET',
+              url: requestUrl,
+            },
+          },
+        ],
+      },
+    };
+  }
+
+  private buildSubjectSearchBody(query: string, fhirResource: FhirCommunication): Record<string, unknown> {
+    const payload = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload[0] : undefined;
+    const attachment = payload?.contentAttachment;
+    const dataBase64 = String(attachment?.data || '').trim();
+    if (dataBase64) {
+      try {
+        return JSON.parse(Buffer.from(dataBase64, 'base64').toString('utf8'));
+      } catch {
+        // Fall back to query string conversion below.
+      }
+    }
+
+    const params = new URLSearchParams(query);
+    const parameter: Array<Record<string, unknown>> = [];
+    for (const [key, rawValue] of params.entries()) {
+      const name = String(key || '').trim().toLowerCase();
+      const value = String(rawValue || '').trim();
+      if (!value) continue;
+      parameter.push({
+        name,
+        valueString: value,
+      });
+    }
+
+    return {
+      resourceType: 'Parameters',
+      parameter,
+    };
   }
 
   private async persistCompositionProjectionFromCommunication(
