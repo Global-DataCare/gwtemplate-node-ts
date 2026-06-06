@@ -55,6 +55,9 @@ export function determineApiBaseUrl(port: number, apiHostname: string): string {
     const domain = process.env.HOST_EXTERNAL_DOMAIN.replace(/^(https?:\/\/)/, '').replace(/\/$/, '');
     return `https://${domain}`;
   }
+  if (process.env.HOST_PUBLIC_URL) {
+    return process.env.HOST_PUBLIC_URL.replace(/\/$/, '');
+  }
   if (process.env.HOST_DEPLOY_URL) {
     return process.env.HOST_DEPLOY_URL.replace(/\/$/, '');
   }

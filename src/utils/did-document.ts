@@ -36,7 +36,7 @@ function ensureHostedContextBaseUrl(baseUrl: string, contextualPath: string): st
     return normalizedBaseUrl;
   }
   const contextualSuffix = `/${normalizedContextualPath}`;
-  return normalizedBaseUrl.endsWith(contextualSuffix)
+  return normalizedBaseUrl.toLowerCase().endsWith(contextualSuffix.toLowerCase())
     ? normalizedBaseUrl
     : `${normalizedBaseUrl}${contextualSuffix}`;
 }

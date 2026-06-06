@@ -1,5 +1,6 @@
 import {
   buildSectorsFromMainAndSubsectors,
+  determineApiBaseUrl,
   getConfig,
   parseAndValidateMainSector,
   parseAndValidateSectors,
@@ -187,6 +188,21 @@ describe('server-config sector resolution', () => {
         expect(config.networkMode).toBe(networkMode);
       }
     }
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
+  it('should prefer HOST_PUBLIC_URL over HOST_DEPLOY_URL and local fallback', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      HOST_EXTERNAL_DOMAIN: '',
+      HOST_PUBLIC_URL: 'http://34.175.78.233/',
+      HOST_DEPLOY_URL: 'https://stale.example.org/',
+    };
+
+    expect(determineApiBaseUrl(3300, '0.0.0.0')).toBe('http://34.175.78.233');
 
     process.env = previousEnv;
     resetServerConfig();

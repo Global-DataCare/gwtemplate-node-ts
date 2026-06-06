@@ -1,3 +1,17 @@
+## [1.8.4] - 2026-06-05
+
+### Changed
+- Fixed GW CORE runtime public-origin resolution so deployed host and tenant
+  discovery artifacts now use `HOST_PUBLIC_URL` when that is the public edge
+  URL injected by GKE/configmap, instead of falling back to `localhost`.
+- Fixed hosted DID service publication so tenant operational URLs do not
+  duplicate `/{tenantId}/cds-{jurisdiction}/{version}/{sector}` when the
+  existing runtime base URL already includes that contextual path with
+  different casing.
+
+### Testing
+- `npm test -- --watchman=false src/__tests__/unit/config/server-config.test.ts src/__tests__/unit/utils/did-document.test.ts src/__tests__/integration/wellKnownApi.test.ts src/__tests__/integration/hostDemoWellKnown.test.ts`
+
 ## [1.8.3] - 2026-06-05
 
 ### Changed
