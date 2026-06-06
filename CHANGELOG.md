@@ -1,3 +1,15 @@
+## [1.8.5] - 2026-06-05
+
+### Changed
+- Fixed the GKE demo deployment probes to use `/host/ping` instead of the
+  removed root host discovery alias `/host/.well-known/ping`, so new GW CORE
+  revisions can become `Ready` after rollout.
+
+### Testing
+- GKE demo rollout inspection against the public deployment, including
+  verification that the previous `1.8.4` pod was blocked by `404` on the old
+  readiness probe path.
+
 ## [1.8.4] - 2026-06-05
 
 ### Changed

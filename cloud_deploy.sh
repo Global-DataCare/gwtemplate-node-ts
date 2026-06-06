@@ -263,7 +263,7 @@ deploy_gke_demo() {
   echo "--- ✅ GKE demo deployment submitted ---"
   echo "Public URL: $GDC_PUBLIC_URL"
   echo "Once the LoadBalancer service is ready, test:"
-  echo "  ${GDC_PUBLIC_URL}/host/.well-known/ping"
+  echo "  ${GDC_PUBLIC_URL}/host/ping"
   echo "  ${GDC_PUBLIC_URL}/api-docs"
 }
 
