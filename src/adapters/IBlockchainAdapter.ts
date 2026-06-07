@@ -35,4 +35,21 @@ export interface IBlockchainAdapter {
     channel: string,
     chaincode: string,
   ): Promise<{ accepted: number; txId?: string }>;
+
+  /**
+   * Optional write path for registering one sanitized consent-access rule on-chain.
+   *
+   * The payload still uses the shared JSON:API-style primary-document contract
+   * with mandatory `data[]`, but GW CORE now submits one atomic rule per call:
+   * - `assetId = data[0].id = CIDv1(SHA3-384(canonicalRuleId))`
+   * - `payload.data.length = 1`
+   */
+  registerConsentAccessBundle?(
+    params: {
+      assetId: string;
+      payload: Record<string, unknown>;
+      channel: string;
+      chaincode: string;
+    },
+  ): Promise<{ accepted: number; txId?: string }>;
 }

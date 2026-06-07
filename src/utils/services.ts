@@ -28,7 +28,7 @@ import {
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
 
-export type HostRegistrySector = 'test' | 'test-network' | 'network';
+export type HostRegistrySector = 'test' | 'local-network' | 'test-network' | 'network';
 
 /**
  * Returns whether a service capability claim marks a tenant as provider-capable.
@@ -49,13 +49,18 @@ export function hasProviderServiceCapabilityClaim(serviceCapabilityClaim?: strin
  * environment, not the business sector.
  *
  * - `demo`/`test` -> `test` (no blockchain integration; in-memory demo/MVP)
- * - `development`/`staging` -> `test-network` (Hyperledger Fabric test network)
+ * - `development`/`staging` -> `test-network` (shared Fabric integration network)
  * - `production` -> `network` (Hyperledger Fabric production network)
+ *
+ * `local-network` is an explicit runtime override for the Docker-based local
+ * Fabric topology used by developers. It must not be collapsed into
+ * `test-network`, because that would blur local Docker validation with the
+ * shared integration network.
  */
 export function resolveHostRegistrySector(input: string | undefined | { nodeEnv?: string; networkMode?: string }): HostRegistrySector {
   if (typeof input === 'object' && input !== null) {
     const networkMode = String(input.networkMode || '').trim().toLowerCase();
-    if (networkMode === 'test' || networkMode === 'test-network' || networkMode === 'network') {
+    if (networkMode === 'test' || networkMode === 'local-network' || networkMode === 'test-network' || networkMode === 'network') {
       return networkMode as HostRegistrySector;
     }
     const env = String(input.nodeEnv || '').trim().toLowerCase();

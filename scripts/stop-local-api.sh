@@ -7,6 +7,8 @@ PORT="${GW_PORT:-3000}"
 pkill -f "gwtemplate-node-ts.*src/main.ts" >/dev/null 2>&1 || true
 pkill -f "nodemon.*gwtemplate-node-ts" >/dev/null 2>&1 || true
 pkill -f "npm run api:local-demo" >/dev/null 2>&1 || true
+pkill -f "npm run api:local-fabric" >/dev/null 2>&1 || true
+pkill -f "npm run api:local-fabric-devnet" >/dev/null 2>&1 || true
 pkill -f "npm run dev" >/dev/null 2>&1 || true
 
 kill_listen_pids() {

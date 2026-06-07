@@ -58,7 +58,13 @@ export class ManageAsset {
 
   public async submit(mspId: string, fnName: string, ...args: string[]): Promise<object> {
     const result = await this.withContract(mspId, async ({ contract }) => {
-      return contract.submitTransaction(fnName, ...args);
+      const proposal = contract.newProposal(fnName, {
+        arguments: args,
+        endorsingOrganizations: [mspId],
+      });
+      const transaction = await proposal.endorse();
+      await transaction.submit();
+      return transaction.getResult();
     });
     return this.parseJson<object>(result);
   }

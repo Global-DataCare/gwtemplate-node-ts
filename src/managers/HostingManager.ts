@@ -2380,6 +2380,12 @@ export class HostingManager {
 
     const jurisdiction = String(this.config.host.jurisdiction || 'es').toLowerCase();
     const baseUrl = icaDomain ? `https://${icaDomain}` : this.config.apiBaseUrl;
+    // Transitional contract:
+    // this placeholder endpoint still models a direct CSR/evidence enrollment.
+    // The target flow is stricter:
+    // hosting validation -> signed adhesion PDF -> Fabric operational
+    // bootstrap/license -> local key generation + enroll -> dataspace ICA Host VC.
+    // Do not treat this call as the final authority for host accreditation.
     const url = `${baseUrl}/${icaSlug}/cds-${jurisdiction}/v1/system/test-network/ica/csr/_enroll`;
 
     const payload = {

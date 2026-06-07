@@ -11,7 +11,7 @@ import {
   ITrustRegistryAdapter,
 } from './trust-registry.adapter';
 
-export type ActivationNetworkMode = 'test' | 'test-network' | 'network';
+export type ActivationNetworkMode = 'test' | 'local-network' | 'test-network' | 'network';
 
 export type ActivationTrustEvaluationInput = {
   networkMode: ActivationNetworkMode;

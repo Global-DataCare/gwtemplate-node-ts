@@ -1,3 +1,35 @@
+## [1.9.0] - 2026-06-07
+
+### Added
+- Added consent-access blockchain registration support so consent ingestion can
+  project one sanitized atomic rule per on-chain asset through a dedicated
+  `registerConsentAccessBundle(...)` adapter path.
+- Added Fabric write-capable blockchain adapters and local-memory/multi-adapter
+  composition for progressive consent-access ledger integration:
+  - `src/adapters/BlockchainAdapterFabric.ts`
+  - `src/adapters/BlockchainAdapterMulti.ts`
+- Added local Fabric bootstrap and smoke/demo support for GW CORE:
+  - `npm run prepare:local-fabric-env`
+  - `npm run api:local-fabric`
+  - `npm run api:local-fabric-devnet`
+- Added `local-network` as an explicit runtime network mode distinct from the
+  shared `test-network` integration environment.
+
+### Changed
+- Normalized legacy plaintext API requests so managers always receive business
+  payloads through `job.content.body`, matching the DIDComm path contract.
+- Updated consent processing to derive canonical consent blockchain entries,
+  persist FHIR CID mappings, and then register consent-access rules on Fabric
+  using jurisdiction-group channel resolution.
+- Regenerated Swagger/OpenAPI profile artifacts and updated bootstrap,
+  discovery, and hosting/operator documentation around the Fabric/local-network
+  flow.
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.19.0`.
+
+### Testing
+- `npm test -- --watchman=false src/__tests__/managers/ConsentManager.test.ts`
+- `npm run build`
+
 ## [1.8.5] - 2026-06-05
 
 ### Changed

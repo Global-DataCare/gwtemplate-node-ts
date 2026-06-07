@@ -10,6 +10,8 @@ import { MessagingManager } from '../managers/MessagingManager';
 import { EmployeeManager } from '../managers/EmployeeManager';
 import { CredentialManager } from '../managers/CredentialManager';
 import { BlockchainAdapterMem } from '../adapters/BlockchainAdapterMem';
+import { BlockchainAdapterFabric } from '../adapters/BlockchainAdapterFabric';
+import { BlockchainAdapterMulti } from '../adapters/BlockchainAdapterMulti';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { CredentialLedgerAdapterMem } from '../adapters/CredentialLedgerAdapterMem';
 import { CredentialLedgerAdapterFabric } from '../adapters/CredentialLedgerAdapterFabric';
@@ -75,7 +77,11 @@ export function buildManagers(options: {
     tenantManager,
     config.hostExternalDomain,
   );
-  const blockchainAdapter: IBlockchainAdapter = new BlockchainAdapterMem();
+  const blockchainAdapterMem = new BlockchainAdapterMem();
+  const blockchainAdapterFabric = shouldEnableFabricBlockchainWrites() ? new BlockchainAdapterFabric() : undefined;
+  const blockchainAdapter: IBlockchainAdapter = blockchainAdapterFabric
+    ? new BlockchainAdapterMulti({ discoveryAdapter: blockchainAdapterMem, writeAdapter: blockchainAdapterFabric })
+    : blockchainAdapterMem;
   const credentialLedgerMem = new CredentialLedgerAdapterMem();
   const credentialLedgerFabric = new CredentialLedgerAdapterFabric();
   const ledgerProviderMap = parseLedgerProviderMap(process.env.LEDGER_PROVIDER_MAP);
@@ -161,4 +167,16 @@ export function buildManagers(options: {
     discoveryService,
     clearingHouseService,
   };
+}
+
+function shouldEnableFabricBlockchainWrites(): boolean {
+  const ledgerEnabled = String(process.env.LEDGER_ENABLED || '').trim().toLowerCase() === 'true';
+  const defaultProvider = String(process.env.LEDGER_PROVIDER_DEFAULT || '').trim().toLowerCase();
+  const providerMap = String(process.env.LEDGER_PROVIDER_MAP || '').trim().toLowerCase();
+  const explicitConsentChaincode = String(process.env.CONSENT_ACCESS_LEDGER_CHAINCODE || '').trim();
+
+  return ledgerEnabled
+    || defaultProvider === 'fabric'
+    || providerMap.includes('fabric')
+    || explicitConsentChaincode.length > 0;
 }

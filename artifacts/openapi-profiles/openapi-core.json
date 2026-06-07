@@ -4,7 +4,7 @@
     "title": "Gateway API - CORE",
     "version": "1.0.3",
     "description": "CORE API documentation for the secure gateway canonical flow.",
-    "x-profile-generated-at": "2026-06-05T23:03:30.682Z",
+    "x-profile-generated-at": "2026-06-07T16:19:22.140Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -2199,13 +2199,13 @@
     }
   },
   "paths": {
-    "/host/.well-known/ping": {
+    "/host/ping": {
       "get": {
         "tags": [
           "Discovery"
         ],
-        "summary": "Ping (host compatibility alias)",
-        "description": "Backward-compatible health check alias for the host tenant.",
+        "summary": "Ping (host root)",
+        "description": "Root-level liveness check for the host runtime.",
         "responses": {
           "200": {
             "description": "OK"

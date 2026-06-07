@@ -13,6 +13,12 @@ import { getClaimValue } from '../../utils/claims';
 import { knownDomainsReversed, knownDomainsReversedEnum } from 'gdc-common-utils-ts/models/urlPath';
 import { getTenantVaultId } from '../../utils/tenant';
 import { getIndividualSectionId } from '../../utils/individual-sections';
+import type { IBlockchainAdapter } from '../../adapters/IBlockchainAdapter';
+import {
+  buildConsentRulePrimaryDocument,
+  deriveConsentRuleBlockchainStatus,
+} from '../../utils/consent-access-blockchain';
+import { getJurisdictionGroup } from '../../utils/jurisdiction';
 
 /**
  * @fileoverview This test suite verifies the functionality of the ConsentManager.
@@ -38,11 +44,12 @@ import { getIndividualSectionId } from '../../utils/individual-sections';
 describe('ConsentManager', () => {
   let consentManager: ConsentManager;
   let mockVaultRepository: MockProxy<IVaultRepository>;
+  let mockBlockchainAdapter: MockProxy<IBlockchainAdapter>;
 
   // --- Test Data Setup ---
   const mockTenantId = 'test-tenant';
   const mockSubjectId = 'unified-health-id';
-  const mockJurisdiction = 'au-nsw';
+  const mockJurisdiction = 'ES';
   const mockSector = 'test-sector';
   const mockIdentifier = CONSENT_CREATION_MESSAGE.body.entry[0].meta.claims['Consent.identifier'];
   const mockActorIdentifier = CONSENT_CREATION_MESSAGE.body.entry[0].meta.claims['Consent.actor-identifier'];
@@ -97,8 +104,9 @@ describe('ConsentManager', () => {
   beforeEach(() => {
     // Create a type-safe mock of the repository
     mockVaultRepository = mock<IVaultRepository>();
+    mockBlockchainAdapter = mock<IBlockchainAdapter>();
     // Inject the mock into the manager
-    consentManager = new ConsentManager({vaultRepository: mockVaultRepository});
+    consentManager = new ConsentManager({vaultRepository: mockVaultRepository, blockchainAdapter: mockBlockchainAdapter});
   });
 
   it('should save attachment and rule to the correct sections in the vault', async () => {
@@ -115,7 +123,7 @@ describe('ConsentManager', () => {
     expect(responseEntry.response.status).toEqual('201');
     expect(responseBody.type).toEqual('_batch-response');
     expect(responseEntry.response.location).toEqual(
-      '/test-tenant/cds-au-nsw/v1/test-sector/individual/org.hl7.fhir.api/Consent/_batch-response'
+      `/test-tenant/cds-${mockJurisdiction}/v1/test-sector/individual/org.hl7.fhir.api/Consent/_batch-response`
     );
     expect(responseEntry.response.location).not.toMatch(/\/Consent\/[0-9a-f]{8,}/i);
 
@@ -147,6 +155,131 @@ describe('ConsentManager', () => {
     expect(storedRule.id).toEqual(expectedRuleId);
     expect(getClaimValue(storedRule, ClaimConsent.attachmentId)).toEqual(mockAttachmentHash);
     expect(getClaimValue(storedRule, ClaimConsent.attachmentData)).toBeUndefined();
+  });
+
+  it('should project one accepted consent rule to one blockchain write when the adapter supports it', async () => {
+    mockVaultRepository.vaultExists.mockResolvedValue(true);
+    mockVaultRepository.put.mockResolvedValue(true);
+    mockBlockchainAdapter.registerConsentAccessBundle = jest.fn().mockResolvedValue({ accepted: 1, txId: 'tx-consentaccess-1' });
+
+    await consentManager.process(mockJobRequest);
+
+    expect(mockBlockchainAdapter.registerConsentAccessBundle).toHaveBeenCalledTimes(1);
+    const consentAccessCall = (mockBlockchainAdapter.registerConsentAccessBundle as jest.Mock).mock.calls[0][0];
+    const expectedPayload = buildConsentRulePrimaryDocument([
+      {
+        ...mockEntry,
+        resource: {
+          ...mockEntry.resource,
+          meta: {
+            claims: mockClaims,
+          },
+        },
+      },
+    ]);
+    expect(consentAccessCall.channel).toEqual(`${mockSector}-${getJurisdictionGroup(mockJurisdiction)}`);
+    expect(consentAccessCall.chaincode).toEqual('consentaccess-sc');
+    expect(consentAccessCall.assetId).toEqual(expectedPayload.data[0].id);
+    expect(consentAccessCall.payload).toEqual({
+      status: deriveConsentRuleBlockchainStatus(mockClaims as unknown as Record<string, unknown>),
+      data: [expectedPayload.data[0]],
+    });
+  });
+
+  it('should perform one blockchain write per derived atomic rule', async () => {
+    mockVaultRepository.vaultExists.mockResolvedValue(true);
+    mockVaultRepository.put.mockResolvedValue(true);
+    mockBlockchainAdapter.registerConsentAccessBundle = jest.fn().mockResolvedValue({ accepted: 1, txId: 'tx-consentaccess-1' });
+
+    const multiRuleClaims: ConsentRule = {
+      ...mockClaims,
+      [ClaimConsent.actorIdentifier]: 'mailto:doctor@acme-id.org,mailto:nurse@acme-id.org',
+      [ClaimConsent.purpose]: 'treatment,research',
+    };
+
+    const multiRuleEntry: BundleEntryRequest = {
+      ...mockEntry,
+      meta: { claims: multiRuleClaims },
+      resource: {
+        ...mockEntry.resource,
+        meta: {
+          claims: multiRuleClaims,
+        },
+      },
+    };
+    const multiRuleJob: JobRequest = {
+      ...mockJobRequest,
+      content: {
+        ...mockDecodedMessage,
+        body: {
+          ...mockBundleJsonApi,
+          data: [multiRuleEntry],
+        },
+      },
+    };
+
+    await consentManager.process(multiRuleJob);
+
+    const expectedPayload = buildConsentRulePrimaryDocument([multiRuleEntry]);
+    expect(mockBlockchainAdapter.registerConsentAccessBundle).toHaveBeenCalledTimes(expectedPayload.data.length);
+
+    const writeCalls = (mockBlockchainAdapter.registerConsentAccessBundle as jest.Mock).mock.calls.map((call) => call[0]);
+    expect(writeCalls.map((call) => call.assetId)).toEqual(expectedPayload.data.map((entry) => entry.id));
+    expect(writeCalls.map((call) => call.payload)).toEqual(
+      expectedPayload.data.map((entry) => ({
+        status: deriveConsentRuleBlockchainStatus(multiRuleClaims as unknown as Record<string, unknown>),
+        data: [entry],
+      })),
+    );
+  });
+
+  it('should revoke and later reactivate the same blockchain rule id when Consent.period-end changes', async () => {
+    mockVaultRepository.vaultExists.mockResolvedValue(true);
+    mockVaultRepository.put.mockResolvedValue(true);
+    mockBlockchainAdapter.registerConsentAccessBundle = jest.fn().mockResolvedValue({ accepted: 1, txId: 'tx-consentaccess-lifecycle' });
+
+    const activeClaims: ConsentRule = {
+      ...mockClaims,
+      [ClaimConsent.actorIdentifier]: 'mailto:doctor.oncall@example.org',
+      [ClaimConsent.actorRole]: 'ISCO-08|2211',
+      [ClaimConsent.purpose]: 'ETREAT',
+      [ClaimConsent.action]: 'LOINC|60591-5',
+    };
+    const revokedClaims: ConsentRule = {
+      ...activeClaims,
+      [ClaimConsent.periodEnd]: '2026-06-01T00:00:00Z',
+    };
+
+    const activeEntry: BundleEntryRequest = {
+      ...mockEntry,
+      meta: { claims: activeClaims },
+      resource: { ...mockEntry.resource, meta: { claims: activeClaims } },
+    };
+    const revokedEntry: BundleEntryRequest = {
+      ...mockEntry,
+      meta: { claims: revokedClaims },
+      resource: { ...mockEntry.resource, meta: { claims: revokedClaims } },
+    };
+
+    const activeJob: JobRequest = {
+      ...mockJobRequest,
+      content: { ...mockDecodedMessage, body: { ...mockBundleJsonApi, data: [activeEntry] } },
+    };
+    const revokedJob: JobRequest = {
+      ...mockJobRequest,
+      content: { ...mockDecodedMessage, body: { ...mockBundleJsonApi, data: [revokedEntry] } },
+    };
+
+    await consentManager.process(activeJob);
+    await consentManager.process(revokedJob);
+    await consentManager.process(activeJob);
+
+    const expectedRuleId = buildConsentRulePrimaryDocument([activeEntry]).data[0].id;
+    const lifecycleCalls = (mockBlockchainAdapter.registerConsentAccessBundle as jest.Mock).mock.calls.map((call) => call[0]);
+
+    expect(lifecycleCalls).toHaveLength(3);
+    expect(lifecycleCalls.map((call) => call.assetId)).toEqual([expectedRuleId, expectedRuleId, expectedRuleId]);
+    expect(lifecycleCalls.map((call) => call.payload.status)).toEqual(['active', 'revoked', 'active']);
   });
 
   it('should return a 400 error if a required claim is missing', async () => {

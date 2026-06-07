@@ -1,4 +1,4 @@
-export type ActivationNetworkMode = 'test' | 'test-network' | 'network';
+export type ActivationNetworkMode = 'test' | 'local-network' | 'test-network' | 'network';
 
 export type TrustRegistryVerificationInput = {
   networkMode: ActivationNetworkMode;
@@ -33,7 +33,10 @@ export interface ITrustRegistryAdapter {
  */
 export class DefaultTrustRegistryAdapter implements ITrustRegistryAdapter {
   async verifyActivationTrust(input: TrustRegistryVerificationInput): Promise<TrustRegistryVerificationResult> {
-    const strictNetwork = input.networkMode === 'test-network' || input.networkMode === 'network';
+    const strictNetwork =
+      input.networkMode === 'local-network'
+      || input.networkMode === 'test-network'
+      || input.networkMode === 'network';
     return {
       revocationChecked: strictNetwork,
       issuerKeyStatusChecked: strictNetwork,

@@ -3,14 +3,31 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/payload-helpers.sh"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+LOCAL_FABRIC_ENV_FILE="${PROJECT_ROOT}/.env.local-fabric"
+LOCAL_FABRIC_DEVNET_PRESENT='false'
+if [[ -f "${LOCAL_FABRIC_ENV_FILE}" ]]; then
+  LOCAL_FABRIC_DEVNET_PRESENT='true'
+fi
+
 BASE_URL="${BASE_URL:-http://localhost:3000}"
 AUTH_BEARER="${AUTH_BEARER:-demo-token}"
 CONTENT_TYPE="${CONTENT_TYPE:-application/json}"
 JURISDICTION="${JURISDICTION:-ES}"
 JURISDICTION_LOWER="$(printf '%s' "${JURISDICTION:-ES}" | tr '[:upper:]' '[:lower:]')"
+HOST_JURISDICTION="${HOST_JURISDICTION:-EU}"
+HOST_JURISDICTION_LOWER="$(printf '%s' "${HOST_JURISDICTION:-EU}" | tr '[:upper:]' '[:lower:]')"
 VERSION="${VERSION:-v1}"
-HOST_NETWORK="${HOST_NETWORK:-test}"
-HOST_REGISTRY_SECTOR="${HOST_REGISTRY_SECTOR:-test}"
+NETWORK_MODE_NORMALIZED="$(printf '%s' "${NETWORK_MODE:-}" | tr '[:upper:]' '[:lower:]')"
+DEFAULT_HOST_NETWORK="test"
+if [[ "$NETWORK_MODE_NORMALIZED" == "local-network" || "$NETWORK_MODE_NORMALIZED" == "test-network" || "$NETWORK_MODE_NORMALIZED" == "network" ]]; then
+  DEFAULT_HOST_NETWORK="$NETWORK_MODE_NORMALIZED"
+elif [[ "$LOCAL_FABRIC_DEVNET_PRESENT" == 'true' ]]; then
+  DEFAULT_HOST_NETWORK="local-network"
+fi
+HOST_NETWORK="${HOST_NETWORK:-$DEFAULT_HOST_NETWORK}"
+HOST_REGISTRY_SECTOR="${HOST_REGISTRY_SECTOR:-$HOST_NETWORK}"
 SECTOR="${SECTOR:-health-care}"
 TENANT_ID="${TENANT_ID:-acme-id}"
 TAX_ID="${TAX_ID:-$TENANT_ID}"
@@ -25,6 +42,14 @@ SERVICE_URL="${SERVICE_URL:-${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION_LOWER}/v
 SERVICE_TYPE="${SERVICE_TYPE:-}"
 SERVICE_AREA_SERVED="${SERVICE_AREA_SERVED:-$JURISDICTION}"
 TERMS_OF_SERVICE="${TERMS_OF_SERVICE:-https://example.com/terms}"
+
+# Host onboarding uses the host "registry sector", which is the deployment
+# network selector (`test`, `local-network`, `test-network`, `network`), not the business sector.
+# For the local Docker Fabric topology, `NETWORK_MODE=local-network`, so the canonical host
+# onboarding surface becomes:
+# - `/host/cds-<host-jurisdiction>/v1/local-network/registry/...`
+# Business resources still use the tenant's business sector, for example:
+# - `/<tenantId>/cds-ES/v1/health-care/...`
 
 for cmd in curl jq node; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing $cmd"; exit 2; }
@@ -46,12 +71,11 @@ poll_async() {
 }
 
 echo "[bootstrap] ping: $BASE_URL/host/ping"
-HOST_PING_URL="${BASE_URL}/host/cds-${JURISDICTION_LOWER}/${VERSION}/${HOST_NETWORK}/.well-known/ping"
+HOST_PING_URL="${BASE_URL}/host/cds-${HOST_JURISDICTION_LOWER}/${VERSION}/${HOST_NETWORK}/.well-known/ping"
 echo "[bootstrap] ping: $HOST_PING_URL"
-code="$(curl -sS -o /tmp/bootstrap-tenant-ping.out -w "%{http_code}" "$HOST_PING_URL" || true)"
-if [[ "$code" != "200" ]]; then
-  echo "ERROR: gateway not reachable (status=$code)"
-  [[ -s /tmp/bootstrap-tenant-ping.out ]] && head -c 220 /tmp/bootstrap-tenant-ping.out
+ping_body="$(curl -f -sS "$HOST_PING_URL" || true)"
+if [[ -z "$ping_body" ]]; then
+  echo "ERROR: gateway not reachable at $HOST_PING_URL"
   exit 1
 fi
 
@@ -95,7 +119,7 @@ org_payload_overrides="$(jq -n \
 org_payload="$(render_example_payload ORGANIZATION_REGISTRATION_REQUEST "$org_payload_overrides")"
 
 echo "[bootstrap] organization registration (taxId=$TAX_ID)"
-org_create="$(post_json "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch" "$org_payload")"
+org_create="$(post_json "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch" "$org_payload")"
 echo "$org_create" | jq '.'
 org_err="$(echo "$org_create" | jq -r '.body.issues.issue[0].diagnostics // .issues.issue[0].diagnostics // empty')"
 if [[ -n "$org_err" && "$org_err" != *"already exists"* ]]; then
@@ -104,7 +128,7 @@ if [[ -n "$org_err" && "$org_err" != *"already exists"* ]]; then
 fi
 
 if [[ -z "$org_err" ]]; then
-  org_poll="$(poll_async "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch-response" "$thid_org")"
+  org_poll="$(poll_async "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch-response" "$thid_org")"
   echo "$org_poll" | jq '.'
   offer_id="$(echo "$org_poll" | jq -r '.body.data[0].meta.claims["org.schema.Offer.identifier"] // .data[0].meta.claims["org.schema.Offer.identifier"] // empty')"
   if [[ -n "$offer_id" ]]; then
@@ -117,9 +141,9 @@ if [[ -z "$org_err" ]]; then
     order_payload="$(render_example_payload ORGANIZATION_ORDER_REQUEST "$order_payload_overrides")"
 
     echo "[bootstrap] order confirmation"
-    order_create="$(post_json "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch" "$order_payload")"
+    order_create="$(post_json "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch" "$order_payload")"
     echo "$order_create" | jq '.'
-    order_poll="$(poll_async "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch-response" "$thid_order")"
+    order_poll="$(poll_async "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch-response" "$thid_order")"
     echo "$order_poll" | jq '.'
   fi
 fi

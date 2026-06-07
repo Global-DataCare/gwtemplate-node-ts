@@ -10,7 +10,7 @@ import { Sector } from "gdc-common-utils-ts/models/urlPath";
  */
 export interface IServerConfig {
   securityMode: 'strict' | 'compat' | 'demo';
-  networkMode: 'test' | 'test-network' | 'network';
+  networkMode: 'test' | 'local-network' | 'test-network' | 'network';
   fhirLegacy: boolean;
   jsonLegacy: boolean;
   didcommPlainEnabled: boolean;
