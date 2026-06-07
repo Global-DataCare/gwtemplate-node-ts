@@ -6,7 +6,7 @@ let configInstance: IServerConfig;
 const MAIN_SECTORS = ['animal', 'health'] as const;
 const SUBSECTORS = ['research', 'care', 'index', 'tech'] as const;
 
-export type NetworkMode = 'test' | 'test-network' | 'network';
+export type NetworkMode = 'test' | 'local-network' | 'test-network' | 'network';
 
 type MainSector = typeof MAIN_SECTORS[number];
 type Subsector = typeof SUBSECTORS[number];
@@ -40,10 +40,10 @@ function mapNodeEnvToNetworkMode(nodeEnv: string | undefined): NetworkMode {
 export function parseNetworkMode(value: string | undefined, nodeEnv?: string): NetworkMode {
   const normalized = String(value || '').trim().toLowerCase();
   if (!normalized) return mapNodeEnvToNetworkMode(nodeEnv);
-  if (normalized === 'test' || normalized === 'test-network' || normalized === 'network') {
+  if (normalized === 'test' || normalized === 'local-network' || normalized === 'test-network' || normalized === 'network') {
     return normalized;
   }
-  throw new Error("Config Error: Invalid NETWORK_MODE. Allowed: test, test-network, network");
+  throw new Error("Config Error: Invalid NETWORK_MODE. Allowed: test, local-network, test-network, network");
 }
 
 export function resetServerConfig(): void {

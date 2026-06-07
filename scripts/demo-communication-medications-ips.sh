@@ -1,20 +1,54 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# This demo is intentionally layered:
+# 1. optionally prepare the canonical individual baseline
+# 2. ingest two medication-bearing Communications
+# 3. verify MedicationStatement search
+# 4. verify IPS Bundle search
+#
+# By default the script bootstraps the individual first because most local demos
+# need the subject to exist. Pass `--no-create-individual` to exercise negative
+# paths where the clinical ingestion should fail because the individual does not
+# exist yet.
+
 source "$(dirname "${BASH_SOURCE[0]}")/payload-helpers.sh"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+LOCAL_FABRIC_ENV_FILE="${PROJECT_ROOT}/.env.local-fabric"
+DEFAULT_LOCAL_FABRIC_TENANT_ID='acme-id'
+CREATE_INDIVIDUAL_BY_DEFAULT='true'
+
 BASE_URL="${BASE_URL:-http://localhost:3000}"
-TENANT_ID="${TENANT_ID:-${E2E_TENANT_ID:-acme}}"
+if [[ -f "${LOCAL_FABRIC_ENV_FILE}" ]]; then
+  TENANT_ID="${TENANT_ID:-${E2E_TENANT_ID:-$DEFAULT_LOCAL_FABRIC_TENANT_ID}}"
+else
+  TENANT_ID="${TENANT_ID:-${E2E_TENANT_ID:-acme}}"
+fi
 JURISDICTION="${JURISDICTION:-${E2E_JURISDICTION:-ES}}"
 SECTOR="${SECTOR:-${E2E_SECTOR:-health-care}}"
 AUTH_BEARER="${AUTH_BEARER:-demo-token}"
 SUBJECT_ID="${SUBJECT_ID:-did:web:api.${TENANT_ID}.org:individual:subject-001}"
 MODE="${MODE:-didcomm}" # didcomm | legacy-fhir
 
-if [[ "${1:-}" == "--mode" ]]; then
-  MODE="${2:-$MODE}"
-  shift 2 || true
-fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode)
+      MODE="${2:-$MODE}"
+      shift 2 || true
+      ;;
+    --no-create-individual)
+      CREATE_INDIVIDUAL_BY_DEFAULT='false'
+      shift
+      ;;
+    *)
+      echo "ERROR: unsupported argument '$1'"
+      echo "Usage: demo-communication-medications-ips.sh [--mode didcomm|legacy-fhir] [--no-create-individual]"
+      exit 2
+      ;;
+  esac
+done
 
 if [[ "$MODE" != "didcomm" && "$MODE" != "legacy-fhir" ]]; then
   echo "ERROR: invalid MODE='$MODE' (allowed: didcomm, legacy-fhir)"
@@ -50,23 +84,43 @@ poll_async() {
     sleep "$sleep_s"
   done
   echo "{\"status\":500,\"issues\":{\"issue\":[{\"diagnostics\":\"Timeout polling thid=$thid\"}]}}"
-  return 1
+    return 1
 }
+
+if [[ "${CREATE_INDIVIDUAL_BY_DEFAULT}" == 'true' ]]; then
+  echo "[0/5] Preparing canonical individual baseline..."
+  BASE_URL="${BASE_URL}" \
+  TENANT_ID="${TENANT_ID}" \
+  JURISDICTION="${JURISDICTION}" \
+  SECTOR="${SECTOR}" \
+  AUTH_BEARER="${AUTH_BEARER}" \
+  EXPECTED_SUBJECT_ID="${SUBJECT_ID}" \
+  bash "${SCRIPT_DIR}/demo-create-individual-organization.sh"
+else
+  echo "[0/4] Skipping individual bootstrap by request (--no-create-individual)"
+fi
 
 echo "[1/4] Rendering canonical synthetic demo payloads..."
 
 render_demo_payload_with_runtime() {
   local payload_name="$1"
   local medication_case_index="${2:-0}"
-  SUBJECT_ID="$SUBJECT_ID" THID_COMM="$THID_COMM" THID_MED_SEARCH="$THID_MED_SEARCH" THID_IPS_SEARCH="$THID_IPS_SEARCH" MEDICATION_CASE_INDEX="$medication_case_index" \
+  (
+    export SUBJECT_ID THID_COMM THID_MED_SEARCH THID_IPS_SEARCH
+    export MEDICATION_CASE_INDEX="$medication_case_index"
     render_demo_payload "$payload_name"
+  )
 }
 
 render_demo_payload_with_runtime_2() {
   local payload_name="$1"
   local medication_case_index="${2:-1}"
-  SUBJECT_ID="$SUBJECT_ID" THID_COMM="$THID_COMM_2" THID_MED_SEARCH="$THID_MED_SEARCH" THID_IPS_SEARCH="$THID_IPS_SEARCH" MEDICATION_CASE_INDEX="$medication_case_index" \
+  (
+    export SUBJECT_ID THID_MED_SEARCH THID_IPS_SEARCH
+    export THID_COMM="$THID_COMM_2"
+    export MEDICATION_CASE_INDEX="$medication_case_index"
     render_demo_payload "$payload_name"
+  )
 }
 
 DIDCOMM_COMM_REQ="$(render_demo_payload_with_runtime COMMUNICATION_DIDCOMM)"

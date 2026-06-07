@@ -79,6 +79,31 @@ function normalizeDidcommBodyForFhirFormat<T extends { body?: any } | undefined>
   } as T;
 }
 
+/**
+ * Normalizes legacy plaintext request bodies so managers can consume them
+ * through the same `job.content.body` contract used by secure DIDComm flows.
+ *
+ * Why this exists:
+ * - secure requests arrive as a DIDComm envelope whose business payload already
+ *   lives under `content.body`
+ * - legacy `application/json` and `application/fhir+json` requests often send
+ *   the business payload directly at the top level
+ * - most managers only read `job.content.body`
+ *
+ * The returned object keeps top-level fields such as `thid`, while also
+ * mirroring the normalized business payload under `body`.
+ */
+function normalizeLegacyPlaintextContent<T extends Record<string, any>>(content: T): T & { body: any } {
+  if (content && typeof content === 'object' && content.body && typeof content.body === 'object') {
+    return content as T & { body: any };
+  }
+
+  return {
+    ...(content || {}),
+    body: content || {},
+  };
+}
+
 function isContentTypeAllowedBySecurityPolicy(contentType: ParsedContentType): boolean {
   const securityMode = resolveSecurityModeFromEnv();
   if (contentType === 'secure-form') return true;
@@ -2431,7 +2456,8 @@ export function createApiRouter(
         }
 
         const legacyBody = normalizeDidcommBodyForFhirFormat(req.body || {}, req.params.format);
-        const legacyMeta = legacyBody?.meta || {};
+        const normalizedLegacyContent = normalizeLegacyPlaintextContent(legacyBody || {});
+        const legacyMeta = normalizedLegacyContent?.meta || {};
 
         jobRequest = {
           ...req.params,
@@ -2440,7 +2466,7 @@ export function createApiRouter(
           status: 'DRAFT' as any, // TODO: fix this any
           createdAtTimestamp: Date.now(),
           content: {
-            ...legacyBody,
+            ...normalizedLegacyContent,
             meta: {
               ...legacyMeta,
               bearer: {

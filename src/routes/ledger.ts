@@ -87,7 +87,7 @@ export function createCredentialLedgerRouter(
   ledgerAdapter: ICredentialLedgerAdapter,
   asyncResponseStore: IAsyncResponseStore,
   tenantsCacheManager: TenantsCacheManager,
-  networkMode?: 'test' | 'test-network' | 'network'
+  networkMode?: 'test' | 'local-network' | 'test-network' | 'network'
 ): Router {
   const router = Router();
 

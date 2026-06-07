@@ -15,3 +15,10 @@ render_demo_payload() {
     node --loader ts-node/esm --experimental-specifier-resolution=node \
     ./scripts/render-demo-communication-medications-ips.mts "$payload_name"
 }
+
+render_demo_consentaccess_payload() {
+  local payload_name="$1"
+  TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+    node --loader ts-node/esm --experimental-specifier-resolution=node \
+    ./scripts/render-demo-consentaccess-payload.mts "$payload_name"
+}

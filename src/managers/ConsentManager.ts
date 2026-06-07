@@ -22,6 +22,11 @@ import { determineResourceId } from '../utils/resource';
 import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { persistConsentRuleAndAttachment, requiredConsentClaims } from '../utils/consent-storage';
+import {
+  buildConsentRulePrimaryDocument,
+  deriveConsentRuleBlockchainStatus as deriveConsentAccessBlockchainStatus,
+} from '../utils/consent-access-blockchain';
+import { getJurisdictionGroup } from '../utils/jurisdiction';
 
 export interface ConsentManagerDeps {
   vaultRepository: IVaultRepository;
@@ -59,6 +64,7 @@ export class ConsentManager implements IJobProcessor {
       (body && Array.isArray(body.entry) && body.entry) ||
       [];
     const cidMappings: FhirCidVersionMapping[] = [];
+    const blockchainEligibleEntries: BundleEntryRequest[] = [];
 
     for (const entry of entries) {
         const rawClaims =
@@ -105,6 +111,7 @@ export class ConsentManager implements IJobProcessor {
               researchTags,
             });
             if (versioning.mapping) cidMappings.push(versioning.mapping);
+            blockchainEligibleEntries.push(buildConsentBlockchainEntry(entry, claims));
 
             const responseAction = `${normalizedAction}-response`;
             responseEntries.push({
@@ -136,6 +143,12 @@ export class ConsentManager implements IJobProcessor {
       jurisdiction,
       mappings: cidMappings,
     });
+    await registerConsentAccessRules({
+      blockchainAdapter: this.blockchainAdapter,
+      entries: blockchainEligibleEntries,
+      sector: job.sector as string,
+      jurisdiction,
+    });
 
     const responseBundle: BundleJsonApi = {
       resourceType: 'Bundle',
@@ -153,4 +166,87 @@ export class ConsentManager implements IJobProcessor {
     };
     return result;
   }
+}
+
+/**
+ * Creates a normalized bundle entry that always carries the canonical claims under
+ * `resource.meta.claims`, which is the shared contract expected by the consent-access
+ * blockchain projection helpers.
+ */
+function buildConsentBlockchainEntry(
+  entry: BundleEntryRequest,
+  claims: Record<string, unknown>,
+): BundleEntryRequest {
+  const normalizedResource = {
+    ...((entry.resource as Record<string, unknown> | undefined) || {}),
+    meta: {
+      ...((((entry.resource as Record<string, unknown> | undefined)?.meta as Record<string, unknown> | undefined) || {})),
+      claims,
+    },
+  };
+
+  return {
+    ...entry,
+    resource: normalizedResource as unknown as RecordBase,
+  };
+}
+
+/**
+ * Registers one sanitized consent-access rule per on-chain asset when a
+ * blockchain adapter exposes a dedicated consent-access write path.
+ *
+ * The blockchain payload still keeps the shared primary-document contract with
+ * mandatory `data[]`, but every submit contains exactly one atomic rule:
+ * - `assetId = data[0].id = CIDv1(SHA3-384(canonicalRuleId))`
+ * - `payload.data.length = 1`
+ *
+ * This makes every rule independently verifiable and independently updatable on
+ * chain even when several rules were derived from one input consent bundle.
+ */
+async function registerConsentAccessRules(params: {
+  blockchainAdapter?: IBlockchainAdapter;
+  entries: BundleEntryRequest[];
+  sector: string;
+  jurisdiction: string;
+}): Promise<void> {
+  const { blockchainAdapter, entries, sector, jurisdiction } = params;
+  if (!blockchainAdapter?.registerConsentAccessBundle) return;
+  if (entries.length === 0) return;
+
+  const channel = `${sector}-${resolveConsentAccessChannelJurisdiction(jurisdiction)}`;
+  const chaincode = process.env.CONSENT_ACCESS_LEDGER_CHAINCODE || 'consentaccess-sc';
+  for (const sourceEntry of entries) {
+    const entryClaims = ((sourceEntry.resource as Record<string, unknown> | undefined)?.meta as { claims?: Record<string, unknown> } | undefined)?.claims || {};
+    const payload = buildConsentRulePrimaryDocument([sourceEntry]);
+    const status = deriveConsentAccessBlockchainStatus(entryClaims);
+    if (!Array.isArray(payload.data) || payload.data.length === 0) continue;
+
+    for (const ruleEntry of payload.data) {
+      const assetId = String(ruleEntry.id || '').trim();
+      if (!assetId) {
+        throw new Error('Cannot register consent access rule without ruleId');
+      }
+
+      await blockchainAdapter.registerConsentAccessBundle({
+        assetId,
+        payload: { status, data: [ruleEntry] },
+        channel,
+        chaincode,
+      });
+    }
+  }
+}
+
+/**
+ * Maps the request jurisdiction to the Fabric channel suffix used by
+ * `consentaccess-sc`.
+ *
+ * The legal jurisdiction carried by the request can be a country code such as
+ * `ES`, while the local or shared Fabric topology is organized by broader
+ * jurisdiction groups such as `eu`. Reusing the same mapping helper as the rest
+ * of GW CORE keeps consent-access writes aligned with the channels that actually
+ * exist in the network.
+ */
+function resolveConsentAccessChannelJurisdiction(jurisdiction: string): string {
+  return getJurisdictionGroup(String(jurisdiction || '').trim());
 }

@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-06-05T23:03:30.716Z",
+    "x-profile-generated-at": "2026-06-07T16:19:22.170Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -4936,13 +4936,13 @@
         "x-profile": "compat"
       }
     },
-    "/host/.well-known/ping": {
+    "/host/ping": {
       "get": {
         "tags": [
           "Discovery"
         ],
-        "summary": "Ping (host compatibility alias)",
-        "description": "Backward-compatible health check alias for the host tenant.",
+        "summary": "Ping (host root)",
+        "description": "Root-level liveness check for the host runtime.",
         "responses": {
           "200": {
             "description": "OK"
@@ -5004,12 +5004,23 @@
         "x-profile": "core"
       }
     },
-    "/host/.well-known/did.json": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/did.json": {
       "get": {
         "tags": [
           "Discovery"
         ],
         "summary": "DID document (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -5049,12 +5060,23 @@
         "x-profile": "core"
       }
     },
-    "/host/.well-known/jwks.json": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/jwks.json": {
       "get": {
         "tags": [
           "Discovery"
         ],
         "summary": "JWKS (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -5094,12 +5116,23 @@
         "x-profile": "core"
       }
     },
-    "/host/.well-known/openid-configuration": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/openid-configuration": {
       "get": {
         "tags": [
           "Discovery"
         ],
         "summary": "OpenID configuration (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -5139,12 +5172,23 @@
         "x-profile": "core"
       }
     },
-    "/host/.well-known/smart-configuration": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/smart-configuration": {
       "get": {
         "tags": [
           "Discovery"
         ],
         "summary": "SMART configuration (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -5184,12 +5228,23 @@
         "x-profile": "core"
       }
     },
-    "/host/.well-known/legal-participant.vc.json": {
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/legal-participant.vc.json": {
       "get": {
         "tags": [
           "Discovery"
         ],
         "summary": "Gaia-X Legal Participant VC (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"

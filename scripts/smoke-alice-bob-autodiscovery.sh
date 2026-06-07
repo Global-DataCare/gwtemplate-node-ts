@@ -7,7 +7,12 @@ SECTOR="${SECTOR:-health-care}"
 JURISDICTION="${JURISDICTION:-ES}"
 JURISDICTION_LOWER="$(printf '%s' "${JURISDICTION:-ES}" | tr '[:upper:]' '[:lower:]')"
 VERSION="${VERSION:-v1}"
-HOST_NETWORK="${HOST_NETWORK:-test}"
+NETWORK_MODE_NORMALIZED="$(printf '%s' "${NETWORK_MODE:-}" | tr '[:upper:]' '[:lower:]')"
+DEFAULT_HOST_NETWORK="test"
+if [[ "$NETWORK_MODE_NORMALIZED" == "local-network" || "$NETWORK_MODE_NORMALIZED" == "test-network" || "$NETWORK_MODE_NORMALIZED" == "network" ]]; then
+  DEFAULT_HOST_NETWORK="$NETWORK_MODE_NORMALIZED"
+fi
+HOST_NETWORK="${HOST_NETWORK:-$DEFAULT_HOST_NETWORK}"
 INDEX_PROVIDER="${INDEX_PROVIDER:-organization/Composition.cruds}"
 DIGITAL_TWIN_PROVIDER="${DIGITAL_TWIN_PROVIDER:-organization/ResearchSubject.cruds}"
 READER_ONLY_TENANT="${READER_ONLY_TENANT:-Acme 4 Organization SL}"
