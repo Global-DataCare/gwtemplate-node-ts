@@ -27,6 +27,7 @@ import {
   ACTION_PURGE,
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
+import { mergeServiceCapabilityClaims } from './service-capability-claims';
 
 export type HostRegistrySector = 'test' | 'local-network' | 'test-network' | 'network';
 
@@ -36,8 +37,13 @@ export type HostRegistrySector = 'test' | 'local-network' | 'test-network' | 'ne
  * This is used by autodiscovery to avoid publishing tenants that can only consume
  * services but cannot act as providers.
  */
-export function hasProviderServiceCapabilityClaim(serviceCapabilityClaim?: string): boolean {
-  const serviceTypes = parseServiceCapabilityTokens(String(serviceCapabilityClaim || ''));
+export function hasProviderServiceCapabilityClaim(
+  serviceCapabilityClaim?: string,
+  serviceAdditionalTypeClaim?: string,
+): boolean {
+  const serviceTypes = parseServiceCapabilityTokens(
+    mergeServiceCapabilityClaims(serviceCapabilityClaim, serviceAdditionalTypeClaim) || '',
+  );
   return serviceTypes.some((token) => isProviderServiceCapability(token));
 }
 
@@ -168,6 +174,12 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     ['Organization'],
     ['_search']
+  ));
+
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'pdf' },
+    ['DocumentReference'],
+    ['_create']
   ));
 
   // FHIR endpoints are exposed under explicit FHIR formats (as documented in API_INTEGRATORS_GUIDE and Swagger).
@@ -327,11 +339,16 @@ export function initializeTenantServicesConfig(
   sector: Sector,
   customServices: DidService[] = [],
   serviceCapabilityClaim?: string,
+  serviceAdditionalTypeClaim?: string,
 ): DidService[] {
+  const effectiveServiceCapabilityClaim = mergeServiceCapabilityClaims(
+    serviceCapabilityClaim,
+    serviceAdditionalTypeClaim,
+  );
   const defaultBusinessServices = filterBusinessServicesByCapabilityClaim(
     generateDefaultBusinessServices(sector),
     sector,
-    serviceCapabilityClaim,
+    effectiveServiceCapabilityClaim,
   );
   
   const defaultNetworkServices: DidService[] = [

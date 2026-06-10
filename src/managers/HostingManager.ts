@@ -51,6 +51,7 @@ import { resolveIdentityChannel } from '../utils/ledger';
 import { slugFromDomain } from '../utils/slug';
 import { getEnvSectionId } from '../utils/section-env';
 import { normalizeIndexedEmail, splitIndexedEmails, splitIndexedPhones } from '../utils/indexed-contact';
+import { SERVICE_ADDITIONAL_TYPE_CLAIM } from '../utils/service-capability-claims';
 import { ClearingHouseService, IClearingHouseService } from '../services/ClearingHouseService';
 import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
 import {
@@ -2229,6 +2230,7 @@ export class HostingManager {
       sector,
       [],
       allClaims[ClaimsServiceSchemaorg.serviceType] as string | undefined,
+      allClaims[SERVICE_ADDITIONAL_TYPE_CLAIM] as string | undefined,
     );
     const publicBaseUrl = isHosted ? this.config.apiBaseUrl : (publicTenantUrl || this.config.apiBaseUrl);
     const serviceBaseUrl = operationalTenantUrl || publicBaseUrl;

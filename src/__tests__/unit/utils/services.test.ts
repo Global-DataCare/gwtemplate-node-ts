@@ -14,6 +14,7 @@ import {
   serializeServiceCapabilityTokens,
 } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
+import { SERVICE_ADDITIONAL_TYPE_CLAIM } from '../../../utils/service-capability-claims';
 
 // Create a mock config object for the tests.
 const mockConfig: IServerConfig = {
@@ -185,6 +186,15 @@ describe('Service Initialization Utilities', () => {
           (s.actions || []).includes('_search'),
       );
       expect(subjectSearchService).toBeDefined();
+
+      const individualPdfDraftService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'individual' &&
+          (s as any).selector?.format === 'pdf' &&
+          s.serviceEndpoint === 'DocumentReference' &&
+          (s.actions || []).includes('_create'),
+      );
+      expect(individualPdfDraftService).toBeDefined();
     });
 
     it('should treat synthetic animal-tech as FHIR-enabled', () => {
@@ -263,6 +273,26 @@ describe('Service Initialization Utilities', () => {
       )).toBe(true);
     });
 
+    it('should read tenant discovery capabilities from additionalType during migration', () => {
+      const services = initializeTenantServicesConfig(
+        Sector.RESEARCH,
+        [],
+        undefined,
+        serializeServiceCapabilityTokens([ServiceCapability.IndexReader]),
+      );
+
+      expect(SERVICE_ADDITIONAL_TYPE_CLAIM).toBeDefined();
+      expect(services.some(
+        (s: DidService) => (s as any).selector?.section === 'entity',
+      )).toBe(true);
+      expect(services.some(
+        (s: DidService) => (s as any).selector?.section === 'individual',
+      )).toBe(true);
+      expect(services.some(
+        (s: DidService) => (s as any).selector?.section === 'digitaltwin',
+      )).toBe(false);
+    });
+
     it('should not include standard discovery endpoints', () => {
       // ARRANGE
       const tenantConfig = createTestTenantConfig(Sector.RESEARCH, 'did:web:acme.com');
@@ -326,7 +356,7 @@ describe('Service Initialization Utilities', () => {
       expect(catalogService?.type).toBe(DidServiceTypes.CatalogService);
       expect(catalogService?.serviceEndpoint).toBe(buildGwCatalogRequestPath({
         participantId: 'host',
-        jurisdiction: '{jurisdiction}',
+        jurisdiction: '{hostCoverageScope}',
         version: 'v1',
         hostNetwork: '{hostNetwork}',
       }));

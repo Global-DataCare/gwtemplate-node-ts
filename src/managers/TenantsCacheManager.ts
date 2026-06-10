@@ -14,6 +14,7 @@ import { parseTenantUrn } from '../utils/urn';
 import { getEnvSectionId } from '../utils/section-env';
 import { getTenantAuthorizationStatus, isTenantAuthorizationOperational, TenantAuthorizationLifecycleStatus } from '../utils/tenant-lifecycle';
 import { hasProviderServiceCapabilityClaim } from '../utils/services';
+import { getTenantServiceCapabilityClaim } from '../utils/service-capability-claims';
 
 const SERVICE_OPERATIONAL_URL_CLAIM = 'org.schema.Service.url';
 
@@ -198,7 +199,7 @@ export class TenantsCacheManager implements ITenantsManager {
   public async listAutodiscoverableTenants(): Promise<any[]> {
     const tenants = await this.listRegisteredTenants();
     return tenants.filter((tenant) => {
-      const serviceCapabilityClaim = getTenantServiceClaim(tenant, ClaimsServiceSchemaorg.serviceType);
+      const serviceCapabilityClaim = getTenantServiceCapabilityClaim(tenant);
       return isTenantAuthorizationOperational(tenant) && hasProviderServiceCapabilityClaim(serviceCapabilityClaim);
     });
   }

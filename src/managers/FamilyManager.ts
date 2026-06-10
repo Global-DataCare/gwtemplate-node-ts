@@ -31,6 +31,8 @@ import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import { buildClaimsFromIndividualRegistrationPdfAttachment } from '../utils/individual-registration-pdf-attachment';
+import { buildClaimsFromIndividualOrganizationKyc } from '../utils/individual-organization-kyc';
+import { buildIndividualOnboardingPdfDraftResponse } from '../utils/individual-onboarding-pdf-draft';
 import { normalizeIndexedEmail, splitIndexedEmails, splitIndexedPhones } from '../utils/indexed-contact';
 import {
   ACTION_DISABLE,
@@ -75,6 +77,8 @@ export class FamilyManager {
             responseEntries.push(await this.processFamilyDisableEntry(job, entry));
           } else if (job.action === ACTION_PURGE && job.resourceType === 'Organization') {
             responseEntries.push(await this.processFamilyPurgeEntry(job, entry));
+          } else if (job.resourceType === 'DocumentReference' || job.resourceType === 'Action') {
+            responseEntries.push(await this.processIndividualOnboardingPdfDraftEntry(job, entry));
           } else if (job.resourceType === 'Organization') {
             responseEntries.push(await this.processFamilyRegistrationEntry(job, entry, environment));
           } else if (job.resourceType === 'Order') {
@@ -112,9 +116,15 @@ export class FamilyManager {
   private async processFamilyRegistrationEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
     const entryType = entry.type || 'Family-registration-form-v1.0';
     const rawClaims = entry?.meta?.claims;
+    const rawClaimsObject = (rawClaims && typeof rawClaims === 'object') ? rawClaims as Record<string, unknown> : {};
+    const normalizedRawClaims: ClaimsRecord | undefined = Object.keys(rawClaimsObject).length > 0
+      ? (normalizeContextualizedClaims(rawClaimsObject) as ClaimsRecord)
+      : undefined;
     const attachmentClaims = await this.resolveIndividualRegistrationAttachmentClaims(job);
+    const kycClaims = this.resolveIndividualRegistrationKycClaims(entry, normalizedRawClaims, attachmentClaims);
     const mergedClaims = {
-      ...((rawClaims && typeof rawClaims === 'object') ? rawClaims : {}),
+      ...rawClaimsObject,
+      ...(kycClaims || {}),
       ...(attachmentClaims || {}),
     };
     const claims: ClaimsRecord | undefined = Object.keys(mergedClaims).length > 0
@@ -268,6 +278,52 @@ export class FamilyManager {
     };
   }
 
+  private async processIndividualOnboardingPdfDraftEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry | ErrorEntry> {
+    if (job.action !== '_create') {
+      throw new ManagerError(`Unsupported family Action operation: '${job.action}'`, IssueType.NotSupported);
+    }
+
+    const entryResourceMeta = (entry?.resource?.meta && typeof entry.resource.meta === 'object')
+      ? entry.resource.meta as Record<string, unknown>
+      : {};
+    const entryClaims = (entryResourceMeta.claims && typeof entryResourceMeta.claims === 'object')
+      ? entryResourceMeta.claims as Record<string, unknown>
+      : {};
+    const template = entryResourceMeta.template as any;
+    const formFields = entryResourceMeta.formFields as any;
+    const kyc = entryResourceMeta.kyc as any;
+    const subjectDid = String(
+      entryClaims[ClaimsOrganizationSchemaorg.identifier]
+      || entryClaims[ClaimsPersonSchemaorg.identifier]
+      || entryClaims[ClaimsServiceSchemaorg.identifier]
+      || '',
+    ).trim();
+
+    if (!subjectDid) {
+      throw new ManagerError(
+        `Individual onboarding PDF draft requires one subject identifier claim such as '${ClaimsOrganizationSchemaorg.identifier}'.`,
+        IssueType.Required,
+      );
+    }
+
+    const documentReferenceEntry = await buildIndividualOnboardingPdfDraftResponse(
+      {
+        template,
+        formFields,
+        kyc,
+        claims: entryClaims,
+      },
+      subjectDid,
+      String(entry?.resource?.id || '').trim() || undefined,
+    );
+
+    return {
+      type: documentReferenceEntry.type,
+      resource: documentReferenceEntry.resource as any,
+      response: { status: '200' },
+    };
+  }
+
   private async resolveIndividualRegistrationAttachmentClaims(job: JobRequest): Promise<ClaimsRecord | undefined> {
     const decodedContent = job.content as Record<string, any> | undefined;
     const attachmentResult = await buildClaimsFromIndividualRegistrationPdfAttachment(
@@ -275,6 +331,59 @@ export class FamilyManager {
     );
     if (!attachmentResult) return undefined;
     return attachmentResult.claims as ClaimsRecord;
+  }
+
+  private resolveIndividualRegistrationEntryMeta(entry: BundleEntry): Record<string, unknown> | undefined {
+    const entryMeta = entry?.meta;
+    const resourceMeta = (entry?.resource as Record<string, unknown> | undefined)?.meta;
+    const normalizedEntryMeta = (entryMeta && typeof entryMeta === 'object') ? entryMeta as Record<string, unknown> : undefined;
+    const normalizedResourceMeta = (resourceMeta && typeof resourceMeta === 'object') ? resourceMeta as Record<string, unknown> : undefined;
+
+    if (!normalizedEntryMeta && !normalizedResourceMeta) return undefined;
+    return {
+      ...(normalizedResourceMeta || {}),
+      ...(normalizedEntryMeta || {}),
+    };
+  }
+
+  private resolveIndividualRegistrationKycClaims(
+    entry: BundleEntry,
+    normalizedRawClaims?: ClaimsRecord,
+    attachmentClaims?: ClaimsRecord,
+  ): ClaimsRecord | undefined {
+    const meta = this.resolveIndividualRegistrationEntryMeta(entry);
+    if (!meta) return undefined;
+
+    const extensions = (meta.extensions && typeof meta.extensions === 'object')
+      ? meta.extensions as Record<string, unknown>
+      : undefined;
+    const rawKyc = meta.kyc ?? extensions?.kyc;
+    if (!rawKyc || typeof rawKyc !== 'object') return undefined;
+
+    const kycPayload = rawKyc as Record<string, unknown>;
+    const profile = (kycPayload.profile && typeof kycPayload.profile === 'object')
+      ? kycPayload.profile as Record<string, unknown>
+      : kycPayload;
+    if (!profile || Object.keys(profile).length === 0) return undefined;
+
+    const fallbackClaims = attachmentClaims || normalizedRawClaims;
+    const individualAlternateName =
+      (typeof kycPayload.individualAlternateName === 'string' ? kycPayload.individualAlternateName : undefined) ||
+      (fallbackClaims?.[ClaimsOrganizationSchemaorg.alternateName] as string | undefined);
+    const individualBirthDate =
+      (typeof kycPayload.individualBirthDate === 'string' ? kycPayload.individualBirthDate : undefined) ||
+      (fallbackClaims?.[ClaimsPersonSchemaorg.birthDate] as string | undefined);
+    const controllerEmail =
+      (typeof kycPayload.controllerEmail === 'string' ? kycPayload.controllerEmail : undefined) ||
+      (fallbackClaims?.[ClaimsOrganizationSchemaorg.ownerEmail] as string | undefined) ||
+      (fallbackClaims?.[ClaimsPersonSchemaorg.email] as string | undefined);
+
+    return buildClaimsFromIndividualOrganizationKyc({
+      profile,
+      individualAlternateName: String(individualAlternateName || ''),
+      individualBirthDate,
+      controllerEmail,
+    }).claims as ClaimsRecord;
   }
 
   private async processFamilyOrderEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
@@ -364,8 +473,12 @@ export class FamilyManager {
       }
       await this.vaultRepository.put(tenantVaultId, licenseDocs, DEVICE_LICENSE_SECTION);
 
-      const controllerEmail = finalizedContent.claims[ClaimsPersonSchemaorg.email] as string | undefined;
-      const controllerPhoneForActivation = finalizedContent.claims[ClaimsPersonSchemaorg.telephone] as string | undefined;
+      const controllerEmail =
+        finalizedContent.claims[ClaimsOrganizationSchemaorg.ownerEmail] as string | undefined
+        || finalizedContent.claims[ClaimsPersonSchemaorg.email] as string | undefined;
+      const controllerPhoneForActivation =
+        finalizedContent.claims[ClaimsOrganizationSchemaorg.ownerTelephone] as string | undefined
+        || finalizedContent.claims[ClaimsPersonSchemaorg.telephone] as string | undefined;
       const controllerContact = controllerEmail || controllerPhoneForActivation;
       const controllerRole = getPersonOccupationClaim(finalizedContent.claims as Record<string, any> | undefined) || 'FAMILY_CONTROLLER';
       if (controllerContact) {
@@ -397,7 +510,9 @@ export class FamilyManager {
       tenantId,
       tenantDid: recipientDid,
       senderDid: tenantDid,
-      email: finalizedContent.claims[ClaimsPersonSchemaorg.email] as string | undefined,
+      email:
+        finalizedContent.claims[ClaimsOrganizationSchemaorg.ownerEmail] as string | undefined
+        || finalizedContent.claims[ClaimsPersonSchemaorg.email] as string | undefined,
       legalName: finalizedContent.claims[ClaimsOrganizationSchemaorg.legalName] as string | undefined,
       addressCountry: finalizedContent.claims[ClaimsOrganizationSchemaorg.addressCountry] as string | undefined,
       addressRegion: finalizedContent.claims[ClaimsOrganizationSchemaorg.addressRegion] as string | undefined,

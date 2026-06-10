@@ -1,3 +1,44 @@
+## [1.10.0] - 2026-06-10
+
+### Added
+- Added an individual onboarding PDF draft flow in GW CORE so a controller can
+  submit template bytes/reference plus KYC/form data and receive a filled PDF
+  draft back as `DocumentReference` claims.
+- Added shared onboarding draft generation helpers in:
+  - `src/utils/individual-onboarding-pdf-draft.ts`
+  - `src/utils/individual-organization-kyc.ts`
+  - `src/utils/service-capability-claims.ts`
+- Added focused coverage for:
+  - onboarding PDF draft generation in `FamilyManager`
+  - worker routing for `individual/pdf/DocumentReference/_create`
+
+### Changed
+- Integrated KYC normalization into the individual/family onboarding flow so
+  GW CORE now merges claims with precedence:
+  - raw claims
+  - KYC-derived claims
+  - PDF/form-derived claims
+- Completed the GW CORE PDF field mapping for the pending onboarding fields,
+  including subject birth/gender fields, consent date, and service-provider
+  domain.
+- Switched the onboarding draft route contract from `Action/_create` to the
+  more accurate `DocumentReference/_create`, while keeping `Action` accepted
+  temporarily inside the family manager for compatibility.
+- Fixed worker routing so `DocumentReference/_create` requests under
+  `individual/pdf` actually reach the family onboarding manager instead of the
+  generic document manager.
+- Updated tenant/host discovery capability publication and filtering so GW
+  CORE accepts capabilities from both:
+  - `Service.serviceType`
+  - `Service.additionalType`
+  during the discovery migration.
+- Expanded the API/family integrator guides to document the onboarding PDF
+  draft endpoint and the transitional discovery-capability semantics.
+
+### Testing
+- `npm test -- --watchman=false src/__tests__/unit/worker.test.ts src/__tests__/managers/FamilyManager.test.ts src/__tests__/unit/utils/services.test.ts`
+- `npm run build`
+
 ## [1.9.0] - 2026-06-07
 
 ### Added

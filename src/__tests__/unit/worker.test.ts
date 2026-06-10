@@ -15,14 +15,20 @@ describe('Worker', () => {
   let worker: Worker;
   let mockManagerRegistry: MockProxy<ManagerRegistry>;
   let mockIndividualManager: MockProxy<IJobProcessor>;
+  let mockFamilyManager: MockProxy<IJobProcessor>;
+  let mockDocumentReferenceManager: MockProxy<IJobProcessor>;
   let mockKmsService: MockProxy<IKmsService>;
   const API_BASE_URL = 'https://api.example.com';
 
   beforeEach(() => {
     mockIndividualManager = mock<IJobProcessor>();
+    mockFamilyManager = mock<IJobProcessor>();
+    mockDocumentReferenceManager = mock<IJobProcessor>();
     mockKmsService = mock<IKmsService>();
     mockManagerRegistry = mock<ManagerRegistry>({
       individualManager: mockIndividualManager,
+      familyManager: mockFamilyManager,
+      documentReferenceManager: mockDocumentReferenceManager,
     });
     
     worker = new Worker(mockManagerRegistry, API_BASE_URL, mockKmsService);
@@ -162,6 +168,40 @@ describe('Worker', () => {
       subject: 'Person/elder-001',
       status: 'active',
     });
+  });
+
+  it('should route individual pdf DocumentReference create jobs to the FamilyManager', async () => {
+    const jobName = createJobName('health-care_acme', 'DocumentReference', '_create');
+    const job: JobRequest = {
+      ...testCreateCustomerJobRequestProfessionalOnboarding,
+      tenantId: 'acme',
+      sector: 'health-care',
+      section: 'individual',
+      format: 'pdf',
+      action: '_create',
+      resourceType: 'DocumentReference',
+      contentType: 'application/json',
+    };
+
+    const managerResponse: IDecodedDidcommPayload = {
+      jti: 'mock-jti-document-reference',
+      type: 'batch-response',
+      iss: API_BASE_URL,
+      aud: 'did:web:client.example.com',
+      exp: Math.floor(Date.now() / 1000) + 300,
+      thid: job.content?.thid as string,
+      body: { data: [] },
+    };
+
+    mockFamilyManager.process.mockResolvedValue(managerResponse);
+    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'tenant-key' } as any);
+    mockKmsService.encodeResponse.mockResolvedValue('encrypted-document-reference-response');
+
+    await worker.process(jobName, job);
+
+    expect(mockFamilyManager.process).toHaveBeenCalledTimes(1);
+    expect(mockFamilyManager.process).toHaveBeenCalledWith(job);
+    expect(mockDocumentReferenceManager.process).not.toHaveBeenCalled();
   });
 
   describe('Architecture Keeper Tests', () => {

@@ -1,4 +1,5 @@
-import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 
 /** Flat map of PDF form field names to raw values extracted from the individual onboarding PDF. */
 export type IndividualFormPdfFieldMap = Record<string, string | boolean | undefined | null>;
@@ -43,6 +44,19 @@ function firstDefined(...values: Array<string | undefined>): string | undefined 
     if (normalized) return normalized;
   }
   return undefined;
+}
+
+/** Reads the canonical field first and falls back to a legacy alias when present. */
+function readField(
+  fields: IndividualFormPdfFieldMap,
+  canonical: string,
+  legacy?: string,
+): unknown {
+  const canonicalValue = fields[canonical];
+  if (canonicalValue !== undefined && canonicalValue !== null && String(canonicalValue).trim() !== '') {
+    return canonicalValue;
+  }
+  return legacy ? fields[legacy] : undefined;
 }
 
 /** Normalizes DN keys so `serialNumber`, `SERIALNUMBER`, and spaced variants collapse to one key. */
@@ -92,14 +106,28 @@ export function buildClaimsFromIndividualFormPdf(
   signerSubjectDn: string,
 ): Record<string, string> {
   const subjectDn = parseDistinguishedName(signerSubjectDn);
-  const selfDeclared = normalizeBoolean(fields.self);
-  const mainAlternateName = firstDefined(normalizeText(fields.alternateName));
-  const subjectAlternateName = firstDefined(normalizeText(fields.subjectAlternateName));
-  const mainEmail = normalizeEmail(fields.email);
-  const subjectEmail = normalizeEmail(fields.subjectEmail);
-  const mainPhone = normalizePhone(fields.phone);
-  const subjectPhone = normalizePhone(fields.subjectPhone);
-  const hasExplicitSubjectFields = Boolean(subjectAlternateName || subjectEmail || subjectPhone);
+  const selfDeclared = normalizeBoolean(readField(fields, 'controllerIsSubject', 'self'));
+  const mainAlternateName = firstDefined(normalizeText(readField(fields, 'controllerAlternateName', 'alternateName')));
+  const subjectAlternateName = firstDefined(normalizeText(readField(fields, 'subjectAlternateName')));
+  const mainEmail = normalizeEmail(readField(fields, 'controllerEmail', 'email'));
+  const subjectEmail = normalizeEmail(readField(fields, 'subjectEmail'));
+  const mainPhone = normalizePhone(readField(fields, 'controllerPhone', 'phone'));
+  const subjectPhone = normalizePhone(readField(fields, 'subjectPhone'));
+  const mainBirthDate = firstDefined(normalizeText(readField(fields, 'controllerDateOfBirth', 'dateOfBirth')));
+  const subjectBirthDate = firstDefined(normalizeText(readField(fields, 'subjectDateOfBirth')));
+  const mainGender = firstDefined(
+    normalizeGender(readField(fields, 'controllerSexAtBirth', 'sexPicker')),
+    normalizeGender(readField(fields, 'controllerGender', 'gender')),
+  );
+  const subjectGender = firstDefined(
+    normalizeGender(readField(fields, 'subjectSexAtBirth', 'subjectSexPicker')),
+    normalizeGender(readField(fields, 'subjectGender')),
+  );
+  const consentDate = firstDefined(normalizeText(readField(fields, 'docDate', 'date')));
+  const serviceProviderDomain = firstDefined(normalizeText(fields.serviceProviderDomain));
+  const hasExplicitSubjectFields = Boolean(
+    subjectAlternateName || subjectEmail || subjectPhone || subjectBirthDate || subjectGender,
+  );
   const useSubjectValues = !selfDeclared && hasExplicitSubjectFields;
 
   const organizationAlternateName = firstDefined(
@@ -108,7 +136,7 @@ export function buildClaimsFromIndividualFormPdf(
     subjectAlternateName,
   );
   if (!organizationAlternateName) {
-    throw new Error('Individual PDF form requires alternateName or subjectAlternateName.');
+    throw new Error('Individual PDF form requires controllerAlternateName or subjectAlternateName.');
   }
 
   const resolvedEmail = useSubjectValues
@@ -118,7 +146,7 @@ export function buildClaimsFromIndividualFormPdf(
     ? firstDefined(subjectPhone, !subjectEmail ? mainPhone : undefined)
     : firstDefined(mainPhone, subjectPhone);
   if (!resolvedEmail && !resolvedTelephone) {
-    throw new Error('Individual PDF form requires email/subjectEmail or phone/subjectPhone.');
+    throw new Error('Individual PDF form requires controllerEmail/subjectEmail or controllerPhone/subjectPhone.');
   }
 
   const givenName = firstDefined(subjectDn.GN, subjectDn.GIVENNAME);
@@ -126,25 +154,33 @@ export function buildClaimsFromIndividualFormPdf(
   const personName = [givenName, familyName].filter(Boolean).join(' ') || firstDefined(subjectDn.CN)?.split(' - ')[0]?.trim();
   const personIdentifier = firstDefined(subjectDn.SERIALNUMBER, subjectDn['OID.2.5.4.5']);
   const personAlternateName = firstDefined(mainAlternateName, organizationAlternateName);
-  const gender = firstDefined(normalizeGender(fields.sexPicker), normalizeGender(fields.gender));
-  const birthDate = firstDefined(normalizeText(fields.dateOfBirth));
+  const memberGivenName = firstDefined(
+    useSubjectValues ? normalizeText(readField(fields, 'subjectGivenName')) : undefined,
+    normalizeText(readField(fields, 'subjectGivenName')),
+    selfDeclared ? normalizeText(readField(fields, 'controllerGivenName')) : undefined,
+  );
+  const memberFamilyName = firstDefined(
+    useSubjectValues ? normalizeText(readField(fields, 'subjectFamilyName')) : undefined,
+    normalizeText(readField(fields, 'subjectFamilyName')),
+    selfDeclared ? normalizeText(readField(fields, 'controllerFamilyName')) : undefined,
+  );
+  const gender = firstDefined(useSubjectValues ? subjectGender : undefined, mainGender, subjectGender);
+  const birthDate = firstDefined(useSubjectValues ? subjectBirthDate : undefined, mainBirthDate, subjectBirthDate);
   const country = firstDefined(subjectDn.C, subjectDn.COUNTRYNAME);
 
   return {
     '@context': 'org.schema',
     [ClaimsOrganizationSchemaorg.alternateName]: organizationAlternateName,
+    ...(personAlternateName ? { [ClaimsOrganizationSchemaorg.ownerAlternateName]: personAlternateName } : {}),
     ...(personIdentifier ? {
       [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: personIdentifier,
     } : {}),
     ...(resolvedEmail ? {
       [ClaimsOrganizationSchemaorg.ownerEmail]: resolvedEmail,
-      [ClaimsPersonSchemaorg.email]: resolvedEmail,
     } : {}),
     ...(resolvedTelephone ? {
       [ClaimsOrganizationSchemaorg.ownerTelephone]: resolvedTelephone,
-      [ClaimsPersonSchemaorg.telephone]: resolvedTelephone,
     } : {}),
-    ...(personAlternateName ? { [ClaimsPersonSchemaorg.alternateName]: personAlternateName } : {}),
     ...(personName ? { [ClaimsPersonSchemaorg.name]: personName } : {}),
     ...(givenName ? { [ClaimsPersonSchemaorg.givenName]: givenName } : {}),
     ...(familyName ? { [ClaimsPersonSchemaorg.familyName]: familyName } : {}),
@@ -152,8 +188,15 @@ export function buildClaimsFromIndividualFormPdf(
       [ClaimsPersonSchemaorg.identifierValue]: personIdentifier,
       [ClaimsPersonSchemaorg.identifier]: `urn:person:identifier:${personIdentifier}`,
     } : {}),
+    ...(memberGivenName ? { [ClaimsOrganizationSchemaorg.memberGivenName]: memberGivenName } : {}),
+    ...(memberFamilyName ? { [ClaimsOrganizationSchemaorg.memberFamilyName]: memberFamilyName } : {}),
+    [ClaimsOrganizationSchemaorg.memberRole]: 'ONESELF',
     ...(country ? { [ClaimsOrganizationSchemaorg.addressCountry]: country } : {}),
-    ...(gender ? { [ClaimsPersonSchemaorg.gender]: gender } : {}),
-    ...(birthDate ? { [ClaimsPersonSchemaorg.birthDate]: birthDate } : {}),
+    ...(mainGender ? { [ClaimsPersonSchemaorg.gender]: mainGender } : {}),
+    ...(mainBirthDate ? { [ClaimsPersonSchemaorg.birthDate]: mainBirthDate } : {}),
+    ...(gender ? { [ClaimsOrganizationSchemaorg.memberGender]: gender } : {}),
+    ...(birthDate ? { [ClaimsOrganizationSchemaorg.memberBirthDate]: birthDate } : {}),
+    ...(consentDate ? { [ClaimConsent.date]: consentDate } : {}),
+    ...(serviceProviderDomain ? { [ClaimsOrderSchemaorg.orderedItemServiceType]: serviceProviderDomain } : {}),
   };
 }
