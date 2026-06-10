@@ -33,6 +33,7 @@ import {
 import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 import { isFhirSector, isResearchSector } from '../utils/sector';
 import { hasProviderServiceCapabilityClaim } from '../utils/services';
+import { getTenantServiceCapabilityClaim } from '../utils/service-capability-claims';
 
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ILogger } from '../loggers/ILogger';
@@ -195,7 +196,7 @@ export function createDiscoveryRouter(
     const alternateName = (tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.alternateName] as string | undefined)?.trim();
     const sector = parseCategory(getTenantServiceClaim(tenantConfig, ClaimsServiceSchemaorg.category));
     const jurisdiction = parseJurisdiction(tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.addressCountry]);
-    const serviceTypeClaim = getTenantServiceClaim(tenantConfig, ClaimsServiceSchemaorg.serviceType);
+    const serviceTypeClaim = getTenantServiceCapabilityClaim(tenantConfig);
     return {
       datasetId: toDatasetId(publisherDid),
       publisherDid,
@@ -355,7 +356,7 @@ export function createDiscoveryRouter(
     const hostCountry = parseJurisdiction(hostClaims[ClaimsOrganizationSchemaorg.addressCountry]);
     const hostCoverageScope = inferCoverageScope(hostCountry);
     const aggregatedServiceTypes = Array.from(new Set(
-      tenants.flatMap((tenant) => parseServiceCapabilityTokens(String(getTenantServiceClaim(tenant, ClaimsServiceSchemaorg.serviceType) || '')))
+      tenants.flatMap((tenant) => parseServiceCapabilityTokens(String(getTenantServiceCapabilityClaim(tenant) || '')))
         .filter((token) => isProviderServiceCapability(token)),
     ));
     const aggregatedCategories = Array.from(new Set(

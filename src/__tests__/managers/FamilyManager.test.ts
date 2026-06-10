@@ -12,11 +12,44 @@ import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-j
 import { BundleJsonApi, BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { PDFDocument } from 'pdf-lib';
+import { DocumentReferenceClaim } from 'gdc-common-utils-ts/models/interoperable-claims/document-reference-claims';
 import {
+  ClaimsOrderSchemaorg,
   ClaimsOrganizationSchemaorg,
   ClaimsPersonSchemaorg,
   ClaimsServiceSchemaorg,
 } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
+import {
+  EXAMPLE_CONTROLLER_IDENTIFIER_TYPE,
+  EXAMPLE_DOCUMENT_REFERENCE_CONTENT_TYPE_PDF,
+  EXAMPLE_FORM_CONTROLLER_PHONE,
+  EXAMPLE_FORM_SUBJECT_IDENTIFIER_VALUE,
+  EXAMPLE_FORM_SUBJECT_PHONE,
+  EXAMPLE_KYC_CONTROLLER_BIRTHDATE,
+  EXAMPLE_KYC_CONTROLLER_CITY,
+  EXAMPLE_KYC_CONTROLLER_COUNTRY,
+  EXAMPLE_KYC_CONTROLLER_CREATED_AT,
+  EXAMPLE_KYC_CONTROLLER_FAMILY_NAME,
+  EXAMPLE_KYC_CONTROLLER_GENDER_MALE,
+  EXAMPLE_KYC_CONTROLLER_GIVEN_NAME,
+  EXAMPLE_KYC_CONTROLLER_IDENTIFIER,
+  EXAMPLE_KYC_CONTROLLER_LANGUAGE,
+  EXAMPLE_KYC_CONTROLLER_POSTAL_CODE,
+  EXAMPLE_KYC_CONTROLLER_STREET_ADDRESS,
+  EXAMPLE_KYC_CONTROLLER_TELEPHONE,
+  EXAMPLE_KYC_CONTROLLER_UPDATED_AT,
+  EXAMPLE_KYC_CONTROLLER_USER_UUID,
+  EXAMPLE_KYC_CONTROLLER_UUID,
+  EXAMPLE_KYC_CONTROLLER_VERIFIED_AT,
+  EXAMPLE_PDF_CONSENT_DATE,
+  EXAMPLE_SERVICE_PROVIDER_DOMAIN,
+  EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+  EXAMPLE_REGISTERED_SUBJECT_BIRTH_YEAR,
+  EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
+  EXAMPLE_SUBJECT_DID,
+} from 'gdc-common-utils-ts/examples/shared';
+import { mergeIndividualOrganizationClaims } from 'gdc-common-utils-ts/utils/individual-organization-claims';
 import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
 import { IStorageAdapter } from '../../database/storage/IStorageAdapter';
 import { ILogger } from '../../loggers/ILogger';
@@ -61,6 +94,29 @@ const BASE_CLAIMS: Record<string, unknown> = {
   [ClaimsServiceSchemaorg.serviceType]: testDefaultTenantServiceTypeClaim,
   [ClaimsServiceSchemaorg.termsOfService]: 'https://example.com/terms',
 };
+
+const TEST_KYC_PROFILE = Object.freeze({
+  uuid: EXAMPLE_KYC_CONTROLLER_UUID,
+  user_uuid: EXAMPLE_KYC_CONTROLLER_USER_UUID,
+  first_name: EXAMPLE_KYC_CONTROLLER_GIVEN_NAME,
+  last_name: EXAMPLE_KYC_CONTROLLER_FAMILY_NAME,
+  nationality: null,
+  country: EXAMPLE_KYC_CONTROLLER_COUNTRY,
+  ip_country: null,
+  city: EXAMPLE_KYC_CONTROLLER_CITY,
+  address: EXAMPLE_KYC_CONTROLLER_STREET_ADDRESS,
+  id_number: EXAMPLE_KYC_CONTROLLER_IDENTIFIER,
+  postal_code: EXAMPLE_KYC_CONTROLLER_POSTAL_CODE,
+  phone_number: EXAMPLE_KYC_CONTROLLER_TELEPHONE,
+  birthdate: EXAMPLE_KYC_CONTROLLER_BIRTHDATE,
+  kyc_verified_at: EXAMPLE_KYC_CONTROLLER_VERIFIED_AT,
+  gender: EXAMPLE_KYC_CONTROLLER_GENDER_MALE,
+  language: EXAMPLE_KYC_CONTROLLER_LANGUAGE,
+  created_at: EXAMPLE_KYC_CONTROLLER_CREATED_AT,
+  updated_at: EXAMPLE_KYC_CONTROLLER_UPDATED_AT,
+  primary_wallet_address: null,
+  primary_wallet: null,
+} as const);
 
 function makeBatchJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
   return {
@@ -150,6 +206,84 @@ function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest
               [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
               [ClaimsServiceSchemaorg.category]: SECTOR,
               ...overrideClaims,
+            },
+          },
+        }],
+      },
+    },
+  };
+}
+
+async function createIndividualOnboardingTemplateBase64(): Promise<string> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([600, 800]);
+  const form = pdf.getForm();
+
+  const alternateNameField = form.createTextField('controllerAlternateName');
+  alternateNameField.addToPage(page, { x: 20, y: 740, width: 200, height: 20 });
+  const emailField = form.createTextField('controllerEmail');
+  emailField.addToPage(page, { x: 20, y: 700, width: 200, height: 20 });
+  const consentDateField = form.createTextField('docDate');
+  consentDateField.addToPage(page, { x: 20, y: 660, width: 200, height: 20 });
+  const providerField = form.createTextField('serviceProviderDomain');
+  providerField.addToPage(page, { x: 20, y: 620, width: 200, height: 20 });
+  const selfField = form.createCheckBox('controllerIsSubject');
+  selfField.addToPage(page, { x: 20, y: 580, width: 20, height: 20 });
+
+  return Buffer.from(await pdf.save()).toString('base64');
+}
+
+function makePdfDraftJob(input: {
+  templateBytesBase64: string;
+  formFields?: Record<string, unknown>;
+  kyc?: Record<string, unknown>;
+  claims?: Record<string, unknown>;
+}): JobRequest {
+  return {
+    id: randomUUID(),
+    status: JobStatus.DRAFT,
+    sequence: 0,
+    createdAtTimestamp: Date.now(),
+    tenantId: TENANT_ID,
+    sector: SECTOR,
+    section: 'individual',
+    format: 'pdf',
+    action: '_create',
+    resourceType: 'DocumentReference',
+    content: {
+      jti: randomUUID(),
+      thid: randomUUID(),
+      iss: 'did:web:client.example.com',
+      aud: `did:web:${TENANT_ID}.example.com`,
+      type: 'application/api+json',
+      body: {
+        data: [{
+          type: 'DocumentReference',
+          resource: {
+            resourceType: 'DocumentReference',
+            meta: {
+              claims: {
+                [ClaimsOrganizationSchemaorg.identifier]: EXAMPLE_SUBJECT_DID,
+                [ClaimsServiceSchemaorg.category]: SECTOR,
+                ...(input.claims || {}),
+              },
+              template: {
+                sector: SECTOR,
+                language: 'es',
+                version: 'v1',
+                templateBytesBase64: input.templateBytesBase64,
+              },
+              formFields: {
+                controllerIsSubject: true,
+                controllerAlternateName: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+                controllerEmail: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
+                controllerPhone: EXAMPLE_FORM_CONTROLLER_PHONE,
+                controllerIdType: EXAMPLE_CONTROLLER_IDENTIFIER_TYPE,
+                docDate: EXAMPLE_PDF_CONSENT_DATE,
+                serviceProviderDomain: EXAMPLE_SERVICE_PROVIDER_DOMAIN,
+                ...(input.formFields || {}),
+              },
+              ...(input.kyc ? { kyc: input.kyc } : {}),
             },
           },
         }],
@@ -431,6 +565,165 @@ describe('FamilyManager', () => {
       );
     });
 
+    it('merges KYC metadata into family registration claims before persistence', async () => {
+      mockVaultRepository.query.mockResolvedValue([]);
+      mockVaultRepository.put.mockResolvedValue(true);
+
+      const job = makeBatchJob({
+        [ClaimsOrganizationSchemaorg.alternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+        [ClaimsOrganizationSchemaorg.ownerAlternateName]: '',
+        [ClaimsOrganizationSchemaorg.ownerEmail]: '',
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+        [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: '',
+        [ClaimsPersonSchemaorg.birthDate]: '',
+      });
+      const firstEntry = (job.content?.body?.data?.[0] || {}) as BundleEntry;
+      firstEntry.meta = {
+        claims: firstEntry.meta?.claims,
+        kyc: {
+          profile: TEST_KYC_PROFILE,
+          controllerEmail: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
+          individualAlternateName: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+          individualBirthDate: EXAMPLE_REGISTERED_SUBJECT_BIRTH_YEAR,
+        },
+      } as any;
+
+      const response = await manager.process(job);
+      const body = response.body as BundleJsonApi;
+      const entry = body.data[0] as BundleEntry;
+      const protectedDoc = mockKmsService.protectConfidentialData.mock.calls[0]?.[0] as ConfidentialStorageDoc;
+      const persistedClaims = (protectedDoc.content as any).claims as Record<string, unknown>;
+
+      expect(entry.meta?.claims).toEqual(expect.objectContaining({
+        [ClaimsOrganizationSchemaorg.alternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+        [ClaimsOrganizationSchemaorg.ownerAlternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+        [ClaimsOrganizationSchemaorg.ownerEmail]: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_KYC_CONTROLLER_TELEPHONE,
+        [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: EXAMPLE_KYC_CONTROLLER_IDENTIFIER,
+        [ClaimsOrganizationSchemaorg.addressCountry]: EXAMPLE_KYC_CONTROLLER_COUNTRY,
+        [ClaimsPersonSchemaorg.givenName]: EXAMPLE_KYC_CONTROLLER_GIVEN_NAME.toUpperCase(),
+        [ClaimsPersonSchemaorg.familyName]: EXAMPLE_KYC_CONTROLLER_FAMILY_NAME.toUpperCase(),
+        [ClaimsPersonSchemaorg.birthDate]: EXAMPLE_KYC_CONTROLLER_BIRTHDATE.slice(0, 4),
+      }));
+      expect(persistedClaims).toEqual(expect.objectContaining({
+        [ClaimsOrganizationSchemaorg.ownerAlternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+        [ClaimsOrganizationSchemaorg.ownerEmail]: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_KYC_CONTROLLER_TELEPHONE,
+        [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: EXAMPLE_KYC_CONTROLLER_IDENTIFIER,
+        [ClaimsPersonSchemaorg.birthDate]: EXAMPLE_KYC_CONTROLLER_BIRTHDATE.slice(0, 4),
+      }));
+    });
+
+    it('renders a filled onboarding PDF draft from template + formFields + KYC and returns it as DocumentReference claims', async () => {
+      const templateBytesBase64 = await createIndividualOnboardingTemplateBase64();
+
+      const response = await manager.process(makePdfDraftJob({
+        templateBytesBase64,
+        kyc: {
+          profile: TEST_KYC_PROFILE,
+          controllerEmail: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
+          individualAlternateName: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+          individualBirthDate: EXAMPLE_REGISTERED_SUBJECT_BIRTH_YEAR,
+        },
+        formFields: {
+          controllerIsSubject: true,
+          controllerAlternateName: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+          controllerEmail: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
+          docDate: EXAMPLE_PDF_CONSENT_DATE,
+          serviceProviderDomain: EXAMPLE_SERVICE_PROVIDER_DOMAIN,
+        },
+      }));
+      const body = response.body as BundleJsonApi;
+      const entry = body.data[0] as BundleEntry;
+      const claims = entry.resource?.meta?.claims as Record<string, unknown>;
+
+      expect(entry.type).toBe('DocumentReference');
+      expect(entry.response?.status).toBe('200');
+      expect(claims[DocumentReferenceClaim.ContentType]).toBe(EXAMPLE_DOCUMENT_REFERENCE_CONTENT_TYPE_PDF);
+      expect(typeof claims[DocumentReferenceClaim.ContentData]).toBe('string');
+      expect(String(claims[DocumentReferenceClaim.ContentData]).length).toBeGreaterThan(100);
+      expect(claims[ClaimsOrganizationSchemaorg.alternateName]).toBe(EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME);
+      expect(claims[ClaimsOrganizationSchemaorg.ownerEmail]).toBe(EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED);
+      expect(claims[ClaimConsent.date]).toBe(EXAMPLE_PDF_CONSENT_DATE);
+      expect(claims[ClaimsOrderSchemaorg.orderedItemServiceType]).toBe(EXAMPLE_SERVICE_PROVIDER_DOMAIN);
+
+      const renderedPdf = await PDFDocument.load(
+        Buffer.from(String(claims[DocumentReferenceClaim.ContentData]), 'base64'),
+        { ignoreEncryption: true, updateMetadata: false },
+      );
+      const renderedForm = renderedPdf.getForm();
+      expect(renderedForm.getTextField('controllerAlternateName').getText()).toBe(EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME);
+      expect(renderedForm.getTextField('controllerEmail').getText()).toBe(EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED);
+      expect(renderedForm.getTextField('docDate').getText()).toBe(EXAMPLE_PDF_CONSENT_DATE);
+      expect(renderedForm.getTextField('serviceProviderDomain').getText()).toBe(EXAMPLE_SERVICE_PROVIDER_DOMAIN);
+      expect(renderedForm.getCheckBox('controllerIsSubject').isChecked()).toBe(true);
+    });
+
+    it('accepts final resource.meta.claims built step by step after KYC and returns a filled PDF draft', async () => {
+      const templateBytesBase64 = await createIndividualOnboardingTemplateBase64();
+      const claimsAfterKyc = mergeIndividualOrganizationClaims({
+        kyc: {
+          profile: TEST_KYC_PROFILE,
+          controllerEmail: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
+          individualAlternateName: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+          individualBirthDate: EXAMPLE_REGISTERED_SUBJECT_BIRTH_YEAR,
+        },
+      }).claims;
+      const finalClaims = mergeIndividualOrganizationClaims({
+        claims: claimsAfterKyc,
+        formFields: {
+          controllerIsSubject: false,
+          controllerPhone: EXAMPLE_FORM_CONTROLLER_PHONE,
+          subjectAlternateName: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+          subjectPhone: EXAMPLE_FORM_SUBJECT_PHONE,
+          subjectIdValue: EXAMPLE_FORM_SUBJECT_IDENTIFIER_VALUE,
+          subjectDateOfBirth: EXAMPLE_REGISTERED_SUBJECT_BIRTH_YEAR,
+          docDate: EXAMPLE_PDF_CONSENT_DATE,
+          serviceProviderDomain: EXAMPLE_SERVICE_PROVIDER_DOMAIN,
+        },
+      }).claims;
+
+      const response = await manager.process(makePdfDraftJob({
+        templateBytesBase64,
+        claims: finalClaims,
+        formFields: {
+          controllerIsSubject: false,
+          controllerAlternateName: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+          controllerEmail: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
+          controllerPhone: EXAMPLE_FORM_CONTROLLER_PHONE,
+          subjectAlternateName: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+          subjectPhone: EXAMPLE_FORM_SUBJECT_PHONE,
+          subjectIdValue: EXAMPLE_FORM_SUBJECT_IDENTIFIER_VALUE,
+          subjectDateOfBirth: EXAMPLE_REGISTERED_SUBJECT_BIRTH_YEAR,
+          docDate: EXAMPLE_PDF_CONSENT_DATE,
+          serviceProviderDomain: EXAMPLE_SERVICE_PROVIDER_DOMAIN,
+        },
+      }));
+      const body = response.body as BundleJsonApi;
+      const entry = body.data[0] as BundleEntry;
+      const claims = entry.resource?.meta?.claims as Record<string, unknown>;
+
+      expect(entry.type).toBe('DocumentReference');
+      expect(entry.response?.status).toBe('200');
+      expect(claims[ClaimsOrganizationSchemaorg.ownerEmail]).toBe(EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED);
+      expect(claims[ClaimsOrganizationSchemaorg.ownerTelephone]).toBe(EXAMPLE_FORM_CONTROLLER_PHONE);
+      expect(claims[ClaimsOrganizationSchemaorg.alternateName]).toBe(EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME);
+      expect(claims[ClaimsOrganizationSchemaorg.ownerAlternateName]).toBe(EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME);
+      expect(claims[ClaimsOrganizationSchemaorg.memberIdentifierValue]).toBe(EXAMPLE_FORM_SUBJECT_IDENTIFIER_VALUE);
+      expect(claims[ClaimsOrderSchemaorg.orderedItemServiceType]).toBe(EXAMPLE_SERVICE_PROVIDER_DOMAIN);
+
+      const renderedPdf = await PDFDocument.load(
+        Buffer.from(String(claims[DocumentReferenceClaim.ContentData]), 'base64'),
+        { ignoreEncryption: true, updateMetadata: false },
+      );
+      const renderedForm = renderedPdf.getForm();
+      expect(renderedForm.getTextField('controllerAlternateName').getText()).toBe(EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME);
+      expect(renderedForm.getTextField('controllerEmail').getText()).toBe(EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED);
+      expect(renderedForm.getTextField('docDate').getText()).toBe(EXAMPLE_PDF_CONSENT_DATE);
+      expect(renderedForm.getTextField('serviceProviderDomain').getText()).toBe(EXAMPLE_SERVICE_PROVIDER_DOMAIN);
+      expect(renderedForm.getCheckBox('controllerIsSubject').isChecked()).toBe(false);
+    });
+
     it('individual-form-pdf-cert-signed maps the real signed PDF into valid CORE family claims', async () => {
         const fixture = getIndividualPdfFixtureConfig();
         if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
@@ -446,7 +739,6 @@ describe('FamilyManager', () => {
 
         const response = await manager.process(makeBatchJob({
           [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
-          [ClaimsPersonSchemaorg.telephone]: '',
           ...mapped,
         }));
         const body = response.body as BundleJsonApi;
@@ -459,10 +751,9 @@ describe('FamilyManager', () => {
         expect(mapped).toEqual(expect.objectContaining({
           '@context': 'org.schema',
           [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
           [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
           [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-          [ClaimsPersonSchemaorg.email]: fixture.expectedControllerEmail,
-          [ClaimsPersonSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
           [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
           [ClaimsOrganizationSchemaorg.addressCountry]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_COUNTRY || '').trim(),
         }));
@@ -481,6 +772,7 @@ describe('FamilyManager', () => {
         expect(entry.meta?.claims).toEqual(expect.objectContaining({
           'org.schema.FamilyRegistration.status': 'new_created',
           [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
           [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
           [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
           [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
@@ -500,7 +792,6 @@ describe('FamilyManager', () => {
         const response = await manager.process(makeTransactionJob(
           {
             [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
-            [ClaimsPersonSchemaorg.telephone]: '',
             [ClaimsServiceSchemaorg.category]: SECTOR,
             [ClaimsServiceSchemaorg.identifier]: 'did:web:provider.example.com',
             [ClaimsServiceSchemaorg.serviceType]: testDefaultTenantServiceTypeClaim,
@@ -519,6 +810,7 @@ describe('FamilyManager', () => {
         expect(entry.meta?.claims).toEqual(expect.objectContaining({
           'org.schema.FamilyRegistration.status': 'new_created',
           [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
           [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
           [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
           [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
@@ -545,7 +837,6 @@ describe('FamilyManager', () => {
           const response = await manager.process(makeTransactionJob(
             {
               [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
-              [ClaimsPersonSchemaorg.telephone]: '',
               [ClaimsServiceSchemaorg.category]: SECTOR,
               [ClaimsServiceSchemaorg.identifier]: 'did:web:provider.example.com',
               [ClaimsServiceSchemaorg.serviceType]: testDefaultTenantServiceTypeClaim,
@@ -567,6 +858,7 @@ describe('FamilyManager', () => {
           expect(entry.meta?.claims).toEqual(expect.objectContaining({
             'org.schema.FamilyRegistration.status': 'new_created',
             [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
+            [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
             [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
             [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
             [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
