@@ -15,10 +15,12 @@ Usage:
 EOF
 }
 
-resolve_versioned_demo_image() {
+resolve_versioned_image() {
   local image_ref="$1"
   local explicit_tag="${2:-}"
+  local mutable_tags="${3:-latest,demo}"
   local package_version git_sha computed_tag image_repo image_tag
+  local mutable_tag
 
   if [[ "$image_ref" == *@sha256:* ]]; then
     echo "$image_ref"
@@ -37,10 +39,18 @@ resolve_versioned_demo_image() {
     image_tag=""
   fi
 
-  if [[ -z "$image_tag" || "$image_tag" == "demo" || "$image_tag" == "latest" ]]; then
+  if [[ -z "$image_tag" ]]; then
     echo "${image_repo}:${computed_tag}"
     return 0
   fi
+
+  IFS=',' read -r -a mutable_tag_list <<< "$mutable_tags"
+  for mutable_tag in "${mutable_tag_list[@]}"; do
+    if [[ "$image_tag" == "$mutable_tag" ]]; then
+      echo "${image_repo}:${computed_tag}"
+      return 0
+    fi
+  done
 
   echo "$image_ref"
 }
@@ -138,12 +148,16 @@ deploy_cloud_run() {
   fi
 
   local repo_name="$ARTIFACT_REGISTRY_NAME"
-  local image_path="${DEPLOY_REGION}-docker.pkg.dev/${FIRESTORE_PROJECT_ID}/${repo_name}/${DEPLOY_SERVICE_NAME}:latest"
+  local image_repository="${DEPLOY_REGION}-docker.pkg.dev/${FIRESTORE_PROJECT_ID}/${repo_name}/${DEPLOY_SERVICE_NAME}"
+  local requested_image_ref="${DEPLOY_IMAGE:-${image_repository}:latest}"
+  local image_path
+  image_path="$(resolve_versioned_image "$requested_image_ref" "${DEPLOY_IMAGE_TAG:-}" "latest")"
 
   echo "--- 🚀 Preparing for GCP Deployment to '$env_name' ---"
   echo "  Service Name:       $DEPLOY_SERVICE_NAME"
   echo "  Project ID:         $FIRESTORE_PROJECT_ID"
   echo "  Region:             $DEPLOY_REGION"
+  echo "  Image:              $image_path"
   echo "  External Domain:    ${HOST_EXTERNAL_DOMAIN:-}"
   echo "  External Port:      ${HOST_EXTERNAL_PORT:-}"
   echo "  Database Provider:  ${DB_PROVIDER:-}"
@@ -158,7 +172,7 @@ deploy_cloud_run() {
   gcloud config set project "$FIRESTORE_PROJECT_ID"
   gcloud services enable run.googleapis.com artifactregistry.googleapis.com
 
-  build_and_push_image "$FIRESTORE_PROJECT_ID" "$DEPLOY_REGION" "$image_path" "$repo_name" "$DEPLOY_SERVICE_NAME"
+  build_and_push_image "$FIRESTORE_PROJECT_ID" "$DEPLOY_REGION" "$image_path" "$repo_name" "$DEPLOY_SERVICE_NAME" "${LOCAL_IMAGE_NAME:-gwtemplate}"
 
   echo "⚙️  Preparing runtime environment variables for Cloud Run..."
   local temp_env_file="temp_env.yaml"
@@ -215,7 +229,7 @@ deploy_gke_demo() {
   source "$config_file"
   set +a
 
-  GDC_IMAGE="$(resolve_versioned_demo_image "${GDC_IMAGE:-}" "${GDC_IMAGE_TAG:-}")"
+  GDC_IMAGE="$(resolve_versioned_image "${GDC_IMAGE:-}" "${GDC_IMAGE_TAG:-}" "latest,demo")"
   export GDC_IMAGE
   local required_vars=(
     GCP_PROJECT_ID GCP_REGION GKE_CLUSTER

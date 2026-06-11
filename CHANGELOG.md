@@ -1,3 +1,10 @@
+## [Unreleased]
+
+### Changed
+- Updated `cloud_deploy.sh` so Cloud Run deployments can resolve versioned
+  Artifact Registry image tags from `package.json` plus the current git SHA,
+  and reuse a prebuilt local Docker image when `SKIP_BUILD=true`.
+
 ## [1.10.1] - 2026-06-11
 
 ### Changed
