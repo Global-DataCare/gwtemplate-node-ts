@@ -1,3 +1,15 @@
+## [1.10.1] - 2026-06-11
+
+### Changed
+- Simplified the Docker image build so GW CORE no longer copies the deprecated
+  local `gdc-sdk-client-ts` source tree into the builder/runtime image.
+- Narrowed `EXTRA_TS_PATCH_DIRS` in the Docker build to the remaining shared
+  local dependency (`gdc-common-utils-ts`), keeping local image creation aligned
+  with the current dependency graph.
+
+### Testing
+- `./docker_build_local.sh`
+
 ## [1.10.0] - 2026-06-10
 
 ### Added

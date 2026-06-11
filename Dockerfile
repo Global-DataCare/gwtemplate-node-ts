@@ -11,7 +11,6 @@ WORKDIR /usr/src/gwtemplate-node-ts
 
 # Copy local file-based dependencies into the build context.
 COPY gdc-common-utils-ts /usr/src/gdc-common-utils-ts
-COPY gdc-sdk-client-ts /usr/src/gdc-sdk-client-ts
 
 # Copy package.json and package-lock.json
 COPY gwtemplate-node-ts/package*.json ./
@@ -25,7 +24,7 @@ COPY gwtemplate-node-ts ./
 # Build the TypeScript code
 # Fail fast on type errors before emitting build output.
 RUN npm run type-check
-ENV EXTRA_TS_PATCH_DIRS=/usr/src/gdc-common-utils-ts/src,/usr/src/gdc-sdk-client-ts/src
+ENV EXTRA_TS_PATCH_DIRS=/usr/src/gdc-common-utils-ts/src
 RUN npm run build
 
 # Stage 2: Production
@@ -39,7 +38,6 @@ COPY gwtemplate-node-ts/package*.json ./
 
 # Copy local file-based dependencies into the runtime image.
 COPY --from=builder /usr/src/gdc-common-utils-ts /usr/src/gdc-common-utils-ts
-COPY --from=builder /usr/src/gdc-sdk-client-ts /usr/src/gdc-sdk-client-ts
 
 # Install ONLY production dependencies
 RUN npm install --omit=dev
