@@ -32,6 +32,11 @@
   - `Service.serviceType`
   - `Service.additionalType`
   during the discovery migration.
+- Clarified `Service.additionalType` handling so compact HL7
+  `ActReason` values such as
+  `http://terminology.hl7.org/CodeSystem/v3-ActReason|METAMGT,HRESCH`
+  are treated as purposes and no longer misread as provider discovery
+  capabilities.
 - Expanded the API/family integrator guides to document the onboarding PDF
   draft endpoint and the transitional discovery-capability semantics.
 

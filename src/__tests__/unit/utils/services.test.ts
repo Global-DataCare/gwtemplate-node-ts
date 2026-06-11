@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
-import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../../../utils/services';
+import { hasProviderServiceCapabilityClaim, initializeHostServicesConfig, initializeTenantServicesConfig } from '../../../utils/services';
 import { OrganizationConfig } from '../../../gdc-backend-utils-node/models/entity';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { IServerConfig } from '../../../config';
@@ -290,6 +290,13 @@ describe('Service Initialization Utilities', () => {
       )).toBe(true);
       expect(services.some(
         (s: DidService) => (s as any).selector?.section === 'digitaltwin',
+      )).toBe(false);
+    });
+
+    it('should ignore ActReason values stored in Service.additionalType when resolving provider capability flags', () => {
+      expect(hasProviderServiceCapabilityClaim(
+        undefined,
+        'http://terminology.hl7.org/CodeSystem/v3-ActReason|METAMGT,HRESCH',
       )).toBe(false);
     });
 
