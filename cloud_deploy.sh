@@ -175,8 +175,9 @@ deploy_cloud_run() {
   build_and_push_image "$FIRESTORE_PROJECT_ID" "$DEPLOY_REGION" "$image_path" "$repo_name" "$DEPLOY_SERVICE_NAME" "${LOCAL_IMAGE_NAME:-gwtemplate}"
 
   echo "⚙️  Preparing runtime environment variables for Cloud Run..."
-  local temp_env_file="temp_env.yaml"
-  trap 'rm -f "$temp_env_file"' EXIT
+  local temp_env_file
+  temp_env_file="$(mktemp "${TMPDIR:-/tmp}/gwtemplate-cloud-run-env.XXXXXX.yaml")"
+  trap "rm -f -- '$temp_env_file'" EXIT
   > "$temp_env_file"
 
   local runtime_vars=(
