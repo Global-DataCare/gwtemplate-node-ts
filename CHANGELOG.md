@@ -1,6 +1,7 @@
-## [Unreleased]
+## [1.10.2] - 2026-06-11
 
 ### Changed
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.20.2`.
 - Updated `cloud_deploy.sh` so Cloud Run deployments can resolve versioned
   Artifact Registry image tags from `package.json` plus the current git SHA,
   and reuse a prebuilt local Docker image when `SKIP_BUILD=true`.
