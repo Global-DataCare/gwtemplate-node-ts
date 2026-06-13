@@ -602,6 +602,13 @@ Compatibility flags:
 - `JSON_LEGACY=true|false`: allows `application/json` in `compat`.
 - `DIDCOMM_PLAIN=true|false|enabled|disabled`: allows `application/didcomm-plaintext+json` in `compat`.
 - `DEMO_ALLOW_INSECURE_BEARER=true|false`: in `demo`, allows invalid/unverified bearer tokens in API routes.
+- `GW_REQUEST_BODY_LIMIT=<bytes|kb|mb|gb>`: request body size limit shared by `express.json()` and `express.urlencoded()`. Default: `25mb`.
+
+Why `GW_REQUEST_BODY_LIMIT` matters:
+
+- Communication ingestion can embed large DIDComm/FHIR payloads, including IPS bundles and base64 attachments.
+- Express defaults to about `100kb`, which is too small for realistic clinical payloads.
+- The same global parser is used before routing, so both `.../org.hl7.fhir.r4/Communication/_batch` and `.../org.hl7.fhir.api/Communication/_batch` fail in the same way when the request body exceeds the configured limit.
 
 Guardrail:
 

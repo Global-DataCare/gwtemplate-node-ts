@@ -39,7 +39,14 @@ describe('isRequestValid', () => {
       id: '#registry:org.schema:order',
       type: 'ApiService',
       serviceEndpoint: 'Order',
-      actions: ['_batch'],
+      actions: ['_batch', '_search'],
+      selector: { section: 'registry', format: 'org.schema' },
+    },
+    {
+      id: '#registry:org.schema:offer',
+      type: 'ApiService',
+      serviceEndpoint: 'Offer',
+      actions: ['_search'],
       selector: { section: 'registry', format: 'org.schema' },
     },
     {
@@ -48,7 +55,21 @@ describe('isRequestValid', () => {
       serviceEndpoint: 'Organization',
       actions: ['_transaction', '_disable', '_purge'],
       selector: { section: 'individual', format: 'org.schema' },
-    }
+    },
+    {
+      id: '#individual:org.schema:commercial',
+      type: 'ApiService',
+      serviceEndpoint: 'Offer,Order',
+      actions: ['_search'],
+      selector: { section: 'individual', format: 'org.schema' },
+    },
+    {
+      id: '#individual:org.hl7.fhir.api:relatedperson',
+      type: 'ApiService',
+      serviceEndpoint: 'RelatedPerson',
+      actions: ['_purge'],
+      selector: { section: 'individual', format: 'org.hl7.fhir.api' },
+    },
   ];
 
   it('should return TRUE for a valid request matching a GENERAL service definition', () => {
@@ -168,6 +189,39 @@ describe('isRequestValid', () => {
       format: 'org.schema',
       resourceType: 'Employee',
       action: '_search',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for registry Offer _search', () => {
+    const params = {
+      sector: 'test',
+      section: 'registry',
+      format: 'org.schema',
+      resourceType: 'Offer',
+      action: '_search',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for individual Order _search', () => {
+    const params = {
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      resourceType: 'Order',
+      action: '_search',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for related person _purge on the individual FHIR API surface', () => {
+    const params = {
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.hl7.fhir.api',
+      resourceType: 'RelatedPerson',
+      action: '_purge',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
   });

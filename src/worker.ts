@@ -62,6 +62,9 @@ export class Worker {
           // Orders follow the same routing as their corresponding onboarding flow.
           manager = job.section === SUBJECT_SECTION_INDIVIDUAL ? this.managers.familyManager : this.managers.hostingManager;
           break;
+        case 'Offer':
+          manager = job.section === SUBJECT_SECTION_INDIVIDUAL ? this.managers.familyManager : this.managers.hostingManager;
+          break;
         case 'Action':
           manager = job.section === SUBJECT_SECTION_INDIVIDUAL ? this.managers.familyManager : undefined;
           break;

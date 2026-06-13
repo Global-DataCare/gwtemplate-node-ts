@@ -6,10 +6,12 @@ import { RelatedPersonManager } from '../../../managers/RelatedPersonManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
+import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/enums';
 
 describe('RelatedPersonManager', () => {
   const mockVaultRepository = {
     vaultExists: jest.fn(),
+    get: jest.fn(),
     put: jest.fn(),
   } as unknown as jest.Mocked<IVaultRepository>;
 
@@ -18,6 +20,7 @@ describe('RelatedPersonManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+    mockVaultRepository.get.mockResolvedValue(undefined as any);
     mockVaultRepository.put.mockResolvedValue(true as any);
   });
 
@@ -84,5 +87,87 @@ describe('RelatedPersonManager', () => {
     const job = createJob({ action: '' as any });
     await expect(manager.process(job)).rejects.toThrow('Missing jurisdiction, section, format, or action.');
   });
-});
 
+  it('accepts canonical resource.meta.claims and stores inactive status for lifecycle-style updates', async () => {
+    const job = createJob({
+      content: {
+        jti: 'jti-relatedperson-2',
+        thid: 'thid-relatedperson-2',
+        iss: 'did:web:app.example',
+        aud: 'did:web:api.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.api.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          entry: [{
+            type: 'RelatedPerson',
+            resource: {
+              meta: {
+                status: EntityLifecycleStatus.Inactive,
+                claims: {
+                  '@context': 'org.hl7.fhir.api',
+                  'RelatedPerson.patient': 'did:web:connector.example.com:animal:chip:z123',
+                  'RelatedPerson.identifier': 'urn:uuid:rel-002',
+                  'RelatedPerson.relationship': 'guardian',
+                },
+              },
+            },
+          }],
+        },
+      } as any,
+    });
+
+    const response = await manager.process(job);
+    expect((response.body as any).data[0].response.status).toBe('201');
+    expect(mockVaultRepository.put).toHaveBeenCalled();
+    const stored = (mockVaultRepository.put as any).mock.calls[0][1][0];
+    expect(stored.status).toBe(EntityLifecycleStatus.Inactive);
+  });
+
+  it('purges a disabled related person through the explicit _purge action', async () => {
+    const job = createJob({
+      action: '_purge',
+      content: {
+        jti: 'jti-relatedperson-3',
+        thid: 'thid-relatedperson-3',
+        iss: 'did:web:app.example',
+        aud: 'did:web:api.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.api.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          entry: [{
+            type: 'RelatedPerson',
+            resource: {
+              id: 'urn:uuid:rel-001',
+              meta: {
+                claims: {
+                  '@context': 'org.hl7.fhir.api',
+                  'RelatedPerson.patient': 'did:web:connector.example.com:animal:chip:z123',
+                  'RelatedPerson.identifier': 'urn:uuid:rel-001',
+                  'RelatedPerson.relationship': 'guardian',
+                },
+              },
+            },
+          }],
+        },
+      } as any,
+    });
+
+    mockVaultRepository.get.mockResolvedValue({
+      id: 'urn:uuid:rel-001',
+      status: EntityLifecycleStatus.Inactive,
+      meta: {},
+      'RelatedPerson.identifier': 'urn:uuid:rel-001',
+      'RelatedPerson.patient': 'did:web:connector.example.com:animal:chip:z123',
+    } as any);
+
+    const response = await manager.process(job);
+    expect((response.body as any).data[0].response.status).toBe('200');
+    const stored = (mockVaultRepository.put as any).mock.calls[0][1][0];
+    expect(stored.status).toBe(EntityLifecycleStatus.Inactive);
+    expect(stored.meta.lifecycleDisposition).toBe('purged');
+  });
+});

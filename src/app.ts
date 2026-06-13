@@ -6,6 +6,13 @@ import cors from 'cors';
 
 type SecurityMode = 'strict' | 'compat' | 'demo';
 
+const JSON_MEDIA_TYPE = 'application/json';
+const FHIR_JSON_MEDIA_TYPE = 'application/fhir+json';
+const DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE = 'application/didcomm-plaintext+json';
+const DEFAULT_REQUEST_BODY_LIMIT = '25mb';
+const PRIMARY_REQUEST_BODY_LIMIT_ENV = 'GW_REQUEST_BODY_LIMIT';
+const COMPAT_REQUEST_BODY_LIMIT_ENV = 'REQUEST_BODY_LIMIT';
+
 function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
   const normalized = String(value).trim().toLowerCase();
@@ -20,13 +27,32 @@ function resolveSecurityModeFromEnv(): SecurityMode {
   return 'strict';
 }
 
+/**
+ * Resolves the request body size limit shared by JSON and urlencoded parsers.
+ *
+ * Why this exists:
+ * - Communication/Document style flows can legitimately carry large payloads,
+ *   especially when a DIDComm message embeds a FHIR Bundle or base64 payload.
+ * - Express defaults to `100kb`, which is too small for realistic IPS and
+ *   clinical ingestion scenarios.
+ * - Keeping the limit configurable lets deployments tighten or relax it without
+ *   changing code.
+ */
+export function resolveRequestBodyLimit(): string {
+  return String(
+    process.env[PRIMARY_REQUEST_BODY_LIMIT_ENV]
+    || process.env[COMPAT_REQUEST_BODY_LIMIT_ENV]
+    || DEFAULT_REQUEST_BODY_LIMIT,
+  ).trim();
+}
+
 function buildAcceptedJsonBodyTypes(): string[] {
   const mode = resolveSecurityModeFromEnv();
   const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
   const acceptsDidcommPlain = mode === 'demo' || didcommPlainEnabled;
-  const types = ['application/json', 'application/fhir+json'];
+  const types = [JSON_MEDIA_TYPE, FHIR_JSON_MEDIA_TYPE];
   if (acceptsDidcommPlain) {
-    types.push('application/didcomm-plaintext+json');
+    types.push(DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE);
   }
   return types;
 }
@@ -67,6 +93,7 @@ export function createApp() {
   }
 
   app.use(express.json({
+    limit: resolveRequestBodyLimit(),
     type: buildAcceptedJsonBodyTypes(),
   }));
 

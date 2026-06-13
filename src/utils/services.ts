@@ -158,6 +158,12 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   ));
 
   services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'entity', format: 'org.schema' },
+    ['Offer', 'Order'],
+    ['_search']
+  ));
+
+  services.push(createDidEndpointConfigFromSelector(
     { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     individualResources,
     ['_batch']
@@ -173,6 +179,12 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   services.push(createDidEndpointConfigFromSelector(
     { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     ['Organization'],
+    ['_search']
+  ));
+
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
+    ['Offer', 'Order'],
     ['_search']
   ));
 
@@ -238,12 +250,26 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
         ['_batch'],
       ),
     );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.r4' },
+        ['RelatedPerson'],
+        [ACTION_PURGE],
+      ),
+    );
     // Personal (non-clinical) data collection endpoints use the versionless `org.hl7.fhir.api` context.
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
         [...fhirApiCoreBatchResources, ...fhirApiExtensionBatchResources],
         ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
+        ['RelatedPerson'],
+        [ACTION_PURGE],
       ),
     );
     services.push(
@@ -473,7 +499,14 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
     createDidEndpointConfigFromSelector(
       { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
       ['Order'],
-      ['_batch'],
+      ['_batch', '_search'],
+    ),
+  );
+  services.push(
+    createDidEndpointConfigFromSelector(
+      { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
+      ['Offer'],
+      ['_search'],
     ),
   );
 

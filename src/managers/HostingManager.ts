@@ -17,7 +17,7 @@ import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { DidCommDecodedMetadata, IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
-import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
@@ -51,6 +51,7 @@ import { resolveIdentityChannel } from '../utils/ledger';
 import { slugFromDomain } from '../utils/slug';
 import { getEnvSectionId } from '../utils/section-env';
 import { normalizeIndexedEmail, splitIndexedEmails, splitIndexedPhones } from '../utils/indexed-contact';
+import { buildCommercialSearchRow, extractCommercialSearchClaims, matchCommercialSearch } from '../utils/commercial-read-model';
 import { SERVICE_ADDITIONAL_TYPE_CLAIM } from '../utils/service-capability-claims';
 import { ClearingHouseService, IClearingHouseService } from '../services/ClearingHouseService';
 import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
@@ -797,7 +798,15 @@ export class HostingManager {
             return await this.processOrganizationLifecycle(job);
           }
           return await this.processOrganizationRegistration(job, environment, isBootstrap);
+        case 'Offer':
+          if (job.action === '_search') {
+            return await this.processCommercialSearch(job);
+          }
+          throw new ManagerError(`Unsupported action for Offer: '${job.action}'`, IssueType.NotSupported);
         case 'Order':
+          if (job.action === '_search') {
+            return await this.processCommercialSearch(job);
+          }
           return await this.processOrder(job, environment);
         default:
           throw new ManagerError(`Unsupported resourceType for hosting process: '${job.resourceType}'`, IssueType.NotSupported);
@@ -819,6 +828,122 @@ export class HostingManager {
         },
       };
     }
+  }
+
+  /**
+   * Reads already-persisted Offer/Order records so portal/BFF code can build
+   * list/detail screens without reading raw vault sections directly.
+   */
+  private async processCommercialSearch(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const jobEntries = job?.content?.body?.data || [];
+    const responseEntries: (BundleEntry | ErrorEntry)[] = [];
+
+    for (const entry of jobEntries) {
+      try {
+        responseEntries.push(
+          job.resourceType === 'Offer'
+            ? await this.processOfferSearchEntry(job, entry)
+            : await this.processOrderSearchEntry(job, entry),
+        );
+      } catch (error) {
+        responseEntries.push(this.handleError(error, entry?.type || `${job.resourceType}-search`, entry?.meta));
+      }
+    }
+
+    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    return {
+      jti: uuidv4(),
+      type: 'hosting-response',
+      thid: job.content?.thid as string,
+      iss: issuerDid,
+      aud: job.content?.iss as string,
+      exp: Math.floor(Date.now() / 1000) + 300,
+      body: {
+        data: responseEntries,
+        resourceType: 'Bundle',
+        type: getBundleResponseTypeForAction(job.action),
+        total: responseEntries.length,
+      },
+    };
+  }
+
+  private async processOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
+    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    const tenantRecords = await this.vaultRepository.getContainersInSection(
+      hostCollectionName!,
+      getEnvSectionId('tenants'),
+    );
+    const communicationRecords = await this.vaultRepository.getContainersInSection(
+      hostCollectionName!,
+      getEnvSectionId('communications'),
+    );
+    const filters = extractCommercialSearchClaims(entry);
+    const tenantIdFilter = String(job.tenantId || '').trim();
+    const matches: Record<string, unknown>[] = [];
+    const seenIds = new Set<string>();
+
+    for (const secureDoc of [...tenantRecords, ...communicationRecords] as ConfidentialStorageDoc[]) {
+      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, 'host');
+      const claims = { ...((content?.claims || {}) as Record<string, unknown>) };
+      if (!claims[ClaimsOfferSchemaorg.identifier] && claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]) {
+        claims[ClaimsOfferSchemaorg.identifier] = claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier];
+      }
+      const alternateName = String(claims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+      if (tenantIdFilter && alternateName && alternateName !== tenantIdFilter) continue;
+      if (!claims[ClaimsOfferSchemaorg.identifier]) continue;
+      if (!matchCommercialSearch(claims, filters)) continue;
+      const row = buildCommercialSearchRow(secureDoc, claims, ClaimsOfferSchemaorg.identifier);
+      const rowId = String(row.id || '').trim();
+      if (rowId && seenIds.has(rowId)) continue;
+      if (rowId) seenIds.add(rowId);
+      matches.push(row);
+    }
+
+    return {
+      type: 'Offer-search-response-v1.0',
+      resource: { total: matches.length, data: matches } as any,
+      response: { status: '200' },
+    };
+  }
+
+  private async processOrderSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
+    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    const tenantRecords = await this.vaultRepository.getContainersInSection(
+      hostCollectionName!,
+      getEnvSectionId('tenants'),
+    );
+    const orderRecords = await this.vaultRepository.getContainersInSection(
+      hostCollectionName!,
+      getEnvSectionId('communications'),
+    );
+    const filters = extractCommercialSearchClaims(entry);
+    const tenantIdFilter = String(job.tenantId || '').trim();
+    const allowedOfferIds = new Set<string>();
+
+    for (const secureDoc of tenantRecords as ConfidentialStorageDoc[]) {
+      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, 'host');
+      const claims = (content?.claims || {}) as Record<string, unknown>;
+      const alternateName = String(claims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+      if (tenantIdFilter && alternateName && alternateName !== tenantIdFilter) continue;
+      const offerId = String(claims[ClaimsOfferSchemaorg.identifier] || '').trim();
+      if (offerId) allowedOfferIds.add(offerId);
+    }
+
+    const matches: Record<string, unknown>[] = [];
+    for (const secureDoc of orderRecords as ConfidentialStorageDoc[]) {
+      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, 'host');
+      const claims = (content?.claims || {}) as Record<string, unknown>;
+      const acceptedOfferId = String(claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] || '').trim();
+      if (!acceptedOfferId || (allowedOfferIds.size > 0 && !allowedOfferIds.has(acceptedOfferId))) continue;
+      if (!matchCommercialSearch(claims, filters)) continue;
+      matches.push(buildCommercialSearchRow(secureDoc, claims, ClaimsOrderSchemaorg.acceptedOfferIdentifier));
+    }
+
+    return {
+      type: 'Order-search-response-v1.0',
+      resource: { total: matches.length, data: matches } as any,
+      response: { status: '200' },
+    };
   }
 
   /**
