@@ -1,4 +1,4 @@
-## [1.11.0] - 2026-06-12
+## [1.11.1] - 2026-06-13
 
 ### Changed
 - Added explicit `RelatedPerson/_purge` lifecycle handling in the individual
