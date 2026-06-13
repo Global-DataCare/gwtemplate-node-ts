@@ -1,3 +1,25 @@
+## [1.11.0] - 2026-06-12
+
+### Changed
+- Added explicit `RelatedPerson/_purge` lifecycle handling in the individual
+  surface, requiring the stored record to already be inactive and preserving
+  the record with purge metadata instead of hard-deleting it.
+- Aligned `RelatedPerson` processing with the canonical claims envelope by
+  reading `resource.meta.claims` first while keeping legacy `entry.meta.claims`
+  compatibility during migration.
+- Extended `RelatedPerson` lifecycle writes to preserve canonical per-entry
+  status from `resource.meta.status`, enabling inactive-state lifecycle updates
+  to flow through the stored record shape.
+- Hardened stored `RelatedPerson` normalization so purge/update flows can
+  operate consistently whether the vault returns raw content or wrapped
+  records.
+- Published new DID service definitions for `RelatedPerson/_purge` on both
+  `org.hl7.fhir.r4` and `org.hl7.fhir.api` individual endpoints.
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.21.0`.
+
+### Testing
+- `npm test -- RelatedPersonManager.test.ts request-validator.test.ts`
+
 ## [1.10.2] - 2026-06-11
 
 ### Changed

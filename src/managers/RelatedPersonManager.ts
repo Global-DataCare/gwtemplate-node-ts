@@ -20,7 +20,8 @@ import {
 } from '../utils/fhir-ingestion';
 import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
-import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
+import { ACTION_PURGE, SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
+import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -34,6 +35,40 @@ type FhirBundleLike = {
   type?: string;
   entry?: FhirBundleEntryLike[];
 };
+
+type StoredRelatedPersonRecord = {
+  id: string;
+  status?: string;
+  meta?: Record<string, any>;
+  [key: string]: any;
+};
+
+function getEntryClaims(entry: FhirBundleEntryLike): Record<string, any> | undefined {
+  const resourceClaims = entry?.resource?.meta?.claims;
+  if (resourceClaims && typeof resourceClaims === 'object') {
+    return resourceClaims as Record<string, any>;
+  }
+  const legacyClaims = entry?.meta?.claims;
+  if (legacyClaims && typeof legacyClaims === 'object') {
+    return legacyClaims as Record<string, any>;
+  }
+  return undefined;
+}
+
+function getEntryLifecycleStatus(entry: FhirBundleEntryLike): string | undefined {
+  const status = entry?.resource?.meta?.status;
+  return typeof status === 'string' && status.trim() ? status.trim() : undefined;
+}
+
+function normalizeStoredRelatedPersonRecord(record: any): StoredRelatedPersonRecord | undefined {
+  if (!record || typeof record !== 'object') return undefined;
+  const content = record.content && typeof record.content === 'object' ? record.content : record;
+  return {
+    ...(content as Record<string, any>),
+    ...(typeof record.status === 'string' ? { status: record.status } : {}),
+    ...(content?.meta && typeof content.meta === 'object' ? { meta: { ...content.meta } } : {}),
+  } as StoredRelatedPersonRecord;
+}
 
 /**
  * Registers family member relationships / emergency contacts using FHIR RelatedPerson-style claims.
@@ -78,14 +113,14 @@ export class RelatedPersonManager implements IJobProcessor {
     const cidMappings: FhirCidVersionMapping[] = [];
 
     for (const entry of entries) {
-      const rawClaims = entry?.meta?.claims;
-      try {
-        if (!rawClaims || typeof rawClaims !== 'object') {
-          throw new ManagerError('Missing meta.claims in RelatedPerson entry.', IssueType.Required);
-        }
-        validateFhirPayloadByVersion(normalizedFormat, 'RelatedPerson', entry);
+        const rawClaims = getEntryClaims(entry);
+        try {
+          if (!rawClaims || typeof rawClaims !== 'object') {
+            throw new ManagerError('Missing resource.meta.claims in RelatedPerson entry.', IssueType.Required);
+          }
+          validateFhirPayloadByVersion(normalizedFormat, 'RelatedPerson', entry);
 
-        const claims = normalizeContextualizedClaims(rawClaims);
+          const claims = normalizeContextualizedClaims(rawClaims);
         const researchTags = extractLedgerSafeResearchTags(entry);
         const subject =
           getClaimValue<string>(claims, 'RelatedPerson.patient') ||
@@ -111,7 +146,47 @@ export class RelatedPersonManager implements IJobProcessor {
         const id = String(entry?.resource?.id || fallbackId);
 
         const sectionId = getSubjectScopedSectionId(subject, scope, 'related-persons');
-        const record: Record<string, any> = { id, ...claims };
+        if (normalizedAction === ACTION_PURGE) {
+          const existingRaw = await this.vaultRepository.get<any>(tenantVaultId, id, sectionId);
+          const existingRecord = normalizeStoredRelatedPersonRecord(existingRaw);
+          if (!existingRecord) {
+            throw new ManagerError(`RelatedPerson not found for purge: ${id}`, IssueType.NotFound);
+          }
+          if (existingRecord.status !== EntityLifecycleStatus.Inactive) {
+            throw new ManagerError('RelatedPerson must be disabled before purge.', IssueType.Conflict);
+          }
+          const updatedRecord: Record<string, any> = {
+            ...existingRecord,
+            status: EntityLifecycleStatus.Inactive,
+            meta: {
+              ...(existingRecord.meta || {}),
+              lifecycleDisposition: 'purged',
+              lifecyclePurgedAt: new Date().toISOString(),
+            },
+          };
+          await this.vaultRepository.put(tenantVaultId, [updatedRecord as any], sectionId);
+
+          const responseAction = `${normalizedAction}-response`;
+          responseEntries.push({
+            type: 'RelatedPerson',
+            response: {
+              status: '200',
+              location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/RelatedPerson/${responseAction}`,
+            },
+            meta: {
+              claims,
+              ...(researchTags && researchTags.length > 0 ? { tag: researchTags } : {}),
+            },
+          });
+          continue;
+        }
+
+        const requestedLifecycleStatus = getEntryLifecycleStatus(entry);
+        const record: Record<string, any> = {
+          id,
+          ...claims,
+          ...(requestedLifecycleStatus ? { status: requestedLifecycleStatus } : {}),
+        };
         if (researchTags && researchTags.length > 0) {
           record.meta = { tag: researchTags };
           record.tag = researchTags;

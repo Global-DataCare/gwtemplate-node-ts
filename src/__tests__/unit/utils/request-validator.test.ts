@@ -48,7 +48,14 @@ describe('isRequestValid', () => {
       serviceEndpoint: 'Organization',
       actions: ['_transaction', '_disable', '_purge'],
       selector: { section: 'individual', format: 'org.schema' },
-    }
+    },
+    {
+      id: '#individual:org.hl7.fhir.api:relatedperson',
+      type: 'ApiService',
+      serviceEndpoint: 'RelatedPerson',
+      actions: ['_purge'],
+      selector: { section: 'individual', format: 'org.hl7.fhir.api' },
+    },
   ];
 
   it('should return TRUE for a valid request matching a GENERAL service definition', () => {
@@ -168,6 +175,17 @@ describe('isRequestValid', () => {
       format: 'org.schema',
       resourceType: 'Employee',
       action: '_search',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for related person _purge on the individual FHIR API surface', () => {
+    const params = {
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.hl7.fhir.api',
+      resourceType: 'RelatedPerson',
+      action: '_purge',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
   });
