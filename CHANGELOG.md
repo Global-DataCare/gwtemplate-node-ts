@@ -1,3 +1,64 @@
+## [1.12.1] - 2026-06-13
+
+### Changed
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.23.0`.
+- Pulled the newly published shared invoice/charge-item claims surface into GW
+  CORE so the hosted commercial/order flows added in `1.12.0` now consume the
+  same published package version that exposes:
+  - canonical `Invoice.*` claims
+  - canonical `ChargeItem.*` claims
+  - charge-item repeated-row builders
+  - contextualized `org.hl7.fhir.api.*` invoice/charge-item projections
+  - embedded `resource.meta.claims` invoice projection support
+- Refreshed the lockfile so GW CORE resolves the published `1.23.0` tarball
+  rather than the previous `1.22.0` line for all environments that install
+  from npm.
+- Kept the release intentionally code-stable inside GW CORE itself:
+  - no manager/controller source logic changed in this patch
+  - no OpenAPI contract files were intentionally regenerated for this patch
+  - the purpose of this release is to move the runtime onto the published
+    shared claims surface that backs invoice and charge-item readback
+
+### Dependency Surface Now Available Through GW CORE
+- Invoice-level claims available through the shared dependency include:
+  - `Invoice.identifier`
+  - `Invoice.date`
+  - `Invoice.status`
+  - `Invoice.subject`
+  - `Invoice.recipient`
+  - `Invoice.issuer`
+  - `Invoice.issuer-display`
+  - `Invoice.payment-terms`
+  - `Invoice.payment-url`
+  - `Invoice.totalnet-value`
+  - `Invoice.totalnet-currency`
+  - `Invoice.totalgross-value`
+  - `Invoice.totalgross-currency`
+- Charge-item-level claims available through the shared dependency include:
+  - `ChargeItem.identifier`
+  - `ChargeItem.status`
+  - `ChargeItem.part-of`
+  - `ChargeItem.code`
+  - `ChargeItem.code-text`
+  - `ChargeItem.category`
+  - `ChargeItem.supplier-productcode`
+  - `ChargeItem.quantity`
+  - `ChargeItem.quantity-number`
+  - `ChargeItem.quantity-unit`
+  - `ChargeItem.items-per-unit`
+  - `ChargeItem.items-quantity`
+  - `ChargeItem.items-quantity-number`
+  - `ChargeItem.items-quantity-unit`
+- High-level shared builders/readers now available through the published
+  dependency include:
+  - invoice claim-row construction from `createInvoiceBundleEditor()`
+  - repeated invoice + charge-item row generation
+  - contextualized claim generation for query/readback paths
+  - invoice `meta.claims` embedding in generated FHIR `Invoice` resources
+
+### Testing
+- `npm install gdc-common-utils-ts@^1.23.0`
+
 ## [1.12.0] - 2026-06-13
 
 ### Added
