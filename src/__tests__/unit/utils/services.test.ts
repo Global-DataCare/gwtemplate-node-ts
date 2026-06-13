@@ -160,6 +160,15 @@ describe('Service Initialization Utilities', () => {
       );
       expect(employeeSearchService).toBeDefined();
 
+      const organizationCommercialSearchService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'entity' &&
+          (s as any).selector?.format === 'org.schema' &&
+          s.serviceEndpoint === 'Offer,Order' &&
+          (s.actions || []).includes('_search'),
+      );
+      expect(organizationCommercialSearchService).toBeDefined();
+
       const fhirR4Service = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'individual' &&
@@ -195,6 +204,15 @@ describe('Service Initialization Utilities', () => {
           (s.actions || []).includes('_create'),
       );
       expect(individualPdfDraftService).toBeDefined();
+
+      const individualCommercialSearchService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'individual' &&
+          (s as any).selector?.format === 'org.schema' &&
+          s.serviceEndpoint === 'Offer,Order' &&
+          (s.actions || []).includes('_search'),
+      );
+      expect(individualCommercialSearchService).toBeDefined();
     });
 
     it('should treat synthetic animal-tech as FHIR-enabled', () => {
@@ -329,12 +347,14 @@ describe('Service Initialization Utilities', () => {
 
       // ASSERT
       const registryServices = services.filter((s: DidService) => (s as any).selector?.section === 'registry');
-      expect(registryServices).toHaveLength(2);
+      expect(registryServices).toHaveLength(3);
       const organizationRegistry = registryServices.find((s: DidService) => s.serviceEndpoint === 'Organization');
       const orderRegistry = registryServices.find((s: DidService) => s.serviceEndpoint === 'Order');
+      const offerRegistry = registryServices.find((s: DidService) => s.serviceEndpoint === 'Offer');
       expect((organizationRegistry as any)?.selector?.sector).toBe('test');
       expect(organizationRegistry?.actions).toEqual(['_batch', '_activate', '_disable', '_enable']);
-      expect(orderRegistry?.actions).toEqual(['_batch']);
+      expect(orderRegistry?.actions).toEqual(['_batch', '_search']);
+      expect(offerRegistry?.actions).toEqual(['_search']);
 
       const identityServices = services.filter((s: DidService) => (s as any).selector?.section === 'identity');
       expect(identityServices).toHaveLength(4); // (research + health-care) × (firebase + openid)
@@ -349,9 +369,10 @@ describe('Service Initialization Utilities', () => {
       );
 
       const registryServices = services.filter((s: DidService) => (s as any).selector?.section === 'registry');
-      expect(registryServices).toHaveLength(2);
+      expect(registryServices).toHaveLength(3);
       expect((registryServices[0] as any).selector?.sector).toBe('test-network');
       expect((registryServices[1] as any).selector?.sector).toBe('test-network');
+      expect((registryServices[2] as any).selector?.sector).toBe('test-network');
     });
 
     it('should publish the host catalog service at the host DSP catalog endpoint template', () => {

@@ -22,7 +22,7 @@ import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-
 import { ORGANIZATION_ORDER_JOB, ORGANIZATION_REGISTRATION_JOB } from '../../data/example-jobs';
 import { FAMILY_ORDER_REQUEST, FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
 import * as tenantUtils from '../../../utils/tenant';
-import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { HostingManager } from '../../../managers/HostingManager';
@@ -153,7 +153,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const offerId = offerResponse.body.data[0].meta.claims[ClaimsOfferSchemaorg.identifier] as string;
 
     const orderJob = { ...ORGANIZATION_ORDER_JOB };
-    orderJob.content!.body!.data[0]!.meta!.claims['Order.acceptedOffer.identifier'] = offerId;
+    orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
     await hostingManager.process(orderJob);
 
     familyManager = new FamilyManager(
@@ -217,7 +217,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const offerId = firstEntry.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
 
     const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
-    orderContent.body.data[0].meta.claims['Order.acceptedOffer.identifier'] = offerId;
+    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
 
     const familyOrderJob: JobRequest = {
       id: 'job-family-order-1',
@@ -238,7 +238,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
     expect(['201', '400']).toContain(entry.response.status);
     if (entry.response.status === '201') {
       expect(entry.type).toBe('Family-order-response-v1.0');
-      expect(entry.meta.claims['org.schema.Order.acceptedOffer.identifier']).toBe(offerId);
+      expect(entry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
     }
 
     const tenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, tenantId);
@@ -251,5 +251,96 @@ describe('FamilyManager - Offer/Order Flow', () => {
     if (entry.response.status === '201') {
       expect(communications.length).toBeGreaterThan(0);
     }
+  });
+
+  it('should reopen family Offer and Order records through _search for portal-style read models', async () => {
+    const tenantId = testTenant1TenantId;
+    const familyRegistrationJob: JobRequest = {
+      id: 'job-family-search-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: 'Organization',
+      content: buildFamilyRegistrationRequestWithoutPdfAttachment(),
+    };
+
+    const offerPayload = await familyManager.process(familyRegistrationJob);
+    const firstEntry = offerPayload.body.data[0];
+    if (firstEntry.response.status !== '201') {
+      expect(firstEntry.response.status).toBe('400');
+      return;
+    }
+    const offerId = firstEntry.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
+
+    const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
+    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    await familyManager.process({
+      id: 'job-family-search-order-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: 'Order',
+      content: orderContent,
+    });
+
+    const offerSearch = await familyManager.process({
+      id: 'job-family-offer-search-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_search',
+      resourceType: 'Offer',
+      content: {
+        body: {
+          data: [{
+            type: 'Offer-search-request-v1.0',
+            meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } },
+            resource: { meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } } },
+          }],
+        },
+      } as any,
+    });
+
+    expect(offerSearch.body.data[0].response.status).toBe('200');
+    expect(offerSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
+
+    const orderSearch = await familyManager.process({
+      id: 'job-family-order-search-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_search',
+      resourceType: 'Order',
+      content: {
+        body: {
+          data: [{
+            type: 'Order-search-request-v1.0',
+            meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } },
+            resource: { meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } } },
+          }],
+        },
+      } as any,
+    });
+
+    expect(orderSearch.body.data[0].response.status).toBe('200');
+    expect(orderSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
   });
 });

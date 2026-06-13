@@ -15,6 +15,15 @@
   records.
 - Published new DID service definitions for `RelatedPerson/_purge` on both
   `org.hl7.fhir.r4` and `org.hl7.fhir.api` individual endpoints.
+- Added modular commercial/license read-model helpers in:
+  - `src/utils/commercial-read-model.ts`
+  - `src/utils/license-search.ts`
+- Added `License/_search` support plus hosted/family `Offer/_search` and
+  `Order/_search` readback so portal-facing flows can reopen persisted
+  commercial state without inventing a separate service contract.
+- Made the request body size limit explicit and configurable through
+  `GW_REQUEST_BODY_LIMIT`, returning a clear `413` lifecycle-safe early error
+  when large `Communication/_batch` payloads exceed the configured limit.
 - Updated the shared dependency target to `gdc-common-utils-ts@^1.21.0`.
 
 ### Testing

@@ -21,9 +21,21 @@ import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { getEnvSectionId } from '../utils/section-env';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import {
+  buildLicenseSearchClaims,
+  extractLicenseSearchFilters,
+  extractLicenseSearchMetaClaims,
+  mapLicenseCategory,
+  matchesLicenseFilters,
+  resolveLicenseFilterValues,
+  searchLicenseDocuments,
+  toFilterValues,
+} from '../utils/license-search';
+import {
   LICENSE_CATEGORY_INDIVIDUAL,
   LICENSE_CATEGORY_PROFESSIONAL,
+  LICENSE_STATUS_ACTIVE,
   LICENSE_STATUS_AVAILABLE,
+  LICENSE_STATUS_ISSUED,
   LICENSE_TYPE_MOBILE,
   LICENSE_TYPE_WEB,
   LICENSE_USER_CLASS_EMPLOYEE,
@@ -56,6 +68,7 @@ export class LicenseManager implements IJobProcessor {
       throw new ManagerError('Missing action.', IssueType.Required);
     }
     if (action === '_issue') return this.issueActivationCodes(job);
+    if (action === '_search') return this.searchLicenses(job);
     // Keep legacy/internal semantics where the action might be `create`.
     const {
       targetTenantId,
@@ -161,6 +174,71 @@ export class LicenseManager implements IJobProcessor {
           }
         }]
       }
+    };
+  }
+
+  /**
+   * Searches one tenant `device-licenses` pool using either:
+   * - FHIR-like `Bundle.entry.request.url + Parameters`
+   * - current shared claims-first search entries emitted by common-utils
+   */
+  private async searchLicenses(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const thid = String(job.content?.thid || uuidv4());
+    if (!job.tenantId || !job.sector) {
+      throw new ManagerError('Missing tenantId or sector.', IssueType.Required);
+    }
+
+    const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
+    const body = job.content?.body as any;
+    const entries: any[] =
+      (Array.isArray(body?.entry) && body.entry)
+      || (Array.isArray(body?.data) && body.data)
+      || [];
+
+    if (entries.length === 0) {
+      throw new ManagerError('License search requires at least one entry.', IssueType.Required);
+    }
+
+    const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
+
+    for (const entry of entries) {
+      try {
+        const filters = extractLicenseSearchFilters(entry);
+        const matches = await searchLicenseDocuments(this.vaultRepository, tenantVaultId, filters);
+        responseEntries.push({
+          type: 'License-search-response-v1.0',
+          resource: {
+            total: matches.length,
+            data: matches,
+          } as any,
+          response: { status: '200' },
+        });
+      } catch (e: any) {
+        responseEntries.push({
+          type: 'License-search-response-v1.0',
+          meta: { claims: extractLicenseSearchMetaClaims(entry) },
+          response: {
+            status: '400',
+            outcome: createOperationOutcome(IssueLevel.Error, IssueType.Invalid, e?.message || String(e)),
+          },
+        } as any);
+      }
+    }
+
+    const responseBundle: BundleJsonApi = {
+      resourceType: 'Bundle',
+      type: 'batch-response',
+      total: responseEntries.length,
+      data: responseEntries,
+    };
+
+    return {
+      jti: uuidv4(),
+      thid,
+      type: 'search-response',
+      iss: job.content?.aud as string,
+      aud: job.content?.iss as string,
+      body: responseBundle,
     };
   }
 
@@ -287,5 +365,77 @@ export class LicenseManager implements IJobProcessor {
       aud: job.content?.iss as string,
       body: responseBundle,
     };
+  }
+
+  /**
+   * Accepts both FHIR-style request wrappers and shared claims-first search
+   * entries so the GW route can serve current SDK/common-utils helpers.
+   */
+  private extractLicenseSearchFilters(entry: any): ReturnType<typeof extractLicenseSearchFilters> {
+    return extractLicenseSearchFilters(entry);
+  }
+
+  /**
+   * Extracts the original search claims for error reporting without assuming
+   * whether they arrived in `entry.meta.claims` or `entry.resource.meta.claims`.
+   */
+  private extractLicenseSearchMetaClaims(entry: any): Record<string, unknown> {
+    return extractLicenseSearchMetaClaims(entry);
+  }
+
+  /**
+   * Returns one frontend-friendly search row shape compatible with the shared
+   * `readLicenseListRecords(...)` reader.
+   */
+  private async searchLicenseDocuments(
+    tenantVaultId: string,
+    filters: ReturnType<typeof extractLicenseSearchFilters>,
+  ): Promise<Array<Record<string, unknown>>> {
+    return searchLicenseDocuments(this.vaultRepository, tenantVaultId, filters);
+  }
+
+  /**
+   * Projects one stored `DeviceLicense` document into the shared
+   * schema.org-flavored claim shape expected by list/search readers.
+   */
+  private buildLicenseSearchClaims(license: DeviceLicense & Record<string, any>): Record<string, unknown> {
+    return buildLicenseSearchClaims(license);
+  }
+
+  /**
+   * Applies all requested search filters to one stored seat.
+   */
+  private matchesLicenseFilters(
+    license: (DeviceLicense & Record<string, any>) | undefined,
+    filters: ReturnType<typeof extractLicenseSearchFilters>,
+  ): boolean {
+    return matchesLicenseFilters(license, filters);
+  }
+
+  /**
+   * Resolves one concrete filter key into the comparable string values exposed
+   * by the current storage model.
+   */
+  private resolveLicenseFilterValues(
+    license: DeviceLicense & Record<string, any>,
+    key: string,
+  ): string[] {
+    return resolveLicenseFilterValues(license, key);
+  }
+
+  /**
+   * Maps runtime user-class storage to the schema.org-style license family
+   * value already used by shared readers/builders.
+   */
+  private mapLicenseCategory(userClass: string | undefined): string {
+    return mapLicenseCategory(userClass);
+  }
+
+  /**
+   * Normalizes one optional scalar into the common string-array form used by
+   * the search matcher.
+   */
+  private toFilterValues(value: unknown): string[] {
+    return toFilterValues(value);
   }
 }

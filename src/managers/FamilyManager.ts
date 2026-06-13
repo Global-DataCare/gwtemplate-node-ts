@@ -14,10 +14,11 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
-import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
+import { buildCommercialSearchRow, extractCommercialSearchClaims, matchCommercialSearch } from '../utils/commercial-read-model';
 import { createOperationOutcome } from '../utils/outcome';
 import { determineResourceId } from '../utils/resource';
 import { getTenantVaultId } from '../utils/tenant';
@@ -73,6 +74,10 @@ export class FamilyManager {
         try {
           if (job.action === '_search' && job.resourceType === 'Organization') {
             responseEntries.push(await this.processFamilySearchEntry(job, entry, environment));
+          } else if (job.action === '_search' && job.resourceType === 'Offer') {
+            responseEntries.push(await this.processFamilyOfferSearchEntry(job, entry));
+          } else if (job.action === '_search' && job.resourceType === 'Order') {
+            responseEntries.push(await this.processFamilyOrderSearchEntry(job, entry));
           } else if (job.action === ACTION_DISABLE && job.resourceType === 'Organization') {
             responseEntries.push(await this.processFamilyDisableEntry(job, entry));
           } else if (job.action === ACTION_PURGE && job.resourceType === 'Organization') {
@@ -110,6 +115,66 @@ export class FamilyManager {
       aud: job.content?.iss as string,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: responseBundle,
+    };
+  }
+
+  private async processFamilyOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
+    const tenantId = job.tenantId;
+    const sector = job.sector as Sector | undefined;
+    if (!tenantId || !sector) {
+      throw new ManagerError('Job is missing tenantId or sector.', IssueType.Required);
+    }
+    const tenantVaultId = getTenantVaultId(sector, tenantId);
+    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(tenantVaultId);
+    if (!tenantCollectionName) {
+      throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
+    }
+
+    const filters = extractCommercialSearchClaims(entry);
+    const records = await this.vaultRepository.getContainersInSection(tenantCollectionName, INDIVIDUAL_SECTION);
+    const matches: Record<string, unknown>[] = [];
+    for (const secureDoc of records as ConfidentialStorageDoc[]) {
+      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, tenantVaultId);
+      const claims = (content?.claims || {}) as Record<string, unknown>;
+      if (!claims[ClaimsOfferSchemaorg.identifier]) continue;
+      if (!matchCommercialSearch(claims, filters)) continue;
+      matches.push(buildCommercialSearchRow(secureDoc, claims, ClaimsOfferSchemaorg.identifier));
+    }
+
+    return {
+      type: 'Offer-search-response-v1.0',
+      resource: { total: matches.length, data: matches } as any,
+      response: { status: '200' },
+    };
+  }
+
+  private async processFamilyOrderSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
+    const tenantId = job.tenantId;
+    const sector = job.sector as Sector | undefined;
+    if (!tenantId || !sector) {
+      throw new ManagerError('Job is missing tenantId or sector.', IssueType.Required);
+    }
+    const tenantVaultId = getTenantVaultId(sector, tenantId);
+    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(tenantVaultId);
+    if (!tenantCollectionName) {
+      throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
+    }
+
+    const filters = extractCommercialSearchClaims(entry);
+    const records = await this.vaultRepository.getContainersInSection(tenantCollectionName, getEnvSectionId('communications'));
+    const matches: Record<string, unknown>[] = [];
+    for (const secureDoc of records as ConfidentialStorageDoc[]) {
+      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, tenantVaultId);
+      const claims = (content?.claims || {}) as Record<string, unknown>;
+      if (!claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]) continue;
+      if (!matchCommercialSearch(claims, filters)) continue;
+      matches.push(buildCommercialSearchRow(secureDoc, claims, ClaimsOrderSchemaorg.acceptedOfferIdentifier));
+    }
+
+    return {
+      type: 'Order-search-response-v1.0',
+      resource: { total: matches.length, data: matches } as any,
+      response: { status: '200' },
     };
   }
 

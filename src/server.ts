@@ -1,6 +1,6 @@
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
 
-import { createApp } from './app';
+import { createApp, resolveRequestBodyLimit } from './app';
 import * as express from 'express';
 
 
@@ -155,7 +155,10 @@ async function startServer(options?: StartServerOptions) {
   }
 
   const app = createApp();
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.urlencoded({
+    extended: true,
+    limit: resolveRequestBodyLimit(),
+  }));
 
   if (options?.testMiddlewares) {
     options.testMiddlewares.forEach((mw) => app.use(mw));

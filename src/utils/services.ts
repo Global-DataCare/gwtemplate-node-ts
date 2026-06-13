@@ -158,6 +158,12 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   ));
 
   services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'entity', format: 'org.schema' },
+    ['Offer', 'Order'],
+    ['_search']
+  ));
+
+  services.push(createDidEndpointConfigFromSelector(
     { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     individualResources,
     ['_batch']
@@ -173,6 +179,12 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   services.push(createDidEndpointConfigFromSelector(
     { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     ['Organization'],
+    ['_search']
+  ));
+
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
+    ['Offer', 'Order'],
     ['_search']
   ));
 
@@ -487,7 +499,14 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
     createDidEndpointConfigFromSelector(
       { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
       ['Order'],
-      ['_batch'],
+      ['_batch', '_search'],
+    ),
+  );
+  services.push(
+    createDidEndpointConfigFromSelector(
+      { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
+      ['Offer'],
+      ['_search'],
     ),
   );
 

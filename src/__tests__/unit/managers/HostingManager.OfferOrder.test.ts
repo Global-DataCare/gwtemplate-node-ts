@@ -13,11 +13,13 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { IServerConfig } from '../../../config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { EXAMPLE_LICENSE_INVALID_OFFER_ID } from 'gdc-common-utils-ts';
 
 // Create a mock KMS service for testing.
 export const mockKmsService: jest.Mocked<IKmsService> = {
@@ -53,6 +55,7 @@ import { testClaimsHostInitialization } from '../../data/end-to-end.data';
 import {
   ClaimsOrganizationSchemaorg,
   ClaimsOfferSchemaorg,
+  ClaimsOrderSchemaorg,
   ClaimsServiceSchemaorg,
 } from 'gdc-common-utils-ts/constants/schemaorg';
 import * as tenantUtils from '../../../utils/tenant';
@@ -201,7 +204,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     // Step 2: Create and process the Order
     const orderJob = { ...ORGANIZATION_ORDER_JOB };
     orderJob.content!.body!.data[0]!.meta!.claims[
-      'Order.acceptedOffer.identifier'
+      ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = offerId;
 
     const finalResponse = await hostingManager.process(orderJob);
@@ -212,8 +215,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     expect(['Organization-order-response-v1.0', 'Organization-order-request-v1.0']).toContain(finalEntry.type);
     if (finalEntry.response.status === '201') {
       expect(
-        finalEntry.meta.claims['org.schema.Order.acceptedOffer.identifier']
-        || finalEntry.meta.claims['Order.acceptedOffer.identifier'],
+        finalEntry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier],
       ).toBe(offerId);
     }
 
@@ -265,8 +267,8 @@ describe('HostingManager - Offer/Order Flow', () => {
   it('should return a 404 Not Found for an Order with an invalid offerId', async () => {
     const orderJob = { ...ORGANIZATION_ORDER_JOB };
     orderJob.content!.body!.data[0]!.meta!.claims[
-      'Order.acceptedOffer.identifier'
-    ] = 'urn:uuid:invalid-offer-id';
+      ClaimsOrderSchemaorg.acceptedOfferIdentifier
+    ] = EXAMPLE_LICENSE_INVALID_OFFER_ID;
 
     const responsePayload = await hostingManager.process(orderJob);
 
@@ -275,5 +277,72 @@ describe('HostingManager - Offer/Order Flow', () => {
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain(
       'No pending registration found for offerId',
     );
+  });
+
+  it('should reopen hosted Offer and Order records through _search for portal-style read models', async () => {
+    const registrationJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    const offerResponse = await hostingManager.process(registrationJob);
+    const offerId = offerResponse.body.data[0].meta.claims[
+      ClaimsOfferSchemaorg.identifier
+    ] as string;
+
+    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    await hostingManager.process(orderJob);
+
+    const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;
+    const tenantAlternateName =
+      regClaims[ClaimsOrganizationSchemaorg.alternateName]
+      || regClaims[ClaimsOrganizationSchemaorg.identifierValue];
+
+    const offerSearch = await hostingManager.process({
+      id: 'job-host-offer-search-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId: tenantAlternateName,
+      sector: Sector.HEALTH_CARE,
+      section: 'entity',
+      format: 'org.schema',
+      action: '_search',
+      resourceType: 'Offer',
+      content: {
+        body: {
+          data: [{
+            type: 'Offer-search-request-v1.0',
+            meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } },
+            resource: { meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } } },
+          }],
+        },
+      } as any,
+    });
+
+    expect(offerSearch.body.data[0].response.status).toBe('200');
+    expect(offerSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
+
+    const orderSearch = await hostingManager.process({
+      id: 'job-host-order-search-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId: tenantAlternateName,
+      sector: Sector.HEALTH_CARE,
+      section: 'entity',
+      format: 'org.schema',
+      action: '_search',
+      resourceType: 'Order',
+      content: {
+        body: {
+          data: [{
+            type: 'Order-search-request-v1.0',
+            meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } },
+            resource: { meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } } },
+          }],
+        },
+      } as any,
+    });
+
+    expect(orderSearch.body.data[0].response.status).toBe('200');
+    expect(orderSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
   });
 });

@@ -39,7 +39,14 @@ describe('isRequestValid', () => {
       id: '#registry:org.schema:order',
       type: 'ApiService',
       serviceEndpoint: 'Order',
-      actions: ['_batch'],
+      actions: ['_batch', '_search'],
+      selector: { section: 'registry', format: 'org.schema' },
+    },
+    {
+      id: '#registry:org.schema:offer',
+      type: 'ApiService',
+      serviceEndpoint: 'Offer',
+      actions: ['_search'],
       selector: { section: 'registry', format: 'org.schema' },
     },
     {
@@ -47,6 +54,13 @@ describe('isRequestValid', () => {
       type: 'ApiService',
       serviceEndpoint: 'Organization',
       actions: ['_transaction', '_disable', '_purge'],
+      selector: { section: 'individual', format: 'org.schema' },
+    },
+    {
+      id: '#individual:org.schema:commercial',
+      type: 'ApiService',
+      serviceEndpoint: 'Offer,Order',
+      actions: ['_search'],
       selector: { section: 'individual', format: 'org.schema' },
     },
     {
@@ -174,6 +188,28 @@ describe('isRequestValid', () => {
       section: 'entity',
       format: 'org.schema',
       resourceType: 'Employee',
+      action: '_search',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for registry Offer _search', () => {
+    const params = {
+      sector: 'test',
+      section: 'registry',
+      format: 'org.schema',
+      resourceType: 'Offer',
+      action: '_search',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for individual Order _search', () => {
+    const params = {
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      resourceType: 'Order',
       action: '_search',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);

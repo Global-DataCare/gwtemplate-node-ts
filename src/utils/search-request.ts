@@ -75,7 +75,9 @@ export function extractSearchFiltersFromRequestUrl(requestUrl: unknown): SearchF
 export function extractSearchResourceTarget(requestUrl: unknown): string {
   const target = getRequestTarget(requestUrl);
   if (!target) return '';
-  return target.endsWith('/_search') ? target.slice(0, -'/_search'.length) : target;
+  const withoutAction = target.endsWith('/_search') ? target.slice(0, -'/_search'.length) : target;
+  const segments = withoutAction.split('/').filter(Boolean);
+  return segments.length > 0 ? String(segments[segments.length - 1] || '').trim() : '';
 }
 
 export function assertSearchRequestTarget(
