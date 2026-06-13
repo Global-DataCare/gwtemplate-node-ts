@@ -23,6 +23,10 @@ interface PaymentContext {
   streetAddress?: string;
   activationCode?: string;
   activationCategory?: string;
+  paymentMethod?: string;
+  paymentUrl?: string;
+  invoiceId?: string;
+  paymentConfirmed?: boolean;
 }
 
 interface PaymentCommunicationResult {
@@ -162,19 +166,22 @@ export async function buildPaymentCommunication(
   context: PaymentContext,
 ): Promise<PaymentCommunicationResult> {
   const now = context.now || new Date();
-  let paymentUrl = '';
-  let invoiceId = '';
+  let paymentUrl = context.paymentUrl || '';
+  let invoiceId = context.invoiceId || '';
+  let paymentMethod = context.paymentMethod || '';
   let paymentDueDate: string | undefined;
 
-  if (isStripeInvoiceEnabled() && stripeIsConfigured() && invoiceFlow() === 'pre') {
+  if (!context.paymentConfirmed && !paymentUrl && !invoiceId && isStripeInvoiceEnabled() && stripeIsConfigured() && invoiceFlow() === 'pre') {
     const stripeInvoice = await createStripeInvoice(context);
     paymentUrl = stripeInvoice.paymentUrl;
     invoiceId = stripeInvoice.invoiceId;
     paymentDueDate = stripeInvoice.paymentDueDate;
+    paymentMethod = paymentUrl || invoiceId ? 'Stripe' : paymentMethod;
   }
 
-  if (!paymentUrl && isStripePaymentEnabled() && stripeIsConfigured() && invoiceFlow() === 'post') {
+  if (!context.paymentConfirmed && !paymentUrl && isStripePaymentEnabled() && stripeIsConfigured() && invoiceFlow() === 'post') {
     paymentUrl = await createStripeCheckoutUrl(context);
+    paymentMethod = paymentUrl ? 'Stripe' : paymentMethod;
   }
 
   const communicationId = uuidv4();
@@ -184,7 +191,7 @@ export async function buildPaymentCommunication(
     '@type': 'Order:Invoice',
     'org.schema.Order.acceptedOffer.identifier': context.offerId,
     'org.schema.Order.partOfInvoice': paymentUrl || invoiceId || undefined,
-    'org.schema.Order.paymentMethod': paymentUrl ? 'Stripe' : undefined,
+    'org.schema.Order.paymentMethod': paymentMethod || (paymentUrl ? 'Stripe' : undefined),
     'org.schema.Order.paymentDueDate': paymentDueDate,
     'org.schema.Order.paymentUrl': paymentUrl || undefined,
     'org.schema.Order.invoiceIssuedAt': now.toISOString(),

@@ -30,6 +30,8 @@ import { TenantsCacheManager } from './TenantsCacheManager';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
+import { buildGatewayInvoiceBundle } from '../utils/invoice-bundle';
+import { verifyOrderPaymentConfirmation } from '../utils/payment-confirmation';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import { buildClaimsFromIndividualRegistrationPdfAttachment } from '../utils/individual-registration-pdf-attachment';
 import { buildClaimsFromIndividualOrganizationKyc } from '../utils/individual-organization-kyc';
@@ -131,14 +133,22 @@ export class FamilyManager {
     }
 
     const filters = extractCommercialSearchClaims(entry);
-    const records = await this.vaultRepository.getContainersInSection(tenantCollectionName, INDIVIDUAL_SECTION);
+    const records = [
+      ...await this.vaultRepository.getContainersInSection(tenantCollectionName, INDIVIDUAL_SECTION),
+      ...await this.vaultRepository.getContainersInSection(tenantCollectionName, getEnvSectionId('communications')),
+    ];
     const matches: Record<string, unknown>[] = [];
     for (const secureDoc of records as ConfidentialStorageDoc[]) {
       const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, tenantVaultId);
       const claims = (content?.claims || {}) as Record<string, unknown>;
       if (!claims[ClaimsOfferSchemaorg.identifier]) continue;
       if (!matchCommercialSearch(claims, filters)) continue;
-      matches.push(buildCommercialSearchRow(secureDoc, claims, ClaimsOfferSchemaorg.identifier));
+      matches.push(buildCommercialSearchRow(
+        secureDoc,
+        claims,
+        ClaimsOfferSchemaorg.identifier,
+        content?.invoiceBundle as Record<string, unknown> | undefined,
+      ));
     }
 
     return {
@@ -168,7 +178,12 @@ export class FamilyManager {
       const claims = (content?.claims || {}) as Record<string, unknown>;
       if (!claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]) continue;
       if (!matchCommercialSearch(claims, filters)) continue;
-      matches.push(buildCommercialSearchRow(secureDoc, claims, ClaimsOrderSchemaorg.acceptedOfferIdentifier));
+      matches.push(buildCommercialSearchRow(
+        secureDoc,
+        claims,
+        ClaimsOrderSchemaorg.acceptedOfferIdentifier,
+        content?.invoiceBundle as Record<string, unknown> | undefined,
+      ));
     }
 
     return {
@@ -482,7 +497,7 @@ export class FamilyManager {
     });
 
     if (results.length === 0) {
-      throw new ManagerError(`No pending family registration found for offerId: '${offerId}'`, IssueType.NotFound);
+      return this.processCommercialFamilyOrderEntry(job, claims, offerId);
     }
     if (results.length > 1) {
       this.logger.error(`CRITICAL: Multiple pending family registrations found for the same offerId: '${offerId}'`);
@@ -586,15 +601,37 @@ export class FamilyManager {
       streetAddress: finalizedContent.claims[ClaimsOrganizationSchemaorg.streetAddress] as string | undefined,
       activationCode: (finalizedContent.claims as any)['org.schema.IndividualProduct.serialNumber'] as string | undefined,
       activationCategory: (finalizedContent.claims as any)['org.schema.IndividualProduct.category'] as string | undefined,
+      paymentMethod: claims[ClaimsOrderSchemaorg.paymentMethod] as string | undefined,
+      paymentUrl: claims[ClaimsOrderSchemaorg.paymentUrl] as string | undefined,
+      invoiceId: claims[ClaimsOrderSchemaorg.partOfInvoice] as string | undefined,
+      paymentConfirmed: true,
       ...readOfferPaymentContext(finalizedContent.claims),
     };
     const paymentCommunication = await buildPaymentCommunication(paymentContext);
+    const invoiceBundle = buildGatewayInvoiceBundle({
+      invoiceId: String(
+        paymentCommunication.claims[ClaimsOrderSchemaorg.partOfInvoice]
+        || paymentCommunication.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]
+        || offerId,
+      ),
+      subjectReference: recipientDid,
+      issuerReference: tenantDid,
+      recipientReference: recipientDid,
+      issuedAt: String(
+        paymentCommunication.claims['org.schema.Order.invoiceIssuedAt']
+        || new Date().toISOString(),
+      ),
+      amount: String(finalizedContent.claims[ClaimsOfferSchemaorg.price] || ''),
+      currency: String(finalizedContent.claims[ClaimsOfferSchemaorg.priceCurrency] || ''),
+      paymentMethod: claims[ClaimsOrderSchemaorg.paymentMethod] as string | undefined,
+      paymentUrl: claims[ClaimsOrderSchemaorg.paymentUrl] as string | undefined,
+    });
 
     const communicationDoc: ConfidentialStorageDoc = {
       id: paymentCommunication.communicationId,
       status: EntityLifecycleStatus.Active,
       sequence: 0,
-      content: { claims: paymentCommunication.claims },
+      content: { claims: paymentCommunication.claims, invoiceBundle },
     };
     const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, tenantVaultId);
     await this.vaultRepository.put(tenantCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
@@ -602,6 +639,120 @@ export class FamilyManager {
     return {
       type: 'Family-order-response-v1.0',
       meta: { claims: paymentCommunication.claims },
+      resource: invoiceBundle as any,
+      response: { status: '201' },
+    };
+  }
+
+  private async processCommercialFamilyOrderEntry(
+    job: JobRequest,
+    orderClaims: ClaimsRecord,
+    offerId: string,
+  ): Promise<BundleEntry | ErrorEntry> {
+    const tenantId = job.tenantId;
+    const sector = job.sector as Sector | undefined;
+    if (!tenantId || !sector) {
+      throw new ManagerError('Job is missing tenantId or sector.', IssueType.Required);
+    }
+    const tenantVaultId = getTenantVaultId(sector, tenantId);
+    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(tenantVaultId);
+    if (!tenantCollectionName) {
+      throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
+    }
+
+    const records = await this.vaultRepository.getContainersInSection(tenantCollectionName, getEnvSectionId('communications'));
+    let matchedOfferClaims: Record<string, unknown> | undefined;
+    for (const secureDoc of records as ConfidentialStorageDoc[]) {
+      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, tenantVaultId);
+      const candidateClaims = (content?.claims || {}) as Record<string, unknown>;
+      if (String(candidateClaims[ClaimsOfferSchemaorg.identifier] || '').trim() === offerId) {
+        matchedOfferClaims = candidateClaims;
+        break;
+      }
+    }
+    if (!matchedOfferClaims) {
+      throw new ManagerError(`No pending family registration or commercial offer found for offerId: '${offerId}'`, IssueType.NotFound);
+    }
+
+    const verification = await verifyOrderPaymentConfirmation({
+      orderClaims,
+      offerClaims: matchedOfferClaims,
+    });
+    if (!verification.verified) {
+      throw new ManagerError(`Payment confirmation failed for offerId '${offerId}'.`, IssueType.Conflict);
+    }
+
+    const quantity = Number(matchedOfferClaims[ClaimsOfferSchemaorg.eligibleQuantityValue] || 1);
+    const now = Date.now();
+    const expiryDate = new Date(now);
+    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    const exp = Math.floor(expiryDate.getTime() / 1000);
+    const licenseDocs: ConfidentialStorageDoc[] = [];
+    for (let i = 0; i < quantity; i++) {
+      const licenseId = uuidv4();
+      const license: DeviceLicense = {
+        id: licenseId,
+        tenantId,
+        orderId: verification.invoiceId || offerId,
+        userClass: LICENSE_USER_CLASS_INDIVIDUAL,
+        type: LICENSE_TYPE_MOBILE,
+        status: LICENSE_STATUS_AVAILABLE,
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        exp,
+      } as any;
+      licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
+    }
+    await this.vaultRepository.put(tenantVaultId, licenseDocs, DEVICE_LICENSE_SECTION);
+
+    const tenantDid = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
+    if (!tenantDid) {
+      throw new ManagerError(`Tenant DID not found for '${tenantVaultId}'`, IssueType.NotFound);
+    }
+    const paymentCommunication = await buildPaymentCommunication({
+      offerId,
+      tenantId,
+      tenantDid,
+      senderDid: tenantDid,
+      paymentMethod: verification.paymentMethod,
+      paymentUrl: verification.paymentUrl,
+      invoiceId: verification.invoiceId,
+      paymentConfirmed: true,
+      ...readOfferPaymentContext(matchedOfferClaims),
+    });
+    const invoiceBundle = buildGatewayInvoiceBundle({
+      invoiceId: String(
+        paymentCommunication.claims[ClaimsOrderSchemaorg.partOfInvoice]
+        || verification.invoiceId
+        || offerId,
+      ),
+      subjectReference: tenantDid,
+      issuerReference: tenantDid,
+      recipientReference: tenantDid,
+      issuedAt: String(
+        paymentCommunication.claims['org.schema.Order.invoiceIssuedAt']
+        || new Date().toISOString(),
+      ),
+      amount: String(matchedOfferClaims[ClaimsOfferSchemaorg.price] || ''),
+      currency: String(matchedOfferClaims[ClaimsOfferSchemaorg.priceCurrency] || ''),
+      paymentMethod: verification.paymentMethod,
+      paymentUrl: verification.paymentUrl,
+    });
+
+    const communicationDoc: ConfidentialStorageDoc = {
+      id: paymentCommunication.communicationId,
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      content: { claims: paymentCommunication.claims, invoiceBundle },
+    };
+    const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, tenantVaultId);
+    await this.vaultRepository.put(tenantCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
+
+    return {
+      type: 'Family-order-response-v1.0',
+      meta: { claims: paymentCommunication.claims },
+      resource: invoiceBundle as any,
       response: { status: '201' },
     };
   }

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 HOST_PORT="${HOST_PORT:-8080}"
-ENV_FILE="${ENV_FILE:-./.env.local}"
+ENV_FILE="${ENV_FILE:-./.env.local-demo}"
 CONTAINER_NAME="${CONTAINER_NAME:-gwtemplate}"
 IMAGE_NAME="${IMAGE_NAME:-gwtemplate}"
 FORCE_RECREATE="${FORCE_RECREATE:-false}"

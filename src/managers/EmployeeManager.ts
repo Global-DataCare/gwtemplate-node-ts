@@ -6,7 +6,7 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
-import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { determineResourceId } from '../utils/resource';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { initializeEmployeeServices } from '../utils/services';
@@ -94,6 +94,7 @@ export class EmployeeManager {
           entry,
           job.action,
           vaultId,
+          String(job.tenantId || ''),
           issuerUrn,
           job.content.meta,
           job.contentType,
@@ -236,6 +237,7 @@ export class EmployeeManager {
     entry: BundleEntry,
     action: string | undefined,
     vaultId: string,
+    tenantId: string,
     tenantUrn: string,
     meta: IDecodedDidcommPayload['meta'],
     contentType?: string,
@@ -262,7 +264,7 @@ export class EmployeeManager {
         if (action === ACTION_PURGE) {
           return this.purgeEmployee(vaultId, employeeId, claims, type);
         }
-        return this.createEmployee(vaultId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction);
+        return this.createEmployee(vaultId, tenantId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction);
       case 'DELETE':
         return this.disableEmployee(vaultId, employeeId, type);
       default:
@@ -272,6 +274,7 @@ export class EmployeeManager {
 
   private async createEmployee(
     vaultId: string,
+    tenantId: string,
     tenantUrn: string,
     employeeId: string,
     claims: ClaimsRecord,
@@ -318,6 +321,7 @@ export class EmployeeManager {
 
     const licenseOffer = await this.tryConsumeEmployeeSeatOrOffer({
       vaultId,
+      tenantId,
       employeeId,
       sector: sector || 'health-care',
       jurisdiction: jurisdiction || 'us',
@@ -547,6 +551,7 @@ export class EmployeeManager {
 
   private async tryConsumeEmployeeSeatOrOffer(params: {
     vaultId: string;
+    tenantId: string;
     employeeId: string;
     sector: string;
     jurisdiction: string;
@@ -575,6 +580,8 @@ export class EmployeeManager {
         allowedPaymentMethods,
         LICENSE_USER_CLASS_EMPLOYEE,
       );
+      offerClaims[ClaimsOrganizationSchemaorg.alternateName] = params.tenantId;
+      await this.persistHostCommercialOffer(offerClaims);
 
       return {
         type: 'Employee-license-offer-v1.0',
@@ -596,6 +603,21 @@ export class EmployeeManager {
       DEVICE_LICENSE_SECTION,
     );
     return undefined;
+  }
+
+  private async persistHostCommercialOffer(claims: Record<string, unknown>): Promise<void> {
+    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    const offerId = String(claims[ClaimsOfferSchemaorg.identifier] || '').trim();
+    if (!hostCollectionName || !offerId) return;
+
+    const communicationDoc: ConfidentialStorageDoc = {
+      id: offerId,
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      content: { claims },
+    };
+    const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, 'host');
+    await this.vaultRepository.put(hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
   }
 
   private async disableEmployee(vaultId: string, employeeId: string, entryType: string): Promise<BundleEntry> {

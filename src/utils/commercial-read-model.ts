@@ -47,6 +47,7 @@ export function buildCommercialSearchRow(
   doc: ConfidentialStorageDoc,
   claims: Record<string, unknown>,
   fallbackIdClaim: string,
+  resource?: Record<string, unknown>,
 ): Record<string, unknown> {
   return {
     id: String(doc.id || claims[fallbackIdClaim] || '').trim() || undefined,
@@ -54,5 +55,6 @@ export function buildCommercialSearchRow(
       status: doc.status,
       claims,
     },
+    ...(resource ? { resource } : {}),
   };
 }

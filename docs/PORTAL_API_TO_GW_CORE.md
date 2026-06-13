@@ -1,0 +1,286 @@
+# Portal API To GW CORE
+
+Status: Canonical cross-repository functional reference for portal-facing API
+design over GW CORE.
+
+Use this document when you need to define or review:
+
+- portal/BFF endpoint shape
+- the functional mapping from portal APIs to GW CORE operations
+- the separation between `employees`, `related persons`, `members`, and
+  `consents`
+- which concerns belong to the portal backend instead of the browser/mobile app
+
+This document is intentionally product-facing and integration-facing.
+It does not replace lower-level SDK or GW route documentation.
+
+## Scope
+
+This table describes what it makes sense to expose from a portal backend.
+
+It does not require the frontend to know about:
+
+- DIDComm wrapping
+- submit/poll internals
+- KMS signing
+- transport-level GW route variants
+
+Readback rule:
+
+- every write/use-case step must have one user-facing readback step
+- after a controller confirms one paid offer, the web app must be able to read
+  the updated order/license state with high-level readers or bundle/read-model
+  helpers
+- that readback can be implemented later in a `job manager` or portal cache
+  layer, but the functional contract belongs here from the start
+
+When helpful, the last column states what the portal backend does against GW
+CORE behind the scenes.
+
+## Organizations
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/organizations/{uuid}/activate-tenant` | `POST` | activate a legal organization in GW from an ICA proof / `vp_token` | calls the GW host activation flow and waits for the result |
+| `/organizations/{uuid}/activate-tenant` | `GET` | retrieve activation status/result | reads the status persisted by the portal |
+| `/organizations/{uuid}/license-offers` | `POST` | request an offer to buy/add more licenses | today the portal must orchestrate this as its own capability; GW does not yet expose one converged public route for this commercial offer flow |
+| `/organizations/{uuid}/license-offers` | `GET` | list license offers known by the portal | uses portal-side commercial/materialized history |
+| `/organizations/{uuid}/license-offers/{offerId}` | `GET` | get one license offer detail | returns known price, quantity, currency, and state |
+| `/organizations/{uuid}/license-orders` | `POST` | request purchase/addition of more licenses | conceptually triggers `offer -> order -> payment`; today the portal must orchestrate this with its own commercial/backend layer |
+| `/organizations/{uuid}/license-orders` | `GET` | list license purchases launched from the portal | uses commercial/materialized history |
+| `/organizations/{uuid}/license-orders/{orderId}` | `GET` | get one purchase status | returns the status materialized by the portal |
+| `/organizations/{uuid}/license-orders/{orderId}/payment-confirmation` | `POST` | confirm payment for a license purchase so seats can be emitted | in portal-managed mode the BFF receives the Stripe or other provider confirmation, then submits one `Order`-style confirmation to GW CORE so seats are emitted from the accepted offer |
+| `/organizations/{uuid}/licenses` | `GET` | list visible organization seats/licenses | the org controller must be able to read this high-level view in web after payment confirmation; the portal can derive it from the `device-licenses` pool or one materialized read model |
+| `/organizations/{uuid}/orders` | `POST` | confirm the legal-organization offer/license | sends the organization order to GW |
+| `/organizations/{uuid}/orders` | `GET` | list orders launched from the portal | reads portal-stored order history |
+| `/organizations/{uuid}/orders/{orderId}` | `GET` | get one order detail | returns portal-materialized order state |
+| `/organizations/{uuid}/employees` | `POST` | create employees/professionals | sends `Employee/_batch` to GW |
+| `/organizations/{uuid}/employees` | `GET` | list employees/professionals visible to the portal | uses portal storage or a materialized read model |
+| `/organizations/{uuid}/employees/{employeeId}` | `GET` | get one employee/professional detail | returns the known employee detail |
+
+## Portal Technical Identity
+
+These operations are normally internal to the portal backend, not frontend
+calls.
+
+| Internal operation | Purpose |
+|---|---|
+| activation code exchange | exchange an activation code for an initial credential |
+| device activation / DCR | register the portal backend JWK/public key as the actor technical device |
+| SMART token | obtain an operational token with protected scopes |
+
+## Subject / Individual Onboarding
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/subject/onboarding-fill` | `POST` | send PDF template + fields and receive the populated PDF | calls the onboarding PDF `DocumentReference/_create` flow |
+| `/subject/onboarding-fill/{requestId}` | `GET` | retrieve the populated PDF or latest result | reads the resulting `DocumentReference` or portal cache |
+| `/subject` | `POST` | register the individual organization and start onboarding | sends the individual start flow to GW |
+| `/subject` | `GET` | list subjects managed by the portal | uses a local/materialized subject model |
+| `/subject/{subjectId}` | `GET` | get one subject detail | returns portal-known subject detail |
+| `/subject/license-offers` | `POST` | request an offer to buy/add licenses for the individual/family context | today the portal must orchestrate this as its own capability; GW does not yet expose one converged public route for this |
+| `/subject/license-offers` | `GET` | list personal license offers known by the portal | uses commercial/materialized history |
+| `/subject/license-offers/{offerId}` | `GET` | get one personal offer detail | returns known price, quantity, currency, and state |
+| `/subject/license-orders` | `POST` | request purchase/addition of more licenses for the individual/family context | conceptually triggers `offer -> order -> payment`; the portal must orchestrate it today |
+| `/subject/license-orders` | `GET` | list personal license purchases launched from the portal | uses commercial/materialized history |
+| `/subject/license-orders/{orderId}` | `GET` | get one personal purchase status | returns the portal-materialized state |
+| `/subject/license-orders/{orderId}/payment-confirmation` | `POST` | confirm payment for a personal license purchase so seats can be emitted | today the portal must close this with its commercial backend and then trigger internal GW creation of new `device-licenses` |
+| `/subject/onboarding-confirm` | `POST` | confirm the onboarding order/offer | sends the subject order to GW |
+| `/subject/onboarding-confirm/{confirmationId}` | `GET` | retrieve confirmation status/result | reads the portal-stored status |
+
+## Subject Orders
+
+The functional logic is the same as for legal organizations:
+
+- first there is a start/registration step returning an offer
+- then the order is confirmed by accepting that offer
+
+What changes is the verification/preparation step before the start:
+
+- signed PDF
+- or an OTP/backend flow
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/subject/orders` | `POST` | confirm the subject onboarding offer when the frontend already has `offerId` | sends the individual order flow to GW |
+| `/subject/orders` | `GET` | list subject orders known by the portal | uses portal-stored history |
+| `/subject/orders/{orderId}` | `GET` | get one individual order detail/status | returns the portal-materialized state |
+| `/subject/licenses` | `GET` | list visible licenses/seats for the individual/personal organization context | should be exposed as a real portal facade over `device-licenses`; no converged SDK method exists yet, but the source data exists in GW |
+
+## IPS And Clinical Read
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/subject/ips-requests` | `POST` | request full IPS or IPS with selected sections | launches the request into the relevant GW channel/filter |
+| `/subject/ips-requests` | `GET` | list IPS requests launched from the portal | uses portal history/audit |
+| `/subject/ips-requests/{requestId}` | `GET` | get one IPS request and its result | reconstructs it from `Communication` or local cache |
+| `/subject/ips` | `GET` | retrieve the latest IPS view for rendering | resolves the latest materialized clinical result |
+| `/subject/clinical-bundle/search` | `POST` | run more flexible clinical search when IPS is not enough | uses `Bundle/_search` or the equivalent GW flow |
+| `/subject/documents` | `GET` | list subject clinical/documents | retrieves `DocumentReference` and projections |
+| `/subject/documents/{documentId}` | `GET` | get one document detail | returns `DocumentReference` or a resolved document view |
+
+## Access Consents
+
+If documentary evidence belongs to a consent flow, the frontend should retrieve
+it from the consent aggregate, not from a separate document collection.
+
+Important:
+
+- `Consent` models effective access permissions
+- it must not be confused with `RelatedPerson`
+- one `RelatedPerson` may coincide with an authorized actor, but that does not
+  grant access by itself
+- disabling a `RelatedPerson` does not currently imply automatic revocation of
+  already granted permissions
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/subject/access-consents` | `POST` | create an access consent / pre-authorization | today sends `Consent/_batch` to GW |
+| `/subject/access-consents` | `GET` | list consents with associated evidence | reconstructs a portal-side aggregate from storage/audit |
+| `/subject/access-consents/{consentId}` | `GET` | get one consent detail with original evidence | returns the consent aggregate plus evidence/references |
+
+## Related Persons
+
+This block models subject contacts and relationships, not invited access
+members.
+
+Typical examples:
+
+- caregiver
+- guardian
+- parent
+- friend
+- emergency contact
+
+One `RelatedPerson`:
+
+- may exist without any member license
+- may exist without any access permission
+- may also coincide with an invited/authorized actor, but that belongs to a
+  different domain block
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/subject/related-persons` | `POST` | create or update guardians, caregivers, or emergency contacts | today sends `RelatedPerson/_batch` to GW |
+| `/subject/related-persons` | `GET` | list related persons | returns a portal-materialized view |
+| `/subject/related-persons/{relatedPersonId}` | `GET` | get one related-person detail | returns the known detail |
+
+## Subject Members
+
+This block represents actors invited into the individual health-index space.
+
+It is not the same thing as:
+
+- employees of a legal organization
+- `RelatedPerson` contacts
+- effective `Consent` permissions
+
+One `member` in the individual/family context is an actor invited into the
+subject space. After that, the actor may still require specific access
+permissions depending on consent or policy.
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/subject/members` | `POST` | invite or register one actor as a member of the individual/family context | the portal backend must orchestrate this over current GW capabilities; there is no equally converged public route today like `employees` or `related-persons` |
+| `/subject/members` | `GET` | list actors invited into the subject index | returns a portal-materialized view separate from `related-persons` |
+| `/subject/members/{memberId}` | `GET` | get one invited-member detail | returns identity, state, relationship with the subject, and portal-known operational metadata |
+
+## Subject Member Licenses
+
+`Member licenses` in the individual/family context exist to invite actors into
+the individual's health index.
+
+They are not for:
+
+- employees of other legal organizations
+- `RelatedPerson` contacts just because they are contacts
+- external actors without onboarding/invitation into the individual context
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/subject/member-licenses` | `GET` | list available seats/licenses for inviting members into the individual index | may be exposed as a specialized view over `device-licenses` or a portal materialized model for the individual context |
+
+## Communications
+
+`Communication` exists in the system, but it should not become the first mental
+API for frontend developers except when a channel/history view is explicitly
+needed.
+
+Use it as a backend concept when you need:
+
+- history reconstruction
+- traceability
+- to inspect what was requested or sent
+- debugging of result flows
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/subject/communications` | `GET` | list subject communication history/channel | searches or reconstructs `Communication` records |
+| `/subject/communications/{communicationId}` | `GET` | get one communication detail | returns the audited envelope and its attachments/references |
+
+## Design Summary
+
+- For frontend-first product design, prioritize:
+  - onboarding
+  - current offer/license preview before order
+  - subject orders
+  - licenses only when there is a real admin or guard screen
+  - IPS and sections
+  - documents
+  - consents
+  - related persons
+  - members when the product exposes delegated access or invitations
+- Keep these as backend/internal concerns:
+  - GW submit/poll
+  - `_exchange`
+  - `_dcr`
+  - SMART token
+  - part of the `Communication` transport complexity
+- Use `Communication` as channel/history when that UX is explicitly needed, not
+  as the only mental entry point for the domain
+
+## Notes On Offers And Licenses
+
+- In legal organizations:
+  - the initial offer usually comes from the activation response
+  - the backend can extract `offerId` and preview with helpers such as
+    `getOfferIdFromResponse(...)` and `getOfferPreviewFromResponse(...)`
+  - the order comes after that
+  - buying/adding licenses later requires a separate
+    `license-offer -> license-order -> payment-confirmation` flow
+- In individual/personal organization:
+  - the initial offer usually comes from the individual start response
+  - or from the PDF/OTP onboarding path that leads into that start step
+  - the order comes after that
+  - buying/adding licenses later follows the same separated commercial flow
+  - it is also useful to distinguish:
+    - general individual-context seats/licenses
+    - seats/licenses specifically intended to invite subject `members`
+- Do not assume there is already one converged SDK/GW public endpoint for
+  license listing:
+  - `licenses.listAvailable` is still a gap in the SDK layer
+  - but the real source data already exists in GW: the `device-licenses` pool
+  - therefore `GET /organizations/{uuid}/licenses` and `GET /subject/licenses`
+    are reasonable portal facades over an existing backend source
+  - likewise, `GET /subject/member-licenses` can be treated as a functional
+    specialization of that same source for the individual invitation UX
+- Always distinguish these two things:
+  - `License/_issue`: does not buy or create new licenses; it reserves one
+    existing seat from the `device-licenses` pool and returns an activation code
+    for `_exchange` + `_dcr`
+  - buy/add licenses: a separate business flow after tenant bootstrap,
+    conceptually `offer -> order -> payment -> internal creation of new
+    device-licenses`
+- In current GW implementation:
+  - the buy/add logic exists at internal business-logic level
+  - but not yet as one stable, converged public endpoint family equivalent to
+    the other SDK flows
+  - new licenses are effectively created internally by `LicenseManager` jobs as
+    `DeviceLicense` documents in `device-licenses`
+  - listing/visualizing licenses can also already be reconstructed from that
+    data source
+- Practical consequence for a portal backend:
+  - if you want to test real buy/add flows from the portal web app, that facade
+    still needs to be implemented in the portal backend
+  - and payment closing must be wired to the step that triggers effective
+    creation of new `device-licenses` in GW

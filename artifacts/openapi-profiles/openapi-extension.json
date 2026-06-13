@@ -4,7 +4,7 @@
     "title": "Gateway API - EXTENSIONS",
     "version": "1.0.3",
     "description": "Extension profile including non-core and vertical-specific capabilities on top of core and compat.",
-    "x-profile-generated-at": "2026-06-13T15:59:44.633Z",
+    "x-profile-generated-at": "2026-06-13T20:40:18.450Z",
     "x-profile-name": "extension"
   },
   "servers": [],
@@ -4622,7 +4622,7 @@
           "1.2 Organization Order"
         ],
         "summary": "Poll the organization order result (host)",
-        "description": "Polls the asynchronous job submitted to `.../Order/_batch`. The `jurisdiction` and `sector` are path routing parameters for the host registry.\nThe completed response returns a Bundle entry with order invoice claims, including an optional payment\nlink (`org.schema.Order.paymentUrl`) and the accepted Offer reference (`org.schema.Order.acceptedOffer.identifier`). When using\nStripe (INVOICE_PROVIDER=stripe, INVOICE_FLOW=pre), `org.schema.Order.partOfInvoice` and `org.schema.Order.paymentUrl` refer to\nthe Stripe invoice/checkout URL. UBL/PDF/VeriFactu invoices are not emitted yet.\n",
+        "description": "Polls the asynchronous job submitted to `.../Order/_batch`. The `jurisdiction` and `sector` are path routing parameters for the host registry.\nThe completed response returns a Bundle entry with order invoice claims plus one embedded invoice\n`resource` Bundle containing a FHIR `Invoice`, one PDF `DocumentReference`, and one structured\n`DocumentReference` carrying JSON/XML invoice payloads. `org.schema.Order.partOfInvoice` and\n`org.schema.Order.paymentUrl` remain as flat compatibility claims for legacy readers.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -5046,7 +5046,7 @@
           "4.2 Family Order"
         ],
         "summary": "Poll the legacy individual order result",
-        "description": "Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.\nThe completed response returns a Bundle entry with order invoice claims, including an\noptional payment link (`org.schema.Order.paymentUrl`) and the accepted Offer reference (`org.schema.Order.acceptedOffer.identifier`).\n",
+        "description": "Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.\nThe completed response returns a Bundle entry with order invoice claims plus one embedded invoice\n`resource` Bundle containing a FHIR `Invoice`, one PDF `DocumentReference`, and one structured\n`DocumentReference` carrying JSON/XML invoice payloads.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

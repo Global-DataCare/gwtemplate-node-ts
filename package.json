@@ -1,6 +1,6 @@
 {
   "name": "gwtemplate-node-ts",
-  "version": "1.11.1",
+  "version": "1.12.0",
   "license": "Apache-2.0",
   "main": "src/server.ts",
   "type": "module",
@@ -67,12 +67,14 @@
     "pki:host": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"NodeNext\",\"moduleResolution\":\"NodeNext\",\"allowImportingTsExtensions\":true}' node --loader ts-node/esm --experimental-specifier-resolution=node scripts/generate-host.ts",
     "pki:member": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"NodeNext\",\"moduleResolution\":\"NodeNext\",\"allowImportingTsExtensions\":true}' node --loader ts-node/esm --experimental-specifier-resolution=node scripts/generate-member.ts",
     "update-deps": "node update-deps.js",
-    "docker:build": "./docker_build.sh",
-    "docker:run": "./docker_run.sh",
+    "docker:build": "./docker_build_local.sh",
+    "docker:run": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",
+    "docker:run:mem": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",
+    "docker:run:firestore-demo": "ENV_FILE=./.env.firestore-demo ./docker_run_local.sh",
     "check:portal-web-go-no-go": "bash ./scripts/portal-web-go-no-go.sh",
     "local:close": "PORTS=3000 bash ./scripts/local-close.sh",
     "docker:close": "PORTS=8000 bash ./scripts/local-close.sh",
-    "api:local-firestore-demo": "npm run build:swagger && npx dotenv -e .env.firestore-demo -- nodemon --legacy-watch --watch 'src/**/*.ts' --watch 'swagger.config.cjs' --exec 'TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS={\"module\":\"NodeNext\",\"moduleResolution\":\"NodeNext\",\"allowImportingTsExtensions\":true} node --loader ts-node/esm --experimental-specifier-resolution=node src/main.ts'"
+    "api:local-firestore-demo": "npm run build:swagger && npx dotenv -e .env.firestore-demo -- nodemon --legacy-watch --watch 'src/**/*.ts' --watch 'swagger.config.cjs' --exec 'TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS={\\\"module\\\":\\\"NodeNext\\\",\\\"moduleResolution\\\":\\\"NodeNext\\\",\\\"allowImportingTsExtensions\\\":true} node --loader ts-node/esm --experimental-specifier-resolution=node src/main.ts'"
   },
   "dependencies": {
     "@ahryman40k/ts-fhir-types": "^4.0.39",
@@ -96,7 +98,7 @@
     "env-var": "^7.5.0",
     "express": "^4.18.2",
     "firebase-admin": "^13.5.0",
-    "gdc-common-utils-ts": "^1.21.0",
+    "gdc-common-utils-ts": "^1.22.0",
     "google-auth-library": "^9.0.0",
     "jose": "^4.15.9",
     "js-base64": "^3.7.8",

@@ -1,3 +1,34 @@
+## [1.12.0] - 2026-06-13
+
+### Added
+- Added portal-managed payment confirmation utilities in:
+  - `src/utils/payment-confirmation.ts`
+- Added embedded invoice bundle generation for commercial order responses in:
+  - `src/utils/invoice-bundle.ts`
+  - `docs/PORTAL_API_TO_GW_CORE.md`
+- Added focused unit coverage for payment confirmation and commercial order
+  invoice readback in:
+  - `src/__tests__/unit/utils/payment-confirmation.test.ts`
+  - `src/__tests__/unit/managers/HostingManager.OfferOrder.test.ts`
+  - `src/__tests__/unit/managers/FamilyManager.OfferOrder.test.ts`
+
+### Changed
+- Updated hosted organization and family/individual commercial order flows so
+  persisted offer/order state can be reopened and the accepted order response
+  now includes:
+  - FHIR `Invoice`
+  - `DocumentReference` PDF
+  - `DocumentReference` structured JSON/XML
+- Persisted commercial offer state for both employee and individual/member
+  seat activation follow-up flows.
+- Fixed `api:local-firestore-demo` so the local firestore profile starts with
+  the same `ts-node` compiler option escaping used by the demo profile.
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.22.0`.
+
+### Testing
+- `npm run type-check`
+- `npm test -- --runInBand src/__tests__/unit/utils/payment-confirmation.test.ts src/__tests__/unit/managers/HostingManager.OfferOrder.test.ts src/__tests__/unit/managers/FamilyManager.OfferOrder.test.ts src/__tests__/unit/managers/IndividualManager.test.ts src/__tests__/unit/managers/EmployeeManager.test.ts`
+
 ## [1.11.1] - 2026-06-13
 
 ### Changed

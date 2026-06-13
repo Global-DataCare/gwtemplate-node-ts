@@ -10,7 +10,7 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
-import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { initializeCustomerServices } from '../utils/services'; 
 import { createOperationOutcome } from '../utils/outcome';
@@ -155,6 +155,7 @@ export class IndividualManager {
 
     const licenseOffer = await this.tryConsumeIndividualSeatOrOffer({
       tenantVaultId,
+      tenantId: String((aggregatedClaims as any)[ClaimsOrganizationSchemaorg.alternateName] || this.extractTenantIdFromVaultId(tenantVaultId)),
       individualId: internalId,
       sector: sector || (aggregatedClaims as any)[ClaimsServiceSchemaorg.category] || 'health-care',
       jurisdiction,
@@ -466,6 +467,7 @@ export class IndividualManager {
 
   private async tryConsumeIndividualSeatOrOffer(params: {
     tenantVaultId: string;
+    tenantId: string;
     individualId: string;
     sector: string;
     jurisdiction: string;
@@ -500,6 +502,8 @@ export class IndividualManager {
         allowedPaymentMethods,
         LICENSE_CATEGORY_INDIVIDUAL,
       );
+      offerClaims[ClaimsOrganizationSchemaorg.alternateName] = params.tenantId;
+      await this.persistCommercialIndividualOffer(params.tenantVaultId, offerClaims);
       return {
         type: 'Individual-license-offer-v1.0',
         meta: { claims: offerClaims },
@@ -520,6 +524,29 @@ export class IndividualManager {
       DEVICE_LICENSE_SECTION,
     );
     return undefined;
+  }
+
+  private extractTenantIdFromVaultId(tenantVaultId: string): string {
+    const parts = String(tenantVaultId || '').split('_');
+    return parts.length > 1 ? parts.slice(1).join('_') : String(tenantVaultId || '');
+  }
+
+  private async persistCommercialIndividualOffer(
+    tenantVaultId: string,
+    claims: Record<string, unknown>,
+  ): Promise<void> {
+    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(tenantVaultId);
+    const offerId = String(claims[ClaimsOfferSchemaorg.identifier] || '').trim();
+    if (!tenantCollectionName || !offerId) return;
+
+    const communicationDoc: ConfidentialStorageDoc = {
+      id: offerId,
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      content: { claims },
+    };
+    const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, tenantVaultId);
+    await this.vaultRepository.put(tenantCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
   }
 
   private handleError(error: any, entryType: string = 'unknown', meta?: any): ErrorEntry {

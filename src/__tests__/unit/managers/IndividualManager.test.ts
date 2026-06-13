@@ -64,6 +64,7 @@ describe('IndividualManager', () => {
     (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
 
     mockTenantsCacheManager.getEntityClaims.mockResolvedValue({});
+    mockTenantsCacheManager.getCollectionName.mockResolvedValue('tenant-collection');
     mockKmsService.protectAttributesNameAndValue.mockResolvedValue([]);
 
     mockKmsService.protectConfidentialData.mockImplementation(
@@ -214,7 +215,7 @@ describe('IndividualManager', () => {
       const entry = response.body.data[0] as any;
       expect(entry.type).toBe('Individual-license-offer-v1.0');
       expect(entry.meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeDefined();
-      expect(mockVaultRepository.put).not.toHaveBeenCalled();
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
     });
   });
 

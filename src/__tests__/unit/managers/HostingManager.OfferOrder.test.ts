@@ -62,6 +62,7 @@ import * as tenantUtils from '../../../utils/tenant';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { testTenant1LegalName } from '../../data/organization.data';
 import { HostingManager } from '../../../managers/HostingManager';
+import { generateLicenseOffer } from '../../../utils/offer';
 
 
 export const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
@@ -264,6 +265,85 @@ describe('HostingManager - Offer/Order Flow', () => {
     }
   });
 
+  it('should accept one portal-managed commercial Order and emit extra employee seats for an active tenant', async () => {
+    process.env.PAYMENT_ORCHESTRATION_MODE = 'portal-bff';
+    process.env.PAYMENT_VERIFICATION_MODE = 'mock';
+
+    const registrationJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    const offerResponse = await hostingManager.process(registrationJob);
+    const registrationOfferId = offerResponse.body.data[0].meta.claims[
+      ClaimsOfferSchemaorg.identifier
+    ] as string;
+
+    const registrationOrder = { ...ORGANIZATION_ORDER_JOB };
+    registrationOrder.content!.body!.data[0]!.meta!.claims[
+      ClaimsOrderSchemaorg.acceptedOfferIdentifier
+    ] = registrationOfferId;
+    await hostingManager.process(registrationOrder);
+
+    const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;
+    const tenantAlternateName =
+      regClaims[ClaimsOrganizationSchemaorg.alternateName]
+      || regClaims[ClaimsOrganizationSchemaorg.identifierValue];
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      regClaims[ClaimsServiceSchemaorg.category] as Sector,
+      tenantAlternateName,
+    );
+
+    const extraOfferClaims = generateLicenseOffer(
+      2,
+      'did:web:testhost.com',
+      'us',
+      Sector.HEALTH_CARE,
+      ['Stripe'],
+    );
+    extraOfferClaims[ClaimsOrganizationSchemaorg.alternateName] = tenantAlternateName;
+
+    const secureOfferDoc = await mockKmsService.protectConfidentialData({
+      id: String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]),
+      status: 'active',
+      sequence: 0,
+      content: { claims: extraOfferClaims },
+    } as ConfidentialStorageDoc, 'host');
+    await vaultRepository.put(hostCollectionName, [secureOfferDoc], getEnvSectionId('communications'));
+
+    const beforeLicenses = await vaultRepository.getContainersInSection(
+      tenantVaultId,
+      getEnvSectionId('device-licenses'),
+    );
+
+    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    orderJob.content!.body!.data[0]!.meta!.claims[
+      ClaimsOrderSchemaorg.acceptedOfferIdentifier
+    ] = String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]);
+    orderJob.content!.body!.data[0]!.meta!.claims[
+      ClaimsOrderSchemaorg.paymentMethod
+    ] = 'Stripe';
+    orderJob.content!.body!.data[0]!.meta!.claims[
+      ClaimsOrderSchemaorg.partOfInvoice
+    ] = 'in_test_001';
+
+    const responsePayload = await hostingManager.process(orderJob);
+    const finalEntry = responsePayload.body.data[0];
+
+    expect(finalEntry.response.status).toBe('201');
+    expect(finalEntry.type).toBe('Organization-order-response-v1.0');
+    expect(finalEntry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(
+      extraOfferClaims[ClaimsOfferSchemaorg.identifier],
+    );
+    expect(finalEntry.meta.claims[ClaimsOrderSchemaorg.partOfInvoice]).toBe('in_test_001');
+    expect(finalEntry.resource?.resourceType).toBe('Bundle');
+    expect(
+      finalEntry.resource?.entry?.some?.((bundleEntry: any) => bundleEntry?.resource?.resourceType === 'Invoice'),
+    ).toBe(true);
+
+    const afterLicenses = await vaultRepository.getContainersInSection(
+      tenantVaultId,
+      getEnvSectionId('device-licenses'),
+    );
+    expect(afterLicenses.length).toBe(beforeLicenses.length + 2);
+  });
+
   it('should return a 404 Not Found for an Order with an invalid offerId', async () => {
     const orderJob = { ...ORGANIZATION_ORDER_JOB };
     orderJob.content!.body!.data[0]!.meta!.claims[
@@ -275,7 +355,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     const errorEntry = responsePayload.body.data[0];
     expect(errorEntry.response.status).toBe('404');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain(
-      'No pending registration found for offerId',
+      'No pending registration or commercial offer found for offerId',
     );
   });
 

@@ -28,6 +28,7 @@ import { getEnvSectionId } from '../../../utils/section-env';
 import { HostingManager } from '../../../managers/HostingManager';
 import { FamilyManager } from '../../../managers/FamilyManager';
 import { testDefaultTenantServiceTypeClaim, testTenant1TenantId } from '../../data/organization.data';
+import { generateLicenseOffer } from '../../../utils/offer';
 
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
@@ -342,5 +343,75 @@ describe('FamilyManager - Offer/Order Flow', () => {
 
     expect(orderSearch.body.data[0].response.status).toBe('200');
     expect(orderSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
+  });
+
+  it('should accept one portal-managed commercial family Order and emit extra individual seats', async () => {
+    process.env.PAYMENT_ORCHESTRATION_MODE = 'portal-bff';
+    process.env.PAYMENT_VERIFICATION_MODE = 'mock';
+
+    const tenantId = testTenant1TenantId;
+    const tenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, tenantId);
+    const tenantCollectionName = await tenantsCacheManager.getCollectionName(tenantVaultId);
+    expect(tenantCollectionName).toBeDefined();
+
+    const extraOfferClaims = generateLicenseOffer(
+      2,
+      'did:web:host.example.com',
+      'es',
+      Sector.HEALTH_CARE,
+      ['Stripe'],
+      'individual' as any,
+    );
+
+    const secureOfferDoc = await mockKmsService.protectConfidentialData({
+      id: String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]),
+      status: 'active',
+      sequence: 0,
+      content: { claims: extraOfferClaims },
+    } as ConfidentialStorageDoc, tenantVaultId);
+    await vaultRepository.put(tenantCollectionName!, [secureOfferDoc], getEnvSectionId('communications'));
+
+    const beforeLicenses = await vaultRepository.getContainersInSection(
+      tenantVaultId,
+      getEnvSectionId('device-licenses'),
+    );
+
+    const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
+    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] =
+      String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]);
+    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.paymentMethod] = 'Stripe';
+    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.partOfInvoice] = 'in_family_test_001';
+
+    const familyOrderJob: JobRequest = {
+      id: 'job-family-commercial-order-1',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: 'Order',
+      content: orderContent,
+    };
+
+    const responsePayload = await familyManager.process(familyOrderJob);
+    const entry = responsePayload.body.data[0];
+    expect(entry.response.status).toBe('201');
+    expect(entry.type).toBe('Family-order-response-v1.0');
+    expect(entry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(
+      extraOfferClaims[ClaimsOfferSchemaorg.identifier],
+    );
+    expect(entry.resource?.resourceType).toBe('Bundle');
+    expect(
+      entry.resource?.entry?.some?.((bundleEntry: any) => bundleEntry?.resource?.resourceType === 'Invoice'),
+    ).toBe(true);
+
+    const afterLicenses = await vaultRepository.getContainersInSection(
+      tenantVaultId,
+      getEnvSectionId('device-licenses'),
+    );
+    expect(afterLicenses.length).toBe(beforeLicenses.length + 2);
   });
 });

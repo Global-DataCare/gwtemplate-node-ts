@@ -1811,10 +1811,10 @@ export function createApiRouter(
    *     summary: Poll the organization order result (host)
    *     description: |
    *       Polls the asynchronous job submitted to `.../Order/_batch`. The `jurisdiction` and `sector` are path routing parameters for the host registry.
-   *       The completed response returns a Bundle entry with order invoice claims, including an optional payment
-   *       link (`org.schema.Order.paymentUrl`) and the accepted Offer reference (`org.schema.Order.acceptedOffer.identifier`). When using
-   *       Stripe (INVOICE_PROVIDER=stripe, INVOICE_FLOW=pre), `org.schema.Order.partOfInvoice` and `org.schema.Order.paymentUrl` refer to
-   *       the Stripe invoice/checkout URL. UBL/PDF/VeriFactu invoices are not emitted yet.
+   *       The completed response returns a Bundle entry with order invoice claims plus one embedded invoice
+   *       `resource` Bundle containing a FHIR `Invoice`, one PDF `DocumentReference`, and one structured
+   *       `DocumentReference` carrying JSON/XML invoice payloads. `org.schema.Order.partOfInvoice` and
+   *       `org.schema.Order.paymentUrl` remain as flat compatibility claims for legacy readers.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -2056,8 +2056,9 @@ export function createApiRouter(
   *     summary: Poll the legacy individual order result
    *     description: |
    *       Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.
-   *       The completed response returns a Bundle entry with order invoice claims, including an
-   *       optional payment link (`org.schema.Order.paymentUrl`) and the accepted Offer reference (`org.schema.Order.acceptedOffer.identifier`).
+   *       The completed response returns a Bundle entry with order invoice claims plus one embedded invoice
+   *       `resource` Bundle containing a FHIR `Invoice`, one PDF `DocumentReference`, and one structured
+   *       `DocumentReference` carrying JSON/XML invoice payloads.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'

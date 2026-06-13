@@ -35,6 +35,7 @@ docs/
 - **Swagger/OpenAPI**: `swagger-spec.json` is generated via `npm run build:swagger` and served at `/api-docs`.
 - **V2 integrators guide**: [docs-v2/09-api-integrators-guide.md](../docs-v2/09-api-integrators-guide.md) is the clean onboarding path without legacy examples/endpoints.
 - **Core integration bible**: [API_CORE_INTEGRATION.md](API_CORE_INTEGRATION.md) defines the canonical SEDIA-aligned flow used by SDK live core tests.
+- **Portal API to GW CORE**: [PORTAL_API_TO_GW_CORE.md](PORTAL_API_TO_GW_CORE.md) is the canonical functional reference for portal/BFF endpoint design over GW CORE, including the separation between `employees`, `related persons`, `members`, and `consents`.
 - **Communication layering source of truth**:
   - [101-COMMUNICATION_LAYERING.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
 - **IPS communication outbox source of truth**:
