@@ -135,6 +135,10 @@ export class TenantsCacheManager implements ITenantsManager {
     return await this._ensureTenantIsInCache(vaultId);
   }
 
+  public async tenantExists(vaultId: string): Promise<boolean> {
+    return (await this._ensureTenantIsInCache(vaultId)) !== undefined;
+  }
+
   public async refreshTenant(vaultId: string): Promise<any | undefined> {
     this.tenantCacheByVaultId.delete(vaultId);
     return await this._ensureTenantIsInCache(vaultId);

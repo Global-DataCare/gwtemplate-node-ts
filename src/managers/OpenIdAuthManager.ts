@@ -86,7 +86,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     // An omitted section means the backend's default permitted set for that subject.
     const { subject, sections } = this.extractPinnedSubjectAndSections(scope);
     const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
-    const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+    const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
     if (!tenantExists) throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
 
     // --- Consent Rule Check (MVP) ---

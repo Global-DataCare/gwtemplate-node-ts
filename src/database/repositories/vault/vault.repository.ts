@@ -4,6 +4,10 @@
 import { ConsentRule } from "gdc-common-utils-ts/models/consent-rule";
 import { RecordBase, VaultConfig } from "gdc-common-utils-ts/models/resource-document";
 
+export type VaultQueryOptions = {
+    hydrate?: boolean;
+};
+
 /**
  * Defines the contract for a Vault Repository, an abstraction layer over the physical
  * storage mechanism for tenant data.
@@ -38,6 +42,8 @@ export abstract class IVaultRepository {
     abstract sectionExists(collectionName: string, sectionId: string): Promise<boolean>;
     /** Retrieves a list of record identifiers from a section. */
     abstract getContainersListInSection(collectionName: string, sectionId: string): Promise<string[]>;
+    /** Retrieves lightweight records from a section without hydrating confidential blob payloads. */
+    abstract listContainersInSection<T extends RecordBase>(collectionName: string, sectionId: string, excludeRecordTypes?: string[]): Promise<T[]>;
     /** Retrieves full records from a section. */
     abstract getContainersInSection<T extends RecordBase>(collectionName: string, sectionId: string, excludeRecordTypes?: string[]): Promise<T[]>;
     /** Writes one or more records. */
@@ -47,7 +53,7 @@ export abstract class IVaultRepository {
     /** Retrieves all versions of a record by its ID. */
     abstract getHistory(collectionName: string, containerId: string): Promise<any[]>;
     /** Queries for records based on a structured query object. */
-    abstract query(collectionName: string, query: any): Promise<any[]>;
+    abstract query(collectionName: string, query: any, options?: VaultQueryOptions): Promise<any[]>;
     /** Marks a record as deleted. */
     abstract delete(collectionName: string, containerId: string, sectionId?: string): Promise<boolean>;
     /** Permanently removes records marked as deleted. */

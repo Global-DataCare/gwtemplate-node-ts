@@ -1,3 +1,57 @@
+## [Unreleased]
+
+### Added
+- Added persistent Firestore/GCS storage tracing so local and live runs can
+  emit JSONL timing records for repository and blob-store operations in:
+  - `src/utils/storage-trace.ts`
+- Added lightweight section listing semantics to the vault repository contract
+  so search/index paths can iterate persisted records without hydrating JWE
+  blobs:
+  - `src/database/repositories/vault/vault.repository.ts`
+  - `src/database/repositories/vault/vault.mem.repository.ts`
+  - `src/database/repositories/postgres/postgres.vault.repository.ts`
+  - `src/database/repositories/firestore/firestore.vault.repository.ts`
+- Added cache-aware tenant existence checks to the tenant cache contract so
+  managers that already depend on `TenantsCacheManager` can reuse hydrated
+  host/tenant registrations instead of re-querying storage:
+  - `src/managers/ITenantsManager.ts`
+  - `src/managers/TenantsCacheManager.ts`
+
+### Changed
+- Split heavy read semantics from index-only search semantics in Firestore and
+  PostgreSQL vault repositories:
+  - `getContainersInSection(...)` remains the hydrated/full-read path
+  - `listContainersInSection(...)` is now the lightweight/index-only path
+  - `query(..., { hydrate: false })` skips confidential blob hydration for
+    search flows that only need indexed claims
+- Updated the following managers to use lightweight listing/query paths for
+  search and composition projection flows, reducing unnecessary GCS blob
+  downloads during Firestore-backed live runs:
+  - `src/managers/CompositionManager.ts`
+  - `src/managers/CommunicationManager.ts`
+  - `src/managers/IndividualManager.ts`
+  - `src/managers/MedicationStatementManager.ts`
+- Changed Firestore `vaultExists(...)` so existence checks no longer hydrate the
+  host tenant-registration JWE from GCS just to answer a boolean existence test.
+- Updated managers that already receive `TenantsCacheManager` so tenant
+  existence checks reuse the in-memory tenant cache where possible instead of
+  going back to the repository:
+  - `src/managers/CommunicationManager.ts`
+  - `src/managers/IndividualManager.ts`
+  - `src/managers/OpenIdAuthManager.ts`
+- Refreshed generated OpenAPI profile artifacts after the latest local build.
+
+### Performance Notes
+- Live `Firestore + GCS` tracing identified the primary latency source as
+  repeated hydration of the host/tenant registration JWE during existence
+  checks and search/list flows.
+- The storage optimizations above materially reduced live-suite overhead during
+  local Firestore+GCS runs by:
+  - replacing repeated blob hydration with lightweight index-only reads where
+    full JWE payloads were not needed
+  - avoiding GCS downloads for Firestore `vaultExists(...)`
+  - shifting some tenant existence checks onto the tenant cache
+
 ## [1.13.0] - 2026-06-13
 
 ### Added

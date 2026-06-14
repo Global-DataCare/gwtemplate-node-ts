@@ -11,6 +11,7 @@ import { TenantAuthorizationLifecycleStatus } from '../utils/tenant-lifecycle';
  * such as their public URN or service endpoints. It acts as a fast ID resolver.
  */
 export interface ITenantsManager {
+  tenantExists(vaultId: string): Promise<boolean>;
   
   getDidDocument(vaultId: string): Promise<DidDocument | undefined>;
 

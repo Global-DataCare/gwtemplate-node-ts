@@ -115,7 +115,7 @@ export class MedicationStatementManager implements IJobProcessor {
       const where = Object.entries(claims)
         .filter(([k, v]) => k !== '@context' && v !== undefined && v !== null && String(v).trim() !== '')
         .map(([name, value]) => ({ name, value }));
-      const matches = await this.vaultRepository.query(tenantVaultId, { sectionId, where });
+      const matches = await this.vaultRepository.query(tenantVaultId, { sectionId, where }, { hydrate: false });
       responseEntries.push({
         type: 'MedicationStatement-search-response-v1.0',
         resource: { total: matches.length, data: matches },

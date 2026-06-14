@@ -296,13 +296,13 @@ export class IndividualManager {
       throw new ManagerError("Missing required search parameter 'subject'.", IssueType.Required);
     }
 
-    const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+    const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
     if (!tenantExists) {
       throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
     }
 
     const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'consents');
-    const matchesRaw = await this.vaultRepository.getContainersInSection(tenantVaultId, sectionId);
+    const matchesRaw = await this.vaultRepository.listContainersInSection(tenantVaultId, sectionId);
     const matches = this.filterConsentMatches(matchesRaw, filters);
 
     return {

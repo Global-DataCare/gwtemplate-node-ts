@@ -203,7 +203,7 @@ export class CompositionManager implements IJobProcessor {
         scope,
         useDocumentReferenceSection ? 'document-references' : useCommunicationSection ? 'communications' : 'composition',
       );
-      const matchesRaw = await this.vaultRepository.getContainersInSection(tenantVaultId, sectionId);
+      const matchesRaw = await this.vaultRepository.listContainersInSection(tenantVaultId, sectionId);
       const matches = useDocumentReferenceSection
         ? this.filterDocumentReferenceMatches(matchesRaw, documentReferenceFilters)
         : useCommunicationSection
@@ -620,7 +620,7 @@ export class CompositionManager implements IJobProcessor {
     requiredTypes: string[];
   }): Promise<Record<string, any>> {
     const compositionSectionId = getSubjectScopedSectionId(params.subject, params.scope, 'composition');
-    const compositionRecords = await this.vaultRepository.getContainersInSection(params.tenantVaultId, compositionSectionId);
+    const compositionRecords = await this.vaultRepository.listContainersInSection(params.tenantVaultId, compositionSectionId);
 
     const sectionRefs = new Map<string, Set<string>>();
     const bundleEntries = new Map<string, { fullUrl?: string; resource: Record<string, any> }>();
@@ -655,7 +655,7 @@ export class CompositionManager implements IJobProcessor {
       for (const projectionConfig of projectionConfigs) {
         for (const sectionIdSuffix of projectionConfig.sectionIds) {
           const resourceSectionId = getSubjectScopedSectionId(params.subject, params.scope, sectionIdSuffix);
-          const resourceRecords = await this.vaultRepository.getContainersInSection(params.tenantVaultId, resourceSectionId);
+          const resourceRecords = await this.vaultRepository.listContainersInSection(params.tenantVaultId, resourceSectionId);
           for (const resourceRecord of resourceRecords) {
             const resource = this.buildFhirResourceFromIndexedClaims(projectionConfig.resourceType, resourceRecord);
             const entryKey = this.resolveEntryKey(undefined, resource);
@@ -672,7 +672,7 @@ export class CompositionManager implements IJobProcessor {
     }
 
     const documentReferenceSectionId = getSubjectScopedSectionId(params.subject, params.scope, 'document-references');
-    const documentReferenceRecords = await this.vaultRepository.getContainersInSection(params.tenantVaultId, documentReferenceSectionId);
+    const documentReferenceRecords = await this.vaultRepository.listContainersInSection(params.tenantVaultId, documentReferenceSectionId);
     for (const documentReferenceRecord of documentReferenceRecords) {
       const resource = this.buildFhirResourceFromIndexedClaims('DocumentReference', documentReferenceRecord);
       const entryKey = this.resolveEntryKey(undefined, resource);
@@ -990,7 +990,7 @@ export class CompositionManager implements IJobProcessor {
     let allowedDocumentReferences: Set<string> | undefined;
     if (filters.attachmentHash) {
       const documentReferenceSectionId = getSubjectScopedSectionId(subject, scope, 'document-references');
-      const documentReferences = await this.vaultRepository.getContainersInSection(tenantVaultId, documentReferenceSectionId);
+      const documentReferences = await this.vaultRepository.listContainersInSection(tenantVaultId, documentReferenceSectionId);
       allowedDocumentReferences = new Set(
         documentReferences
           .filter((record: any) => {

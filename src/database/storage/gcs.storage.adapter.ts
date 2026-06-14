@@ -5,8 +5,13 @@ import { Storage } from '@google-cloud/storage';
 import { DownloadResult, IStorageAdapter, UploadResult } from './IStorageAdapter';
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
+import { appendStorageTrace, isStorageTraceEnabled } from '../../utils/storage-trace';
 
 const SHA3_384_MULTIHASH_PREFIX = new Uint8Array([0x15, 0x30]); // 0x15: sha3-384, 0x30: 48-byte length
+
+function nowMs(): number {
+  return Date.now();
+}
 
 /**
  * An implementation of the IStorageAdapter for Google Cloud Storage.
@@ -30,6 +35,15 @@ export class GcsStorageAdapter implements IStorageAdapter {
     this.bucketName = bucketName;
   }
 
+  private trace(operation: string, details: Record<string, unknown>): void {
+    if (!isStorageTraceEnabled()) return;
+    const normalized = Object.entries(details)
+      .map(([key, value]) => `${key}=${typeof value === 'string' ? value : JSON.stringify(value)}`)
+      .join(' ');
+    console.log(`[StorageTrace][GCS] op=${operation} ${normalized}`);
+    appendStorageTrace('gcs', operation, details);
+  }
+
   /**
    * Uploads a file to GCS. The object name in the bucket will be the
    * multibase58btc encoded SHA3-384 multihash of the file's content.
@@ -39,6 +53,7 @@ export class GcsStorageAdapter implements IStorageAdapter {
    * @returns A promise that resolves to an UploadResult.
    */
   async upload(dataBytes: Uint8Array, contentType: string): Promise<UploadResult> {
+    const startedAt = nowMs();
     try {
       // 1. Calculate the SHA3-384 digest of the content.
       const digest = sha3_384(dataBytes);
@@ -60,6 +75,13 @@ export class GcsStorageAdapter implements IStorageAdapter {
         resumable: false, // Use simple upload for smaller files.
       });
 
+      this.trace('upload', {
+        bucketName: this.bucketName,
+        blobRef: encodedMultiHash,
+        bytes: dataBytes.byteLength,
+        contentType,
+        durationMs: nowMs() - startedAt,
+      });
       // 7. Return the result. The public URL is generated automatically.
       return {
         publicUrl: file.publicUrl(),
@@ -73,10 +95,18 @@ export class GcsStorageAdapter implements IStorageAdapter {
   }
 
   async download(encodedMultiHash: string): Promise<DownloadResult> {
+    const startedAt = nowMs();
     try {
       const file = this.storage.bucket(this.bucketName).file(encodedMultiHash);
       const [dataBytes] = await file.download();
       const [metadata] = await file.getMetadata();
+      this.trace('download', {
+        bucketName: this.bucketName,
+        blobRef: encodedMultiHash,
+        bytes: dataBytes.byteLength,
+        contentType: metadata.contentType,
+        durationMs: nowMs() - startedAt,
+      });
       return {
         dataBytes: new Uint8Array(dataBytes),
         contentType: metadata.contentType,
@@ -88,8 +118,14 @@ export class GcsStorageAdapter implements IStorageAdapter {
   }
 
   async delete(encodedMultiHash: string): Promise<void> {
+    const startedAt = nowMs();
     try {
       await this.storage.bucket(this.bucketName).file(encodedMultiHash).delete({ ignoreNotFound: true });
+      this.trace('delete', {
+        bucketName: this.bucketName,
+        blobRef: encodedMultiHash,
+        durationMs: nowMs() - startedAt,
+      });
     } catch (error) {
       console.error(`[GcsStorageAdapter] Failed to delete '${encodedMultiHash}' from bucket '${this.bucketName}'.`, error);
       throw new Error(`GCS delete failed: ${error instanceof Error ? error.message : String(error)}`);

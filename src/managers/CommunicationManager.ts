@@ -471,7 +471,7 @@ export class CommunicationManager implements IJobProcessor {
     serverDid: string,
   ): Promise<void> {
     const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
-    const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+    const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
     if (!tenantExists) return;
 
     const rawSubject =
@@ -560,7 +560,7 @@ export class CommunicationManager implements IJobProcessor {
     commMsg: CommMsgExtended,
   ): Promise<void> {
     const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
-    const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+    const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
     if (!tenantExists) return;
 
     const subject = this.resolveCommunicationSubject(entry, fhirResource);
@@ -677,7 +677,7 @@ export class CommunicationManager implements IJobProcessor {
     fhirResource: FhirCommunication,
   ): Promise<void> {
     const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
-    const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+    const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
     if (!tenantExists) return;
 
     const nowIso = new Date().toISOString();
@@ -799,7 +799,7 @@ export class CommunicationManager implements IJobProcessor {
     where: Array<{ name: string; value: string }>,
   ): Promise<boolean> {
     if (!Array.isArray(where) || where.length === 0) return false;
-    const matches = await this.vaultRepository.query(tenantVaultId, { sectionId, where });
+    const matches = await this.vaultRepository.query(tenantVaultId, { sectionId, where }, { hydrate: false });
     return Array.isArray(matches) && matches.length > 0;
   }
 
@@ -809,7 +809,7 @@ export class CommunicationManager implements IJobProcessor {
     fhirResource: FhirCommunication,
   ): Promise<void> {
     const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
-    const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+    const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
     if (!tenantExists) return;
 
     const communicationSubject = this.resolveCommunicationSubject(entry, fhirResource);

@@ -115,6 +115,13 @@ export class VaultMemRepository implements IVaultRepository {
     collectionName: string,
     sectionId: string,
   ): Promise<T[]> {
+    return this.listContainersInSection(collectionName, sectionId);
+  }
+
+  public async listContainersInSection<T extends RecordBase>(
+    collectionName: string,
+    sectionId: string,
+  ): Promise<T[]> {
     const vault = this.dataVaults.get(collectionName);
     const section = vault?.sections.get(sectionId);
     return section ? (Array.from(section.values()) as T[]) : [];
@@ -123,6 +130,7 @@ export class VaultMemRepository implements IVaultRepository {
   public async query<T extends RecordBase>(
     collectionName: string,
     query: { sectionId: string; where: { name: string; value: string }[] },
+    _options?: { hydrate?: boolean },
     ): Promise<T[]> {
       const section = this.dataVaults.get(collectionName)?.sections.get(query.sectionId);
       if (!section) { return []; }

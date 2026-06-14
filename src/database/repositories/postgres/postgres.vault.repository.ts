@@ -1,6 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import { RecordBase, VaultConfig } from 'gdc-common-utils-ts/models/resource-document';
-import { IVaultRepository } from '../vault/vault.repository';
+import { IVaultRepository, type VaultQueryOptions } from '../vault/vault.repository';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { resolvePostgresSchema } from './postgres.schema';
 import type { IConfidentialBlobStore } from '../../storage/IConfidentialBlobStore';
@@ -249,6 +249,21 @@ export class PostgresVaultRepository extends IVaultRepository {
     );
   }
 
+  async listContainersInSection<T extends RecordBase>(collectionName: string, sectionId: string): Promise<T[]> {
+    const result = await this.pool.query<{ payload_json: T }>(
+      `
+        SELECT payload_json
+        FROM ${this.tables.documents}
+        WHERE collection_name = $1
+          AND section_id = $2
+          AND deleted_at IS NULL
+        ORDER BY document_id
+      `,
+      [collectionName, sectionId],
+    );
+    return result.rows.map((row) => row.payload_json);
+  }
+
   async put<T extends RecordBase>(collectionName: string, containers: T[], sectionId: string = DEFAULT_SECTION): Promise<boolean> {
     if (containers.length === 0) {
       await this.ensureVaultExists(collectionName);
@@ -293,7 +308,7 @@ export class PostgresVaultRepository extends IVaultRepository {
     return [];
   }
 
-  async query<T extends RecordBase>(collectionName: string, query: LegacyVaultQuery): Promise<T[]> {
+  async query<T extends RecordBase>(collectionName: string, query: LegacyVaultQuery, options?: VaultQueryOptions): Promise<T[]> {
     const normalized = normalizeQuery(query);
     if (normalized.conditions.length === 0) {
       return [];
@@ -327,9 +342,11 @@ export class PostgresVaultRepository extends IVaultRepository {
       params,
     );
 
-    return Promise.all(
-      result.rows.map((row) => hydrateConfidentialStorageDocFromPersistence(row.payload_json, this.blobStore)),
-    );
+    if (options?.hydrate === false) {
+      return result.rows.map((row) => row.payload_json);
+    }
+
+    return Promise.all(result.rows.map((row) => hydrateConfidentialStorageDocFromPersistence(row.payload_json, this.blobStore)));
   }
 
   async delete(collectionName: string, containerId: string, sectionId: string = DEFAULT_SECTION): Promise<boolean> {
