@@ -27,19 +27,30 @@ import {
   deriveConsentRuleBlockchainStatus as deriveConsentAccessBlockchainStatus,
 } from '../utils/consent-access-blockchain';
 import { getJurisdictionGroup } from '../utils/jurisdiction';
+import type { ITenantsManager } from './ITenantsManager';
 
 export interface ConsentManagerDeps {
   vaultRepository: IVaultRepository;
   blockchainAdapter?: IBlockchainAdapter;
+  tenantsCacheManager?: ITenantsManager;
 }
 
 export class ConsentManager implements IJobProcessor {
   private readonly vaultRepository: IVaultRepository;
   private readonly blockchainAdapter?: IBlockchainAdapter;
+  private readonly tenantsCacheManager?: ITenantsManager;
 
   constructor(deps: ConsentManagerDeps) {
     this.vaultRepository = deps.vaultRepository;
     this.blockchainAdapter = deps.blockchainAdapter;
+    this.tenantsCacheManager = deps.tenantsCacheManager;
+  }
+
+  private async tenantExists(tenantVaultId: string): Promise<boolean> {
+    if (this.tenantsCacheManager) {
+      return this.tenantsCacheManager.tenantExists(tenantVaultId);
+    }
+    return this.vaultRepository.vaultExists(tenantVaultId);
   }
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
@@ -100,7 +111,7 @@ export class ConsentManager implements IJobProcessor {
             }
             const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
 
-            const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+            const tenantExists = await this.tenantExists(tenantVaultId);
             if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
             await persistConsentRuleAndAttachment({

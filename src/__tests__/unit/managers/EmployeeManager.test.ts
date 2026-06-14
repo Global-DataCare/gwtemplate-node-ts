@@ -44,12 +44,23 @@ describe('EmployeeManager', () => {
   const TENANT_SECTOR = 'health-care';
   const TENANT_VAULT_ID = `${TENANT_SECTOR}_${TENANT_ALTERNATE_NAME}`;
   const TENANT_URN = `urn:antifraud:soschain-test:us:v1:${TENANT_SECTOR}:entity:tax:123456789`;
+  const HOST_COLLECTION_NAME = 'host-collection';
+  const HOST_DID = 'did:web:host.example.com';
 
   beforeEach(() => {
     mockVaultRepository = mock<IVaultRepository>();
     mockKmsService = mock<IKmsService>();
     mockTenantsCacheManager = mock<TenantsCacheManager>();
-    employeeManager = new EmployeeManager(mockVaultRepository, mockKmsService, mockTenantsCacheManager);
+    employeeManager = new EmployeeManager(
+      mockVaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockTenantsCacheManager,
+      {
+        hostCollectionName: HOST_COLLECTION_NAME,
+        hostDid: HOST_DID,
+      },
+    );
     (uuidv4 as jest.Mock).mockReturnValue(MOCKED_OCCUPATION_UUID);
     jest.clearAllMocks();
 

@@ -1,4 +1,4 @@
-## [Unreleased]
+## [1.14.0] - 2026-06-14
 
 ### Added
 - Added persistent Firestore/GCS storage tracing so local and live runs can
@@ -16,6 +16,24 @@
   host/tenant registrations instead of re-querying storage:
   - `src/managers/ITenantsManager.ts`
   - `src/managers/TenantsCacheManager.ts`
+- Added explicit capability-bounded tenant-registry interfaces so runtime,
+  routing, discovery, ledger, and hosting flows no longer all depend on the
+  same concrete tenant cache type:
+  - `src/managers/IApiTenantRegistry.ts`
+  - `src/managers/IDiscoveryTenantRegistry.ts`
+  - `src/managers/IHostRuntime.ts`
+  - `src/managers/IHostingTenantRegistry.ts`
+  - `src/managers/ILedgerTenantRegistry.ts`
+  - `src/managers/IPrivilegedTenantRegistry.ts`
+  - `src/managers/ITenantDidRegistryMutator.ts`
+- Added dedicated hosting sub-services so `HostingManager` no longer keeps all
+  offer/order search and lifecycle logic inline:
+  - `src/managers/hosting/HostingLifecycleService.ts`
+  - `src/managers/hosting/HostingOfferOrderService.ts`
+- Added explicit lightweight public projection support to the confidential
+  storage model so copied/generated consultation data can live outside
+  encrypted payloads when required for runtime lookup or gating:
+  - `gdc-common-utils-ts@^1.24.1`
 
 ### Changed
 - Split heavy read semantics from index-only search semantics in Firestore and
@@ -39,6 +57,36 @@
   - `src/managers/CommunicationManager.ts`
   - `src/managers/IndividualManager.ts`
   - `src/managers/OpenIdAuthManager.ts`
+- Renamed the ambiguous commercial read-model helper to an offer/order-specific
+  name and aligned tests/utilities with that terminology:
+  - `src/utils/offer-order-read-model.ts`
+  - `src/__tests__/unit/utils/offer-order-read-model.test.ts`
+- Moved offer/order search handling out of `HostingManager` and `FamilyManager`
+  onto lightweight indexed queries instead of reopening encrypted vault
+  records for readback screens.
+- Narrowed runtime managers away from the concrete `TenantsCacheManager`
+  implementation. Ordinary managers now consume minimal interfaces or host
+  scalars instead of a broad tenant-registry capability surface.
+- Updated tenant runtime caching so:
+  - general metadata lookups use a sanitized runtime projection
+  - explicit full reads remain privileged
+  - host lifecycle and tenant lifecycle refreshes invalidate/reload cache after
+    storage writes
+- Tightened lifecycle gating so hosted tenant/host disable and purge flows
+  respect real descendants while ignoring known auxiliary records that should
+  not block lifecycle transitions:
+  - bootstrap technical controller records
+  - auxiliary `Occupation` records stored in `employees`
+- Corrected host lifecycle resolution so host disable/purge no longer tries to
+  resolve the host through hosted-tenant reverse lookup by `identifier.value`.
+- Added submit-time hosted individual gating in the family/individual flow so a
+  disabled tenant cannot create new hosted individual registrations.
+- Reduced several route/service full-tenant reads to narrower metadata lookups:
+  - `src/routes/api.ts`
+  - `src/routes/discovery.ts`
+  - `src/routes/ledger.ts`
+  - `src/services/DiscoveryService.ts`
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.24.1`.
 - Refreshed generated OpenAPI profile artifacts after the latest local build.
 
 ### Performance Notes
@@ -51,6 +99,21 @@
     full JWE payloads were not needed
   - avoiding GCS downloads for Firestore `vaultExists(...)`
   - shifting some tenant existence checks onto the tenant cache
+- Lifecycle descendant scans now use `listContainersInSection(...)` rather than
+  hydrated reads, which materially reduced GCS traffic during host/tenant
+  lifecycle validation.
+
+### Security And Boundaries
+- Documented capability boundaries with JSDoc so future changes do not quietly
+  widen tenant-registry access again.
+- Split general runtime tenant lookup from privileged control-plane reads so
+  everyday managers no longer depend on a type that can decrypt full tenant
+  registrations by default.
+
+### Validation
+- `npm run type-check`
+- `npm run api:local-demo` + `HOST_ID_VALUE=... npm run test:e2e:live-gw`
+- `npm run api:local-firestore-demo` + `HOST_ID_VALUE=... npm run test:e2e:live-gw`
 
 ## [1.13.0] - 2026-06-13
 

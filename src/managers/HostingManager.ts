@@ -32,7 +32,8 @@ import { AllowedIndexableClaims } from '../gdc-backend-utils-node/models/indexin
 import { createEmployeeUrn, createOrganizationUrn, parseTenantUrn } from '../utils/urn';
 import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { ILogger } from '../loggers/ILogger';
-import { TenantsCacheManager } from './TenantsCacheManager';
+import type { IHostingTenantRegistry } from './IHostingTenantRegistry';
+import type { IHostRuntime } from './IHostRuntime';
 import { generateLicenseOffer } from '../utils/offer';
 import { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
 import { EntityLifecycleStatus, EntityType, NetworkAccessStatus, NetworkName, BundleEntryType } from '../gdc-backend-utils-node/models/enums';
@@ -53,7 +54,11 @@ import { resolveIdentityChannel } from '../utils/ledger';
 import { slugFromDomain } from '../utils/slug';
 import { getEnvSectionId } from '../utils/section-env';
 import { normalizeIndexedEmail, splitIndexedEmails, splitIndexedPhones } from '../utils/indexed-contact';
-import { buildCommercialSearchRow, extractCommercialSearchClaims, matchCommercialSearch } from '../utils/commercial-read-model';
+import {
+  buildOfferOrderIndexedAttributes,
+} from '../utils/offer-order-read-model';
+import { HostingOfferOrderService } from './hosting/HostingOfferOrderService';
+import { HostingLifecycleService } from './hosting/HostingLifecycleService';
 import { SERVICE_ADDITIONAL_TYPE_CLAIM } from '../utils/service-capability-claims';
 import { ClearingHouseService, IClearingHouseService } from '../services/ClearingHouseService';
 import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
@@ -87,16 +92,20 @@ type ActivationParticipantMaterial = {
 };
 
 type VpCredentialObject = Record<string, unknown>;
-type TenantLifecycleAction = typeof ACTION_DISABLE | typeof ACTION_ENABLE | typeof ACTION_PURGE;
-type TenantDescendantLifecycleSummary = {
-  activeEmployees: number;
-  activeIndividuals: number;
-  unpurgedEmployees: number;
-  unpurgedIndividuals: number;
-};
-type HostedTenantRegistrySummary = {
-  registeredHostedTenants: number;
-};
+/**
+ * Technical runtime marker copied outside encrypted employee content for the
+ * host bootstrap controller created during tenant onboarding.
+ *
+ * Why this exists:
+ * - the bootstrap controller is an implementation detail needed to initialize
+ *   the hosted tenant
+ * - tenant lifecycle scans must ignore this synthetic employee so it does not
+ *   block later `disable` or `purge` operations
+ *
+ * The canonical business role remains inside protected claims and, when
+ * searchable, in `indexed.attributes`. This marker is only a lightweight
+ * operational projection for lifecycle inspection.
+ */
 const HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE = 'host-bootstrap-controller';
 
 /**
@@ -117,20 +126,24 @@ const HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE = 'host-bootstrap-controller';
 export class HostingManager {
   private vaultRepository: IVaultRepository;
   private kmsService: IKmsService;
-  private tenantsCacheManager: TenantsCacheManager;
+  private tenantsCacheManager: IHostingTenantRegistry;
   private storageAdapter: IStorageAdapter;
   private logger: ILogger;
   private config: IServerConfig;
+  private hostRuntime: IHostRuntime;
   private clearingHouseService: IClearingHouseService;
   private activationTrustAdapter: IActivationTrustAdapter;
+  private offerOrderService: HostingOfferOrderService;
+  private lifecycleService: HostingLifecycleService;
 
   constructor(
     vaultRepository: IVaultRepository,
     kmsService: IKmsService,
-    tenantsCacheManager: TenantsCacheManager,
+    tenantsCacheManager: IHostingTenantRegistry,
     storageAdapter: IStorageAdapter,
     logger: ILogger,
     config: IServerConfig,
+    hostRuntime: IHostRuntime,
     clearingHouseService?: IClearingHouseService,
     activationTrustAdapter?: IActivationTrustAdapter,
   ) {
@@ -140,8 +153,24 @@ export class HostingManager {
     this.storageAdapter = storageAdapter;
     this.logger = logger;
     this.config = config;
+    this.hostRuntime = hostRuntime;
     this.clearingHouseService = clearingHouseService || new ClearingHouseService();
     this.activationTrustAdapter = activationTrustAdapter || new DefaultActivationTrustAdapter(this.clearingHouseService);
+    this.offerOrderService = new HostingOfferOrderService(
+      this.vaultRepository,
+      this.kmsService,
+      this.tenantsCacheManager,
+      this.config,
+      this.hostRuntime,
+    );
+    this.lifecycleService = new HostingLifecycleService(
+      this.vaultRepository,
+      this.kmsService,
+      this.tenantsCacheManager,
+      this.config,
+      this.hostRuntime,
+      (error, type, meta) => this.handleError(error, type, meta),
+    );
   }
 
   public async bootstrapHost(hostClaims: ClaimsRecord): Promise<void> {
@@ -774,25 +803,32 @@ export class HostingManager {
     };
   }
 
+  /**
+   * Persists the synthetic bootstrap controller employee created for hosted
+   * tenant initialization.
+   *
+   * Important behavior:
+   * - this employee is not treated as a normal descendant for lifecycle gates
+   * - a lightweight technical marker is copied to `doc.public.role`
+   * - `HostingLifecycleService` uses that marker to ignore this record when it
+   *   counts remaining employees before tenant `disable`/`purge`
+   *
+   * This keeps lifecycle scans on the lightweight container projection and
+   * avoids hydrating the encrypted JWE just to recognize the bootstrap record.
+   */
   private async storeControllerEntityConfig(
     controllerConfig: EntityConfig,
     tenantCollectionName: string,
     vaultId: string,
   ): Promise<void> {
-    const lifecycleAwareControllerConfig: EntityConfig = {
-      ...controllerConfig,
-      meta: {
-        ...(controllerConfig.meta || {}),
-        lifecycleRole: HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE,
-      },
-    };
     const verificationMethods = controllerConfig.didDocument?.verificationMethod || [];
-    const email = normalizeIndexedEmail(lifecycleAwareControllerConfig.claims?.[ClaimsPersonSchemaorg.email]) as string | undefined;
-    const roleCode = getPersonOccupationClaim(lifecycleAwareControllerConfig.claims as Record<string, any> | undefined);
+    const email = normalizeIndexedEmail(controllerConfig.claims?.[ClaimsPersonSchemaorg.email]) as string | undefined;
+    const roleCode = getPersonOccupationClaim(controllerConfig.claims as Record<string, any> | undefined);
 
     const attributesToIndex: ParameterData[] = [
       ...(email ? [{ name: 'email', value: email, unique: true, type: 'string' } as ParameterData] : []),
       ...(roleCode ? [{ name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token' } as ParameterData] : []),
+      { name: 'lifecycleRole', value: HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE, unique: false, type: 'string' } as ParameterData,
       ...verificationMethods
         .map((vm) => (vm.publicKeyJwk as PublicJwk | undefined)?.kid)
         .filter((kid): kid is string => Boolean(kid))
@@ -800,13 +836,18 @@ export class HostingManager {
     ];
     const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(attributesToIndex, vaultId);
 
-    const employeeDoc: ConfidentialStorageDoc = {
-      id: lifecycleAwareControllerConfig.id,
-      status: lifecycleAwareControllerConfig.status,
+    const employeeDoc = {
+      id: controllerConfig.id,
+      status: controllerConfig.status,
       sequence: 0,
-      content: lifecycleAwareControllerConfig,
+      content: controllerConfig,
       indexed: { attributes: protectedAttributes },
-    };
+      public: {
+        // Lightweight runtime projection used only so lifecycle scans can
+        // recognize and ignore the synthetic bootstrap controller employee.
+        role: HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE,
+      },
+    } as ConfidentialStorageDoc;
     const secureEmployeeDoc = await this.kmsService.protectConfidentialData(employeeDoc, vaultId);
     await this.vaultRepository.put(tenantCollectionName, [secureEmployeeDoc], getEnvSectionId('employees'));
   }
@@ -826,12 +867,12 @@ export class HostingManager {
           return await this.processOrganizationRegistration(job, environment, isBootstrap);
         case 'Offer':
           if (job.action === '_search') {
-            return await this.processCommercialSearch(job);
+            return await this.processOfferOrderSearch(job);
           }
           throw new ManagerError(`Unsupported action for Offer: '${job.action}'`, IssueType.NotSupported);
         case 'Order':
           if (job.action === '_search') {
-            return await this.processCommercialSearch(job);
+            return await this.processOfferOrderSearch(job);
           }
           return await this.processOrder(job, environment);
         default:
@@ -860,7 +901,7 @@ export class HostingManager {
    * Reads already-persisted Offer/Order records so portal/BFF code can build
    * list/detail screens without reading raw vault sections directly.
    */
-  private async processCommercialSearch(job: JobRequest): Promise<IDecodedDidcommPayload> {
+  private async processOfferOrderSearch(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const jobEntries = job?.content?.body?.data || [];
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
 
@@ -894,94 +935,11 @@ export class HostingManager {
   }
 
   private async processOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
-    const tenantRecords = await this.vaultRepository.getContainersInSection(
-      hostCollectionName!,
-      getEnvSectionId('tenants'),
-    );
-    const communicationRecords = await this.vaultRepository.getContainersInSection(
-      hostCollectionName!,
-      getEnvSectionId('communications'),
-    );
-    const filters = extractCommercialSearchClaims(entry);
-    const tenantIdFilter = String(job.tenantId || '').trim();
-    const matches: Record<string, unknown>[] = [];
-    const seenIds = new Set<string>();
-
-    for (const secureDoc of [...tenantRecords, ...communicationRecords] as ConfidentialStorageDoc[]) {
-      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, 'host');
-      const claims = { ...((content?.claims || {}) as Record<string, unknown>) };
-      if (!claims[ClaimsOfferSchemaorg.identifier] && claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]) {
-        claims[ClaimsOfferSchemaorg.identifier] = claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier];
-      }
-      const alternateName = String(claims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
-      if (tenantIdFilter && alternateName && alternateName !== tenantIdFilter) continue;
-      if (!claims[ClaimsOfferSchemaorg.identifier]) continue;
-      if (!matchCommercialSearch(claims, filters)) continue;
-      const row = buildCommercialSearchRow(
-        secureDoc,
-        claims,
-        ClaimsOfferSchemaorg.identifier,
-        content?.invoiceBundle as Record<string, unknown> | undefined,
-      );
-      const rowId = String(row.id || '').trim();
-      if (rowId && seenIds.has(rowId)) continue;
-      if (rowId) seenIds.add(rowId);
-      matches.push(row);
-    }
-
-    return {
-      type: 'Offer-search-response-v1.0',
-      resource: { total: matches.length, data: matches } as any,
-      response: { status: '200' },
-    };
+    return this.offerOrderService.processOfferSearchEntry(job, entry);
   }
 
   private async processOrderSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
-    const tenantRecords = await this.vaultRepository.getContainersInSection(
-      hostCollectionName!,
-      getEnvSectionId('tenants'),
-    );
-    const orderRecords = await this.vaultRepository.getContainersInSection(
-      hostCollectionName!,
-      getEnvSectionId('communications'),
-    );
-    const filters = extractCommercialSearchClaims(entry);
-    const tenantIdFilter = String(job.tenantId || '').trim();
-    const allowedOfferIds = new Set<string>();
-
-    for (const secureDoc of tenantRecords as ConfidentialStorageDoc[]) {
-      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, 'host');
-      const claims = (content?.claims || {}) as Record<string, unknown>;
-      const alternateName = String(claims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
-      if (tenantIdFilter && alternateName && alternateName !== tenantIdFilter) continue;
-      const offerId = String(claims[ClaimsOfferSchemaorg.identifier] || '').trim();
-      if (offerId) allowedOfferIds.add(offerId);
-    }
-
-    const matches: Record<string, unknown>[] = [];
-    for (const secureDoc of orderRecords as ConfidentialStorageDoc[]) {
-      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, 'host');
-      const claims = (content?.claims || {}) as Record<string, unknown>;
-      const acceptedOfferId = String(claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] || '').trim();
-      const alternateName = String(claims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
-      if (!acceptedOfferId) continue;
-      if (allowedOfferIds.size > 0 && !allowedOfferIds.has(acceptedOfferId) && (!tenantIdFilter || alternateName !== tenantIdFilter)) continue;
-      if (!matchCommercialSearch(claims, filters)) continue;
-      matches.push(buildCommercialSearchRow(
-        secureDoc,
-        claims,
-        ClaimsOrderSchemaorg.acceptedOfferIdentifier,
-        content?.invoiceBundle as Record<string, unknown> | undefined,
-      ));
-    }
-
-    return {
-      type: 'Order-search-response-v1.0',
-      resource: { total: matches.length, data: matches } as any,
-      response: { status: '200' },
-    };
+    return this.offerOrderService.processOrderSearchEntry(job, entry);
   }
 
   /**
@@ -1035,366 +993,7 @@ export class HostingManager {
   }
 
   private async processOrganizationLifecycle(job: JobRequest): Promise<IDecodedDidcommPayload> {
-    const jobEntries = job?.content?.body?.data || [];
-    const responseEntries: (BundleEntry | ErrorEntry)[] = [];
-
-    for (const entry of jobEntries) {
-      try {
-        const resultEntry = await this.processLifecycleEntry(entry, job.action as TenantLifecycleAction, job.content?.iss);
-        responseEntries.push(resultEntry);
-      } catch (error) {
-        responseEntries.push(this.handleError(error, entry?.type || 'Organization', entry?.meta));
-      }
-    }
-
-    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
-    return {
-      jti: uuidv4(),
-      type: 'hosting-response',
-      thid: job.content?.thid as string,
-      iss: issuerDid,
-      aud: job.content?.iss as string,
-      exp: Math.floor(Date.now() / 1000) + 300,
-      body: {
-        data: responseEntries,
-        resourceType: 'Bundle',
-        type: getBundleResponseTypeForAction(job.action),
-        total: responseEntries.length,
-      },
-    };
-  }
-
-  private async processLifecycleEntry(
-    entry: BundleEntry,
-    action: TenantLifecycleAction,
-    actorDid?: string,
-  ): Promise<BundleEntry | ErrorEntry> {
-    const rawClaims = entry?.meta?.claims || entry?.resource?.meta?.claims;
-    const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : undefined;
-    if (!claims) {
-      throw new ManagerError('Malformed lifecycle entry: missing meta.claims', IssueType.Required);
-    }
-
-    const identifierValue = String(claims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
-    if (!identifierValue) {
-      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.identifierValue}'`, IssueType.Required);
-    }
-
-    const vaultId = await this.tenantsCacheManager.findTenantVaultIdByIdentifierValue(identifierValue);
-    if (!vaultId) {
-      throw new ManagerError(`Tenant not found for identifier.value '${identifierValue}'`, IssueType.NotFound);
-    }
-
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
-    if (!hostCollectionName) {
-      throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
-    }
-
-    const existing = await this.vaultRepository.get<ConfidentialStorageDoc>(hostCollectionName, vaultId, getEnvSectionId('tenants'));
-    if (!existing) {
-      throw new ManagerError(`Tenant registration not found for '${vaultId}'`, IssueType.NotFound);
-    }
-
-    const tenantConfig = await this.kmsService.unprotectConfidentialData<OrganizationConfig>(existing, 'host');
-    const currentStatus = getTenantAuthorizationStatus(tenantConfig);
-    const isHostLifecycle = vaultId === 'host';
-    if (action === ACTION_PURGE) {
-      if (isHostLifecycle) {
-        await this.assertHostLifecycleAllowed(action, hostCollectionName);
-        const hostVaultPurged = await this.vaultRepository.purge(hostCollectionName);
-        if (!hostVaultPurged) {
-          throw new ManagerError("Host data purge failed for 'host'.", IssueType.Exception);
-        }
-        await this.tenantsCacheManager.refreshTenant('host');
-
-        return {
-          type: 'Organization-purge-response-v1.0',
-          meta: {
-            claims: {
-              ...claims,
-              'org.schema.Organization.identifier.value': identifierValue,
-              'org.schema.Action.tenantAuthorization.status': 'revoked',
-              'org.schema.Action.tenantAuthorization.changedBy': actorDid || '',
-              'org.schema.Action.tenantAuthorization.lifecycleDisposition': 'purged',
-            },
-          },
-          resource: {
-            resourceType: 'Organization',
-            id: tenantConfig.id,
-          },
-          response: { status: '200' },
-        };
-      }
-      await this.assertTenantPurgeAllowed(vaultId, currentStatus);
-      const tenantVaultPurged = await this.vaultRepository.purge(vaultId);
-      if (!tenantVaultPurged) {
-        throw new ManagerError(`Tenant data purge failed for '${vaultId}'.`, IssueType.Exception);
-      }
-      const tenantRegistryDeleted = await this.vaultRepository.delete(hostCollectionName, vaultId, getEnvSectionId('tenants'));
-      if (!tenantRegistryDeleted) {
-        throw new ManagerError(`Tenant registry purge failed for '${vaultId}'.`, IssueType.Exception);
-      }
-      await this.tenantsCacheManager.refreshTenant(vaultId);
-
-      return {
-        type: 'Organization-purge-response-v1.0',
-        meta: {
-          claims: {
-            ...claims,
-            'org.schema.Organization.identifier.value': identifierValue,
-            'org.schema.Action.tenantAuthorization.status': 'revoked',
-            'org.schema.Action.tenantAuthorization.changedBy': actorDid || '',
-            'org.schema.Action.tenantAuthorization.lifecycleDisposition': 'purged',
-          },
-        },
-        resource: {
-          resourceType: 'Organization',
-          id: tenantConfig.id,
-        },
-        response: { status: '200' },
-      };
-    }
-
-    const nextStatus = this.getNextTenantLifecycleStatus(action, currentStatus);
-    if (isHostLifecycle) {
-      await this.assertHostLifecycleAllowed(action, hostCollectionName);
-    } else {
-      await this.assertTenantDisableAllowed(action, vaultId);
-    }
-    const updatedConfig = applyTenantAuthorizationStatus(tenantConfig, nextStatus, actorDid);
-    const updatedDoc: ConfidentialStorageDoc = {
-      ...existing,
-      status: updatedConfig.status,
-      content: updatedConfig,
-    };
-    const secureDoc = await this.kmsService.protectConfidentialData(updatedDoc, 'host');
-    await this.vaultRepository.put(hostCollectionName, [secureDoc], getEnvSectionId('tenants'));
-    await this.tenantsCacheManager.refreshTenant(vaultId);
-
-    return {
-      type: action === '_disable' ? 'Organization-disable-response-v1.0' : 'Organization-enable-response-v1.0',
-      meta: {
-        claims: {
-          ...claims,
-          'org.schema.Organization.identifier.value': identifierValue,
-          'org.schema.Action.tenantAuthorization.status': nextStatus,
-          'org.schema.Action.tenantAuthorization.changedBy': actorDid || '',
-        },
-      },
-      resource: {
-        resourceType: 'Organization',
-        id: tenantConfig.id,
-      },
-      response: { status: '200' },
-    };
-  }
-
-  private getNextTenantLifecycleStatus(
-    action: TenantLifecycleAction,
-    currentStatus: TenantAuthorizationLifecycleStatus,
-  ): TenantAuthorizationLifecycleStatus {
-    if (action === ACTION_DISABLE) {
-      if (currentStatus === 'revoked') {
-        throw new ManagerError('Tenant authorization is revoked and cannot be disabled.', IssueType.Conflict);
-      }
-      if (currentStatus === 'suspended') {
-        throw new ManagerError('Tenant authorization is already disabled.', IssueType.Conflict);
-      }
-      return 'suspended';
-    }
-
-    if (currentStatus === 'revoked') {
-      throw new ManagerError('Tenant authorization is revoked and cannot be enabled.', IssueType.Conflict);
-    }
-    if (currentStatus !== 'suspended') {
-      throw new ManagerError('Tenant authorization can only be enabled from disabled state.', IssueType.Conflict);
-    }
-    return 'active';
-  }
-
-  private async assertTenantDisableAllowed(action: TenantLifecycleAction, vaultId: string): Promise<void> {
-    if (action !== ACTION_DISABLE) {
-      return;
-    }
-
-    const descendants = await this.inspectTenantDescendants(vaultId);
-    if (descendants.activeEmployees > 0) {
-      throw new ManagerError(
-        `Tenant cannot be disabled while ${descendants.activeEmployees} employee record(s) remain active.`,
-        IssueType.Conflict,
-      );
-    }
-    if (descendants.activeIndividuals > 0) {
-      throw new ManagerError(
-        `Tenant cannot be disabled while ${descendants.activeIndividuals} individual/member record(s) remain active.`,
-        IssueType.Conflict,
-      );
-    }
-  }
-
-  /**
-   * Prevents host lifecycle transitions while hosted tenant registrations still
-   * remain in the host registry.
-   */
-  private async assertHostLifecycleAllowed(
-    action: TenantLifecycleAction,
-    hostCollectionName: string,
-  ): Promise<void> {
-    if (action !== ACTION_DISABLE && action !== ACTION_PURGE) {
-      return;
-    }
-
-    const hostedTenants = await this.inspectHostedTenantRegistry(hostCollectionName);
-    if (hostedTenants.registeredHostedTenants > 0) {
-      throw new ManagerError(
-        `Host cannot be ${action === ACTION_DISABLE ? 'disabled' : 'purged'} while ${hostedTenants.registeredHostedTenants} hosted tenant registration(s) remain.`,
-        IssueType.Conflict,
-      );
-    }
-  }
-
-  private async assertTenantPurgeAllowed(
-    vaultId: string,
-    currentStatus: TenantAuthorizationLifecycleStatus,
-  ): Promise<void> {
-    if (currentStatus !== 'suspended') {
-      throw new ManagerError('Tenant authorization must be disabled before purge.', IssueType.Conflict);
-    }
-
-    const descendants = await this.inspectTenantDescendants(vaultId);
-    if (descendants.unpurgedEmployees > 0) {
-      throw new ManagerError(
-        `Tenant cannot be purged while ${descendants.unpurgedEmployees} employee record(s) are not purged yet.`,
-        IssueType.Conflict,
-      );
-    }
-    if (descendants.unpurgedIndividuals > 0) {
-      throw new ManagerError(
-        `Tenant cannot be purged while ${descendants.unpurgedIndividuals} individual/member record(s) are not purged yet.`,
-        IssueType.Conflict,
-      );
-    }
-  }
-
-  /**
-   * Counts hosted tenant registrations that remain in the host registry,
-   * excluding the host record itself.
-   */
-  private async inspectHostedTenantRegistry(
-    hostCollectionName: string,
-  ): Promise<HostedTenantRegistrySummary> {
-    const tenantRecords = await this.vaultRepository.getContainersInSection<any>(
-      hostCollectionName,
-      getEnvSectionId('tenants'),
-    );
-    const registeredHostedTenants = tenantRecords
-      .filter((record) => String(record?.id || '').trim() && String(record?.id || '').trim() !== 'host')
-      .length;
-    return { registeredHostedTenants };
-  }
-
-  /**
-   * Scans the tenant vault for the lifecycle-managed descendants that must be
-   * cleaned before the host tenant itself can be disabled or purged.
-   *
-   * Current scope:
-   * - employee records in `employees`
-   * - family/individual registration records in `individual`
-   * - subject/member records in hashed `individual_*` sections
-   */
-  private async inspectTenantDescendants(vaultId: string): Promise<TenantDescendantLifecycleSummary> {
-    const employeeSectionId = getEnvSectionId('employees');
-    const baseIndividualSectionId = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
-    const subjectSectionPrefix = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_`);
-    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(vaultId);
-    const collectionNames = [...new Set([vaultId, tenantCollectionName].filter(Boolean) as string[])];
-    const summary: TenantDescendantLifecycleSummary = {
-      activeEmployees: 0,
-      activeIndividuals: 0,
-      unpurgedEmployees: 0,
-      unpurgedIndividuals: 0,
-    };
-    const seenRecordKeys = new Set<string>();
-
-    for (const collectionName of collectionNames) {
-      const sectionIds = await this.vaultRepository.getAllSections(collectionName);
-      for (const sectionId of sectionIds) {
-        const isEmployeeSection = sectionId === employeeSectionId;
-        const isBaseIndividualSection = sectionId === baseIndividualSectionId;
-        const isSubjectLifecycleSection = sectionId.startsWith(subjectSectionPrefix);
-        if (!isEmployeeSection && !isBaseIndividualSection && !isSubjectLifecycleSection) {
-          continue;
-        }
-
-        const records = await this.vaultRepository.getContainersInSection<any>(collectionName, sectionId);
-        for (const record of records) {
-          const recordKey = `${collectionName}:${sectionId}:${String(record?.id || '')}`;
-          if (seenRecordKeys.has(recordKey)) {
-            continue;
-          }
-          seenRecordKeys.add(recordKey);
-
-          const lifecycleRecord = await this.readTenantLifecycleRecord(record, vaultId, isEmployeeSection || isBaseIndividualSection);
-          if (!lifecycleRecord) {
-            continue;
-          }
-          if (isEmployeeSection && this.isHostBootstrapControllerRecord(lifecycleRecord)) {
-            continue;
-          }
-
-          const isActive = String(lifecycleRecord.status || '').trim().toLowerCase() !== EntityLifecycleStatus.Inactive;
-          const isPurged = this.isPurgedTenantLifecycleRecord(lifecycleRecord);
-          if (isEmployeeSection) {
-            if (isActive) summary.activeEmployees += 1;
-            if (!isPurged) summary.unpurgedEmployees += 1;
-            continue;
-          }
-
-          if (isActive) summary.activeIndividuals += 1;
-          if (!isPurged) summary.unpurgedIndividuals += 1;
-        }
-      }
-    }
-
-    return summary;
-  }
-
-  private async readTenantLifecycleRecord(
-    record: any,
-    vaultId: string,
-    decryptProtectedContent: boolean,
-  ): Promise<Record<string, any> | undefined> {
-    if (!record || typeof record !== 'object') {
-      return undefined;
-    }
-
-    if (!decryptProtectedContent) {
-      return record as Record<string, any>;
-    }
-
-    try {
-      const decrypted = await this.kmsService.unprotectConfidentialData<Record<string, any>>(record, vaultId);
-      return decrypted && typeof decrypted === 'object'
-        ? decrypted
-        : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private isPurgedTenantLifecycleRecord(record: Record<string, any>): boolean {
-    const meta = (record.meta || {}) as Record<string, any>;
-    const claims = (record.claims || {}) as Record<string, any>;
-    return meta.lifecycleDisposition === 'purged'
-      || Boolean(meta.lifecyclePurgedAt)
-      || Boolean(meta.purgedAt)
-      || Boolean(meta.licensingPurgedAt)
-      || String(claims['org.schema.FamilyRegistration.status'] || '').trim().toLowerCase() === 'purged';
-  }
-
-  private isHostBootstrapControllerRecord(record: Record<string, any>): boolean {
-    const meta = (record.meta || {}) as Record<string, any>;
-    return String(meta.lifecycleRole || '').trim() === HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE;
+    return this.lifecycleService.processOrganizationLifecycle(job);
   }
 
   private async processActivationEntry(
@@ -1521,15 +1120,22 @@ export class HostingManager {
       .map(claimKey => ({ name: claimKey, value: String(processedClaims[claimKey]), ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }) }))
       .filter(attr => attr.value !== 'undefined' && attr.value !== 'null');
 
-    const tenantRegistrationDoc: ConfidentialStorageDoc = {
+    const tenantRegistrationDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
       id: vaultId,
       status: finalTenantConfig.status,
       sequence: 0,
-      indexed: { attributes, hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' } },
+      meta: { claims: processedClaims },
+      indexed: {
+        attributes: [
+          ...attributes,
+          ...buildOfferOrderIndexedAttributes(processedClaims),
+        ],
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
       content: finalTenantConfig,
     };
 
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    const hostCollectionName = this.hostRuntime.hostCollectionName;
     if (!hostCollectionName) {
       throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
     }
@@ -1740,6 +1346,14 @@ export class HostingManager {
     }
 
     const tenantVaultId = getTenantVaultId(sector, job.tenantId);
+    const tenantConfig = await this.tenantsCacheManager.getTenant(tenantVaultId);
+    if (!tenantConfig) {
+      throw new ManagerError(`Hosted tenant '${tenantVaultId}' was not found.`, IssueType.NotFound);
+    }
+    const tenantAuthorizationStatus = getTenantAuthorizationStatus(tenantConfig);
+    if (tenantAuthorizationStatus !== 'active') {
+      throw new ManagerError('Hosted individual registration is not allowed while the tenant is disabled.', IssueType.Forbidden);
+    }
     const tenantCollectionName = await this.resolveTenantCollectionForIndividuals(tenantVaultId, true);
 
     const apodo = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
@@ -1943,7 +1557,7 @@ export class HostingManager {
       throw new ManagerError(`Missing required claim in Order: 'Order.acceptedOffer.identifier'`, IssueType.Required);
     }
 
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    const hostCollectionName = this.hostRuntime.hostCollectionName;
     
     const query = {
       sectionId: getEnvSectionId('tenants'),
@@ -1953,7 +1567,7 @@ export class HostingManager {
     const results = await this.vaultRepository.query(hostCollectionName!, query);
 
     if (results.length === 0) {
-      return this.processCommercialLicenseOrderEntry(claims, offerId);
+      return this.offerOrderService.processLicenseOrderEntry(claims, offerId);
     }
     if (results.length > 1) {
       this.logger.error(`CRITICAL: Multiple pending registrations found for the same offerId: '${offerId}'`);
@@ -2152,10 +1766,15 @@ export class HostingManager {
     if (!hostCollectionName) {
       throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
     }
-    const communicationDoc: ConfidentialStorageDoc = {
+    const communicationDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
       id: paymentCommunication.communicationId,
       status: EntityLifecycleStatus.Active,
       sequence: 0,
+      meta: { claims: paymentCommunication.claims },
+      indexed: {
+        attributes: buildOfferOrderIndexedAttributes(paymentCommunication.claims),
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
       content: { claims: paymentCommunication.claims, invoiceBundle },
     };
     const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, 'host');
@@ -2169,127 +1788,11 @@ export class HostingManager {
     };
   }
 
-  private async processCommercialLicenseOrderEntry(
+  private async processLicenseOrderEntry(
     orderClaims: ClaimsRecord,
     offerId: string,
   ): Promise<BundleEntry | ErrorEntry> {
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
-    if (!hostCollectionName) {
-      throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
-    }
-
-    const communicationRecords = await this.vaultRepository.getContainersInSection(
-      hostCollectionName,
-      getEnvSectionId('communications'),
-    );
-
-    let matchedOfferClaims: Record<string, unknown> | undefined;
-    for (const secureDoc of communicationRecords as ConfidentialStorageDoc[]) {
-      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, 'host');
-      const candidateClaims = (content?.claims || {}) as Record<string, unknown>;
-      if (String(candidateClaims[ClaimsOfferSchemaorg.identifier] || '').trim() === offerId) {
-        matchedOfferClaims = candidateClaims;
-        break;
-      }
-    }
-
-    if (!matchedOfferClaims) {
-      throw new ManagerError(`No pending registration or commercial offer found for offerId: '${offerId}'`, IssueType.NotFound);
-    }
-
-    const verification = await verifyOrderPaymentConfirmation({
-      orderClaims,
-      offerClaims: matchedOfferClaims,
-    });
-    if (!verification.verified) {
-      throw new ManagerError(`Payment confirmation failed for offerId '${offerId}'.`, IssueType.Conflict);
-    }
-
-    const tenantId = String(matchedOfferClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
-    const sector = String(
-      matchedOfferClaims[ClaimsOfferSchemaorg.category]
-      || matchedOfferClaims[ClaimsServiceSchemaorg.category]
-      || '',
-    ).trim();
-    if (!tenantId || !sector) {
-      throw new ManagerError('Commercial license offer is missing tenant alternateName or sector.', IssueType.Required);
-    }
-
-    const tenantVaultId = getTenantVaultId(sector as Sector, tenantId);
-    const quantity = Number(matchedOfferClaims[ClaimsOfferSchemaorg.eligibleQuantityValue] || 1);
-    const now = Date.now();
-    const expiryDate = new Date(now);
-    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-    const exp = Math.floor(expiryDate.getTime() / 1000);
-    const licenseDocs: ConfidentialStorageDoc[] = [];
-
-    for (let i = 0; i < quantity; i++) {
-      const licenseId = uuidv4();
-      const license: DeviceLicense = {
-        id: licenseId,
-        tenantId,
-        orderId: verification.invoiceId || offerId,
-        userClass: 'employee',
-        userCategory: 'default',
-        type: 'mobile',
-        status: 'available',
-        plan: 'default',
-        renewalCycle: '12m',
-        reactivationEnabled: false,
-        exp,
-      };
-      licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
-    }
-
-    await this.vaultRepository.put(tenantVaultId, licenseDocs, getEnvSectionId('device-licenses'));
-
-    const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
-    const paymentCommunication = await buildPaymentCommunication({
-      offerId,
-      tenantId,
-      tenantDid: '',
-      senderDid: hostDid,
-      paymentMethod: verification.paymentMethod,
-      paymentUrl: verification.paymentUrl,
-      invoiceId: verification.invoiceId,
-      paymentConfirmed: true,
-      ...readOfferPaymentContext(matchedOfferClaims),
-    });
-    paymentCommunication.claims[ClaimsOrganizationSchemaorg.alternateName] = tenantId;
-    const invoiceBundle = buildGatewayInvoiceBundle({
-      invoiceId: String(
-        paymentCommunication.claims[ClaimsOrderSchemaorg.partOfInvoice]
-        || verification.invoiceId
-        || offerId,
-      ),
-      subjectReference: `urn:tenant:${tenantId}`,
-      issuerReference: hostDid,
-      recipientReference: `urn:tenant:${tenantId}`,
-      issuedAt: String(
-        paymentCommunication.claims['org.schema.Order.invoiceIssuedAt']
-        || new Date().toISOString(),
-      ),
-      amount: String(matchedOfferClaims[ClaimsOfferSchemaorg.price] || ''),
-      currency: String(matchedOfferClaims[ClaimsOfferSchemaorg.priceCurrency] || ''),
-      paymentMethod: verification.paymentMethod,
-      paymentUrl: verification.paymentUrl,
-    });
-
-    const communicationDoc: ConfidentialStorageDoc = {
-      id: paymentCommunication.communicationId,
-      status: EntityLifecycleStatus.Active,
-      sequence: 0,
-      content: { claims: paymentCommunication.claims, invoiceBundle },
-    };
-    const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, 'host');
-    await this.vaultRepository.put(hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
-
-    return {
-      type: 'Organization-order-response-v1.0',
-      meta: { claims: paymentCommunication.claims },
-      resource: invoiceBundle as any,
-      response: { status: '201' },
-    };
+    return this.offerOrderService.processLicenseOrderEntry(orderClaims, offerId);
   }
 
   /**
@@ -2401,7 +1904,7 @@ export class HostingManager {
           },
         };
 
-        const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+        const hostCollectionName = this.hostRuntime.hostCollectionName;
         const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
         await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], getEnvSectionId('tenants'));
       }
@@ -2591,7 +2094,7 @@ export class HostingManager {
     const { alternateName, role, externalDomain } = params;
     const sector = Sector.SYSTEM;
     const vaultId = getTenantVaultId(sector, alternateName);
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    const hostCollectionName = this.hostRuntime.hostCollectionName;
     if (!hostCollectionName) {
       throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
     }
@@ -2711,7 +2214,7 @@ export class HostingManager {
       indexed: { attributes, hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' } },
       content: finalTenantConfig,
     };
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
+    const hostCollectionName = this.hostRuntime.hostCollectionName;
     const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
     await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], getEnvSectionId('tenants'));
 

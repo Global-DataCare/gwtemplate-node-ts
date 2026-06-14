@@ -17,7 +17,6 @@ import { createOperationOutcome } from '../utils/outcome';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { ParameterData } from 'gdc-common-utils-ts/models/params'; // extends ParamAttribute with `type` and others
 import { CredentialManager } from './CredentialManager';
-import { TenantsCacheManager } from './TenantsCacheManager';
 import { parseTenantUrn } from '../utils/urn';
 import { getTenantVaultId } from '../utils/tenant';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
@@ -45,6 +44,8 @@ import {
   LICENSE_USER_CLASS_INDIVIDUAL,
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
+import type { ITenantsManager } from './ITenantsManager';
+import type { IHostRuntime } from './IHostRuntime';
 
 
 const INDIVIDUAL_SECTION = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
@@ -53,25 +54,42 @@ const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
 export class IndividualManager {
   private vaultRepository: IVaultRepository;
   private kmsService: IKmsService;
-  private tenantsCacheManager: TenantsCacheManager;
+  private tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn' | 'getCollectionName'>;
   private credentialManager: CredentialManager;
   private blockchainAdapter: IBlockchainAdapter;
   private network: string;
+  private hostRuntime: IHostRuntime;
 
+  /**
+   * Creates an individual manager with only the narrow tenant/host dependencies
+   * needed for current flows.
+   *
+   * Why the tenant resolver is still present:
+   * - current response envelopes still use the tenant URN as `iss`
+   * - some offer persistence paths still need the tenant physical collection
+   *   name until that storage concern is pushed down into infrastructure
+   *
+   * Security boundary:
+   * - this manager must not receive broad tenant-registry/decryption capability
+   * - the only tenant-facing capability exposed here is the minimal read-only
+   *   runtime resolver contract
+   */
   constructor(
     vaultRepository: IVaultRepository,
     kmsService: IKmsService,
-    tenantsCacheManager: TenantsCacheManager,
+    tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn' | 'getCollectionName'>,
     credentialManager: CredentialManager,
     blockchainAdapter: IBlockchainAdapter,
-    network: string
+    network: string,
+    hostRuntime: IHostRuntime,
   ) {
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
-    this.tenantsCacheManager = tenantsCacheManager;
+    this.tenantsManager = tenantsManager;
     this.credentialManager = credentialManager;
     this.blockchainAdapter = blockchainAdapter;
     this.network = network;
+    this.hostRuntime = hostRuntime;
   }
 
   public async process(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
@@ -82,7 +100,7 @@ export class IndividualManager {
     // The Manager is responsible for constructing the vaultId from the job's context
     const tenantVaultId = getTenantVaultId(job.sector!, job.tenantId!);
 
-    const issuerUrn = await this.tenantsCacheManager.getTenantIdentifierUrn(tenantVaultId);
+    const issuerUrn = await this.tenantsManager.getTenantIdentifierUrn(tenantVaultId);
     if (!issuerUrn) {
       throw new ManagerError(`Tenant with vaultId '${tenantVaultId}' could not be resolved.`, IssueType.NotFound);
     }
@@ -184,12 +202,7 @@ export class IndividualManager {
       },
     };
 
-    const tenantClaims = await this.tenantsCacheManager.getEntityClaims(tenantVaultId);
-    if (!tenantClaims) {
-      throw new ManagerError(`Could not retrieve claims for tenant vault ${tenantVaultId}`, IssueType.NotFound);
-    }
-    
-    individualConfig.didDocument!.service = initializeCustomerServices(individualConfig, sector, tenantClaims);
+    individualConfig.didDocument!.service = initializeCustomerServices(individualConfig, sector);
     individualConfig.didConfig!.service = individualConfig.didDocument!.service;
 
     const docToStore: ConfidentialStorageDoc = {
@@ -296,7 +309,7 @@ export class IndividualManager {
       throw new ManagerError("Missing required search parameter 'subject'.", IssueType.Required);
     }
 
-    const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
+    const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
     if (!tenantExists) {
       throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
     }
@@ -492,11 +505,10 @@ export class IndividualManager {
       (doc) => (doc.content as DeviceLicense).status === LICENSE_STATUS_AVAILABLE,
     );
     if (!availableDoc) {
-      const hostDid = (await this.tenantsCacheManager.getTenantDid('host')) || 'did:web:host';
       const allowedPaymentMethods = (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(',').map(s => s.trim()).filter(Boolean);
       const offerClaims = generateLicenseOffer(
         1,
-        hostDid,
+        this.hostRuntime.hostDid,
         params.jurisdiction,
         params.sector,
         allowedPaymentMethods,
@@ -535,7 +547,7 @@ export class IndividualManager {
     tenantVaultId: string,
     claims: Record<string, unknown>,
   ): Promise<void> {
-    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(tenantVaultId);
+    const tenantCollectionName = await this.tenantsManager.getCollectionName(tenantVaultId);
     const offerId = String(claims[ClaimsOfferSchemaorg.identifier] || '').trim();
     if (!tenantCollectionName || !offerId) return;
 

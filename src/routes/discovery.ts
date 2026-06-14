@@ -3,7 +3,7 @@
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import * as express from 'express';
-import { TenantsCacheManager } from '../managers/TenantsCacheManager';
+import type { IDiscoveryTenantRegistry } from '../managers/IDiscoveryTenantRegistry';
 import { DiscoveryService } from '../services/DiscoveryService';
 import { getTenantVaultId } from '../utils/tenant';
 import { pingHandler } from './handlers/discovery/ping.handler';
@@ -43,14 +43,14 @@ const STATUS_LIST_INDEX = 0;
 
 /**
  * Creates the router for synchronous, public discovery endpoints.
- * @param tenantsCacheManager The cache manager to resolve tenant configurations.
+ * @param tenantsCacheManager Discovery-scoped tenant registry dependency.
  * @param discoveryService The service to generate discovery documents.
  * @param kmsService The service to retrieve cryptographic keys.
  * @param logger The logging service.
  * @returns An Express router.
  */
 export function createDiscoveryRouter(
-  tenantsCacheManager: TenantsCacheManager,
+  tenantsCacheManager: IDiscoveryTenantRegistry,
   discoveryService: DiscoveryService,
   kmsService: IKmsService,
   logger: ILogger,
@@ -1192,8 +1192,6 @@ export function createDiscoveryRouter(
     if (!(await isDiscoveryPublicationOperational(res.locals.vaultId))) {
       return res.status(404).type('text').send('Not Found');
     }
-    const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
-    if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
 
     res.json(buildDspaceVersionMetadata(buildGwDataspaceBasePath({
       tenantId: req.params.tenantId,
@@ -1213,8 +1211,6 @@ export function createDiscoveryRouter(
       return res.status(404).type('text').send('Not Found');
     }
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
-    if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
-
     const dataset = toProviderDataset(tenantConfig);
     if (!dataset) return res.status(404).type('text').send('Not Found');
     const filtered = filterDatasets([dataset], req.body?.filters);
@@ -1239,8 +1235,6 @@ export function createDiscoveryRouter(
       return res.status(404).type('text').send('Not Found');
     }
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
-    if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
-
     const dataset = toProviderDataset(tenantConfig);
     if (!dataset) return res.status(404).type('text').send('Not Found');
 
@@ -1264,8 +1258,6 @@ export function createDiscoveryRouter(
       return res.status(404).type('text').send('Not Found');
     }
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
-    if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
-
     const dataset = toProviderDataset(tenantConfig);
     if (!dataset || dataset.datasetId !== req.params.id) return res.status(404).type('text').send('Not Found');
 

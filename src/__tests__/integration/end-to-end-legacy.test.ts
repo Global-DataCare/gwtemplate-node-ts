@@ -127,6 +127,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
       host: { legalName: 'Test Host', jurisdiction: 'us', idType: 'test-id', idValue: '12345' },
       mongo: { dbName: 'test' }, firebase: {},
     };
+    const hostRuntime = { hostCollectionName, hostDid: 'did:web:testhost.com' };
     
     const hostingManager = new HostingManager(vaultRepository, kmsService, tenantManager, new StorageMemAdapter(), logger, mockConfig);
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
@@ -134,8 +135,22 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     
 	    const managerRegistry: ManagerRegistry = {
 	      hostingManager,
-	      employeeManager: new EmployeeManager(vaultRepository, kmsService, tenantManager),
-	      individualManager: new IndividualManager(vaultRepository, kmsService, tenantManager, new CredentialManager(vaultRepository, kmsService, tenantManager, 'testhost.com'), new BlockchainAdapterMem(), 'test-ns'),
+	      employeeManager: new EmployeeManager(
+          vaultRepository,
+          kmsService,
+          tenantManager,
+          tenantManager,
+          hostRuntime,
+        ),
+	      individualManager: new IndividualManager(
+          vaultRepository,
+          kmsService,
+          tenantManager,
+          new CredentialManager(vaultRepository, kmsService, tenantManager, 'testhost.com'),
+          new BlockchainAdapterMem(),
+          'test-ns',
+          hostRuntime,
+        ),
 	      compositionManager: new CompositionManager(vaultRepository),
 	      communicationManager: new CommunicationManager({ tenantsCacheManager: tenantManager, vaultRepository }),
 	      licenseManager: new LicenseManager(vaultRepository, kmsService),

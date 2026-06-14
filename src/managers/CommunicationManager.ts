@@ -11,7 +11,7 @@ import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils
 import { determineResourceId } from '../utils/resource';
 import { v4 as uuidv4 } from 'uuid';
 import { IJobProcessor } from './registry';
-import { TenantsCacheManager } from './TenantsCacheManager';
+import type { ITenantsManager } from './ITenantsManager';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { getTenantVaultId } from '../utils/tenant';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
@@ -119,7 +119,7 @@ const PROJECTED_RESOURCE_CONFIG: Record<SupportedProjectedResourceType, Projecti
 };
 
 interface CommunicationManagerOptions {
-  tenantsCacheManager: TenantsCacheManager;
+  tenantsCacheManager: ITenantsManager;
   vaultRepository: IVaultRepository;
   compositionManager?: IJobProcessor;
   individualManager?: IJobProcessor;
@@ -130,7 +130,7 @@ interface CommunicationManagerOptions {
  * into the internal CommMsgExtended format.
  */
 export class CommunicationManager implements IJobProcessor {
-  private readonly tenantsCacheManager: TenantsCacheManager;
+  private readonly tenantsCacheManager: ITenantsManager;
   private readonly vaultRepository: IVaultRepository;
   private readonly compositionManager?: IJobProcessor;
   private readonly individualManager?: IJobProcessor;

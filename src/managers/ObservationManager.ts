@@ -21,6 +21,7 @@ import {
 import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
+import type { ITenantsManager } from './ITenantsManager';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -47,7 +48,15 @@ export class ObservationManager implements IJobProcessor {
   constructor(
     private readonly vaultRepository: IVaultRepository,
     private readonly blockchainAdapter?: IBlockchainAdapter,
+    private readonly tenantsCacheManager?: ITenantsManager,
   ) {}
+
+  private async tenantExists(tenantVaultId: string): Promise<boolean> {
+    if (this.tenantsCacheManager) {
+      return this.tenantsCacheManager.tenantExists(tenantVaultId);
+    }
+    return this.vaultRepository.vaultExists(tenantVaultId);
+  }
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const thid = job.content?.thid as string | undefined;
@@ -177,7 +186,7 @@ export class ObservationManager implements IJobProcessor {
         }
 
         const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
-        const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+        const tenantExists = await this.tenantExists(tenantVaultId);
         if (!tenantExists) throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
 
         const identifierClaim =

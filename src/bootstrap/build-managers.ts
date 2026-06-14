@@ -1,7 +1,6 @@
 import type { IServerConfig } from '../config';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
-import type { TenantsCacheManager } from '../managers/TenantsCacheManager';
 import type { IStorageAdapter } from '../database/storage/IStorageAdapter';
 import type { ILogger } from '../loggers/ILogger';
 import { HostingManager } from '../managers/HostingManager';
@@ -37,8 +36,34 @@ import { ConsentManager } from '../managers/ConsentManager';
 import { DiscoveryService } from '../services/DiscoveryService';
 import { ClearingHouseService } from '../services/ClearingHouseService';
 import type { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { composeHostDidWebId } from '../utils/did-backend';
+import type { ITenantsManager } from '../managers/ITenantsManager';
+import type { ITenantDidRegistryMutator } from '../managers/ITenantDidRegistryMutator';
+import type { IHostingTenantRegistry } from '../managers/IHostingTenantRegistry';
+import type { IDiscoveryTenantRegistry } from '../managers/IDiscoveryTenantRegistry';
+import type { IApiTenantRegistry } from '../managers/IApiTenantRegistry';
+import type { ILedgerTenantRegistry } from '../managers/ILedgerTenantRegistry';
 
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
+
+/**
+ * Aggregate capability contract required by the runtime manager wiring.
+ *
+ * @security
+ * This keeps the bootstrap layer honest: it depends on the minimum set of
+ * interfaces needed to assemble the application, instead of depending on the
+ * concrete `TenantsCacheManager` implementation directly.
+ *
+ * The concrete implementation may still be `TenantsCacheManager`, but that
+ * choice is made by the composition root, not by the manager registry type.
+ */
+type IManagerRuntimeTenantRegistry =
+  ITenantsManager
+  & ITenantDidRegistryMutator
+  & IHostingTenantRegistry
+  & IDiscoveryTenantRegistry
+  & IApiTenantRegistry
+  & ILedgerTenantRegistry;
 
 /**
  * Builds the manager registry used by the worker/router runtime.
@@ -51,12 +76,17 @@ export function buildManagers(options: {
   config: IServerConfig;
   vaultRepository: IVaultRepository;
   kmsService: IKmsService;
-  tenantManager: TenantsCacheManager;
+  tenantManager: IManagerRuntimeTenantRegistry;
+  hostCollectionName: string;
   storageAdapter: IStorageAdapter;
   logger: ILogger;
   cryptographyService: CryptographyService;
 }) {
   const { config, vaultRepository, kmsService, tenantManager, storageAdapter, logger, cryptographyService } = options;
+  const hostRuntime = {
+    hostCollectionName: options.hostCollectionName,
+    hostDid: composeHostDidWebId(config.apiBaseUrl, config.hostExternalDomain),
+  };
 
   const clearingHouseService = new ClearingHouseService();
   const hostingManager = new HostingManager(
@@ -66,11 +96,12 @@ export function buildManagers(options: {
     storageAdapter,
     logger,
     config,
+    hostRuntime,
     clearingHouseService,
   );
   const icaManager = new IcaManager(vaultRepository, kmsService);
   const messagingManager = new MessagingManager(vaultRepository, kmsService);
-  const employeeManager = new EmployeeManager(vaultRepository, kmsService, tenantManager);
+  const employeeManager = new EmployeeManager(vaultRepository, kmsService, tenantManager, tenantManager, hostRuntime);
   const credentialManager = new CredentialManager(
     vaultRepository,
     kmsService,
@@ -104,6 +135,7 @@ export function buildManagers(options: {
     credentialManager,
     blockchainAdapter,
     config.namespace,
+    hostRuntime,
   );
 
   const familyManager = new FamilyManager(
@@ -115,8 +147,8 @@ export function buildManagers(options: {
     config,
   );
 
-  const compositionManager = new CompositionManager(vaultRepository, blockchainAdapter);
-  const documentReferenceManager = new DocumentReferenceManager(vaultRepository, blockchainAdapter);
+  const compositionManager = new CompositionManager(vaultRepository, blockchainAdapter, tenantManager);
+  const documentReferenceManager = new DocumentReferenceManager(vaultRepository, blockchainAdapter, tenantManager);
   const communicationManager = new CommunicationManager({
     tenantsCacheManager: tenantManager,
     vaultRepository,
@@ -124,7 +156,7 @@ export function buildManagers(options: {
     individualManager,
   });
   const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService);
-  const licenseManager = new LicenseManager(vaultRepository, kmsService);
+  const licenseManager = new LicenseManager(vaultRepository, kmsService, tenantManager);
   const tokenVerifier = resolveTokenVerifierFromEnv(isTestEnv);
   const appAuthManager = new AppAuthorizationManager(
     vaultRepository,
@@ -135,10 +167,10 @@ export function buildManagers(options: {
   const tokenManager = new TokenManager(kmsService, tenantManager);
   const identityTokenManager = new IdentityTokenManager(appAuthManager, tokenManager);
   const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository, clearingHouseService);
-  const observationManager = new ObservationManager(vaultRepository, blockchainAdapter);
-  const medicationStatementManager = new MedicationStatementManager(vaultRepository);
-  const relatedPersonManager = new RelatedPersonManager(vaultRepository, blockchainAdapter);
-  const consentManager = new ConsentManager({ vaultRepository, blockchainAdapter });
+  const observationManager = new ObservationManager(vaultRepository, blockchainAdapter, tenantManager);
+  const medicationStatementManager = new MedicationStatementManager(vaultRepository, tenantManager);
+  const relatedPersonManager = new RelatedPersonManager(vaultRepository, blockchainAdapter, tenantManager);
+  const consentManager = new ConsentManager({ vaultRepository, blockchainAdapter, tenantsCacheManager: tenantManager });
   const discoveryService = new DiscoveryService(tenantManager);
 
   return {

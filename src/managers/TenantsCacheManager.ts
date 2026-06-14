@@ -3,6 +3,11 @@
 
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ITenantsManager } from './ITenantsManager';
+import { IPrivilegedTenantRegistry } from './IPrivilegedTenantRegistry';
+import { IDiscoveryTenantRegistry } from './IDiscoveryTenantRegistry';
+import { IHostingTenantRegistry } from './IHostingTenantRegistry';
+import { IApiTenantRegistry } from './IApiTenantRegistry';
+import { ILedgerTenantRegistry } from './ILedgerTenantRegistry';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { getIdentifierUrnFromClaims, generateTenantCollectionNameFromClaims } from '../utils/tenant';
@@ -42,17 +47,47 @@ function getTenantServiceClaim(tenantConfig: any, claimName: string): string | u
   return undefined;
 }
 
+type TenantRuntimeView = {
+  collectionName?: string;
+  didDocument?: DidDocument;
+  didServiceConfig?: DidService[];
+  tenantIdentifierUrn?: string;
+  legacySignAlg?: string;
+  tenantAuthorizationStatus?: TenantAuthorizationLifecycleStatus;
+  isTenantOperational: boolean;
+  jurisdiction?: string;
+  alternateName?: string;
+  domainUrl?: string;
+  operationalUrl?: string;
+  sector?: Sector;
+  serviceCapabilityClaim?: string;
+};
+
 /**
- * An in-memory cache implementation of the Tenant Manager.
- * Its primary role is to load all tenant configurations at startup and provide
- * a fast, read-only, and specific lookup for tenant data, acting as a fast
- * ID resolver and service provider. It does not expose the full EntityConfig.
+ * In-memory runtime cache for tenant registry metadata.
+ *
+ * Design intent:
+ * - cache only a sanitized runtime projection for general reads
+ * - keep ordinary runtime flows off the tenant registry after first load
+ * - avoid exposing full tenant registration/configuration objects except
+ *   through explicit privileged methods
+ *
+ * Source-of-truth rule:
+ * - this cache is never the primary source of truth
+ * - privileged write flows must persist to storage first
+ * - only after a successful write may callers refresh or update cached runtime
+ *   metadata
+ *
+ * Security rule:
+ * - the runtime cache should contain only derived, non-secret tenant metadata
+ * - future secrets such as DB credentials, seeds, or key regeneration material
+ *   must not be added to `TenantRuntimeView`
  */
-export class TenantsCacheManager implements ITenantsManager {
+export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRegistry, IDiscoveryTenantRegistry, IHostingTenantRegistry, IApiTenantRegistry, ILedgerTenantRegistry {
   private vaultRepository: IVaultRepository;
   private kmsServiceResolver: () => IKmsService;
   private hostCollectionName: string; // The physical collection name for the host
-  private tenantCacheByVaultId = new Map<string, any>();
+  private tenantRuntimeCacheByVaultId = new Map<string, TenantRuntimeView>();
   private get kmsService(): IKmsService {
     return this.kmsServiceResolver();
   }
@@ -68,9 +103,10 @@ export class TenantsCacheManager implements ITenantsManager {
   }
 
   /**
-   * Proactively loads the 'host' configuration into the cache.
-   * This is intended to be called at server startup to ensure the host's
-   * identity and services are immediately available.
+   * Proactively loads the `host` runtime view into cache at startup.
+   *
+   * This is an optimization only. If omitted, host metadata will still load
+   * lazily on first access.
    */
   public async loadHost(): Promise<void> {
     await this._ensureTenantIsInCache('host');
@@ -78,70 +114,113 @@ export class TenantsCacheManager implements ITenantsManager {
 
 
   /**
-   * Ensures a tenant's configuration is loaded into the cache.
-   * If the tenant is not in the cache, it fetches the record from the host's
-   * physical collection, decrypts it, and adds it to the cache.
+   * Loads and decrypts the full tenant registration from the host registry.
+   *
+   * @security
+   * This method is intentionally broader than ordinary runtime lookups. It is
+   * used only to derive a safe runtime view or to satisfy explicit privileged
+   * control-plane reads.
    *
    * @architecture
-   * This method correctly uses the `hostCollectionName` (a physical identifier)
-   * to query the repository, upholding the principle that the repository layer
-   * is "dumb" and operates only on physical collection names. This manager is
-   * responsible for knowing the physical location of the host's tenant registry.
+   * The repository reads the physical host registry collection. This manager is
+   * still responsible for knowing where that registry lives.
    */
-  private async _ensureTenantIsInCache(vaultId: string): Promise<any | undefined> {
-    // 1. Check the cache first.
-    let tenantConfig = this.tenantCacheByVaultId.get(vaultId);
-    if (tenantConfig) {
-      return tenantConfig;
-    }
-
-    // 2. If not in cache, fetch the tenant's registration record from the HOST'S PHYSICAL collection.
+  private async loadFullTenantConfig(vaultId: string): Promise<any | undefined> {
     const secureTenantRecord = await this.vaultRepository.get<ConfidentialStorageDoc>(this.hostCollectionName, vaultId, getEnvSectionId('tenants'));
-    
-    // 3. If not in the repository, it doesn't exist.
     if (!secureTenantRecord) {
       return undefined;
     }
 
     try {
-      // 4. Decrypt the tenant's configuration.
-      tenantConfig = await this.kmsService.unprotectConfidentialData<any>(secureTenantRecord, 'host');
-
-      if (tenantConfig?.claims) {
-        // 5. Generate and add the collectionName to the config object.
-        const collectionName = generateTenantCollectionNameFromClaims(tenantConfig.claims);
-        tenantConfig.collectionName = collectionName;
-
-        // 6. Cache the entire decrypted config for future use.
-        this.tenantCacheByVaultId.set(vaultId, tenantConfig);
-
-        return tenantConfig;
-      } else {
+      const tenantConfig = await this.kmsService.unprotectConfidentialData<any>(secureTenantRecord, 'host');
+      if (!tenantConfig?.claims) {
         console.error(`[TenantsCacheManager] Decrypted record for vaultId '${vaultId}' is invalid or missing claims.`);
         return undefined;
       }
+
+      tenantConfig.collectionName = generateTenantCollectionNameFromClaims(tenantConfig.claims);
+      return tenantConfig;
     } catch (error) {
       console.error(`[TenantsCacheManager] Failed to decrypt tenant record for vaultId '${vaultId}'.`, error);
       return undefined;
     }
   }
 
+  private toRuntimeView(tenantConfig: any): TenantRuntimeView {
+    const tenantIdentifierUrn = getIdentifierUrnFromClaims(tenantConfig?.claims);
+    return {
+      collectionName: tenantConfig?.collectionName,
+      didDocument: tenantConfig?.didDocument,
+      didServiceConfig: tenantConfig?.didConfig?.service,
+      tenantIdentifierUrn,
+      legacySignAlg: tenantConfig?.legacySignAlg as string | undefined,
+      tenantAuthorizationStatus: tenantConfig ? getTenantAuthorizationStatus(tenantConfig) : undefined,
+      isTenantOperational: tenantConfig ? isTenantAuthorizationOperational(tenantConfig) : false,
+      jurisdiction: tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.addressCountry] as string | undefined,
+      alternateName: tenantConfig?.claims?.[ClaimsOrganizationSchemaorg.alternateName] as string | undefined,
+      domainUrl: getTenantServiceClaim(tenantConfig, ClaimsOrganizationSchemaorg.url),
+      operationalUrl: getTenantServiceClaim(tenantConfig, SERVICE_OPERATIONAL_URL_CLAIM),
+      sector: parseTenantUrn(tenantIdentifierUrn || '')?.sector as Sector | undefined,
+      serviceCapabilityClaim: getTenantServiceCapabilityClaim(tenantConfig),
+    };
+  }
+
   /**
-   * Retrieves the full, cached configuration for a tenant.
-   * @param vaultId The unique vault identifier for the tenant.
-   * @returns The tenant's configuration object, or `undefined` if not found.
+   * Returns a cached runtime view when present, otherwise loads it once from
+   * storage and stores the sanitized projection in memory.
+   *
+   * Ordinary runtime callers should reach tenant metadata through this path.
+   */
+  private async _ensureTenantIsInCache(vaultId: string): Promise<TenantRuntimeView | undefined> {
+    // 1. Check the cache first.
+    const runtimeView = this.tenantRuntimeCacheByVaultId.get(vaultId);
+    if (runtimeView) {
+      return runtimeView;
+    }
+
+    const tenantConfig = await this.loadFullTenantConfig(vaultId);
+    if (!tenantConfig) {
+      return undefined;
+    }
+
+    const nextRuntimeView = this.toRuntimeView(tenantConfig);
+    this.tenantRuntimeCacheByVaultId.set(vaultId, nextRuntimeView);
+    return nextRuntimeView;
+  }
+
+  /**
+   * Reads the full tenant registration/configuration object.
+   *
+   * @warning
+   * This is a privileged control-plane read. It should not be used by ordinary
+   * runtime flows that only need derived metadata.
+   *
+   * Cache behavior:
+   * - reads the current storage-backed registration
+   * - refreshes the sanitized runtime view after a successful read
    */
   public async getTenant(vaultId: string): Promise<any | undefined> {
-    return await this._ensureTenantIsInCache(vaultId);
+    const tenantConfig = await this.loadFullTenantConfig(vaultId);
+    if (!tenantConfig) {
+      return undefined;
+    }
+    this.tenantRuntimeCacheByVaultId.set(vaultId, this.toRuntimeView(tenantConfig));
+    return tenantConfig;
   }
 
   public async tenantExists(vaultId: string): Promise<boolean> {
     return (await this._ensureTenantIsInCache(vaultId)) !== undefined;
   }
 
+  /**
+   * Invalidates a tenant runtime entry and reloads it from storage.
+   *
+   * Use this after a successful write to the tenant registration, never as a
+   * substitute for persisting the write itself.
+   */
   public async refreshTenant(vaultId: string): Promise<any | undefined> {
-    this.tenantCacheByVaultId.delete(vaultId);
-    return await this._ensureTenantIsInCache(vaultId);
+    this.tenantRuntimeCacheByVaultId.delete(vaultId);
+    return await this.getTenant(vaultId);
   }
 
   /**
@@ -150,25 +229,20 @@ export class TenantsCacheManager implements ITenantsManager {
    */
   public async findTenantVaultIdByIdentifierValue(identifierValue: string): Promise<string | undefined> {
     const target = String(identifierValue || '').trim();
-    if (!target || target.toLowerCase() === 'host') return undefined;
+    if (!target) return undefined;
 
-    const tenantsSection = getEnvSectionId('tenants');
-    const records = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(this.hostCollectionName, tenantsSection);
-    for (const record of records) {
-      try {
-        const config = await this.kmsService.unprotectConfidentialData<any>(record, 'host');
-        const current = String(config?.claims?.[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
-        if (current && current === target) {
-          const collectionName = generateTenantCollectionNameFromClaims(config.claims);
-          config.collectionName = collectionName;
-          this.tenantCacheByVaultId.set(record.id, config);
-          return record.id;
-        }
-      } catch {
-        // Skip malformed tenant records.
-      }
+    const hostConfig = await this.getTenant('host');
+    const hostIdentifierValue = String(hostConfig?.claims?.[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
+    if (hostIdentifierValue && hostIdentifierValue === target) {
+      return 'host';
     }
-    return undefined;
+
+    const results = await this.vaultRepository.query(
+      this.hostCollectionName,
+      { sectionId: getEnvSectionId('tenants'), where: [{ name: ClaimsOrganizationSchemaorg.identifierValue, value: target }] },
+      { hydrate: false },
+    );
+    return results.length > 0 ? String(results[0]?.id || '').trim() || undefined : undefined;
   }
 
   /**
@@ -187,7 +261,7 @@ export class TenantsCacheManager implements ITenantsManager {
         const collectionName = generateTenantCollectionNameFromClaims(config.claims);
         config.collectionName = collectionName;
         const vaultId = record.id;
-        this.tenantCacheByVaultId.set(vaultId, config);
+        this.tenantRuntimeCacheByVaultId.set(vaultId, this.toRuntimeView(config));
         tenants.push(config);
       } catch {
         // Skip malformed/unreadable tenant records in discovery output.
@@ -220,19 +294,19 @@ export class TenantsCacheManager implements ITenantsManager {
   }
 
   public async getTenantAuthorizationStatus(vaultId: string): Promise<TenantAuthorizationLifecycleStatus | undefined> {
-    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
-    if (!tenantConfig) {
+    const tenantRuntime = await this._ensureTenantIsInCache(vaultId);
+    if (!tenantRuntime) {
       return undefined;
     }
-    return getTenantAuthorizationStatus(tenantConfig);
+    return tenantRuntime.tenantAuthorizationStatus;
   }
 
   public async isTenantOperational(vaultId: string): Promise<boolean> {
-    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
-    if (!tenantConfig) {
+    const tenantRuntime = await this._ensureTenantIsInCache(vaultId);
+    if (!tenantRuntime) {
       return false;
     }
-    return isTenantAuthorizationOperational(tenantConfig);
+    return tenantRuntime.isTenantOperational;
   }
 
   /**
@@ -285,13 +359,13 @@ export class TenantsCacheManager implements ITenantsManager {
    * @param verificationMethod The verification method object to add.
    */
   public addVerificationMethodToTenant(vaultId: string, verificationMethod: VerificationMethod): void {
-    const tenantConfig = this.tenantCacheByVaultId.get(vaultId);
-    if (tenantConfig) {
-      if (!tenantConfig.didDocument.verificationMethod) {
-        tenantConfig.didDocument.verificationMethod = [];
+    const tenantRuntime = this.tenantRuntimeCacheByVaultId.get(vaultId);
+    if (tenantRuntime?.didDocument) {
+      if (!tenantRuntime.didDocument.verificationMethod) {
+        tenantRuntime.didDocument.verificationMethod = [];
       }
-      tenantConfig.didDocument.verificationMethod.push(verificationMethod);
-      this.tenantCacheByVaultId.set(vaultId, tenantConfig);
+      tenantRuntime.didDocument.verificationMethod.push(verificationMethod);
+      this.tenantRuntimeCacheByVaultId.set(vaultId, tenantRuntime);
     } else {
       console.warn(`[TenantsCacheManager] Could not add verification method: Tenant with vaultId '${vaultId}' not found in cache.`);
     }
@@ -304,7 +378,7 @@ export class TenantsCacheManager implements ITenantsManager {
    */
   public async getTenantIdentifierUrn(vaultId: string): Promise<string | undefined> {
     const tenantConfig = await this._ensureTenantIsInCache(vaultId);
-    return getIdentifierUrnFromClaims(tenantConfig?.claims);
+    return tenantConfig?.tenantIdentifierUrn;
   }
 
   public async getDidDocument(vaultId: string): Promise<DidDocument | undefined> {
@@ -314,7 +388,16 @@ export class TenantsCacheManager implements ITenantsManager {
 
   public async getDidServiceConfig(vaultId: string): Promise<DidService[] | undefined> {
     const tenantConfig = await this._ensureTenantIsInCache(vaultId);
-    return tenantConfig?.didConfig?.service;
+    return tenantConfig?.didServiceConfig;
+  }
+
+  /**
+   * Retrieves the published legacy signing algorithm from cached runtime
+   * metadata when present.
+   */
+  public async getLegacySignAlg(vaultId: string): Promise<string | undefined> {
+    const tenantRuntime = await this._ensureTenantIsInCache(vaultId);
+    return tenantRuntime?.legacySignAlg;
   }
 
   /**
@@ -334,7 +417,7 @@ export class TenantsCacheManager implements ITenantsManager {
    * @returns The claims object, or `undefined` if not found.
    */
   public async getEntityClaims(vaultId: string): Promise<any | undefined> {
-    const tenantConfig = await this._ensureTenantIsInCache(vaultId);
+    const tenantConfig = await this.getTenant(vaultId);
     return tenantConfig?.claims;
   }
 
@@ -358,8 +441,7 @@ export class TenantsCacheManager implements ITenantsManager {
    */
   public async getTenantJurisdiction(vaultId: string): Promise<string | undefined> {
     const tenantConfig = await this._ensureTenantIsInCache(vaultId);
-    if (!tenantConfig) return undefined;
-    return tenantConfig.claims[ClaimsOrganizationSchemaorg.addressCountry] as string;
+    return tenantConfig?.jurisdiction;
   }
 
   /**
@@ -381,7 +463,7 @@ export class TenantsCacheManager implements ITenantsManager {
       return undefined;
     }
     
-    const externalUrl = tenantConfig.claims[ClaimsOrganizationSchemaorg.url];
+    const externalUrl = tenantConfig.domainUrl;
     if (externalUrl) {
       return externalUrl.startsWith('http') ? externalUrl : `https://${externalUrl}`;
     }
@@ -404,7 +486,7 @@ export class TenantsCacheManager implements ITenantsManager {
       return undefined;
     }
 
-    const operationalUrl = tenantConfig.claims[SERVICE_OPERATIONAL_URL_CLAIM];
+    const operationalUrl = tenantConfig.operationalUrl;
     if (typeof operationalUrl === 'string' && operationalUrl.trim()) {
       return operationalUrl.startsWith('http') ? operationalUrl : `https://${operationalUrl}`;
     }
@@ -416,7 +498,7 @@ export class TenantsCacheManager implements ITenantsManager {
    * Constructs the full hosted URL for a tenant based on its configuration.
    * @param config The full tenant configuration object from the cache.
    */
-  private async constructHostedUrl(config: any): Promise<string | undefined> {
+  private async constructHostedUrl(config: TenantRuntimeView): Promise<string | undefined> {
     const hostDidDoc = await this.getDidDocument('host');
     if (!hostDidDoc) {
       console.error('[TenantsCacheManager] Cannot construct hosted URL: Host DID document not found in cache.');
@@ -426,10 +508,8 @@ export class TenantsCacheManager implements ITenantsManager {
     const baseUrl = getBaseUrlFromDidWeb(hostDidDoc.id);
     const hostPublicBaseUrl = getDidDocumentServiceEndpointBaseUrl(hostDidDoc, '#did-document') || baseUrl;
 
-    const alternateName = config.claims[ClaimsOrganizationSchemaorg.alternateName];
-    // The URN is the single source of truth for jurisdiction, version, and sector.
-    const urn = config.claims[ClaimsOrganizationSchemaorg.identifier];
-    const parsedUrn = urn ? parseTenantUrn(urn) : null;
+    const alternateName = config.alternateName;
+    const parsedUrn = config.tenantIdentifierUrn ? parseTenantUrn(config.tenantIdentifierUrn) : null;
 
     if (!alternateName || !parsedUrn?.jurisdiction || !parsedUrn?.version || !parsedUrn?.sector) {
       console.warn('[TenantsCacheManager] Cannot construct hosted URL: missing alternateName or could not parse URN.');

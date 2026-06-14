@@ -209,6 +209,7 @@ async function startServer(options?: StartServerOptions) {
     vaultRepository,
     kmsService,
     tenantManager,
+    hostCollectionName,
     storageAdapter,
     logger,
     cryptographyService,
@@ -226,7 +227,7 @@ async function startServer(options?: StartServerOptions) {
    * per execution. Reading before bootstrapping would try to resolve a host
    * registration that does not exist in the new physical host collection yet.
    */
-  if (!(await tenantManager.getTenant('host'))) {
+  if (!(await tenantManager.tenantExists('host'))) {
     console.log('[GW-API] Host tenant not found. Bootstrapping...');
     await bootstrapHost(hostingManager, config);
     // After bootstrapping, explicitly refresh the cache for the host to prevent

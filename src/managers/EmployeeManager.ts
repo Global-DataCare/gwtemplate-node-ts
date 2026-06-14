@@ -12,7 +12,6 @@ import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { initializeEmployeeServices } from '../utils/services';
 import { createOperationOutcome } from '../utils/outcome';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
-import { TenantsCacheManager } from './TenantsCacheManager';
 import { getTenantVaultId } from '../utils/tenant';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { BundleEntry, ErrorEntry, BundleEntryRequest, BundleJsonApi } from 'gdc-common-utils-ts/models/bundle';
@@ -32,6 +31,9 @@ import { getPersonOccupationClaim } from '../utils/occupation';
 import { createEmployeeUrn, parseTenantUrn } from '../utils/urn';
 import { normalizeIndexedEmail } from '../utils/indexed-contact';
 import { extractSearchFiltersFromEntry } from '../utils/search-request';
+import type { ITenantsManager } from './ITenantsManager';
+import type { ITenantDidRegistryMutator } from './ITenantDidRegistryMutator';
+import type { IHostRuntime } from './IHostRuntime';
 import {
   ACTION_PURGE,
   LICENSE_STATUS_AVAILABLE,
@@ -46,16 +48,38 @@ const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
 export class EmployeeManager {
   private vaultRepository: IVaultRepository;
   private kmsService: IKmsService;
-  private tenantsCacheManager: TenantsCacheManager;
+  private tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn'>;
+  private tenantDidRegistryMutator: ITenantDidRegistryMutator;
+  private hostRuntime: IHostRuntime;
 
+  /**
+   * Creates an employee manager with only the minimum tenant/host capabilities
+   * required by the current onboarding and offer flows.
+   *
+   * Design note:
+   * - this manager must not receive `TenantsCacheManager` directly
+   * - it only needs:
+   *   - tenant URN resolution for response `iss`
+   *   - a narrow DID-registry mutator to publish child verification methods
+   *   - host runtime scalars for host-owned offers
+   *
+   * Security boundary:
+   * - no decrypted tenant config
+   * - no general tenant lookup API
+   * - no direct access to tenant secrets or registry records
+   */
   constructor(
     vaultRepository: IVaultRepository,
     kmsService: IKmsService,
-    tenantsCacheManager: TenantsCacheManager,
+    tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn'>,
+    tenantDidRegistryMutator: ITenantDidRegistryMutator,
+    hostRuntime: IHostRuntime,
   ) {
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
-    this.tenantsCacheManager = tenantsCacheManager;
+    this.tenantsManager = tenantsManager;
+    this.tenantDidRegistryMutator = tenantDidRegistryMutator;
+    this.hostRuntime = hostRuntime;
   }
 
   public async process(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
@@ -71,7 +95,7 @@ export class EmployeeManager {
     const vaultId = getTenantVaultId(job.sector, job.tenantId);
 
     // Fetch the tenant's URN once for the entire job.
-    const issuerUrn = await this.tenantsCacheManager.getTenantIdentifierUrn(vaultId);
+    const issuerUrn = await this.tenantsManager.getTenantIdentifierUrn(vaultId);
     if (!issuerUrn) {
       throw new ManagerError(`Tenant with ID '${job.tenantId}' not found.`, IssueType.NotFound);
     }
@@ -387,8 +411,8 @@ export class EmployeeManager {
     
     // Also add these keys to the parent tenant's DID Document for resolution.
     // This allows others to find the employee's keys by querying the tenant's DID.
-    this.tenantsCacheManager.addVerificationMethodToTenant(vaultId, verificationMethods[0]);
-    this.tenantsCacheManager.addVerificationMethodToTenant(vaultId, verificationMethods[1]);
+    this.tenantDidRegistryMutator.addVerificationMethodToTenant(vaultId, verificationMethods[0]);
+    this.tenantDidRegistryMutator.addVerificationMethodToTenant(vaultId, verificationMethods[1]);
 
     const employeeConfig: EntityConfig = {
       id: employeeId,
@@ -404,13 +428,7 @@ export class EmployeeManager {
       },
     };
 
-    const tenantClaims = await this.tenantsCacheManager.getEntityClaims(vaultId);
-    if (!tenantClaims) {
-      throw new ManagerError(`Could not retrieve claims for tenant vault ${vaultId}`, IssueType.NotFound);
-    }
-    
-    // Initialize services using the tenant's service claims and the new employee config.
-    employeeConfig.didDocument!.service = initializeEmployeeServices(employeeConfig, tenantClaims);
+    employeeConfig.didDocument!.service = initializeEmployeeServices(employeeConfig);
     
     // Also, update the didConfig with the same services.
     employeeConfig.didConfig!.service = employeeConfig.didDocument!.service;
@@ -442,6 +460,9 @@ export class EmployeeManager {
       sequence: 0,
       content: employeeConfig,
       indexed: { attributes: protectedAttributes },
+      audit: {
+        updated: employeeConfig.meta?.lastUpdated,
+      } as any,
     };
     
     // The tenant's vaultId is used for the security context.
@@ -533,6 +554,11 @@ export class EmployeeManager {
         status: employee.status,
         sequence: (employeeDoc.sequence || 0) + 1,
         content: employee,
+        audit: {
+          ...(employeeDoc.audit || {}),
+          updated: employee.meta?.lastUpdated,
+          deactivated: false,
+        } as any,
       };
       const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
       await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);
@@ -570,11 +596,10 @@ export class EmployeeManager {
 
     const availableDoc = employeeLicenseDocs.find((doc) => (doc.content as DeviceLicense).status === LICENSE_STATUS_AVAILABLE);
     if (!availableDoc) {
-      const hostDid = (await this.tenantsCacheManager.getTenantDid('host')) || 'did:web:host';
       const allowedPaymentMethods = (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(',').map(s => s.trim()).filter(Boolean);
       const offerClaims = generateLicenseOffer(
         1,
-        hostDid,
+        this.hostRuntime.hostDid,
         params.jurisdiction,
         params.sector,
         allowedPaymentMethods,
@@ -606,9 +631,8 @@ export class EmployeeManager {
   }
 
   private async persistHostCommercialOffer(claims: Record<string, unknown>): Promise<void> {
-    const hostCollectionName = await this.tenantsCacheManager.getCollectionName('host');
     const offerId = String(claims[ClaimsOfferSchemaorg.identifier] || '').trim();
-    if (!hostCollectionName || !offerId) return;
+    if (!offerId) return;
 
     const communicationDoc: ConfidentialStorageDoc = {
       id: offerId,
@@ -617,7 +641,7 @@ export class EmployeeManager {
       content: { claims },
     };
     const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, 'host');
-    await this.vaultRepository.put(hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
+    await this.vaultRepository.put(this.hostRuntime.hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
   }
 
   private async disableEmployee(vaultId: string, employeeId: string, entryType: string): Promise<BundleEntry> {
@@ -634,6 +658,11 @@ export class EmployeeManager {
       status: employee.status,
       sequence: (employeeDoc.sequence || 0) + 1,
       content: employee,
+      audit: {
+        ...(employeeDoc.audit || {}),
+        updated: new Date().toISOString(),
+        deactivated: true,
+      } as any,
     };
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
     await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);
@@ -676,6 +705,12 @@ export class EmployeeManager {
       status: employee.status,
       sequence: (employeeDoc.sequence || 0) + 1,
       content: employee,
+      audit: {
+        ...(employeeDoc.audit || {}),
+        updated: new Date().toISOString(),
+        deactivated: true,
+        disposition: 'purged',
+      } as any,
     };
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
     await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);

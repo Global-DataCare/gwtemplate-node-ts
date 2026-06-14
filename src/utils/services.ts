@@ -601,7 +601,7 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
  * @param employeeConfig The configuration object for the new employee.
  * @returns The array of DidService objects for the employee's didDocument.
  */
-export function initializeEmployeeServices(employeeConfig: EntityConfig, tenantClaims: any): DidService[] {
+export function initializeEmployeeServices(employeeConfig: EntityConfig): DidService[] {
   const { didDocument } = employeeConfig;
   if (!didDocument?.id) {
     throw new TypeError("Cannot initialize employee services: didDocument with id is missing from the configuration.");
@@ -630,7 +630,7 @@ export function initializeEmployeeServices(employeeConfig: EntityConfig, tenantC
  * @param sector The sector of the tenant under which the customer is being created.
  * @returns The array of DidService objects for the customer's didDocument.
  */
-export function initializeCustomerServices(customerConfig: EntityConfig, sector: Sector, tenantClaims: any): DidService[] {
+export function initializeCustomerServices(customerConfig: EntityConfig, sector: Sector): DidService[] {
   const { didDocument } = customerConfig;
   if (!didDocument?.id) {
     throw new TypeError("Cannot initialize customer services: didDocument with id is missing from the configuration.");

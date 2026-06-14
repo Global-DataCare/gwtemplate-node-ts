@@ -5,19 +5,19 @@ import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confiden
 import { normalizeContextualizedClaims } from './claims';
 
 /**
- * Normalizes one portal/BFF commercial search entry into flat comparable claims.
+ * Normalizes one offer/order search entry into flat comparable claims.
  *
  * Current shared SDK helpers may send claims either in `entry.meta.claims` or
  * in `entry.resource.meta.claims`. GW search readers should not force frontend
  * code to care about that transport detail.
  */
-export function extractCommercialSearchClaims(entry: BundleEntry): Record<string, unknown> {
+export function extractOfferOrderSearchClaims(entry: BundleEntry): Record<string, unknown> {
   const rawClaims = entry?.meta?.claims || entry?.resource?.meta?.claims;
   return rawClaims ? normalizeContextualizedClaims(rawClaims) : {};
 }
 
 /**
- * Applies the current exact-match commercial search semantics used by hosted
+ * Applies the current exact-match offer/order search semantics used by hosted
  * and family offer/order read-models.
  *
  * Notes:
@@ -28,7 +28,7 @@ export function extractCommercialSearchClaims(entry: BundleEntry): Record<string
  *   designed first in shared `common-utils`/BFF contracts before being baked
  *   into GW.
  */
-export function matchCommercialSearch(
+export function matchOfferOrderSearchClaims(
   claims: Record<string, unknown>,
   filters: Record<string, unknown>,
 ): boolean {
@@ -40,10 +40,10 @@ export function matchCommercialSearch(
 }
 
 /**
- * Projects one stored commercial artifact into the compact row shape consumed
+ * Projects one stored offer/order artifact into the compact row shape consumed
  * by current portal-oriented read-model readers.
  */
-export function buildCommercialSearchRow(
+export function buildOfferOrderSearchRow(
   doc: ConfidentialStorageDoc,
   claims: Record<string, unknown>,
   fallbackIdClaim: string,
@@ -57,4 +57,35 @@ export function buildCommercialSearchRow(
     },
     ...(resource ? { resource } : {}),
   };
+}
+
+export function readProjectedOfferOrderClaims(doc: ConfidentialStorageDoc): Record<string, unknown> {
+  const rawClaims =
+    (doc as any)?.meta?.claims
+    || (doc as any)?.resource?.meta?.claims
+    || (doc as any)?.content?.claims;
+  return rawClaims ? normalizeContextualizedClaims(rawClaims) : {};
+}
+
+export function buildOfferOrderIndexedAttributes(
+  claims: Record<string, unknown>,
+): Array<{ name: string; value: string; unique?: boolean }> {
+  const attributes: Array<{ name: string; value: string; unique?: boolean }> = [];
+  const seen = new Set<string>();
+
+  for (const [name, rawValue] of Object.entries(claims || {})) {
+    if (!name || name.startsWith('@')) continue;
+    if (rawValue === undefined || rawValue === null) continue;
+    if (typeof rawValue === 'object') continue;
+
+    const value = String(rawValue).trim();
+    if (!value) continue;
+
+    const dedupeKey = `${name}\u0000${value}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    attributes.push({ name, value });
+  }
+
+  return attributes;
 }

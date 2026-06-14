@@ -5,7 +5,7 @@ import { IJobProcessor } from './registry';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
-import { TenantsCacheManager } from './TenantsCacheManager';
+import type { ITenantsManager } from './ITenantsManager';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { Content } from 'gdc-common-utils-ts/utils/content';
@@ -32,7 +32,7 @@ type TokenRequestBody = {
 export class OpenIdAuthManager implements IJobProcessor {
   constructor(
     private readonly kmsService: IKmsService,
-    private readonly tenantsCacheManager: TenantsCacheManager,
+    private readonly tenantsCacheManager: ITenantsManager,
     private readonly vaultRepository: IVaultRepository,
     private readonly clearingHouseService: IClearingHouseService,
   ) {}

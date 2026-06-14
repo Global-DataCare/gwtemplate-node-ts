@@ -19,7 +19,13 @@ import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
-import { buildCommercialSearchRow, extractCommercialSearchClaims, matchCommercialSearch } from '../utils/commercial-read-model';
+import {
+  buildOfferOrderIndexedAttributes,
+  buildOfferOrderSearchRow,
+  extractOfferOrderSearchClaims,
+  matchOfferOrderSearchClaims,
+  readProjectedOfferOrderClaims,
+} from '../utils/offer-order-read-model';
 import { createOperationOutcome } from '../utils/outcome';
 import { determineResourceId } from '../utils/resource';
 import { getTenantVaultId } from '../utils/tenant';
@@ -27,7 +33,7 @@ import { generateLicenseOffer } from '../utils/offer';
 import { getEnvSectionId } from '../utils/section-env';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
-import { TenantsCacheManager } from './TenantsCacheManager';
+import type { ITenantsManager } from './ITenantsManager';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
@@ -57,12 +63,14 @@ type FamilyRegistrationContent = {
 
 const INDIVIDUAL_SECTION = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
 const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
+const TENANT_DISABLED_HOSTED_INDIVIDUAL_MESSAGE =
+  'Tenant disabled must not allow creating a new hosted individual.';
 
 export class FamilyManager {
   constructor(
     private vaultRepository: IVaultRepository,
     private kmsService: IKmsService,
-    private tenantsCacheManager: TenantsCacheManager,
+    private tenantsCacheManager: ITenantsManager,
     private storageAdapter: IStorageAdapter,
     private logger: ILogger,
     private config: IServerConfig,
@@ -121,6 +129,27 @@ export class FamilyManager {
     };
   }
 
+  /**
+   * Rejects hosted individual onboarding when the parent tenant is not
+   * operational.
+   *
+   * Why this guard lives here:
+   * - individual section `Organization` jobs are routed to `FamilyManager`, not
+   *   `HostingManager`
+   * - the live lifecycle contract expects a disabled tenant to reject new
+   *   hosted individual creation immediately
+   *
+   * Why this uses `ITenantsManager` only:
+   * - the onboarding flow needs only the derived operational state
+   * - it must not load or decrypt the full tenant registration object
+   */
+  private async assertTenantAllowsHostedIndividualCreation(tenantVaultId: string): Promise<void> {
+    const isTenantOperational = await this.tenantsCacheManager.isTenantOperational(tenantVaultId);
+    if (!isTenantOperational) {
+      throw new ManagerError(TENANT_DISABLED_HOSTED_INDIVIDUAL_MESSAGE, IssueType.Forbidden);
+    }
+  }
+
   private async processFamilyOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
     const tenantId = job.tenantId;
     const sector = job.sector as Sector | undefined;
@@ -133,22 +162,28 @@ export class FamilyManager {
       throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
     }
 
-    const filters = extractCommercialSearchClaims(entry);
-    const records = [
-      ...await this.vaultRepository.getContainersInSection(tenantCollectionName, INDIVIDUAL_SECTION),
-      ...await this.vaultRepository.getContainersInSection(tenantCollectionName, getEnvSectionId('communications')),
-    ];
+    const filters = extractOfferOrderSearchClaims(entry);
+    const where = Object.entries(filters)
+      .filter(([key, value]) => !key.startsWith('@') && value !== undefined && value !== null && String(value).trim() !== '')
+      .map(([name, value]) => ({ name, value: String(value).trim() }));
+    const records = where.length > 0
+      ? [
+        ...await this.vaultRepository.query(tenantCollectionName, { sectionId: INDIVIDUAL_SECTION, where }, { hydrate: false }),
+        ...await this.vaultRepository.query(tenantCollectionName, { sectionId: getEnvSectionId('communications'), where }, { hydrate: false }),
+      ]
+      : [
+        ...await this.vaultRepository.listContainersInSection(tenantCollectionName, INDIVIDUAL_SECTION),
+        ...await this.vaultRepository.listContainersInSection(tenantCollectionName, getEnvSectionId('communications')),
+      ];
     const matches: Record<string, unknown>[] = [];
     for (const secureDoc of records as ConfidentialStorageDoc[]) {
-      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, tenantVaultId);
-      const claims = (content?.claims || {}) as Record<string, unknown>;
+      const claims = readProjectedOfferOrderClaims(secureDoc);
       if (!claims[ClaimsOfferSchemaorg.identifier]) continue;
-      if (!matchCommercialSearch(claims, filters)) continue;
-      matches.push(buildCommercialSearchRow(
+      if (!matchOfferOrderSearchClaims(claims, filters)) continue;
+      matches.push(buildOfferOrderSearchRow(
         secureDoc,
         claims,
         ClaimsOfferSchemaorg.identifier,
-        content?.invoiceBundle as Record<string, unknown> | undefined,
       ));
     }
 
@@ -171,19 +206,26 @@ export class FamilyManager {
       throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
     }
 
-    const filters = extractCommercialSearchClaims(entry);
-    const records = await this.vaultRepository.getContainersInSection(tenantCollectionName, getEnvSectionId('communications'));
+    const filters = extractOfferOrderSearchClaims(entry);
+    const where = Object.entries(filters)
+      .filter(([key, value]) => !key.startsWith('@') && value !== undefined && value !== null && String(value).trim() !== '')
+      .map(([name, value]) => ({ name, value: String(value).trim() }));
+    const records = where.length > 0
+      ? await this.vaultRepository.query(
+        tenantCollectionName,
+        { sectionId: getEnvSectionId('communications'), where },
+        { hydrate: false },
+      )
+      : await this.vaultRepository.listContainersInSection(tenantCollectionName, getEnvSectionId('communications'));
     const matches: Record<string, unknown>[] = [];
     for (const secureDoc of records as ConfidentialStorageDoc[]) {
-      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, tenantVaultId);
-      const claims = (content?.claims || {}) as Record<string, unknown>;
+      const claims = readProjectedOfferOrderClaims(secureDoc);
       if (!claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]) continue;
-      if (!matchCommercialSearch(claims, filters)) continue;
-      matches.push(buildCommercialSearchRow(
+      if (!matchOfferOrderSearchClaims(claims, filters)) continue;
+      matches.push(buildOfferOrderSearchRow(
         secureDoc,
         claims,
         ClaimsOrderSchemaorg.acceptedOfferIdentifier,
-        content?.invoiceBundle as Record<string, unknown> | undefined,
       ));
     }
 
@@ -230,6 +272,7 @@ export class FamilyManager {
     if (!tenantCollectionName) {
       throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
     }
+    await this.assertTenantAllowsHostedIndividualCreation(tenantVaultId);
 
     const { organization, person, service } = this.extractResources(claims, environment);
     const processedService = await this.handleServiceAttachment(service);
@@ -328,10 +371,11 @@ export class FamilyManager {
     const individualDocId =
       (processedClaims[`${ClaimsOrganizationSchemaorg.identifierValue}`] as string | undefined) || uuidv4();
 
-    const registrationDoc: ConfidentialStorageDoc = {
+    const registrationDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
       id: individualDocId,
       status: EntityLifecycleStatus.Pending,
       sequence: 0,
+      meta: { claims: processedClaims },
       indexed: {
         attributes: [
           { name: 'status', value: EntityLifecycleStatus.Pending },
@@ -339,6 +383,7 @@ export class FamilyManager {
           ...indexedPhones,
           ...indexedEmails,
           ...(apodo ? [{ name: ClaimsOrganizationSchemaorg.alternateName, value: apodo }] : []),
+          ...buildOfferOrderIndexedAttributes(processedClaims),
         ],
         hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
       },
@@ -498,7 +543,7 @@ export class FamilyManager {
     });
 
     if (results.length === 0) {
-      return this.processCommercialFamilyOrderEntry(job, claims, offerId);
+      return this.processFamilyLicenseOrderEntry(job, claims, offerId);
     }
     if (results.length > 1) {
       this.logger.error(`CRITICAL: Multiple pending family registrations found for the same offerId: '${offerId}'`);
@@ -628,10 +673,15 @@ export class FamilyManager {
       paymentUrl: claims[ClaimsOrderSchemaorg.paymentUrl] as string | undefined,
     });
 
-    const communicationDoc: ConfidentialStorageDoc = {
+    const communicationDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
       id: paymentCommunication.communicationId,
       status: EntityLifecycleStatus.Active,
       sequence: 0,
+      meta: { claims: paymentCommunication.claims },
+      indexed: {
+        attributes: buildOfferOrderIndexedAttributes(paymentCommunication.claims),
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
       content: { claims: paymentCommunication.claims, invoiceBundle },
     };
     const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, tenantVaultId);
@@ -645,7 +695,7 @@ export class FamilyManager {
     };
   }
 
-  private async processCommercialFamilyOrderEntry(
+  private async processFamilyLicenseOrderEntry(
     job: JobRequest,
     orderClaims: ClaimsRecord,
     offerId: string,
@@ -661,11 +711,17 @@ export class FamilyManager {
       throw new ManagerError(`Tenant not found in cache: '${tenantVaultId}'`, IssueType.NotFound);
     }
 
-    const records = await this.vaultRepository.getContainersInSection(tenantCollectionName, getEnvSectionId('communications'));
+    const records = await this.vaultRepository.query(
+      tenantCollectionName,
+      {
+        sectionId: getEnvSectionId('communications'),
+        where: [{ name: ClaimsOfferSchemaorg.identifier, value: offerId }],
+      },
+      { hydrate: false },
+    );
     let matchedOfferClaims: Record<string, unknown> | undefined;
     for (const secureDoc of records as ConfidentialStorageDoc[]) {
-      const content = await this.kmsService.unprotectConfidentialData<any>(secureDoc, tenantVaultId);
-      const candidateClaims = (content?.claims || {}) as Record<string, unknown>;
+      const candidateClaims = readProjectedOfferOrderClaims(secureDoc);
       if (String(candidateClaims[ClaimsOfferSchemaorg.identifier] || '').trim() === offerId) {
         matchedOfferClaims = candidateClaims;
         break;
@@ -741,10 +797,15 @@ export class FamilyManager {
       paymentUrl: verification.paymentUrl,
     });
 
-    const communicationDoc: ConfidentialStorageDoc = {
+    const communicationDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
       id: paymentCommunication.communicationId,
       status: EntityLifecycleStatus.Active,
       sequence: 0,
+      meta: { claims: paymentCommunication.claims },
+      indexed: {
+        attributes: buildOfferOrderIndexedAttributes(paymentCommunication.claims),
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
       content: { claims: paymentCommunication.claims, invoiceBundle },
     };
     const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, tenantVaultId);

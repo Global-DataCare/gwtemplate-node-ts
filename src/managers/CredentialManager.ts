@@ -6,7 +6,6 @@ import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { VerifiableCredentialV2, ProofEBSIv2 } from '../gdc-backend-utils-node/models/verifiable-credential';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { objectToBytes } from 'gdc-common-utils-ts/utils/object-convert';
-import { TenantsCacheManager } from './TenantsCacheManager';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { generateVcId } from '../utils/vc-id';
@@ -14,6 +13,7 @@ import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ParameterData } from 'gdc-common-utils-ts/models/params';
 import { parseValidityPeriod } from '../utils/time';
+import type { ITenantsManager } from './ITenantsManager';
 
 /**
  * A low-level cryptographic engine responsible for the mechanics of creating,
@@ -24,18 +24,27 @@ import { parseValidityPeriod } from '../utils/time';
 export class CredentialManager {
   private vaultRepository: IVaultRepository;
   private kmsService: IKmsService;
-  private tenantsCacheManager: TenantsCacheManager;
+  private tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn'>;
   private hostDid: string;
 
+  /**
+   * Creates the low-level VC engine.
+   *
+   * Design note:
+   * - this manager signs and stores credentials, but it does not need the full
+   *   tenant registry
+   * - it only resolves the tenant URN for issuer composition in employee VC
+   *   issuance
+   */
   constructor(
     vaultRepository: IVaultRepository,
     kmsService: IKmsService,
-    tenantsCacheManager: TenantsCacheManager,
+    tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn'>,
     hostExternalDomain: string,
   ) {
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
-    this.tenantsCacheManager = tenantsCacheManager;
+    this.tenantsManager = tenantsManager;
     this.hostDid = `did:web:${hostExternalDomain}`;
   }
 
@@ -69,7 +78,7 @@ export class CredentialManager {
     validatedClaims: ClaimsRecord,
     evidence: any,
   ): Promise<VerifiableCredentialV2> {
-    const issuerUrn = await this.tenantsCacheManager.getTenantIdentifierUrn(jobContext.tenantId);
+    const issuerUrn = await this.tenantsManager.getTenantIdentifierUrn(jobContext.tenantVaultId);
     if (!issuerUrn) {
       throw new ManagerError(`Could not resolve URN for tenant '${jobContext.tenantId}'.`, IssueType.NotFound);
     }

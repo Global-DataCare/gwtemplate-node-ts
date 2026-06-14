@@ -5,9 +5,9 @@ import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
-import { TenantsCacheManager } from './TenantsCacheManager';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
+import type { ITenantsManager } from './ITenantsManager';
 
 /**
  * Manages the business logic for the 'ping' operation.
@@ -15,10 +15,16 @@ import { IssueType } from 'gdc-common-utils-ts/models/issue';
  * serving as a reference implementation and end-to-end diagnostic tool.
  */
 export class PingManager {
-  private tenantsCacheManager: TenantsCacheManager;
+  private tenantsManager: Pick<ITenantsManager, 'getTenantDid'>;
 
-  constructor(tenantsCacheManager: TenantsCacheManager) {
-    this.tenantsCacheManager = tenantsCacheManager;
+  /**
+   * Creates the diagnostic ping manager.
+   *
+   * It only needs the ability to resolve a DID string for the response issuer.
+   * It must not receive broader tenant-registry capability.
+   */
+  constructor(tenantsManager: Pick<ITenantsManager, 'getTenantDid'>) {
+    this.tenantsManager = tenantsManager;
   }
 
   /**
@@ -46,7 +52,7 @@ export class PingManager {
 
     // Determine the issuer's DID from the cache based on the tenantId from the job.
     const vaultId = job.tenantId || 'host';
-    const issuerDid = await this.tenantsCacheManager.getTenantDid(vaultId);
+    const issuerDid = await this.tenantsManager.getTenantDid(vaultId);
 
     if (!issuerDid) {
       // This should theoretically never happen if the routing validation is working correctly.

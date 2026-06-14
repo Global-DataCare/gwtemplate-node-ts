@@ -3,7 +3,7 @@
 
 import * as express from 'express';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
-import { TenantsCacheManager } from '../managers/TenantsCacheManager';
+import type { IApiTenantRegistry } from '../managers/IApiTenantRegistry';
 import { QueueAdapter } from '../adapters/queue';
 import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 import { createJobName } from '../utils/naming';
@@ -23,8 +23,8 @@ import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 import { getEnvSectionId } from '../utils/section-env';
 import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/replay-protection-store';
 import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
-import { getTenantAuthorizationStatus } from '../utils/tenant-lifecycle';
 import { ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE } from '../constants/domain';
+import { getTenantAuthorizationStatus as readTenantAuthorizationStatusFromConfig } from '../utils/tenant-lifecycle';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -260,7 +260,7 @@ function normalizeUnifiedIdentityAuthRouteParams(raw: RouteParams): RouteParams 
  */
 export function createApiRouter(
   queueAdapter: QueueAdapter,
-  tenantsCacheManager: TenantsCacheManager,
+  tenantsCacheManager: IApiTenantRegistry,
   kmsService: IKmsService,
   asyncResponseStore: IAsyncResponseStore,
   vaultRepository: IVaultRepository,
@@ -274,8 +274,7 @@ export function createApiRouter(
   const resolveVaultId = async (tenantId: string, sector: string): Promise<string> => {
     if (tenantId === 'host') return 'host';
     const directVaultId = getTenantVaultId(sector, tenantId);
-    const directTenant = await tenantsCacheManager.getTenant(directVaultId);
-    if (directTenant) return directVaultId;
+    if (await tenantsCacheManager.tenantExists(directVaultId)) return directVaultId;
 
     const canonicalVaultId = await tenantsCacheManager.findTenantVaultIdByIdentifierValue(tenantId);
     if (canonicalVaultId) return canonicalVaultId;
@@ -2540,8 +2539,11 @@ export function createApiRouter(
     }
 
     if (requiresActiveTenantAuthorization(tenantId, section, req.params.format, resourceType, action)) {
-      const tenantConfig = await tenantsCacheManager.getTenant(vaultId);
-      if (!tenantConfig) {
+      const tenantConfigForAuthorization = await tenantsCacheManager.getTenant(vaultId);
+      const authorizationStatus = tenantConfigForAuthorization
+        ? readTenantAuthorizationStatusFromConfig(tenantConfigForAuthorization)
+        : undefined;
+      if (!authorizationStatus) {
         return sendDidcommEarlyError(
           req,
           res,
@@ -2550,7 +2552,6 @@ export function createApiRouter(
           'The requested tenant or endpoint path does not exist.',
         );
       }
-      const authorizationStatus = getTenantAuthorizationStatus(tenantConfig);
       if (authorizationStatus !== 'active') {
         return sendDidcommEarlyError(
           req,

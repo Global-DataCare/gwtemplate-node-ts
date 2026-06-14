@@ -41,6 +41,7 @@ import {
   LICENSE_USER_CLASS_EMPLOYEE,
   LICENSE_USER_CLASS_INDIVIDUAL,
 } from '../constants/domain';
+import type { ITenantsManager } from './ITenantsManager';
 
 /**
  * Manages the business logic for creating device activation licenses.
@@ -50,10 +51,19 @@ import {
 export class LicenseManager implements IJobProcessor {
   private vaultRepository: IVaultRepository;
   private kmsService?: IKmsService;
+  private tenantsCacheManager?: ITenantsManager;
 
-  constructor(vaultRepository: IVaultRepository, kmsService?: IKmsService) {
+  constructor(vaultRepository: IVaultRepository, kmsService?: IKmsService, tenantsCacheManager?: ITenantsManager) {
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
+    this.tenantsCacheManager = tenantsCacheManager;
+  }
+
+  private async tenantExists(tenantVaultId: string): Promise<boolean> {
+    if (this.tenantsCacheManager) {
+      return this.tenantsCacheManager.tenantExists(tenantVaultId);
+    }
+    return this.vaultRepository.vaultExists(tenantVaultId);
   }
 
   /**
@@ -258,7 +268,7 @@ export class LicenseManager implements IJobProcessor {
     }
 
     const tenantVaultId = getTenantVaultId(job.sector as any, job.tenantId);
-    if (!(await this.vaultRepository.vaultExists(tenantVaultId))) {
+    if (!(await this.tenantExists(tenantVaultId))) {
       throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
     }
 

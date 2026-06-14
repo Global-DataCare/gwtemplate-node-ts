@@ -10,14 +10,14 @@ import {
   LicenseStatuses,
 } from 'gdc-common-utils-ts';
 import {
-  buildCommercialSearchRow,
-  extractCommercialSearchClaims,
-  matchCommercialSearch,
-} from '../../../utils/commercial-read-model';
+  buildOfferOrderSearchRow,
+  extractOfferOrderSearchClaims,
+  matchOfferOrderSearchClaims,
+} from '../../../utils/offer-order-read-model';
 
-describe('commercial-read-model utils', () => {
+describe('offer-order-read-model utils', () => {
   it('extracts normalized claims from resource.meta.claims and ignores transport nesting details', () => {
-    const claims = extractCommercialSearchClaims({
+    const claims = extractOfferOrderSearchClaims({
       resource: {
         meta: {
           claims: {
@@ -32,7 +32,7 @@ describe('commercial-read-model utils', () => {
   });
 
   it('matches only exact non-empty business filters and ignores @-prefixed vocab keys', () => {
-    const matches = matchCommercialSearch(
+    const matches = matchOfferOrderSearchClaims(
       {
         [ClaimsOfferSchemaorg.identifier]: EXAMPLE_LICENSE_OFFER_ID,
         [ClaimsOfferSchemaorg.category]: LicenseCategories.Professional,
@@ -47,7 +47,7 @@ describe('commercial-read-model utils', () => {
   });
 
   it('projects one compact row shape for portal-oriented read models', () => {
-    const row = buildCommercialSearchRow(
+    const row = buildOfferOrderSearchRow(
       {
         id: EXAMPLE_LICENSE_OFFER_ID,
         status: LicenseStatuses.Active,

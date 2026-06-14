@@ -4,7 +4,7 @@
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
-import { TenantsCacheManager } from './TenantsCacheManager';
+import type { ITenantsManager } from './ITenantsManager';
 
 /**
  * Manages the business logic for creating and signing system-level tokens,
@@ -13,11 +13,11 @@ import { TenantsCacheManager } from './TenantsCacheManager';
  */
 export class TokenManager {
   private kmsService: IKmsService;
-  private tenantsCacheManager: TenantsCacheManager;
+  private tenantsCacheManager: ITenantsManager;
 
   constructor(
     kmsService: IKmsService,
-    tenantsCacheManager: TenantsCacheManager
+    tenantsCacheManager: ITenantsManager
   ) {
     this.kmsService = kmsService;
     this.tenantsCacheManager = tenantsCacheManager;

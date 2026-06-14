@@ -4,7 +4,7 @@
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { DidDocument } from '../gdc-backend-utils-node/models/did';
 import { JwkSet } from '../gdc-backend-utils-node/models/jwk';
-import { TenantsCacheManager } from '../managers/TenantsCacheManager';
+import type { IDiscoveryTenantRegistry } from '../managers/IDiscoveryTenantRegistry';
 
 function ensureTrailingSlash(url: string): string {
   return url.endsWith('/') ? url : `${url}/`;
@@ -19,9 +19,9 @@ function resolveDidServiceEndpoint(didDoc: DidDocument, suffix: string): string 
  * like DID Documents and JWKS based on a provided tenant configuration.
  */
 export class DiscoveryService {
-  private tenantsCacheManager: TenantsCacheManager;
+  private tenantsCacheManager: IDiscoveryTenantRegistry;
 
-  constructor(tenantsCacheManager: TenantsCacheManager) {
+  constructor(tenantsCacheManager: IDiscoveryTenantRegistry) {
     this.tenantsCacheManager = tenantsCacheManager;
   }
 
@@ -86,10 +86,9 @@ export class DiscoveryService {
   public async getOpenIdCredentialIssuerMetadata(vaultId: string): Promise<object | undefined> {
     const tenantUrl = await this.tenantsCacheManager.getTenantDomainUrl(vaultId);
     const operationalUrl = await this.tenantsCacheManager.getTenantOperationalUrl(vaultId);
-    const tenantConfig = await this.tenantsCacheManager.getTenant(vaultId);
     if (!tenantUrl || !operationalUrl) return undefined;
 
-    const legacyAlg = tenantConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG;
+    const legacyAlg = await this.tenantsCacheManager.getLegacySignAlg(vaultId) || process.env.LEGACY_SIGN_ALG;
     const algValues = ['ML-DSA-44', ...(legacyAlg ? [legacyAlg] : [])];
 
     return {

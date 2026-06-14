@@ -44,6 +44,8 @@ describe('IndividualManager', () => {
 
 
   const TENANT_URN = testTenant1IdentifierUrn;
+  const HOST_COLLECTION_NAME = 'host-collection';
+  const HOST_DID = 'did:web:host.example.com';
 
   beforeEach(() => {
     mockVaultRepository = mock<IVaultRepository>();
@@ -58,7 +60,11 @@ describe('IndividualManager', () => {
       mockTenantsCacheManager,
       mockCredentialManager,
       mockBlockchainAdapter, // Add the new dependency
-      'test-network'         // Add the network name
+      'test-network',        // Add the network name
+      {
+        hostCollectionName: HOST_COLLECTION_NAME,
+        hostDid: HOST_DID,
+      },
     );
     jest.clearAllMocks();
     (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');

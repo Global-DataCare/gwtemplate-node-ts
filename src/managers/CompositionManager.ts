@@ -29,6 +29,7 @@ import {
   SearchFilters,
 } from '../utils/search-request';
 import { HealthcareBasicSections } from '../shared/healthcare-constants';
+import type { ITenantsManager } from './ITenantsManager';
 
 type IpsSectionProjectionConfig = {
   sectionIds: string[];
@@ -91,7 +92,15 @@ export class CompositionManager implements IJobProcessor {
   constructor(
     private readonly vaultRepository: IVaultRepository,
     private readonly blockchainAdapter?: IBlockchainAdapter,
+    private readonly tenantsCacheManager?: ITenantsManager,
   ) {}
+
+  private async tenantExists(tenantVaultId: string): Promise<boolean> {
+    if (this.tenantsCacheManager) {
+      return this.tenantsCacheManager.tenantExists(tenantVaultId);
+    }
+    return this.vaultRepository.vaultExists(tenantVaultId);
+  }
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const body = job.content?.body as any;
@@ -144,7 +153,7 @@ export class CompositionManager implements IJobProcessor {
 
     if (normalizedAction === '_search' || isSummaryOperation) {
       const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
-      const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+      const tenantExists = await this.tenantExists(tenantVaultId);
       if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
       const searchResourceType = isSummaryOperation
@@ -283,7 +292,7 @@ export class CompositionManager implements IJobProcessor {
         const type = getClaimValue<string>(claims, 'Composition.type') || 'LOINC|60591-5';
 
         const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
-        const tenantExists = await this.vaultRepository.vaultExists(tenantVaultId);
+        const tenantExists = await this.tenantExists(tenantVaultId);
         if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
         const identifierClaim =

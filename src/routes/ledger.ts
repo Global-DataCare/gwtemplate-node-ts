@@ -7,8 +7,7 @@ import { IAsyncResponseStore, StoredJob } from '../adapters/async-response-store
 import { CredentialLedgerContext, ICredentialLedgerAdapter } from '../adapters/ICredentialLedgerAdapter';
 import { createOperationOutcome } from '../utils/outcome';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
-import { TenantsCacheManager } from '../managers/TenantsCacheManager';
-import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import type { ILedgerTenantRegistry } from '../managers/ILedgerTenantRegistry';
 import { getTenantVaultId } from '../utils/tenant';
 import { resolveHostRegistrySector } from '../utils/services';
 import { resolveIdentityChannel } from '../utils/ledger';
@@ -86,7 +85,7 @@ function handleAsyncPoll(store: IAsyncResponseStore, req: any, res: any): void {
 export function createCredentialLedgerRouter(
   ledgerAdapter: ICredentialLedgerAdapter,
   asyncResponseStore: IAsyncResponseStore,
-  tenantsCacheManager: TenantsCacheManager,
+  tenantsCacheManager: ILedgerTenantRegistry,
   networkMode?: 'test' | 'local-network' | 'test-network' | 'network'
 ): Router {
   const router = Router();
@@ -97,10 +96,10 @@ export function createCredentialLedgerRouter(
     const tenantId = String(req.params.tenantId || '');
     const sector = String(req.params.sector || '');
     const vaultId = tenantId === 'host' ? 'host' : getTenantVaultId(sector, tenantId);
-    const tenantConfig = await tenantsCacheManager.getTenant(vaultId);
-    if (!tenantConfig) return { vaultId, jurisdiction: req.params.jurisdiction };
-    const jurisdiction = (tenantConfig.claims?.[ClaimsOrganizationSchemaorg.addressCountry] as string) || req.params.jurisdiction;
-    return { vaultId, jurisdiction, tenantConfig };
+    const tenantExists = await tenantsCacheManager.tenantExists(vaultId);
+    if (!tenantExists) return { vaultId, jurisdiction: req.params.jurisdiction, tenantExists };
+    const jurisdiction = await tenantsCacheManager.getTenantJurisdiction(vaultId) || req.params.jurisdiction;
+    return { vaultId, jurisdiction, tenantExists };
   };
 
   const resolveNetwork = () => resolveHostRegistrySector({ nodeEnv: process.env.NODE_ENV, networkMode });
@@ -111,8 +110,8 @@ export function createCredentialLedgerRouter(
       const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing credential id.');
       return res.status(400).json(outcome);
     }
-    const { jurisdiction, tenantConfig } = await resolveTenantContext(req);
-    if (!tenantConfig && req.params.tenantId !== 'host') {
+    const { jurisdiction, tenantExists } = await resolveTenantContext(req);
+    if (!tenantExists && req.params.tenantId !== 'host') {
       return res.status(404).json(createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'Tenant not found.'));
     }
     const statusRecord = await ledgerAdapter.getCredentialStatus(
@@ -133,8 +132,8 @@ export function createCredentialLedgerRouter(
       const outcome = createOperationOutcome(IssueLevel.Error, IssueType.Required, 'Missing credential id.');
       return res.status(400).json(outcome);
     }
-    const { jurisdiction, tenantConfig } = await resolveTenantContext(req);
-    if (!tenantConfig && req.params.tenantId !== 'host') {
+    const { jurisdiction, tenantExists } = await resolveTenantContext(req);
+    if (!tenantExists && req.params.tenantId !== 'host') {
       return res.status(404).json(createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'Tenant not found.'));
     }
     const events = await ledgerAdapter.getCredentialHistory(
@@ -156,8 +155,8 @@ export function createCredentialLedgerRouter(
       return res.status(400).json(outcome);
     }
 
-    const { jurisdiction, tenantConfig } = await resolveTenantContext(req);
-    if (!tenantConfig && req.params.tenantId !== 'host') {
+    const { jurisdiction, tenantExists } = await resolveTenantContext(req);
+    if (!tenantExists && req.params.tenantId !== 'host') {
       return res.status(404).json(createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'Tenant not found.'));
     }
     const thid = randomUUID();
@@ -191,8 +190,8 @@ export function createCredentialLedgerRouter(
       return res.status(400).json(outcome);
     }
 
-    const { jurisdiction, tenantConfig } = await resolveTenantContext(req);
-    if (!tenantConfig && req.params.tenantId !== 'host') {
+    const { jurisdiction, tenantExists } = await resolveTenantContext(req);
+    if (!tenantExists && req.params.tenantId !== 'host') {
       return res.status(404).json(createOperationOutcome(IssueLevel.Error, IssueType.NotFound, 'Tenant not found.'));
     }
     const thid = randomUUID();
