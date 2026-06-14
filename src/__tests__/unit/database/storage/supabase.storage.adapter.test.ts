@@ -81,4 +81,31 @@ describe('SupabaseStorageAdapter', () => {
       'Supabase upload failed: 404 Not Found: bucket not found'
     );
   });
+
+  it('should download a stored object through the Supabase REST API', async () => {
+    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+      new Response(testBytes, { status: 200, headers: { 'content-type': testContentType } })
+    );
+    const adapter = new SupabaseStorageAdapter({
+      url: baseUrl,
+      serviceRoleKey,
+      bucketName,
+      fetchImpl: fetchMock,
+    });
+
+    const result = await adapter.download('zQmBlobRef');
+
+    expect(result.dataBytes).toEqual(testBytes);
+    expect(result.contentType).toBe(testContentType);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${baseUrl}/storage/v1/object/${bucketName}/zQmBlobRef`,
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+        }),
+      }),
+    );
+  });
 });

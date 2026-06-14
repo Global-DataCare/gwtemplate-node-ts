@@ -11,6 +11,12 @@ import path from 'path';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { BundleJsonApi, BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import {
+  buildExampleFamilyRegistrationClaims,
+  buildExampleFamilyRegistrationContent,
+  EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+  mergeIndividualOrganizationClaims,
+} from 'gdc-common-utils-ts';
 import { PDFDocument } from 'pdf-lib';
 import { DocumentReferenceClaim } from 'gdc-common-utils-ts/models/interoperable-claims/document-reference-claims';
 import {
@@ -49,7 +55,8 @@ import {
   EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
   EXAMPLE_SUBJECT_DID,
 } from 'gdc-common-utils-ts/examples/shared';
-import { mergeIndividualOrganizationClaims } from 'gdc-common-utils-ts/utils/individual-organization-claims';
+import { getSubjectScopedSectionId } from '../../utils/individual-sections';
+import { getEnvSectionId } from '../../utils/section-env';
 import { IVaultRepository } from '../../database/repositories/vault/vault.repository';
 import { IStorageAdapter } from '../../database/storage/IStorageAdapter';
 import { ILogger } from '../../loggers/ILogger';
@@ -60,6 +67,7 @@ import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { mockKmsService } from '../mocks/kms.mock';
 import { buildClaimsFromIndividualFormPdf } from '../../utils/individual-form-pdf';
 import { testDefaultTenantServiceTypeClaim } from '../data/organization.data';
+import { SUBJECT_SECTION_INDIVIDUAL } from '../../constants/domain';
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -76,24 +84,14 @@ const TENANT_DID = 'did:web:host.example.com';
  * (Person is optional for individual organizations).
  * `termsOfService` is an https URL so handleServiceAttachment skips file upload.
  */
-const BASE_CLAIMS: Record<string, unknown> = {
+const BASE_CLAIMS: Record<string, unknown> = buildExampleFamilyRegistrationClaims({
   [ClaimsServiceSchemaorg.category]: SECTOR,
-  [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
   [ClaimsOrganizationSchemaorg.identifierType]: 'UUID',
   [ClaimsOrganizationSchemaorg.identifierValue]: randomUUID(),
-  [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent@example.com',
-  [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
-  [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: 'IDCES-TEST-CONTROLLER',
-  [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
-  [ClaimsPersonSchemaorg.email]: 'child@example.com',
   [ClaimsPersonSchemaorg.identifierType]: 'UUID',
   [ClaimsPersonSchemaorg.identifierValue]: randomUUID(),
-  [ClaimsPersonSchemaorg.telephone]: '+34600000001',
-  [ClaimsPersonSchemaorg.alternateName]: 'Ana',
-  [ClaimsServiceSchemaorg.identifier]: 'did:web:provider.example.com',
   [ClaimsServiceSchemaorg.serviceType]: testDefaultTenantServiceTypeClaim,
-  [ClaimsServiceSchemaorg.termsOfService]: 'https://example.com/terms',
-};
+});
 
 const TEST_KYC_PROFILE = Object.freeze({
   uuid: EXAMPLE_KYC_CONTROLLER_UUID,
@@ -201,9 +199,9 @@ function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest
           type: 'Family-search-v1.0',
           meta: {
             claims: {
-              [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
-              [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent@example.com',
-              [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+              [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+              [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
+              [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
               [ClaimsServiceSchemaorg.category]: SECTOR,
               ...overrideClaims,
             },
@@ -315,9 +313,9 @@ function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
           type: 'Family-purge-request-v1.0',
           meta: {
             claims: {
-              [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
-              [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent@example.com',
-              [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+              [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+              [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
+              [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
               [ClaimsServiceSchemaorg.category]: SECTOR,
               ...overrideClaims,
             },
@@ -351,9 +349,9 @@ function makeDisableJob(overrideClaims: Record<string, unknown> = {}): JobReques
           type: 'Family-disable-request-v1.0',
           meta: {
             claims: {
-              [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
-              [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent@example.com',
-              [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+              [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+              [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
+              [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
               [ClaimsServiceSchemaorg.category]: SECTOR,
               ...overrideClaims,
             },
@@ -515,11 +513,10 @@ describe('FamilyManager', () => {
     });
 
     it('already_exists: returns status already_exists without inserting when Active record is found', async () => {
-      const existingContent = {
+      const existingContent = buildExampleFamilyRegistrationContent({
         status: EntityLifecycleStatus.Active,
         claims: { ...BASE_CLAIMS },
-        contained: [],
-      };
+      });
       mockVaultRepository.query.mockResolvedValue([{ id: 'existing-active-id', jwe: { ciphertext: '' } } as any]);
       mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
 
@@ -532,11 +529,10 @@ describe('FamilyManager', () => {
     });
 
     it('resume_required: returns status resume_required without inserting when Pending record is found', async () => {
-      const existingContent = {
+      const existingContent = buildExampleFamilyRegistrationContent({
         status: EntityLifecycleStatus.Pending,
         claims: { ...BASE_CLAIMS },
-        contained: [],
-      };
+      });
       mockVaultRepository.query.mockResolvedValue([{ id: 'existing-pending-id', jwe: { ciphertext: '' } } as any]);
       mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
 
@@ -558,8 +554,8 @@ describe('FamilyManager', () => {
         COLLECTION_NAME,
         expect.objectContaining({
           where: expect.arrayContaining([
-            expect.objectContaining({ name: ClaimsOrganizationSchemaorg.ownerTelephone, value: 'tel:+34600000001' }),
-            expect.objectContaining({ name: ClaimsOrganizationSchemaorg.alternateName, value: 'Ana' }),
+            expect.objectContaining({ name: ClaimsOrganizationSchemaorg.ownerTelephone, value: `tel:${EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE}` }),
+            expect.objectContaining({ name: ClaimsOrganizationSchemaorg.alternateName, value: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]) }),
           ]),
         }),
       );
@@ -885,14 +881,13 @@ describe('FamilyManager', () => {
     });
 
     it('already_exists: returns already_exists from _search when Active record is found', async () => {
-      const existingContent = {
+      const existingContent = buildExampleFamilyRegistrationContent({
         status: EntityLifecycleStatus.Active,
         claims: {
-          [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
-          [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+          [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+          [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
         },
-        contained: [],
-      };
+      });
       mockVaultRepository.query.mockResolvedValue([{ id: 'active-search-id', jwe: { ciphertext: '' } } as any]);
       mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
 
@@ -904,14 +899,13 @@ describe('FamilyManager', () => {
     });
 
     it('resume_required: returns resume_required from _search when Pending record is found', async () => {
-      const existingContent = {
+      const existingContent = buildExampleFamilyRegistrationContent({
         status: EntityLifecycleStatus.Pending,
         claims: {
-          [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
-          [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+          [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+          [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
         },
-        contained: [],
-      };
+      });
       mockVaultRepository.query.mockResolvedValue([{ id: 'pending-search-id', jwe: { ciphertext: '' } } as any]);
       mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
 
@@ -925,11 +919,10 @@ describe('FamilyManager', () => {
 
   describe('_purge / processFamilyPurgeEntry', () => {
     it('disabled: marks the family registration inactive without touching licenses', async () => {
-      const existingContent = {
+      const existingContent = buildExampleFamilyRegistrationContent({
         status: EntityLifecycleStatus.Active,
         claims: { ...BASE_CLAIMS },
-        contained: [],
-      };
+      });
       mockVaultRepository.query.mockResolvedValue([{ id: 'family-doc-1', status: 'active', sequence: 1, jwe: { ciphertext: '' } } as any]);
       mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
       mockVaultRepository.put.mockResolvedValue(true);
@@ -944,15 +937,21 @@ describe('FamilyManager', () => {
       expect(updatedDocs[0].status).toBe(EntityLifecycleStatus.Inactive);
     });
 
-    it('purged: keeps the family record and releases associated licenses only after disable', async () => {
-      const existingContent = {
+    it('purged: deletes the family record, subject sections, and associated blobs only after disable', async () => {
+      const subjectSectionId = getSubjectScopedSectionId(
+        EXAMPLE_SUBJECT_DID,
+        SUBJECT_SECTION_INDIVIDUAL,
+        'document-references',
+      );
+      const existingContent = buildExampleFamilyRegistrationContent({
         status: EntityLifecycleStatus.Inactive,
         claims: {
           ...BASE_CLAIMS,
           'org.schema.IndividualProduct.serialNumber': 'lic-123',
+          [ClaimsOrganizationSchemaorg.identifier]: EXAMPLE_SUBJECT_DID,
+          'DocumentReference.attachment#hash': 'zExampleIndividualPdfHash',
         },
-        contained: [],
-      };
+      });
       const licenseDoc: ConfidentialStorageDoc = {
         id: 'license-1',
         status: 'issued',
@@ -962,14 +961,22 @@ describe('FamilyManager', () => {
           userClass: 'individual',
           status: 'issued',
           activationCode: 'lic-123',
-          issuedToEmail: 'child@example.com',
+          issuedToEmail: String(BASE_CLAIMS[ClaimsPersonSchemaorg.email]),
         } as any,
       };
 
       mockVaultRepository.query.mockResolvedValue([{ id: 'family-doc-1', status: 'inactive', sequence: 1, jwe: { ciphertext: '' } } as any]);
       mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
-      mockVaultRepository.getContainersInSection.mockResolvedValue([licenseDoc]);
+      mockVaultRepository.getContainersInSection
+        .mockResolvedValueOnce([licenseDoc])
+        .mockResolvedValueOnce([{ id: 'subject-doc-1', 'DocumentReference.attachment#hash': 'zExampleSubjectBlobHash' }] as any);
+      mockVaultRepository.getAllSections.mockResolvedValue([
+        getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
+        subjectSectionId,
+      ]);
       mockVaultRepository.put.mockResolvedValue(true);
+      mockVaultRepository.delete.mockResolvedValue(true);
+      (mockStorageAdapter.delete as any) = jest.fn(async () => {});
 
       const response = await manager.process(makePurgeJob());
       const body = response.body as BundleJsonApi;
@@ -977,20 +984,69 @@ describe('FamilyManager', () => {
 
       expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('purged');
       expect(entry.response?.status).toBe('200');
-      expect(mockVaultRepository.put).toHaveBeenCalledTimes(2);
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
       const updatedLicenseDocs = mockVaultRepository.put.mock.calls[0][1] as ConfidentialStorageDoc[];
       expect(updatedLicenseDocs[0].status).toBe('available');
       expect((updatedLicenseDocs[0].content as any).activationCode).toBeUndefined();
-      const updatedFamilyDocs = mockVaultRepository.put.mock.calls[1][1] as ConfidentialStorageDoc[];
-      expect(updatedFamilyDocs[0].status).toBe(EntityLifecycleStatus.Inactive);
+      expect(mockVaultRepository.delete).toHaveBeenCalledWith(
+        COLLECTION_NAME,
+        'subject-doc-1',
+        subjectSectionId,
+      );
+      expect(mockVaultRepository.delete).toHaveBeenCalledWith(
+        COLLECTION_NAME,
+        'family-doc-1',
+        getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
+      );
+      expect((mockStorageAdapter.delete as any)).toHaveBeenCalledWith('zExampleSubjectBlobHash');
+    });
+
+    it('purged: uses lifecycle request identifiers to clean subject-scoped sections that are not stored in the family record', async () => {
+      const requestSubjectDid = EXAMPLE_SUBJECT_DID;
+      const subjectSectionId = getSubjectScopedSectionId(
+        requestSubjectDid,
+        SUBJECT_SECTION_INDIVIDUAL,
+        'communications',
+      );
+      const existingContent = buildExampleFamilyRegistrationContent({
+        status: EntityLifecycleStatus.Inactive,
+        claims: {
+          ...BASE_CLAIMS,
+          [ClaimsOrganizationSchemaorg.identifier]: 'did:web:stored-family-subject.example',
+        },
+      });
+
+      mockVaultRepository.query.mockResolvedValue([{ id: 'family-doc-2', status: 'inactive', sequence: 1, jwe: { ciphertext: '' } } as any]);
+      mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
+      mockVaultRepository.getContainersInSection
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'subject-doc-2' }] as any);
+      mockVaultRepository.getAllSections.mockResolvedValue([
+        getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
+        subjectSectionId,
+      ]);
+      mockVaultRepository.put.mockResolvedValue(true);
+      mockVaultRepository.delete.mockResolvedValue(true);
+
+      const response = await manager.process(makePurgeJob({
+        [ClaimsOrganizationSchemaorg.identifier]: requestSubjectDid,
+      }));
+      const body = response.body as BundleJsonApi;
+      const entry = body.data[0] as BundleEntry;
+
+      expect(entry.response?.status).toBe('200');
+      expect(mockVaultRepository.delete).toHaveBeenCalledWith(
+        COLLECTION_NAME,
+        'subject-doc-2',
+        subjectSectionId,
+      );
     });
 
     it('returns 409 when family registration is still active during purge', async () => {
-      const existingContent = {
+      const existingContent = buildExampleFamilyRegistrationContent({
         status: EntityLifecycleStatus.Active,
         claims: { ...BASE_CLAIMS },
-        contained: [],
-      };
+      });
       mockVaultRepository.query.mockResolvedValue([{ id: 'family-doc-1', status: 'active', sequence: 1, jwe: { ciphertext: '' } } as any]);
       mockKmsService.unprotectConfidentialData.mockResolvedValueOnce(existingContent as any);
 

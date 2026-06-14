@@ -49,4 +49,13 @@ describe('StorageMemAdapter', () => {
     expect(storedFile).toBeDefined();
     expect(storedFile.contentType).toBe(pngContentType);
   });
+
+  it('should download a previously stored object by its multihash', async () => {
+    const uploadResult = await adapter.upload(testPdfBytes, testContentType);
+
+    const downloadResult = await adapter.download(uploadResult.encodedMultiHash);
+
+    expect(downloadResult.dataBytes).toEqual(testPdfBytes);
+    expect(downloadResult.contentType).toBe(testContentType);
+  });
 });

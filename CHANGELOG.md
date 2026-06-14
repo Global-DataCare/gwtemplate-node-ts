@@ -1,3 +1,83 @@
+## [1.13.0] - 2026-06-13
+
+### Added
+- Added confidential blob persistence abstractions so encrypted vault metadata
+  can keep large/private payloads in the configured storage backend instead of
+  forcing every repository implementation to inline the same storage logic:
+  - `src/database/storage/IConfidentialBlobStore.ts`
+  - `src/database/storage/storage-adapter-confidential-blob.store.ts`
+  - `src/database/repositories/vault/confidential-storage-persistence.ts`
+- Added explicit lifecycle and audit documentation for deactivation and purge
+  flows in:
+  - `docs-v2/16-deactivation-and-purge-lifecycle.md`
+- Added host/tenant discovery publication guards so dataspace discovery
+  endpoints stop advertising disabled participants while keeping DID material
+  resolvable for audit/readback scenarios.
+- Added `_purge` support to the host registry organization service contract and
+  corresponding lifecycle tests for host/tenant gating and destructive cleanup.
+
+### Changed
+- Updated the shared dependency target to `gdc-common-utils-ts@^1.24.0`.
+- Refactored infrastructure bootstrap so Firestore/PostgreSQL vault repositories
+  receive a confidential blob store backed by the configured storage adapter.
+- Updated Firestore/PostgreSQL vault repositories and storage adapters to
+  persist blob-backed confidential payloads consistently across `mem`, GCS, and
+  Supabase storage modes.
+- Hardened host startup so a fresh `HOST_ID_VALUE` bootstraps first and only
+  then warms the in-memory tenant cache, avoiding stale host cache state across
+  local/live executions.
+- Standardized local test/runtime profile documentation and loaders around
+  `.env.local-demo`:
+  - `jest.setup.ts`
+  - `scripts/verify-auth.ts`
+  - `TESTING.md`
+  - `TESTING-GUIDE.md`
+  - `README.md`
+  - `demo-deploy.config.example`
+- Simplified local stop behavior so `api:close` reuses the canonical
+  `local:close` path.
+- Updated Firebase initialization to resolve the project id explicitly from the
+  active environment before calling `firebase-admin`.
+
+### Lifecycle And Contract Changes
+- Extended host registry lifecycle routes so `Organization/_purge` is exposed as
+  a first-class contract alongside `_enable` and `_disable`.
+- Tightened tenant lifecycle authorization rules:
+  - a tenant cannot be disabled while active employees remain
+  - a tenant cannot be disabled while active individuals/family members remain
+  - a tenant cannot be purged until it is already disabled
+  - a tenant cannot be purged while non-purged descendants remain
+  - the host cannot be disabled or purged while hosted tenant registrations
+    still exist
+- Marked the bootstrap controller employee record with a dedicated lifecycle
+  role so host lifecycle enforcement can ignore that synthetic record when
+  counting real descendants.
+- Replaced duplicated local activation service parsing with shared policy
+  validation from `gdc-common-utils-ts`, enforcing required sector/service-type
+  authorization during hosted activation.
+- Updated discovery routes so disabled or purged hosts/tenants return
+  non-published responses instead of continuing to surface dataspace metadata.
+
+### Individual/Family Purge Semantics
+- Changed family/individual purge from a soft status update to destructive
+  cleanup of:
+  - the stored family registration record
+  - hashed subject-scoped individual sections
+  - best-effort referenced confidential blobs
+- Added subject identifier collection and hashed section scanning so purge
+  removes all related individual/member fragments derived from the registration.
+- Added best-effort blob reference traversal for `blobRef` fields and
+  `*#hash`-style references before deleting the underlying vault record.
+
+### Testing
+- Expanded lifecycle/unit/integration coverage for:
+  - host lifecycle gating and activation policy enforcement
+  - family purge behavior
+  - Firestore/PostgreSQL confidential persistence flows
+  - discovery publication behavior
+  - storage adapter blob persistence semantics
+- Updated OpenAPI profile artifacts to reflect the current published contract.
+
 ## [1.12.1] - 2026-06-13
 
 ### Changed

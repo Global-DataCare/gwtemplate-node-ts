@@ -492,7 +492,7 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
     createDidEndpointConfigFromSelector(
       { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
       ['Organization'],
-      ['_batch', '_activate', ACTION_DISABLE, ACTION_ENABLE],
+      ['_batch', '_activate', ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE],
     ),
   );
   services.push(

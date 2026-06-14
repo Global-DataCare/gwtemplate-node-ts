@@ -71,7 +71,7 @@ The Firebase Console is the easiest way to manage Firestore, Authentication, and
     -   Go to the **Sign-in method** tab.
     -   Click on **Email/Password** in the "Native providers" list, **enable** it, and click **Save**.
     -   Go to the **Users** tab and click **"+ Add user"**.
-    -   Create a test user with an email and password that you will use in your `.env.test` file (e.g., `admin1@acme.org`).
+    -   Create a test user with an email and password that you will use in your `.env.local-demo` file (e.g., `admin1@acme.org`).
     -   In the Firebase Console, go to **Project Overview > Project settings** (⚙️ icon).
     -   In the **General** tab, under "Your apps", click the Web icon (`</>`) to create a new Web App.
     -   Give it a nickname (e.g., `E2E Tests`) and click **"Register app"**. **Do not** check the box for Firebase Hosting unless you need it for other purposes.
@@ -81,13 +81,12 @@ The Firebase Console is the easiest way to manage Firestore, Authentication, and
 
 ## 3. Local Environment Setup
 
-### Create `.env.test` File
-1.  In the project root, create a file named `.env.test`.
+### Prepare `.env.local-demo`
+1.  In the project root, create a file named `.env.local-demo`.
 2.  Use `env.example` as a template and fill in all the required values you gathered from the steps above. It should look similar to this:
 
     ```
-    # .env.test
-    TEST_ENV=e2e
+    # .env.local-demo
     DB_PROVIDER=firestore
     STORAGE_PROVIDER=gcs
 
@@ -114,7 +113,7 @@ With the setup complete, you can run the full E2E test suite:
 npm run test:e2e
 ```
 
-This command will execute all test files in the `src/__tests__/e2e` directory. If the environment is configured correctly, all tests should pass.
+This command will execute all test files in the `src/__tests__/e2e` directory. If the environment is configured correctly, all tests should pass. By default, Jest will load `.env.local-demo` for these E2E runs.
 
 For real-auth prechecked execution:
 

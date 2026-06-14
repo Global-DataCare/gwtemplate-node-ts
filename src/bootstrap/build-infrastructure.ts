@@ -10,6 +10,7 @@ import { VaultMemRepository } from '../database/repositories/vault/vault.mem.rep
 import type { IStorageAdapter } from '../database/storage/IStorageAdapter';
 import { GcsStorageAdapter } from '../database/storage/gcs.storage.adapter';
 import { StorageMemAdapter } from '../database/storage/mem.storage.adapter';
+import { StorageAdapterConfidentialBlobStore } from '../database/storage/storage-adapter-confidential-blob.store';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import { AdapterCryptoSdkNode } from '../gdc-backend-utils-node/adapters/node/crypto';
 import type { ILogger } from '../loggers/ILogger';
@@ -31,22 +32,6 @@ export async function buildInfrastructure(options: {
   kmsService: IKmsService;
 }> {
   const { config, hostCollectionName } = options;
-
-  let vaultRepository: IVaultRepository;
-  if (config.dbProvider === 'firestore') {
-    const db = admin.firestore();
-    vaultRepository = new FirestoreVaultRepository(db, hostCollectionName);
-    console.log('[GW-API] Using Firestore Vault Repository.');
-  } else if (config.dbProvider === 'postgres') {
-    const pool = createPostgresPool(config.postgres);
-    await ensurePostgresVaultSchema(pool, config.postgres?.schema);
-    vaultRepository = new PostgresVaultRepository(pool, hostCollectionName, config.postgres?.schema);
-    console.log('[GW-API] Using PostgreSQL Vault Repository.');
-  } else {
-    vaultRepository = new VaultMemRepository();
-    (vaultRepository as VaultMemRepository).clear();
-    console.log('[GW-API] Using In-Memory Vault Repository (cleared).');
-  }
 
   let storageAdapter: IStorageAdapter;
   if (config.storageProvider === 'gcs') {
@@ -75,6 +60,24 @@ export async function buildInfrastructure(options: {
   } else {
     storageAdapter = new StorageMemAdapter();
     console.log('[GW-API] Using In-Memory Storage Adapter.');
+  }
+
+  const confidentialBlobStore = new StorageAdapterConfidentialBlobStore(storageAdapter, config.storageProvider);
+
+  let vaultRepository: IVaultRepository;
+  if (config.dbProvider === 'firestore') {
+    const db = admin.firestore();
+    vaultRepository = new FirestoreVaultRepository(db, hostCollectionName, confidentialBlobStore);
+    console.log('[GW-API] Using Firestore Vault Repository.');
+  } else if (config.dbProvider === 'postgres') {
+    const pool = createPostgresPool(config.postgres);
+    await ensurePostgresVaultSchema(pool, config.postgres?.schema);
+    vaultRepository = new PostgresVaultRepository(pool, hostCollectionName, config.postgres?.schema, confidentialBlobStore);
+    console.log('[GW-API] Using PostgreSQL Vault Repository.');
+  } else {
+    vaultRepository = new VaultMemRepository();
+    (vaultRepository as VaultMemRepository).clear();
+    console.log('[GW-API] Using In-Memory Vault Repository (cleared).');
   }
 
   const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());

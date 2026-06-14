@@ -10,10 +10,15 @@ import { IStorageAdapter } from '../../database/storage/IStorageAdapter';
  */
 export const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
   upload: jest.fn(),
+  download: jest.fn(),
 };
 
 // Default successful upload behavior
 mockStorageAdapter.upload.mockResolvedValue({
   publicUrl: 'https://storage.example.com/terms.pdf',
   encodedMultiHash: 'zQm...',
+});
+mockStorageAdapter.download.mockResolvedValue({
+  dataBytes: new TextEncoder().encode('{"ciphertext":"mock"}'),
+  contentType: 'application/jose+json',
 });

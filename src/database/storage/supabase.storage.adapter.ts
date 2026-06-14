@@ -3,7 +3,7 @@
 
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
-import { IStorageAdapter, UploadResult } from './IStorageAdapter';
+import { DownloadResult, IStorageAdapter, UploadResult } from './IStorageAdapter';
 
 const SHA3_384_MULTIHASH_PREFIX = new Uint8Array([0x15, 0x30]); // 0x15: sha3-384, 0x30: 48-byte length
 
@@ -96,5 +96,58 @@ export class SupabaseStorageAdapter implements IStorageAdapter {
       publicUrl: buildPublicUrl(this.baseUrl, this.bucketName, objectPath),
       encodedMultiHash,
     };
+  }
+
+  async download(encodedMultiHash: string): Promise<DownloadResult> {
+    const response = await this.fetchImpl(
+      `${this.baseUrl}/storage/v1/object/${encodeURIComponent(this.bucketName)}/${encodeURIComponent(encodedMultiHash)}`,
+      {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${this.serviceRoleKey}`,
+          apikey: this.serviceRoleKey,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      let diagnostics = `${response.status} ${response.statusText}`.trim();
+      try {
+        const bodyText = await response.text();
+        if (bodyText) diagnostics = `${diagnostics}: ${bodyText}`;
+      } catch {
+        // Ignore body parsing failures; status text is enough.
+      }
+      throw new Error(`Supabase download failed: ${diagnostics}`);
+    }
+
+    return {
+      dataBytes: new Uint8Array(await response.arrayBuffer()),
+      contentType: response.headers.get('content-type') ?? undefined,
+    };
+  }
+
+  async delete(encodedMultiHash: string): Promise<void> {
+    const response = await this.fetchImpl(
+      `${this.baseUrl}/storage/v1/object/${encodeURIComponent(this.bucketName)}/${encodeURIComponent(encodedMultiHash)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          authorization: `Bearer ${this.serviceRoleKey}`,
+          apikey: this.serviceRoleKey,
+        },
+      },
+    );
+
+    if (!response.ok && response.status !== 404) {
+      let diagnostics = `${response.status} ${response.statusText}`.trim();
+      try {
+        const bodyText = await response.text();
+        if (bodyText) diagnostics = `${diagnostics}: ${bodyText}`;
+      } catch {
+        // Ignore body parsing failures; status text is enough.
+      }
+      throw new Error(`Supabase delete failed: ${diagnostics}`);
+    }
   }
 }

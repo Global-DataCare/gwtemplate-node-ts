@@ -352,7 +352,7 @@ describe('Service Initialization Utilities', () => {
       const orderRegistry = registryServices.find((s: DidService) => s.serviceEndpoint === 'Order');
       const offerRegistry = registryServices.find((s: DidService) => s.serviceEndpoint === 'Offer');
       expect((organizationRegistry as any)?.selector?.sector).toBe('test');
-      expect(organizationRegistry?.actions).toEqual(['_batch', '_activate', '_disable', '_enable']);
+      expect(organizationRegistry?.actions).toEqual(['_batch', '_activate', '_disable', '_enable', '_purge']);
       expect(orderRegistry?.actions).toEqual(['_batch', '_search']);
       expect(offerRegistry?.actions).toEqual(['_search']);
 

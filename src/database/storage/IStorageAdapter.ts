@@ -20,6 +20,21 @@ export interface UploadResult {
 }
 
 /**
+ * Represents the result of downloading a previously stored object.
+ */
+export interface DownloadResult {
+  /**
+   * Raw binary content associated with the stored object.
+   */
+  dataBytes: Uint8Array;
+
+  /**
+   * Best-effort MIME type returned by the storage provider.
+   */
+  contentType?: string;
+}
+
+/**
  * Defines the interface for a generic file storage adapter.
  * This abstraction allows the application to interact with different
  * cloud storage providers (like Google Cloud Storage, AWS S3) in a uniform way.
@@ -36,4 +51,18 @@ export interface IStorageAdapter {
    * @throws An error if the upload fails.
    */
   upload(dataBytes: Uint8Array, contentType: string): Promise<UploadResult>;
+
+  /**
+   * Downloads a previously stored object using its canonical multihash identifier.
+   *
+   * @param encodedMultiHash Canonical object identifier returned by `upload`.
+   * @returns The stored bytes and, when available, the associated MIME type.
+   * @throws An error if the object cannot be read.
+   */
+  download?(encodedMultiHash: string): Promise<DownloadResult>;
+
+  /**
+   * Deletes a previously stored object using its canonical multihash key.
+   */
+  delete?(encodedMultiHash: string): Promise<void>;
 }

@@ -1,7 +1,7 @@
 // src/database/storage/mem.storage.adapter.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { IStorageAdapter, UploadResult } from './IStorageAdapter';
+import { DownloadResult, IStorageAdapter, UploadResult } from './IStorageAdapter';
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 
@@ -42,5 +42,21 @@ export class StorageMemAdapter implements IStorageAdapter {
       publicUrl: `http://localhost:3000/local-storage/${encodedMultiHash}`,
       encodedMultiHash: encodedMultiHash,
     });
+  }
+
+  async download(encodedMultiHash: string): Promise<DownloadResult> {
+    const storedObject = this.storage.get(encodedMultiHash);
+    if (!storedObject) {
+      throw new Error(`StorageMemAdapter could not find object '${encodedMultiHash}'.`);
+    }
+
+    return {
+      dataBytes: storedObject.dataBytes,
+      contentType: storedObject.contentType,
+    };
+  }
+
+  async delete(encodedMultiHash: string): Promise<void> {
+    this.storage.delete(encodedMultiHash);
   }
 }

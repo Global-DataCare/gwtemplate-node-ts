@@ -3,6 +3,11 @@ import { RecordBase, VaultConfig } from 'gdc-common-utils-ts/models/resource-doc
 import { IVaultRepository } from '../vault/vault.repository';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { resolvePostgresSchema } from './postgres.schema';
+import type { IConfidentialBlobStore } from '../../storage/IConfidentialBlobStore';
+import {
+  externalizeConfidentialStorageDocForPersistence,
+  hydrateConfidentialStorageDocFromPersistence,
+} from '../vault/confidential-storage-persistence';
 
 const DEFAULT_SECTION = 'default';
 
@@ -96,14 +101,17 @@ export class PostgresVaultRepository extends IVaultRepository {
     documents: string;
     indexes: string;
   };
+  private readonly blobStore?: IConfidentialBlobStore;
 
   constructor(
     private readonly pool: Pool,
     private readonly hostCollectionName: string,
     schema?: string,
+    blobStore?: IConfidentialBlobStore,
   ) {
     super();
     this.schema = resolvePostgresSchema(schema);
+    this.blobStore = blobStore;
     this.tables = {
       vaults: toQualifiedTable(this.schema, 'vaults'),
       sections: toQualifiedTable(this.schema, 'vault_sections'),
@@ -236,7 +244,9 @@ export class PostgresVaultRepository extends IVaultRepository {
       `,
       [collectionName, sectionId],
     );
-    return result.rows.map((row) => row.payload_json);
+    return Promise.all(
+      result.rows.map((row) => hydrateConfidentialStorageDocFromPersistence(row.payload_json, this.blobStore)),
+    );
   }
 
   async put<T extends RecordBase>(collectionName: string, containers: T[], sectionId: string = DEFAULT_SECTION): Promise<boolean> {
@@ -275,7 +285,8 @@ export class PostgresVaultRepository extends IVaultRepository {
       `,
       [collectionName, sectionId, containerId],
     );
-    return result.rows[0]?.payload_json;
+    const payload = result.rows[0]?.payload_json;
+    return payload ? hydrateConfidentialStorageDocFromPersistence(payload, this.blobStore) : undefined;
   }
 
   async getHistory(): Promise<any[]> {
@@ -316,7 +327,9 @@ export class PostgresVaultRepository extends IVaultRepository {
       params,
     );
 
-    return result.rows.map((row) => row.payload_json);
+    return Promise.all(
+      result.rows.map((row) => hydrateConfidentialStorageDocFromPersistence(row.payload_json, this.blobStore)),
+    );
   }
 
   async delete(collectionName: string, containerId: string, sectionId: string = DEFAULT_SECTION): Promise<boolean> {
@@ -372,6 +385,7 @@ export class PostgresVaultRepository extends IVaultRepository {
       if (!document?.id) {
         throw new Error('Document being put into a vault must have an id.');
       }
+      const persistedDocument = await externalizeConfidentialStorageDocForPersistence(document, this.blobStore);
 
       await client.query(
         `
@@ -387,7 +401,7 @@ export class PostgresVaultRepository extends IVaultRepository {
           ON CONFLICT (collection_name, section_id, document_id)
           DO UPDATE SET payload_json = EXCLUDED.payload_json, deleted_at = NULL, updated_at = now()
         `,
-        [collectionName, sectionId, document.id, JSON.stringify(document)],
+        [collectionName, sectionId, document.id, JSON.stringify(persistedDocument)],
       );
 
       await client.query(
@@ -398,7 +412,7 @@ export class PostgresVaultRepository extends IVaultRepository {
         [collectionName, sectionId, document.id],
       );
 
-      const indexedAttributes = extractIndexedAttributes(document);
+      const indexedAttributes = extractIndexedAttributes(persistedDocument);
       for (const attribute of indexedAttributes) {
         await client.query(
           `

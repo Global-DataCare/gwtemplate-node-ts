@@ -9,10 +9,13 @@ import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService'
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { LifecycleRequestType } from 'gdc-common-utils-ts/constants/lifecycle';
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
+import { testDefaultHostServiceTypeClaim } from '../../data/organization.data';
 import * as tenantUtils from '../../../utils/tenant';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { getTenantAuthorizationLifecycle } from '../../../utils/tenant-lifecycle';
+import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/enums';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -69,6 +72,8 @@ describe('HostingManager activation flow', () => {
           credentialSubject: {
             id: 'did:web:api.acme.org',
             taxID: 'VATES-B00112233',
+            category: testClaimsTenant1Registration[ClaimsServiceSchemaorg.category],
+            serviceType: testClaimsTenant1Registration[ClaimsServiceSchemaorg.serviceType],
           },
         },
         {
@@ -202,6 +207,9 @@ describe('HostingManager activation flow', () => {
             type: ['VerifiableCredential'],
             credentialSubject: {
               id: 'did:web:api.acme.org',
+              taxID: 'VATES-B00112233',
+              category: testClaimsTenant1Registration[ClaimsServiceSchemaorg.category],
+              serviceType: testClaimsTenant1Registration[ClaimsServiceSchemaorg.serviceType],
             },
           },
           representativeCredential: {
@@ -253,7 +261,7 @@ describe('HostingManager activation flow', () => {
     };
   }
 
-  function buildLifecycleJob(action: '_disable' | '_enable'): JobRequest {
+  function buildLifecycleJob(action: '_disable' | '_enable' | '_purge'): JobRequest {
     return {
       id: `${action}-job-id`,
       status: JobStatus.DRAFT,
@@ -275,7 +283,11 @@ describe('HostingManager activation flow', () => {
         body: {
           data: [
             {
-              type: action === '_disable' ? 'Organization-disable-request-v1.0' : 'Organization-enable-request-v1.0',
+              type: action === '_disable'
+                ? LifecycleRequestType.TenantDisable
+                : action === '_enable'
+                  ? LifecycleRequestType.TenantEnable
+                  : LifecycleRequestType.TenantPurge,
               meta: {
                 claims: {
                   [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
@@ -291,6 +303,71 @@ describe('HostingManager activation flow', () => {
       httpMethod: 'POST',
       requestUrl: `/host/cds-es/v1/test-network/registry/org.schema/Organization/${action}`,
     };
+  }
+
+  function buildHostLifecycleJob(action: '_disable' | '_purge'): JobRequest {
+    return {
+      id: `host-${action}-job-id`,
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId: 'host',
+      jurisdiction: 'es',
+      sector: 'test-network' as Sector,
+      section: 'registry',
+      format: 'org.schema',
+      action,
+      resourceType: 'Organization',
+      content: {
+        iss: 'did:web:host.example.com',
+        aud: 'did:web:testhost.com',
+        thid: `host-${action}-thid`,
+        jti: `host-${action}-jti`,
+        type: 'json',
+        body: {
+          data: [
+            {
+              type: action === '_disable'
+                ? LifecycleRequestType.TenantDisable
+                : LifecycleRequestType.TenantPurge,
+              meta: {
+                claims: {
+                  [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsHostInitialization[ClaimsOrganizationSchemaorg.identifierValue],
+                },
+              },
+              request: { method: 'POST' },
+              resource: {},
+            },
+          ],
+        },
+        meta: {},
+      } as any,
+      httpMethod: 'POST',
+      requestUrl: `/host/cds-es/v1/test-network/registry/org.schema/Organization/${action}`,
+    };
+  }
+
+  async function putEmployeeLifecycleDoc(
+    tenantCollectionName: string,
+    employeeId: string,
+    status: EntityLifecycleStatus,
+    meta: Record<string, unknown> = {},
+  ): Promise<void> {
+    await vaultRepository.put(
+      tenantCollectionName,
+      [{
+        id: employeeId,
+        status,
+        sequence: 0,
+        content: {
+          id: employeeId,
+          status,
+          meta,
+          claims: {},
+        },
+      } as ConfidentialStorageDoc],
+      getEnvSectionId('employees'),
+    );
   }
 
   it('should activate a tenant from ICA proof and persist the final tenant config', async () => {
@@ -362,6 +439,17 @@ describe('HostingManager activation flow', () => {
 
     expect(errorEntry.response.status).toBe('400');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('vp_token');
+  });
+
+  it('should reject activation when ICA credential does not authorize the requested serviceType', async () => {
+    const job = buildActivationJob();
+    (job.content!.body as any).organizationCredential.credentialSubject.serviceType = testDefaultHostServiceTypeClaim;
+
+    const responsePayload = await hostingManager.process(job);
+    const errorEntry = responsePayload.body.data[0];
+
+    expect(errorEntry.response.status).toBe('409');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('does not authorize serviceType');
   });
 
   it('should not warn about deprecated activation credential side-fields when only vp_token + controller.* are used', async () => {
@@ -574,5 +662,85 @@ describe('HostingManager activation flow', () => {
     const errorEntry = response.body.data[0];
     expect(errorEntry.response.status).toBe('409');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('only be enabled from disabled');
+  });
+
+  it('should reject tenant disable while active employee descendants remain', async () => {
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+
+    const claims = activationJob.content!.body!.data[0]!.meta!.claims;
+    const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
+      ...claims,
+      [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
+    } as any);
+    await putEmployeeLifecycleDoc(
+      tenantCollectionName,
+      'active-employee-1',
+      EntityLifecycleStatus.Active,
+    );
+
+    const response = await hostingManager.process(buildLifecycleJob('_disable'));
+    const errorEntry = response.body.data[0];
+    expect(errorEntry.response.status).toBe('409');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('employee record(s) remain active');
+  });
+
+  it('should reject tenant purge while descendants are disabled but not purged', async () => {
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+
+    const claims = activationJob.content!.body!.data[0]!.meta!.claims;
+    const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
+      ...claims,
+      [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
+    } as any);
+    await putEmployeeLifecycleDoc(
+      tenantCollectionName,
+      'inactive-employee-1',
+      EntityLifecycleStatus.Inactive,
+    );
+
+    await vaultRepository.put(
+      hostCollectionName,
+      [{
+        id: tenantUtils.getTenantVaultId(
+          claims[ClaimsServiceSchemaorg.category] as Sector,
+          claims[ClaimsOrganizationSchemaorg.alternateName],
+        ),
+        status: EntityLifecycleStatus.Inactive,
+        sequence: 1,
+        content: {
+          status: EntityLifecycleStatus.Inactive,
+          claims,
+          meta: {
+            tenantAuthorization: {
+              status: 'suspended',
+            },
+          },
+        },
+      } as ConfidentialStorageDoc],
+      getEnvSectionId('tenants'),
+    );
+    await mockTenantsCacheManager.refreshTenant(
+      tenantUtils.getTenantVaultId(
+        claims[ClaimsServiceSchemaorg.category] as Sector,
+        claims[ClaimsOrganizationSchemaorg.alternateName],
+      ),
+    );
+
+    const response = await hostingManager.process(buildLifecycleJob('_purge'));
+    const errorEntry = response.body.data[0];
+    expect(errorEntry.response.status).toBe('409');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('employee record(s) are not purged yet');
+  });
+
+  it('should reject host disable while hosted tenant registrations remain', async () => {
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+
+    const response = await hostingManager.process(buildHostLifecycleJob('_disable'));
+    const errorEntry = response.body.data[0];
+    expect(errorEntry.response.status).toBe('409');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('hosted tenant registration(s) remain');
   });
 });

@@ -43,6 +43,7 @@ docs/
 - **Consent access status**: [90.E-TODO_SMART_EHR_COMPAT.md](90.E-TODO_SMART_EHR_COMPAT.md) also records the current live SMART consent-evaluation behavior, including deny precedence and permission-request lookup identifiers.
 - **Tenant identifier migration note**: [90.K-TODO_TENANT_IDENTIFIER_V2.md](90.K-TODO_TENANT_IDENTIFIER_V2.md) tracks the deferred `v2.0` redesign away from `alternateName`-based hosted compatibility.
 - **GW lifecycle 101**: [101-01.I-LIFECYCLE.md](01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md) explains the local GW CORE lifecycle model, including `status`, `audit`, and `/_purge`.
+- **GW deactivation/purge lifecycle**: [../docs-v2/16-deactivation-and-purge-lifecycle.md](../docs-v2/16-deactivation-and-purge-lifecycle.md) explains the disable/purge hierarchy for individual, tenant, and host, including blob deletion and discovery unpublication.
 - **GW lifecycle current vs target**: [90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md) separates what is already implemented from the target normalized `PATCH`-based contract for SDK alignment.
 - **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
@@ -114,6 +115,7 @@ Memory aid:
 *   **[01.G-TESTING-PATTERNS.md](01-OVERVIEW-AND-GUIDES/01.G-TESTING-PATTERNS.md)**: Outlines the project's testing philosophy and strategies.
 *   **[01.H-DEPLOYMENT-GUIDE.md](01-OVERVIEW-AND-GUIDES/01.H-DEPLOYMENT-GUIDE.md)**: Step-by-step instructions for deploying the application to Google Cloud Run.
 *   **[101-01.I-LIFECYCLE.md](01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md)**: Local lifecycle semantics for GW CORE, including `status` vs `audit`, `PATCH` target semantics, and `/_purge`.
+*   **[docs-v2/16-deactivation-and-purge-lifecycle.md](../docs-v2/16-deactivation-and-purge-lifecycle.md)**: Auditor/integrator contract for deactivation semantics across individual, tenant, and host, including what gets unpublished and what gets physically deleted.
 
 ### 📂 02-API-AND-ENDPOINTS
 *   **[02.A-API-ENDPOINTS.md](02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md)**: A summary of the primary API endpoints available.

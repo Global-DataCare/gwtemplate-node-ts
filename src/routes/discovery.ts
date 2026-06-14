@@ -153,6 +153,18 @@ export function createDiscoveryRouter(
   const buildPublicOrigin = (req: express.Request): string => `${req.protocol}://${req.get('host')}`;
 
   /**
+   * Returns whether the resolved participant is currently allowed to publish
+   * discovery/catalog metadata.
+   *
+   * Lifecycle rule:
+   * - DIDs and key material may remain resolvable for auditability
+   * - dataspace publication endpoints (`dspace-version`, DCAT, provider listings)
+   *   must disappear when the participant authorization is not operational
+   */
+  const isDiscoveryPublicationOperational = async (vaultId: string): Promise<boolean> =>
+    tenantsCacheManager.isTenantOperational(vaultId);
+
+  /**
    * Builds an absolute public URL from a GW CORE path contract.
    */
   const buildAbsoluteUrl = (publicOrigin: string, path: string): string =>
@@ -1013,6 +1025,9 @@ export function createDiscoveryRouter(
     version: ':version',
     hostNetwork: ':hostNetwork',
   }), async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational('host'))) {
+      return res.status(503).type('text').send('Service Unavailable');
+    }
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
@@ -1038,6 +1053,9 @@ export function createDiscoveryRouter(
     version: ':version',
     hostNetwork: ':hostNetwork',
   }), async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational('host'))) {
+      return res.status(503).type('text').send('Service Unavailable');
+    }
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
@@ -1067,6 +1085,9 @@ export function createDiscoveryRouter(
    *       '503': { description: Host DID document is unavailable }
    */
   router.post('/api/dataspace-discovery/providers', async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational('host'))) {
+      return res.status(503).type('text').send('Service Unavailable');
+    }
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
@@ -1112,6 +1133,9 @@ export function createDiscoveryRouter(
     version: ':version',
     hostNetwork: ':hostNetwork',
   }), async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational('host'))) {
+      return res.status(503).type('text').send('Service Unavailable');
+    }
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
@@ -1135,6 +1159,9 @@ export function createDiscoveryRouter(
     version: ':version',
     hostNetwork: ':hostNetwork',
   }, ':id'), async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational('host'))) {
+      return res.status(503).type('text').send('Service Unavailable');
+    }
     const hostDid = await tenantsCacheManager.getDidDocument('host');
     if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
 
@@ -1162,6 +1189,9 @@ export function createDiscoveryRouter(
     version: ':version',
     sector: ':sector',
   }), resolveTenant, async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational(res.locals.vaultId))) {
+      return res.status(404).type('text').send('Not Found');
+    }
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
 
@@ -1179,6 +1209,9 @@ export function createDiscoveryRouter(
     version: ':version',
     sector: ':sector',
   }), resolveTenant, async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational(res.locals.vaultId))) {
+      return res.status(404).type('text').send('Not Found');
+    }
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
 
@@ -1202,6 +1235,9 @@ export function createDiscoveryRouter(
     version: ':version',
     sector: ':sector',
   }), resolveTenant, async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational(res.locals.vaultId))) {
+      return res.status(404).type('text').send('Not Found');
+    }
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
 
@@ -1224,6 +1260,9 @@ export function createDiscoveryRouter(
     version: ':version',
     sector: ':sector',
   }, ':id'), resolveTenant, async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational(res.locals.vaultId))) {
+      return res.status(404).type('text').send('Not Found');
+    }
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     if (!tenantConfig?.didDocument?.id) return res.status(404).type('text').send('Not Found');
 

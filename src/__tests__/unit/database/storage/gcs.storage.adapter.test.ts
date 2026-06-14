@@ -26,6 +26,8 @@ describe('GcsStorageAdapter', () => {
   type AsyncVoidFn = (...args: any[]) => Promise<void>;
   let mockFileSave: jest.MockedFunction<AsyncVoidFn>;
   let mockMakePublic: jest.MockedFunction<AsyncVoidFn>;
+  let mockFileDownload: jest.Mock;
+  let mockGetMetadata: jest.Mock;
   let mockFile: jest.Mock;
   let mockBucket: jest.Mock;
 
@@ -38,9 +40,17 @@ describe('GcsStorageAdapter', () => {
     mockFileSave.mockResolvedValue(undefined);
     mockMakePublic = jest.fn() as unknown as jest.MockedFunction<AsyncVoidFn>;
     mockMakePublic.mockResolvedValue(undefined);
+    const fileDownloadMock: any = jest.fn();
+    fileDownloadMock.mockResolvedValue([Buffer.from(testPdfBytes)]);
+    mockFileDownload = fileDownloadMock as jest.Mock;
+    const getMetadataMock: any = jest.fn();
+    getMetadataMock.mockResolvedValue([{ contentType: testContentType }]);
+    mockGetMetadata = getMetadataMock as jest.Mock;
     mockFile = jest.fn().mockReturnValue({
       save: mockFileSave,
       makePublic: mockMakePublic,
+      download: mockFileDownload,
+      getMetadata: mockGetMetadata,
       publicUrl: () => `https://storage.googleapis.com/${testBucketName}/mock-hash`,
     });
     mockBucket = jest.fn().mockReturnValue({
@@ -99,5 +109,16 @@ describe('GcsStorageAdapter', () => {
 
     // Clean up the mock for subsequent tests
     mockFileSave.mockResolvedValue(undefined);
+  });
+
+  it('should download a stored object by multihash', async () => {
+    const adapter = new GcsStorageAdapter(testBucketName);
+
+    const result = await adapter.download('zQmDownloadTarget');
+
+    expect(mockBucket).toHaveBeenCalledWith(testBucketName);
+    expect(mockFile).toHaveBeenCalledWith('zQmDownloadTarget');
+    expect(result.dataBytes).toEqual(testPdfBytes);
+    expect(result.contentType).toBe(testContentType);
   });
 });

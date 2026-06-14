@@ -58,6 +58,12 @@ import { SERVICE_ADDITIONAL_TYPE_CLAIM } from '../utils/service-capability-claim
 import { ClearingHouseService, IClearingHouseService } from '../services/ClearingHouseService';
 import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
 import {
+  parseServiceCapabilityTokens,
+} from 'gdc-common-utils-ts/constants/service-capabilities';
+import {
+  validateActivationServiceAuthorizationPolicy,
+} from 'gdc-common-utils-ts/utils/activation-policy';
+import {
   DefaultActivationTrustAdapter,
   IActivationTrustAdapter,
 } from '../adapters/activation-trust.adapter';
@@ -69,6 +75,7 @@ import {
 import {
   ACTION_DISABLE,
   ACTION_ENABLE,
+  ACTION_PURGE,
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
 
@@ -80,7 +87,17 @@ type ActivationParticipantMaterial = {
 };
 
 type VpCredentialObject = Record<string, unknown>;
-type TenantLifecycleAction = typeof ACTION_DISABLE | typeof ACTION_ENABLE;
+type TenantLifecycleAction = typeof ACTION_DISABLE | typeof ACTION_ENABLE | typeof ACTION_PURGE;
+type TenantDescendantLifecycleSummary = {
+  activeEmployees: number;
+  activeIndividuals: number;
+  unpurgedEmployees: number;
+  unpurgedIndividuals: number;
+};
+type HostedTenantRegistrySummary = {
+  registeredHostedTenants: number;
+};
+const HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE = 'host-bootstrap-controller';
 
 /**
  * Manages the initial onboarding of new tenants onto the Gateway.
@@ -762,9 +779,16 @@ export class HostingManager {
     tenantCollectionName: string,
     vaultId: string,
   ): Promise<void> {
+    const lifecycleAwareControllerConfig: EntityConfig = {
+      ...controllerConfig,
+      meta: {
+        ...(controllerConfig.meta || {}),
+        lifecycleRole: HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE,
+      },
+    };
     const verificationMethods = controllerConfig.didDocument?.verificationMethod || [];
-    const email = normalizeIndexedEmail(controllerConfig.claims?.[ClaimsPersonSchemaorg.email]) as string | undefined;
-    const roleCode = getPersonOccupationClaim(controllerConfig.claims as Record<string, any> | undefined);
+    const email = normalizeIndexedEmail(lifecycleAwareControllerConfig.claims?.[ClaimsPersonSchemaorg.email]) as string | undefined;
+    const roleCode = getPersonOccupationClaim(lifecycleAwareControllerConfig.claims as Record<string, any> | undefined);
 
     const attributesToIndex: ParameterData[] = [
       ...(email ? [{ name: 'email', value: email, unique: true, type: 'string' } as ParameterData] : []),
@@ -777,10 +801,10 @@ export class HostingManager {
     const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(attributesToIndex, vaultId);
 
     const employeeDoc: ConfidentialStorageDoc = {
-      id: controllerConfig.id,
-      status: controllerConfig.status,
+      id: lifecycleAwareControllerConfig.id,
+      status: lifecycleAwareControllerConfig.status,
       sequence: 0,
-      content: controllerConfig,
+      content: lifecycleAwareControllerConfig,
       indexed: { attributes: protectedAttributes },
     };
     const secureEmployeeDoc = await this.kmsService.protectConfidentialData(employeeDoc, vaultId);
@@ -796,7 +820,7 @@ export class HostingManager {
           if (job.action === '_activate') {
             return await this.processOrganizationActivation(job, environment);
           }
-          if (job.action === ACTION_DISABLE || job.action === ACTION_ENABLE) {
+          if (job.action === ACTION_DISABLE || job.action === ACTION_ENABLE || job.action === ACTION_PURGE) {
             return await this.processOrganizationLifecycle(job);
           }
           return await this.processOrganizationRegistration(job, environment, isBootstrap);
@@ -1073,7 +1097,70 @@ export class HostingManager {
 
     const tenantConfig = await this.kmsService.unprotectConfidentialData<OrganizationConfig>(existing, 'host');
     const currentStatus = getTenantAuthorizationStatus(tenantConfig);
+    const isHostLifecycle = vaultId === 'host';
+    if (action === ACTION_PURGE) {
+      if (isHostLifecycle) {
+        await this.assertHostLifecycleAllowed(action, hostCollectionName);
+        const hostVaultPurged = await this.vaultRepository.purge(hostCollectionName);
+        if (!hostVaultPurged) {
+          throw new ManagerError("Host data purge failed for 'host'.", IssueType.Exception);
+        }
+        await this.tenantsCacheManager.refreshTenant('host');
+
+        return {
+          type: 'Organization-purge-response-v1.0',
+          meta: {
+            claims: {
+              ...claims,
+              'org.schema.Organization.identifier.value': identifierValue,
+              'org.schema.Action.tenantAuthorization.status': 'revoked',
+              'org.schema.Action.tenantAuthorization.changedBy': actorDid || '',
+              'org.schema.Action.tenantAuthorization.lifecycleDisposition': 'purged',
+            },
+          },
+          resource: {
+            resourceType: 'Organization',
+            id: tenantConfig.id,
+          },
+          response: { status: '200' },
+        };
+      }
+      await this.assertTenantPurgeAllowed(vaultId, currentStatus);
+      const tenantVaultPurged = await this.vaultRepository.purge(vaultId);
+      if (!tenantVaultPurged) {
+        throw new ManagerError(`Tenant data purge failed for '${vaultId}'.`, IssueType.Exception);
+      }
+      const tenantRegistryDeleted = await this.vaultRepository.delete(hostCollectionName, vaultId, getEnvSectionId('tenants'));
+      if (!tenantRegistryDeleted) {
+        throw new ManagerError(`Tenant registry purge failed for '${vaultId}'.`, IssueType.Exception);
+      }
+      await this.tenantsCacheManager.refreshTenant(vaultId);
+
+      return {
+        type: 'Organization-purge-response-v1.0',
+        meta: {
+          claims: {
+            ...claims,
+            'org.schema.Organization.identifier.value': identifierValue,
+            'org.schema.Action.tenantAuthorization.status': 'revoked',
+            'org.schema.Action.tenantAuthorization.changedBy': actorDid || '',
+            'org.schema.Action.tenantAuthorization.lifecycleDisposition': 'purged',
+          },
+        },
+        resource: {
+          resourceType: 'Organization',
+          id: tenantConfig.id,
+        },
+        response: { status: '200' },
+      };
+    }
+
     const nextStatus = this.getNextTenantLifecycleStatus(action, currentStatus);
+    if (isHostLifecycle) {
+      await this.assertHostLifecycleAllowed(action, hostCollectionName);
+    } else {
+      await this.assertTenantDisableAllowed(action, vaultId);
+    }
     const updatedConfig = applyTenantAuthorizationStatus(tenantConfig, nextStatus, actorDid);
     const updatedDoc: ConfidentialStorageDoc = {
       ...existing,
@@ -1123,6 +1210,191 @@ export class HostingManager {
       throw new ManagerError('Tenant authorization can only be enabled from disabled state.', IssueType.Conflict);
     }
     return 'active';
+  }
+
+  private async assertTenantDisableAllowed(action: TenantLifecycleAction, vaultId: string): Promise<void> {
+    if (action !== ACTION_DISABLE) {
+      return;
+    }
+
+    const descendants = await this.inspectTenantDescendants(vaultId);
+    if (descendants.activeEmployees > 0) {
+      throw new ManagerError(
+        `Tenant cannot be disabled while ${descendants.activeEmployees} employee record(s) remain active.`,
+        IssueType.Conflict,
+      );
+    }
+    if (descendants.activeIndividuals > 0) {
+      throw new ManagerError(
+        `Tenant cannot be disabled while ${descendants.activeIndividuals} individual/member record(s) remain active.`,
+        IssueType.Conflict,
+      );
+    }
+  }
+
+  /**
+   * Prevents host lifecycle transitions while hosted tenant registrations still
+   * remain in the host registry.
+   */
+  private async assertHostLifecycleAllowed(
+    action: TenantLifecycleAction,
+    hostCollectionName: string,
+  ): Promise<void> {
+    if (action !== ACTION_DISABLE && action !== ACTION_PURGE) {
+      return;
+    }
+
+    const hostedTenants = await this.inspectHostedTenantRegistry(hostCollectionName);
+    if (hostedTenants.registeredHostedTenants > 0) {
+      throw new ManagerError(
+        `Host cannot be ${action === ACTION_DISABLE ? 'disabled' : 'purged'} while ${hostedTenants.registeredHostedTenants} hosted tenant registration(s) remain.`,
+        IssueType.Conflict,
+      );
+    }
+  }
+
+  private async assertTenantPurgeAllowed(
+    vaultId: string,
+    currentStatus: TenantAuthorizationLifecycleStatus,
+  ): Promise<void> {
+    if (currentStatus !== 'suspended') {
+      throw new ManagerError('Tenant authorization must be disabled before purge.', IssueType.Conflict);
+    }
+
+    const descendants = await this.inspectTenantDescendants(vaultId);
+    if (descendants.unpurgedEmployees > 0) {
+      throw new ManagerError(
+        `Tenant cannot be purged while ${descendants.unpurgedEmployees} employee record(s) are not purged yet.`,
+        IssueType.Conflict,
+      );
+    }
+    if (descendants.unpurgedIndividuals > 0) {
+      throw new ManagerError(
+        `Tenant cannot be purged while ${descendants.unpurgedIndividuals} individual/member record(s) are not purged yet.`,
+        IssueType.Conflict,
+      );
+    }
+  }
+
+  /**
+   * Counts hosted tenant registrations that remain in the host registry,
+   * excluding the host record itself.
+   */
+  private async inspectHostedTenantRegistry(
+    hostCollectionName: string,
+  ): Promise<HostedTenantRegistrySummary> {
+    const tenantRecords = await this.vaultRepository.getContainersInSection<any>(
+      hostCollectionName,
+      getEnvSectionId('tenants'),
+    );
+    const registeredHostedTenants = tenantRecords
+      .filter((record) => String(record?.id || '').trim() && String(record?.id || '').trim() !== 'host')
+      .length;
+    return { registeredHostedTenants };
+  }
+
+  /**
+   * Scans the tenant vault for the lifecycle-managed descendants that must be
+   * cleaned before the host tenant itself can be disabled or purged.
+   *
+   * Current scope:
+   * - employee records in `employees`
+   * - family/individual registration records in `individual`
+   * - subject/member records in hashed `individual_*` sections
+   */
+  private async inspectTenantDescendants(vaultId: string): Promise<TenantDescendantLifecycleSummary> {
+    const employeeSectionId = getEnvSectionId('employees');
+    const baseIndividualSectionId = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
+    const subjectSectionPrefix = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_`);
+    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(vaultId);
+    const collectionNames = [...new Set([vaultId, tenantCollectionName].filter(Boolean) as string[])];
+    const summary: TenantDescendantLifecycleSummary = {
+      activeEmployees: 0,
+      activeIndividuals: 0,
+      unpurgedEmployees: 0,
+      unpurgedIndividuals: 0,
+    };
+    const seenRecordKeys = new Set<string>();
+
+    for (const collectionName of collectionNames) {
+      const sectionIds = await this.vaultRepository.getAllSections(collectionName);
+      for (const sectionId of sectionIds) {
+        const isEmployeeSection = sectionId === employeeSectionId;
+        const isBaseIndividualSection = sectionId === baseIndividualSectionId;
+        const isSubjectLifecycleSection = sectionId.startsWith(subjectSectionPrefix);
+        if (!isEmployeeSection && !isBaseIndividualSection && !isSubjectLifecycleSection) {
+          continue;
+        }
+
+        const records = await this.vaultRepository.getContainersInSection<any>(collectionName, sectionId);
+        for (const record of records) {
+          const recordKey = `${collectionName}:${sectionId}:${String(record?.id || '')}`;
+          if (seenRecordKeys.has(recordKey)) {
+            continue;
+          }
+          seenRecordKeys.add(recordKey);
+
+          const lifecycleRecord = await this.readTenantLifecycleRecord(record, vaultId, isEmployeeSection || isBaseIndividualSection);
+          if (!lifecycleRecord) {
+            continue;
+          }
+          if (isEmployeeSection && this.isHostBootstrapControllerRecord(lifecycleRecord)) {
+            continue;
+          }
+
+          const isActive = String(lifecycleRecord.status || '').trim().toLowerCase() !== EntityLifecycleStatus.Inactive;
+          const isPurged = this.isPurgedTenantLifecycleRecord(lifecycleRecord);
+          if (isEmployeeSection) {
+            if (isActive) summary.activeEmployees += 1;
+            if (!isPurged) summary.unpurgedEmployees += 1;
+            continue;
+          }
+
+          if (isActive) summary.activeIndividuals += 1;
+          if (!isPurged) summary.unpurgedIndividuals += 1;
+        }
+      }
+    }
+
+    return summary;
+  }
+
+  private async readTenantLifecycleRecord(
+    record: any,
+    vaultId: string,
+    decryptProtectedContent: boolean,
+  ): Promise<Record<string, any> | undefined> {
+    if (!record || typeof record !== 'object') {
+      return undefined;
+    }
+
+    if (!decryptProtectedContent) {
+      return record as Record<string, any>;
+    }
+
+    try {
+      const decrypted = await this.kmsService.unprotectConfidentialData<Record<string, any>>(record, vaultId);
+      return decrypted && typeof decrypted === 'object'
+        ? decrypted
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private isPurgedTenantLifecycleRecord(record: Record<string, any>): boolean {
+    const meta = (record.meta || {}) as Record<string, any>;
+    const claims = (record.claims || {}) as Record<string, any>;
+    return meta.lifecycleDisposition === 'purged'
+      || Boolean(meta.lifecyclePurgedAt)
+      || Boolean(meta.purgedAt)
+      || Boolean(meta.licensingPurgedAt)
+      || String(claims['org.schema.FamilyRegistration.status'] || '').trim().toLowerCase() === 'purged';
+  }
+
+  private isHostBootstrapControllerRecord(record: Record<string, any>): boolean {
+    const meta = (record.meta || {}) as Record<string, any>;
+    return String(meta.lifecycleRole || '').trim() === HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE;
   }
 
   private async processActivationEntry(
@@ -1175,6 +1447,21 @@ export class HostingManager {
     }
     if (!this.config.sectorsAllowed.includes(requestedSector)) {
       throw new ManagerError(`The requested sector '${requestedSector}' is not supported by this gateway.`, IssueType.Value);
+    }
+    const requestedServiceTypes = parseServiceCapabilityTokens(
+      normalizedClaims[ClaimsServiceSchemaorg.serviceType],
+    );
+    const serviceAuthorizationErrors = validateActivationServiceAuthorizationPolicy({
+      organizationCredential: activation.organizationCredential,
+      requiredCategory: requestedSector,
+      requiredServiceTypes: requestedServiceTypes,
+    });
+    if (serviceAuthorizationErrors.length > 0) {
+      const first = serviceAuthorizationErrors[0];
+      const issueType = first.code.startsWith('UNAUTHORIZED_')
+        ? IssueType.Conflict
+        : IssueType.Required;
+      throw new ManagerError(first.message, issueType);
     }
 
     const vaultId = getTenantVaultId(requestedSector, alternateName);

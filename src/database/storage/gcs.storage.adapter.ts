@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { Storage } from '@google-cloud/storage';
-import { IStorageAdapter, UploadResult } from './IStorageAdapter';
+import { DownloadResult, IStorageAdapter, UploadResult } from './IStorageAdapter';
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 
@@ -69,6 +69,30 @@ export class GcsStorageAdapter implements IStorageAdapter {
       console.error(`[GcsStorageAdapter] Failed to upload to bucket '${this.bucketName}'.`, error);
       // Re-throw a more specific error for the manager layer to handle.
       throw new Error(`GCS upload failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async download(encodedMultiHash: string): Promise<DownloadResult> {
+    try {
+      const file = this.storage.bucket(this.bucketName).file(encodedMultiHash);
+      const [dataBytes] = await file.download();
+      const [metadata] = await file.getMetadata();
+      return {
+        dataBytes: new Uint8Array(dataBytes),
+        contentType: metadata.contentType,
+      };
+    } catch (error) {
+      console.error(`[GcsStorageAdapter] Failed to download '${encodedMultiHash}' from bucket '${this.bucketName}'.`, error);
+      throw new Error(`GCS download failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async delete(encodedMultiHash: string): Promise<void> {
+    try {
+      await this.storage.bucket(this.bucketName).file(encodedMultiHash).delete({ ignoreNotFound: true });
+    } catch (error) {
+      console.error(`[GcsStorageAdapter] Failed to delete '${encodedMultiHash}' from bucket '${this.bucketName}'.`, error);
+      throw new Error(`GCS delete failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

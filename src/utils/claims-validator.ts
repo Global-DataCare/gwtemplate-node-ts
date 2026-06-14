@@ -5,6 +5,7 @@ import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { parseServiceCapabilityTokens } from 'gdc-common-utils-ts/constants/service-capabilities';
 
 /**
  * Validates the claims provided for a new organization registration request.
@@ -24,6 +25,16 @@ export function validateNewOrganizationClaims(claims: ClaimsRecord): void {
     throw new ManagerError(
       'Multiple sectors (comma-separated) are not allowed in a single registration entry. Please submit one entry per sector.',
       IssueType.Value,
+    );
+  }
+
+  const requestedServiceTypes = parseServiceCapabilityTokens(
+    claims[ClaimsServiceSchemaorg.serviceType],
+  );
+  if (requestedServiceTypes.length === 0) {
+    throw new ManagerError(
+      `Missing required claim for activation: '${ClaimsServiceSchemaorg.serviceType}'`,
+      IssueType.Required,
     );
   }
 

@@ -13,14 +13,15 @@ async function verifyFirebaseCredentials() {
 
   // --- 1. Load Environment Variables ---
   // The goal is to replicate the exact environment loading mechanism used by the E2E tests.
-  const envPath = path.resolve(__dirname, '../.env.test');
+  const envFile = process.env.JEST_ENV_FILE || '.env.local-demo';
+  const envPath = path.resolve(__dirname, `../${envFile}`);
   const result = dotenv.config({ path: envPath, override: true });
 
   if (result.error) {
-    console.error(`🔴 FATAL: Could not load the .env.test file from path: ${envPath}`, result.error);
+    console.error(`🔴 FATAL: Could not load the ${envFile} file from path: ${envPath}`, result.error);
     return;
   }
-  console.log(`✅ Successfully loaded .env.test file.`);
+  console.log(`✅ Successfully loaded ${envFile}.`);
 
   // --- 2. Read and Validate Credentials ---
   const apiKey = process.env.FIREBASE_API_KEY;

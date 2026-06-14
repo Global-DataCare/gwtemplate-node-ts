@@ -37,6 +37,7 @@ import {
 const mockTenantsCacheManager = {
   getDidDocument: jest.fn(),
   getTenant: jest.fn(),
+  isTenantOperational: jest.fn(async () => true),
   getTenantDomainUrl: jest.fn(async () => 'https://host.example.com'),
   listAutodiscoverableTenants: jest.fn(),
   listRegisteredTenants: jest.fn(),
@@ -305,6 +306,23 @@ describe('Well-Known Tenant Artifacts API', () => {
 
     expect(response.status).toBe(404);
   });
+
+  it('should hide tenant dataspace publication endpoints when the tenant is disabled', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const tenantId = testTenant1AlternateName;
+    const expectedUrl = buildGwDspaceVersionWellKnownPath({
+      tenantId,
+      jurisdiction: urnParts.jurisdiction,
+      version: urnParts.version,
+      sector: urnParts.sector,
+    });
+
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
+    mockTenantsCacheManager.isTenantOperational.mockResolvedValue(false);
+
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    expect(response.status).toBe(404);
+  });
 });
 
 describe('Well-Known Legal Participant VC API', () => {
@@ -336,6 +354,10 @@ describe('Well-Known Legal Participant VC API', () => {
 });
 
 describe('DSP Discovery API', () => {
+  beforeEach(() => {
+    mockTenantsCacheManager.isTenantOperational.mockResolvedValue(true);
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
   });

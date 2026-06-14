@@ -17,7 +17,7 @@ The specific repository implementation is chosen at runtime based on the `VAULT_
 
 The project uses Jest as its test runner, configured via `jest.config.ts`. A key part of the configuration is the `jest.setup.ts` file, which is executed before any test suite runs.
 
-This setup file is responsible for loading the correct environment variables (`.env` or `.env.test`) based on the test script being executed. This ensures that tests run in the correct, isolated environment.
+This setup file is responsible for loading the correct environment variables based on the test script being executed. The canonical local profile is `.env.local-demo`, with an optional `JEST_ENV_FILE` override for explicit E2E variants.
 
 Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-client-ts`) ship ESM TypeScript sources. Tests run with `NODE_OPTIONS=--experimental-vm-modules`, and `ts-jest` is configured to transform those packages from `node_modules`.
 
@@ -47,7 +47,8 @@ Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-cl
     TEST_USER_PASSWORD=your-password
     ```
     Notes:
-    - E2E tests read from `.env.test` via `jest.setup.ts`.
+    - E2E tests read from `.env.local-demo` by default via `jest.setup.ts`.
+    - If you need a different profile, set `JEST_ENV_FILE=<filename>` before running the E2E suite.
     - Firestore E2E runs only when `FIRESTORE_E2E=true` and either `FIRESTORE_EMULATOR_HOST` or valid Google credentials are present.
     - GCS E2E runs only when `GCS_E2E=true` and `GCS_BUCKET_NAME` is set.
 

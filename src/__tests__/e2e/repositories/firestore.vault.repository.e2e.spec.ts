@@ -5,7 +5,8 @@ import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-
 import { FirestoreVaultRepository } from '../../../database/repositories/firestore/firestore.vault.repository';
 import { getEnvSectionId } from '../../../utils/section-env';
 
-// IMPORTANT: This E2E test is configured via the .env.test file.
+// IMPORTANT: This E2E test is configured via the profile loaded by `jest.setup.ts`.
+// By default that profile is `.env.local-demo`, but callers can override it with `JEST_ENV_FILE`.
 // See TESTING-FIRESTORE.md for instructions.
 const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 const hasCredentialsFile = credentialsPath

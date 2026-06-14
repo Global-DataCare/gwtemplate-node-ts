@@ -1,7 +1,13 @@
 import admin from 'firebase-admin';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { RecordBase, VaultConfig } from 'gdc-common-utils-ts/models/resource-document';
+import { stripUndefinedDeep } from 'gdc-common-utils-ts';
 import { getEnvSectionId } from '../../../utils/section-env';
+import type { IConfidentialBlobStore } from '../../storage/IConfidentialBlobStore';
+import {
+  externalizeConfidentialStorageDocForPersistence,
+  hydrateConfidentialStorageDocFromPersistence,
+} from '../vault/confidential-storage-persistence';
 
 const DEFAULT_SECTION = 'default';
 
@@ -21,11 +27,13 @@ const DEFAULT_SECTION = 'default';
 export class FirestoreVaultRepository extends IVaultRepository {
   private readonly db: admin.firestore.Firestore;
   private readonly hostCollectionName: string;
+  private readonly blobStore?: IConfidentialBlobStore;
 
-  constructor(db: admin.firestore.Firestore, hostCollectionName: string) {
+  constructor(db: admin.firestore.Firestore, hostCollectionName: string, blobStore?: IConfidentialBlobStore) {
     super();
     this.db = db;
     this.hostCollectionName = hostCollectionName;
+    this.blobStore = blobStore;
   }
 
   private sectionDocRef(collectionName: string, sectionId: string): admin.firestore.DocumentReference {
@@ -73,10 +81,11 @@ export class FirestoreVaultRepository extends IVaultRepository {
       const batch = this.db.batch();
       // Firestore path: {collectionName}/{sectionId}/documents/{documentId}
       const sectionCollectionRef = this.documentsCollectionRef(collectionName, sectionId);
-      documents.forEach((document) => {
+      for (const document of documents) {
+        const persistedDocument = await externalizeConfidentialStorageDocForPersistence(document, this.blobStore);
         const docRef = sectionCollectionRef.doc(document.id);
-        batch.set(docRef, { ...document });
-      });
+        batch.set(docRef, stripUndefinedDeep({ ...persistedDocument }));
+      }
       await batch.commit();
       return true;
     } catch (error) {
@@ -89,28 +98,47 @@ export class FirestoreVaultRepository extends IVaultRepository {
     const docRef = this.documentsCollectionRef(collectionName, sectionId).doc(docId);
     console.log(`[FirestoreVaultRepository DEBUG] GET path: ${docRef.path}`); // <-- DEBUG LOG
     const docSnap = await docRef.get();
-    return docSnap.exists ? (docSnap.data() as T) : undefined;
+    if (!docSnap.exists) {
+      return undefined;
+    }
+    return hydrateConfidentialStorageDocFromPersistence(docSnap.data() as T, this.blobStore);
   }
 
   async getContainersInSection<T extends RecordBase>(collectionName: string, sectionId: string): Promise<T[]> {
     const sectionCollectionRef = this.documentsCollectionRef(collectionName, sectionId);
     const querySnapshot = await sectionCollectionRef.get();
-    return querySnapshot.docs.map((doc) => doc.data() as T);
+    return Promise.all(
+      querySnapshot.docs.map((doc) =>
+        hydrateConfidentialStorageDocFromPersistence(doc.data() as T, this.blobStore),
+      ),
+    );
   }
 
   async query<T extends RecordBase>(collectionName: string, q: any): Promise<T[]> {
-    const sectionId = q.section || DEFAULT_SECTION;
-    let queryChain: admin.firestore.Query = this.documentsCollectionRef(collectionName, sectionId);
+    const sectionId = q.sectionId || q.section || DEFAULT_SECTION;
+    const snapshot = await this.documentsCollectionRef(collectionName, sectionId).get();
+    const docs = snapshot.docs.map((doc) => doc.data() as any);
+
+    if (Array.isArray(q.where) && q.where.length > 0) {
+      return Promise.all(docs.filter((doc) => {
+        const attributes = Array.isArray(doc?.indexed?.attributes) ? doc.indexed.attributes : [];
+        return q.where.every((condition: { name: string; value: string }) =>
+          attributes.some((attr: { name?: string; value?: string }) =>
+            attr?.name === condition.name && attr?.value === condition.value
+          )
+        );
+      }).map((doc) => hydrateConfidentialStorageDocFromPersistence(doc as T, this.blobStore)));
+    }
 
     if (q.equals && q.equals['indexed.attributes']) {
       const attributeToFind = q.equals['indexed.attributes'];
-      queryChain = queryChain.where('indexed.attributes', 'array-contains', attributeToFind);
-    } else {
-        throw new Error(`Query type not supported by FirestoreVaultRepository: ${JSON.stringify(q)}`);
+      return Promise.all(docs.filter((doc) => {
+        const attributes = Array.isArray(doc?.indexed?.attributes) ? doc.indexed.attributes : [];
+        return attributes.some((attr: unknown) => JSON.stringify(attr) === JSON.stringify(attributeToFind));
+      }).map((doc) => hydrateConfidentialStorageDocFromPersistence(doc as T, this.blobStore)));
     }
 
-    const snapshot = await queryChain.get();
-    return snapshot.docs.map((doc) => doc.data() as T);
+    throw new Error(`Query type not supported by FirestoreVaultRepository: ${JSON.stringify(q)}`);
   }
 
   async getVaultConfig(vaultId: string): Promise<VaultConfig | undefined> {
@@ -171,7 +199,17 @@ export class FirestoreVaultRepository extends IVaultRepository {
   }
 
   async purge(collectionName: string): Promise<boolean> {
-    // Dangerous operation; not implemented for Firestore in this repo.
-    throw new Error('Method not implemented.');
+    try {
+      const sectionRefs = await this.db.collection(collectionName).listDocuments();
+      for (const sectionRef of sectionRefs) {
+        const documentRefs = await sectionRef.collection('documents').listDocuments();
+        await Promise.all(documentRefs.map((documentRef) => documentRef.delete()));
+        await sectionRef.delete().catch(() => undefined);
+      }
+      return true;
+    } catch (error) {
+      console.error(`[FirestoreVaultRepository] purge failed for '${collectionName}':`, error);
+      return false;
+    }
   }
 }

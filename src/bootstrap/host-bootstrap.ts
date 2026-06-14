@@ -1,6 +1,7 @@
 import { IServerConfig } from '../config';
 import { HostingManager } from '../managers/HostingManager';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 
 function getHostEnv(key: string): string | undefined {
@@ -21,6 +22,7 @@ export async function bootstrapHost(hostingManager: HostingManager, bootConfig: 
     [ClaimsPersonSchemaorg.hasOccupation]: bootConfig.host.adminRole,
     [ClaimsServiceSchemaorg.category]: 'system',
     [ClaimsServiceSchemaorg.identifier]: `urn:uuid:${bootConfig.host.idValue}-service`,
+    [ClaimsServiceSchemaorg.serviceType]: ServiceCapability.OrganizationRegistryProvider,
   };
   const termsUrl = getHostEnv('TERMS_URL');
   if (termsUrl) {
@@ -34,4 +36,3 @@ export async function bootstrapHost(hostingManager: HostingManager, bootConfig: 
     throw error;
   }
 }
-

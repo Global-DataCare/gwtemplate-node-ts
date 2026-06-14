@@ -27,7 +27,6 @@ import { EmployeeManager } from './managers/EmployeeManager';
 import { IcaManager } from './managers/IcaManager';
 import { MessagingManager } from './managers/MessagingManager';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
-import { slugFromDomain } from './utils/slug';
 import { IndividualManager } from './managers/IndividualManager';
 import { CredentialManager } from './managers/CredentialManager';
 import { CompositionManager } from './managers/CompositionManager';
@@ -215,28 +214,25 @@ async function startServer(options?: StartServerOptions) {
     cryptographyService,
   });
 
-  // Proactively load the host configuration into the cache at startup.
-  await tenantManager.loadHost();
-
+  /**
+   * Resolve the current host registration from the physical host collection.
+   *
+   * Startup rule:
+   * - if the configured host already exists for the current `HOST_ID_VALUE`,
+   *   warm it into cache and continue
+   * - if it does not exist yet, bootstrap it first and then refresh cache
+   *
+   * This order is required when local/live test runs generate a fresh host id
+   * per execution. Reading before bootstrapping would try to resolve a host
+   * registration that does not exist in the new physical host collection yet.
+   */
   if (!(await tenantManager.getTenant('host'))) {
     console.log('[GW-API] Host tenant not found. Bootstrapping...');
     await bootstrapHost(hostingManager, config);
-    // After bootstrapping, explicitly warm up the cache for the host to prevent race conditions on startup.
+    // After bootstrapping, explicitly refresh the cache for the host to prevent
+    // stale in-memory state when a previous execution used a different host id.
     console.log('[GW-API] Warming up host cache after bootstrap...');
-    await tenantManager.getTenant('host');
-  }
-
-  const icaDomain = process.env.ICA_EXTERNAL_DOMAIN;
-  const caDomain = process.env.CA_EXTERNAL_DOMAIN;
-  if (config.nodeEnv === 'demo' && (icaDomain || caDomain)) {
-    const icaSlug = slugFromDomain(icaDomain);
-    const caSlug = slugFromDomain(caDomain);
-    if (icaSlug) {
-      await hostingManager.ensureAuthorityTenant({ alternateName: icaSlug, role: 'ica', externalDomain: icaDomain });
-    }
-    if (caSlug) {
-      await hostingManager.ensureAuthorityTenant({ alternateName: caSlug, role: 'ca', externalDomain: caDomain });
-    }
+    await tenantManager.refreshTenant('host');
   }
 
   const managerRegistry: ManagerRegistry = {

@@ -1,5 +1,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/FamilyManager.ts
+import { createHash } from 'crypto';
 
 import { v4 as uuidv4 } from 'uuid';
 import { IServerConfig } from '../config';
@@ -875,23 +876,13 @@ export class FamilyManager {
     }
 
     await this.releaseFamilyLicenses(tenantVaultId, familyContent);
-
-    const updatedContent: FamilyRegistrationContent = {
-      ...familyContent,
-      status: EntityLifecycleStatus.Inactive,
-      claims: {
-        ...familyContent.claims,
-        'org.schema.FamilyRegistration.status': 'purged',
-      } as ClaimsRecord,
-    };
-    const updatedDoc: ConfidentialStorageDoc = {
-      ...foundResult,
-      status: EntityLifecycleStatus.Inactive,
-      sequence: (foundResult.sequence || 0) + 1,
-      content: updatedContent,
-    };
-    const secureUpdatedDoc = await this.kmsService.protectConfidentialData(updatedDoc, tenantVaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], INDIVIDUAL_SECTION);
+    await this.purgeIndividualSubjectData({
+      tenantVaultId,
+      tenantCollectionName,
+      familyRecord: foundResult,
+      familyContent,
+      lifecycleClaims: claims,
+    });
 
     return {
       type: 'Family-purge-response-v1.0',
@@ -904,6 +895,131 @@ export class FamilyManager {
       resource: { resourceType: 'Organization', id: foundResult.id },
       response: { status: '200' },
     };
+  }
+
+  /**
+   * Destructively removes one individual/family registration plus every
+   * subject-scoped section and best-effort blob reference derived from it.
+   */
+  private async purgeIndividualSubjectData(params: {
+    tenantVaultId: string;
+    tenantCollectionName: string;
+    familyRecord: ConfidentialStorageDoc;
+    familyContent: FamilyRegistrationContent;
+    lifecycleClaims?: ClaimsRecord;
+  }): Promise<void> {
+    const collectionNames = [...new Set([params.tenantVaultId, params.tenantCollectionName].filter(Boolean))];
+    const subjectIdentifiers = this.collectFamilySubjectIdentifiers(params.familyContent, params.lifecycleClaims);
+
+    for (const subjectIdentifier of subjectIdentifiers) {
+      await this.purgeSubjectScopedSections(collectionNames, subjectIdentifier);
+    }
+
+    await this.deleteStoredRecordWithBlobs(
+      params.tenantCollectionName,
+      params.familyRecord.id,
+      INDIVIDUAL_SECTION,
+      params.familyRecord,
+      params.familyContent as unknown as Record<string, any>,
+    );
+  }
+
+  private collectFamilySubjectIdentifiers(
+    content: FamilyRegistrationContent,
+    lifecycleClaims?: ClaimsRecord,
+  ): string[] {
+    const claims = {
+      ...(content?.claims || {}),
+      ...(lifecycleClaims || {}),
+    };
+    const identifiers = [
+      claims[ClaimsOrganizationSchemaorg.identifier],
+      claims[ClaimsPersonSchemaorg.identifier],
+      claims[ClaimsServiceSchemaorg.identifier],
+    ]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+
+    for (const resource of Array.isArray(content?.contained) ? content.contained : []) {
+      const resourceId = String((resource as Record<string, unknown>)?.id || '').trim();
+      if (resourceId) {
+        identifiers.push(resourceId);
+      }
+    }
+
+    return [...new Set(identifiers)];
+  }
+
+  private async purgeSubjectScopedSections(collectionNames: string[], subjectIdentifier: string): Promise<void> {
+    const subjectHash = createHash('sha256').update(subjectIdentifier, 'utf8').digest('hex');
+
+    for (const collectionName of collectionNames) {
+      const sectionIds = await this.vaultRepository.getAllSections(collectionName);
+      for (const sectionId of sectionIds) {
+        if (!sectionId.startsWith(getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_`)) || !sectionId.endsWith(subjectHash)) {
+          continue;
+        }
+
+        const records = await this.vaultRepository.getContainersInSection<any>(collectionName, sectionId);
+        for (const record of records) {
+          const recordId = String(record?.id || '').trim();
+          if (!recordId) {
+            continue;
+          }
+          await this.deleteStoredRecordWithBlobs(collectionName, recordId, sectionId, record);
+        }
+      }
+    }
+  }
+
+  private async deleteStoredRecordWithBlobs(
+    collectionName: string,
+    recordId: string,
+    sectionId: string,
+    record: Record<string, any>,
+    additionalBlobReferenceSource?: Record<string, any>,
+  ): Promise<void> {
+    await this.deleteBlobReferencesFromRecord(record, additionalBlobReferenceSource);
+    await this.vaultRepository.delete(collectionName, recordId, sectionId);
+  }
+
+  private async deleteBlobReferencesFromRecord(
+    record: Record<string, any>,
+    additionalBlobReferenceSource?: Record<string, any>,
+  ): Promise<void> {
+    if (!record || typeof record !== 'object') {
+      return;
+    }
+
+    const blobRefs = [...new Set([
+      ...this.collectBlobReferenceStrings(record),
+      ...this.collectBlobReferenceStrings(additionalBlobReferenceSource),
+    ])];
+    for (const blobRef of blobRefs) {
+      if (!blobRef || !this.storageAdapter.delete) {
+        continue;
+      }
+      await this.storageAdapter.delete(blobRef).catch(() => undefined);
+    }
+  }
+
+  private collectBlobReferenceStrings(value: unknown): string[] {
+    if (!value || typeof value !== 'object') {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap((entry) => this.collectBlobReferenceStrings(entry));
+    }
+
+    const blobRefs: string[] = [];
+    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      if (typeof nestedValue === 'string' && (key === 'blobRef' || key.endsWith('#hash'))) {
+        blobRefs.push(nestedValue);
+      }
+      blobRefs.push(...this.collectBlobReferenceStrings(nestedValue));
+    }
+    return blobRefs;
   }
 
   private async processFamilyDisableEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry | ErrorEntry> {

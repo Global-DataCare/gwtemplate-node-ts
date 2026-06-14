@@ -24,7 +24,7 @@ import { getEnvSectionId } from '../utils/section-env';
 import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/replay-protection-store';
 import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
 import { getTenantAuthorizationStatus } from '../utils/tenant-lifecycle';
-import { ACTION_DISABLE, ACTION_ENABLE } from '../constants/domain';
+import { ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE } from '../constants/domain';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -152,7 +152,7 @@ function isHostTenantLifecycleRoute(
     && section === 'registry'
     && String(format || '').toLowerCase() === 'org.schema'
     && String(resourceType || '').toLowerCase() === 'organization'
-    && (action === ACTION_DISABLE || action === ACTION_ENABLE);
+    && (action === ACTION_DISABLE || action === ACTION_ENABLE || action === ACTION_PURGE);
 }
 
 function requiresActiveTenantAuthorization(

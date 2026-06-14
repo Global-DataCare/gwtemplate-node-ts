@@ -5,6 +5,17 @@ import admin from 'firebase-admin';
 
 let isFirebaseInitialized = false;
 
+function resolveFirebaseProjectIdFromEnv(): string | undefined {
+  const projectId = String(
+    process.env.FIREBASE_PROJECT_ID
+    || process.env.FIRESTORE_PROJECT_ID
+    || process.env.GOOGLE_CLOUD_PROJECT
+    || process.env.GCLOUD_PROJECT
+    || '',
+  ).trim();
+  return projectId || undefined;
+}
+
 /**
  * Initializes the Firebase Admin SDK if it hasn't been initialized already.
  * This function is idempotent and safe to call multiple times.
@@ -15,7 +26,8 @@ export function initializeFirebase(): void {
   }
 
   try {
-    admin.initializeApp();
+    const projectId = resolveFirebaseProjectIdFromEnv();
+    admin.initializeApp(projectId ? { projectId } : undefined);
     isFirebaseInitialized = true;
     console.log('[FirebaseUtil] Firebase Admin SDK initialized successfully.');
   } catch (error: any) {

@@ -1,38 +1,40 @@
 import { newDb } from 'pg-mem';
 import type { Pool } from 'pg';
-import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { buildExampleConfidentialJwe, buildExampleConfidentialStorageDoc } from 'gdc-common-utils-ts';
 import { PostgresVaultRepository } from '../../../database/repositories/postgres/postgres.vault.repository';
 import { ensurePostgresVaultSchema } from '../../../database/repositories/postgres/postgres.schema';
 import { getEnvSectionId } from '../../../utils/section-env';
+import type { IConfidentialBlobStore } from '../../../database/storage/IConfidentialBlobStore';
 
 const HOST_COLLECTION = 'host-system-eu_vat_esx0000000x_system';
 const TENANT_VAULT_ID = 'health-care_acme';
 
-const TEST_CONFIDENTIAL_DOC: ConfidentialStorageDoc = {
-  id: 'doc-1',
-  status: 'active',
-  sequence: 0,
-  indexed: {
-    attributes: [
-      {
-        name: 'hmac_for_email',
-        value: 'hmac_for_test@example.com',
-        unique: true,
-      },
-      {
-        name: 'hmac_for_role',
-        value: 'hmac_for_admin',
-      },
-    ],
-  },
-  jwe: {
-    protected: '...',
-    recipients: [],
-    iv: '...',
-    ciphertext: '...',
-    tag: '...',
-  },
-};
+class InMemoryConfidentialBlobStore implements IConfidentialBlobStore {
+  readonly provider = 'mem';
+  private readonly blobs = new Map<string, Uint8Array>();
+
+  async put(dataBytes: Uint8Array, contentType: string) {
+    const blobRef = `blob-${this.blobs.size + 1}`;
+    this.blobs.set(blobRef, dataBytes);
+    return { blobRef, locator: `mem://${blobRef}`, contentType };
+  }
+
+  async get(blobRef: string) {
+    const dataBytes = this.blobs.get(blobRef);
+    if (!dataBytes) {
+      throw new Error(`Missing test blob '${blobRef}'.`);
+    }
+    return { dataBytes, contentType: 'application/jose+json' };
+  }
+}
+
+function expectHydratedConfidentialDoc(actual: unknown, expectedInlineDoc: ReturnType<typeof buildExampleConfidentialStorageDoc>): void {
+  expect(actual).toEqual(expect.objectContaining(expectedInlineDoc));
+  expect((actual as { blob?: unknown }).blob).toMatchObject({
+    provider: 'mem',
+    contentType: 'application/jose+json',
+  });
+}
 
 function createPool(): Pool {
   const db = newDb({ autoCreateForeignKeyIndices: true });
@@ -47,11 +49,14 @@ function createPool(): Pool {
 describe('PostgresVaultRepository (Integration)', () => {
   let pool: Pool;
   let repository: PostgresVaultRepository;
+  let blobStore: InMemoryConfidentialBlobStore;
+  const testConfidentialDoc = buildExampleConfidentialStorageDoc();
 
   beforeEach(async () => {
     pool = createPool();
     await ensurePostgresVaultSchema(pool, 'vault_test');
-    repository = new PostgresVaultRepository(pool, HOST_COLLECTION, 'vault_test');
+    blobStore = new InMemoryConfidentialBlobStore();
+    repository = new PostgresVaultRepository(pool, HOST_COLLECTION, 'vault_test', blobStore);
   });
 
   afterEach(async () => {
@@ -61,35 +66,41 @@ describe('PostgresVaultRepository (Integration)', () => {
   it('puts a ConfidentialStorageDoc into a section and gets it back by id', async () => {
     const sectionId = getEnvSectionId('employees');
 
-    await repository.put(TENANT_VAULT_ID, [TEST_CONFIDENTIAL_DOC], sectionId);
-    const retrievedDoc = await repository.get(TENANT_VAULT_ID, TEST_CONFIDENTIAL_DOC.id, sectionId);
+    await repository.put(TENANT_VAULT_ID, [testConfidentialDoc], sectionId);
+    const retrievedDoc = await repository.get(TENANT_VAULT_ID, testConfidentialDoc.id, sectionId);
 
-    expect(retrievedDoc).toEqual(TEST_CONFIDENTIAL_DOC);
+    expectHydratedConfidentialDoc(retrievedDoc, testConfidentialDoc);
+
+    const rawStored = await pool.query(
+      'SELECT payload_json FROM "vault_test"."vault_documents" WHERE collection_name = $1 AND section_id = $2 AND document_id = $3',
+      [TENANT_VAULT_ID, sectionId, testConfidentialDoc.id],
+    );
+    expect(rawStored.rows[0].payload_json.jwe).toBeUndefined();
+    expect(rawStored.rows[0].payload_json.blob).toMatchObject({
+      provider: 'mem',
+      contentType: 'application/jose+json',
+    });
   });
 
   it('updates an existing document when put is called again with the same id', async () => {
-    const updatedDoc: ConfidentialStorageDoc = {
-      ...TEST_CONFIDENTIAL_DOC,
+    const updatedDoc = buildExampleConfidentialStorageDoc({
       sequence: 1,
       jwe: {
-        protected: 'updated',
-        recipients: [],
-        iv: 'updated',
+        ...buildExampleConfidentialJwe(),
         ciphertext: 'updated',
-        tag: 'updated',
       },
-    };
+    });
 
-    await repository.put(TENANT_VAULT_ID, [TEST_CONFIDENTIAL_DOC]);
+    await repository.put(TENANT_VAULT_ID, [testConfidentialDoc]);
     await repository.put(TENANT_VAULT_ID, [updatedDoc]);
 
-    const retrievedDoc = await repository.get(TENANT_VAULT_ID, TEST_CONFIDENTIAL_DOC.id);
-    expect(retrievedDoc).toEqual(updatedDoc);
+    const retrievedDoc = await repository.get(TENANT_VAULT_ID, testConfidentialDoc.id);
+    expectHydratedConfidentialDoc(retrievedDoc, updatedDoc);
   });
 
   it('finds a document by indexed attributes using the where query format', async () => {
     const sectionId = getEnvSectionId('employees');
-    await repository.put(TENANT_VAULT_ID, [TEST_CONFIDENTIAL_DOC], sectionId);
+    await repository.put(TENANT_VAULT_ID, [testConfidentialDoc], sectionId);
 
     const results = await repository.query(TENANT_VAULT_ID, {
       sectionId,
@@ -97,12 +108,12 @@ describe('PostgresVaultRepository (Integration)', () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toEqual(TEST_CONFIDENTIAL_DOC);
+    expectHydratedConfidentialDoc(results[0], testConfidentialDoc);
   });
 
   it('finds a document by indexed attributes using the legacy equals query format', async () => {
     const sectionId = getEnvSectionId('employees');
-    await repository.put(TENANT_VAULT_ID, [TEST_CONFIDENTIAL_DOC], sectionId);
+    await repository.put(TENANT_VAULT_ID, [testConfidentialDoc], sectionId);
 
     const results = await repository.query(TENANT_VAULT_ID, {
       section: sectionId,
@@ -115,13 +126,12 @@ describe('PostgresVaultRepository (Integration)', () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toEqual(TEST_CONFIDENTIAL_DOC);
+    expectHydratedConfidentialDoc(results[0], testConfidentialDoc);
   });
 
   it('finds documents only when all query conditions match', async () => {
     const sectionId = getEnvSectionId('employees');
-    const secondDoc: ConfidentialStorageDoc = {
-      ...TEST_CONFIDENTIAL_DOC,
+    const secondDoc = buildExampleConfidentialStorageDoc({
       id: 'doc-2',
       indexed: {
         attributes: [
@@ -129,8 +139,8 @@ describe('PostgresVaultRepository (Integration)', () => {
           { name: 'hmac_for_email', value: 'hmac_for_other@example.com', unique: true },
         ],
       },
-    };
-    await repository.put(TENANT_VAULT_ID, [TEST_CONFIDENTIAL_DOC, secondDoc], sectionId);
+    });
+    await repository.put(TENANT_VAULT_ID, [testConfidentialDoc, secondDoc], sectionId);
 
     const results = await repository.query(TENANT_VAULT_ID, {
       sectionId,
@@ -141,15 +151,15 @@ describe('PostgresVaultRepository (Integration)', () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toEqual(TEST_CONFIDENTIAL_DOC);
+    expectHydratedConfidentialDoc(results[0], testConfidentialDoc);
   });
 
   it('marks a document as deleted and purge clears deleted rows physically', async () => {
     const sectionId = getEnvSectionId('employees');
-    await repository.put(TENANT_VAULT_ID, [TEST_CONFIDENTIAL_DOC], sectionId);
+    await repository.put(TENANT_VAULT_ID, [testConfidentialDoc], sectionId);
 
-    const deleted = await repository.delete(TENANT_VAULT_ID, TEST_CONFIDENTIAL_DOC.id, sectionId);
-    const afterDelete = await repository.get(TENANT_VAULT_ID, TEST_CONFIDENTIAL_DOC.id, sectionId);
+    const deleted = await repository.delete(TENANT_VAULT_ID, testConfidentialDoc.id, sectionId);
+    const afterDelete = await repository.get(TENANT_VAULT_ID, testConfidentialDoc.id, sectionId);
     const listAfterDelete = await repository.getContainersInSection(TENANT_VAULT_ID, sectionId);
 
     expect(deleted).toBe(true);
@@ -174,7 +184,7 @@ describe('PostgresVaultRepository (Integration)', () => {
       getEnvSectionId('tenants'),
     );
 
-    await repository.put(TENANT_VAULT_ID, [TEST_CONFIDENTIAL_DOC], getEnvSectionId('employees'));
+    await repository.put(TENANT_VAULT_ID, [testConfidentialDoc], getEnvSectionId('employees'));
 
     await expect(repository.vaultExists('host')).resolves.toBe(true);
     await expect(repository.vaultExists(TENANT_VAULT_ID)).resolves.toBe(true);

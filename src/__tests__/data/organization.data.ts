@@ -31,6 +31,10 @@ export const testDefaultTenantServiceTypeClaim = serializeServiceCapabilityToken
   ServiceCapability.DigitalTwinReader,
 ]) as string;
 
+export const testDefaultHostServiceTypeClaim = serializeServiceCapabilityTokens([
+  ServiceCapability.OrganizationRegistryProvider,
+]) as string;
+
 export const testClaimsRegisterTenantExpanded = {
   [ClaimsOrganizationSchemaorg.addressCountry]: "ES",
   [ClaimsOrganizationSchemaorg.alternateName]: "acme-id",
@@ -60,7 +64,7 @@ export { testHostDomain, testHostDidWeb };
 const testServiceManufacturerDidWebIdentifier = `urn:web:<manufacturer>`;
 const testServiceManufacturerCategory = "system";
 const testServiceManufacturerTerms = "https://github.com/<manufacturer>/<software>/terms";
-const testServiceManufacturerPurposeType = testDefaultTenantServiceTypeClaim;
+const testServiceManufacturerPurposeType = testDefaultHostServiceTypeClaim;
 export { testRootOrgDidWeb }; // https://testca.unid.es/.well-known/did.json
 
 export const testConfigDataHost: OrganizationConfig = {

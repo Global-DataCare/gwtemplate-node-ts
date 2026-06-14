@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # Copy to demo-deploy.config (ignored by git) and adjust only the GKE/edge values.
-# This file intentionally reuses .env.local for the actual GW runtime configuration.
+# This file intentionally reuses .env.local-demo for the actual GW runtime configuration.
 
 export BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 set -a
-source "${BASE_DIR}/.env.local"
+source "${BASE_DIR}/.env.local-demo"
 set +a
 
 # GCP / GKE
@@ -30,7 +30,7 @@ export GDC_GSA_EMAIL="gwtemplate-gke@globaldatacare-test.iam.gserviceaccount.com
 # Optional external ICA URL. Leave empty while GW runs standalone.
 export DATASPACE_ICA_EXTERNAL_URL=""
 
-# Demo mode: keep the runtime from .env.local unless you need to override something for k8s.
+# Demo mode: keep the runtime from .env.local-demo unless you need to override something for k8s.
 export NODE_ENV="${NODE_ENV:-demo}"
 export SECURITY_MODE="${SECURITY_MODE:-compat}"
 export NETWORK_MODE="${NETWORK_MODE:-test}"

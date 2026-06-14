@@ -1,38 +1,36 @@
+import admin from 'firebase-admin';
 import { RulesTestEnvironment, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { buildExampleConfidentialStorageDoc, buildExampleConfidentialJwe } from 'gdc-common-utils-ts';
 import { FirestoreVaultRepository } from '../../../database/repositories/firestore/firestore.vault.repository';
 import { getEnvSectionId } from '../../../utils/section-env';
+import type { IConfidentialBlobStore } from '../../../database/storage/IConfidentialBlobStore';
 
-// A realistic test document that simulates a document with HMAC'd indexed attributes.
-const TEST_CONFIDENTIAL_DOC: ConfidentialStorageDoc = {
-  id: 'doc-1',
-  sequence: 0,
-  indexed: {
-    attributes: [
-      {
-        name: 'hmac_for_email', // Represents HMAC("email")
-        value: 'hmac_for_test@example.com', // Represents HMAC("test@example.com")
-        unique: true,
-      },
-      {
-        name: 'hmac_for_role', // Represents HMAC("role")
-        value: 'hmac_for_admin', // Represents HMAC("admin")
-      },
-    ],
-  },
-  jwe: {
-    protected: '...',
-    recipients: [],
-    iv: '...',
-    ciphertext: '...',
-    tag: '...',
-  },
-};
+class InMemoryConfidentialBlobStore implements IConfidentialBlobStore {
+  readonly provider = 'mem';
+  private readonly blobs = new Map<string, Uint8Array>();
+
+  async put(dataBytes: Uint8Array, contentType: string) {
+    const blobRef = `blob-${this.blobs.size + 1}`;
+    this.blobs.set(blobRef, dataBytes);
+    return { blobRef, locator: `mem://${blobRef}`, contentType };
+  }
+
+  async get(blobRef: string) {
+    const dataBytes = this.blobs.get(blobRef);
+    if (!dataBytes) {
+      throw new Error(`Missing test blob '${blobRef}'.`);
+    }
+    return { dataBytes, contentType: 'application/jose+json' };
+  }
+}
 
 describe('FirestoreVaultRepository (Integration)', () => {
   let repository: FirestoreVaultRepository;
   let testEnv: RulesTestEnvironment;
+  let blobStore: InMemoryConfidentialBlobStore;
   const vaultId = 'my-confidential-vault';
+  const hostCollectionName = 'host';
+  const testConfidentialDoc = buildExampleConfidentialStorageDoc();
 
   beforeAll(async () => {
     // Set the emulator host, which the FirestoreVaultRepository constructor will pick up.
@@ -40,12 +38,16 @@ describe('FirestoreVaultRepository (Integration)', () => {
     testEnv = await initializeTestEnvironment({
       projectId: 'firestore-vault-test-2',
     });
+    if (!admin.apps.length) {
+      admin.initializeApp({ projectId: 'firestore-vault-test-2' });
+    }
   });
 
   beforeEach(async () => {
     await testEnv.clearFirestore();
-    repository = new FirestoreVaultRepository();
-    await repository.createNewVault({ id: vaultId });
+    blobStore = new InMemoryConfidentialBlobStore();
+    repository = new FirestoreVaultRepository(admin.firestore(), hostCollectionName, blobStore);
+    await repository.createNewVault({ id: vaultId } as any);
   });
 
   afterAll(async () => {
@@ -56,41 +58,50 @@ describe('FirestoreVaultRepository (Integration)', () => {
 
   describe('put and get operations', () => {
     it('should put a ConfidentialStorageDoc into a specific section and get it back by id', async () => {
-      // Arrange
       const sectionId = getEnvSectionId('employees');
 
-      // Act
-      await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC], sectionId);
-      const retrievedDoc = await repository.get(vaultId, TEST_CONFIDENTIAL_DOC.id, sectionId);
+      await repository.put(vaultId, [testConfidentialDoc], sectionId);
+      const retrievedDoc = await repository.get(vaultId, testConfidentialDoc.id, sectionId);
 
-      // Assert
       expect(retrievedDoc).toBeDefined();
-      expect(retrievedDoc).toEqual(TEST_CONFIDENTIAL_DOC);
+      expect(retrievedDoc).toEqual(testConfidentialDoc);
+
+      const persistedSnapshot = await admin
+        .firestore()
+        .collection(vaultId)
+        .doc(sectionId)
+        .collection('documents')
+        .doc(testConfidentialDoc.id)
+        .get();
+      const persistedPayload = persistedSnapshot.data();
+      expect(persistedPayload?.jwe).toBeUndefined();
+      expect(persistedPayload?.blob).toMatchObject({
+        provider: 'mem',
+        contentType: 'application/jose+json',
+      });
     });
 
     it('should update an existing document when put is called again with the same id', async () => {
-        // Arrange
-        const updatedDoc: ConfidentialStorageDoc = {
-            ...TEST_CONFIDENTIAL_DOC,
-            sequence: 1,
-            jwe: { updated: 'true' }
-        };
-        await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC]); // Put initial version
+        const updatedDoc = buildExampleConfidentialStorageDoc({
+          sequence: 1,
+          jwe: {
+            ...buildExampleConfidentialJwe(),
+            ciphertext: 'updated-ciphertext',
+          },
+        });
+        await repository.put(vaultId, [testConfidentialDoc]);
 
-        // Act
         await repository.put(vaultId, [updatedDoc]);
-        const retrievedDoc = await repository.get(vaultId, TEST_CONFIDENTIAL_DOC.id);
+        const retrievedDoc = await repository.get(vaultId, testConfidentialDoc.id);
 
-        // Assert
         expect(retrievedDoc).toEqual(updatedDoc);
     });
   });
 
   describe('query operations', () => {
     it('should find a document by a unique indexed attribute using the query method', async () => {
-      // Arrange
       const sectionId = getEnvSectionId('employees');
-      await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC], sectionId);
+      await repository.put(vaultId, [testConfidentialDoc], sectionId);
       const queryObj = {
         section: sectionId,
         equals: {
@@ -102,18 +113,15 @@ describe('FirestoreVaultRepository (Integration)', () => {
         },
       };
 
-      // Act
       const results = await repository.query(vaultId, queryObj);
 
-      // Assert
       expect(results).toHaveLength(1);
-      expect(results[0]).toEqual(TEST_CONFIDENTIAL_DOC);
+      expect(results[0]).toEqual(testConfidentialDoc);
     });
 
     it('should return an empty array if no document matches the query', async () => {
-      // Arrange
       const sectionId = getEnvSectionId('employees');
-      await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC], sectionId);
+      await repository.put(vaultId, [testConfidentialDoc], sectionId);
       const queryObj = {
         section: sectionId,
         equals: {
@@ -124,27 +132,23 @@ describe('FirestoreVaultRepository (Integration)', () => {
         },
       };
       
-      // Act
       const results = await repository.query(vaultId, queryObj);
 
-      // Assert
       expect(results).toHaveLength(0);
     });
 
     it('should find multiple documents by a non-unique indexed attribute using the query method', async () => {
-      // Arrange
       const sectionId = getEnvSectionId('employees');
-      const anotherAdminDoc: ConfidentialStorageDoc = {
-        ...TEST_CONFIDENTIAL_DOC,
+      const anotherAdminDoc = buildExampleConfidentialStorageDoc({
         id: 'doc-2',
         indexed: {
           attributes: [
             { name: 'hmac_for_role', value: 'hmac_for_admin' }, // Same role
             { name: 'hmac_for_email', value: 'hmac_for_another@example.com', unique: true }
-          ]
-        }
-      };
-      await repository.put(vaultId, [TEST_CONFIDENTIAL_DOC, anotherAdminDoc], sectionId);
+          ],
+        },
+      });
+      await repository.put(vaultId, [testConfidentialDoc, anotherAdminDoc], sectionId);
 
       const queryObj = {
         section: sectionId,
@@ -156,12 +160,10 @@ describe('FirestoreVaultRepository (Integration)', () => {
         },
       };
 
-      // Act
       const results = await repository.query(vaultId, queryObj);
 
-      // Assert
       expect(results).toHaveLength(2);
-      expect(results).toEqual(expect.arrayContaining([TEST_CONFIDENTIAL_DOC, anotherAdminDoc]));
+      expect(results).toEqual(expect.arrayContaining([testConfidentialDoc, anotherAdminDoc]));
     });
   });
 });
