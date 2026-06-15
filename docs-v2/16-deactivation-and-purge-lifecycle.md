@@ -71,11 +71,41 @@ This step is required before purge.
 
 `purge individual` is destructive.
 
+However, communication retention is a separate policy boundary. By default,
+clinical/professional communications are not purged together with the hosted
+individual record.
+
 It must remove:
 
 - the family/individual registration record itself
 - subject-scoped section containers associated with that individual
 - blobs referenced by those individual records
+
+It must not remove retained `Communication` records when retention remains
+enabled.
+
+Current default policy:
+
+- `COMMUNICATION_RETENTION_DISABLED=false`
+
+Meaning:
+
+- `false` or unset: purge skips retained communications
+- `true`: hosting/runtime policy may additionally allow communication purge
+
+Why this default exists:
+
+- health-care communications may need to be retained for complaints,
+  malpractice review, safeguarding, or legal threats
+- the right to erasure is not absolute where retention is needed for legal
+  claims, legal obligations, or health-care delivery
+
+Compliance/audit references:
+
+- ICO storage limitation:
+  https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/data-protection-principles/a-guide-to-the-data-protection-principles/storage-limitation/
+- ICO right to erasure:
+  https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/individual-rights/right-to-erasure/
 
 Current practical meaning of "subject-scoped sections":
 
@@ -149,6 +179,10 @@ This prevents a provider from disappearing while it still has live hosted actors
 
 `purge tenant` is destructive.
 
+As with individual purge, retained communications are a separate policy
+boundary and are skipped by default while
+`COMMUNICATION_RETENTION_DISABLED=false`.
+
 It is only allowed after the tenant has already been disabled.
 
 It also requires that descendants are no longer merely disabled, but already purged when required by policy.
@@ -205,6 +239,11 @@ So the host controller can only disable the host after hosted tenants have alrea
 ### Purge Host
 
 `purge host` is destructive and final.
+
+In normal production policy, host purge should still be blocked while retained
+communications remain under hosted data responsibility. Test or explicit
+cleanup environments may temporarily set
+`COMMUNICATION_RETENTION_DISABLED=true` to allow full destructive cleanup.
 
 It is only allowed when no hosted tenant registrations remain.
 
@@ -267,6 +306,20 @@ That service type expresses that the host is allowed to host/manage organization
 - When preparing activation proofs, always include the correct `category` and `serviceType`.
 
 ## Practical Summary
+
+## Portal/API Lifecycle Table
+
+This condensed table is intended as a bridge for portal/backend designers who
+need a route-level view of the lifecycle contract.
+
+| Scope | Operation | Portal/backend intent | Required preconditions | Expected effect |
+|---|---|---|---|---|
+| Individual | `disable` | stop treating a hosted subject as active | individual exists and is currently active | operational deactivation only, no physical deletion |
+| Individual | `purge` | irreversibly remove a hosted subject footprint | individual already disabled | delete registration, subject-scoped sections, and referenced confidential blobs |
+| Tenant | `disable` | stop a provider from operating/publishing | no active descendant employees or individuals/members remain | provider discovery/publication stops; audit identity may remain resolvable |
+| Tenant | `purge` | irreversibly remove a hosted legal organization/provider | tenant already disabled and descendants already purged as required by policy | delete tenant registration and remaining tenant-owned data footprint |
+| Host | `disable` | stop the hosting operator from being discoverable/onboarding new tenants | no hosted tenants remain registered | host discovery/publication stops; DID/JWKS may remain for traceability |
+| Host | `purge` | irreversibly remove the hosting operator footprint | host already disabled and no hosted tenants remain | delete host registration and remaining host-owned data footprint |
 
 - Individual:
   - disable first

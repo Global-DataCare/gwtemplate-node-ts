@@ -12,6 +12,13 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { randomUUID } from 'crypto';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
+import {
+  buildCommunicationParticipantSearchParameters,
+  buildExampleCommunicationParticipantProjection,
+  buildExampleCommunicationParticipantSearchInput,
+  CommunicationParticipantPrefixes,
+} from 'gdc-common-utils-ts';
+import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
 
 describe('CommunicationManager Unit Tests', () => {
   let communicationManager: CommunicationManager;
@@ -25,11 +32,14 @@ describe('CommunicationManager Unit Tests', () => {
     // Create a new mock instance for each test
     mockTenantsCacheManager = {
       getTenantDid: jest.fn(),
+      tenantExists: jest.fn(async () => true),
     } as unknown as jest.Mocked<TenantsCacheManager>;
     mockVaultRepository = {
       vaultExists: jest.fn(async () => false),
       put: jest.fn(async () => undefined),
       query: jest.fn(async () => []),
+      listContainersInSection: jest.fn(async () => []),
+      getAllSections: jest.fn(async () => []),
     } as unknown as jest.Mocked<IVaultRepository>;
     mockCompositionManager = {
       process: jest.fn(),
@@ -1466,6 +1476,146 @@ describe('CommunicationManager Unit Tests', () => {
       expect(forwardedJob.resourceType).toBe('Subject');
       expect(forwardedJob.action).toBe('_search');
       expect((forwardedJob.content as any)?.body).toEqual(parametersResource);
+    });
+  });
+
+  describe('participant search and indexing', () => {
+    it('stores normalized participant index attributes in channel projections', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+
+      const fhirResource = {
+        resourceType: 'Communication' as const,
+        status: 'completed',
+        subject: { reference: 'did:web:subject.example' },
+        sender: { reference: 'mailto:Sender@Example.org' },
+        recipient: [
+          { reference: 'did:web:member.example' },
+          { reference: '+34 600 111 222' },
+        ],
+        sent: '2026-06-15T10:00:00Z',
+      };
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: {
+          jti: randomUUID(),
+          thid: 'thread-participant-index-001',
+          iss: 'did:web:sender.example',
+          aud: 'did:web:gw.example',
+          exp: Math.floor(Date.now() / 1000) + 300,
+          type: 'api+json',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            data: [{ resource: fhirResource }],
+          },
+        } as any,
+      };
+
+      await communicationManager.process(job);
+
+      const communicationSectionWrite = mockVaultRepository.put.mock.calls.find((call) =>
+        String(call[2] || '').includes('communications'),
+      );
+      expect(communicationSectionWrite).toBeDefined();
+      const storedRecord = communicationSectionWrite?.[1]?.[0] as Record<string, any>;
+      expect(storedRecord.indexed?.attributes).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'Communication.sender-token', value: 'email:sender@example.org' }),
+        expect.objectContaining({ name: 'Communication.recipient-token', value: 'did:web:member.example' }),
+        expect.objectContaining({ name: 'Communication.recipient-token', value: 'tel:+34600111222' }),
+      ]));
+    });
+
+    it('searches communication channel records through Parameters criteria and wildcard subject scope', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+
+      const firstSection = getSubjectScopedSectionId('did:web:subject.example', 'individual', 'communications');
+      const secondSection = getSubjectScopedSectionId('did:web:subject.example:secondary', 'individual', 'communications');
+      (mockVaultRepository.getAllSections as unknown as jest.Mock<any>).mockResolvedValue([
+        firstSection,
+        secondSection,
+        'test_individual_dictionary_abc',
+      ]);
+      (mockVaultRepository.listContainersInSection as unknown as jest.Mock<any>).mockImplementation(async (...args: any[]) => {
+        const sectionId = args[1] as string;
+        if (sectionId === firstSection) {
+          const firstProjection = buildExampleCommunicationParticipantProjection();
+          return [
+            {
+              ...firstProjection,
+              type: 'CommMsgExtended',
+              resource: { id: 'comm-1' },
+              [CommunicationClaim.Identifier]: 'comm-1',
+              [CommunicationClaim.Subject]: firstProjection.subject,
+              [CommunicationClaim.Sender]: firstProjection.sender,
+              [CommunicationClaim.Recipient]: (firstProjection.recipients as string[]).join(','),
+              [CommunicationClaim.Category]: firstProjection.category,
+              [CommunicationClaim.Topic]: firstProjection.topic,
+              [CommunicationClaim.Sent]: '2026-06-15T10:00:00Z',
+            },
+          ];
+        }
+        const secondProjection = buildExampleCommunicationParticipantProjection({
+            id: 'communication-participant-record-002',
+            subject: 'did:web:subject.example:secondary',
+            recipients: ['did:web:somebody.else'],
+          });
+        return [{
+          ...secondProjection,
+          type: 'CommMsgExtended',
+          resource: { id: 'comm-2' },
+          [CommunicationClaim.Identifier]: 'comm-2',
+          [CommunicationClaim.Subject]: secondProjection.subject,
+          [CommunicationClaim.Sender]: secondProjection.sender,
+          [CommunicationClaim.Recipient]: (secondProjection.recipients as string[]).join(','),
+          [CommunicationClaim.Category]: secondProjection.category,
+          [CommunicationClaim.Topic]: secondProjection.topic,
+          [CommunicationClaim.Sent]: '2026-06-15T11:00:00Z',
+        }];
+      });
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_search',
+        content: {
+          jti: randomUUID(),
+          thid: 'thread-participant-search-001',
+          iss: 'did:web:searcher.example',
+          aud: 'did:web:gw.example',
+          exp: Math.floor(Date.now() / 1000) + 300,
+          type: 'api+json',
+          body: buildCommunicationParticipantSearchParameters(
+            buildExampleCommunicationParticipantSearchInput({
+              subject: CommunicationParticipantPrefixes.Wildcard,
+            }),
+          ),
+        } as any,
+      };
+
+      const response = await communicationManager.process(job);
+      const data = (response.body as any).data;
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe('communication-participant-record-001');
+      expect(data[0].meta.claims[CommunicationClaim.Identifier]).toBe('comm-1');
     });
   });
 });
