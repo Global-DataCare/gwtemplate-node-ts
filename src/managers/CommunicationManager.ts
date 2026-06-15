@@ -5,6 +5,13 @@
 import { CommMsgExtended, DataEntry, FhirCommunication } from 'gdc-common-utils-ts/models/comm';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
 import { claimsToContentCid } from 'gdc-common-utils-ts/utils/fhir-cid';
+import {
+  buildCommunicationParticipantIndexAttributes,
+  matchesCommunicationParticipantSearch,
+  paginateCommunicationParticipantMatches,
+  parseCommunicationParticipantSearchCriteria,
+} from 'gdc-common-utils-ts/utils/communication-participant-search';
+import { SearchBundleTypes } from 'gdc-common-utils-ts/utils/fhir-search';
 import { HealthcareBasicSections } from '../shared/healthcare-constants';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
@@ -16,6 +23,7 @@ import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { getTenantVaultId } from '../utils/tenant';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { getSubjectScopedSectionId } from '../utils/individual-sections';
+import { getEnvSectionId } from '../utils/section-env';
 import { createHash } from 'crypto';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import { applyFhirCidVersioningToEntry, fhirResourceToCid } from '../utils/fhir-versioning';
@@ -125,6 +133,13 @@ interface CommunicationManagerOptions {
   individualManager?: IJobProcessor;
 }
 
+const COMMUNICATION_RESOURCE_TYPE = 'Communication' as const;
+const COMMUNICATION_ENTRY_TYPE = 'CommMsgExtended' as const;
+const COMMUNICATION_SECTION_NAME = 'communications' as const;
+const FHIR_PARAMETERS_RESOURCE_TYPE = 'Parameters' as const;
+const SEARCH_RESPONSE_ENTRY_TYPE = 'Communication-search-response-v1.0' as const;
+const COMMUNICATION_SECTION_PREFIX = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_${COMMUNICATION_SECTION_NAME}_`);
+
 /**
  * Manages the business logic for converting FHIR Communication resources
  * into the internal CommMsgExtended format.
@@ -149,6 +164,10 @@ export class CommunicationManager implements IJobProcessor {
    * @returns A promise that resolves to a payload response containing the converted messages.
    */
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    if (job.action === '_search') {
+      return this.processSearch(job);
+    }
+
     const bundleEntries: (BundleEntryResponse | ErrorEntry)[] = [];
     const now = Math.floor(Date.now() / 1000);
 
@@ -172,7 +191,7 @@ export class CommunicationManager implements IJobProcessor {
           throw new Error('Malformed entry: missing resource and missing meta.claims');
         }
         
-        if (fhirResource.resourceType !== 'Communication') {
+        if (fhirResource.resourceType !== COMMUNICATION_RESOURCE_TYPE) {
           console.warn(`Skipping resource of type ${fhirResource.resourceType}`);
           continue;
         }
@@ -201,7 +220,7 @@ export class CommunicationManager implements IJobProcessor {
         bundleEntries.push({
           response: { status: '200' },
           id: resourceId,
-          type: 'CommMsgExtended',
+          type: COMMUNICATION_ENTRY_TYPE,
           resource: commMsg,
         });
 
@@ -256,6 +275,47 @@ export class CommunicationManager implements IJobProcessor {
       body: responseBundle,
     };
     return result;
+  }
+
+  private async processSearch(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const now = Math.floor(Date.now() / 1000);
+    const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+    const serverDid = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
+    if (!serverDid) {
+      throw new Error(`Could not determine server DID for tenant '${job.tenantId}'.`);
+    }
+
+    const criteria = parseCommunicationParticipantSearchCriteria(
+      this.extractSearchBody(job),
+    );
+    const records = await this.searchCommunicationChannelRecords(tenantVaultId, criteria);
+    const pagedRecords = paginateCommunicationParticipantMatches(records, criteria);
+    const data: Array<BundleEntryResponse | ErrorEntry> = pagedRecords.map((record) => ({
+      response: { status: '200' },
+      id: this.normalizeOptionalString(record.id) || determineResourceId(record[CommunicationClaim.Identifier], process.env.NODE_ENV),
+      type: COMMUNICATION_ENTRY_TYPE,
+      meta: {
+        claims: this.buildSearchResponseClaims(record),
+      },
+      resource: record.resource || record,
+    }));
+
+    const responseBundle: BundleJsonApi<BundleEntryResponse | ErrorEntry> = {
+      resourceType: 'Bundle',
+      type: SearchBundleTypes.SearchResponse,
+      total: records.length,
+      data,
+    };
+
+    return {
+      jti: uuidv4(),
+      iss: serverDid,
+      aud: job.content?.meta?.bearer?.jwt?.payload?.iss || '',
+      exp: now + 300,
+      thid: this.normalizeOptionalString(job.content?.thid) || uuidv4(),
+      type: 'api+json',
+      body: responseBundle,
+    };
   }
 
   private async executeEmbeddedSearchRequest(
@@ -590,11 +650,20 @@ export class CommunicationManager implements IJobProcessor {
 
     const record: Record<string, any> = {
       id: messageId,
-      type: 'CommMsgExtended',
+      type: COMMUNICATION_ENTRY_TYPE,
       thid: threadId,
       pthid: String(job.content?.pthid || commMsg.pthid || '').trim() || undefined,
       from: commMsg.from,
       to: commMsg.to,
+      indexed: {
+        attributes: buildCommunicationParticipantIndexAttributes({
+          subject,
+          sender: this.resolveCommunicationSender(entry, fhirResource) || commMsg.from,
+          recipients: this.resolveCommunicationRecipient(entry, fhirResource) || commMsg.to,
+          from: commMsg.from,
+          to: commMsg.to,
+        }),
+      },
       created_time: commMsg.created_time,
       audit: {
         created: sent,
@@ -617,7 +686,7 @@ export class CommunicationManager implements IJobProcessor {
       record[CommunicationClaim.ContentReference] = contentReferences.join(',');
     }
 
-    const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'communications');
+    const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, COMMUNICATION_SECTION_NAME);
     await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
   }
 
@@ -999,6 +1068,103 @@ export class CommunicationManager implements IJobProcessor {
       });
     }
     return attributes;
+  }
+
+  private extractSearchBody(job: JobRequest): Record<string, unknown> {
+    const body = job.content?.body as Record<string, any> | undefined;
+    if (!body || typeof body !== 'object') {
+      return { resourceType: FHIR_PARAMETERS_RESOURCE_TYPE, parameter: [] };
+    }
+    if (body.resourceType === FHIR_PARAMETERS_RESOURCE_TYPE) {
+      return body;
+    }
+    if (Array.isArray(body.entry)) {
+      const parameterResource = body.entry.find((entry) => entry?.resource?.resourceType === FHIR_PARAMETERS_RESOURCE_TYPE)?.resource;
+      if (parameterResource && typeof parameterResource === 'object') {
+        return parameterResource;
+      }
+    }
+    return body;
+  }
+
+  private async searchCommunicationChannelRecords(
+    tenantVaultId: string,
+    criteria: ReturnType<typeof parseCommunicationParticipantSearchCriteria>,
+  ): Promise<Array<Record<string, any>>> {
+    const sectionIds = await this.resolveCommunicationSearchSectionIds(tenantVaultId, criteria);
+    const recordsById = new Map<string, Record<string, any>>();
+
+    for (const sectionId of sectionIds) {
+      const records = await this.vaultRepository.listContainersInSection<any>(tenantVaultId, sectionId);
+      for (const record of records) {
+        if (String(record?.type || '').trim() !== COMMUNICATION_ENTRY_TYPE) {
+          continue;
+        }
+        if (!matchesCommunicationParticipantSearch({
+          subject: record?.[CommunicationClaim.Subject],
+          sender: record?.[CommunicationClaim.Sender] || record?.from,
+          recipients: record?.[CommunicationClaim.Recipient] || record?.to,
+          from: record?.from,
+          to: record?.to,
+          sent: record?.[CommunicationClaim.Sent],
+          category: record?.[CommunicationClaim.Category],
+          topic: record?.[CommunicationClaim.Topic],
+        }, criteria)) {
+          continue;
+        }
+        const stableId = this.normalizeOptionalString(record.id)
+          || this.normalizeOptionalString(record[CommunicationClaim.Identifier])
+          || determineResourceId(record?.thid, process.env.NODE_ENV);
+        if (!recordsById.has(stableId)) {
+          recordsById.set(stableId, record);
+        }
+      }
+    }
+
+    return Array.from(recordsById.values()).sort((left, right) => {
+      const leftSent = this.normalizeOptionalString(left?.[CommunicationClaim.Sent]) || '';
+      const rightSent = this.normalizeOptionalString(right?.[CommunicationClaim.Sent]) || '';
+      return leftSent.localeCompare(rightSent);
+    });
+  }
+
+  private async resolveCommunicationSearchSectionIds(
+    tenantVaultId: string,
+    criteria: ReturnType<typeof parseCommunicationParticipantSearchCriteria>,
+  ): Promise<string[]> {
+    if (!criteria.anySubject && criteria.subjectActorIds.length > 0) {
+      return criteria.subjectActorIds.map((subjectActorId) =>
+        getSubjectScopedSectionId(subjectActorId, SUBJECT_SECTION_INDIVIDUAL, COMMUNICATION_SECTION_NAME));
+    }
+
+    const sectionIds = await this.vaultRepository.getAllSections(tenantVaultId);
+    return sectionIds.filter((sectionId) => String(sectionId || '').startsWith(COMMUNICATION_SECTION_PREFIX));
+  }
+
+  private buildSearchResponseClaims(record: Record<string, any>): Record<string, unknown> {
+    return {
+      '@context': 'org.hl7.fhir.r4',
+      [CommunicationClaim.Identifier]: this.normalizeOptionalString(record[CommunicationClaim.Identifier]) || this.normalizeOptionalString(record.id),
+      [CommunicationClaim.Subject]: this.normalizeOptionalString(record[CommunicationClaim.Subject]),
+      [CommunicationClaim.Sender]: this.normalizeOptionalString(record[CommunicationClaim.Sender]) || this.normalizeOptionalString(record.from),
+      [CommunicationClaim.Recipient]: this.normalizeOptionalString(record[CommunicationClaim.Recipient])
+        || this.joinSearchResponseRecipients(record.to),
+      [CommunicationClaim.Sent]: this.normalizeOptionalString(record[CommunicationClaim.Sent]),
+      ...(this.normalizeOptionalString(record[CommunicationClaim.NoteText])
+        ? { [CommunicationClaim.NoteText]: this.normalizeOptionalString(record[CommunicationClaim.NoteText]) }
+        : {}),
+      ...(this.normalizeOptionalString(record.thid)
+        ? { [CommunicationClaim.PartOf]: this.normalizeOptionalString(record.thid) }
+        : {}),
+    };
+  }
+
+  private joinSearchResponseRecipients(value: unknown): string | undefined {
+    if (Array.isArray(value)) {
+      const joined = value.map((item) => String(item || '').trim()).filter(Boolean).join(',');
+      return joined || undefined;
+    }
+    return this.normalizeOptionalString(value);
   }
 
   private extractCommunicationNoteTexts(fhirResource: FhirCommunication): string[] {

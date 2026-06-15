@@ -115,6 +115,45 @@
 - `npm run api:local-demo` + `HOST_ID_VALUE=... npm run test:e2e:live-gw`
 - `npm run api:local-firestore-demo` + `HOST_ID_VALUE=... npm run test:e2e:live-gw`
 
+## [Unreleased]
+
+### Changed
+- Documented the conservative communication-retention lifecycle boundary so
+  individual, tenant, and host purge flows can skip retained `Communication`
+  records by default while `COMMUNICATION_RETENTION_DISABLED=false`, and added
+  explicit audit/compliance references in:
+  - `docs-v2/16-deactivation-and-purge-lifecycle.md`
+- Added/updated portal/backend-facing operational docs for the new v1.3
+  lifecycle and deploy flow:
+  - `v1.3-tabla-portal-api-gw.md`
+  - `DEPLOY.md`
+  - `demo-deploy.config.example`
+  - `cloud_deploy.sh`
+  - `.docker-build-deps.sha256`
+- Clarified the release scope to include the VC verification fix in
+  `_activate`, along with the communication-search and lifecycle hardening work
+  already in flight across:
+  - `src/__tests__/unit/adapters/activation-trust.adapter.test.ts`
+  - `src/utils/services.ts`
+  - `src/managers/CommunicationManager.ts`
+  - `src/__tests__/unit/managers/CommunicationManager.unit.test.ts`
+- Added indexed `Communication/_search` support for communication channel
+  records, including normalized participant matching, claim-based search
+  filters, shared pagination semantics, and canonical `search-response`
+  envelopes in:
+  - `src/managers/CommunicationManager.ts`
+  - `src/utils/services.ts`
+  - `src/__tests__/unit/managers/CommunicationManager.unit.test.ts`
+- Updated the root deployment entrypoint so GKE deployments can now be selected
+  by profile via `./cloud_deploy.sh gke <profile> [config-file]`, which loads
+  `.env.gke.<profile>` before the infra-specific GKE config file.
+- Kept `./cloud_deploy.sh gke-demo [config-file]` as a backward-compatible
+  alias for the current `gdc` GKE profile.
+- Updated `demo-deploy.config.example` so runtime GW settings are expected to
+  come from `.env.gke.<profile>` instead of hardwiring `.env.local-demo`.
+- Added `DEPLOY.md` at the repo root to document the practical split between
+  local demo, Cloud Run deployment envs, and GKE profile-based deployment.
+
 ## [1.13.0] - 2026-06-13
 
 ### Added

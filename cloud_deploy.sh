@@ -10,9 +10,23 @@ FABRIC_MULTICLOUD_DIR="${FABRIC_MULTICLOUD_DIR:-${WORKSPACE_ROOT}/fabric-multicl
 usage() {
   cat <<'EOF'
 Usage:
-  ./cloud_deploy.sh <staging|production|...>     Deploy to Cloud Run using .env.deploy.<env>
-  ./cloud_deploy.sh gke-demo [config-file]       Deploy demo GW to GKE using demo-deploy.config
+  ./cloud_deploy.sh <staging|production|...>       Deploy to Cloud Run using .env.deploy.<env>
+  ./cloud_deploy.sh gke <profile> [config-file]   Deploy to GKE using .env.gke.<profile>
+  ./cloud_deploy.sh gke-demo [config-file]        Backward-compatible alias for demo GKE deployment
 EOF
+}
+
+source_env_file() {
+  local env_file="$1"
+
+  if [[ ! -f "$env_file" ]]; then
+    echo "❌ ERROR: Configuration file not found: $env_file"
+    exit 1
+  fi
+
+  set -a
+  source "$env_file"
+  set +a
 }
 
 resolve_versioned_image() {
@@ -133,14 +147,7 @@ deploy_cloud_run() {
   local env_name="$1"
   local env_file=".env.deploy.${env_name}"
 
-  if [[ ! -f "$env_file" ]]; then
-    echo "❌ ERROR: Configuration file for '$env_name' not found."
-    exit 1
-  fi
-
-  set -a
-  source "$env_file"
-  set +a
+  source_env_file "$env_file"
 
   if [[ -z "${FIRESTORE_PROJECT_ID:-}" || -z "${DEPLOY_REGION:-}" || -z "${DEPLOY_SERVICE_NAME:-}" || -z "${ARTIFACT_REGISTRY_NAME:-}" ]]; then
     echo "ERROR: Missing FIRESTORE_PROJECT_ID, DEPLOY_REGION, DEPLOY_SERVICE_NAME, or ARTIFACT_REGISTRY_NAME."
@@ -218,17 +225,20 @@ deploy_cloud_run() {
   echo "You can check the interactive API docs at: ${service_url}/api-docs"
 }
 
-deploy_gke_demo() {
-  local config_file="${1:-demo-deploy.config}"
+deploy_gke() {
+  local profile="$1"
+  local config_file="${2:-demo-deploy.config}"
+  local env_file=".env.gke.${profile}"
+
+  source_env_file "$env_file"
+
   if [[ ! -f "$config_file" ]]; then
-    echo "❌ ERROR: GKE demo config file not found: $config_file"
+    echo "❌ ERROR: GKE config file not found: $config_file"
     echo "Create it from demo-deploy.config.example first."
     exit 1
   fi
 
-  set -a
-  source "$config_file"
-  set +a
+  source_env_file "$config_file"
 
   GDC_IMAGE="$(resolve_versioned_image "${GDC_IMAGE:-}" "${GDC_IMAGE_TAG:-}" "latest,demo")"
   export GDC_IMAGE
@@ -249,7 +259,8 @@ deploy_gke_demo() {
   remainder="${image_host_and_project#*/}"
   repo_name="${remainder%%/*}"
 
-  echo "--- 🚀 Preparing for GKE demo deployment ---"
+  echo "--- 🚀 Preparing for GKE deployment ---"
+  echo "  Profile:            $profile"
   echo "  Project ID:         $GCP_PROJECT_ID"
   echo "  Region:             $GCP_REGION"
   echo "  Cluster:            $GKE_CLUSTER"
@@ -267,7 +278,7 @@ deploy_gke_demo() {
   echo "⚙️  Enabling required GKE services..."
   gcloud services enable container.googleapis.com artifactregistry.googleapis.com
 
-  build_and_push_image "$GCP_PROJECT_ID" "$GCP_REGION" "$GDC_IMAGE" "$repo_name" "gwtemplate-gke-demo" "${LOCAL_IMAGE_NAME:-gwtemplate}"
+  build_and_push_image "$GCP_PROJECT_ID" "$GCP_REGION" "$GDC_IMAGE" "$repo_name" "gwtemplate-gke-${profile}" "${LOCAL_IMAGE_NAME:-gwtemplate}"
 
   echo "⚙️  Fetching GKE credentials for cluster: $GKE_CLUSTER"
   gcloud container clusters get-credentials "$GKE_CLUSTER" --region "$GCP_REGION"
@@ -275,7 +286,7 @@ deploy_gke_demo() {
   echo "⚙️  Applying GW GKE manifests..."
   bash "$FABRIC_MULTICLOUD_DIR/scripts/05-k8s-deploy-gdc.sh"
 
-  echo "--- ✅ GKE demo deployment submitted ---"
+  echo "--- ✅ GKE deployment submitted ---"
   echo "Public URL: $GDC_PUBLIC_URL"
   echo "Once the LoadBalancer service is ready, test:"
   echo "  ${GDC_PUBLIC_URL}/host/ping"
@@ -292,8 +303,16 @@ main() {
   shift || true
 
   case "$mode" in
+    gke)
+      if [[ $# -lt 1 ]]; then
+        echo "❌ ERROR: Missing GKE profile."
+        usage
+        exit 1
+      fi
+      deploy_gke "$1" "${2:-demo-deploy.config}"
+      ;;
     gke-demo)
-      deploy_gke_demo "${1:-demo-deploy.config}"
+      deploy_gke "gdc" "${1:-demo-deploy.config}"
       ;;
     *)
       deploy_cloud_run "$mode"
