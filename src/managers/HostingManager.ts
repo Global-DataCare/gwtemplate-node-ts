@@ -2,7 +2,7 @@
 // File: src/managers/HostingManager.ts
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 import { IServerConfig } from '../config';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
@@ -191,6 +191,38 @@ export class HostingManager {
     const identifierValue = String(processedClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
     if (identifierValue) {
       processedClaims[ClaimsOrganizationSchemaorg.alternateName] = identifierValue;
+    }
+    return processedClaims;
+  }
+
+  /**
+   * Activation payloads coming from ICA often carry the organization's fiscal
+   * identifier only in the governance VC (`credentialSubject.taxID`) rather
+   * than as flat GW claims. Backend activation keeps the canonical claim model
+   * stable by filling `identifier.value` from that tax ID and defaulting the
+   * missing identifier type to `TAX`.
+   */
+  private applyActivationOrganizationIdentifierCompatibility(
+    claims: ClaimsRecord,
+    organizationCredential?: unknown,
+  ): ClaimsRecord {
+    const processedClaims = { ...claims };
+    const identifierValue = String(processedClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
+    const identifierType = String(processedClaims[ClaimsOrganizationSchemaorg.identifierType] || '').trim();
+    const subject = Array.isArray((organizationCredential as any)?.credentialSubject)
+      ? (organizationCredential as any).credentialSubject[0]
+      : (organizationCredential as any)?.credentialSubject;
+    const taxId = String(subject?.taxID || '').trim();
+
+    if (!identifierValue && taxId) {
+      processedClaims[ClaimsOrganizationSchemaorg.identifierValue] = taxId;
+    }
+    const finalIdentifierValue = String(processedClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
+    const normalizedUuidValue = finalIdentifierValue.startsWith('urn:uuid:')
+      ? finalIdentifierValue.slice('urn:uuid:'.length)
+      : finalIdentifierValue;
+    if (!identifierType && finalIdentifierValue) {
+      processedClaims[ClaimsOrganizationSchemaorg.identifierType] = uuidValidate(normalizedUuidValue) ? 'UUID' : 'TAX';
     }
     return processedClaims;
   }
@@ -1027,7 +1059,10 @@ export class HostingManager {
       throw new ManagerError('Malformed activation entry: missing meta.claims', IssueType.Required);
     }
 
-    const normalizedClaims = this.applyLegalOrganizationAlternateNameCompatibility(claims);
+    const normalizedClaims = this.applyActivationOrganizationIdentifierCompatibility(
+      this.applyLegalOrganizationAlternateNameCompatibility(claims),
+      activation.organizationCredential,
+    );
     validateNewOrganizationClaims(normalizedClaims);
     const alternateName = normalizedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
     if (!alternateName) {

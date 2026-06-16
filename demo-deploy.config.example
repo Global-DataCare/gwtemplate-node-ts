@@ -22,6 +22,10 @@ export GDC_PUBLIC_URL="http://${GDC_PUBLIC_IP}"
 export GDC_STATIC_IP_NAME="gdc-gw-demo-ip"
 export GDC_GSA_EMAIL="gwtemplate-gke@globaldatacare-test.iam.gserviceaccount.com"
 
+# Runtime env comes from `.env.gke.<profile>`.
+# If you need the provisional startup workaround for a Firestore auth incident,
+# set `STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR=true` there, not here.
+
 # Optional external ICA URL. Leave empty while GW runs standalone.
 export DATASPACE_ICA_EXTERNAL_URL=""
 

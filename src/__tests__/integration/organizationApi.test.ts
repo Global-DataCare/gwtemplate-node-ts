@@ -35,6 +35,7 @@ import { Content } from 'gdc-common-utils-ts/utils/content';
 import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { JWK } from 'gdc-common-utils-ts/models/jwk';
 import { HostingManager } from '../../managers/HostingManager';
+import type { IHostRuntime } from '../../managers/IHostRuntime';
 import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 
@@ -183,6 +184,7 @@ describe('Organization Registration API', () => {
   let mockConfig: IServerConfig;
   let cryptoService: CryptographyService;
   let externalEncrypter: MlkemPrivateJwk;
+  let hostRuntime: IHostRuntime;
   const hostPublicEncKey: MlkemPublicJwk = {
     kty: 'OKP',
     crv: 'ML-KEM-768',
@@ -206,6 +208,10 @@ describe('Organization Registration API', () => {
     vaultRepository = new VaultMemRepository();
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
     asyncResponseStore = new AsyncResponseStoreMem();
+    hostRuntime = {
+      hostCollectionName,
+      hostDid: 'did:web:host.example.com',
+    };
 
     mockConfig = {
       securityMode: 'demo',
@@ -279,17 +285,46 @@ describe('Organization Registration API', () => {
       mockStorageAdapter,
       mockLogger,
       mockConfig,
+      hostRuntime,
     );
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await tenantsCacheManager.loadHost();
   });
 
-  async function activateTenantDirectly(): Promise<{ tenantId: string; sector: string }> {
+  async function activateTenantDirectly(
+    representativeCredentialId = 'did:web:controller.example.com',
+    activationClaims: Record<string, unknown> = { ...testClaimsTenant1Registration },
+  ): Promise<{ tenantId: string; sector: string }> {
     const vpTokenCompact = [
       Buffer.from(JSON.stringify({ alg: 'ML-DSA-44', typ: 'JWT' })).toString('base64url'),
       Buffer.from(JSON.stringify({
         sub: 'did:web:controller.example.com',
-        vp: { verifiableCredential: [] },
+        vp: {
+          verifiableCredential: [
+            {
+              '@context': ['https://www.w3.org/2018/credentials/v1'],
+              type: ['VerifiableCredential', 'OrganizationCredential'],
+              credentialSubject: {
+                id: 'did:web:api.acme.org',
+                taxID: 'VATES-B00112233',
+                category: testClaimsTenant1Registration[ClaimsServiceSchemaorg.category],
+                serviceType: testClaimsTenant1Registration[ClaimsServiceSchemaorg.serviceType],
+              },
+            },
+            {
+              '@context': ['https://www.w3.org/2018/credentials/v1'],
+              type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
+              credentialSubject: {
+                id: representativeCredentialId,
+                memberOf: {
+                  taxID: 'VATES-B00112233',
+                },
+                hasOccupation: { identifier: { value: 'RESPRSN' } },
+                hasCredential: { material: 'controller-sig-kid' },
+              },
+            },
+          ],
+        },
       })).toString('base64url'),
       'mock-signature',
     ].join('.');
@@ -317,13 +352,21 @@ describe('Organization Registration API', () => {
           organizationCredential: {
             '@context': ['https://www.w3.org/2018/credentials/v1'],
             type: ['VerifiableCredential'],
-            credentialSubject: { id: 'did:web:api.acme.org' },
+            credentialSubject: {
+              id: 'did:web:api.acme.org',
+              taxID: 'VATES-B00112233',
+              category: testClaimsTenant1Registration[ClaimsServiceSchemaorg.category],
+              serviceType: testClaimsTenant1Registration[ClaimsServiceSchemaorg.serviceType],
+            },
           },
           representativeCredential: {
             '@context': ['https://www.w3.org/2018/credentials/v1'],
             type: ['VerifiableCredential'],
             credentialSubject: {
-              id: 'did:web:controller.example.com',
+              id: representativeCredentialId,
+              memberOf: {
+                taxID: 'VATES-B00112233',
+              },
               hasOccupation: { identifier: { value: 'RESPRSN' } },
               hasCredential: { material: 'controller-sig-kid' },
             },
@@ -331,7 +374,7 @@ describe('Organization Registration API', () => {
           data: [
             {
               type: 'Organization-activation-request-v1.0',
-              meta: { claims: { ...testClaimsTenant1Registration } },
+              meta: { claims: activationClaims },
               request: { method: 'POST' },
               resource: {},
             },
@@ -363,6 +406,49 @@ describe('Organization Registration API', () => {
   });
 
   describe('tenant lifecycle authorization gating', () => {
+    it('should accept activation when the representative credential subject id is a URN', async () => {
+      const tenant = await activateTenantDirectly('urn:person:identifier:controller-001');
+
+      expect(tenant).toMatchObject({
+        tenantId: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.alternateName]),
+        sector: String(testClaimsTenant1Registration[ClaimsServiceSchemaorg.category]),
+      });
+    });
+
+    it('should derive organization identifier claims from VC taxID when activation claims omit them', async () => {
+      const activationClaims = { ...testClaimsTenant1Registration } as Record<string, unknown>;
+      delete activationClaims[ClaimsOrganizationSchemaorg.identifier];
+      delete activationClaims[ClaimsOrganizationSchemaorg.identifierType];
+      delete activationClaims[ClaimsOrganizationSchemaorg.identifierValue];
+
+      const tenant = await activateTenantDirectly(
+        'urn:person:identifier:controller-001',
+        activationClaims,
+      );
+
+      expect(tenant).toMatchObject({
+        tenantId: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.alternateName]),
+        sector: String(testClaimsTenant1Registration[ClaimsServiceSchemaorg.category]),
+      });
+    });
+
+    it('should default organization identifierType to UUID when activation claims provide a UUID value', async () => {
+      const activationClaims = { ...testClaimsTenant1Registration } as Record<string, unknown>;
+      delete activationClaims[ClaimsOrganizationSchemaorg.identifier];
+      delete activationClaims[ClaimsOrganizationSchemaorg.identifierType];
+      activationClaims[ClaimsOrganizationSchemaorg.identifierValue] = '123e4567-e89b-12d3-a456-426614174000';
+
+      const tenant = await activateTenantDirectly(
+        'urn:person:identifier:controller-001',
+        activationClaims,
+      );
+
+      expect(tenant).toMatchObject({
+        tenantId: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.alternateName]),
+        sector: String(testClaimsTenant1Registration[ClaimsServiceSchemaorg.category]),
+      });
+    });
+
     it('should block tenant onboarding flows while disabled and allow them again after enable', async () => {
       const tenant = await activateTenantDirectly();
 

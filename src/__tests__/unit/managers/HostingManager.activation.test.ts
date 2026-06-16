@@ -437,6 +437,56 @@ describe('HostingManager activation flow', () => {
     );
   });
 
+  it('should activate when the representative credential uses a non-did credentialSubject.id', async () => {
+    const job = buildActivationJob();
+    (job.content!.body as any).representativeCredential.credentialSubject.id = 'urn:person:identifier:controller-001';
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
+  });
+
+  it('should derive organization identifier claims from taxID when activation claims omit them', async () => {
+    const job = buildActivationJob();
+    const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifier];
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifierType];
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifierValue];
+    job.content!.body!.data[0]!.meta!.claims = activationClaims;
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('TAX');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('VATES-B00112233');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
+      'urn:test-namespace:test-network:es:v1:health-care:entity:tax:VATES-B00112233',
+    );
+  });
+
+  it('should default organization identifierType to UUID when identifierValue is a UUID', async () => {
+    const job = buildActivationJob();
+    const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifier];
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifierType];
+    activationClaims[ClaimsOrganizationSchemaorg.identifierValue] = '123e4567-e89b-12d3-a456-426614174000';
+    job.content!.body!.data[0]!.meta!.claims = activationClaims;
+    uuidMock.validate.mockReturnValue(true);
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('UUID');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('123e4567-e89b-12d3-a456-426614174000');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
+      'urn:test-namespace:test-network:es:v1:health-care:entity:uuid:123e4567-e89b-12d3-a456-426614174000',
+    );
+  });
+
   it('should reject activation when vp_token is missing', async () => {
     const job = buildActivationJob();
     delete (job.content!.body as any).vp_token;

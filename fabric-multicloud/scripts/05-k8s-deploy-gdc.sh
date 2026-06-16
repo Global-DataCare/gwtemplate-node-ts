@@ -49,6 +49,7 @@ optional_env_defaults=(
   "HOST_ADMIN_ROLE=ISCO-08|1111"
   "HOST_TERMS_URL=${GDC_PUBLIC_URL}/terms"
   "GCS_BUCKET_NAME="
+  "STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR=false"
 )
 
 for entry in "${optional_env_defaults[@]}"; do
@@ -97,6 +98,7 @@ render_template() {
     -e "s|__HOST_ADMIN_UID__|${HOST_ADMIN_UID}|g" \
     -e "s|__HOST_ADMIN_ROLE__|${HOST_ADMIN_ROLE}|g" \
     -e "s|__HOST_TERMS_URL__|${HOST_TERMS_URL}|g" \
+    -e "s|__STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR__|${STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR}|g" \
     -e "s|__GDC_GSA_EMAIL__|${GDC_GSA_EMAIL}|g" \
     -e "s|__DATASPACE_ICA_EXTERNAL_URL__|${DATASPACE_ICA_EXTERNAL_URL:-}|g" \
     "$src" > "$dest"

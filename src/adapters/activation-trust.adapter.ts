@@ -2,6 +2,7 @@ import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import {
   extractDidWebFromCredential,
+  extractRepresentativeSubjectId,
   validateActivationRepresentativePolicy,
 } from 'gdc-common-utils-ts/utils/activation-policy';
 import { ClearingHouseVerificationResult, IClearingHouseService } from '../services/ClearingHouseService';
@@ -99,8 +100,8 @@ function assertActivationCredentialConsistency(params: {
     throw new ManagerError('Submitted organization DID does not match ICA-issued organization credential DID.', IssueType.Conflict);
   }
 
-  const representativeDidFromCredential = representativeCredential
-    ? extractDidWebFromCredential(representativeCredential)
+  const representativeSubjectId = representativeCredential
+    ? extractRepresentativeSubjectId(representativeCredential)
     : undefined;
   const policyErrors = validateActivationRepresentativePolicy({
     organizationCredential,
@@ -115,7 +116,9 @@ function assertActivationCredentialConsistency(params: {
 
   return {
     organizationDid: organizationDidFromCredential,
-    representativeDid: representativeDidFromCredential,
+    representativeDid: representativeSubjectId?.startsWith('did:web:')
+      ? representativeSubjectId
+      : undefined,
   };
 }
 

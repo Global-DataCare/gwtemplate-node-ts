@@ -117,12 +117,29 @@
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-06-16
+
 ### Changed
+- Activation onboarding now fills missing
+  `org.schema.Organization.identifierValue` from ICA
+  `organizationCredential.credentialSubject.taxID` and defaults
+  `org.schema.Organization.identifierType` to `UUID` when the identifier value
+  is a UUID, otherwise to `TAX`, before generating the canonical organization
+  URN, avoiding activation failures when ICA-first payloads omit the flat
+  identifier claims:
+  - `src/managers/HostingManager.ts`
 - Documented the conservative communication-retention lifecycle boundary so
   individual, tenant, and host purge flows can skip retained `Communication`
   records by default while `COMMUNICATION_RETENTION_DISABLED=false`, and added
   explicit audit/compliance references in:
   - `docs-v2/16-deactivation-and-purge-lifecycle.md`
+- Relaxed ICA activation representative validation so `Organization/_activate`
+  no longer requires the representative VC `credentialSubject.id` to be a
+  `did:web`; non-DID subject ids such as `urn:person:...` now pass while GW
+  still enforces representative role and key-binding policy through:
+  - `src/adapters/activation-trust.adapter.ts`
+  - `src/__tests__/unit/managers/HostingManager.activation.test.ts`
+  - `src/__tests__/integration/organizationApi.test.ts`
 - Added/updated portal/backend-facing operational docs for the new v1.3
   lifecycle and deploy flow:
   - `v1.3-tabla-portal-api-gw.md`

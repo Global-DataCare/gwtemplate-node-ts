@@ -218,22 +218,36 @@ async function startServer(options?: StartServerOptions) {
   /**
    * Resolve the current host registration from the physical host collection.
    *
-   * Startup rule:
-   * - if the configured host already exists for the current `HOST_ID_VALUE`,
-   *   warm it into cache and continue
-   * - if it does not exist yet, bootstrap it first and then refresh cache
+   * Keep startup behavior aligned with the older stable path used in v1.8.5:
+   * - first try to warm the host cache
+   * - if the host registration is still absent, bootstrap it
+   * - then explicitly load it again
    *
-   * This order is required when local/live test runs generate a fresh host id
-   * per execution. Reading before bootstrapping would try to resolve a host
-   * registration that does not exist in the new physical host collection yet.
+   * This preserves the previous startup sequence while still allowing an
+   * opt-in non-fatal fallback for environments where Firestore auth is
+   * temporarily broken during rollout/debugging.
    */
-  if (!(await tenantManager.tenantExists('host'))) {
-    console.log('[GW-API] Host tenant not found. Bootstrapping...');
-    await bootstrapHost(hostingManager, config);
-    // After bootstrapping, explicitly refresh the cache for the host to prevent
-    // stale in-memory state when a previous execution used a different host id.
-    console.log('[GW-API] Warming up host cache after bootstrap...');
-    await tenantManager.refreshTenant('host');
+  try {
+    await tenantManager.loadHost();
+    if (!(await tenantManager.getTenant('host'))) {
+      console.log('[GW-API] Host tenant not found. Bootstrapping...');
+      await bootstrapHost(hostingManager, config);
+      // After bootstrapping, explicitly warm the cache again using the legacy
+      // full-read path to preserve the previous startup semantics.
+      console.log('[GW-API] Warming up host cache after bootstrap...');
+      await tenantManager.getTenant('host');
+    }
+  } catch (error) {
+    const allowStartupWithoutHostWarmup =
+      String(process.env.STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR || '').trim().toLowerCase() === 'true';
+    console.warn(
+      '[GW-API] Host startup cache warmup failed.'
+      + (allowStartupWithoutHostWarmup ? ' Continuing because STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR=true.' : ''),
+      error,
+    );
+    if (!allowStartupWithoutHostWarmup) {
+      throw error;
+    }
   }
 
   const managerRegistry: ManagerRegistry = {
