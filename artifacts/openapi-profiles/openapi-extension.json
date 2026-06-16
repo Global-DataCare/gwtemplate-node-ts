@@ -4,7 +4,7 @@
     "title": "Gateway API - EXTENSIONS",
     "version": "1.0.3",
     "description": "Extension profile including non-core and vertical-specific capabilities on top of core and compat.",
-    "x-profile-generated-at": "2026-06-14T11:31:38.286Z",
+    "x-profile-generated-at": "2026-06-16T22:12:38.097Z",
     "x-profile-name": "extension"
   },
   "servers": [],
@@ -350,7 +350,7 @@
             "vp_token": "<ica-proof-token>",
             "controller": {
               "did": "did:web:people.acme.org:controllers:primary",
-              "sameAs": "mailto:controller@acme.org",
+              "sameAs": "urn:multibase:zControllerHash",
               "publicKeyJwk": {
                 "kid": "controller-es384-001",
                 "kty": "EC",

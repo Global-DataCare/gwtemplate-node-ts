@@ -83,12 +83,26 @@ import {
   ACTION_PURGE,
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 
 type ActivationParticipantMaterial = {
   did?: string;
   sameAs?: string;
   publicKeyJwk?: PublicJwk;
   jwks?: JwkSet;
+};
+
+type ActivationMaterial = {
+  vpToken: any;
+  presentationSubmission: any;
+  organizationCredential: any;
+  representativeCredential: any;
+  legacyOrganizationCredential: any;
+  legacyRepresentativeCredential: any;
+  primaryDid: any;
+  publicTenantUrl: any;
+  organizationBinding?: ActivationParticipantMaterial;
+  controllerBinding?: ActivationParticipantMaterial;
 };
 
 type VpCredentialObject = Record<string, unknown>;
@@ -107,6 +121,7 @@ type VpCredentialObject = Record<string, unknown>;
  * operational projection for lifecycle inspection.
  */
 const HOST_BOOTSTRAP_CONTROLLER_LIFECYCLE_ROLE = 'host-bootstrap-controller';
+const JWK_THUMBPRINT_SHA256_URN_PREFIX = 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:';
 
 /**
  * Manages the initial onboarding of new tenants onto the Gateway.
@@ -180,33 +195,34 @@ export class HostingManager {
     await this.persistHostConfig(organization, allClaims, [person, processedService!]);
   }
 
-  private applyLegalOrganizationAlternateNameCompatibility(claims: ClaimsRecord): ClaimsRecord {
-    const processedClaims = { ...claims };
-    const alternateName = String(processedClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
-    if (alternateName) return processedClaims;
-
-    const isIndividualOrg = !!processedClaims['org.schema.Organization.owner.telephone'];
-    if (isIndividualOrg) return processedClaims;
-
-    const identifierValue = String(processedClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
-    if (identifierValue) {
-      processedClaims[ClaimsOrganizationSchemaorg.alternateName] = identifierValue;
-    }
-    return processedClaims;
-  }
-
   /**
-   * Activation payloads coming from ICA often carry the organization's fiscal
-   * identifier only in the governance VC (`credentialSubject.taxID`) rather
-   * than as flat GW claims. Backend activation keeps the canonical claim model
-   * stable by filling `identifier.value` from that tax ID and defaulting the
-   * missing identifier type to `TAX`.
+   * Normalizes the legal-organization identity claims used by host onboarding.
+   *
+   * Precedence rules:
+   * - If `identifier.value` is already present, it is treated as the canonical
+   *   legal identifier for onboarding and path routing.
+   * - If `identifier.value` is missing but ICA provides
+   *   `organizationCredential.credentialSubject.taxID`, that tax ID backfills
+   *   `identifier.value`.
+   * - If `identifier.type` is missing, GW infers `UUID` for UUID values and
+   *   otherwise falls back to `TAX`.
+   * - If `alternateName` is missing for a legal organization, GW derives it
+   *   from the final canonical `identifier.value`.
+   *
+   * This makes the path-facing tenant id (`alternateName`) explicit:
+   * - tax-id-only onboarding becomes `taxID -> identifier.value -> alternateName`
+   * - if a jurisdiction uses a different legal identifier (for example, a
+   *   Canadian incorporation number) and sends it in `identifier.value`, that
+   *   legal identifier wins over `taxID` for `alternateName`, `tenantId`, and
+   *   `vaultId`.
    */
-  private applyActivationOrganizationIdentifierCompatibility(
+  private applyLegalOrganizationIdentityCompatibility(
     claims: ClaimsRecord,
     organizationCredential?: unknown,
   ): ClaimsRecord {
     const processedClaims = { ...claims };
+    const alternateName = String(processedClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+    const isIndividualOrg = !!processedClaims['org.schema.Organization.owner.telephone'];
     const identifierValue = String(processedClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
     const identifierType = String(processedClaims[ClaimsOrganizationSchemaorg.identifierType] || '').trim();
     const subject = Array.isArray((organizationCredential as any)?.credentialSubject)
@@ -223,6 +239,9 @@ export class HostingManager {
       : finalIdentifierValue;
     if (!identifierType && finalIdentifierValue) {
       processedClaims[ClaimsOrganizationSchemaorg.identifierType] = uuidValidate(normalizedUuidValue) ? 'UUID' : 'TAX';
+    }
+    if (!alternateName && !isIndividualOrg && finalIdentifierValue) {
+      processedClaims[ClaimsOrganizationSchemaorg.alternateName] = finalIdentifierValue;
     }
     return processedClaims;
   }
@@ -544,6 +563,95 @@ export class HostingManager {
       `[HostingManager] _activate received deprecated legacy compatibility field(s): ${usedLegacyFields.join(', ')}. `
       + 'Canonical proof must be carried in vp_token; controller.* is the explicit controller key-binding contract.',
     );
+  }
+
+  private isDemoSecurityMode(): boolean {
+    return this.config.securityMode === 'demo' || String(this.config.nodeEnv || '').trim().toLowerCase() === 'demo';
+  }
+
+  private extractRepresentativeCredentialBindingValue(representativeCredential: any): string | undefined {
+    const credentialData = representativeCredential?.credentialSubject?.hasCredential;
+    const candidates = Array.isArray(credentialData) ? credentialData : [credentialData];
+    for (const candidate of candidates) {
+      if (!candidate) {
+        continue;
+      }
+      if (typeof candidate === 'string' && candidate.trim()) {
+        return candidate.trim();
+      }
+      if (typeof candidate === 'object') {
+        const value = String(
+          (candidate as any).material
+          || (candidate as any).value
+          || (candidate as any).identifier?.value
+          || '',
+        ).trim();
+        if (value) {
+          return value;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private async normalizeRepresentativeBindingMaterial(params: {
+    publicKeyJwk?: PublicJwk;
+    kid?: string;
+  }): Promise<string | undefined> {
+    if (params.publicKeyJwk) {
+      try {
+        return toJwkThumbprintSha256Urn(params.publicKeyJwk);
+      } catch {
+        // Fall through to kid normalization when the provided JWK cannot be
+        // thumbprinted canonically.
+      }
+    }
+
+    const rawKid = String(params.kid || '').trim();
+    if (!rawKid) {
+      return undefined;
+    }
+    if (rawKid.startsWith(JWK_THUMBPRINT_SHA256_URN_PREFIX)) {
+      return rawKid;
+    }
+    return `${JWK_THUMBPRINT_SHA256_URN_PREFIX}${rawKid}`;
+  }
+
+  private async applyDemoRepresentativeBindingFallback(
+    activation: ActivationMaterial,
+    jobMeta?: DidCommDecodedMetadata,
+  ): Promise<ActivationMaterial> {
+    if (!this.isDemoSecurityMode() || !activation.representativeCredential) {
+      return activation;
+    }
+    if (this.extractRepresentativeCredentialBindingValue(activation.representativeCredential)) {
+      return activation;
+    }
+
+    const fallbackMaterial = await this.normalizeRepresentativeBindingMaterial({
+      publicKeyJwk: activation.controllerBinding?.publicKeyJwk || jobMeta?.jws?.protected?.jwk as PublicJwk | undefined,
+      kid: activation.controllerBinding?.publicKeyJwk?.kid || jobMeta?.jws?.protected?.kid,
+    });
+    if (!fallbackMaterial) {
+      return activation;
+    }
+
+    this.logger.warn?.(
+      '[HostingManager] _activate applied demo-only representative hasCredential.material fallback from controller/DIDComm metadata.',
+    );
+
+    return {
+      ...activation,
+      representativeCredential: {
+        ...activation.representativeCredential,
+        credentialSubject: {
+          ...(activation.representativeCredential?.credentialSubject || {}),
+          hasCredential: {
+            material: fallbackMaterial,
+          },
+        },
+      },
+    };
   }
 
   private getIcaDidCreateUrl(): string | undefined {
@@ -1035,7 +1143,10 @@ export class HostingManager {
     jobMeta?: DidCommDecodedMetadata,
     hostRegistrySector?: string,
   ): Promise<BundleEntry | ErrorEntry> {
-    const activation = this.extractActivationMaterial(entry, body);
+    const activation = await this.applyDemoRepresentativeBindingFallback(
+      this.extractActivationMaterial(entry, body),
+      jobMeta,
+    );
     this.warnOnLegacyActivationCredentialFields(activation);
     if (!activation.vpToken || typeof activation.vpToken !== 'string') {
       throw new ManagerError("Missing required activation proof 'vp_token'.", IssueType.Required);
@@ -1059,8 +1170,8 @@ export class HostingManager {
       throw new ManagerError('Malformed activation entry: missing meta.claims', IssueType.Required);
     }
 
-    const normalizedClaims = this.applyActivationOrganizationIdentifierCompatibility(
-      this.applyLegalOrganizationAlternateNameCompatibility(claims),
+    const normalizedClaims = this.applyLegalOrganizationIdentityCompatibility(
+      claims,
       activation.organizationCredential,
     );
     validateNewOrganizationClaims(normalizedClaims);
@@ -1847,7 +1958,7 @@ export class HostingManager {
     }
 
     try {
-      const normalizedClaims = this.applyLegalOrganizationAlternateNameCompatibility(claims);
+      const normalizedClaims = this.applyLegalOrganizationIdentityCompatibility(claims);
       validateNewOrganizationClaims(normalizedClaims);
       const alternateName = normalizedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
 
