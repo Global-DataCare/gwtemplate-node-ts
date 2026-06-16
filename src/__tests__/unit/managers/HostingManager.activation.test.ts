@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { IServerConfig } from '../../../config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
@@ -448,9 +449,38 @@ describe('HostingManager activation flow', () => {
     expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
   });
 
+  it('should apply demo representative binding fallback from meta.jws when ICA omits hasCredential', async () => {
+    const job = buildActivationJob();
+    mockConfig.securityMode = 'demo';
+    delete (job.content!.body as any).representativeCredential.credentialSubject.hasCredential;
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+
+    const claims = job.content!.body!.data[0]!.meta!.claims;
+    const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
+      ...claims,
+      [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
+    } as any);
+    const proofDoc = await vaultRepository.get(
+      tenantCollectionName,
+      'activation-proof.json',
+      getEnvSectionId('proofs'),
+    );
+    expect((proofDoc as any)?.content?.representativeCredential?.credentialSubject?.hasCredential?.material).toBe(
+      toJwkThumbprintSha256Urn((job.content!.meta as any).jws.protected.jwk),
+    );
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('demo-only representative hasCredential.material fallback'),
+    );
+  });
+
   it('should derive organization identifier claims from taxID when activation claims omit them', async () => {
     const job = buildActivationJob();
     const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
+    delete activationClaims[ClaimsOrganizationSchemaorg.alternateName];
     delete activationClaims[ClaimsOrganizationSchemaorg.identifier];
     delete activationClaims[ClaimsOrganizationSchemaorg.identifierType];
     delete activationClaims[ClaimsOrganizationSchemaorg.identifierValue];
@@ -460,6 +490,7 @@ describe('HostingManager activation flow', () => {
     const entry = responsePayload.body.data[0];
 
     expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe('VATES-B00112233');
     expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('TAX');
     expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('VATES-B00112233');
     expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
@@ -470,6 +501,7 @@ describe('HostingManager activation flow', () => {
   it('should default organization identifierType to UUID when identifierValue is a UUID', async () => {
     const job = buildActivationJob();
     const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
+    delete activationClaims[ClaimsOrganizationSchemaorg.alternateName];
     delete activationClaims[ClaimsOrganizationSchemaorg.identifier];
     delete activationClaims[ClaimsOrganizationSchemaorg.identifierType];
     activationClaims[ClaimsOrganizationSchemaorg.identifierValue] = '123e4567-e89b-12d3-a456-426614174000';
@@ -480,10 +512,33 @@ describe('HostingManager activation flow', () => {
     const entry = responsePayload.body.data[0];
 
     expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe('123e4567-e89b-12d3-a456-426614174000');
     expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('UUID');
     expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('123e4567-e89b-12d3-a456-426614174000');
     expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
       'urn:test-namespace:test-network:es:v1:health-care:entity:uuid:123e4567-e89b-12d3-a456-426614174000',
+    );
+  });
+
+  it('should prefer a distinct legal identifier over taxID when deriving alternateName', async () => {
+    const job = buildActivationJob();
+    const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
+    delete activationClaims[ClaimsOrganizationSchemaorg.alternateName];
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifier];
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifierType];
+    activationClaims[ClaimsOrganizationSchemaorg.identifierValue] = 'BC1234567';
+    job.content!.body!.data[0]!.meta!.claims = activationClaims;
+    uuidMock.validate.mockReturnValue(false);
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe('BC1234567');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('TAX');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('BC1234567');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
+      'urn:test-namespace:test-network:es:v1:health-care:entity:tax:BC1234567',
     );
   });
 

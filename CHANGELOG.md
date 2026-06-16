@@ -117,6 +117,35 @@
 
 ## [Unreleased]
 
+### Changed
+- Updated demo `_activate` representative binding fallback so GW now consumes
+  the canonical shared RFC 9278 JWK-thumbprint helper from
+  `gdc-common-utils-ts` instead of maintaining a local derivation path:
+  - `src/managers/HostingManager.ts`
+- Normalized demo/plaintext representative fallback material to the canonical
+  `urn:ietf:params:oauth:jwk-thumbprint:sha-256:<base64url>` form when ICA
+  omits `credentialSubject.hasCredential.material`, using controller JWK data
+  first and only preserving an already-prefixed fallback `kid` value when no
+  JWK is available.
+- Updated activation route/unit coverage so GW assertions compare against the
+  same shared thumbprint helper used by SDK/common-utils:
+  - `src/__tests__/unit/managers/HostingManager.activation.test.ts`
+  - `src/__tests__/integration/organizationApi.test.ts`
+- Updated the shared dependency target to `gdc-common-utils-ts@^2.0.1`.
+- Refreshed generated core-flow and OpenAPI profile artifacts so activation
+  examples now show the canonical hashed controller `sameAs` form rather than
+  `mailto:` fallback examples:
+  - `artifacts/core-flow-examples.json`
+  - `artifacts/openapi-profiles/openapi-compat.json`
+  - `artifacts/openapi-profiles/openapi-core.json`
+  - `artifacts/openapi-profiles/openapi-extension.json`
+- Added an explicit GW CORE architecture baseline so backend contract ownership
+  and layering against shared SDK packages is documented in-repo:
+  - `ARCHITECTURE.md`
+- Refreshed the Docker build dependency checksum after the current dependency
+  graph changes:
+  - `.docker-build-deps.sha256`
+
 ## [1.14.1] - 2026-06-16
 
 ### Changed
@@ -125,8 +154,12 @@
   `organizationCredential.credentialSubject.taxID` and defaults
   `org.schema.Organization.identifierType` to `UUID` when the identifier value
   is a UUID, otherwise to `TAX`, before generating the canonical organization
-  URN, avoiding activation failures when ICA-first payloads omit the flat
-  identifier claims:
+  URN. When `alternateName` is also missing for a legal organization, GW now
+  derives it from the final canonical `identifierValue`, so tax-id-only
+  onboarding becomes `taxID -> identifierValue -> alternateName`, while an
+  explicit legal identifier still wins over `taxID` for path-facing tenant ids
+  and vault ids. This avoids activation failures when ICA-first payloads omit
+  the flat identifier claims:
   - `src/managers/HostingManager.ts`
 - Documented the conservative communication-retention lifecycle boundary so
   individual, tenant, and host purge flows can skip retained `Communication`
@@ -138,6 +171,15 @@
   `did:web`; non-DID subject ids such as `urn:person:...` now pass while GW
   still enforces representative role and key-binding policy through:
   - `src/adapters/activation-trust.adapter.ts`
+  - `src/__tests__/unit/managers/HostingManager.activation.test.ts`
+  - `src/__tests__/integration/organizationApi.test.ts`
+- In `SECURITY_MODE=demo`, `Organization/_activate` now backfills a missing
+  representative `credentialSubject.hasCredential.material` from explicit
+  `controller.publicKeyJwk.kid` or DIDComm `meta.jws.protected.kid` before
+  running shared activation policy validation. Production/strict modes remain
+  unchanged; this is a demo bootstrap fallback for ICA payloads that still do
+  not emit representative binding data:
+  - `src/managers/HostingManager.ts`
   - `src/__tests__/unit/managers/HostingManager.activation.test.ts`
   - `src/__tests__/integration/organizationApi.test.ts`
 - Added/updated portal/backend-facing operational docs for the new v1.3
