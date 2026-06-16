@@ -16,6 +16,7 @@ import * as tenantUtils from '../../../utils/tenant';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { getTenantAuthorizationLifecycle } from '../../../utils/tenant-lifecycle';
 import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/enums';
+import type { IHostRuntime } from '../../../managers/IHostRuntime';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -108,6 +109,7 @@ describe('HostingManager activation flow', () => {
   let mockTenantsCacheManager: jest.Mocked<TenantsCacheManager>;
   let mockConfig: IServerConfig;
   let hostCollectionName: string;
+  let hostRuntime: IHostRuntime;
   const originalFetch = global.fetch;
 
   beforeEach(async () => {
@@ -121,6 +123,10 @@ describe('HostingManager activation flow', () => {
       () => mockKmsService,
       hostCollectionName,
     ) as jest.Mocked<TenantsCacheManager>;
+    hostRuntime = {
+      hostCollectionName,
+      hostDid: 'did:web:testhost.com',
+    };
 
     mockConfig = {
       securityMode: 'compat',
@@ -157,6 +163,7 @@ describe('HostingManager activation flow', () => {
       mockStorageAdapter,
       mockLogger,
       mockConfig,
+      hostRuntime,
     );
 
     mockKmsService.getPublicJwks.mockResolvedValue({
@@ -511,14 +518,16 @@ describe('HostingManager activation flow', () => {
       mockStorageAdapter,
       mockLogger,
       mockConfig,
+      hostRuntime,
     );
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await mockTenantsCacheManager.loadHost();
 
     const job = buildActivationJob();
+    const controllerSameAs = 'urn:multibase:zControllerHash';
     (job.content!.body as any).controller = {
       did: 'did:web:people.acme.org:controllers:primary',
-      sameAs: 'mailto:controller@acme.org',
+      sameAs: controllerSameAs,
       publicKeyJwk: {
         kid: 'explicit-controller-sig-kid',
         kty: 'EC',
@@ -559,13 +568,13 @@ describe('HostingManager activation flow', () => {
 
     const controllerDidDocument = (employeeDocs[0] as any).content?.didDocument;
     expect(controllerDidDocument.id).toBe('did:web:people.acme.org:controllers:primary');
-    expect(controllerDidDocument.alsoKnownAs).toContain('mailto:controller@acme.org');
+    expect(controllerDidDocument.alsoKnownAs).toContain(controllerSameAs);
     expect(controllerDidDocument.verificationMethod?.[0]?.publicKeyJwk?.kid).toBe('explicit-controller-sig-kid');
     expect(controllerDidDocument.keyAgreement).toContain('did:web:people.acme.org:controllers:primary#explicit-controller-enc-kid');
 
     const icaRequestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(icaRequestBody.controller.publicKeyJwk.kid).toBe('explicit-controller-sig-kid');
-    expect(icaRequestBody.controller.sameAs).toBe('mailto:controller@acme.org');
+    expect(icaRequestBody.controller.sameAs).toBe(controllerSameAs);
     expect(icaRequestBody.controller.jwks.keys[0].kid).toBe('explicit-controller-enc-kid');
   });
 
@@ -581,6 +590,7 @@ describe('HostingManager activation flow', () => {
       mockStorageAdapter,
       mockLogger,
       mockConfig,
+      hostRuntime,
     );
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await mockTenantsCacheManager.loadHost();
@@ -669,12 +679,12 @@ describe('HostingManager activation flow', () => {
     await hostingManager.process(activationJob);
 
     const claims = activationJob.content!.body!.data[0]!.meta!.claims;
-    const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
-      ...claims,
-      [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
-    } as any);
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      claims[ClaimsServiceSchemaorg.category] as Sector,
+      claims[ClaimsOrganizationSchemaorg.alternateName],
+    );
     await putEmployeeLifecycleDoc(
-      tenantCollectionName,
+      tenantVaultId,
       'active-employee-1',
       EntityLifecycleStatus.Active,
     );
@@ -690,42 +700,17 @@ describe('HostingManager activation flow', () => {
     await hostingManager.process(activationJob);
 
     const claims = activationJob.content!.body!.data[0]!.meta!.claims;
-    const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
-      ...claims,
-      [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
-    } as any);
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      claims[ClaimsServiceSchemaorg.category] as Sector,
+      claims[ClaimsOrganizationSchemaorg.alternateName],
+    );
+    const disableResponse = await hostingManager.process(buildLifecycleJob('_disable'));
+    expect(disableResponse.body.data[0].response.status).toBe('200');
+
     await putEmployeeLifecycleDoc(
-      tenantCollectionName,
+      tenantVaultId,
       'inactive-employee-1',
       EntityLifecycleStatus.Inactive,
-    );
-
-    await vaultRepository.put(
-      hostCollectionName,
-      [{
-        id: tenantUtils.getTenantVaultId(
-          claims[ClaimsServiceSchemaorg.category] as Sector,
-          claims[ClaimsOrganizationSchemaorg.alternateName],
-        ),
-        status: EntityLifecycleStatus.Inactive,
-        sequence: 1,
-        content: {
-          status: EntityLifecycleStatus.Inactive,
-          claims,
-          meta: {
-            tenantAuthorization: {
-              status: 'suspended',
-            },
-          },
-        },
-      } as ConfidentialStorageDoc],
-      getEnvSectionId('tenants'),
-    );
-    await mockTenantsCacheManager.refreshTenant(
-      tenantUtils.getTenantVaultId(
-        claims[ClaimsServiceSchemaorg.category] as Sector,
-        claims[ClaimsOrganizationSchemaorg.alternateName],
-      ),
     );
 
     const response = await hostingManager.process(buildLifecycleJob('_purge'));

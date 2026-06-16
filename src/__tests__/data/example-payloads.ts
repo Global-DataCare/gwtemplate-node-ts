@@ -275,7 +275,7 @@ export const ORGANIZATION_ACTIVATION_REQUEST = {
     "vp_token": "<ica-proof-token>",
     "controller": {
       "did": "did:web:people.acme.org:controllers:primary",
-      "sameAs": "mailto:controller@acme.org",
+      "sameAs": "urn:multibase:zControllerHash",
       "publicKeyJwk": {
         "kid": "controller-es384-001",
         "kty": "EC",

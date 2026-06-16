@@ -75,6 +75,17 @@ function assertActivationCredentialConsistency(params: {
   organizationCredential?: any;
   representativeCredential?: any;
 }): { organizationDid: string; representativeDid?: string } {
+  /**
+   * Representative proof is intentionally split into two dimensions:
+   * - `credentialSubject.sameAs` for public identity continuity
+   * - `credentialSubject.hasCredential.material` for controller signing-key continuity
+   *
+   * GW activation enforces the key-binding dimension through shared activation
+   * policy validation. The public-identity dimension remains complementary and
+   * is expected to be present in production-grade ICA-issued credentials, but
+   * demo/local flows may still need higher-level fallbacks when signed PDF
+   * evidence did not carry `person.email`.
+   */
   const { primaryDid, organizationCredential, representativeCredential } = params;
   if (!organizationCredential) {
     throw new ManagerError('Missing ICA-issued organization credential.', IssueType.Required);

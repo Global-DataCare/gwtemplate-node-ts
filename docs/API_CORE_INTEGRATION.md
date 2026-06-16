@@ -57,8 +57,15 @@ Teaching rule:
   - `body.controller.sameAs`
   - `body.controller.publicKeyJwk`
   - `body.controller.jwks`
+- Representative proof model:
+  - `credentialSubject.sameAs`
+    public identity continuity of the representative/controller
+  - `credentialSubject.hasCredential.material`
+    signing-key continuity of the controller binding
+  - production-grade ICA proofs should ideally carry both dimensions
 - Indexed-contact canonicalization rule:
-  - public aliases may keep URI form such as `mailto:controller@example.org` in `controller.sameAs`
+  - for email-based ICA identity continuity, examples should prefer canonical
+    `urn:multibase:z...` in `controller.sameAs` instead of `mailto:...`
   - indexed email attributes must be normalized to plain lowercase email without the `mailto:` prefix
   - indexed phone attributes must be normalized to `tel:+<digits>` without formatting spaces or separators
   - storage and query inputs must use the same canonicalization before HMAC/index protection
@@ -88,7 +95,14 @@ Teaching rule:
 - Representative VC security linkage (enforced):
   - `credentialSubject.memberOf.taxID` must match organization credential tax ID.
   - `credentialSubject.hasOccupation.identifier.value` must be `RESPRSN` (Responsible Party). Legacy tokenized formats are normalized for compatibility.
-  - `credentialSubject.hasCredential.material` must be present (email/signing-key continuity material).
+  - `credentialSubject.hasCredential.material` must be present (signing-key continuity material).
+  - `credentialSubject.sameAs` is the complementary public-identity continuity dimension and should also be present in normal production ICA proofs.
+- Preferred activation sequence:
+  - Step 1. Ask ICA `_verify` to issue the representative VC from signed PDF evidence.
+  - Step 2. Prefer ICA responses where the representative VC already carries both `sameAs` and `hasCredential.material`.
+  - Step 3. Submit `_activate` with the ICA VP proof.
+  - Step 4. Use `additionalClaims[org.schema.Person.email]` only as a demo/local bootstrap when GW must create the internal admin and the VC still lacks signed email continuity.
+  - Step 5. Treat `controller.sameAs` in `_activate` as a demo/local workaround, not as the normal production source of truth.
 
 2. Host order acceptance
 - Submit: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`
