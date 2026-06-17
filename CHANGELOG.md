@@ -118,6 +118,10 @@
 ## [Unreleased]
 
 ### Changed
+- Bumped the GW package patch version from `1.14.1` to `1.14.2` to publish the
+  `gdc-common-utils-ts@^2.0.2` adoption alongside the corresponding image/deploy
+  tag lineage.
+- Updated the shared dependency target to `gdc-common-utils-ts@^2.0.2`.
 - Updated demo `_activate` representative binding fallback so GW now consumes
   the canonical shared RFC 9278 JWK-thumbprint helper from
   `gdc-common-utils-ts` instead of maintaining a local derivation path:
