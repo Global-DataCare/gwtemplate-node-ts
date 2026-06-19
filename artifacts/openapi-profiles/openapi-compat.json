@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-06-16T22:12:38.091Z",
+    "x-profile-generated-at": "2026-06-19T02:17:02.529Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -260,7 +260,7 @@
           "example": "test",
           "default": "test"
         },
-        "description": "Host onboarding network selector (immutable-proof network), not business domain sector. demo/test→test, development/staging→test-network, production→network."
+        "description": "Legacy path parameter name for the host runtime/network segment. This value is not the tenant business sector. Use test/test-network/network according to the host deployment profile: demo or local test -> test, development or staging -> test-network, production -> network."
       }
     },
     "examples": {
@@ -436,6 +436,16 @@
             }
           }
         }
+      },
+      "OrganizationVerificationTransactionPlaintextMessage": {
+        "summary": "Plaintext Message for Organization Verification Transaction",
+        "description": "A DIDComm-like message wrapper for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This route is distinct from `_activate`, which starts from an already-issued ICA proof.",
+        "value": {}
+      },
+      "OrganizationVerificationTransactionResponseBundle": {
+        "summary": "Organization Verification Transaction Response Bundle",
+        "description": "Async `_transaction-response` bundle. It preserves the ICA verification bundle in `resource.icaResponse`, returns the generated host Offer claims in `meta.claims`, and makes the next host step explicit in `resource.next` so the caller can continue with `Order/_batch`.",
+        "value": {}
       },
       "OrganizationOrderPlaintextMessage": {
         "summary": "Plaintext Message for Organization Order",
@@ -2511,6 +2521,176 @@
           },
           "404": {
             "description": "Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or network selector)."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction": {
+      "post": {
+        "tags": [
+          "1.1 Organization Registration"
+        ],
+        "summary": "Submit the first legal-organization onboarding transaction and forward it to ICA `_verify`",
+        "description": "Canonical first host-side onboarding step for a legal organization.\n\nResponsibilities of this transaction:\n- carry the signed terms PDF evidence or PDF URL attachment\n- carry the controller business binding key in `body.data[].resource.controller.publicKeyJwk`\n- optionally carry the organization VC-signing public key in `body.data[].resource.organization.publicKeyJwk`\n- carry the legal organization claims and representative payload that GW CORE forwards to ICA `_verify`\n\nSeparation of concerns:\n- `meta.jws` / `meta.jwe` remain communication/runtime keys of the portal app, confidential app, device profile, or BFF\n- `body.data[].resource.controller.publicKeyJwk` is the controller business/operation-signing key that ICA should project into representative `hasCredential.material`\n- `body.data[].resource.organization.publicKeyJwk` is the organization credential-signing key when the hosting operator/runtime already knows it\n- this route is distinct from `Organization/_activate`, which starts from an already-issued ICA proof (`vp_token`)\n\nBFF/confidential-app note:\n- a BFF or confidential app may protect the DIDComm/FAPI envelope with its own communication key\n- that communication key must not replace the controller business binding key sent in the business payload\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted\n(secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical,\nand `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/OrganizationVerificationTransactionPlaintextMessage"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. The verification-forwarding job has been queued. The client should poll\nthe URL provided in the `Location` header to get the result.\n"
+          },
+          "400": {
+            "description": "Bad Request. The payload is malformed."
+          },
+          "401": {
+            "description": "Unauthorized. Invalid or missing Bearer token for legacy flow, or failed JWE decryption/JWS verification for secure flow."
+          },
+          "404": {
+            "description": "Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or network selector)."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response": {
+      "post": {
+        "tags": [
+          "1.1 Organization Registration"
+        ],
+        "summary": "Poll the legal-organization verification transaction result",
+        "description": "Polls the asynchronous job submitted to `.../Organization/_transaction`.\n\nPolling semantics:\n- submit (`_transaction`) returns immediate errors if the request cannot be accepted/enqueued\n- poll (`_transaction-response`) returns `202` while pending, then `200` with:\n  - `resource.icaResponse`: the verification payload returned by ICA `_verify`\n  - `meta.claims`: the host-side pending-registration and generated Offer claims\n  - `resource.next`: the explicit follow-up contract for `Order/_batch`\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          },
+          {
+            "$ref": "#/components/parameters/Thid"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/AsyncPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/AsyncPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed. Returns either JSON (legacy) or `response=<jwe>` (secure).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/OrganizationVerificationTransactionResponseBundle"
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Pending. Retry later.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "5"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncPollPending"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
           }
         },
         "x-profile": "core"
@@ -4830,6 +5010,127 @@
           "2.2 SMART Token"
         ],
         "summary": "Poll the SMART token issuance result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          },
+          "400": {
+            "description": "Missing or invalid thid."
+          },
+          "404": {
+            "description": "thid not found."
+          },
+          "500": {
+            "description": "Job failed or response decode failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/did/document/_binding": {
+      "post": {
+        "tags": [
+          "1.1 Organization Registration"
+        ],
+        "summary": "Bind the tenant DID document public aliases",
+        "description": "Updates the tenant DID document public alias projection managed by GW CORE.\n\nStep by step:\n- this is a tenant-scoped GW operation\n- it is distinct from host `Organization/_transaction`\n- it is distinct from legacy ICA `_verify -> Organization/_activate`\n- `organization.url` provides the public alias/domain list projected into `alsoKnownAs`\n- the tenant path already identifies the organization; no extra organization locator is required in the payload\n\nReplacement rule:\n- when `organization.url` is provided, the resolved alias list replaces the current `alsoKnownAs`\n- when omitted, the current alias list is preserved\n\nKey-management rule:\n- this operation does not rotate or replace organization public keys\n- `controller.sameAs` is optional corroborating identity material only\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "required": true,
+          "content": {
+            "application/didcomm-plaintext+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the binding result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/did/document/_binding-response": {
+      "post": {
+        "tags": [
+          "1.1 Organization Registration"
+        ],
+        "summary": "Poll the tenant DID document binding result",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

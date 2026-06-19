@@ -401,6 +401,21 @@ export function createApiRouter(
     if (!actionResponse.endsWith('-response')) return next();
     return pollingHandler(req, res);
   };
+  const didDocumentBindingRoute = '/:tenantId/cds-:jurisdiction/v1/:sector/did/document/:action';
+  const didDocumentBindingPollingRoute = '/:tenantId/cds-:jurisdiction/v1/:sector/did/document/:actionResponse';
+  const didDocumentBindingPollingGate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const actionResponse = String(req.params.actionResponse || '');
+    if (!actionResponse.endsWith('-response')) return next();
+    req.params = {
+      ...req.params,
+      section: 'did',
+      format: 'document',
+      resourceType: 'Document',
+    };
+    return pollingHandler(req, res);
+  };
+  router.post(didDocumentBindingPollingRoute, didDocumentBindingPollingGate);
+  router.get(didDocumentBindingPollingRoute, isFhirSector, didDocumentBindingPollingGate);
   router.post(pollingRoute, pollingGate);
   router.get(pollingRoute, isFhirSector, pollingGate);
 
@@ -613,6 +628,7 @@ export function createApiRouter(
    *       - when that key id is represented as a JWK thumbprint, RFC 7638 defines the canonical thumbprint calculation over the public signing / verification JWK and RFC 9278 defines the canonical URN form `urn:ietf:params:oauth:jwk-thumbprint:sha-256:<base64url>`
    *       - the controller-side signature belongs to the prior ICA registration step; later operational app-service proofs should be signed by the app-service key itself
    *       - `org.schema.Service.url` is the hosting URL selected by the controller during onboarding; it identifies the chosen hosting operator / connector location and is separate from the tenant public `did:web`
+   *       - `org.schema.Service.serviceType` is already required at this step because GW uses it to validate the requested tenant capabilities and prepare the pending Offer that will later be confirmed in `Order/_batch`
    *       - `body.controller.*` is the explicit controller key-binding contract inherited from the ICA model and is used when GW must publish/bootstrap the controller person DID
    *       - `body.organizationCredential` / `body.representativeCredential` are deprecated compatibility fields and must not be treated as the canonical proof contract
    *       - the host validates the ICA proof and activates the tenant backend/connector
@@ -657,6 +673,126 @@ export function createApiRouter(
    *         description: Unauthorized. Invalid or missing Bearer token for legacy flow, or failed JWE decryption/JWS verification for secure flow.
    *       '404':
    *         description: Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or network selector).
+   *
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction:
+   *   post:
+   *     tags:
+   *       - 1.1 Organization Registration
+   *     summary: Submit the first legal-organization onboarding transaction and forward it to ICA `_verify`
+   *     description: |
+   *       Canonical first host-side onboarding step for a legal organization.
+   *
+   *       Responsibilities of this transaction:
+   *       - carry the signed terms PDF evidence or PDF URL attachment
+   *       - carry the controller business binding key in `body.data[].resource.controller.publicKeyJwk`
+   *       - optionally carry the organization VC-signing public key in `body.data[].resource.organization.publicKeyJwk`
+   *       - carry the legal organization claims and representative payload that GW CORE forwards to ICA `_verify`
+   *
+   *       Separation of concerns:
+   *       - `meta.jws` / `meta.jwe` remain communication/runtime keys of the portal app, confidential app, device profile, or BFF
+   *       - `body.data[].resource.controller.publicKeyJwk` is the controller business/operation-signing key that ICA should project into representative `hasCredential.material`
+   *       - `body.data[].resource.organization.publicKeyJwk` is the organization credential-signing key when the hosting operator/runtime already knows it
+   *       - this route is distinct from `Organization/_activate`, which starts from an already-issued ICA proof (`vp_token`)
+   *
+   *       BFF/confidential-app note:
+   *       - a BFF or confidential app may protect the DIDComm/FAPI envelope with its own communication key
+   *       - that communication key must not replace the controller business binding key sent in the business payload
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted
+   *         (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical,
+   *         and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/OrganizationVerificationTransactionPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: |
+   *           Accepted. The verification-forwarding job has been queued. The client should poll
+   *           the URL provided in the `Location` header to get the result.
+   *       '400':
+   *         description: Bad Request. The payload is malformed.
+   *       '401':
+   *         description: Unauthorized. Invalid or missing Bearer token for legacy flow, or failed JWE decryption/JWS verification for secure flow.
+   *       '404':
+   *         description: Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or network selector).
+   *
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response:
+   *   post:
+   *     tags:
+   *       - 1.1 Organization Registration
+   *     summary: Poll the legal-organization verification transaction result
+   *     description: |
+   *       Polls the asynchronous job submitted to `.../Organization/_transaction`.
+   *
+   *       Polling semantics:
+   *       - submit (`_transaction`) returns immediate errors if the request cannot be accepted/enqueued
+   *       - poll (`_transaction-response`) returns `202` while pending, then `200` with:
+   *         - `resource.icaResponse`: the verification payload returned by ICA `_verify`
+   *         - `meta.claims`: the host-side pending-registration and generated Offer claims
+   *         - `resource.next`: the explicit follow-up contract for `Order/_batch`
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *       - $ref: '#/components/parameters/Thid'
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/AsyncPollRequest'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/AsyncPollRequest'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/AsyncPollRequest'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/AsyncPollRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: Pending. Retry later.
+   *         headers:
+   *           Retry-After:
+   *             schema: { type: string, example: '5' }
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/AsyncPollPending' }
+   *       '200':
+   *         description: Completed. Returns either JSON (legacy) or `response=<jwe>` (secure).
+   *         content:
+   *           application/json:
+   *             schema: { type: object }
+   *             examples:
+   *               message:
+   *                 $ref: '#/components/examples/OrganizationVerificationTransactionResponseBundle'
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
    *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch:
    *   post:
@@ -2228,7 +2364,249 @@ export function createApiRouter(
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }
    */
+  /**
+   * @openapi
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/did/document/_binding:
+   *   post:
+   *     tags:
+   *       - 1.1 Organization Registration
+   *     summary: Bind the tenant DID document public aliases
+   *     description: |
+   *       Updates the tenant DID document public alias projection managed by GW CORE.
+   *
+   *       Step by step:
+   *       - this is a tenant-scoped GW operation
+   *       - it is distinct from host `Organization/_transaction`
+   *       - it is distinct from legacy ICA `_verify -> Organization/_activate`
+   *       - `organization.url` provides the public alias/domain list projected into `alsoKnownAs`
+   *       - the tenant path already identifies the organization; no extra organization locator is required in the payload
+   *
+   *       Replacement rule:
+   *       - when `organization.url` is provided, the resolved alias list replaces the current `alsoKnownAs`
+   *       - when omitted, the current alias list is preserved
+   *
+   *       Key-management rule:
+   *       - this operation does not rotate or replace organization public keys
+   *       - `controller.sameAs` is optional corroborating identity material only
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plaintext+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the binding result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/did/document/_binding-response:
+   *   post:
+   *     tags:
+   *       - 1.1 Organization Registration
+   *     summary: Poll the tenant DID document binding result
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed. }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
+   */
   // --- 1. ASYNC JOB SUBMISSION ENDPOINT ---
+  router.post(didDocumentBindingRoute, async (req, res, next) => {
+    const action = String(req.params.action || '').trim();
+    if (action !== '_binding') return next();
+
+    req.params = {
+      ...req.params,
+      section: 'did',
+      format: 'document',
+      resourceType: 'Document',
+    } as any;
+
+    const routeParams = req.params as unknown as RouteParams;
+    const { tenantId, section, resourceType, sector } = routeParams;
+    const contentTypeHeader = String(req.headers['content-type'] || '');
+    const contentType = normalizeContentType(contentTypeHeader);
+    const parsedContentType = parseIncomingContentType(contentType);
+    let jobRequest: JobRequest;
+
+    try {
+      if (!isContentTypeAllowedBySecurityPolicy(parsedContentType)) {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          415,
+          IssueType.NotSupported,
+          `Unsupported Content-Type for current SECURITY_MODE: ${contentTypeHeader || '<missing>'}`,
+        );
+      }
+
+      if (parsedContentType !== 'didcomm-plain' && parsedContentType !== 'json') {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          415,
+          IssueType.NotSupported,
+          `Unsupported Content-Type for did/document/_binding: ${contentTypeHeader || '<missing>'}`,
+        );
+      }
+
+      const authToken = req.headers.authorization;
+      const enforceBearerValidation = !allowsInsecureBearerBySecurityMode();
+      const requireBearerHeader = !allowsInsecureBearerBySecurityMode();
+      if (requireBearerHeader && (!authToken || !authToken.startsWith('Bearer '))) {
+        return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
+      }
+      if (enforceBearerValidation) {
+        if (!appAuthManager) {
+          return sendDidcommEarlyError(
+            req,
+            res,
+            500,
+            IssueType.Exception,
+            'Bearer validation is required by SECURITY_MODE but AppAuthorizationManager is not configured.',
+          );
+        }
+        try {
+          const bearerToken = authToken?.split(' ')[1] || '';
+          await appAuthManager.verifyIdToken(bearerToken);
+        } catch (error: any) {
+          return sendDidcommEarlyError(
+            req,
+            res,
+            401,
+            IssueType.Security,
+            `Invalid Bearer token: ${error?.message || 'verification failed'}`,
+          );
+        }
+      }
+
+      const legacyBody = normalizeDidcommBodyForFhirFormat(req.body || {}, routeParams.format);
+      const normalizedLegacyContent = normalizeLegacyPlaintextContent(legacyBody || {});
+      const legacyMeta = normalizedLegacyContent?.meta || {};
+
+      jobRequest = {
+        ...(routeParams as any),
+        id: '',
+        sequence: 0,
+        status: 'DRAFT' as any,
+        createdAtTimestamp: Date.now(),
+        content: {
+          ...normalizedLegacyContent,
+          meta: {
+            ...legacyMeta,
+            bearer: {
+              token: authToken,
+              jwt: { header: { alg: '', kid: '' }, payload: {} },
+            },
+          },
+        },
+        contentType: contentType,
+      };
+    } catch (error: any) {
+      console.error('[API] Error during did/document/_binding request processing:', error);
+      return sendDidcommEarlyError(
+        req,
+        res,
+        400,
+        IssueType.Security,
+        'Failed to process request: ' + error.message,
+      );
+    }
+
+    const thid = jobRequest.content?.thid;
+    if (!thid) {
+      return sendDidcommEarlyError(
+        req,
+        res,
+        400,
+        IssueType.Required,
+        'Request body must contain a "thid" or "id" property.',
+      );
+    }
+
+    const vaultId = await resolveVaultId(tenantId, sector);
+    const tenantServices = await tenantsCacheManager.getDidServiceConfig(vaultId);
+
+    if (!isRequestValid(tenantServices, { ...routeParams, action })) {
+      return sendDidcommEarlyError(
+        req,
+        res,
+        404,
+        IssueType.NotFound,
+        'The requested tenant or endpoint path does not exist.',
+      );
+    }
+
+    if (requiresActiveTenantAuthorization(tenantId, section, routeParams.format, resourceType, action)) {
+      const tenantConfigForAuthorization = await tenantsCacheManager.getTenant(vaultId);
+      const authorizationStatus = tenantConfigForAuthorization
+        ? readTenantAuthorizationStatusFromConfig(tenantConfigForAuthorization)
+        : undefined;
+      if (!authorizationStatus) {
+        return sendDidcommEarlyError(req, res, 404, IssueType.NotFound, 'The requested tenant or endpoint path does not exist.');
+      }
+      if (authorizationStatus !== 'active') {
+        return sendDidcommEarlyError(req, res, 403, IssueType.Forbidden, `Tenant authorization is ${authorizationStatus}.`);
+      }
+    }
+
+    const iss = String(jobRequest.content?.iss || '').trim();
+    const jti = String(jobRequest.content?.jti || '').trim();
+    if (iss && jti) {
+      const replayKey = `${vaultId}:${iss}:${jti}`;
+      const reserved = await replayProtectionStore.reserveIfNotExists(
+        replayKey,
+        getReplayTtlSeconds(jobRequest.content),
+      );
+      if (!reserved) {
+        return sendDidcommEarlyError(req, res, 409, IssueType.Conflict, 'Duplicate jti detected for this issuer (possible replay).');
+      }
+    }
+
+    const jobName = createJobName(vaultId, 'Document', action);
+    jobRequest.action = action;
+    await queueAdapter.addJob(jobName, jobRequest);
+    asyncResponseStore.set(thid, { status: 'PENDING', vaultId: vaultId });
+
+    const relativeUrl = `${req.originalUrl}-response`;
+    const requestBaseUrl = getRequestBaseUrl(req, apiBaseUrl);
+    const pollingUrl = new URL(relativeUrl, requestBaseUrl).href;
+    res.location(pollingUrl);
+    res.set('Retry-After', '5');
+    res.status(202).send();
+  });
+
   router.post(`${cdsRoutePrefix}/:action`, async (req, res) => {
     const normalizedParams = normalizeUnifiedIdentityAuthRouteParams(req.params as unknown as RouteParams);
     req.params = { ...req.params, ...normalizedParams };

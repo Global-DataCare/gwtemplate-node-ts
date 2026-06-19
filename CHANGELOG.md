@@ -117,7 +117,73 @@
 
 ## [Unreleased]
 
+## [1.14.3] - 2026-06-18
+
+### Added
+- Added the host-side legal-organization verification transaction contract as a
+  first-class onboarding step so GW can forward PDF evidence to ICA `_verify`
+  and return the next commercial step for `Order/_batch`:
+  - `src/managers/HostingManager.ts`
+  - `src/routes/api.ts`
+  - `src/__tests__/unit/managers/HostingManager.verification-transaction.test.ts`
+  - `src/__tests__/data/example-payloads.ts`
+- Added explicit operational testing guidance for the real verification order:
+  local process TTY, local Docker, staging, then production:
+  - `TESTING.md`
+- Added `v1.5-tabla-portal-api-gw.md` and refreshed the portal/BFF mapping docs
+  so organization onboarding and public DID resolution are documented from the
+  external integration perspective:
+  - `v1.5-tabla-portal-api-gw.md`
+  - `docs/PORTAL_API_TO_GW_CORE.md`
+  - `docs/API_CORE_INTEGRATION.md`
+  - `docs/OPENAPI_PROFILE_MATRIX.md`
+
 ### Changed
+- Updated GW to consume `gdc-common-utils-ts@^2.0.5` and reuse shared
+  DIDComm submit constants plus shared legal-organization bundle helpers
+  instead of local string literals/path drilling:
+  - `src/managers/HostingManager.ts`
+  - `src/__tests__/unit/managers/HostingManager.test.ts`
+  - `src/__tests__/unit/utils/swagger-spec.test.ts`
+- Clarified the OpenAPI/Swagger contract for `Organization/_transaction`,
+  including the response bundle, examples, and profile exports:
+  - `swagger.config.cjs`
+  - `src/utils/swagger-spec.ts`
+  - `artifacts/openapi-profiles/openapi-core.json`
+  - `artifacts/openapi-profiles/openapi-compat.json`
+  - `artifacts/openapi-profiles/openapi-extension.json`
+- Fixed deploy/runtime configuration so Cloud Run and local-demo can receive
+  explicit ICA routing and security/network variables for host-side
+  `_transaction` verification:
+  - `cloud_deploy.sh`
+  - `env.local-demo.example`
+  - `src/server.ts`
+- Refreshed repository docs and examples to point integrators at the canonical
+  live verification flow and contract surface:
+  - `README.md`
+  - `docs/90.A-API_INTEGRATORS_GUIDE.md`
+
+### Testing
+- `npm test -- --runInBand src/__tests__/unit/managers/HostingManager.verification-transaction.test.ts src/__tests__/unit/utils/swagger-spec.test.ts`
+
+### Changed
+- Updated `v1.5-tabla-portal-api-gw.md` so the portal-facing organization
+  onboarding contract is documented as `organization-registrations` instead of
+  exposing GW-internal `verification-transaction` / activation / order steps as
+  frontend-first routes.
+- Extended `v1.5-tabla-portal-api-gw.md` with a dedicated public `did:web`
+  resolution block so portal `GET .../.well-known/did.json` facades are
+  documented as projections of the real GW-hosted DID documents rather than as
+  a separate identity plane.
+- Added `v1.5-tabla-portal-api-gw.md` and refreshed the canonical portal/BFF
+  mapping docs so legal-organization `Organization/_transaction` is treated as
+  a first-class portal-facing operation and tenant-side `Organization/_binding`
+  is explicitly tracked as a pending GW/OpenAPI publication rather than being
+  silently implied:
+  - `v1.5-tabla-portal-api-gw.md`
+  - `docs/PORTAL_API_TO_GW_CORE.md`
+  - `docs/API_CORE_INTEGRATION.md`
+  - `docs/OPENAPI_PROFILE_MATRIX.md`
 - Bumped the GW package patch version from `1.14.1` to `1.14.2` to publish the
   `gdc-common-utils-ts@^2.0.2` adoption alongside the corresponding image/deploy
   tag lineage.

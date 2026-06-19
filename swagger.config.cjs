@@ -225,7 +225,7 @@ const swaggerDefinition = {
         required: true,
         schema: { type: 'string', enum: ['test', 'test-network', 'network'], example: 'test', default: 'test' },
         description:
-          'Host onboarding network selector (immutable-proof network), not business domain sector. demo/test→test, development/staging→test-network, production→network.',
+          'Legacy path parameter name for the host runtime/network segment. This value is not the tenant business sector. Use test/test-network/network according to the host deployment profile: demo or local test -> test, development or staging -> test-network, production -> network.',
       },
     },
     examples: {
@@ -239,6 +239,18 @@ const swaggerDefinition = {
         summary: 'Plaintext Message for Organization Activation',
         description:
           'A DIDComm-like message wrapper for `_activate`; canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, `SoftwareApplication.material` denotes the public cryptographic material of the software application when ICA issues that VC, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields.',
+        value: {},
+      },
+      OrganizationVerificationTransactionPlaintextMessage: {
+        summary: 'Plaintext Message for Organization Verification Transaction',
+        description:
+          'A DIDComm-like message wrapper for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This route is distinct from `_activate`, which starts from an already-issued ICA proof.',
+        value: {},
+      },
+      OrganizationVerificationTransactionResponseBundle: {
+        summary: 'Organization Verification Transaction Response Bundle',
+        description:
+          'Async `_transaction-response` bundle. It preserves the ICA verification bundle in `resource.icaResponse`, returns the generated host Offer claims in `meta.claims`, and makes the next host step explicit in `resource.next` so the caller can continue with `Order/_batch`.',
         value: {},
       },
       OrganizationOrderPlaintextMessage: {

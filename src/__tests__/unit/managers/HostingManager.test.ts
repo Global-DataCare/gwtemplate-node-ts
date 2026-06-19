@@ -28,9 +28,11 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
+import { initializeHostServicesConfig } from '../../../utils/services';
 
 import { ILogger } from '../../../loggers/ILogger';
 import { testTenant1LegalName } from '../../data/organization.data';
+import { composeHostDidWebId } from '../../../utils/did-backend';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -164,7 +166,21 @@ describe('HostingManager', () => {
       firebase: {},
     };
 
-    hostingManager = new HostingManager(vaultRepository, mockKmsService, mockTenantsCacheManager, mockStorageAdapter, mockLogger, mockConfig);
+    const hostCollectionNameForRuntime = tenantUtils.generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const hostRuntime = {
+      hostCollectionName: hostCollectionNameForRuntime,
+      hostDid: composeHostDidWebId(mockConfig.apiBaseUrl, mockConfig.hostExternalDomain),
+    };
+
+    hostingManager = new HostingManager(
+      vaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      mockConfig,
+      hostRuntime,
+    );
     
     mockKmsService.getPublicJwks.mockResolvedValue(mockPublicKeys);
     
@@ -188,6 +204,50 @@ describe('HostingManager', () => {
     expect(entry.response.status).toBe('201');
     // Host registration should now also return an offer, aligning with the tenant flow.
     expect(entry.type).toBe('Organization-registration-offer-v1.0');
+  });
+
+  it('[1.1 HOST] reconciles a stale persisted host service surface and restores Organization/_transaction', async () => {
+    const hostCollectionName = await mockTenantsCacheManager.getCollectionName('host') as string;
+    const secureHostDoc = await vaultRepository.get(
+      hostCollectionName,
+      'host',
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc;
+    expect(secureHostDoc).toBeDefined();
+
+    const staleHostConfig = structuredClone(secureHostDoc.content as any);
+    staleHostConfig.didConfig.service = staleHostConfig.didConfig.service.map((service: any) => (
+      Array.isArray(service?.actions)
+        ? { ...service, actions: service.actions.filter((action: string) => action !== '_transaction') }
+        : service
+    ));
+    staleHostConfig.didDocument.service = [];
+
+    const staleSecureDoc = await mockKmsService.protectConfidentialData({
+      ...secureHostDoc,
+      content: staleHostConfig,
+    } as ConfidentialStorageDoc, 'host');
+    await vaultRepository.put(hostCollectionName, [staleSecureDoc], getEnvSectionId('tenants'));
+    await mockTenantsCacheManager.refreshTenant('host');
+
+    const updated = await hostingManager.reconcilePersistedHostRuntimeConfig();
+    expect(updated).toBe(true);
+
+    const refreshedServices = await mockTenantsCacheManager.getDidServiceConfig('host');
+    const expectedServices = initializeHostServicesConfig(
+      mockConfig.sectorsAllowed as Sector[],
+      mockConfig.nodeEnv,
+      mockConfig.networkMode,
+    );
+
+    expect(refreshedServices).toEqual(expectedServices);
+    expect(
+      refreshedServices?.some((service: any) =>
+        service?.selector?.section === 'registry'
+        && service?.selector?.format === 'org.schema'
+        && Array.isArray(service?.actions)
+        && service.actions.includes('_transaction'))
+    ).toBe(true);
   });
 
   it('[5 TENANT (Happy Path): should create full tenant config and protect it', async () => {

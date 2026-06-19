@@ -84,6 +84,11 @@ import {
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
+import { OrganizationDidBindingEntryTypes } from 'gdc-common-utils-ts/utils/organization-did-binding';
+import {
+  DIDCOMM_DEFAULT_ACCEPT_HEADER,
+  DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE,
+} from 'gdc-common-utils-ts/utils/didcomm-submit';
 
 type ActivationParticipantMaterial = {
   did?: string;
@@ -106,6 +111,35 @@ type ActivationMaterial = {
 };
 
 type VpCredentialObject = Record<string, unknown>;
+type LegalOrganizationVerificationTransactionResource = Readonly<{
+  controller?: Record<string, unknown>;
+  organization?: Record<string, unknown>;
+  legalRepresentativePayload?: Record<string, unknown>;
+  legalRepresentative?: Record<string, unknown>;
+  verification?: Record<string, unknown>;
+}>;
+
+type LegalOrganizationVerificationTransactionEntry = Readonly<{
+  type?: string;
+  meta?: {
+    claims?: ClaimsRecord;
+  };
+  resource?: LegalOrganizationVerificationTransactionResource;
+}>;
+type LegalOrganizationVerificationTransactionNextStep = Readonly<{
+  action: 'Order/_batch';
+  acceptedOffer: {
+    identifier?: string;
+    identifierClaim: typeof ClaimsOrderSchemaorg.acceptedOfferIdentifier;
+  };
+}>;
+type LegalOrganizationVerificationTransactionResponseResource = Readonly<{
+  icaResponse: unknown;
+  next: LegalOrganizationVerificationTransactionNextStep;
+}>;
+const ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE_TYPE = 'Organization-verification-transaction-response-v1.0';
+const ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST_TYPE = 'Organization-verification-transaction-request-v1.0';
+const ORGANIZATION_VERIFICATION_TRANSACTION_NEXT_ACTION = 'Order/_batch';
 /**
  * Technical runtime marker copied outside encrypted employee content for the
  * host bootstrap controller created during tenant onboarding.
@@ -193,6 +227,126 @@ export class HostingManager {
     const processedService = await this._handleServiceAttachment(service);
     const allClaims = { ...hostClaims, ...(processedService?.meta.claims || {}) };
     await this.persistHostConfig(organization, allClaims, [person, processedService!]);
+  }
+
+  /**
+   * Reconciles the persisted host runtime registration with the current code-defined
+   * service surface.
+   *
+   * Why this exists:
+   * - the host tenant record is persisted once and then reused across restarts
+   * - newly added host runtime endpoints (for example `Organization/_transaction`)
+   *   will not become routable if the stored `didConfig.service` remains stale
+   * - startup must therefore refresh the host runtime projection without
+   *   re-running the full bootstrap or mutating business identity claims
+   *
+   * What this updates:
+   * - `didConfig.service`
+   * - `didDocument.service`
+   * - legacy x509 metadata derived from runtime config
+   * - `meta.lastUpdated`
+   *
+   * What this preserves:
+   * - host claims and identity
+   * - host keys / verification methods
+   * - well-known VCs and other persisted host artifacts
+   *
+   * @returns `true` when the stored host runtime projection was rewritten,
+   *          otherwise `false`.
+   */
+  public async reconcilePersistedHostRuntimeConfig(): Promise<boolean> {
+    const hostCollectionName = this.hostRuntime.hostCollectionName;
+    if (!hostCollectionName) {
+      throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
+    }
+
+    const existingSecureDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(
+      hostCollectionName,
+      'host',
+      getEnvSectionId('tenants'),
+    );
+    if (!existingSecureDoc) {
+      return false;
+    }
+
+    const hostConfig = await this.kmsService.unprotectConfidentialData<OrganizationConfig>(existingSecureDoc, 'host');
+    if (!hostConfig?.claims) {
+      throw new ManagerError('Host tenant record is invalid or missing claims.', IssueType.Exception);
+    }
+
+    const expectedDidConfigServices = initializeHostServicesConfig(
+      this.config.sectorsAllowed,
+      this.config.nodeEnv,
+      this.config.networkMode,
+    );
+    const didId = String(hostConfig.didDocument?.id || composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain));
+    const didDocument = {
+      '@context': hostConfig.didDocument?.['@context'] || 'https://www.w3.org/ns/did/v1',
+      ...hostConfig.didDocument,
+      id: didId,
+      alsoKnownAs: Array.isArray(hostConfig.didDocument?.alsoKnownAs) ? hostConfig.didDocument?.alsoKnownAs : [],
+    } as DidDocument;
+    const nextDidDocumentServices = populateDidDocumentServices(
+      didId,
+      this.config.apiBaseUrl,
+      expectedDidConfigServices,
+      false,
+      {} as any,
+    );
+    applyLegacyX509Metadata(
+      didDocument,
+      this.config.legacySignAlg,
+      this.config.legacySignAlg && this.config.legacyX509DerBase64
+        ? `${this.config.apiBaseUrl}/host/cds-${this.config.host.coverageScope || 'EU'}/v1/${this.config.networkMode}/.well-known/x509.der`
+        : undefined,
+      this.config.legacyX509DerBase64
+        ? [this.config.legacyX509DerBase64, ...(this.config.legacyX509ChainBase64 || [])]
+        : this.config.legacyX509ChainBase64,
+    );
+
+    const previousDidConfigServices = JSON.stringify(hostConfig.didConfig?.service || []);
+    const expectedDidConfigServicesJson = JSON.stringify(expectedDidConfigServices);
+    const previousDidDocumentServices = JSON.stringify(hostConfig.didDocument?.service || []);
+    const expectedDidDocumentServicesJson = JSON.stringify(nextDidDocumentServices);
+
+    if (
+      previousDidConfigServices === expectedDidConfigServicesJson
+      && previousDidDocumentServices === expectedDidDocumentServicesJson
+    ) {
+      const refreshTenant = (this.tenantsCacheManager as any)?.refreshTenant;
+      if (typeof refreshTenant === 'function') {
+        await refreshTenant.call(this.tenantsCacheManager, 'host');
+      }
+      return false;
+    }
+
+    didDocument.service = nextDidDocumentServices;
+    const nextHostConfig: OrganizationConfig = {
+      ...hostConfig,
+      didConfig: {
+        ...(hostConfig.didConfig || {}),
+        service: expectedDidConfigServices,
+      },
+      didDocument,
+      meta: {
+        ...(hostConfig.meta || {}),
+        lastUpdated: new Date().toISOString(),
+      },
+    };
+
+    const nextSecureDoc: ConfidentialStorageDoc = {
+      ...existingSecureDoc,
+      status: nextHostConfig.status || existingSecureDoc.status,
+      content: nextHostConfig,
+    };
+    const protectedDoc = await this.kmsService.protectConfidentialData(nextSecureDoc, 'host');
+    await this.vaultRepository.put(hostCollectionName, [protectedDoc], getEnvSectionId('tenants'));
+
+    const refreshTenant = (this.tenantsCacheManager as any)?.refreshTenant;
+    if (typeof refreshTenant === 'function') {
+      await refreshTenant.call(this.tenantsCacheManager, 'host');
+    }
+    return true;
   }
 
   /**
@@ -654,7 +808,20 @@ export class HostingManager {
     };
   }
 
-  private getIcaDidCreateUrl(): string | undefined {
+  private buildIcaSectorBaseUrl(jurisdiction: string, sector: string): string {
+    const configuredBaseUrl = this.getIcaVerifyBaseUrl();
+    const normalizedJurisdiction = String(jurisdiction || this.config.host.jurisdiction || 'ES').trim().toUpperCase();
+    const normalizedSector = String(sector || '').trim();
+    if (!normalizedSector) {
+      throw new ManagerError('ICA sector base URL requires a non-empty sector.', IssueType.Value);
+    }
+    if (configuredBaseUrl.includes('/ica/cds-')) {
+      return configuredBaseUrl;
+    }
+    return `${configuredBaseUrl}/ica/cds-${normalizedJurisdiction}/v1/${normalizedSector}`;
+  }
+
+  private buildIcaDidCreateUrl(jurisdiction: string, sector: string): string | undefined {
     const configuredBaseUrl = this.config.ica?.mode === 'internal'
       ? this.config.ica?.internalUrl
       : this.config.ica?.externalUrl || this.config.ica?.internalUrl;
@@ -664,16 +831,35 @@ export class HostingManager {
     if (configuredBaseUrl.includes('/entity/did/document/_create')) {
       return configuredBaseUrl;
     }
-    return `${configuredBaseUrl.replace(/\/+$/, '')}/entity/did/document/_create`;
+    if (configuredBaseUrl.includes('/ica/cds-')) {
+      return `${configuredBaseUrl.replace(/\/+$/, '')}/entity/did/document/_create`;
+    }
+    return `${this.buildIcaSectorBaseUrl(jurisdiction, sector)}/entity/did/document/_create`;
   }
 
-  private async pollIcaJsonResult(location: string, attempts: number = 5): Promise<any | undefined> {
+  private resolveAbsoluteUrl(location: string, baseUrl?: string): string {
+    const normalizedLocation = String(location || '').trim();
+    if (!normalizedLocation) {
+      throw new ManagerError('ICA polling location is empty.', IssueType.Value);
+    }
+    try {
+      return new URL(normalizedLocation).toString();
+    } catch {
+      if (!baseUrl) {
+        throw new ManagerError(`ICA polling location must be absolute or have a base URL: ${normalizedLocation}`, IssueType.Value);
+      }
+      return new URL(normalizedLocation, baseUrl).toString();
+    }
+  }
+
+  private async pollIcaJsonResult(location: string, baseUrl?: string, attempts: number = 5): Promise<any | undefined> {
+    const pollingUrl = this.resolveAbsoluteUrl(location, baseUrl);
     let waitMs = 2000;
     for (let i = 0; i < attempts; i++) {
       if (i > 0) {
         await new Promise((resolve) => setTimeout(resolve, waitMs));
       }
-      const res = await fetch(location, {
+      const res = await fetch(pollingUrl, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -703,6 +889,8 @@ export class HostingManager {
   private async registerDidDocumentWithIca(params: {
     vpToken: string;
     presentationSubmission?: any;
+    jurisdiction: string;
+    sector: string;
     organizationCredential: any;
     representativeCredential: any;
     organizationDidDocument: DidDocument;
@@ -710,7 +898,7 @@ export class HostingManager {
     organizationBinding?: ActivationParticipantMaterial;
     controllerBinding?: ActivationParticipantMaterial;
   }): Promise<any | undefined> {
-    const url = this.getIcaDidCreateUrl();
+    const url = this.buildIcaDidCreateUrl(params.jurisdiction, params.sector);
     if (!url) {
       return undefined;
     }
@@ -732,25 +920,35 @@ export class HostingManager {
     const res = await fetch(url, {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
+        'content-type': DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE,
+        accept: DIDCOMM_DEFAULT_ACCEPT_HEADER,
       },
       body: JSON.stringify({
-        vp_token: params.vpToken,
-        presentation_submission: params.presentationSubmission,
-        organization: {
-          credential: params.organizationCredential,
-          did: params.organizationDidDocument.id,
-          didDocument: params.organizationDidDocument,
-          publicKeyJwk: organizationSigningKey,
-          ...(params.organizationBinding?.jwks ? { jwks: params.organizationBinding.jwks } : {}),
-        },
-        controller: {
-          credential: params.representativeCredential,
-          did: params.controllerDidDocument.id,
-          didDocument: params.controllerDidDocument,
-          publicKeyJwk: controllerSigningKey,
-          ...(params.controllerBinding?.sameAs ? { sameAs: params.controllerBinding.sameAs } : {}),
-          ...(params.controllerBinding?.jwks ? { jwks: params.controllerBinding.jwks } : {}),
+        thid: `ica-did-document-create-${Date.now()}`,
+        type: DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE,
+        body: {
+          vp_token: params.vpToken,
+          presentation_submission: params.presentationSubmission,
+          data: [{
+            resource: {
+              organization: {
+                credential: params.organizationCredential,
+                identifier: params.organizationDidDocument.id,
+                did: params.organizationDidDocument.id,
+                didDocument: params.organizationDidDocument,
+                publicKeyJwk: organizationSigningKey,
+                ...(params.organizationBinding?.jwks ? { jwks: params.organizationBinding.jwks } : {}),
+              },
+              controller: {
+                credential: params.representativeCredential,
+                did: params.controllerDidDocument.id,
+                didDocument: params.controllerDidDocument,
+                publicKeyJwk: controllerSigningKey,
+                ...(params.controllerBinding?.sameAs ? { sameAs: params.controllerBinding.sameAs } : {}),
+                ...(params.controllerBinding?.jwks ? { jwks: params.controllerBinding.jwks } : {}),
+              },
+            },
+          }],
         },
       }),
     });
@@ -760,7 +958,7 @@ export class HostingManager {
       if (!location) {
         throw new ManagerError('ICA DID document creation returned 202 Accepted without Location header.', IssueType.NotSupported);
       }
-      return await this.pollIcaJsonResult(location);
+      return await this.pollIcaJsonResult(location, url);
     }
     if (!res.ok) {
       const text = await res.text().catch(() => '');
@@ -772,6 +970,15 @@ export class HostingManager {
       return undefined;
     }
     return await res.json().catch(() => undefined);
+  }
+
+  private normalizeBindingAliasList(value: unknown): string[] {
+    const rawItems = Array.isArray(value) ? value : [value];
+    const aliases = rawItems
+      .map((item) => typeof item === 'string' ? item.trim() : '')
+      .filter(Boolean)
+      .map((item) => this.normalizeTenantPublicUrl(item) || item);
+    return Array.from(new Set(aliases));
   }
 
   private extractRegistrationKeys(jobMeta?: DidCommDecodedMetadata) {
@@ -998,6 +1205,9 @@ export class HostingManager {
     try {
       switch (job.resourceType) {
         case 'Organization':
+          if (job.action === '_transaction') {
+            return await this.processOrganizationVerificationTransaction(job);
+          }
           if (job.action === '_activate') {
             return await this.processOrganizationActivation(job, environment);
           }
@@ -1005,6 +1215,11 @@ export class HostingManager {
             return await this.processOrganizationLifecycle(job);
           }
           return await this.processOrganizationRegistration(job, environment, isBootstrap);
+        case 'Document':
+          if (job.section === 'did' && job.format === 'document' && job.action === '_binding') {
+            return await this.processTenantDidDocumentBinding(job);
+          }
+          throw new ManagerError(`Unsupported action for Document: '${job.action}'`, IssueType.NotSupported);
         case 'Offer':
           if (job.action === '_search') {
             return await this.processOfferOrderSearch(job);
@@ -1035,6 +1250,383 @@ export class HostingManager {
         },
       };
     }
+  }
+
+  private async processTenantDidDocumentBinding(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const entry = (job.content?.body?.data?.[0] || {}) as Record<string, any>;
+    const resource = (entry.resource || {}) as Record<string, any>;
+    const organization = (resource.organization || {}) as Record<string, any>;
+    const aliases = this.normalizeBindingAliasList(organization.url);
+    if (!aliases.length) {
+      throw new ManagerError('Organization DID binding requires at least one organization.url value.', IssueType.Required);
+    }
+
+    const tenantSector = String(job.sector || '').trim() as Sector;
+    const tenantRouteId = String(job.tenantId || '').trim();
+    const jurisdiction = String(job.jurisdiction || '').trim();
+    if (!tenantSector || !tenantRouteId || !jurisdiction) {
+      throw new ManagerError('Tenant DID binding requires tenantId, jurisdiction, and sector in the route.', IssueType.Required);
+    }
+
+    const tenantVaultId = getTenantVaultId(tenantSector, tenantRouteId);
+    const tenantConfig = await this.tenantsCacheManager.getTenant(tenantVaultId);
+    if (!tenantConfig) {
+      throw new ManagerError(`Tenant not found for DID binding: '${tenantVaultId}'.`, IssueType.NotFound);
+    }
+
+    const hostCollectionName = this.hostRuntime.hostCollectionName;
+    if (hostCollectionName) {
+      const tenantRegistrationDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(
+        hostCollectionName,
+        tenantVaultId,
+        getEnvSectionId('tenants'),
+      );
+      if (tenantRegistrationDoc?.content?.didDocument) {
+        tenantRegistrationDoc.content.didDocument.alsoKnownAs = aliases;
+        tenantRegistrationDoc.content.meta = {
+          ...(tenantRegistrationDoc.content.meta || {}),
+          lastUpdated: new Date().toISOString(),
+        };
+        const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
+        await this.vaultRepository.put(hostCollectionName, [secureTenantRegistrationDoc], getEnvSectionId('tenants'));
+        await this.tenantsCacheManager.refreshTenant(tenantVaultId);
+      }
+    }
+
+    return {
+      jti: uuidv4(),
+      type: 'hosting-response',
+      thid: job.content?.thid as string,
+      iss: issuerDid,
+      aud: job.content?.iss as string,
+      exp: Math.floor(Date.now() / 1000) + 300,
+      body: {
+        data: [{
+          type: OrganizationDidBindingEntryTypes.Response,
+          resource: {
+            resourceType: 'Document',
+            didDocument: {
+              ...(tenantConfig.didDocument || {}),
+              alsoKnownAs: aliases,
+            },
+          },
+          response: { status: '200' },
+        }],
+        resourceType: 'Bundle',
+        type: 'batch-response',
+        total: 1,
+      },
+    };
+  }
+
+  /**
+   * Forwards the first host-side legal-organization onboarding transaction to
+   * ICA `_verify`.
+   *
+   * Separation of concerns:
+   * - GW/portal/BFF communication keys remain in `meta.jws` / `meta.jwe`
+   * - controller business binding material remains in
+   *   `body.data[].resource.controller.publicKeyJwk`
+   * - optional organization credential-signing material remains in
+   *   `body.data[].resource.organization.publicKeyJwk`
+   * - this flow is distinct from `_activate`, which consumes an already-issued
+   *   ICA proof
+   */
+  private async processOrganizationVerificationTransaction(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const entry = (job.content?.body?.data?.[0] || {}) as LegalOrganizationVerificationTransactionEntry;
+    const claims = normalizeContextualizedClaims(entry.meta?.claims || {});
+    const resource = (entry.resource || {}) as LegalOrganizationVerificationTransactionResource;
+    const requestedSector = String(claims[ClaimsServiceSchemaorg.category] || '').trim();
+    const resourceType = String(resource.verification?.resourceType || 'contract').trim() || 'contract';
+    if (!requestedSector) {
+      throw new ManagerError(`Missing required claim: '${ClaimsServiceSchemaorg.category}'`, IssueType.Required);
+    }
+
+    const icaResponse = await this.forwardOrganizationVerificationTransactionToIca({
+      job,
+      entry,
+      claims,
+      resource,
+      requestedSector,
+      resourceType,
+    });
+
+    const processedClaims = await this.createPendingTenantRegistrationFromClaims({
+      claims,
+      environment: resourceType,
+      jobMeta: job.content?.meta,
+      fallbackAlternateName: job.tenantId,
+    });
+
+    return {
+      jti: uuidv4(),
+      type: 'hosting-response',
+      thid: job.content?.thid as string,
+      iss: issuerDid,
+      aud: job.content?.iss as string,
+      body: {
+        resourceType: 'Bundle',
+        type: getBundleResponseTypeForAction(job.action),
+        total: 1,
+        data: [{
+          type: ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE_TYPE,
+          meta: {
+            claims: processedClaims,
+          },
+          resource: this.buildOrganizationVerificationTransactionResponseResource(icaResponse, processedClaims),
+          response: {
+            status: '200',
+          },
+        }],
+      },
+    };
+  }
+
+  /**
+   * Projects the host `_transaction-response` contract into one explicit object
+   * that portal/BFF callers can consume without reverse-engineering GW state.
+   *
+   * Why this shape exists:
+   * - `icaResponse` preserves the verification VCs/Bundle returned by ICA
+   * - `meta.claims` already carries the generated host-side commercial offer
+   * - `resource.next` makes the next mandatory host action explicit so the
+   *   caller can continue directly with `Order/_batch`
+   *
+   * Contract rule:
+   * - `_transaction` is not a replacement for `_activate`
+   * - it is the pre-activation verification/bootstrap step that prepares the
+   *   same host-side pending registration/offer state later consumed by Order
+   */
+  private buildOrganizationVerificationTransactionResponseResource(
+    icaResponse: unknown,
+    processedClaims: ClaimsRecord,
+  ): LegalOrganizationVerificationTransactionResponseResource {
+    const offerId = String(processedClaims[ClaimsOfferSchemaorg.identifier] || '').trim() || undefined;
+    return {
+      icaResponse,
+      next: {
+        action: ORGANIZATION_VERIFICATION_TRANSACTION_NEXT_ACTION,
+        acceptedOffer: {
+          ...(offerId ? { identifier: offerId } : {}),
+          identifierClaim: ClaimsOrderSchemaorg.acceptedOfferIdentifier,
+        },
+      },
+    };
+  }
+
+  /**
+   * Creates the same provisional host-side registration state used by the
+   * legacy registration offer flow, but starting from the claims already
+   * validated for host `_transaction`.
+   *
+   * Step by step:
+   * 1. normalize legal-organization identity compatibility fields
+   * 2. ensure a tenant alternateName exists, falling back to the tenant route id
+   * 3. validate the requested tenant sector against host policy
+   * 4. derive the canonical organization identifier and commercial offer claims
+   * 5. persist one `pending` host-side registration record indexed by offer id
+   *
+   * This helper is intentionally reused by both:
+   * - direct organization registration (`Organization/_batch`)
+   * - host legal verification transaction (`Organization/_transaction`)
+   *
+   * so the new flow can continue with `Order/_batch` without legacy `_activate`.
+   */
+  private async createPendingTenantRegistrationFromClaims(input: {
+    claims: ClaimsRecord;
+    environment?: string;
+    jobMeta?: DidCommDecodedMetadata;
+    fallbackAlternateName?: string;
+  }): Promise<ClaimsRecord> {
+    const normalizedClaims = this.applyLegalOrganizationIdentityCompatibility(input.claims);
+    const alternateName = String(
+      normalizedClaims[ClaimsOrganizationSchemaorg.alternateName]
+      || input.fallbackAlternateName
+      || '',
+    ).trim();
+    const enrichedClaims: ClaimsRecord = {
+      ...normalizedClaims,
+      ...(alternateName ? { [ClaimsOrganizationSchemaorg.alternateName]: alternateName } : {}),
+    };
+    validateNewOrganizationClaims(enrichedClaims);
+
+    if (!alternateName) {
+      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
+    }
+    if (!isValidTenantAlternateName(alternateName)) {
+      throw new ManagerError(`Invalid alternateName format: '${alternateName}'`, IssueType.Value);
+    }
+
+    const requestedSector = enrichedClaims[ClaimsServiceSchemaorg.category] as Sector;
+    if (!requestedSector) {
+      throw new ManagerError(`Missing required claim for new tenant: '${ClaimsServiceSchemaorg.category}'`, IssueType.Required);
+    }
+    if (requestedSector === Sector.SYSTEM) {
+      throw new ManagerError("The 'system' sector is a reserved keyword and cannot be used by tenants.", IssueType.Forbidden);
+    }
+    if (!this.config.sectorsAllowed.includes(requestedSector)) {
+      throw new ManagerError(`The requested sector '${requestedSector}' is not supported by this gateway.`, IssueType.Value);
+    }
+
+    const vaultId = getTenantVaultId(requestedSector, alternateName);
+    if (await this.vaultRepository.vaultExists(vaultId)) {
+      throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
+    }
+
+    const { organization, person, service } = this.extractResources(enrichedClaims, input.environment);
+    const processedService = await this._handleServiceAttachment(service);
+    let processedClaims: ClaimsRecord = { ...enrichedClaims, ...(processedService?.meta.claims || {}) };
+
+    const jurisdiction = processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;
+    const isIndividualOrg = !!processedClaims['org.schema.Organization.owner.telephone'];
+    if (!isIndividualOrg) {
+      (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = createOrganizationUrn({
+        namespace: this.config.namespace,
+        network: this.getCurrentUrnNetwork(),
+        jurisdiction,
+        sector: requestedSector,
+        idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+        idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+      });
+    } else {
+      (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = alternateName || organization.id;
+    }
+
+    const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const offerClaims = generateLicenseOffer(
+      processedClaims[ClaimsOrganizationSchemaorg.numberOfEmployees] as number,
+      hostDid,
+      jurisdiction,
+      requestedSector,
+      this.config.allowedPaymentMethods,
+    );
+    processedClaims = { ...processedClaims, ...offerClaims };
+
+    const registrationKeys = this.extractRegistrationKeys(input.jobMeta);
+    const tenantRegistrationDoc: ConfidentialStorageDoc = {
+      id: vaultId,
+      status: EntityLifecycleStatus.Pending,
+      sequence: 0,
+      indexed: {
+        attributes: [
+          { name: 'status', value: EntityLifecycleStatus.Pending },
+          { name: ClaimsOfferSchemaorg.identifier, value: processedClaims[ClaimsOfferSchemaorg.identifier] as string, unique: true },
+        ],
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
+      content: {
+        status: EntityLifecycleStatus.Pending,
+        claims: processedClaims,
+        contained: [person, processedService].filter(Boolean),
+        ...(registrationKeys.signerJwk || registrationKeys.encrypterJwk ? { registrationKeys } : {}),
+      },
+    };
+
+    const hostCollectionName = this.hostRuntime.hostCollectionName;
+    const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
+    await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], getEnvSectionId('tenants'));
+    return processedClaims;
+  }
+
+  private getIcaVerifyBaseUrl(): string {
+    const configuredBaseUrl = this.config.ica?.mode === 'internal'
+      ? this.config.ica?.internalUrl
+      : this.config.ica?.externalUrl || this.config.ica?.internalUrl;
+    if (!configuredBaseUrl) {
+      throw new ManagerError('ICA verification URL is not configured.', IssueType.NotSupported);
+    }
+    return configuredBaseUrl.replace(/\/+$/, '');
+  }
+
+  private buildIcaVerifyUrl(jurisdiction: string, sector: string, resourceType: string): string {
+    const normalizedResourceType = String(resourceType || 'contract').trim();
+    return `${this.buildIcaSectorBaseUrl(jurisdiction, sector)}/terms/pdf/${normalizedResourceType}/_verify`;
+  }
+
+  private async forwardOrganizationVerificationTransactionToIca(input: {
+    job: JobRequest;
+    entry: LegalOrganizationVerificationTransactionEntry;
+    claims: ClaimsRecord;
+    resource: LegalOrganizationVerificationTransactionResource;
+    requestedSector: string;
+    resourceType: string;
+  }): Promise<any> {
+    const didcommContent = (input.job.content || {}) as IDecodedDidcommPayload & { attachments?: unknown[] };
+    const attachments = Array.isArray(didcommContent.attachments) && didcommContent.attachments.length > 0
+      ? didcommContent.attachments
+      : Array.isArray((input.job.content?.body as any)?.attachments)
+        ? (input.job.content?.body as any).attachments
+        : [];
+    const translatedBody = {
+      resourceType: 'Bundle',
+      type: 'collection',
+      total: 1,
+      data: [{
+        type: input.entry.type || ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST_TYPE,
+        meta: {
+          claims: input.claims,
+        },
+        resource: {
+          ...(input.resource.controller ? { controller: input.resource.controller } : {}),
+          ...(input.resource.organization ? { organization: input.resource.organization } : {}),
+          ...(input.resource.legalRepresentativePayload
+            ? { legalRepresentative: input.resource.legalRepresentativePayload }
+            : input.resource.legalRepresentative
+              ? { legalRepresentative: input.resource.legalRepresentative }
+              : {}),
+          verification: {
+            resourceType: input.resourceType,
+          },
+        },
+      }],
+    };
+    const requestPayload = {
+      jti: String(input.job.content?.jti || uuidv4()),
+      thid: String(input.job.content?.thid || uuidv4()),
+      iss: input.job.content?.iss,
+      aud: 'ica',
+      type: input.job.content?.type || 'application/api+json',
+      body: translatedBody,
+      ...(attachments.length ? { attachments } : {}),
+      ...(input.job.content?.meta ? { meta: input.job.content.meta } : {}),
+    };
+
+    const verifyUrl = this.buildIcaVerifyUrl(
+      input.job.jurisdiction || this.config.host.jurisdiction || 'ES',
+      input.requestedSector,
+      input.resourceType,
+    );
+    const response = await fetch(
+      verifyUrl,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE,
+        },
+        body: JSON.stringify(requestPayload),
+      },
+    );
+
+    if (response.status === 202) {
+      const location = response.headers.get('location') || response.headers.get('Location') || '';
+      if (!location) {
+        throw new ManagerError('ICA verify returned 202 Accepted without Location header.', IssueType.NotSupported);
+      }
+      const polled = await this.pollIcaJsonResult(location, verifyUrl);
+      return polled || {};
+    }
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new ManagerError(`ICA verify failed: ${response.status} ${text}`.trim(), IssueType.Exception);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return {};
+    }
+    return await response.json().catch(() => ({}));
   }
 
   /**
@@ -1315,6 +1907,8 @@ export class HostingManager {
     const icaDidRegistration = await this.registerDidDocumentWithIca({
       vpToken: activation.vpToken,
       presentationSubmission: activation.presentationSubmission,
+      jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+      sector: requestedSector,
       organizationCredential: activation.organizationCredential,
       representativeCredential: activation.representativeCredential,
       organizationDidDocument: finalTenantConfig.didDocument!,
@@ -2000,59 +2594,11 @@ export class HostingManager {
       if (alternateName === 'host') {
         await this.persistHostConfig(organization, processedClaims, [person, processedService!]);
       } else {
-        const registrationKeys = this.extractRegistrationKeys(jobMeta);
-        const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
-        const jurisdiction = processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;
-        const isIndividualOrg = !!normalizedClaims['org.schema.Organization.owner.telephone'];
-
-        let tenantUrn: string | undefined = undefined;
-        if (!isIndividualOrg) {
-          // Only generate canonical URN for legal orgs
-          tenantUrn = createOrganizationUrn({
-            namespace: this.config.namespace,
-            network: this.getCurrentUrnNetwork(),
-            jurisdiction,
-            sector: validatedSector!,
-            idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
-            idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
-          });
-          (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = tenantUrn;
-        } else {
-          // For individual orgs, use a simple identifier (e.g., alternateName or a UUID)
-          (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = alternateName || organization.id;
-        }
-
-        const offerClaims = generateLicenseOffer(
-          processedClaims[ClaimsOrganizationSchemaorg.numberOfEmployees] as number,
-          hostDid,
-          jurisdiction,
-          validatedSector!,
-          this.config.allowedPaymentMethods
-        );
-        processedClaims = { ...processedClaims, ...offerClaims };
-
-        const tenantRegistrationDoc: ConfidentialStorageDoc = {
-          id: getTenantVaultId(validatedSector!, alternateName),
-          status: EntityLifecycleStatus.Pending,
-          sequence: 0,
-          indexed: {
-            attributes: [
-              { name: 'status', value: 'pending' },
-              { name: ClaimsOfferSchemaorg.identifier, value: processedClaims[ClaimsOfferSchemaorg.identifier] as string, unique: true },
-            ],
-            hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
-          },
-          content: {
-            status: EntityLifecycleStatus.Pending,
-            claims: processedClaims,
-            contained: [person, processedService].filter(Boolean),
-            ...(registrationKeys.signerJwk || registrationKeys.encrypterJwk ? { registrationKeys } : {}),
-          },
-        };
-
-        const hostCollectionName = this.hostRuntime.hostCollectionName;
-        const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
-        await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], getEnvSectionId('tenants'));
+        processedClaims = await this.createPendingTenantRegistrationFromClaims({
+          claims: normalizedClaims,
+          environment,
+          jobMeta,
+        });
       }
 
       return {
