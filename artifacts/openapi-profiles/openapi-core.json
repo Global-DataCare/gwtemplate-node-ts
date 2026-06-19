@@ -4,7 +4,7 @@
     "title": "Gateway API - CORE",
     "version": "1.0.3",
     "description": "CORE API documentation for the secure gateway canonical flow.",
-    "x-profile-generated-at": "2026-06-19T05:12:48.448Z",
+    "x-profile-generated-at": "2026-06-19T15:04:31.531Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -182,7 +182,7 @@
     "examples": {
       "OrganizationRegistrationPlaintextMessage": {
         "summary": "Plaintext Message for Organization Registration",
-        "description": "A DIDComm-like message wrapper containing the registration claims. This is the format for `application/didcomm-plaintext+json`.",
+        "description": "A DIDComm-like message wrapper containing the registration claims. This is the format for `application/didcomm-plain+json`.",
         "value": {
           "jti": "org-registration-request-<test-id>",
           "thid": "org-registration-thread-<test-id>",
@@ -237,7 +237,7 @@
             "jws": {
               "protected": {
                 "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
+                "cty": "application/didcomm-plain+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device",
                 "jwk": {
@@ -340,7 +340,7 @@
             "jws": {
               "protected": {
                 "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
+                "cty": "application/didcomm-plain+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device",
                 "jwk": {
@@ -402,7 +402,7 @@
             "jws": {
               "protected": {
                 "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
+                "cty": "application/didcomm-plain+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -653,7 +653,7 @@
             "jws": {
               "protected": {
                 "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
+                "cty": "application/didcomm-plain+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -701,7 +701,7 @@
             "jws": {
               "protected": {
                 "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
+                "cty": "application/didcomm-plain+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -773,7 +773,7 @@
             "jws": {
               "protected": {
                 "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
+                "cty": "application/didcomm-plain+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device",
                 "jwk": {
@@ -827,7 +827,7 @@
             "jws": {
               "protected": {
                 "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
+                "cty": "application/didcomm-plain+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -1732,7 +1732,7 @@
             "jws": {
               "protected": {
                 "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
+                "cty": "application/didcomm-plain+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device",
                 "jwk": {
@@ -1798,7 +1798,7 @@
             "jws": {
               "protected": {
                 "typ": "application/didcomm-signed+json",
-                "cty": "application/didcomm-plaintext+json",
+                "cty": "application/didcomm-plain+json",
                 "alg": "ML-DSA-44",
                 "kid": "thumbprint-public-sig-key-device"
               }
@@ -2249,10 +2249,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted\n(secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical,\nand `application/json` is also accepted for simplicity.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted\n(secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical,\nand `application/json` is also accepted for simplicity.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               }
@@ -2376,10 +2376,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               },
@@ -2549,10 +2549,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               },
@@ -2686,10 +2686,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               },
@@ -2815,10 +2815,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               },
@@ -2947,10 +2947,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               },
@@ -3076,10 +3076,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\nLegacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.\nLegacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/ConsentCreation"
               },
@@ -3243,10 +3243,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               }
@@ -3372,10 +3372,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\nLegacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.\nLegacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/CommunicationCreation"
               },
@@ -3539,10 +3539,10 @@
           }
         ],
         "requestBody": {
-          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.\nLegacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.\n",
+          "description": "Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).\nDemo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.\nLegacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.\n",
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               },
@@ -3713,7 +3713,7 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/didcomm-plaintext+json": {
+            "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
               }

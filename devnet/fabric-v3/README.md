@@ -1,4 +1,10 @@
-## Fabric v3 deterministic devnet (development-only)
+## Fabric v3 deterministic devnet (development-only, legacy local copy)
+
+The active workspace source of truth now lives in the sibling repo:
+- `../fabric-multicloud/devnet/fabric-v3`
+
+Use that sibling path for real local runs. This folder is kept only as a
+legacy in-repo reference and should not be the primary operational path.
 
 This folder provides a reproducible local Fabric v3 network to test:
 - public vs private chaincode flows,
@@ -19,7 +25,8 @@ The scripts below copy that material into this devnet and start the CA container
 
 ### Quick start
 
-From `gwtemplate-node-ts/devnet/fabric-v3`:
+If you intentionally use this legacy local copy, start from
+`gwtemplate-node-ts/devnet/fabric-v3`:
 
 **DEMO-style (single host peer, tenants are clients)**:
 `export SINGLE_HOST=true`

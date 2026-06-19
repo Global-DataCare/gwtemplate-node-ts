@@ -1,6 +1,11 @@
 ## [Unreleased]
 
+## [1.14.4] - 2026-06-19
+
 ### Changed
+- Documented the workspace layout cleanup that removes the in-repo
+  `fabric-multicloud/` copy and standardizes operational references on the
+  sibling repo `../fabric-multicloud`.
 - Updated the shared dependency target to `gdc-common-utils-ts@^2.0.6`.
 - Switched host/runtime and docs to the canonical
   `application/didcomm-plain+json` media type.

@@ -521,7 +521,7 @@ Use that sibling workspace path as the source of truth.
 
 Do not use these legacy reference folders for this flow:
 
-- `gwtemplate-node-ts/fabric-multicloud`
+- `gwtemplate-node-ts/fabric-multicloud` (removed; use `../fabric-multicloud`)
 - `gwtemplate-node-ts/devnet`
 
 ## Recommended One-Shot Script
