@@ -2628,7 +2628,8 @@ export function createApiRouter(
     if (isLegacyHostOrganizationSubmit) {
       console.warn(
         '[API] Legacy host onboarding endpoint used (Organization/_batch or alias _verify). '
-        + 'Prefer Organization/_activate for ICA-first onboarding.',
+        + 'Prefer Organization/_transaction for canonical ICA-backed onboarding. '
+        + 'Organization/_activate remains legacy compatibility for ICA-proof-first callers.',
       );
     }
     const contentTypeHeader = String(req.headers['content-type'] || '');

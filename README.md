@@ -449,15 +449,15 @@ Current status (important):
   - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/...`
 - `gwtemplate-node-ts` now accepts both patterns for identity auth (new unified + legacy) and normalizes internally.
 
-The list below mixes current portal routes and legacy compatibility routes. The current canonical first step is `/_transaction` for legal-organization verification forwarding to ICA `_verify`, followed by `/_activate` once ICA proof already exists; the older `Organization/_batch` / `Order/_batch` family remains only for backward compatibility and portal regression checks.
+The list below mixes current portal routes and legacy compatibility routes. The canonical legal-organization onboarding flow starts with `/_transaction` for verification forwarding to ICA `_verify`, and that flow is complete without requiring `/_activate` as a follow-up step. `Organization/_activate` remains published only as a legacy compatibility route for callers that already start from an ICA-issued proof. The older `Organization/_batch` / `Order/_batch` family remains only for backward compatibility and portal regression checks.
 Compatibility aliases are also enabled for older callers: `Organization/_verify` behaves as `Organization/_batch`, and `Organization/_verify-response` behaves as `Organization/_batch-response`.
 
 Minimum backend routes required for portal tests (current gwtemplate):
 
 1. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction`
 2. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response`
-3. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
-4. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
+3. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate` (legacy compatibility for ICA-proof-first callers)
+4. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response` (legacy compatibility)
 5. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch` (legacy compatibility)
 6. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response` (legacy compatibility)
 7. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch` (legacy compatibility)

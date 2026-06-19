@@ -4,7 +4,7 @@
     "title": "Gateway API - CORE",
     "version": "1.0.3",
     "description": "CORE API documentation for the secure gateway canonical flow.",
-    "x-profile-generated-at": "2026-06-19T15:04:31.531Z",
+    "x-profile-generated-at": "2026-06-19T21:57:40.463Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -211,7 +211,7 @@
                     "org.schema.Person.hasOccupation": "ISCO-08|1120",
                     "org.schema.Service.category": "health-care",
                     "org.schema.Service.identifier": "did:web:api-provider.example.com",
-                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/Composition.rs,organization/ResearchSubject.rs",
+                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
                     "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
                   }
                 }
@@ -252,7 +252,7 @@
       },
       "OrganizationActivationPlaintextMessage": {
         "summary": "Plaintext Message for Organization Activation",
-        "description": "A DIDComm-like message wrapper for `_activate`; canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, `SoftwareApplication.material` denotes the public cryptographic material of the software application when ICA issues that VC, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields.",
+        "description": "A DIDComm-like message wrapper for legacy compatibility `Organization/_activate`. Canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, `SoftwareApplication.material` denotes the public cryptographic material of the software application when ICA issues that VC, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields. This route is not required after a successful `Organization/_transaction`.",
         "value": {
           "jti": "org-activation-request-<test-id>",
           "thid": "org-activation-thread-<test-id>",
@@ -355,12 +355,12 @@
       },
       "OrganizationVerificationTransactionPlaintextMessage": {
         "summary": "Plaintext Message for Organization Verification Transaction",
-        "description": "A DIDComm-like message wrapper for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This route is distinct from `_activate`, which starts from an already-issued ICA proof.",
+        "description": "A DIDComm-like message wrapper for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This is the canonical legal-organization onboarding route and does not require `_activate` as a follow-up step.",
         "value": {}
       },
       "OrganizationVerificationTransactionResponseBundle": {
         "summary": "Organization Verification Transaction Response Bundle",
-        "description": "Async `_transaction-response` bundle. It preserves the ICA verification bundle in `resource.icaResponse`, returns the generated host Offer claims in `meta.claims`, and makes the next host step explicit in `resource.next` so the caller can continue with `Order/_batch`.",
+        "description": "Async `_transaction-response` bundle. It preserves the ICA verification bundle in `resource.icaResponse`, returns the generated host Offer claims in `meta.claims`, and makes the next host step explicit in `resource.next` so the caller can continue with `Order/_batch` without requiring legacy `_activate`.",
         "value": {}
       },
       "OrganizationOrderPlaintextMessage": {
@@ -747,7 +747,7 @@
                     "Person.identifier.value": "<child1-ID>",
                     "Service.category": "health-care",
                     "Service.identifier": "did:web:api-provider.example.com",
-                    "Service.serviceType": "organization/Composition.cruds,organization/Composition.rs,organization/ResearchSubject.rs",
+                    "Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
                     "Service.termsOfService": "https://provider.example.com/terms.pdf"
                   }
                 }
@@ -1706,7 +1706,7 @@
                     "org.schema.Person.hasOccupation": "ISCO-08|1120",
                     "org.schema.Service.category": "health-care",
                     "org.schema.Service.identifier": "did:web:api-provider.example.com",
-                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/Composition.rs,organization/ResearchSubject.rs",
+                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
                     "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
                   }
                 }

@@ -7,6 +7,10 @@
 - Added a Firestore-specific persisted-document guardrail so records can be
   externalized before they approach the 1 MiB document limit even when the JWE
   itself is below the global inline threshold.
+- Clarified docs, Swagger/OpenAPI descriptions, and host-flow comments so
+  `Organization/_transaction` is treated as the canonical legal-organization
+  onboarding step and `Organization/_activate` is documented as legacy
+  compatibility, not a required follow-up after `_transaction`.
 
 ## [1.14.5] - 2026-06-19
 

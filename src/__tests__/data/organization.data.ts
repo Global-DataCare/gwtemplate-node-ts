@@ -27,7 +27,6 @@ import { testHostDidWeb, testRootOrgDidWeb, testHostDomain, testTenant1Identifie
  */
 export const testDefaultTenantServiceTypeClaim = serializeServiceCapabilityTokens([
   ServiceCapability.IndexProvider,
-  ServiceCapability.IndexReader,
   ServiceCapability.DigitalTwinReader,
 ]) as string;
 

@@ -238,19 +238,19 @@ const swaggerDefinition = {
       OrganizationActivationPlaintextMessage: {
         summary: 'Plaintext Message for Organization Activation',
         description:
-          'A DIDComm-like message wrapper for `_activate`; canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, `SoftwareApplication.material` denotes the public cryptographic material of the software application when ICA issues that VC, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields.',
+          'A DIDComm-like message wrapper for legacy compatibility `Organization/_activate`. Canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, `SoftwareApplication.material` denotes the public cryptographic material of the software application when ICA issues that VC, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields. This route is not required after a successful `Organization/_transaction`.',
         value: {},
       },
       OrganizationVerificationTransactionPlaintextMessage: {
         summary: 'Plaintext Message for Organization Verification Transaction',
         description:
-          'A DIDComm-like message wrapper for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This route is distinct from `_activate`, which starts from an already-issued ICA proof.',
+          'A DIDComm-like message wrapper for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This is the canonical legal-organization onboarding route and does not require `_activate` as a follow-up step.',
         value: {},
       },
       OrganizationVerificationTransactionResponseBundle: {
         summary: 'Organization Verification Transaction Response Bundle',
         description:
-          'Async `_transaction-response` bundle. It preserves the ICA verification bundle in `resource.icaResponse`, returns the generated host Offer claims in `meta.claims`, and makes the next host step explicit in `resource.next` so the caller can continue with `Order/_batch`.',
+          'Async `_transaction-response` bundle. It preserves the ICA verification bundle in `resource.icaResponse`, returns the generated host Offer claims in `meta.claims`, and makes the next host step explicit in `resource.next` so the caller can continue with `Order/_batch` without requiring legacy `_activate`.',
         value: {},
       },
       OrganizationOrderPlaintextMessage: {
