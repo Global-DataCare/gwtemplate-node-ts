@@ -620,7 +620,7 @@ Compatibility flags:
 
 - `FHIR_LEGACY=true|false`: allows `application/fhir+json` in `compat`.
 - `JSON_LEGACY=true|false`: allows `application/json` in `compat`.
-- `DIDCOMM_PLAIN=true|false|enabled|disabled`: allows `application/didcomm-plaintext+json` in `compat`.
+- `DIDCOMM_PLAIN=true|false|enabled|disabled`: allows `application/didcomm-plain+json` in `compat`.
 - `DEMO_ALLOW_INSECURE_BEARER=true|false`: in `demo`, allows invalid/unverified bearer tokens in API routes.
 - `GW_REQUEST_BODY_LIMIT=<bytes|kb|mb|gb>`: request body size limit shared by `express.json()` and `express.urlencoded()`. Default: `25mb`.
 

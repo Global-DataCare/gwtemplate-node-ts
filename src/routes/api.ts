@@ -29,6 +29,7 @@ import { getTenantAuthorizationStatus as readTenantAuthorizationStatusFromConfig
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
 type ParsedContentType = 'secure-form' | 'didcomm-plain' | 'json' | 'fhir' | 'unsupported';
+const DIDCOMM_PLAINTEXT_JSON_LEGACY_MEDIA_TYPE = 'application/didcomm-plaintext+json';
 
 function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
@@ -49,9 +50,14 @@ function normalizeContentType(rawValue: string | undefined): string {
   return String(rawValue).split(';')[0].trim().toLowerCase();
 }
 
+function acceptLegacyDidcommPlaintextMediaType(): boolean {
+  return parseBooleanEnv(process.env.DIDCOMM_LEGACY_PLAINTEXT_MEDIA_TYPE, false);
+}
+
 function parseIncomingContentType(contentType: string): ParsedContentType {
   if (contentType === 'application/x-www-form-urlencoded') return 'secure-form';
-  if (contentType === 'application/didcomm-plaintext+json') return 'didcomm-plain';
+  if (contentType === 'application/didcomm-plain+json') return 'didcomm-plain';
+  if (acceptLegacyDidcommPlaintextMediaType() && contentType === DIDCOMM_PLAINTEXT_JSON_LEGACY_MEDIA_TYPE) return 'didcomm-plain';
   if (contentType === 'application/json') return 'json';
   if (contentType === 'application/fhir+json') return 'fhir';
   return 'unsupported';
@@ -556,10 +562,10 @@ export function createApiRouter(
    *       description: |
    *         The DIDComm message for registration.
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/OrganizationRegistrationLegacy'
    *           examples:
@@ -647,11 +653,11 @@ export function createApiRouter(
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted
    *         (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical,
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical,
    *         and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *         application/json:
@@ -706,11 +712,11 @@ export function createApiRouter(
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted
    *         (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical,
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical,
    *         and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
@@ -821,10 +827,10 @@ export function createApiRouter(
    *       description: |
    *         DIDComm request for employee creation.
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/EmployeeCreationLegacy'
    *           examples:
@@ -902,7 +908,7 @@ export function createApiRouter(
    *     requestBody:
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/LegacyMessage'
    *         application/json:
@@ -965,7 +971,7 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *         With `@context: "org.schema"`, clients may send contextualized keys such as `Organization.identifier.value`
    *         or `Service.category` without the `org.schema.` prefix; that is the documented default mode.
    *         If the service enables `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, equivalent fully-qualified `org.schema.*`
@@ -973,7 +979,7 @@ export function createApiRouter(
    *         the HTTPS URL form as the default example.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *           examples:
    *             message: { $ref: '#/components/examples/FirebaseCustomTokenPlaintextMessage' }
@@ -1040,10 +1046,10 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *           examples:
    *             message: { $ref: '#/components/examples/InitialAccessTokenExchangePlaintextMessage' }
@@ -1083,7 +1089,7 @@ export function createApiRouter(
    *     requestBody:
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *           examples:
    *             newEmployee: { $ref: '#/components/examples/LicenseIssuePlaintextMessage' }
@@ -1145,10 +1151,10 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Legacy endpoint. Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/CustomerCreationLegacy'
    *           examples:
@@ -1184,11 +1190,11 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *         Legacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/ConsentCreation'
    *           examples:
@@ -1269,11 +1275,11 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *         Legacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/CommunicationCreation'
    *           examples:
@@ -1354,11 +1360,11 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *         Legacy mode (non-production only): `application/fhir+json` may be used to send a raw FHIR Bundle without DIDComm envelope.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
@@ -1462,7 +1468,7 @@ export function createApiRouter(
    *     requestBody:
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *           examples:
    *             message: { $ref: '#/components/examples/ResearchCompositionIngestionPlaintextMessage' }
@@ -1492,7 +1498,7 @@ export function createApiRouter(
    *     requestBody:
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *         application/json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
@@ -1572,7 +1578,7 @@ export function createApiRouter(
    *     requestBody:
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *         application/json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
@@ -1628,7 +1634,7 @@ export function createApiRouter(
    *     requestBody:
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *         application/json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
@@ -1694,7 +1700,7 @@ export function createApiRouter(
   *     requestBody:
   *       required: true
   *       content:
-  *         application/didcomm-plaintext+json:
+  *         application/didcomm-plain+json:
   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
   *         application/json:
   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
@@ -1767,7 +1773,7 @@ export function createApiRouter(
   *     requestBody:
   *       required: true
   *       content:
-  *         application/didcomm-plaintext+json:
+  *         application/didcomm-plain+json:
   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
   *         application/json:
   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
@@ -1795,7 +1801,7 @@ export function createApiRouter(
   *     requestBody:
   *       required: true
   *       content:
-  *         application/didcomm-plaintext+json:
+  *         application/didcomm-plain+json:
   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
   *         application/json:
   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
@@ -1826,10 +1832,10 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
@@ -2015,10 +2021,10 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
@@ -2064,7 +2070,7 @@ export function createApiRouter(
    *       description: |
    *         Same payload contract as `_batch`. Production: only `application/x-www-form-urlencoded`
    *         is accepted (secure JWE envelope with `request=`). Demo/Test-Network:
-   *         `application/didcomm-plaintext+json` is canonical, and `application/json`
+   *         `application/didcomm-plain+json` is canonical, and `application/json`
    *         is also accepted for simplicity.
    *         With `@context: "org.schema"`, clients may send contextualized keys such as `Organization.identifier.value`
    *         or `Service.category` without the `org.schema.` prefix; that is the documented default mode.
@@ -2073,7 +2079,7 @@ export function createApiRouter(
    *         the HTTPS URL form as the default example.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
@@ -2164,10 +2170,10 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
@@ -2237,10 +2243,10 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
@@ -2317,10 +2323,10 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *         application/x-www-form-urlencoded:
@@ -2397,10 +2403,10 @@ export function createApiRouter(
    *     requestBody:
    *       description: |
    *         Production: only `application/x-www-form-urlencoded` is accepted (secure JWE envelope with `request=`).
-   *         Demo/Test-Network: `application/didcomm-plaintext+json` is canonical, and `application/json` is also accepted for simplicity.
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical, and `application/json` is also accepted for simplicity.
    *       required: true
    *       content:
-   *         application/didcomm-plaintext+json:
+   *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *         application/json:

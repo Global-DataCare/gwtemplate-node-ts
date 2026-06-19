@@ -130,7 +130,7 @@ describe('SECURITY_MODE content-type gates', () => {
     const app = buildTestApp();
     const response = await request(app)
       .post(targetPath)
-      .set('Content-Type', 'application/didcomm-plaintext+json')
+      .set('Content-Type', 'application/didcomm-plain+json')
       .send({});
 
     expect(response.status).toBe(400);

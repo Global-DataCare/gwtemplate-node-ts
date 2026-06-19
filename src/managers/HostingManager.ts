@@ -90,6 +90,12 @@ import {
   DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE,
 } from 'gdc-common-utils-ts/utils/didcomm-submit';
 
+// Transitional ICA transport contract:
+// GW host routes use the newer `application/didcomm-plain+json`, but the
+// current dataspace-ica-ts `_verify` endpoint still expects the legacy plain
+// DIDComm media type on this internal forward hop.
+const ICA_DIDCOMM_PLAIN_JSON_MEDIA_TYPE = 'application/didcomm-plain+json';
+
 type ActivationParticipantMaterial = {
   did?: string;
   sameAs?: string;
@@ -1603,7 +1609,8 @@ export class HostingManager {
       {
         method: 'POST',
         headers: {
-          'content-type': DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE,
+          accept: DIDCOMM_DEFAULT_ACCEPT_HEADER,
+          'content-type': ICA_DIDCOMM_PLAIN_JSON_MEDIA_TYPE,
         },
         body: JSON.stringify(requestPayload),
       },

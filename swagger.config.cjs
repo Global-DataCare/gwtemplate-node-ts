@@ -232,7 +232,7 @@ const swaggerDefinition = {
       OrganizationRegistrationPlaintextMessage: {
         summary: 'Plaintext Message for Organization Registration',
         description:
-          'A DIDComm-like message wrapper containing the registration claims. This is the format for `application/didcomm-plaintext+json`.',
+          'A DIDComm-like message wrapper containing the registration claims. This is the format for `application/didcomm-plain+json`.',
         value: {},
       },
       OrganizationActivationPlaintextMessage: {

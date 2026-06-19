@@ -173,7 +173,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: `/host/cds-ES/v1/${hostRegistrySector}/registry/org.schema/Organization/_batch`,
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: deepClone(ORGANIZATION_REGISTRATION_REQUEST),
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -191,7 +191,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: `/host/cds-ES/v1/${hostRegistrySector}/registry/org.schema/Order/_batch`,
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: badOrder,
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -204,7 +204,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: `/host/cds-ES/v1/${hostRegistrySector}/registry/org.schema/Order/_batch`,
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: goodOrder,
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -281,7 +281,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/identity/firebase/Token/_custom',
-        headers: { 'content-type': 'application/didcomm-plaintext+json' },
+        headers: { 'content-type': 'application/didcomm-plain+json' },
         body: deepClone(FIREBASE_CUSTOM_TOKEN_REQUEST),
       };
       const resp = await invokeExpress(app, req);
@@ -302,7 +302,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: `Bearer ${idToken}` },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: `Bearer ${idToken}` },
         body: { ...invalidReqBody, body: { subject_token: activationCode } },
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -335,7 +335,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/identity/openid/License/_issue',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: deepClone(LICENSE_ISSUE_REQUEST),
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -359,7 +359,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/identity/openid/Token/_exchange',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: `Bearer ${idToken}` },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: `Bearer ${idToken}` },
         body: { ...validReqBody, body: { subject_token: issuedCode || activationCode } },
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -418,7 +418,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/identity/openid/Device/_dcr',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer invalid.initial.access' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer invalid.initial.access' },
         body: deepClone(DEVICE_REGISTRATION_REQUEST),
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -429,7 +429,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/identity/openid/Device/_dcr',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: `Bearer ${initialAccessToken}` },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: `Bearer ${initialAccessToken}` },
         body: deepClone(DEVICE_REGISTRATION_REQUEST),
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -478,7 +478,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/entity/org.schema/Employee/_batch',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: deepClone(EMPLOYEE_REGISTRATION_REQUEST),
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -490,7 +490,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/individual/org.schema/Organization/_batch',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: deepClone(FAMILY_REGISTRATION_REQUEST),
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -506,7 +506,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: badOrder,
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -519,7 +519,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: goodOrder,
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -531,7 +531,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: deepClone(CONSENT_CREATION_MESSAGE),
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -543,7 +543,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: deepClone(COMMUNICATION_CREATION_MESSAGE),
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);
@@ -555,7 +555,7 @@ async function main() {
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch',
-        headers: { 'content-type': 'application/didcomm-plaintext+json', authorization: 'Bearer mock' },
+        headers: { 'content-type': 'application/didcomm-plain+json', authorization: 'Bearer mock' },
         body: deepClone(COMPOSITION_UPDATE_MESSAGE),
       };
       const { submit, poll } = await submitAndMaybePoll(app, req);

@@ -90,7 +90,7 @@ export const metaRequestBodyFullJWK = {
     "protected": {
       "typ": "application/didcomm-signed+json",
       // The JWS payload is a DIDComm plaintext JSON object.
-      "cty": "application/didcomm-plaintext+json",
+      "cty": "application/didcomm-plain+json",
       "alg": deviceJwkMldsa.alg,
       "kid": deviceKidMldsa,
       // Bootstrap: provide the sender's public signing key (without `kid`/`use`).
@@ -117,7 +117,7 @@ const metaRequestBodyOnlyKidHeader = {
   "jws": {
     "protected": {
       "typ": "application/didcomm-signed+json",
-      "cty": "application/didcomm-plaintext+json",
+      "cty": "application/didcomm-plain+json",
       "alg": deviceJwkMldsa.alg,
       "kid": deviceKidMldsa,
     }

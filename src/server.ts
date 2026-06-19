@@ -131,10 +131,16 @@ function logSecurityModeCapabilities(config: ReturnType<typeof getConfig>): void
     `[GW-API] Security mode=${config.securityMode} network-mode=${config.networkMode} capabilities: `
       + `didcomm-encrypted=${acceptsDidcommEncrypted}, `
       + `didcomm-plain=${acceptsDidcommPlain}, `
+      + `didcomm-plaintext-legacy=${config.didcommPlaintextLegacyMediaTypeEnabled}, `
       + `json-legacy=${acceptsLegacyJson}, `
       + `fhir-legacy=${acceptsLegacyFhir}, `
       + `insecure-bearer=${allowsInsecureBearer}`,
   );
+  if (config.didcommPlaintextLegacyMediaTypeEnabled) {
+    console.warn(
+      '[GW-API] WARNING: legacy DIDComm media type compatibility enabled: accepting application/didcomm-plaintext+json temporarily while dependent packages are updated. Canonical media type remains application/didcomm-plain+json.',
+    );
+  }
 }
 
 /**

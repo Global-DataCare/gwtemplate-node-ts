@@ -8,7 +8,8 @@ type SecurityMode = 'strict' | 'compat' | 'demo';
 
 const JSON_MEDIA_TYPE = 'application/json';
 const FHIR_JSON_MEDIA_TYPE = 'application/fhir+json';
-const DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE = 'application/didcomm-plaintext+json';
+const DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE = 'application/didcomm-plain+json';
+const DIDCOMM_PLAINTEXT_JSON_LEGACY_MEDIA_TYPE = 'application/didcomm-plaintext+json';
 const DEFAULT_REQUEST_BODY_LIMIT = '25mb';
 const PRIMARY_REQUEST_BODY_LIMIT_ENV = 'GW_REQUEST_BODY_LIMIT';
 const COMPAT_REQUEST_BODY_LIMIT_ENV = 'REQUEST_BODY_LIMIT';
@@ -49,10 +50,14 @@ export function resolveRequestBodyLimit(): string {
 function buildAcceptedJsonBodyTypes(): string[] {
   const mode = resolveSecurityModeFromEnv();
   const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
+  const acceptLegacyDidcommPlaintextMediaType = parseBooleanEnv(process.env.DIDCOMM_LEGACY_PLAINTEXT_MEDIA_TYPE, false);
   const acceptsDidcommPlain = mode === 'demo' || didcommPlainEnabled;
   const types = [JSON_MEDIA_TYPE, FHIR_JSON_MEDIA_TYPE];
   if (acceptsDidcommPlain) {
     types.push(DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE);
+    if (acceptLegacyDidcommPlaintextMediaType) {
+      types.push(DIDCOMM_PLAINTEXT_JSON_LEGACY_MEDIA_TYPE);
+    }
   }
   return types;
 }
