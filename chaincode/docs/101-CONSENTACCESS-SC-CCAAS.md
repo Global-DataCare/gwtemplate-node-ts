@@ -180,7 +180,7 @@ The local deterministic source is:
 
 The local devnet must:
 
-- copy those files into `devnet/fabric-v3/crypto/ca/*`
+- copy those files into `../fabric-multicloud/devnet/fabric-v3/crypto/ca/*`
 - remove stale CA sqlite databases
 - remove stale Docker ledger volumes before a truly clean retry
 - regenerate TLS server certs when SAN assumptions change
@@ -521,8 +521,8 @@ Use that sibling workspace path as the source of truth.
 
 Do not use these legacy reference folders for this flow:
 
-- `gwtemplate-node-ts/fabric-multicloud`
-- `gwtemplate-node-ts/devnet`
+- `gwtemplate-node-ts/fabric-multicloud` (removed; use `../fabric-multicloud`)
+- `gwtemplate-node-ts/devnet` (removed; use `../fabric-multicloud/devnet/fabric-v3`)
 
 ## Recommended One-Shot Script
 

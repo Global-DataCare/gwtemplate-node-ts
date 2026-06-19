@@ -53,7 +53,7 @@
       "jws": {
         "protected": {
           "typ": "application/didcomm-signed+json",
-          "cty": "application/didcomm-plaintext+json",
+          "cty": "application/didcomm-plain+json",
           "alg": "ML-DSA-44",
           "kid": "thumbprint-public-sig-key-device",
           "jwk": {
@@ -152,7 +152,7 @@
       "jws": {
         "protected": {
           "typ": "application/didcomm-signed+json",
-          "cty": "application/didcomm-plaintext+json",
+          "cty": "application/didcomm-plain+json",
           "alg": "ML-DSA-44",
           "kid": "thumbprint-public-sig-key-device",
           "jwk": {
@@ -200,7 +200,7 @@
       "jws": {
         "protected": {
           "typ": "application/didcomm-signed+json",
-          "cty": "application/didcomm-plaintext+json",
+          "cty": "application/didcomm-plain+json",
           "alg": "ML-DSA-44",
           "kid": "thumbprint-public-sig-key-device"
         }
@@ -492,7 +492,7 @@
       "jws": {
         "protected": {
           "typ": "application/didcomm-signed+json",
-          "cty": "application/didcomm-plaintext+json",
+          "cty": "application/didcomm-plain+json",
           "alg": "ML-DSA-44",
           "kid": "thumbprint-public-sig-key-device"
         }
