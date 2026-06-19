@@ -46,6 +46,7 @@ Teaching rule:
 - Submit: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction`
 - Poll: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response`
 - This is the canonical first step for legal-organization onboarding in GW CORE.
+- This flow does not require `Organization/_activate` as a follow-up step.
 - GW forwards the signed PDF evidence and business payload to ICA `_verify`.
 - Required business payload input:
   - `body.data[].resource.controller.publicKeyJwk`
@@ -56,10 +57,11 @@ Teaching rule:
   - `body.data[].resource.controller.publicKeyJwk` is the controller operation-signing key that ICA should project into `credentialSubject.hasCredential.material`
   - `body.data[].resource.organization.publicKeyJwk` is the organization credential-signing key when already known by the hosting runtime
 
-2. Host tenant activation from ICA proof
+2. Legacy compatibility: host tenant activation from ICA proof
 - Submit: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
 - Poll: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
 - SDK method: `activateOrganizationInGatewayFromIcaProof(...)`
+- This route remains available for ICA-proof-first callers, but it is legacy compatibility and is not required after `Organization/_transaction`.
 - Host routing note:
   - the SDK host route object is a host/operator routing context
   - do not teach it as if it were the identity of the legal controller
@@ -111,12 +113,12 @@ Teaching rule:
   - `credentialSubject.hasOccupation.identifier.value` must be `RESPRSN` (Responsible Party). Legacy tokenized formats are normalized for compatibility.
   - `credentialSubject.hasCredential.material` must be present (signing-key continuity material).
   - `credentialSubject.sameAs` is the complementary public-identity continuity dimension and should also be present in normal production ICA proofs.
-- Preferred activation sequence:
-  - Step 1. Submit `Organization/_transaction` so GW forwards the signed PDF, controller binding key, and optional organization signing key to ICA `_verify`.
-  - Step 2. Prefer ICA responses where the representative VC already carries both `sameAs` and `hasCredential.material`.
-  - Step 3. Submit `_activate` with the ICA VP proof.
-  - Step 4. Use `additionalClaims[org.schema.Person.email]` only as a demo/local bootstrap when GW must create the internal admin and the VC still lacks signed email continuity.
-  - Step 5. Treat `controller.sameAs` in `_activate` as a demo/local workaround, not as the normal production source of truth.
+- Legacy `_activate` usage guidance:
+  - Use `_transaction` as the canonical host onboarding flow.
+  - Use `_activate` only for callers that already start from an ICA VP proof and still rely on the older proof-consumption contract.
+  - Prefer ICA responses where the representative VC already carries both `sameAs` and `hasCredential.material`.
+  - Use `additionalClaims[org.schema.Person.email]` only as a demo/local bootstrap when GW must create the internal admin and the VC still lacks signed email continuity.
+  - Treat `controller.sameAs` in `_activate` as a demo/local workaround, not as the normal production source of truth.
 
 2.a. Planned tenant-side DID binding step
 - Target route shape:
@@ -222,4 +224,4 @@ Note:
 ## Planned alternative path (confidential app / portal mode)
 
 - `*_batch` based activation/verification orchestration as a single confidential-client flow is tracked as pending TODO.
-- Current core baseline keeps `_transaction` as the first legal-organization step and `_activate` as the follow-up proof-consumption step.
+- Current core baseline keeps `_transaction` as the canonical legal-organization onboarding step. `_activate` remains only as a legacy proof-consumption compatibility route.

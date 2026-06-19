@@ -769,10 +769,11 @@ export const FAMILY_ORDER_REQUEST = {
  * Canonical host-side first step for legal organization onboarding via ICA
  * `_verify`.
  *
- * This is intentionally distinct from `_activate`:
+ * This is intentionally distinct from legacy compatibility `_activate`:
  * - `_transaction` carries the signed PDF evidence and controller business
  *   binding key
- * - `_activate` later consumes an already-issued ICA proof
+ * - `_transaction` is complete without requiring `_activate` as a follow-up
+ * - `_activate` only exists for callers that already start from an ICA proof
  */
 export const ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST = {
   jti: 'organization-verification-transaction-request-<test-id>',

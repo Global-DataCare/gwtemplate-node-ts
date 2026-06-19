@@ -5,9 +5,12 @@ import { PostgresVaultRepository } from '../../../database/repositories/postgres
 import { ensurePostgresVaultSchema } from '../../../database/repositories/postgres/postgres.schema';
 import { getEnvSectionId } from '../../../utils/section-env';
 import type { IConfidentialBlobStore } from '../../../database/storage/IConfidentialBlobStore';
+import { CONFIDENTIAL_JWE_INLINE_MAX_BYTES_ENV } from '../../../database/repositories/vault/confidential-storage-persistence';
 
 const HOST_COLLECTION = 'host-system-eu_vat_esx0000000x_system';
 const TENANT_VAULT_ID = 'health-care_acme';
+const SMALL_INLINE_THRESHOLD_BYTES = '64';
+const LARGE_CIPHERTEXT = 'x'.repeat(512);
 
 class InMemoryConfidentialBlobStore implements IConfidentialBlobStore {
   readonly provider = 'mem';
@@ -29,11 +32,8 @@ class InMemoryConfidentialBlobStore implements IConfidentialBlobStore {
 }
 
 function expectHydratedConfidentialDoc(actual: unknown, expectedInlineDoc: ReturnType<typeof buildExampleConfidentialStorageDoc>): void {
-  expect(actual).toEqual(expect.objectContaining(expectedInlineDoc));
-  expect((actual as { blob?: unknown }).blob).toMatchObject({
-    provider: 'mem',
-    contentType: 'application/jose+json',
-  });
+  expect(actual).toEqual(expectedInlineDoc);
+  expect((actual as { blob?: unknown }).blob).toBeUndefined();
 }
 
 function createPool(): Pool {
@@ -53,6 +53,7 @@ describe('PostgresVaultRepository (Integration)', () => {
   const testConfidentialDoc = buildExampleConfidentialStorageDoc();
 
   beforeEach(async () => {
+    delete process.env[CONFIDENTIAL_JWE_INLINE_MAX_BYTES_ENV];
     pool = createPool();
     await ensurePostgresVaultSchema(pool, 'vault_test');
     blobStore = new InMemoryConfidentialBlobStore();
@@ -75,11 +76,8 @@ describe('PostgresVaultRepository (Integration)', () => {
       'SELECT payload_json FROM "vault_test"."vault_documents" WHERE collection_name = $1 AND section_id = $2 AND document_id = $3',
       [TENANT_VAULT_ID, sectionId, testConfidentialDoc.id],
     );
-    expect(rawStored.rows[0].payload_json.jwe).toBeUndefined();
-    expect(rawStored.rows[0].payload_json.blob).toMatchObject({
-      provider: 'mem',
-      contentType: 'application/jose+json',
-    });
+    expect(rawStored.rows[0].payload_json.jwe).toBeDefined();
+    expect(rawStored.rows[0].payload_json.blob).toBeUndefined();
   });
 
   it('updates an existing document when put is called again with the same id', async () => {
@@ -96,6 +94,29 @@ describe('PostgresVaultRepository (Integration)', () => {
 
     const retrievedDoc = await repository.get(TENANT_VAULT_ID, testConfidentialDoc.id);
     expectHydratedConfidentialDoc(retrievedDoc, updatedDoc);
+  });
+
+  it('externalizes oversized JWE payloads when the global inline threshold is lowered', async () => {
+    process.env[CONFIDENTIAL_JWE_INLINE_MAX_BYTES_ENV] = SMALL_INLINE_THRESHOLD_BYTES;
+    const sectionId = getEnvSectionId('employees');
+    const largeDoc = buildExampleConfidentialStorageDoc({
+      jwe: {
+        ...buildExampleConfidentialJwe(),
+        ciphertext: LARGE_CIPHERTEXT,
+      },
+    });
+
+    await repository.put(TENANT_VAULT_ID, [largeDoc], sectionId);
+
+    const rawStored = await pool.query(
+      'SELECT payload_json FROM "vault_test"."vault_documents" WHERE collection_name = $1 AND section_id = $2 AND document_id = $3',
+      [TENANT_VAULT_ID, sectionId, largeDoc.id],
+    );
+    expect(rawStored.rows[0].payload_json.jwe).toBeUndefined();
+    expect(rawStored.rows[0].payload_json.blob).toMatchObject({
+      provider: 'mem',
+      contentType: 'application/jose+json',
+    });
   });
 
   it('finds a document by indexed attributes using the where query format', async () => {

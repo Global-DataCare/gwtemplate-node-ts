@@ -2,11 +2,13 @@
 
 Purpose:
 
-- activate a legal organization in GW CORE from ICA-backed proof,
+- provide the legacy compatibility host activation route for callers that already start from ICA-backed proof,
 - bind controller identity,
 - publish the correct service capability semantics for discovery and runtime.
 
-## Canonical Endpoint
+This route is not required after a successful `Organization/_transaction`.
+
+## Legacy Compatibility Endpoint
 
 - `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
 - poll:
@@ -18,6 +20,7 @@ Purpose:
 - service capability semantics are mandatory.
 - the persisted claim is `org.schema.Service.serviceType`.
 - this is not an individual-index `Communication` flow.
+- this route is legacy compatibility, not the canonical continuation of `Organization/_transaction`.
 
 ## Canonical Variables
 

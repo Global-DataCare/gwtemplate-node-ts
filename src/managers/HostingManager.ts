@@ -1336,8 +1336,9 @@ export class HostingManager {
    *   `body.data[].resource.controller.publicKeyJwk`
    * - optional organization credential-signing material remains in
    *   `body.data[].resource.organization.publicKeyJwk`
-   * - this flow is distinct from `_activate`, which consumes an already-issued
-   *   ICA proof
+   * - `_activate` remains a legacy compatibility route for callers that
+   *   already start from an ICA proof, but this `_transaction` flow does not
+   *   require it as a follow-up step
    */
   private async processOrganizationVerificationTransaction(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
@@ -1401,9 +1402,11 @@ export class HostingManager {
    *   caller can continue directly with `Order/_batch`
    *
    * Contract rule:
-   * - `_transaction` is not a replacement for `_activate`
-   * - it is the pre-activation verification/bootstrap step that prepares the
-   *   same host-side pending registration/offer state later consumed by Order
+   * - `_transaction` is the canonical legal-organization onboarding step
+   * - `_activate` remains a legacy compatibility route, not a required
+   *   continuation after `_transaction`
+   * - the response prepares the host-side pending registration/offer state
+   *   later consumed by Order
    */
   private buildOrganizationVerificationTransactionResponseResource(
     icaResponse: unknown,
@@ -1438,7 +1441,7 @@ export class HostingManager {
    * - direct organization registration (`Organization/_batch`)
    * - host legal verification transaction (`Organization/_transaction`)
    *
-   * so the new flow can continue with `Order/_batch` without legacy `_activate`.
+   * so the canonical flow can continue with `Order/_batch` without legacy `_activate`.
    */
   private async createPendingTenantRegistrationFromClaims(input: {
     claims: ClaimsRecord;
