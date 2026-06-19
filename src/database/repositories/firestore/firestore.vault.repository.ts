@@ -7,6 +7,7 @@ import type { IConfidentialBlobStore } from '../../storage/IConfidentialBlobStor
 import {
   externalizeConfidentialStorageDocForPersistence,
   hydrateConfidentialStorageDocFromPersistence,
+  resolveFirestoreInlineDocumentMaxBytes,
 } from '../vault/confidential-storage-persistence';
 import { appendStorageTrace, isStorageTraceEnabled } from '../../../utils/storage-trace';
 
@@ -32,6 +33,13 @@ function countBlobBackedDocs(records: unknown[]): number {
  *
  * The methods `createNewVault` and `vaultExists` are special cases to satisfy the
  * shared `IVaultRepository` interface.
+ *
+ * Firestore-specific note:
+ * - this repository can proactively externalize oversized confidential payloads
+ *   before the persisted document approaches Firestore's 1 MiB limit
+ * - however, single-field index exemptions for large inline fields such as
+ *   `jwe` must still be configured at the Firestore database level; they cannot
+ *   be enforced by repository write code
  */
 export class FirestoreVaultRepository extends IVaultRepository {
   private readonly db: admin.firestore.Firestore;
@@ -130,7 +138,11 @@ export class FirestoreVaultRepository extends IVaultRepository {
       let blobBackedWrites = 0;
       for (const document of documents) {
         const externalizeStartedAt = nowMs();
-        const persistedDocument = await externalizeConfidentialStorageDocForPersistence(document, this.blobStore);
+        const persistedDocument = await externalizeConfidentialStorageDocForPersistence(
+          document,
+          this.blobStore,
+          { inlineDocumentMaxBytes: resolveFirestoreInlineDocumentMaxBytes() },
+        );
         externalizeDurationMs += nowMs() - externalizeStartedAt;
         if (persistedDocument && typeof persistedDocument === 'object' && (persistedDocument as { blob?: unknown }).blob) {
           blobBackedWrites += 1;

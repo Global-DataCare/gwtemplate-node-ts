@@ -4,6 +4,15 @@ import { buildExampleConfidentialStorageDoc, buildExampleConfidentialJwe } from 
 import { FirestoreVaultRepository } from '../../../database/repositories/firestore/firestore.vault.repository';
 import { getEnvSectionId } from '../../../utils/section-env';
 import type { IConfidentialBlobStore } from '../../../database/storage/IConfidentialBlobStore';
+import {
+  CONFIDENTIAL_JWE_INLINE_MAX_BYTES_ENV,
+  FIRESTORE_CONFIDENTIAL_DOC_INLINE_MAX_BYTES_ENV,
+} from '../../../database/repositories/vault/confidential-storage-persistence';
+
+const SMALL_INLINE_THRESHOLD_BYTES = '64';
+const SMALL_FIRESTORE_DOC_THRESHOLD_BYTES = '256';
+const LARGE_CIPHERTEXT = 'x'.repeat(512);
+const LARGE_INDEXED_VALUE = 'z'.repeat(512);
 
 class InMemoryConfidentialBlobStore implements IConfidentialBlobStore {
   readonly provider = 'mem';
@@ -44,6 +53,8 @@ describe('FirestoreVaultRepository (Integration)', () => {
   });
 
   beforeEach(async () => {
+    delete process.env[CONFIDENTIAL_JWE_INLINE_MAX_BYTES_ENV];
+    delete process.env[FIRESTORE_CONFIDENTIAL_DOC_INLINE_MAX_BYTES_ENV];
     await testEnv.clearFirestore();
     blobStore = new InMemoryConfidentialBlobStore();
     repository = new FirestoreVaultRepository(admin.firestore(), hostCollectionName, blobStore);
@@ -74,11 +85,8 @@ describe('FirestoreVaultRepository (Integration)', () => {
         .doc(testConfidentialDoc.id)
         .get();
       const persistedPayload = persistedSnapshot.data();
-      expect(persistedPayload?.jwe).toBeUndefined();
-      expect(persistedPayload?.blob).toMatchObject({
-        provider: 'mem',
-        contentType: 'application/jose+json',
-      });
+      expect(persistedPayload?.jwe).toBeDefined();
+      expect(persistedPayload?.blob).toBeUndefined();
     });
 
     it('should update an existing document when put is called again with the same id', async () => {
@@ -95,6 +103,61 @@ describe('FirestoreVaultRepository (Integration)', () => {
         const retrievedDoc = await repository.get(vaultId, testConfidentialDoc.id);
 
         expect(retrievedDoc).toEqual(updatedDoc);
+    });
+
+    it('should externalize oversized JWE payloads when the global inline threshold is lowered', async () => {
+      process.env[CONFIDENTIAL_JWE_INLINE_MAX_BYTES_ENV] = SMALL_INLINE_THRESHOLD_BYTES;
+      const sectionId = getEnvSectionId('employees');
+      const largeDoc = buildExampleConfidentialStorageDoc({
+        jwe: {
+          ...buildExampleConfidentialJwe(),
+          ciphertext: LARGE_CIPHERTEXT,
+        },
+      });
+
+      await repository.put(vaultId, [largeDoc], sectionId);
+
+      const persistedSnapshot = await admin
+        .firestore()
+        .collection(vaultId)
+        .doc(sectionId)
+        .collection('documents')
+        .doc(largeDoc.id)
+        .get();
+      const persistedPayload = persistedSnapshot.data();
+      expect(persistedPayload?.jwe).toBeUndefined();
+      expect(persistedPayload?.blob).toMatchObject({
+        provider: 'mem',
+        contentType: 'application/jose+json',
+      });
+    });
+
+    it('should externalize when the Firestore document guardrail is exceeded even if the JWE is small', async () => {
+      process.env[FIRESTORE_CONFIDENTIAL_DOC_INLINE_MAX_BYTES_ENV] = SMALL_FIRESTORE_DOC_THRESHOLD_BYTES;
+      const sectionId = getEnvSectionId('employees');
+      const largeIndexedDoc = buildExampleConfidentialStorageDoc({
+        indexed: {
+          attributes: [
+            { name: 'hmac_for_large_field', value: LARGE_INDEXED_VALUE },
+          ],
+        },
+      });
+
+      await repository.put(vaultId, [largeIndexedDoc], sectionId);
+
+      const persistedSnapshot = await admin
+        .firestore()
+        .collection(vaultId)
+        .doc(sectionId)
+        .collection('documents')
+        .doc(largeIndexedDoc.id)
+        .get();
+      const persistedPayload = persistedSnapshot.data();
+      expect(persistedPayload?.jwe).toBeUndefined();
+      expect(persistedPayload?.blob).toMatchObject({
+        provider: 'mem',
+        contentType: 'application/jose+json',
+      });
     });
   });
 

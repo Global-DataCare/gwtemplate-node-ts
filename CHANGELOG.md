@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### Changed
+- Updated confidential-storage persistence so small JWE payloads stay inline by
+  default while larger payloads are externalized to blob storage with persisted
+  blob metadata (`blobRef`, size, hash, provider metadata).
+- Added a Firestore-specific persisted-document guardrail so records can be
+  externalized before they approach the 1 MiB document limit even when the JWE
+  itself is below the global inline threshold.
+
 ## [1.14.5] - 2026-06-19
 
 ### Changed
