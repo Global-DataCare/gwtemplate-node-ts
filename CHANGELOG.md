@@ -1,3 +1,13 @@
+## [Unreleased]
+
+### Changed
+- Updated the shared dependency target to `gdc-common-utils-ts@^2.0.6`.
+- Switched host/runtime and docs to the canonical
+  `application/didcomm-plain+json` media type.
+- Added temporary startup compatibility for legacy
+  `application/didcomm-plaintext+json` while dependent packages and clients
+  finish migrating.
+
 ## [1.14.0] - 2026-06-14
 
 ### Added
