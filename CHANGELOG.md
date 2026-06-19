@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.14.5] - 2026-06-19
+
+### Changed
+- Removed the legacy in-repo `devnet/` copy so local Fabric development now
+  uses only the sibling repo `../fabric-multicloud/devnet/fabric-v3`.
+
 ## [1.14.4] - 2026-06-19
 
 ### Changed
