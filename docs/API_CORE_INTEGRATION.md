@@ -42,7 +42,21 @@ Teaching rule:
 
 ## Canonical Flow (End-to-End)
 
-1. Host tenant activation from ICA proof
+1. Host legal-organization verification transaction
+- Submit: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction`
+- Poll: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response`
+- This is the canonical first step for legal-organization onboarding in GW CORE.
+- GW forwards the signed PDF evidence and business payload to ICA `_verify`.
+- Required business payload input:
+  - `body.data[].resource.controller.publicKeyJwk`
+  - optional `body.data[].resource.organization.publicKeyJwk`
+  - optional `body.data[].resource.legalRepresentativePayload.email`
+- Key-separation rule:
+  - `meta.jws.protected.jwk` and `meta.jwe.header.jwk` are communication/runtime keys of the portal app, device profile, confidential app, or BFF
+  - `body.data[].resource.controller.publicKeyJwk` is the controller operation-signing key that ICA should project into `credentialSubject.hasCredential.material`
+  - `body.data[].resource.organization.publicKeyJwk` is the organization credential-signing key when already known by the hosting runtime
+
+2. Host tenant activation from ICA proof
 - Submit: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
 - Poll: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
 - SDK method: `activateOrganizationInGatewayFromIcaProof(...)`
@@ -98,11 +112,34 @@ Teaching rule:
   - `credentialSubject.hasCredential.material` must be present (signing-key continuity material).
   - `credentialSubject.sameAs` is the complementary public-identity continuity dimension and should also be present in normal production ICA proofs.
 - Preferred activation sequence:
-  - Step 1. Ask ICA `_verify` to issue the representative VC from signed PDF evidence.
+  - Step 1. Submit `Organization/_transaction` so GW forwards the signed PDF, controller binding key, and optional organization signing key to ICA `_verify`.
   - Step 2. Prefer ICA responses where the representative VC already carries both `sameAs` and `hasCredential.material`.
   - Step 3. Submit `_activate` with the ICA VP proof.
   - Step 4. Use `additionalClaims[org.schema.Person.email]` only as a demo/local bootstrap when GW must create the internal admin and the VC still lacks signed email continuity.
   - Step 5. Treat `controller.sameAs` in `_activate` as a demo/local workaround, not as the normal production source of truth.
+
+2.a. Planned tenant-side DID binding step
+- Target route shape:
+  `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Organization/_binding`
+- Poll shape:
+  `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Organization/_binding-response`
+- Intended purpose:
+  - replace the public `alsoKnownAs` alias list of the effective organization
+    DID document
+  - keep legal organization location separate from alias/public domain binding
+- Locator rule:
+  - accept exactly one organization locator:
+    - `org.schema.Organization.taxID`, or
+    - `org.schema.Organization.identifier.value`
+  - do not accept both in the same request
+- Alias rule:
+  - `org.schema.Organization.url`, when present, replaces the existing
+    `alsoKnownAs` list
+  - omitting `Organization.url` preserves the current aliases
+- Current publication status:
+  - this route is not yet published by GW CORE in runtime/OpenAPI
+  - SDKs may expose high-level methods already, but GW docs must keep it marked
+    as pending until the actual route is served
 
 2. Host order acceptance
 - Submit: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`
@@ -185,4 +222,4 @@ Note:
 ## Planned alternative path (confidential app / portal mode)
 
 - `*_batch` based activation/verification orchestration as a single confidential-client flow is tracked as pending TODO.
-- Current core baseline keeps `_activate` + `_activate-response` as first-class canonical onboarding steps.
+- Current core baseline keeps `_transaction` as the first legal-organization step and `_activate` as the follow-up proof-consumption step.

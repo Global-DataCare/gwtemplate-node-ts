@@ -10,6 +10,11 @@ import {
   HealthcareConsentActions,
   HealthcareConsentPurposes,
 } from '../../shared/healthcare-constants';
+import {
+  ClaimsOrganizationSchemaorg,
+  ClaimsPersonSchemaorg,
+  ClaimsServiceSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
 
 
 /**
@@ -118,6 +123,71 @@ const metaRequestBodyOnlyKidHeader = {
     }
   }
 };
+
+const organizationVerificationTransactionBody = {
+  resourceType: 'Bundle',
+  type: 'collection',
+  total: 1,
+  data: [{
+    type: 'Organization-verification-transaction-request-v1.0',
+    meta: {
+      claims: {
+        '@context': 'org.schema',
+        [ClaimsOrganizationSchemaorg.legalName]: 'ACME HEALTH SL',
+        [ClaimsOrganizationSchemaorg.identifierType]: 'taxID',
+        [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233',
+        [ClaimsOrganizationSchemaorg.taxId]: 'VATES-B00112233',
+        [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+        [ClaimsPersonSchemaorg.email]: 'controller@example.org',
+        [ClaimsServiceSchemaorg.category]: 'health-care',
+        [ClaimsServiceSchemaorg.identifier]: 'did:web:tenant.example.org',
+        [ClaimsServiceSchemaorg.url]: 'https://operator.example.net/acme/cds-es/v1/health-care',
+        [ClaimsServiceSchemaorg.serviceType]:
+          testClaimsRegisterTenantExpanded[ClaimsServiceSchemaorg.serviceType],
+      },
+    },
+    resource: {
+      controller: {
+        did: 'did:key:zDnaekW6GaRk6x9t6yC3r5vQk4wMdx0controller',
+        publicKeyJwk: {
+          kid: 'controller-signing-es384-001',
+          kty: 'EC',
+          crv: 'P-384',
+          x: '<controller-sign-x>',
+          y: '<controller-sign-y>',
+          alg: 'ES384',
+          use: 'sig',
+        },
+      },
+      organization: {
+        did: 'did:web:tenant.example.org',
+        publicKeyJwk: {
+          kid: 'organization-signing-es384-001',
+          kty: 'EC',
+          crv: 'P-384',
+          x: '<organization-sign-x>',
+          y: '<organization-sign-y>',
+          alg: 'ES384',
+          use: 'sig',
+        },
+      },
+      legalRepresentativePayload: {
+        email: 'controller@example.org',
+      },
+      verification: {
+        resourceType: 'contract',
+      },
+    },
+  }],
+} as const;
+
+const organizationVerificationTransactionAttachments = [{
+  id: 'signed-terms-pdf-001',
+  media_type: 'application/pdf',
+  data: {
+    links: ['https://portal.example.org/files/legal-organization-signed-terms.pdf'],
+  },
+}] as const;
 
 
 // --- 1. Organization Onboarding ---
@@ -693,6 +763,80 @@ export const FAMILY_ORDER_REQUEST = {
     }]
   },
   "meta": { ...metaRequestBodyOnlyKidHeader }
+};
+
+/**
+ * Canonical host-side first step for legal organization onboarding via ICA
+ * `_verify`.
+ *
+ * This is intentionally distinct from `_activate`:
+ * - `_transaction` carries the signed PDF evidence and controller business
+ *   binding key
+ * - `_activate` later consumes an already-issued ICA proof
+ */
+export const ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST = {
+  jti: 'organization-verification-transaction-request-<test-id>',
+  thid: 'organization-verification-transaction-thread-<test-id>',
+  iss: 'did:web:portal.example.org',
+  aud: 'did:web:host.example.org',
+  type: 'application/api+json',
+  body: organizationVerificationTransactionBody,
+  attachments: organizationVerificationTransactionAttachments,
+  meta: { ...metaRequestBodyFullJWK },
+};
+
+/**
+ * Canonical `_transaction-response` shape for host-side legal-organization
+ * onboarding.
+ *
+ * The response must preserve two independent concerns:
+ * - ICA verification output (`resource.icaResponse`)
+ * - host-side continuation contract (`meta.claims` + `resource.next`) so the
+ *   caller can submit `Order/_batch` with the generated Offer identifier
+ */
+export const ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE = {
+  jti: 'organization-verification-transaction-response-<test-id>',
+  thid: 'organization-verification-transaction-thread-<test-id>',
+  iss: 'did:web:host.example.org',
+  aud: 'did:web:portal.example.org',
+  type: 'hosting-response',
+  body: {
+    resourceType: 'Bundle',
+    type: 'transaction-response',
+    total: 1,
+    data: [{
+      type: 'Organization-verification-transaction-response-v1.0',
+      meta: {
+        claims: {
+          '@context': 'org.schema',
+          ...testClaimsRegisterTenantExpanded,
+          'org.schema.Organization.alternateName': 'acme-health',
+          'org.schema.Offer.identifier': 'urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>',
+        },
+      },
+      resource: {
+        icaResponse: {
+          resourceType: 'Bundle',
+          type: 'batch-response',
+          total: 1,
+          data: [{
+            type: 'VerifyResponse-v1.0',
+            resource: {
+              resourceType: 'Bundle',
+            },
+          }],
+        },
+        next: {
+          action: 'Order/_batch',
+          acceptedOffer: {
+            identifier: 'urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>',
+            identifierClaim: 'org.schema.Order.acceptedOffer.identifier',
+          },
+        },
+      },
+      response: { status: '200' },
+    }],
+  },
 };
 
 

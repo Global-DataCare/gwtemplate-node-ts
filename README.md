@@ -23,6 +23,7 @@ FHIR-like `Communication` vs internal `CommMsgExtended`, read first:
 ## Repository Navigation
 
 - Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
+- Testing and live E2E operations: [TESTING.md](TESTING.md)
 - Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)
 - Main docs index: [docs/README.md](docs/README.md)
 - Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
@@ -40,6 +41,15 @@ FHIR-like `Communication` vs internal `CommMsgExtended`, read first:
 ## Quick test
 
 Minimal demo flow only (in-memory / demo mode).
+
+For the canonical ICA + GW + SDK Node live verification workflow, including:
+
+- local process from a real TTY
+- local Docker against the built image
+- staging checks
+- the exact env vars that avoid ICA URL / jurisdiction / host-network mistakes
+
+go first to [TESTING.md](TESTING.md).
 
 ## 1) Clone repository
 
@@ -75,7 +85,7 @@ npm run api:local-demo
 Command:
 
 ```bash
-TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
+TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_NETWORK=test npm run demo:bootstrap-single-tenant
 ```
 
 ## 5.A) Docker local + Swagger family-registration flow
@@ -95,8 +105,15 @@ HOST_PORT=8080 FORCE_RECREATE=true ./docker_run_local.sh
 Bootstrap the tenant against that Docker URL:
 
 ```bash
-BASE_URL=http://localhost:8080 TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_REGISTRY_SECTOR=test npm run demo:bootstrap-single-tenant
+BASE_URL=http://localhost:8080 TENANT_ID=acme-id JURISDICTION=ES SECTOR=health-care HOST_NETWORK=test npm run demo:bootstrap-single-tenant
 ```
+
+Naming rule:
+
+- `SECTOR=health-care` is the tenant business sector
+- `HOST_NETWORK=test` is the host runtime/network segment used under
+  `/host/cds-{hostCoverageScope}/v1/{hostNetwork}/...`
+- the host network must not be interpreted as the tenant business sector
 
 Then open `http://localhost:8080/api-docs`, select `CORE`, and use the `Family Registration` request example named `Plaintext Message for Family Registration with online PDF link`.
 
@@ -432,27 +449,29 @@ Current status (important):
   - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/...`
 - `gwtemplate-node-ts` now accepts both patterns for identity auth (new unified + legacy) and normalizes internally.
 
-The list below mixes current portal routes and legacy compatibility routes. The current canonical path is `/_activate` for tenant organization onboarding from signed proof; the older `Organization/_batch` / `Order/_batch` family remains only for backward compatibility and portal regression checks.
+The list below mixes current portal routes and legacy compatibility routes. The current canonical first step is `/_transaction` for legal-organization verification forwarding to ICA `_verify`, followed by `/_activate` once ICA proof already exists; the older `Organization/_batch` / `Order/_batch` family remains only for backward compatibility and portal regression checks.
 Compatibility aliases are also enabled for older callers: `Organization/_verify` behaves as `Organization/_batch`, and `Organization/_verify-response` behaves as `Organization/_batch-response`.
 
 Minimum backend routes required for portal tests (current gwtemplate):
 
-1. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
-2. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
-3. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch` (legacy compatibility)
-4. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response` (legacy compatibility)
-5. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch` (legacy compatibility)
-6. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response` (legacy compatibility)
-7. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch`
-8. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch-response`
-9. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange`
-10. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response`
-11. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr`
-12. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response`
-13. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token`
-14. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response`
-15. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch` (legacy compatibility)
-16. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response` (legacy compatibility)
+1. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction`
+2. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response`
+3. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
+4. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
+5. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch` (legacy compatibility)
+6. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response` (legacy compatibility)
+7. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch` (legacy compatibility)
+8. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response` (legacy compatibility)
+9. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch`
+10. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch-response`
+11. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange`
+12. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response`
+13. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr`
+14. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response`
+15. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token`
+16. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response`
+17. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch` (legacy compatibility)
+18. `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response` (legacy compatibility)
 
 Recommended local preparation sequence:
 

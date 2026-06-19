@@ -41,8 +41,12 @@ CORE behind the scenes.
 
 | Portal API | Method | Frontend purpose | Portal backend behavior |
 |---|---|---|---|
+| `/organizations/{uuid}/verification-transaction` | `POST` | submit signed legal evidence, controller binding key, and legal claims before tenant activation | calls the host-side `Organization/_transaction` route and polls until ICA verification data is available |
+| `/organizations/{uuid}/verification-transaction/{requestId}` | `GET` | retrieve the asynchronous legal-verification status/result | reads the portal-stored state or the projected `Organization/_transaction-response` result |
 | `/organizations/{uuid}/activate-tenant` | `POST` | activate a legal organization in GW from an ICA proof / `vp_token` | calls the GW host activation flow and waits for the result |
 | `/organizations/{uuid}/activate-tenant` | `GET` | retrieve activation status/result | reads the status persisted by the portal |
+| `/organizations/{uuid}/did-binding` | `POST` | replace the organization public DID aliases (`alsoKnownAs`) once the legal onboarding already exists | conceptually targets `entity/org.schema/Organization/_binding`; until GW publishes that converged route, the BFF must treat it as a pending capability/helper rather than an already-public contract |
+| `/organizations/{uuid}/did-binding` | `GET` | read the current public DID binding/aliases of the organization | resolves the current DID document view and its `alsoKnownAs` aliases from the hosted/provider projection |
 | `/organizations/{uuid}/license-offers` | `POST` | request an offer to buy/add more licenses | today the portal must orchestrate this as its own capability; GW does not yet expose one converged public route for this commercial offer flow |
 | `/organizations/{uuid}/license-offers` | `GET` | list license offers known by the portal | uses portal-side commercial/materialized history |
 | `/organizations/{uuid}/license-offers/{offerId}` | `GET` | get one license offer detail | returns known price, quantity, currency, and state |
@@ -236,6 +240,10 @@ Use it as a backend concept when you need:
   - `_dcr`
   - SMART token
   - part of the `Communication` transport complexity
+- Treat these as product-facing backend facades even if a confidential or
+  frontend runtime could call GW directly:
+  - legal organization `verification-transaction`
+  - organization DID `binding`
 - Use `Communication` as channel/history when that UX is explicitly needed, not
   as the only mental entry point for the domain
 

@@ -164,6 +164,12 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   ));
 
   services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'did', format: 'document' },
+    ['Document'],
+    ['_binding'],
+  ));
+
+  services.push(createDidEndpointConfigFromSelector(
     { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.schema' },
     individualResources,
     ['_batch']
@@ -499,7 +505,7 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
     createDidEndpointConfigFromSelector(
       { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
       ['Organization'],
-      ['_batch', '_activate', ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE],
+      ['_batch', '_transaction', '_activate', ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE],
     ),
   );
   services.push(

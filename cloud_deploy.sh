@@ -5,7 +5,37 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
-FABRIC_MULTICLOUD_DIR="${FABRIC_MULTICLOUD_DIR:-${WORKSPACE_ROOT}/fabric-multicloud}"
+DEFAULT_FABRIC_MULTICLOUD_DIR="${WORKSPACE_ROOT}/fabric-multicloud"
+DEFAULT_FABRIC_MULTICLOUD_HINT="../fabric-multicloud"
+LEGACY_INTERNAL_FABRIC_MULTICLOUD_DIR="${SCRIPT_DIR}/fabric-multicloud"
+
+resolve_fabric_multicloud_dir() {
+  local requested_dir="${FABRIC_MULTICLOUD_DIR:-$DEFAULT_FABRIC_MULTICLOUD_DIR}"
+  local resolved_dir
+
+  resolved_dir="$(cd "$requested_dir" 2>/dev/null && pwd)" || {
+    echo "❌ ERROR: FABRIC_MULTICLOUD_DIR does not exist: $requested_dir"
+    exit 1
+  }
+
+  if [[ "$resolved_dir" == "$LEGACY_INTERNAL_FABRIC_MULTICLOUD_DIR" ]]; then
+    echo "❌ ERROR: legacy internal fabric-multicloud is no longer accepted for deployment."
+    echo "Set FABRIC_MULTICLOUD_DIR to the workspace sibling repo instead:"
+    echo "  ${DEFAULT_FABRIC_MULTICLOUD_HINT}"
+    exit 1
+  fi
+
+  if [[ ! -f "$resolved_dir/scripts/05-k8s-deploy-gdc.sh" ]]; then
+    echo "❌ ERROR: FABRIC_MULTICLOUD_DIR is missing scripts/05-k8s-deploy-gdc.sh"
+    echo "Resolved path: $resolved_dir"
+    exit 1
+  fi
+
+  FABRIC_MULTICLOUD_DIR="$resolved_dir"
+  export FABRIC_MULTICLOUD_DIR
+}
+
+resolve_fabric_multicloud_dir
 
 usage() {
   cat <<'EOF'
@@ -190,6 +220,9 @@ deploy_cloud_run() {
   local runtime_vars=(
     "NODE_ENV"
     "HOST_EXTERNAL_DOMAIN" "HOST_EXTERNAL_PORT"
+    "LOCAL_SERVICE_ROLE"
+    "SECURITY_MODE" "NETWORK_MODE" "FHIR_LEGACY" "JSON_LEGACY" "DIDCOMM_PLAIN" "DEMO_ALLOW_INSECURE_BEARER"
+    "ICA_MODE" "ICA_URL_INTERNAL" "ICA_URL_EXTERNAL" "ICA_TLS_CA_PEM"
     "ICA_EXTERNAL_DOMAIN" "CA_EXTERNAL_DOMAIN"
     "DEV_SEED" "SECTORS_ALLOWED"
     "HOST_LEGAL_NAME" "HOST_JURISDICTION" "HOST_ID_TYPE" "HOST_ID_VALUE"

@@ -85,6 +85,11 @@ export class Worker {
             ? this.managers.familyManager
             : this.managers.documentReferenceManager;
           break;
+        case 'Document':
+          manager = job.section === 'did' && job.format === 'document'
+            ? this.managers.hostingManager
+            : this.managers.documentReferenceManager;
+          break;
         case 'Consent':
           manager = this.managers.consentManager;
           break;

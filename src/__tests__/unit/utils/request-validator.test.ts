@@ -32,7 +32,7 @@ describe('isRequestValid', () => {
       id: '#registry:org.schema',
       type: 'ApiService',
       serviceEndpoint: 'Organization',
-      actions: ['_batch', '_activate', '_disable', '_enable'],
+      actions: ['_batch', '_transaction', '_activate', '_disable', '_enable'],
       selector: { section: 'registry', format: 'org.schema' },
     },
     {
@@ -112,6 +112,17 @@ describe('isRequestValid', () => {
       format: 'org.schema',
       resourceType: 'Organization',
       action: '_activate',
+    };
+    expect(isRequestValid(mockServices, params)).toBe(true);
+  });
+
+  it('should return TRUE for the host organization verification transaction action', () => {
+    const params = {
+      sector: 'test',
+      section: 'registry',
+      format: 'org.schema',
+      resourceType: 'Organization',
+      action: '_transaction',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
   });

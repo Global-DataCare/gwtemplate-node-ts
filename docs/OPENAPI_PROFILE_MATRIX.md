@@ -6,6 +6,8 @@ Explicit endpoint classification used by profile generation.
 
 - `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
 - `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
+- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction`
+- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response`
 - `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`
 - `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response`
 - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch`
@@ -35,3 +37,11 @@ Explicit endpoint classification used by profile generation.
 - `/{tenantId}/.../individual/org.hl7.fhir.api/Observation/*`
 - `/{tenantId}/.../individual/org.hl7.fhir.api/Subject/*`
 - Any appointment-specific vertical surfaces (kept out of current core profile).
+
+## Pending Core Candidates
+
+The following route shapes are intentionally not listed as core/compat/extension
+yet because GW CORE does not currently publish them in runtime/OpenAPI:
+
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Organization/_binding`
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Organization/_binding-response`

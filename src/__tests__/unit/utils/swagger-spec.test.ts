@@ -1,5 +1,6 @@
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 import { generateSwaggerSpec } from '../../../utils/swagger-spec';
+import { testClaimsRegisterTenantExpanded } from '../../data/organization.data';
 
 describe('Swagger Spec Generation', () => {
   it('includes onboarding endpoints in the same journey order as API_INTEGRATORS_GUIDE', async () => {
@@ -12,10 +13,14 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom-response']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_batch-response']).toBeDefined();
+    expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction']).toBeDefined();
+    expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch']).toBeDefined();
     expect(spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/did/document/_binding']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/did/document/_binding-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_transaction']).toBeDefined();
@@ -86,6 +91,8 @@ describe('Swagger Spec Generation', () => {
     expect(exampleKeys).toEqual(
       expect.arrayContaining([
         'OrganizationRegistrationPlaintextMessage',
+        'OrganizationVerificationTransactionPlaintextMessage',
+        'OrganizationVerificationTransactionResponseBundle',
         'OrganizationOrderPlaintextMessage',
         'InitialAccessTokenExchangePlaintextMessage',
         'FirebaseCustomTokenPlaintextMessage',
@@ -107,6 +114,8 @@ describe('Swagger Spec Generation', () => {
     );
     for (const key of [
       'OrganizationRegistrationPlaintextMessage',
+      'OrganizationVerificationTransactionPlaintextMessage',
+      'OrganizationVerificationTransactionResponseBundle',
       'OrganizationOrderPlaintextMessage',
       'InitialAccessTokenExchangePlaintextMessage',
       'FirebaseCustomTokenPlaintextMessage',
@@ -137,9 +146,15 @@ describe('Swagger Spec Generation', () => {
       spec.components.examples.FamilyRegistrationPlaintextMessageInlineBase64?.value?.attachments?.[0]?.data;
     const organizationClaims =
       spec.components.examples.OrganizationRegistrationPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
+    const verificationTransactionClaims =
+      spec.components.examples.OrganizationVerificationTransactionPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
     expect(organizationClaims).toBeDefined();
     expect(organizationClaims['org.schema.Organization.identifier.value']).toBe('acme-id');
     expect(organizationClaims['org.schema.Organization.alternateName']).toBeUndefined();
+    expect(verificationTransactionClaims).toBeDefined();
+    expect(verificationTransactionClaims['org.schema.Service.serviceType']).toBe(
+      testClaimsRegisterTenantExpanded['org.schema.Service.serviceType'],
+    );
 
     expect(familyClaims).toBeDefined();
     expect(familyClaims['Service.termsOfService']).toBe('https://provider.example.com/terms.pdf');

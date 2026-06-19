@@ -229,13 +229,19 @@ async function startServer(options?: StartServerOptions) {
    */
   try {
     await tenantManager.loadHost();
-    if (!(await tenantManager.getTenant('host'))) {
+    const hostTenant = await tenantManager.getTenant('host');
+    if (!hostTenant) {
       console.log('[GW-API] Host tenant not found. Bootstrapping...');
       await bootstrapHost(hostingManager, config);
       // After bootstrapping, explicitly warm the cache again using the legacy
       // full-read path to preserve the previous startup semantics.
       console.log('[GW-API] Warming up host cache after bootstrap...');
       await tenantManager.getTenant('host');
+    } else {
+      const updated = await hostingManager.reconcilePersistedHostRuntimeConfig();
+      if (updated) {
+        console.log('[GW-API] Reconciled persisted host runtime service config.');
+      }
     }
   } catch (error) {
     const allowStartupWithoutHostWarmup =

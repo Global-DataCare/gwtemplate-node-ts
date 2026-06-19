@@ -32,6 +32,10 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
     examples.ORGANIZATION_REGISTRATION_REQUEST;
   swaggerDefinition.components.examples.OrganizationActivationPlaintextMessage.value =
     examples.ORGANIZATION_ACTIVATION_REQUEST;
+  swaggerDefinition.components.examples.OrganizationVerificationTransactionPlaintextMessage.value =
+    examples.ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST;
+  swaggerDefinition.components.examples.OrganizationVerificationTransactionResponseBundle.value =
+    examples.ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE;
   swaggerDefinition.components.examples.OrganizationOrderPlaintextMessage.value =
     examples.ORGANIZATION_ORDER_REQUEST;
   swaggerDefinition.components.examples.OrganizationOrderResponseBundle.value =
