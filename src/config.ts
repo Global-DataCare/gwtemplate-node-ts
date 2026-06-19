@@ -14,6 +14,7 @@ export interface IServerConfig {
   fhirLegacy: boolean;
   jsonLegacy: boolean;
   didcommPlainEnabled: boolean;
+  didcommPlaintextLegacyMediaTypeEnabled?: boolean;
   demoAllowInsecureBearer: boolean;
   nodeEnv: string;
   port: number;

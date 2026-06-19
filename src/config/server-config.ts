@@ -162,6 +162,10 @@ export function getConfig(): IServerConfig {
     const fhirLegacy = parseBooleanEnv(process.env.FHIR_LEGACY, false);
     const jsonLegacy = parseBooleanEnv(process.env.JSON_LEGACY, false);
     const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
+    const didcommPlaintextLegacyMediaTypeEnabled = parseBooleanEnv(
+      process.env.DIDCOMM_LEGACY_PLAINTEXT_MEDIA_TYPE,
+      false,
+    );
     const demoAllowInsecureBearer = parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
 
     configInstance = {
@@ -170,6 +174,7 @@ export function getConfig(): IServerConfig {
       fhirLegacy,
       jsonLegacy,
       didcommPlainEnabled,
+      didcommPlaintextLegacyMediaTypeEnabled,
       demoAllowInsecureBearer,
       nodeEnv,
       port: port,
