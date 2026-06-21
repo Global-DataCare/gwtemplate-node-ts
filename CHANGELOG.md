@@ -11,6 +11,11 @@
   `Organization/_transaction` is treated as the canonical legal-organization
   onboarding step and `Organization/_activate` is documented as legacy
   compatibility, not a required follow-up after `_transaction`.
+- Documented the current shared `BundleEntryEditor` surface used by GW and
+  added an executable contract test that makes explicit that
+  `asVitalSign()`/`asObservation()` are available while
+  AllergyIntolerance/MedicationStatement/Condition still use generic
+  `setClaim(...)`/`getClaim(...)` editing in this repo.
 
 ## [1.14.5] - 2026-06-19
 

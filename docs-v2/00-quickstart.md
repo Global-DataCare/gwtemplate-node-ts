@@ -51,3 +51,4 @@ Teaching rule:
 - `docs-v2/06-security-model-and-why.md`
 - `docs-v2/07-didweb-pqc-and-trust-chain.md`
 - `docs-v2/09-api-integrators-guide.md`
+- `docs-v2/17-clinical-bundle-readers.md`
