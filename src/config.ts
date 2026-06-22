@@ -26,6 +26,8 @@ export interface IServerConfig {
     mode?: 'internal' | 'external';
     internalUrl?: string;
     externalUrl?: string;
+    jurisdiction?: string;
+    didWeb?: string;
     tlsCaPem?: string;
   };
   ledger?: {

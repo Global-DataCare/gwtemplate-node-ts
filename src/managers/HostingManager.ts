@@ -893,7 +893,7 @@ export class HostingManager {
 
   private buildIcaSectorBaseUrl(jurisdiction: string, sector: string): string {
     const configuredBaseUrl = this.getIcaVerifyBaseUrl();
-    const normalizedJurisdiction = String(jurisdiction || this.config.host.jurisdiction || 'ES').trim().toUpperCase();
+    const normalizedJurisdiction = this.resolveIcaJurisdiction(jurisdiction, configuredBaseUrl);
     const normalizedSector = String(sector || '').trim();
     if (!normalizedSector) {
       throw new ManagerError('ICA sector base URL requires a non-empty sector.', IssueType.Value);
@@ -902,6 +902,59 @@ export class HostingManager {
       return configuredBaseUrl;
     }
     return `${configuredBaseUrl}/ica/cds-${normalizedJurisdiction}/v1/${normalizedSector}`;
+  }
+
+  private extractJurisdictionFromIcaDidWeb(value?: string): string | undefined {
+    const normalizedValue = String(value || '').trim();
+    if (!normalizedValue) return undefined;
+    const match = normalizedValue.match(/:cds-([A-Za-z]{2,10})(?::|$)/i);
+    const jurisdiction = match?.[1]?.trim();
+    return jurisdiction ? jurisdiction.toUpperCase() : undefined;
+  }
+
+  private extractJurisdictionFromIcaUrl(value?: string): string | undefined {
+    const normalizedValue = String(value || '').trim();
+    if (!normalizedValue) return undefined;
+    const match = normalizedValue.match(/\/ica\/cds-([A-Za-z]{2,10})\/v1(?:\/|$)/i);
+    const jurisdiction = match?.[1]?.trim();
+    return jurisdiction ? jurisdiction.toUpperCase() : undefined;
+  }
+
+  private resolveIcaJurisdiction(routeJurisdiction?: string, configuredBaseUrl?: string): string {
+    const configuredJurisdiction = String(this.config.ica?.jurisdiction || '').trim().toUpperCase();
+    if (configuredJurisdiction) {
+      return configuredJurisdiction;
+    }
+
+    const didWebJurisdiction = this.extractJurisdictionFromIcaDidWeb(this.config.ica?.didWeb);
+    if (didWebJurisdiction) {
+      return didWebJurisdiction;
+    }
+
+    const baseUrlJurisdiction = this.extractJurisdictionFromIcaUrl(configuredBaseUrl || this.getIcaVerifyBaseUrl());
+    if (baseUrlJurisdiction) {
+      return baseUrlJurisdiction;
+    }
+
+    const normalizedRouteJurisdiction = String(routeJurisdiction || '').trim().toUpperCase();
+    if (normalizedRouteJurisdiction && !this.isDemoSecurityMode()) {
+      return normalizedRouteJurisdiction;
+    }
+
+    if (this.isDevelopmentOrDemoDiagnosticsEnabled()) {
+      console.log('[HostingManager] ICA jurisdiction fallback', {
+        routeJurisdiction: normalizedRouteJurisdiction || undefined,
+        hostJurisdiction: String(this.config.host.jurisdiction || '').trim().toUpperCase() || undefined,
+        configuredIcaDidWeb: this.config.ica?.didWeb,
+        configuredIcaBaseUrl: configuredBaseUrl || this.getIcaVerifyBaseUrl(),
+        resolvedIcaJurisdiction: undefined,
+      });
+    }
+
+    throw new ManagerError(
+      'ICA jurisdiction could not be resolved. Configure ICA_JURISDICTION, ICA_DID_WEB, or a path-scoped ICA URL such as /ica/cds-ES/v1/....',
+      IssueType.Required,
+    );
   }
 
   private buildIcaDidCreateUrl(jurisdiction: string, sector: string): string | undefined {

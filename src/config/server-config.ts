@@ -238,6 +238,8 @@ export function getConfig(): IServerConfig {
           : undefined,
         internalUrl: process.env.ICA_URL_INTERNAL,
         externalUrl: process.env.ICA_URL_EXTERNAL,
+        jurisdiction: process.env.ICA_JURISDICTION,
+        didWeb: process.env.ICA_DID_WEB,
         tlsCaPem: process.env.ICA_TLS_CA_PEM,
       },
       ledger: {

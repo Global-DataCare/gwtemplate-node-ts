@@ -11,6 +11,16 @@
   `Organization/_transaction` is treated as the canonical legal-organization
   onboarding step and `Organization/_activate` is documented as legacy
   compatibility, not a required follow-up after `_transaction`.
+- Documented the current GW/ICA trust model as one trusted operational ICA per
+  host/deployment, configured explicitly via `ICA_URL_*`,
+  `ICA_JURISDICTION`, and optionally `ICA_DID_WEB`, rather than a dynamic list
+  of trusted ICAs selected from CA/issuer metadata.
+- Fixed host legal-organization onboarding so GW no longer derives the ICA
+  verification route jurisdiction from `HOST_JURISDICTION`. `_transaction`
+  now resolves the ICA route scope from the configured trusted ICA and returns
+  a functional `400 OperationOutcome` when that jurisdiction cannot be
+  resolved in demo/local environments instead of drifting into downstream
+  `500` failures.
 - Documented the current shared `BundleEntryEditor` surface used by GW and
   added an executable contract test that makes explicit that
   `asVitalSign()`/`asObservation()` are available while

@@ -87,6 +87,7 @@ function buildConfig(): IServerConfig {
     ica: {
       mode: 'external',
       externalUrl: EXAMPLE_ICA_BASE_URL,
+      jurisdiction: 'ES',
     },
   };
 }
@@ -225,5 +226,86 @@ describe('HostingManager legal organization verification transaction', () => {
       },
     });
     expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves ICA jurisdiction from the trusted ICA did:web instead of the host route jurisdiction', async () => {
+    const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+    global.fetch = jest.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const normalizedUrl = typeof url === 'string' ? url : String(url);
+      fetchCalls.push({ url: normalizedUrl, init });
+      if (fetchCalls.length === 1) {
+        return {
+          ok: false,
+          status: EXAMPLE_RESPONSE_STATUS_ACCEPTED,
+          headers: {
+            get: (name: string) => name.toLowerCase() === 'location' ? EXAMPLE_ICA_POLL_URL : null,
+          },
+        } as any;
+      }
+      return {
+        ok: true,
+        status: Number(EXAMPLE_RESPONSE_STATUS_OK),
+        headers: {
+          get: (name: string) => name.toLowerCase() === 'content-type' ? EXAMPLE_ICA_RESPONSE_CONTENT_TYPE : null,
+        },
+        json: async () => buildIcaVerifyResponse(),
+      } as any;
+    }) as any;
+
+    const manager = new HostingManager(
+      mockVaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      {
+        ...buildConfig(),
+        host: {
+          jurisdiction: 'EU',
+        },
+        ica: {
+          mode: 'external',
+          externalUrl: EXAMPLE_ICA_BASE_URL,
+          didWeb: 'did:web:34.175.75.120:ica:cds-ES:v1',
+        },
+      },
+      mockHostRuntime,
+    );
+
+    await manager.process(buildTransactionJob(), 'test', false);
+
+    expect(fetchCalls[0]?.url).toBe(
+      `${EXAMPLE_ICA_BASE_URL}/ica/cds-ES/v1/${EXAMPLE_SECTOR}/terms/pdf/${EXAMPLE_VERIFY_RESOURCE_TYPE}/_verify`,
+    );
+  });
+
+  it('returns OperationOutcome 400 when demo GW cannot resolve the trusted ICA jurisdiction', async () => {
+    global.fetch = jest.fn() as any;
+
+    const manager = new HostingManager(
+      mockVaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      {
+        ...buildConfig(),
+        host: {
+          jurisdiction: 'EU',
+        },
+        ica: {
+          mode: 'external',
+          externalUrl: EXAMPLE_ICA_BASE_URL,
+        },
+      },
+      mockHostRuntime,
+    );
+
+    const response = await manager.process(buildTransactionJob(), 'test', false);
+    const errorEntry = response.body.data[0];
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(errorEntry?.response?.status).toBe('400');
+    expect(errorEntry?.response?.outcome?.issue?.[0]?.diagnostics).toContain('ICA jurisdiction could not be resolved');
   });
 });
