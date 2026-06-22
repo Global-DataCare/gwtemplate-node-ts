@@ -729,6 +729,83 @@ export class HostingManager {
     return this.config.securityMode === 'demo' || String(this.config.nodeEnv || '').trim().toLowerCase() === 'demo';
   }
 
+  private isDevelopmentOrDemoDiagnosticsEnabled(): boolean {
+    const nodeEnv = String(this.config.nodeEnv || '').trim().toLowerCase();
+    return this.isDemoSecurityMode() || nodeEnv === 'development';
+  }
+
+  private backfillOrganizationActivationRouteDefaults(
+    claims: ClaimsRecord,
+    routeJurisdiction?: string,
+  ): ClaimsRecord {
+    const processedClaims = { ...claims };
+    const currentCountry = String(processedClaims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim();
+    const fallbackCountry = String(routeJurisdiction || '').trim().toUpperCase();
+    if (!currentCountry && fallbackCountry) {
+      processedClaims[ClaimsOrganizationSchemaorg.addressCountry] = fallbackCountry;
+    }
+    return processedClaims;
+  }
+
+  private logActivationIdentityDiagnostics(
+    stage: string,
+    claims: ClaimsRecord,
+    routeJurisdiction?: string,
+  ): void {
+    if (!this.isDevelopmentOrDemoDiagnosticsEnabled()) return;
+    console.log('[HostingManager] activation identity diagnostics', {
+      stage,
+      routeJurisdiction: String(routeJurisdiction || '').trim() || undefined,
+      addressCountry: claims[ClaimsOrganizationSchemaorg.addressCountry],
+      identifierType: claims[ClaimsOrganizationSchemaorg.identifierType],
+      identifierValue: claims[ClaimsOrganizationSchemaorg.identifierValue],
+      alternateName: claims[ClaimsOrganizationSchemaorg.alternateName],
+      category: claims[ClaimsServiceSchemaorg.category],
+      serviceType: claims[ClaimsServiceSchemaorg.serviceType],
+    });
+  }
+
+  private assertActivationUrnInputs(claims: ClaimsRecord): void {
+    const missing: string[] = [];
+    if (!String(claims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim()) {
+      missing.push(ClaimsOrganizationSchemaorg.addressCountry);
+    }
+    if (!String(claims[ClaimsOrganizationSchemaorg.identifierType] || '').trim()) {
+      missing.push(ClaimsOrganizationSchemaorg.identifierType);
+    }
+    if (!String(claims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim()) {
+      missing.push(ClaimsOrganizationSchemaorg.identifierValue);
+    }
+    if (missing.length > 0) {
+      throw new ManagerError(
+        `Missing required claim(s) for activation organization URN: ${missing.join(', ')}`,
+        IssueType.Required,
+      );
+    }
+  }
+
+  private createOrganizationUrnSafely(
+    claims: ClaimsRecord,
+    requestedSector: Sector,
+  ): string {
+    this.assertActivationUrnInputs(claims);
+    try {
+      return createOrganizationUrn({
+        namespace: this.config.namespace,
+        network: this.getCurrentUrnNetwork(),
+        jurisdiction: claims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+        sector: requestedSector,
+        idType: claims[ClaimsOrganizationSchemaorg.identifierType] as string,
+        idValue: claims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+      });
+    } catch (error: any) {
+      throw new ManagerError(
+        `Failed to construct activation organization URN: ${String(error?.message || error || 'unknown error')}`,
+        IssueType.Required,
+      );
+    }
+  }
+
   private extractRepresentativeCredentialBindingValue(representativeCredential: any): string | undefined {
     const credentialData = representativeCredential?.credentialSubject?.hasCredential;
     const candidates = Array.isArray(credentialData) ? credentialData : [credentialData];
@@ -1707,7 +1784,14 @@ export class HostingManager {
 
     for (const entry of jobEntries) {
       try {
-        const resultEntry = await this.processActivationEntry(entry, body, environment, job.content?.meta, job.sector);
+        const resultEntry = await this.processActivationEntry(
+          entry,
+          body,
+          environment,
+          job.content?.meta,
+          job.sector,
+          job.jurisdiction,
+        );
         responseEntries.push(resultEntry);
       } catch (error) {
         responseEntries.push(this.handleError(error, entry?.type || 'Organization', entry?.meta));
@@ -1744,6 +1828,7 @@ export class HostingManager {
     environment?: string,
     jobMeta?: DidCommDecodedMetadata,
     hostRegistrySector?: string,
+    routeJurisdiction?: string,
   ): Promise<BundleEntry | ErrorEntry> {
     const activation = await this.applyDemoRepresentativeBindingFallback(
       this.extractActivationMaterial(entry, body),
@@ -1772,10 +1857,14 @@ export class HostingManager {
       throw new ManagerError('Malformed activation entry: missing meta.claims', IssueType.Required);
     }
 
-    const normalizedClaims = this.applyLegalOrganizationIdentityCompatibility(
-      claims,
-      activation.organizationCredential,
+    const normalizedClaims = this.backfillOrganizationActivationRouteDefaults(
+      this.applyLegalOrganizationIdentityCompatibility(
+        claims,
+        activation.organizationCredential,
+      ),
+      routeJurisdiction,
     );
+    this.logActivationIdentityDiagnostics('normalized-claims', normalizedClaims, routeJurisdiction);
     validateNewOrganizationClaims(normalizedClaims);
     const alternateName = normalizedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
     if (!alternateName) {
@@ -1818,7 +1907,11 @@ export class HostingManager {
 
     const { organization, person, service } = this.extractResources(normalizedClaims, environment);
     const processedService = await this._handleServiceAttachment(service);
-    const processedClaims = { ...normalizedClaims, ...(processedService?.meta.claims || {}) };
+    const processedClaims = this.backfillOrganizationActivationRouteDefaults(
+      { ...normalizedClaims, ...(processedService?.meta.claims || {}) },
+      routeJurisdiction,
+    );
+    this.logActivationIdentityDiagnostics('processed-claims', processedClaims, routeJurisdiction);
     const normalizedPublicUrl = this.normalizeTenantPublicUrl(
       activation.publicTenantUrl
       || (processedClaims[ClaimsOrganizationSchemaorg.url] as string | undefined),
@@ -1827,14 +1920,10 @@ export class HostingManager {
       (processedClaims as any)[ClaimsOrganizationSchemaorg.url] = normalizedPublicUrl;
     }
     if (!(processedClaims as any)[ClaimsOrganizationSchemaorg.identifier]) {
-      (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = createOrganizationUrn({
-        namespace: this.config.namespace,
-        network: this.getCurrentUrnNetwork(),
-        jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
-        sector: requestedSector,
-        idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
-        idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
-      });
+      (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = this.createOrganizationUrnSafely(
+        processedClaims,
+        requestedSector,
+      );
     }
 
     const tenantCollectionName = generateTenantCollectionNameFromClaims(processedClaims);

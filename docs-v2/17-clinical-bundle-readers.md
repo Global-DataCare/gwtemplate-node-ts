@@ -2,62 +2,34 @@
 
 Purpose:
 
-- define the canonical high-level reader contract for IPS/clinical bundles,
-- keep section-aware reading separate from legacy raw claim plumbing,
-- make GW, SDK node, and assisted-channel apps use the same semantics.
+- define the GW consumption boundary for section-aware clinical bundle readers,
+- avoid reteaching upstream high-level helper APIs inside GW docs,
+- point integrators to the owning repositories.
 
-## Canonical Rules
+## GW Rule
 
-- section-aware readers must operate on one real clinical document with one `Composition`.
-- resources must already carry one canonical section assignment.
-- readers must not infer sections from resource type when the document omitted them.
-- `sections?: readonly string[]` is the canonical selector shape.
-- `sections === undefined` means all sections.
-- `sections.length === 0` means all sections.
+- GW tests and node-side flows should consume the shared high-level readers/editors.
+- the canonical method-by-method documentation does not belong in GW.
+- `gdc-common-utils-ts` owns the high-level shared editor/view/helper docs.
+- `gdc-sdk-core-ts` owns the FHIR document reader facade docs.
+- `gdc-sdk-node-ts` owns the profile/workspace orchestration docs.
 
-## Section Semantics
+## What GW Assumes
 
-- use the IPS/core section codes owned by `gdc-common-utils-ts`.
-- allergies belong to `LOINC|48765-2`.
-- medication statements belong to `LOINC|10160-0`.
-- conditions belong to one explicit problem section such as current/past problem lists.
-- observations belong to the section declared by the document; vital signs are only the observations placed under the vital-sign section/category.
-
-## Canonical Reader Surface
-
-- `getSections()`
-- `getSectionSummary({ sections? })`
-- `getResources({ sections?, resourceType?, start?, end?, searchText?, count?, page?, offset? })`
-- `getAllergies({ sections?, clinicalStatus?, verificationStatus?, criticality?, start?, end?, count?, page?, offset? })`
-- `getConditions({ sections?, clinicalStatus?, verificationStatus?, severity?, start?, end?, count?, page?, offset? })`
-- `getMedications({ sections?, status?, start?, end?, count?, page?, offset? })`
-- `getVitalSigns({ sections?, code?, start?, end?, count?, page?, offset? })`
-- `getLocalTextAndIntDisplay(resource)`
-- `getXhtmlOrDerived(resource)`
-- `getNarrative(resource)`
-
-## Pagination Rules
-
-- `count` limits page size.
-- `page` is 1-based.
-- `offset` is absolute and wins over `page` when both are present.
-- pagination happens after section/date/text/family filters.
-
-## Narrative Rules
-
-- prefer stored `resource.text.div`.
-- if XHTML is missing, derive it from canonical `meta.claims`.
-- derived XHTML may include clinical date, period start/end, and family-specific fields such as `criticality`, `severity`, dosage, or vital-sign quantities.
+- one real clinical document with one `Composition`
+- resources already assigned to canonical sections
+- no section inference by resource type when the source document omitted the section
+- `sections?: readonly string[]` where `undefined` or `[]` means all sections
 
 ## Source Of Truth
 
-- shared fixture and sectioned claims example:
-  [ips-bundle.ts](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/examples/ips-bundle.ts)
-- shared readers/render helpers:
-  [clinical-resource-view.ts](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/utils/clinical-resource-view.ts)
+- shared high-level IPS helpers and examples:
+  [101-IPS_BUNDLE.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-IPS_BUNDLE.md)
+- shared editor/reader baseline:
+  [101-BUNDLE_EDITOR_READER.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-BUNDLE_EDITOR_READER.md)
 - SDK core document facade:
   [communication-document-facade.ts](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/src/communication-document-facade.ts)
-- SDK node orchestration surface:
+- SDK node profile workspace:
   [profile-workspace.ts](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/src/profile-workspace.ts)
 
 ## Related Tests

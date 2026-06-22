@@ -60,6 +60,8 @@
     "test:e2e": "NODE_OPTIONS=--experimental-vm-modules TEST_ENV=e2e jest --no-coverage src/__tests__/e2e",
     "test:e2e:test-network-unid": "NODE_OPTIONS=--experimental-vm-modules TEST_ENV=e2e jest --no-coverage src/__tests__/e2e/consentaccess.test-network-unid.e2e.spec.ts",
     "test:e2e:real": "bash ./scripts/test-e2e-real-precheck.sh",
+    "ica:a4:fullcycle": "node ./scripts/run-ica-a4-fullcycle.mjs",
+    "ica:antifraud:fullcycle": "PDF_PATH=/Users/fernando/GITS/gdc-workspace/examples/TEST-A4-Antifraud.pdf SECTOR=health-care node ./scripts/run-ica-a4-fullcycle.mjs",
     "seed:dev": "ts-node --esm scripts/seed-dev-cas.ts",
     "pki:generate": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"NodeNext\",\"moduleResolution\":\"NodeNext\",\"allowImportingTsExtensions\":true}' node --loader ts-node/esm --experimental-specifier-resolution=node scripts/generate-pki-chain.ts",
     "pki:root": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"NodeNext\",\"moduleResolution\":\"NodeNext\",\"allowImportingTsExtensions\":true}' node --loader ts-node/esm --experimental-specifier-resolution=node scripts/generate-root-ca.ts",

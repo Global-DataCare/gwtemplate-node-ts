@@ -498,6 +498,42 @@ describe('HostingManager activation flow', () => {
     );
   });
 
+  it('should derive addressCountry from activation route jurisdiction when claims omit it', async () => {
+    const job = buildActivationJob();
+    const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
+    delete activationClaims[ClaimsOrganizationSchemaorg.addressCountry];
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifier];
+    job.content!.body!.data[0]!.meta!.claims = activationClaims;
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ES');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
+      'urn:test-namespace:test-network:es:v1:health-care:entity:tax:VATES-B00112233',
+    );
+  });
+
+  it('should return OperationOutcome instead of crashing when activation URN inputs are still incomplete', async () => {
+    const job = buildActivationJob({ jurisdiction: '' as any });
+    const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
+    delete activationClaims[ClaimsOrganizationSchemaorg.addressCountry];
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifier];
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifierType];
+    delete activationClaims[ClaimsOrganizationSchemaorg.identifierValue];
+    delete (job.content!.body as any).organizationCredential.credentialSubject.taxID;
+    job.content!.body!.data[0]!.meta!.claims = activationClaims;
+
+    const responsePayload = await hostingManager.process(job);
+    const errorEntry = responsePayload.body.data[0];
+
+    expect(errorEntry.response.status).toBe('400');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain(
+      'Missing required claim(s) for activation organization URN',
+    );
+  });
+
   it('should default organization identifierType to UUID when identifierValue is a UUID', async () => {
     const job = buildActivationJob();
     const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
