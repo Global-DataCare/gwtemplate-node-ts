@@ -400,10 +400,27 @@ export class HostingManager {
     if (!identifierType && finalIdentifierValue) {
       processedClaims[ClaimsOrganizationSchemaorg.identifierType] = uuidValidate(normalizedUuidValue) ? 'UUID' : 'TAX';
     }
+    if (!String(processedClaims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim()) {
+      const inferredCountry = this.inferJurisdictionFromLegalIdentifier(taxId || finalIdentifierValue);
+      if (inferredCountry) {
+        processedClaims[ClaimsOrganizationSchemaorg.addressCountry] = inferredCountry;
+      }
+    }
     if (!alternateName && !isIndividualOrg && finalIdentifierValue) {
       processedClaims[ClaimsOrganizationSchemaorg.alternateName] = finalIdentifierValue;
     }
     return processedClaims;
+  }
+
+  private inferJurisdictionFromLegalIdentifier(identifierValue?: string): string | undefined {
+    const normalized = String(identifierValue || '').trim().toUpperCase();
+    if (!normalized) return undefined;
+    if (normalized.startsWith('VATES-')) return 'ES';
+    const vatCountryMatch = /^VAT([A-Z]{2})[-:]?/.exec(normalized);
+    if (vatCountryMatch?.[1]) {
+      return vatCountryMatch[1];
+    }
+    return undefined;
   }
 
   /**
@@ -1826,6 +1843,15 @@ export class HostingManager {
     if (normalizedPublicUrl) {
       (processedClaims as any)[ClaimsOrganizationSchemaorg.url] = normalizedPublicUrl;
     }
+    if (!String(processedClaims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim()) {
+      const fallbackCountry = String(this.config.host.jurisdiction || '').trim();
+      if (fallbackCountry) {
+        (processedClaims as any)[ClaimsOrganizationSchemaorg.addressCountry] = fallbackCountry;
+      }
+    }
+    if (!String(processedClaims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim()) {
+      throw new ManagerError(`Missing required claim for activation: '${ClaimsOrganizationSchemaorg.addressCountry}'`, IssueType.Required);
+    }
     if (!(processedClaims as any)[ClaimsOrganizationSchemaorg.identifier]) {
       (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = createOrganizationUrn({
         namespace: this.config.namespace,
@@ -3030,11 +3056,13 @@ export class HostingManager {
     if (!hostSignerKid) {
       throw new ManagerError('Host signing key not found, cannot issue provisional VC.', IssueType.Exception);
     }
-    const legalParticipantOptions = buildGaiaXLegalParticipantOptionsFromClaims({
+    const legalParticipantOptions = this.buildGaiaXLegalParticipantOptionsForTenant({
       claims: allClaims,
       webDomain: publicBaseUrl,
       did: primaryDid,
       issuerDid: hostDid,
+      alternateName: altName,
+      sector,
     });
     let governanceVc: VerifiableCredentialV2;
     if (options?.governanceVc) {
@@ -3059,11 +3087,13 @@ export class HostingManager {
     if (!tenantSignerKid) {
       throw new ManagerError('Tenant signing key not found, cannot issue self-description.', IssueType.Exception);
     }
-    const selfDescriptionOptions = buildGaiaXLegalParticipantOptionsFromClaims({
+    const selfDescriptionOptions = this.buildGaiaXLegalParticipantOptionsForTenant({
       claims: allClaims,
       webDomain: publicBaseUrl,
       did: primaryDid,
       issuerDid: primaryDid,
+      alternateName: altName,
+      sector,
     });
     const selfDescriptionPayload = createGaiaXLegalParticipantCredential(selfDescriptionOptions) as Omit<VerifiableCredentialV2, 'proof'>;
     const selfDescDetachedJws = await this.kmsService.createDetachedJws(selfDescriptionPayload, tenantSignerKid, vaultId, 'vc_sign');
@@ -3105,6 +3135,72 @@ export class HostingManager {
     };
 
     return applyTenantAuthorizationStatus(tenantConfig, 'active');
+  }
+
+  private buildGaiaXLegalParticipantOptionsForTenant(params: {
+    claims: ClaimsRecord;
+    webDomain: string;
+    did: string;
+    issuerDid: string;
+    alternateName: string;
+    sector: Sector;
+  }) {
+    const { claims, webDomain, did, issuerDid, alternateName, sector } = params;
+    const enrichedClaims: ClaimsRecord = { ...claims };
+
+    if (this.isDemoSecurityMode()) {
+      const fallbackName = String(
+        enrichedClaims[ClaimsOrganizationSchemaorg.legalName]
+        || enrichedClaims[ClaimsOrganizationSchemaorg.identifierValue]
+        || alternateName
+        || '',
+      ).trim();
+      if (fallbackName && !String(enrichedClaims[ClaimsOrganizationSchemaorg.legalName] || '').trim()) {
+        enrichedClaims[ClaimsOrganizationSchemaorg.legalName] = fallbackName;
+      }
+      const fallbackCountry = String(
+        enrichedClaims[ClaimsOrganizationSchemaorg.addressCountry]
+        || this.config.host.jurisdiction
+        || 'ES',
+      ).trim();
+      if (fallbackCountry && !String(enrichedClaims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim()) {
+        enrichedClaims[ClaimsOrganizationSchemaorg.addressCountry] = fallbackCountry;
+      }
+      const fallbackVat = String(
+        enrichedClaims[ClaimsOrganizationSchemaorg.identifierValue]
+        || alternateName
+        || '',
+      ).trim();
+      if (fallbackVat && !String(enrichedClaims[ClaimsOrganizationSchemaorg.identifierValue] || '').trim()) {
+        enrichedClaims[ClaimsOrganizationSchemaorg.identifierValue] = fallbackVat;
+      }
+      if (!String(enrichedClaims[ClaimsServiceSchemaorg.termsOfService] || '').trim()) {
+        enrichedClaims[ClaimsServiceSchemaorg.termsOfService] = 'https://example.org/terms';
+      }
+      this.logger?.warn?.('[HostingManager] demo Gaia-X fallback', {
+        alternateName,
+        sector,
+        legalName: enrichedClaims[ClaimsOrganizationSchemaorg.legalName],
+        identifierValue: enrichedClaims[ClaimsOrganizationSchemaorg.identifierValue],
+        addressCountry: enrichedClaims[ClaimsOrganizationSchemaorg.addressCountry],
+        termsOfService: enrichedClaims[ClaimsServiceSchemaorg.termsOfService],
+      });
+    }
+
+    try {
+      return buildGaiaXLegalParticipantOptionsFromClaims({
+        claims: enrichedClaims,
+        webDomain,
+        did,
+        issuerDid,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ManagerError(
+        `Missing required claims to build Gaia-X Legal Participant credential for '${alternateName}': ${message}`,
+        IssueType.Required,
+      );
+    }
   }
 
 
