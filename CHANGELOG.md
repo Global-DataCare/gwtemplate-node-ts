@@ -27,6 +27,19 @@
   AllergyIntolerance/MedicationStatement/Condition still use generic
   `setClaim(...)`/`getClaim(...)` editing in this repo.
 
+## [1.14.6] - 2026-06-23
+
+### Fixed
+- Normalized legacy `Organization/_activate` claims before tenant vault
+  creation so missing `org.schema.Organization.address.addressCountry` no
+  longer crashes with an internal `500` before returning an
+  `OperationOutcome`.
+- Wrapped Gaia-X legal participant option generation in the activation
+  finalization path so demo/compat onboarding no longer leaks unexpected
+  exceptions during tenant provisioning.
+- Added regression coverage for the legacy activation path that previously
+  crashed while building the tenant collection name from incomplete claims.
+
 ## [1.14.5] - 2026-06-19
 
 ### Changed

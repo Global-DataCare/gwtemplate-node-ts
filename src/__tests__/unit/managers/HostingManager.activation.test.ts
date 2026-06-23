@@ -477,6 +477,40 @@ describe('HostingManager activation flow', () => {
     );
   });
 
+  it('should backfill addressCountry before tenant vault creation instead of crashing activation', async () => {
+    const job = buildActivationJob();
+    mockConfig.securityMode = 'demo';
+    const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
+    delete activationClaims[ClaimsOrganizationSchemaorg.addressCountry];
+    job.content!.body!.data[0]!.meta!.claims = activationClaims;
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+
+    const claims = entry.meta.claims;
+    const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
+      ...claims,
+      [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
+    } as any);
+    const tenantDoc = await vaultRepository.get(
+      hostCollectionName,
+      tenantUtils.getTenantVaultId(
+        claims[ClaimsServiceSchemaorg.category] as Sector,
+        claims[ClaimsOrganizationSchemaorg.alternateName] as string,
+      ),
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc;
+    expect(tenantCollectionName).toBeDefined();
+    expect(tenantDoc.content?.status).toBe('active');
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ES');
+    expect(mockLogger.error).not.toHaveBeenCalledWith(
+      'Unexpected error during registration processing:',
+      expect.anything(),
+    );
+  });
+
   it('should derive organization identifier claims from taxID when activation claims omit them', async () => {
     const job = buildActivationJob();
     const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
@@ -714,9 +748,10 @@ describe('HostingManager activation flow', () => {
     expect(controllerDidDocument.keyAgreement).toContain('did:web:people.acme.org:controllers:primary#explicit-controller-enc-kid');
 
     const icaRequestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(icaRequestBody.controller.publicKeyJwk.kid).toBe('explicit-controller-sig-kid');
-    expect(icaRequestBody.controller.sameAs).toBe(controllerSameAs);
-    expect(icaRequestBody.controller.jwks.keys[0].kid).toBe('explicit-controller-enc-kid');
+    const icaController = icaRequestBody.body?.data?.[0]?.resource?.controller;
+    expect(icaController.publicKeyJwk.kid).toBe('explicit-controller-sig-kid');
+    expect(icaController.sameAs).toBe(controllerSameAs);
+    expect(icaController.jwks.keys[0].kid).toBe('explicit-controller-enc-kid');
   });
 
   it('should poll ICA DID creation when remote endpoint responds 202', async () => {

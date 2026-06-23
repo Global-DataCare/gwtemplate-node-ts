@@ -1,3 +1,12 @@
+import {
+  EXAMPLE_CONDITION_CODE,
+  EXAMPLE_CONDITION_IDENTIFIER,
+  EXAMPLE_MEDICATION_STATEMENT_IDENTIFIER,
+  EXAMPLE_MEDICATION_STATEMENT_TEXT,
+  EXAMPLE_SUBJECT_DID,
+  HealthcareBasicSections,
+  ResourceTypesFhirR4,
+} from 'gdc-common-utils-ts';
 import { BundleEditor, BundleEditableResourceTypes } from 'gdc-common-utils-ts/utils/bundle-editor';
 import { BundleReader } from 'gdc-common-utils-ts/utils/bundle-reader';
 import { EmployeeBundleOperations } from 'gdc-common-utils-ts/utils/employee';
@@ -20,30 +29,35 @@ describe('shared bundle entry editor surface in GW', () => {
   });
 
   it('uses the generic entry editor for AllergyIntolerance, MedicationStatement, and Condition bundle claims today', () => {
-    const subjectDid = 'did:web:api.acme.org:individual:shared-editor-001';
-    const sectionClaim = 'LOINC|60591-5';
-
     const bundle = new BundleEditor()
       .setBundleOperation(EmployeeBundleOperations.create)
-      .setAllowedResourceType('AllergyIntolerance')
+      .setAllowedResourceType(ResourceTypesFhirR4.AllergyIntolerance)
       .newEntry('allergy-001')
       .setClaim('AllergyIntolerance.identifier', 'urn:uuid:allergy-001')
-      .setClaim('AllergyIntolerance.subject', subjectDid)
-      .setClaim('AllergyIntolerance.code', 'SNOMEDCT|91936005')
-      .setClaim('Composition.section', sectionClaim)
+      .setClaim('AllergyIntolerance.subject', EXAMPLE_SUBJECT_DID)
+      .setClaim(
+        'Composition.section',
+        HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
+      )
       .doneEntry()
       .newEntry('medication-001')
       .setResourceId('medication-001')
-      .setClaim('MedicationStatement.identifier', 'urn:uuid:medication-001')
-      .setClaim('MedicationStatement.subject', subjectDid)
-      .setClaim('MedicationStatement.medication-text', 'Ibuprofen 400 mg')
-      .setClaim('Composition.section', 'LOINC|10160-0')
+      .setClaim('MedicationStatement.identifier', EXAMPLE_MEDICATION_STATEMENT_IDENTIFIER)
+      .setClaim('MedicationStatement.subject', EXAMPLE_SUBJECT_DID)
+      .setClaim('MedicationStatement.medication-text', EXAMPLE_MEDICATION_STATEMENT_TEXT)
+      .setClaim(
+        'Composition.section',
+        HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+      )
       .doneEntry()
       .newEntry('condition-001')
-      .setClaim('Condition.identifier', 'urn:uuid:condition-001')
-      .setClaim('Condition.subject', subjectDid)
-      .setClaim('Condition.code', 'SNOMEDCT|44054006')
-      .setClaim('Composition.section', 'LOINC|11450-4')
+      .setClaim('Condition.identifier', EXAMPLE_CONDITION_IDENTIFIER)
+      .setClaim('Condition.subject', EXAMPLE_SUBJECT_DID)
+      .setClaim('Condition.code', EXAMPLE_CONDITION_CODE)
+      .setClaim(
+        'Composition.section',
+        HealthcareBasicSections.ProblemList.attributeValue,
+      )
       .doneEntry()
       .build();
 
@@ -63,22 +77,22 @@ describe('shared bundle entry editor surface in GW', () => {
     expect(entries[0]?.resource?.meta?.claims).toEqual(
       expect.objectContaining({
         'AllergyIntolerance.identifier': 'urn:uuid:allergy-001',
-        'AllergyIntolerance.subject': subjectDid,
-        'Composition.section': sectionClaim,
+        'AllergyIntolerance.subject': EXAMPLE_SUBJECT_DID,
+        'Composition.section': HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
       }),
     );
     expect(entries[1]?.resource?.meta?.claims).toEqual(
       expect.objectContaining({
-        'MedicationStatement.identifier': 'urn:uuid:medication-001',
-        'MedicationStatement.subject': subjectDid,
-        'MedicationStatement.medication-text': 'Ibuprofen 400 mg',
+        'MedicationStatement.identifier': EXAMPLE_MEDICATION_STATEMENT_IDENTIFIER,
+        'MedicationStatement.subject': EXAMPLE_SUBJECT_DID,
+        'MedicationStatement.medication-text': EXAMPLE_MEDICATION_STATEMENT_TEXT,
       }),
     );
     expect(entries[2]?.resource?.meta?.claims).toEqual(
       expect.objectContaining({
-        'Condition.identifier': 'urn:uuid:condition-001',
-        'Condition.subject': subjectDid,
-        'Condition.code': 'SNOMEDCT|44054006',
+        'Condition.identifier': EXAMPLE_CONDITION_IDENTIFIER,
+        'Condition.subject': EXAMPLE_SUBJECT_DID,
+        'Condition.code': EXAMPLE_CONDITION_CODE,
       }),
     );
   });
