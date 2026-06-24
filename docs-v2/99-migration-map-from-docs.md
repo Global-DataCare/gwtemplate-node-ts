@@ -19,3 +19,7 @@ Source-of-truth references used by both docs trees:
 - [101-RESOURCE_CLAIMS.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-RESOURCE_CLAIMS.md)
 - [101-IPS_COMMUNICATION_OUTBOX.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-IPS_COMMUNICATION_OUTBOX.md)
 - [API_CORE_INTEGRATION.md](../docs/API_CORE_INTEGRATION.md)
+
+Current v2 additions introduced directly in `docs-v2/*`:
+
+- [18-organization-controller-lifecycle.md](./18-organization-controller-lifecycle.md)

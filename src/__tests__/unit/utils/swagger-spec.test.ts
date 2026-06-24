@@ -93,12 +93,18 @@ describe('Swagger Spec Generation', () => {
     expect(exampleKeys).toEqual(
       expect.arrayContaining([
         'OrganizationRegistrationPlaintextMessage',
+        'OrganizationActivationPlaintextMessage',
+        'OrganizationActivationResponseBundle',
+        'OrganizationIssuePlaintextMessage',
+        'OrganizationIssueResponseBundle',
         'OrganizationVerificationTransactionPlaintextMessage',
         'OrganizationVerificationTransactionResponseBundle',
         'OrganizationOrderPlaintextMessage',
         'InitialAccessTokenExchangePlaintextMessage',
+        'InitialAccessTokenExchangeResponse',
         'FirebaseCustomTokenPlaintextMessage',
         'DeviceRegistrationPlaintextMessage',
+        'DeviceRegistrationResponse',
         'SmartTokenRequestPlaintextMessage',
         'EmployeeRegistrationPlaintextMessage',
         'FamilyRegistrationPlaintextMessage',
@@ -116,12 +122,18 @@ describe('Swagger Spec Generation', () => {
     );
     for (const key of [
       'OrganizationRegistrationPlaintextMessage',
+      'OrganizationActivationPlaintextMessage',
+      'OrganizationActivationResponseBundle',
+      'OrganizationIssuePlaintextMessage',
+      'OrganizationIssueResponseBundle',
       'OrganizationVerificationTransactionPlaintextMessage',
       'OrganizationVerificationTransactionResponseBundle',
       'OrganizationOrderPlaintextMessage',
       'InitialAccessTokenExchangePlaintextMessage',
+      'InitialAccessTokenExchangeResponse',
       'FirebaseCustomTokenPlaintextMessage',
       'DeviceRegistrationPlaintextMessage',
+      'DeviceRegistrationResponse',
       'SmartTokenRequestPlaintextMessage',
       'EmployeeRegistrationPlaintextMessage',
       'FamilyRegistrationPlaintextMessage',
@@ -139,6 +151,31 @@ describe('Swagger Spec Generation', () => {
       expect(spec.components.examples[key]?.value).toBeDefined();
       expect(Object.keys(spec.components.examples[key].value || {}).length).toBeGreaterThan(0);
     }
+
+    expect(
+      spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate']
+        ?.post?.requestBody?.content?.['application/didcomm-plain+json']?.examples?.message?.$ref,
+    ).toBe('#/components/examples/OrganizationActivationPlaintextMessage');
+    expect(
+      spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_issue']
+        ?.post?.requestBody?.content?.['application/didcomm-plain+json']?.examples?.message?.$ref,
+    ).toBe('#/components/examples/OrganizationIssuePlaintextMessage');
+    expect(
+      spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_issue-response']
+        ?.post?.responses?.['200']?.content?.['application/json']?.examples?.message?.$ref,
+    ).toBe('#/components/examples/OrganizationIssueResponseBundle');
+    expect(
+      spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response']
+        ?.post?.responses?.['200']?.content?.['application/json']?.examples?.message?.$ref,
+    ).toBe('#/components/examples/OrganizationActivationResponseBundle');
+    expect(
+      spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response']
+        ?.post?.responses?.['200']?.content?.['application/json']?.examples?.message?.$ref,
+    ).toBe('#/components/examples/InitialAccessTokenExchangeResponse');
+    expect(
+      spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response']
+        ?.post?.responses?.['200']?.content?.['application/json']?.examples?.message?.$ref,
+    ).toBe('#/components/examples/DeviceRegistrationResponse');
 
     const familyClaims =
       spec.components.examples.FamilyRegistrationPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;

@@ -388,6 +388,85 @@ export const ORGANIZATION_ACTIVATION_REQUEST = {
   "meta": { ...metaRequestBodyFullJWK }
 };
 
+/**
+ * Canonical legacy `_activate-response` shape.
+ *
+ * The activation output must preserve the host continuation contract by
+ * returning the generated Offer identifier required by `Order/_batch`.
+ */
+export const ORGANIZATION_ACTIVATION_RESPONSE = {
+  "jti": "org-activation-response-<test-id>",
+  "thid": "org-activation-thread-<test-id>",
+  "aud": "urn:ietf:params:oauth:jwk-thumbprint:sha-256:<controller-signing-thumbprint>",
+  "iss": "did:web:host.example.com",
+  "exp": 1678886460,
+  "iat": 1678886400,
+  "nbf": 1678886400,
+  "type": "application/json",
+  "body": {
+    "resourceType": "Bundle",
+    "type": "batch-response",
+    "total": 1,
+    "data": [
+      {
+        "type": "Organization-activation-response-v1.0",
+        "meta": {
+          "claims": {
+            "@context": "org.schema",
+            ...testClaimsRegisterTenantExpanded,
+            "org.schema.Organization.alternateName": "acme-health",
+            "org.schema.Offer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>"
+          }
+        },
+        "response": { "status": "200" }
+      }
+    ]
+  }
+};
+
+/**
+ * Canonical `_issue-response` shape for controller recovery/rebind.
+ */
+export const ORGANIZATION_ISSUE_RESPONSE = {
+  "jti": "organization-issue-response-<test-id>",
+  "thid": "organization-issue-thread-<test-id>",
+  "iss": "did:web:host.example.org",
+  "aud": "did:web:portal.example.org",
+  "type": "hosting-response",
+  "body": {
+    "resourceType": "Bundle",
+    "type": "transaction-response",
+    "total": 1,
+    "data": [{
+      "type": "Organization-issue-response-v1.0",
+      "meta": {
+        "claims": {
+          "@context": "org.schema",
+          ...testClaimsRegisterTenantExpanded,
+          "org.schema.Organization.alternateName": "acme-health",
+          "org.schema.IndividualProduct.serialNumber": "lic-reactivation-code-001",
+          "org.schema.IndividualProduct.category": "professional",
+          "org.schema.IndividualProduct.additionalType": "mobile"
+        }
+      },
+      "resource": {
+        "icaResponse": {
+          "resourceType": "Bundle",
+          "type": "batch-response",
+          "total": 1,
+          "data": [{
+            "type": "VerifyResponse-v1.0",
+            "resource": {
+              "resourceType": "Bundle"
+            }
+          }]
+        }
+      },
+      "response": { "status": "200" }
+    }]
+  }
+};
+
 // --- Async Polling (HTTP-level payloads) ---
 
 export const ASYNC_POLL_REQUEST = {
@@ -435,6 +514,10 @@ export const TOKEN_EXCHANGE_POLL_REQUEST = {
   "thid": "token-exchange-thread-<test-id>",
 };
 
+export const DEVICE_REGISTRATION_POLL_REQUEST = {
+  "thid": "device-registration-thread-<test-id>",
+};
+
 export const TENANT_ORGANIZATION_POLL_REQUEST = {
   "thid": "tenant-organization-thread-<test-id>",
 };
@@ -446,6 +529,8 @@ export const TENANT_ORDER_POLL_REQUEST = {
 // For legacy/plaintext submissions, the polling endpoint returns the decoded business `body` only.
 export const ORGANIZATION_REGISTRATION_POLL_RESULT_BODY = ORGANIZATION_REGISTRATION_RESPONSE.body;
 export const ORGANIZATION_ORDER_POLL_RESULT_BODY = ORGANIZATION_ORDER_RESPONSE.body;
+export const ORGANIZATION_ACTIVATION_POLL_RESULT_BODY = ORGANIZATION_ACTIVATION_RESPONSE.body;
+export const ORGANIZATION_ISSUE_POLL_RESULT_BODY = ORGANIZATION_ISSUE_RESPONSE.body;
 
 // For secure submissions, the polling endpoint returns a form-encoded `response=<jwe>`.
 export const ASYNC_POLL_SECURE_RESPONSE_FORM = {
@@ -507,6 +592,23 @@ export const DEVICE_REGISTRATION_RESPONSE = {
   "type": "application/json",
   "body": {
     "client_id": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>"
+  }
+};
+
+/**
+ * The final response to a successful activation-code exchange.
+ */
+export const INITIAL_ACCESS_TOKEN_EXCHANGE_RESPONSE = {
+  "jti": "token-exchange-response-<test-id>",
+  "thid": "token-exchange-thread-<test-id>",
+  "aud": "urn:ietf:rfc:7638:thumbprint-public-enc-key-device",
+  "iss": "did:web:api.acme.org",
+  "exp": 1678886460,
+  "iat": 1678886400,
+  "nbf": 1678886400,
+  "type": "application/json",
+  "body": {
+    "initial_access_token": "initial-access-token-001"
   }
 };
 
@@ -784,6 +886,17 @@ export const ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST = {
   body: organizationVerificationTransactionBody,
   attachments: organizationVerificationTransactionAttachments,
   meta: { ...metaRequestBodyFullJWK },
+};
+
+/**
+ * Existing-tenant recovery request. The payload family intentionally matches
+ * `_transaction` because GW forwards the same legal evidence set to ICA
+ * `_verify`, but the continuation semantics differ: no new Offer is created.
+ */
+export const ORGANIZATION_ISSUE_REQUEST = {
+  ...ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST,
+  jti: 'organization-issue-request-<test-id>',
+  thid: 'organization-issue-thread-<test-id>',
 };
 
 /**

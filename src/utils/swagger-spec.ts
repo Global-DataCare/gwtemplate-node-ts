@@ -32,8 +32,14 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
     examples.ORGANIZATION_REGISTRATION_REQUEST;
   swaggerDefinition.components.examples.OrganizationActivationPlaintextMessage.value =
     examples.ORGANIZATION_ACTIVATION_REQUEST;
+  swaggerDefinition.components.examples.OrganizationActivationResponseBundle.value =
+    examples.ORGANIZATION_ACTIVATION_RESPONSE;
   swaggerDefinition.components.examples.OrganizationVerificationTransactionPlaintextMessage.value =
     examples.ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST;
+  swaggerDefinition.components.examples.OrganizationIssuePlaintextMessage.value =
+    examples.ORGANIZATION_ISSUE_REQUEST;
+  swaggerDefinition.components.examples.OrganizationIssueResponseBundle.value =
+    examples.ORGANIZATION_ISSUE_RESPONSE;
   swaggerDefinition.components.examples.OrganizationVerificationTransactionResponseBundle.value =
     examples.ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE;
   swaggerDefinition.components.examples.OrganizationOrderPlaintextMessage.value =
@@ -42,6 +48,8 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
     examples.ORGANIZATION_ORDER_RESPONSE;
   swaggerDefinition.components.examples.InitialAccessTokenExchangePlaintextMessage.value =
     examples.INITIAL_ACCESS_TOKEN_EXCHANGE_REQUEST;
+  swaggerDefinition.components.examples.InitialAccessTokenExchangeResponse.value =
+    examples.INITIAL_ACCESS_TOKEN_EXCHANGE_RESPONSE;
   swaggerDefinition.components.examples.LicenseIssuePlaintextMessage.value =
     examples.LICENSE_ISSUE_REQUEST;
   swaggerDefinition.components.examples.LicenseIssueExistingEmployeePlaintextMessage.value =
@@ -50,6 +58,8 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
     examples.FIREBASE_CUSTOM_TOKEN_REQUEST;
   swaggerDefinition.components.examples.DeviceRegistrationPlaintextMessage.value =
     examples.DEVICE_REGISTRATION_REQUEST;
+  swaggerDefinition.components.examples.DeviceRegistrationResponse.value =
+    examples.DEVICE_REGISTRATION_RESPONSE;
   swaggerDefinition.components.examples.SmartTokenRequestPlaintextMessage.value =
     examples.SMART_TOKEN_REQUEST;
   swaggerDefinition.components.examples.EmployeeRegistrationPlaintextMessage.value =

@@ -241,10 +241,28 @@ const swaggerDefinition = {
           'A DIDComm-like message wrapper for legacy compatibility `Organization/_activate`. Canonical proof is `body.vp_token`, `controller.*` carries explicit controller key binding material, `SoftwareApplication.material` denotes the public cryptographic material of the software application when ICA issues that VC, and `organizationCredential` / `representativeCredential` are deprecated legacy compatibility fields. This route is not required after a successful `Organization/_transaction`.',
         value: {},
       },
+      OrganizationActivationResponseBundle: {
+        summary: 'Organization Activation Response Bundle',
+        description:
+          'Async `_activate-response` bundle. It returns the generated host Offer claims required by the following `Order/_batch` step.',
+        value: {},
+      },
       OrganizationVerificationTransactionPlaintextMessage: {
         summary: 'Plaintext Message for Organization Verification Transaction',
         description:
           'A DIDComm-like message wrapper for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This is the canonical legal-organization onboarding route and does not require `_activate` as a follow-up step.',
+        value: {},
+      },
+      OrganizationIssuePlaintextMessage: {
+        summary: 'Plaintext Message for Organization Reissue / Recovery',
+        description:
+          'A DIDComm-like message wrapper for host `Organization/_issue`. It resubmits legal evidence for an existing tenant and reissues one controller activation code without creating a new Offer.',
+        value: {},
+      },
+      OrganizationIssueResponseBundle: {
+        summary: 'Organization Issue Response Bundle',
+        description:
+          'Async `_issue-response` bundle. It preserves the ICA verification output and returns one reissued controller activation code in `meta.claims`.',
         value: {},
       },
       OrganizationVerificationTransactionResponseBundle: {
@@ -271,6 +289,12 @@ const swaggerDefinition = {
           'A DIDComm-like message wrapper containing `subject_token` (activation code). `subject_token` must be a JSON string (quoted); use {{activationCode}} placeholder in Swagger UI.',
         value: {},
       },
+      InitialAccessTokenExchangeResponse: {
+        summary: 'Initial Access Token Exchange Response',
+        description:
+          'Completed `_exchange-response` payload returning the `initial_access_token` required by the following DCR request.',
+        value: {},
+      },
       LicenseIssuePlaintextMessage: {
         summary: 'Plaintext Message for License Issue',
         description:
@@ -291,6 +315,12 @@ const swaggerDefinition = {
       DeviceRegistrationPlaintextMessage: {
         summary: 'Plaintext Message for Device Registration (DCR)',
         description: 'A DIDComm-like message wrapper containing the OpenID DCR request body.',
+        value: {},
+      },
+      DeviceRegistrationResponse: {
+        summary: 'Device Registration Response',
+        description:
+          'Completed `_dcr-response` payload returning the registered `client_id` for the current device/app.',
         value: {},
       },
       SmartTokenRequestPlaintextMessage: {

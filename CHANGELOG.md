@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+### Added
+- Added a dedicated `docs-v2/18-organization-controller-lifecycle.md` guide
+  that explains the narrow controller recovery/rebind lifecycle, the direct GW
+  route order, and the relationship to the canonical `gdc-sdk-node-ts`
+  executable proof.
+
+### Changed
+- Extended the generated Swagger/OpenAPI examples so the organization
+  controller lifecycle now exposes explicit request, poll-request, and
+  completed poll-response examples for:
+  - `Organization/_issue`
+  - `Organization/_activate`
+  - `Token/_exchange-response`
+  - `Device/_dcr-response`
+- Aligned both Swagger generation paths
+  (`src/utils/swagger-spec.ts` and `scripts/generate-swagger-spec.mts`) so
+  tests and generated profile documents consume the same organization
+  controller example set.
+
 ## [1.14.9] - 2026-06-24
 
 ### Changed

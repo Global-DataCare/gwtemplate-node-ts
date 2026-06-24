@@ -672,6 +672,9 @@ export function createApiRouter(
    *         application/didcomm-plain+json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/OrganizationActivationPlaintextMessage'
    *         application/json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
@@ -728,7 +731,7 @@ export function createApiRouter(
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
    *           examples:
    *             message:
-   *               $ref: '#/components/examples/OrganizationVerificationTransactionPlaintextMessage'
+   *               $ref: '#/components/examples/OrganizationIssuePlaintextMessage'
    *         application/json:
    *           schema:
    *             $ref: '#/components/schemas/DidcommPlaintextMessage'
@@ -799,6 +802,8 @@ export function createApiRouter(
    *         content:
    *           application/json:
    *             schema: { type: object }
+   *             examples:
+   *               message: { $ref: '#/components/examples/OrganizationIssueResponseBundle' }
    *       '400': { description: Missing or invalid thid. }
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }
@@ -1139,7 +1144,13 @@ export function createApiRouter(
    *             message: { $ref: '#/components/examples/ConsentPollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
-   *       '200': { description: Completed. }
+   *       '200':
+   *         description: Completed.
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *             examples:
+   *               message: { $ref: '#/components/examples/InitialAccessTokenExchangeResponse' }
    *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange:
    *   post:
@@ -1227,8 +1238,8 @@ export function createApiRouter(
    *     responses:
    *       '202': { description: Accepted. Poll the Location URL for the result. }
    *
-   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response:
-   *   post:
+ * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response:
+ *   post:
    *     tags:
    *       - 2.1.2 Initial Access Token Exchange
    *     summary: Poll the initial_access_token exchange result
@@ -1253,7 +1264,13 @@ export function createApiRouter(
    *             message: { $ref: '#/components/examples/TokenExchangePollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
-   *       '200': { description: Completed. }
+   *       '200':
+   *         description: Completed.
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *             examples:
+   *               message: { $ref: '#/components/examples/InitialAccessTokenExchangeResponse' }
    *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Person/_batch:
    *   post:
@@ -2059,11 +2076,21 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/AsyncPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/AsyncPollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
-   *       '200': { description: Completed. Returns either JSON (plaintext) or `response=<jwe>` (secure). }
+   *       '200':
+   *         description: Completed. Returns either JSON (plaintext) or `response=<jwe>` (secure).
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *             examples:
+   *               message: { $ref: '#/components/examples/OrganizationActivationResponseBundle' }
    *       '400': { description: Missing or invalid thid. }
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }
@@ -2336,11 +2363,21 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/DeviceRegistrationPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/DeviceRegistrationPollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
-   *       '200': { description: Completed. }
+   *       '200':
+   *         description: Completed.
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *             examples:
+   *               message: { $ref: '#/components/examples/DeviceRegistrationResponse' }
    *       '400': { description: Missing or invalid thid. }
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }
@@ -2386,8 +2423,8 @@ export function createApiRouter(
    *     responses:
    *       '202': { description: Accepted. Poll the Location URL for the result. }
    *
-   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response:
-   *   post:
+ * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response:
+ *   post:
    *     tags:
    *       - 2.1.3 Device Registration (DCR)
    *     summary: Poll the device registration (DCR) result
@@ -2404,11 +2441,21 @@ export function createApiRouter(
    *       content:
    *         application/json:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/DeviceRegistrationPollRequest' }
    *         application/x-www-form-urlencoded:
    *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/DeviceRegistrationPollRequest' }
    *     responses:
    *       '202': { description: Pending. Retry later. }
-   *       '200': { description: Completed. }
+   *       '200':
+   *         description: Completed.
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *             examples:
+   *               message: { $ref: '#/components/examples/DeviceRegistrationResponse' }
    *       '400': { description: Missing or invalid thid. }
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }

@@ -4,7 +4,7 @@
     "title": "Gateway API - COMPAT",
     "version": "1.0.3",
     "description": "Compatibility profile including legacy and alias routes on top of the core flow.",
-    "x-profile-generated-at": "2026-06-24T07:44:21.584Z",
+    "x-profile-generated-at": "2026-06-24T11:09:13.433Z",
     "x-profile-name": "compat"
   },
   "servers": [],
@@ -437,15 +437,394 @@
           }
         }
       },
+      "OrganizationActivationResponseBundle": {
+        "summary": "Organization Activation Response Bundle",
+        "description": "Async `_activate-response` bundle. It returns the generated host Offer claims required by the following `Order/_batch` step.",
+        "value": {
+          "jti": "org-activation-response-<test-id>",
+          "thid": "org-activation-thread-<test-id>",
+          "aud": "urn:ietf:params:oauth:jwk-thumbprint:sha-256:<controller-signing-thumbprint>",
+          "iss": "did:web:host.example.com",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/json",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "batch-response",
+            "total": 1,
+            "data": [
+              {
+                "type": "Organization-activation-response-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.alternateName": "acme-health",
+                    "org.schema.Organization.identifier.additionalType": "TAX",
+                    "org.schema.Organization.identifier.value": "acme-id",
+                    "org.schema.Organization.legalName": "Acme Organization SL",
+                    "org.schema.Organization.name": "Acme Org",
+                    "org.schema.Organization.numberOfEmployees.value": 2,
+                    "org.schema.Organization.url": "api.acme.org",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
+                    "org.schema.Offer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>"
+                  }
+                },
+                "response": {
+                  "status": "200"
+                }
+              }
+            ]
+          }
+        }
+      },
       "OrganizationVerificationTransactionPlaintextMessage": {
         "summary": "Plaintext Message for Organization Verification Transaction",
         "description": "A DIDComm-like message wrapper for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This is the canonical legal-organization onboarding route and does not require `_activate` as a follow-up step.",
-        "value": {}
+        "value": {
+          "jti": "organization-verification-transaction-request-<test-id>",
+          "thid": "organization-verification-transaction-thread-<test-id>",
+          "iss": "did:web:portal.example.org",
+          "aud": "did:web:host.example.org",
+          "type": "application/api+json",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "collection",
+            "total": 1,
+            "data": [
+              {
+                "type": "Organization-verification-transaction-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "org.schema.Organization.legalName": "ACME HEALTH SL",
+                    "org.schema.Organization.identifier.additionalType": "taxID",
+                    "org.schema.Organization.identifier.value": "VATES-B00112233",
+                    "org.schema.Organization.taxID": "VATES-B00112233",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Person.email": "controller@example.org",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:tenant.example.org",
+                    "org.schema.Service.url": "https://operator.example.net/acme/cds-es/v1/health-care",
+                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs"
+                  }
+                },
+                "resource": {
+                  "controller": {
+                    "did": "did:key:zDnaekW6GaRk6x9t6yC3r5vQk4wMdx0controller",
+                    "publicKeyJwk": {
+                      "kid": "controller-signing-es384-001",
+                      "kty": "EC",
+                      "crv": "P-384",
+                      "x": "<controller-sign-x>",
+                      "y": "<controller-sign-y>",
+                      "alg": "ES384",
+                      "use": "sig"
+                    }
+                  },
+                  "organization": {
+                    "did": "did:web:tenant.example.org",
+                    "publicKeyJwk": {
+                      "kid": "organization-signing-es384-001",
+                      "kty": "EC",
+                      "crv": "P-384",
+                      "x": "<organization-sign-x>",
+                      "y": "<organization-sign-y>",
+                      "alg": "ES384",
+                      "use": "sig"
+                    }
+                  },
+                  "legalRepresentativePayload": {
+                    "email": "controller@example.org"
+                  },
+                  "verification": {
+                    "resourceType": "contract"
+                  }
+                }
+              }
+            ]
+          },
+          "attachments": [
+            {
+              "id": "signed-terms-pdf-001",
+              "media_type": "application/pdf",
+              "data": {
+                "links": [
+                  "https://portal.example.org/files/legal-organization-signed-terms.pdf"
+                ]
+              }
+            }
+          ],
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
+                "jwk": {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device"
+                }
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plain+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device",
+                "jwk": {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device"
+                }
+              }
+            }
+          }
+        }
+      },
+      "OrganizationIssuePlaintextMessage": {
+        "summary": "Plaintext Message for Organization Reissue / Recovery",
+        "description": "A DIDComm-like message wrapper for host `Organization/_issue`. It resubmits legal evidence for an existing tenant and reissues one controller activation code without creating a new Offer.",
+        "value": {
+          "jti": "organization-issue-request-<test-id>",
+          "thid": "organization-issue-thread-<test-id>",
+          "iss": "did:web:portal.example.org",
+          "aud": "did:web:host.example.org",
+          "type": "application/api+json",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "collection",
+            "total": 1,
+            "data": [
+              {
+                "type": "Organization-verification-transaction-request-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "org.schema.Organization.legalName": "ACME HEALTH SL",
+                    "org.schema.Organization.identifier.additionalType": "taxID",
+                    "org.schema.Organization.identifier.value": "VATES-B00112233",
+                    "org.schema.Organization.taxID": "VATES-B00112233",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Person.email": "controller@example.org",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:tenant.example.org",
+                    "org.schema.Service.url": "https://operator.example.net/acme/cds-es/v1/health-care",
+                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs"
+                  }
+                },
+                "resource": {
+                  "controller": {
+                    "did": "did:key:zDnaekW6GaRk6x9t6yC3r5vQk4wMdx0controller",
+                    "publicKeyJwk": {
+                      "kid": "controller-signing-es384-001",
+                      "kty": "EC",
+                      "crv": "P-384",
+                      "x": "<controller-sign-x>",
+                      "y": "<controller-sign-y>",
+                      "alg": "ES384",
+                      "use": "sig"
+                    }
+                  },
+                  "organization": {
+                    "did": "did:web:tenant.example.org",
+                    "publicKeyJwk": {
+                      "kid": "organization-signing-es384-001",
+                      "kty": "EC",
+                      "crv": "P-384",
+                      "x": "<organization-sign-x>",
+                      "y": "<organization-sign-y>",
+                      "alg": "ES384",
+                      "use": "sig"
+                    }
+                  },
+                  "legalRepresentativePayload": {
+                    "email": "controller@example.org"
+                  },
+                  "verification": {
+                    "resourceType": "contract"
+                  }
+                }
+              }
+            ]
+          },
+          "attachments": [
+            {
+              "id": "signed-terms-pdf-001",
+              "media_type": "application/pdf",
+              "data": {
+                "links": [
+                  "https://portal.example.org/files/legal-organization-signed-terms.pdf"
+                ]
+              }
+            }
+          ],
+          "meta": {
+            "jwe": {
+              "header": {
+                "typ": "application/didcomm-encrypted+json",
+                "cty": "JWS",
+                "enc": "A256GCM",
+                "alg": "ML-KEM-768",
+                "kid": "thumbprint-public-enc-key-recipient",
+                "skid": "thumbprint-public-enc-key-device",
+                "jwk": {
+                  "crv": "ML-KEM-768",
+                  "kty": "OKP",
+                  "x": "base64url-public-enc-key-device"
+                }
+              }
+            },
+            "jws": {
+              "protected": {
+                "typ": "application/didcomm-signed+json",
+                "cty": "application/didcomm-plain+json",
+                "alg": "ML-DSA-44",
+                "kid": "thumbprint-public-sig-key-device",
+                "jwk": {
+                  "alg": "ML-DSA-44",
+                  "kty": "AKP",
+                  "pub": "base64url-public-sig-key-device"
+                }
+              }
+            }
+          }
+        }
+      },
+      "OrganizationIssueResponseBundle": {
+        "summary": "Organization Issue Response Bundle",
+        "description": "Async `_issue-response` bundle. It preserves the ICA verification output and returns one reissued controller activation code in `meta.claims`.",
+        "value": {
+          "jti": "organization-issue-response-<test-id>",
+          "thid": "organization-issue-thread-<test-id>",
+          "iss": "did:web:host.example.org",
+          "aud": "did:web:portal.example.org",
+          "type": "hosting-response",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "transaction-response",
+            "total": 1,
+            "data": [
+              {
+                "type": "Organization-issue-response-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.alternateName": "acme-health",
+                    "org.schema.Organization.identifier.additionalType": "TAX",
+                    "org.schema.Organization.identifier.value": "acme-id",
+                    "org.schema.Organization.legalName": "Acme Organization SL",
+                    "org.schema.Organization.name": "Acme Org",
+                    "org.schema.Organization.numberOfEmployees.value": 2,
+                    "org.schema.Organization.url": "api.acme.org",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
+                    "org.schema.IndividualProduct.serialNumber": "lic-reactivation-code-001",
+                    "org.schema.IndividualProduct.category": "professional",
+                    "org.schema.IndividualProduct.additionalType": "mobile"
+                  }
+                },
+                "resource": {
+                  "icaResponse": {
+                    "resourceType": "Bundle",
+                    "type": "batch-response",
+                    "total": 1,
+                    "data": [
+                      {
+                        "type": "VerifyResponse-v1.0",
+                        "resource": {
+                          "resourceType": "Bundle"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "response": {
+                  "status": "200"
+                }
+              }
+            ]
+          }
+        }
       },
       "OrganizationVerificationTransactionResponseBundle": {
         "summary": "Organization Verification Transaction Response Bundle",
         "description": "Async `_transaction-response` bundle. It preserves the ICA verification bundle in `resource.icaResponse`, returns the generated host Offer claims in `meta.claims`, and makes the next host step explicit in `resource.next` so the caller can continue with `Order/_batch` without requiring legacy `_activate`.",
-        "value": {}
+        "value": {
+          "jti": "organization-verification-transaction-response-<test-id>",
+          "thid": "organization-verification-transaction-thread-<test-id>",
+          "iss": "did:web:host.example.org",
+          "aud": "did:web:portal.example.org",
+          "type": "hosting-response",
+          "body": {
+            "resourceType": "Bundle",
+            "type": "transaction-response",
+            "total": 1,
+            "data": [
+              {
+                "type": "Organization-verification-transaction-response-v1.0",
+                "meta": {
+                  "claims": {
+                    "@context": "org.schema",
+                    "org.schema.Organization.address.addressCountry": "ES",
+                    "org.schema.Organization.alternateName": "acme-health",
+                    "org.schema.Organization.identifier.additionalType": "TAX",
+                    "org.schema.Organization.identifier.value": "acme-id",
+                    "org.schema.Organization.legalName": "Acme Organization SL",
+                    "org.schema.Organization.name": "Acme Org",
+                    "org.schema.Organization.numberOfEmployees.value": 2,
+                    "org.schema.Organization.url": "api.acme.org",
+                    "org.schema.Person.email": "admin1@acme.org",
+                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                    "org.schema.Service.category": "health-care",
+                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
+                    "org.schema.Offer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>"
+                  }
+                },
+                "resource": {
+                  "icaResponse": {
+                    "resourceType": "Bundle",
+                    "type": "batch-response",
+                    "total": 1,
+                    "data": [
+                      {
+                        "type": "VerifyResponse-v1.0",
+                        "resource": {
+                          "resourceType": "Bundle"
+                        }
+                      }
+                    ]
+                  },
+                  "next": {
+                    "action": "Order/_batch",
+                    "acceptedOffer": {
+                      "identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>",
+                      "identifierClaim": "org.schema.Order.acceptedOffer.identifier"
+                    }
+                  }
+                },
+                "response": {
+                  "status": "200"
+                }
+              }
+            ]
+          }
+        }
       },
       "OrganizationOrderPlaintextMessage": {
         "summary": "Plaintext Message for Organization Order",
@@ -549,6 +928,23 @@
           "type": "application/json",
           "body": {
             "subject_token": "{{activationCode}}"
+          }
+        }
+      },
+      "InitialAccessTokenExchangeResponse": {
+        "summary": "Initial Access Token Exchange Response",
+        "description": "Completed `_exchange-response` payload returning the `initial_access_token` required by the following DCR request.",
+        "value": {
+          "jti": "token-exchange-response-<test-id>",
+          "thid": "token-exchange-thread-<test-id>",
+          "aud": "urn:ietf:rfc:7638:thumbprint-public-enc-key-device",
+          "iss": "did:web:api.acme.org",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/json",
+          "body": {
+            "initial_access_token": "initial-access-token-001"
           }
         }
       },
@@ -684,6 +1080,23 @@
                 }
               ]
             }
+          }
+        }
+      },
+      "DeviceRegistrationResponse": {
+        "summary": "Device Registration Response",
+        "description": "Completed `_dcr-response` payload returning the registered `client_id` for the current device/app.",
+        "value": {
+          "jti": "device-registration-response-<test-id>",
+          "thid": "device-registration-thread-<test-id>",
+          "aud": "urn:ietf:rfc:7638:thumbprint-public-enc-key-device",
+          "iss": "did:web:api.acme.org",
+          "exp": 1678886460,
+          "iat": 1678886400,
+          "nbf": 1678886400,
+          "type": "application/json",
+          "body": {
+            "client_id": "did:web:api.acme.org:employee:admin1@acme.org:device:<uuid>"
           }
         }
       },
@@ -2490,6 +2903,11 @@
             "application/didcomm-plain+json": {
               "schema": {
                 "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/OrganizationActivationPlaintextMessage"
+                }
               }
             },
             "application/json": {
@@ -2557,7 +2975,7 @@
               },
               "examples": {
                 "message": {
-                  "$ref": "#/components/examples/OrganizationVerificationTransactionPlaintextMessage"
+                  "$ref": "#/components/examples/OrganizationIssuePlaintextMessage"
                 }
               }
             },
@@ -2656,6 +3074,11 @@
               "application/json": {
                 "schema": {
                   "type": "object"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/OrganizationIssueResponseBundle"
+                  }
                 }
               }
             }
@@ -3245,7 +3668,19 @@
         },
         "responses": {
           "200": {
-            "description": "Completed."
+            "description": "Completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DidcommPlaintextMessage"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/InitialAccessTokenExchangeResponse"
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Pending. Retry later."
@@ -3457,7 +3892,19 @@
         },
         "responses": {
           "200": {
-            "description": "Completed."
+            "description": "Completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DidcommPlaintextMessage"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/InitialAccessTokenExchangeResponse"
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Pending. Retry later."
@@ -4463,18 +4910,40 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/AsyncPollRequest"
+                }
               }
             },
             "application/x-www-form-urlencoded": {
               "schema": {
                 "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/AsyncPollRequest"
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Completed. Returns either JSON (plaintext) or `response=<jwe>` (secure)."
+            "description": "Completed. Returns either JSON (plaintext) or `response=<jwe>` (secure).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DidcommPlaintextMessage"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/OrganizationActivationResponseBundle"
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Pending. Retry later."
@@ -4951,18 +5420,40 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/DeviceRegistrationPollRequest"
+                }
               }
             },
             "application/x-www-form-urlencoded": {
               "schema": {
                 "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/DeviceRegistrationPollRequest"
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Completed."
+            "description": "Completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DidcommPlaintextMessage"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/DeviceRegistrationResponse"
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Pending. Retry later."
@@ -5077,18 +5568,40 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/DeviceRegistrationPollRequest"
+                }
               }
             },
             "application/x-www-form-urlencoded": {
               "schema": {
                 "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/DeviceRegistrationPollRequest"
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Completed."
+            "description": "Completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DidcommPlaintextMessage"
+                },
+                "examples": {
+                  "message": {
+                    "$ref": "#/components/examples/DeviceRegistrationResponse"
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Pending. Retry later."
