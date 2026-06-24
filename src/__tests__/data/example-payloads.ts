@@ -920,6 +920,15 @@ export const ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE = {
     total: 1,
     data: [{
       type: 'Organization-verification-transaction-response-v1.0',
+      vc: [{
+        resourceType: 'Organization',
+        id: 'urn:uuid:org-vc-001',
+        type: ['VerifiableCredential', 'OrganizationCredential'],
+        credentialSubject: {
+          id: 'did:web:globaldatacare.es:onehealth:organization:taxid:VATES-B00112233',
+          taxID: 'VATES-B00112233',
+        },
+      }],
       meta: {
         claims: {
           '@context': 'org.schema',

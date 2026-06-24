@@ -4,6 +4,10 @@ import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
+import {
+  extractRepresentativeMemberOfTaxId,
+  normalizeTaxIdentifier,
+} from 'gdc-common-utils-ts/utils/activation-policy';
 import { OrganizationConfig } from '../../gdc-backend-utils-node/models/entity';
 import { EntityLifecycleStatus } from '../../gdc-backend-utils-node/models/enums';
 import type { IServerConfig } from '../../config';
@@ -37,6 +41,10 @@ type TenantDescendantLifecycleSummary = {
 type HostedTenantRegistrySummary = {
   registeredHostedTenants: number;
 };
+type LifecycleAuthorizationContext = {
+  actorDid?: string;
+  bearerPayload?: Record<string, unknown>;
+};
 
 /**
  * Technical marker copied to `ConfidentialStorageDoc.public.role` for the
@@ -61,10 +69,15 @@ export class HostingLifecycleService {
   async processOrganizationLifecycle(job: JobRequest): Promise<any> {
     const jobEntries = job?.content?.body?.data || [];
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
+    const authorization = this.resolveLifecycleAuthorization(job);
 
     for (const entry of jobEntries) {
       try {
-        const resultEntry = await this.processLifecycleEntry(entry, job.action as TenantLifecycleAction, job.content?.iss);
+        const resultEntry = await this.processLifecycleEntry(
+          entry,
+          job.action as TenantLifecycleAction,
+          authorization,
+        );
         responseEntries.push(resultEntry);
       } catch (error) {
         responseEntries.push(this.handleError(error, entry?.type || 'Organization', entry?.meta));
@@ -91,7 +104,7 @@ export class HostingLifecycleService {
   private async processLifecycleEntry(
     entry: BundleEntry,
     action: TenantLifecycleAction,
-    actorDid?: string,
+    authorization: LifecycleAuthorizationContext,
   ): Promise<BundleEntry | ErrorEntry> {
     const rawClaims = entry?.meta?.claims || entry?.resource?.meta?.claims;
     const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : undefined;
@@ -131,6 +144,12 @@ export class HostingLifecycleService {
     }
     const currentStatus = getTenantAuthorizationStatus(tenantConfig);
     const isHostLifecycle = vaultId === 'host';
+    if (!isHostLifecycle && (action === ACTION_DISABLE || action === ACTION_PURGE)) {
+      this.assertControllerProofBearerTenantBinding(
+        authorization.bearerPayload,
+        identifierValue,
+      );
+    }
     if (action === ACTION_PURGE) {
       if (isHostLifecycle) {
         await this.assertHostLifecycleAllowed(action, hostCollectionName);
@@ -147,7 +166,7 @@ export class HostingLifecycleService {
               ...claims,
               'org.schema.Organization.identifier.value': identifierValue,
               'org.schema.Action.tenantAuthorization.status': 'revoked',
-              'org.schema.Action.tenantAuthorization.changedBy': actorDid || '',
+              'org.schema.Action.tenantAuthorization.changedBy': authorization.actorDid || '',
               'org.schema.Action.tenantAuthorization.lifecycleDisposition': 'purged',
             },
           },
@@ -176,7 +195,7 @@ export class HostingLifecycleService {
             ...claims,
             'org.schema.Organization.identifier.value': identifierValue,
             'org.schema.Action.tenantAuthorization.status': 'revoked',
-            'org.schema.Action.tenantAuthorization.changedBy': actorDid || '',
+            'org.schema.Action.tenantAuthorization.changedBy': authorization.actorDid || '',
             'org.schema.Action.tenantAuthorization.lifecycleDisposition': 'purged',
           },
         },
@@ -194,7 +213,7 @@ export class HostingLifecycleService {
     } else {
       await this.assertTenantDisableAllowed(action, vaultId);
     }
-    const updatedConfig = applyTenantAuthorizationStatus(tenantConfig, nextStatus, actorDid);
+    const updatedConfig = applyTenantAuthorizationStatus(tenantConfig, nextStatus, authorization.actorDid);
     const existing = isHostLifecycle
       ? await this.vaultRepository.get<any>(hostCollectionName, 'host', getEnvSectionId('tenants'))
       : (await this.vaultRepository.query(
@@ -222,7 +241,7 @@ export class HostingLifecycleService {
           ...claims,
           'org.schema.Organization.identifier.value': identifierValue,
           'org.schema.Action.tenantAuthorization.status': nextStatus,
-          'org.schema.Action.tenantAuthorization.changedBy': actorDid || '',
+          'org.schema.Action.tenantAuthorization.changedBy': authorization.actorDid || '',
         },
       },
       resource: {
@@ -231,6 +250,56 @@ export class HostingLifecycleService {
       },
       response: { status: '200' },
     };
+  }
+
+  private resolveLifecycleAuthorization(job: JobRequest): LifecycleAuthorizationContext {
+    const bearerPayload = (job?.content as any)?.meta?.bearer?.jwt?.payload;
+    const normalizedBearerPayload = bearerPayload && typeof bearerPayload === 'object'
+      ? bearerPayload as Record<string, unknown>
+      : undefined;
+    const proofActorDid = normalizedBearerPayload
+      ? String(normalizedBearerPayload.iss || normalizedBearerPayload.sub || '').trim()
+      : '';
+
+    return {
+      actorDid: proofActorDid || String(job?.content?.iss || '').trim() || undefined,
+      bearerPayload: normalizedBearerPayload,
+    };
+  }
+
+  private assertControllerProofBearerTenantBinding(
+    bearerPayload: Record<string, unknown> | undefined,
+    identifierValue: string,
+  ): void {
+    if (!bearerPayload || !bearerPayload.vp || typeof bearerPayload.vp !== 'object') {
+      return;
+    }
+
+    const verifiableCredentials = Array.isArray((bearerPayload.vp as any).verifiableCredential)
+      ? (bearerPayload.vp as any).verifiableCredential
+      : [];
+    const representativeCredential = verifiableCredentials.find((credential: any) => {
+      const memberOfTaxId = extractRepresentativeMemberOfTaxId(credential);
+      return !!String(memberOfTaxId || '').trim();
+    });
+    if (!representativeCredential) {
+      throw new ManagerError(
+        'Controller proof bearer must include one legal representative credential with memberOf.taxID for tenant lifecycle.',
+        IssueType.Forbidden,
+      );
+    }
+
+    const representativeTaxId = normalizeTaxIdentifier(
+      String(extractRepresentativeMemberOfTaxId(representativeCredential) || '').trim(),
+    );
+    const targetIdentifier = normalizeTaxIdentifier(String(identifierValue || '').trim());
+    if (!representativeTaxId || representativeTaxId !== targetIdentifier) {
+      throw new ManagerError(
+        'Controller proof bearer representative memberOf.taxID must match the Organization.identifier.value being changed.',
+        IssueType.Forbidden,
+      );
+    }
+
   }
 
   private getNextTenantLifecycleStatus(

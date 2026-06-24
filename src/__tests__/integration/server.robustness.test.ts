@@ -1,9 +1,12 @@
 // src/__tests__/integration/server.robustness.test.ts
 
 import request from 'supertest';
+import { once } from 'node:events';
+import type { AddressInfo } from 'node:net';
 import { createApp } from '../../app';
 import { createGlobalErrorHandler } from '../../middlewares/global-error-handler';
 import { ConsoleLogger } from '../../loggers/ConsoleLogger';
+import { startServer } from '../../server';
 
 const TEST_ROUTE_PATH = '/payload-limit-check';
 const REQUEST_BODY_LIMIT_ENV = 'GW_REQUEST_BODY_LIMIT';
@@ -12,14 +15,33 @@ const FHIR_JSON_MEDIA_TYPE = 'application/fhir+json';
 const OVERSIZED_PAYLOAD_PROPERTY = 'payload';
 const OVERSIZED_PAYLOAD_CHUNK = 'x'.repeat(256);
 const PREVIOUS_REQUEST_BODY_LIMIT = process.env[REQUEST_BODY_LIMIT_ENV];
+const MAX_HEADER_SIZE_ENV = 'GW_MAX_HEADER_SIZE';
+const PREVIOUS_MAX_HEADER_SIZE = process.env[MAX_HEADER_SIZE_ENV];
+const PREVIOUS_PORT = process.env.PORT;
+const PREVIOUS_HOST_INTERNAL_IP = process.env.HOST_INTERNAL_IP;
 
 describe('Server Robustness', () => {
   afterEach(() => {
     if (PREVIOUS_REQUEST_BODY_LIMIT === undefined) {
       delete process.env[REQUEST_BODY_LIMIT_ENV];
-      return;
+    } else {
+      process.env[REQUEST_BODY_LIMIT_ENV] = PREVIOUS_REQUEST_BODY_LIMIT;
     }
-    process.env[REQUEST_BODY_LIMIT_ENV] = PREVIOUS_REQUEST_BODY_LIMIT;
+    if (PREVIOUS_MAX_HEADER_SIZE === undefined) {
+      delete process.env[MAX_HEADER_SIZE_ENV];
+    } else {
+      process.env[MAX_HEADER_SIZE_ENV] = PREVIOUS_MAX_HEADER_SIZE;
+    }
+    if (PREVIOUS_PORT === undefined) {
+      delete process.env.PORT;
+    } else {
+      process.env.PORT = PREVIOUS_PORT;
+    }
+    if (PREVIOUS_HOST_INTERNAL_IP === undefined) {
+      delete process.env.HOST_INTERNAL_IP;
+    } else {
+      process.env.HOST_INTERNAL_IP = PREVIOUS_HOST_INTERNAL_IP;
+    }
   });
 
   describe('Global Error Handler', () => {
@@ -125,6 +147,40 @@ describe('Server Robustness', () => {
       expect(response.status).toBe(413);
       expect(response.body).toBeDefined();
       expect(JSON.stringify(response.body)).toContain('configured size limit');
+    });
+  });
+
+  describe('HTTP header limits', () => {
+    it('accepts controller proof bearer sized headers when GW_MAX_HEADER_SIZE is raised', async () => {
+      process.env[MAX_HEADER_SIZE_ENV] = String(128 * 1024);
+      process.env.PORT = '0';
+      process.env.HOST_INTERNAL_IP = '127.0.0.1';
+
+      const { server, queueAdapter } = await startServer();
+      try {
+        if (server && !server.listening) {
+          await once(server, 'listening');
+        }
+        const address = server?.address() as AddressInfo | null;
+        expect(address?.port).toBeGreaterThan(0);
+
+        const oversizedBearer = `Bearer ${'v'.repeat(24 * 1024)}`;
+        const response = await fetch(`http://127.0.0.1:${address?.port}/host/cds-ES/v1/test/.well-known/ping`, {
+          headers: {
+            Authorization: oversizedBearer,
+          },
+        });
+
+        expect(response.status).toBe(200);
+      } finally {
+        (queueAdapter as any)?.stop?.();
+        await new Promise<void>((resolve, reject) => {
+          server?.close((error) => {
+            if (error) reject(error);
+            else resolve();
+          });
+        });
+      }
     });
   });
 });

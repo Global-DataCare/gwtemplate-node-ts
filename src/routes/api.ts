@@ -491,7 +491,7 @@ export function createApiRouter(
         );
       }
       try {
-        await appAuthManager.verifyIdToken(accessToken);
+        await appAuthManager.verifyBearerToken(accessToken);
       } catch (error: any) {
         return sendDidcommEarlyError(
           req,
@@ -764,6 +764,7 @@ export function createApiRouter(
    *       - submit (`_issue`) returns immediate errors if the request cannot be accepted/enqueued
    *       - poll (`_issue-response`) returns `202` while pending, then `200` with:
    *         - `resource.icaResponse`: the verification payload returned by ICA `_verify`
+   *         - `vc[]`: extracted credential resources from that ICA payload
    *         - `meta.claims`: refreshed organization/controller claims plus one reissued activation code for `Token/_exchange` + `Device/_dcr`
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -882,6 +883,7 @@ export function createApiRouter(
    *       - submit (`_transaction`) returns immediate errors if the request cannot be accepted/enqueued
    *       - poll (`_transaction-response`) returns `202` while pending, then `200` with:
    *         - `resource.icaResponse`: the verification payload returned by ICA `_verify`
+   *         - `vc[]`: extracted credential resources from that ICA payload
    *         - `meta.claims`: the host-side pending-registration and generated Offer claims
    *         - `resource.next`: the explicit follow-up contract for `Order/_batch`
    *     parameters:
@@ -2676,7 +2678,7 @@ export function createApiRouter(
         }
         try {
           const bearerToken = authToken?.split(' ')[1] || '';
-          const verificationResult = await appAuthManager.verifyIdToken(bearerToken);
+          const verificationResult = await appAuthManager.verifyBearerToken(bearerToken);
           verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
         } catch (error: any) {
           return sendDidcommEarlyError(
@@ -2862,7 +2864,7 @@ export function createApiRouter(
           }
           try {
             const bearerToken = authToken?.split(' ')[1] || '';
-            const verificationResult = await appAuthManager.verifyIdToken(bearerToken);
+            const verificationResult = await appAuthManager.verifyBearerToken(bearerToken);
             verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
           } catch (error: any) {
             return sendDidcommEarlyError(
@@ -3030,7 +3032,7 @@ export function createApiRouter(
           }
           try {
             const bearerToken = authToken?.split(' ')[1] || '';
-            const verificationResult = await appAuthManager.verifyIdToken(bearerToken);
+            const verificationResult = await appAuthManager.verifyBearerToken(bearerToken);
             verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
           } catch (error: any) {
             return sendDidcommEarlyError(

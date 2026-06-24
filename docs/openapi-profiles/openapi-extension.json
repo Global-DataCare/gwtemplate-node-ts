@@ -4,7 +4,7 @@
     "title": "Gateway API - EXTENSIONS",
     "version": "1.0.3",
     "description": "Extension profile including non-core and vertical-specific capabilities on top of core and compat.",
-    "x-profile-generated-at": "2026-06-24T11:09:13.439Z",
+    "x-profile-generated-at": "2026-06-24T23:02:13.217Z",
     "x-profile-name": "extension"
   },
   "servers": [],
@@ -172,7 +172,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Bearer token used by legacy (JSON) flows and some onboarding steps.\n\nDemo/Test-Network note: in non-production environments signature checks may be bypassed, but token format must still be JWT-like (`header.payload.signature`).\nExample token you can paste in Swagger \"Authorize\": `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJkZW1vLXVzZXIiLCJlbWFpbCI6ImRlbW9AZXhhbXBsZS5vcmcifQ.demo`.\n\nProduction note: token validation is environment-dependent and typically expects a Firebase id_token for end-user identity."
+        "description": "Bearer token used by legacy (JSON) flows and some onboarding steps.\n\nDemo/Test-Network note: in non-production environments signature checks may be bypassed, but token format must still be JWT-like (`header.payload.signature`).\nExample token you can paste in Swagger \"Authorize\": `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJkZW1vLXVzZXIiLCJlbWFpbCI6ImRlbW9AZXhhbXBsZS5vcmcifQ.demo`.\n\nProduction note: token validation is environment-dependent and accepts either one end-user `id_token` or one controller proof bearer (`vp_token` compact JWT) when the route policy allows controller wallet proof."
       }
     },
     "parameters": {
@@ -777,6 +777,20 @@
             "data": [
               {
                 "type": "Organization-verification-transaction-response-v1.0",
+                "vc": [
+                  {
+                    "resourceType": "Organization",
+                    "id": "urn:uuid:org-vc-001",
+                    "type": [
+                      "VerifiableCredential",
+                      "OrganizationCredential"
+                    ],
+                    "credentialSubject": {
+                      "id": "did:web:globaldatacare.es:onehealth:organization:taxid:VATES-B00112233",
+                      "taxID": "VATES-B00112233"
+                    }
+                  }
+                ],
                 "meta": {
                   "claims": {
                     "@context": "org.schema",
@@ -3019,7 +3033,7 @@
           "1.1 Organization Registration"
         ],
         "summary": "Poll the existing-tenant reissue result",
-        "description": "Polls the asynchronous job submitted to `.../Organization/_issue`.\n\nPolling semantics:\n- submit (`_issue`) returns immediate errors if the request cannot be accepted/enqueued\n- poll (`_issue-response`) returns `202` while pending, then `200` with:\n  - `resource.icaResponse`: the verification payload returned by ICA `_verify`\n  - `meta.claims`: refreshed organization/controller claims plus one reissued activation code for `Token/_exchange` + `Device/_dcr`\n",
+        "description": "Polls the asynchronous job submitted to `.../Organization/_issue`.\n\nPolling semantics:\n- submit (`_issue`) returns immediate errors if the request cannot be accepted/enqueued\n- poll (`_issue-response`) returns `202` while pending, then `200` with:\n  - `resource.icaResponse`: the verification payload returned by ICA `_verify`\n  - `vc[]`: extracted credential resources from that ICA payload\n  - `meta.claims`: refreshed organization/controller claims plus one reissued activation code for `Token/_exchange` + `Device/_dcr`\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -3189,7 +3203,7 @@
           "1.1 Organization Registration"
         ],
         "summary": "Poll the legal-organization verification transaction result",
-        "description": "Polls the asynchronous job submitted to `.../Organization/_transaction`.\n\nPolling semantics:\n- submit (`_transaction`) returns immediate errors if the request cannot be accepted/enqueued\n- poll (`_transaction-response`) returns `202` while pending, then `200` with:\n  - `resource.icaResponse`: the verification payload returned by ICA `_verify`\n  - `meta.claims`: the host-side pending-registration and generated Offer claims\n  - `resource.next`: the explicit follow-up contract for `Order/_batch`\n",
+        "description": "Polls the asynchronous job submitted to `.../Organization/_transaction`.\n\nPolling semantics:\n- submit (`_transaction`) returns immediate errors if the request cannot be accepted/enqueued\n- poll (`_transaction-response`) returns `202` while pending, then `200` with:\n  - `resource.icaResponse`: the verification payload returned by ICA `_verify`\n  - `vc[]`: extracted credential resources from that ICA payload\n  - `meta.claims`: the host-side pending-registration and generated Offer claims\n  - `resource.next`: the explicit follow-up contract for `Order/_batch`\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

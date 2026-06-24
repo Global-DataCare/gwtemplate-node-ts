@@ -21,6 +21,20 @@
 - Moved generated core flow examples out of `artifacts/` and into
   `docs/openapi-examples/core-flow-examples.json` so versioned example
   documents live alongside the rest of the published API contract.
+- Updated controller-facing bearer authentication so host registry and other
+  bearer-protected API routes can accept either a verified `id_token` or one
+  signed controller proof bearer (`vp_token` compact JWT with embedded public
+  JWK). `Token/_exchange` remains `id_token`-specific.
+- Tightened host tenant lifecycle authorization so controller proof bearers
+  must carry a legal representative VC whose `memberOf.taxID` matches the
+  target `Organization.identifier.value`. Representative-role and
+  subject-to-signer binding checks remain future tightening work until the
+  example VC/VP contract is finalized.
+
+### Testing
+- `npm test -- --runTestsByPath src/__tests__/integration/server.robustness.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/integration/security-mode-gates.test.ts src/__tests__/managers/AuthorizationManager.test.ts`
+- `npm run build`
 
 ## [1.14.9] - 2026-06-24
 

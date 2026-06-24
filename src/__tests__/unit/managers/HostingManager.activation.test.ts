@@ -313,6 +313,40 @@ describe('HostingManager activation flow', () => {
     };
   }
 
+  function buildControllerProofBearerPayload(input?: {
+    representativeDid?: string;
+    memberOfTaxId?: string;
+    roleCode?: string;
+  }): Record<string, unknown> {
+    const representativeDid = input?.representativeDid || 'did:web:controller.example.com';
+    return {
+      iss: representativeDid,
+      sub: representativeDid,
+      vp: {
+        verifiableCredential: [
+          {
+            '@context': ['https://www.w3.org/2018/credentials/v1'],
+            type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
+            credentialSubject: {
+              id: representativeDid,
+              memberOf: {
+                taxID: input?.memberOfTaxId || String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue]),
+              },
+              hasOccupation: {
+                identifier: {
+                  value: input?.roleCode || 'RESPRSN',
+                },
+              },
+              hasCredential: {
+                material: 'controller-sig-kid',
+              },
+            },
+          },
+        ],
+      },
+    };
+  }
+
   function buildHostLifecycleJob(action: '_disable' | '_purge'): JobRequest {
     return {
       id: `host-${action}-job-id`,
@@ -545,7 +579,7 @@ describe('HostingManager activation flow', () => {
     expect(entry.response.status).toBe('201');
     expect(entry.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ES');
     expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
-      'urn:test-namespace:test-network:es:v1:health-care:entity:tax:VATES-B00112233',
+      'urn:test-namespace:test-network:es:v1:health-care:entity:tax:acme-id',
     );
   });
 
@@ -840,6 +874,26 @@ describe('HostingManager activation flow', () => {
     expect(getTenantAuthorizationLifecycle(enabledDoc.content)?.status).toBe('active');
   });
 
+  it('should attribute tenant lifecycle changedBy to the controller proof bearer actor when present', async () => {
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+
+    const disableJob = buildLifecycleJob('_disable');
+    disableJob.content!.iss = 'did:web:portal.example.org';
+    disableJob.content!.meta = {
+      bearer: {
+        jwt: {
+          payload: buildControllerProofBearerPayload(),
+        },
+      },
+    } as any;
+
+    const disableResponse = await hostingManager.process(disableJob);
+    expect(disableResponse.body.data[0].response.status).toBe('200');
+    expect(disableResponse.body.data[0].meta.claims['org.schema.Action.tenantAuthorization.changedBy'])
+      .toBe('did:web:controller.example.com');
+  });
+
   it('should reject enable unless the tenant is currently disabled', async () => {
     const activationJob = buildActivationJob();
     await hostingManager.process(activationJob);
@@ -893,6 +947,28 @@ describe('HostingManager activation flow', () => {
     const errorEntry = response.body.data[0];
     expect(errorEntry.response.status).toBe('409');
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('employee record(s) are not purged yet');
+  });
+
+  it('should reject tenant disable when controller proof bearer memberOf.taxID does not match the target tenant', async () => {
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+
+    const disableJob = buildLifecycleJob('_disable');
+    disableJob.content!.iss = 'did:web:portal.example.org';
+    disableJob.content!.meta = {
+      bearer: {
+        jwt: {
+          payload: buildControllerProofBearerPayload({
+            memberOfTaxId: 'DIFFERENT-TAX-ID',
+          }),
+        },
+      },
+    } as any;
+
+    const response = await hostingManager.process(disableJob);
+    const errorEntry = response.body.data[0];
+    expect(errorEntry.response.status).toBe('403');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('memberOf.taxID');
   });
 
   it('should reject host disable while hosted tenant registrations remain', async () => {

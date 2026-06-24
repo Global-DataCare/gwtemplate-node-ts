@@ -12,6 +12,7 @@ import { getTenantVaultId } from '../../utils/tenant';
 import { getEnvSectionId } from '../../utils/section-env';
 import {
   buildDeterministicIdTokenFixture,
+  buildDeterministicVpTokenFixture,
   DeterministicJwtTokenVerifier,
 } from '../utils/deterministic-jwt-fixtures';
 
@@ -116,6 +117,39 @@ describe('AppAuthorizationManager', () => {
         email: 'controller@example.org',
         sub: 'controller-sub-001',
       });
+    });
+  });
+
+  describe('verifyBearerToken', () => {
+    it('should fall back to one signed controller proof bearer when id_token verification fails', async () => {
+      const fixture = await buildDeterministicVpTokenFixture({
+        seed: 'gw-controller-proof-bearer-seed-001',
+        issuerDid: 'did:web:controller.demo.example',
+        audience: 'did:web:gw.demo.example#tenant_lifecycle',
+        credentials: [
+          {
+            credential: {
+              '@context': ['https://www.w3.org/2018/credentials/v1'],
+              type: ['VerifiableCredential', 'LegalParticipantCredential'],
+              issuer: 'did:web:ica.demo.example',
+              issuanceDate: '2040-01-01T00:00:00.000Z',
+              credentialSubject: {
+                id: 'did:web:controller.demo.example',
+              },
+            },
+          },
+        ],
+      });
+
+      mockTokenVerifier.verify.mockResolvedValue({ valid: false, error: 'not an id token' });
+
+      const result = await manager.verifyBearerToken(fixture.compactToken);
+
+      expect(result.valid).toBe(true);
+      expect(result.payload).toMatchObject({
+        iss: 'did:web:controller.demo.example',
+      });
+      expect((result.payload as any).vp).toBeDefined();
     });
   });
   

@@ -12,6 +12,7 @@ import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-
 import { getTenantVaultId } from '../utils/tenant';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { getEnvSectionId } from '../utils/section-env';
+import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
 
 /**
  * Manages application-specific authorization logic, such as validating tokens and codes.
@@ -48,6 +49,35 @@ export class AppAuthorizationManager {
       throw new ManagerError(`ID token is invalid: ${result.error}`, IssueType.Security);
     }
     return result;
+  }
+
+  /**
+   * Verifies a generic HTTP Bearer token accepted by controller-facing routes.
+   *
+   * Current policy:
+   * - accept a regular OIDC/Firebase `id_token`, or
+   * - accept one compact JWT VP (`controller proof bearer`) signed by the
+   *   controller wallet key and carrying one embedded public JWK.
+   *
+   * The latter intentionally keeps lifecycle/control-plane calls separate from
+   * SMART access tokens while avoiding a dependency on email-login proof when
+   * the controller already presents ICA-backed wallet proof.
+   */
+  public async verifyBearerToken(token: string): Promise<VerificationResult> {
+    try {
+      return await this.verifyIdToken(token);
+    } catch (idTokenError: any) {
+      try {
+        return await this.verifyControllerProofBearer(token);
+      } catch (vpError: any) {
+        const idMessage = idTokenError instanceof Error ? idTokenError.message : String(idTokenError || 'verification failed');
+        const vpMessage = vpError instanceof Error ? vpError.message : String(vpError || 'verification failed');
+        throw new ManagerError(
+          `Bearer token is invalid: ${idMessage}; controller proof bearer verification also failed: ${vpMessage}`,
+          IssueType.Security,
+        );
+      }
+    }
   }
 
   /**
@@ -148,5 +178,51 @@ export class AppAuthorizationManager {
     }
 
     return claims;
+  }
+
+  private async verifyControllerProofBearer(token: string): Promise<VerificationResult> {
+    const compact = String(token || '').trim();
+    const parts = compact.split('.');
+    if (parts.length !== 3) {
+      throw new ManagerError('Controller proof bearer must be a compact JWT (JWS).', IssueType.Security);
+    }
+
+    const header = decodeProtectedHeader(compact);
+    const alg = String(header.alg || '').trim();
+    if (!alg || alg.toLowerCase() === 'none') {
+      throw new ManagerError('Controller proof bearer must be signed with a supported algorithm.', IssueType.Security);
+    }
+
+    const allowed = new Set(['ES256K', 'ES384', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']);
+    if (!allowed.has(alg)) {
+      throw new ManagerError(`Unsupported controller proof bearer algorithm '${alg}'.`, IssueType.Security);
+    }
+
+    const payload = JSON.parse(Content.bytesToStringUTF8(Content.base64ToBytes(parts[1])));
+    if (!payload?.vp || typeof payload.vp !== 'object') {
+      throw new ManagerError('Controller proof bearer must carry one vp claim.', IssueType.Security);
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp !== undefined && Number(payload.exp) < now) {
+      throw new ManagerError('Controller proof bearer has expired.', IssueType.Security);
+    }
+    if (payload.nbf !== undefined && Number(payload.nbf) > now) {
+      throw new ManagerError('Controller proof bearer is not active yet.', IssueType.Security);
+    }
+
+    if ((alg === 'ES256K' || alg === 'ES384') && header.jwk && typeof header.jwk === 'object') {
+      try {
+        const keyLike = await importJWK(header.jwk as JWK, alg);
+        await compactVerify(compact, keyLike);
+      } catch (error: any) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new ManagerError(`Invalid controller proof bearer signature: ${message}`, IssueType.Security);
+      }
+    } else if (alg === 'ES256K' || alg === 'ES384') {
+      throw new ManagerError('Controller proof bearer must embed one public JWK for ES256K/ES384 verification.', IssueType.Security);
+    }
+
+    return { valid: true, payload };
   }
 }

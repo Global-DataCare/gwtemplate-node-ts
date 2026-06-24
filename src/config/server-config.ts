@@ -2,6 +2,7 @@ import { IServerConfig } from '../config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 
 let configInstance: IServerConfig;
+const DEFAULT_MAX_HEADER_SIZE_BYTES = 128 * 1024;
 
 const MAIN_SECTORS = ['animal', 'health'] as const;
 const SUBSECTORS = ['research', 'care', 'index', 'tech'] as const;
@@ -147,6 +148,10 @@ function getHostEnv(key: string): string | undefined {
 export function getConfig(): IServerConfig {
   if (!configInstance) {
     const port = parseInt(process.env.PORT || process.env.HOST_INTERNAL_PORT || '3300', 10);
+    const parsedMaxHeaderSize = parseInt(process.env.GW_MAX_HEADER_SIZE || '', 10);
+    const maxHeaderSize = Number.isFinite(parsedMaxHeaderSize) && parsedMaxHeaderSize > 0
+      ? parsedMaxHeaderSize
+      : DEFAULT_MAX_HEADER_SIZE_BYTES;
     const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION || process.env.K_CONFIGURATION);
     const apiHostname = isCloudRun ? '0.0.0.0' : (process.env.HOST_INTERNAL_IP || 'localhost');
     const apiBaseUrl = determineApiBaseUrl(port, apiHostname);
@@ -178,6 +183,7 @@ export function getConfig(): IServerConfig {
       demoAllowInsecureBearer,
       nodeEnv,
       port: port,
+      maxHeaderSize,
       apiHostname,
       hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || new URL(apiBaseUrl).host,
       apiBaseUrl,

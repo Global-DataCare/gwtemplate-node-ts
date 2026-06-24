@@ -2,6 +2,7 @@ const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID 
 
 import { createApp, resolveRequestBodyLimit } from './app';
 import * as express from 'express';
+import { createServer } from 'node:http';
 
 
 import { initializeFirebase } from './utils/firebase';
@@ -405,7 +406,7 @@ async function startServer(options?: StartServerOptions) {
   const server =
     options?.listen === false
       ? undefined
-      : app.listen(config.port, config.apiHostname, () => {
+      : createServer({ maxHeaderSize: config.maxHeaderSize }, app).listen(config.port, config.apiHostname, () => {
           console.log(`[GW-API] Listening on ${config.apiHostname}:${config.port}`);
         });
 

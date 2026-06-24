@@ -31,6 +31,7 @@ const EXAMPLE_TRANSACTION_RESPONSE_TYPE = 'Organization-verification-transaction
 const EXAMPLE_NEXT_ACTION = 'Order/_batch';
 const EXAMPLE_REQUEST_CONTENT_TYPE = DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE;
 const EXAMPLE_ICA_RESPONSE_CONTENT_TYPE = 'application/json';
+const EXAMPLE_ICA_DIDCOMM_RESPONSE_CONTENT_TYPE = 'application/didcomm-plain+json';
 const EXAMPLE_ICA_VERIFY_RESPONSE_TYPE = 'VerifyResponse-v1.0';
 const EXAMPLE_RESPONSE_STATUS_OK = '200';
 const EXAMPLE_RESPONSE_STATUS_ACCEPTED = 202;
@@ -149,6 +150,41 @@ function buildIcaVerifyResponse() {
         sector: EXAMPLE_SECTOR,
       },
     }],
+  };
+}
+
+function buildIcaVerifyCredentialResponse() {
+  return {
+    resourceType: 'Bundle',
+    type: EXAMPLE_ICA_RESPONSE_BUNDLE_TYPE,
+    data: [
+      {
+        type: 'Organization-verification-v1.0',
+        resource: {
+          id: 'urn:uuid:org-vc-001',
+          issuer: 'did:web:ica.example.org',
+          type: ['VerifiableCredential', 'OrganizationCredential'],
+          credentialSubject: {
+            id: 'did:web:provider.example.org:organization:taxid:VATES-B00112233',
+            taxID: 'VATES-B00112233',
+          },
+        },
+      },
+      {
+        type: 'LegalRepresentative-verification-v1.0',
+        resource: {
+          id: 'urn:uuid:rep-vc-001',
+          issuer: 'did:web:ica.example.org',
+          type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
+          credentialSubject: {
+            id: 'did:web:controller.example.org',
+            memberOf: {
+              taxID: 'VATES-B00112233',
+            },
+          },
+        },
+      },
+    ],
   };
 }
 
@@ -288,6 +324,84 @@ describe('HostingManager legal organization verification transaction', () => {
     expect(fetchCalls[0]?.url).toBe(
       `${EXAMPLE_ICA_BASE_URL}/ica/cds-ES/v1/${EXAMPLE_SECTOR}/terms/pdf/${EXAMPLE_VERIFY_RESOURCE_TYPE}/_verify`,
     );
+  });
+
+  it('preserves ICA verification payload when the ICA poll returns didcomm-plain+json', async () => {
+    const icaVerifyResponse = buildIcaVerifyResponse();
+    global.fetch = jest.fn(async (_url: string | URL | Request, _init?: RequestInit) => {
+      if ((global.fetch as any).mock.calls.length === 1) {
+        return {
+          ok: false,
+          status: EXAMPLE_RESPONSE_STATUS_ACCEPTED,
+          headers: {
+            get: (name: string) => name.toLowerCase() === 'location' ? EXAMPLE_ICA_POLL_URL : null,
+          },
+        } as any;
+      }
+      return {
+        ok: true,
+        status: Number(EXAMPLE_RESPONSE_STATUS_OK),
+        headers: {
+          get: (name: string) => name.toLowerCase() === 'content-type' ? EXAMPLE_ICA_DIDCOMM_RESPONSE_CONTENT_TYPE : null,
+        },
+        json: async () => icaVerifyResponse,
+      } as any;
+    }) as any;
+
+    const manager = new HostingManager(
+      mockVaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      buildConfig(),
+      mockHostRuntime,
+    );
+
+    const response = await manager.process(buildTransactionJob(), 'test', false);
+
+    expect(response.body.data[0]?.resource?.icaResponse).toEqual(icaVerifyResponse);
+  });
+
+  it('projects credential resources into entry.vc while keeping the raw ICA response', async () => {
+    const icaVerifyResponse = buildIcaVerifyCredentialResponse();
+    global.fetch = jest.fn(async (_url: string | URL | Request, _init?: RequestInit) => {
+      if ((global.fetch as any).mock.calls.length === 1) {
+        return {
+          ok: false,
+          status: EXAMPLE_RESPONSE_STATUS_ACCEPTED,
+          headers: {
+            get: (name: string) => name.toLowerCase() === 'location' ? EXAMPLE_ICA_POLL_URL : null,
+          },
+        } as any;
+      }
+      return {
+        ok: true,
+        status: Number(EXAMPLE_RESPONSE_STATUS_OK),
+        headers: {
+          get: (name: string) => name.toLowerCase() === 'content-type' ? EXAMPLE_ICA_RESPONSE_CONTENT_TYPE : null,
+        },
+        json: async () => icaVerifyResponse,
+      } as any;
+    }) as any;
+
+    const manager = new HostingManager(
+      mockVaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      buildConfig(),
+      mockHostRuntime,
+    );
+
+    const response = await manager.process(buildTransactionJob(), 'test', false);
+
+    expect(response.body.data[0]?.resource?.icaResponse).toEqual(icaVerifyResponse);
+    expect(response.body.data[0]?.vc).toEqual([
+      icaVerifyResponse.data[0].resource,
+      icaVerifyResponse.data[1].resource,
+    ]);
   });
 
   it('returns OperationOutcome 400 when demo GW cannot resolve the trusted ICA jurisdiction', async () => {

@@ -18,6 +18,7 @@ export interface IServerConfig {
   demoAllowInsecureBearer: boolean;
   nodeEnv: string;
   port: number;
+  maxHeaderSize: number;
   apiHostname: string;
   hostExternalDomain: string;
   apiBaseUrl: string;

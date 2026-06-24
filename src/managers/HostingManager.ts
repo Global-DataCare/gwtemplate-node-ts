@@ -1034,8 +1034,12 @@ export class HostingManager {
         const text = await res.text().catch(() => '');
         throw new ManagerError(`ICA DID document poll failed: ${res.status} ${text}`.trim(), IssueType.Exception);
       }
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
+      const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+      if (
+        !contentType.includes('application/json')
+        && !contentType.includes('application/didcomm-plain+json')
+        && !contentType.includes('application/didcomm-plaintext+json')
+      ) {
         return undefined;
       }
       return await res.json().catch(() => undefined);
@@ -1513,6 +1517,7 @@ export class HostingManager {
       requestedSector,
       resourceType,
     });
+    const vc = this.extractCredentialResourcesFromIcaPayload(icaResponse);
 
     const processedClaims = await this.createPendingTenantRegistrationFromClaims({
       claims,
@@ -1533,6 +1538,7 @@ export class HostingManager {
         total: 1,
         data: [{
           type: ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE_TYPE,
+          ...(vc.length > 0 ? { vc } : {}),
           meta: {
             claims: processedClaims,
           },
@@ -1564,6 +1570,7 @@ export class HostingManager {
       requestedSector,
       resourceType,
     });
+    const vc = this.extractCredentialResourcesFromIcaPayload(icaResponse);
 
     const processedClaims = await this.createOrganizationIssueClaimsFromClaims({
       claims,
@@ -1584,6 +1591,7 @@ export class HostingManager {
         total: 1,
         data: [{
           type: ORGANIZATION_ISSUE_RESPONSE_TYPE,
+          ...(vc.length > 0 ? { vc } : {}),
           meta: {
             claims: processedClaims,
           },
@@ -2033,6 +2041,91 @@ export class HostingManager {
       return {};
     }
     return await response.json().catch(() => ({}));
+  }
+
+  /**
+   * Extracts credential resources from the raw ICA verification envelope.
+   *
+   * Transitional response contract:
+   * - `resource.icaResponse` keeps the full raw ICA payload for debugging
+   * - `resource.vc[]` exposes only credential resources so callers can consume
+   *   the verification outcome directly
+   */
+  private extractCredentialResourcesFromIcaPayload(icaResponse: unknown): Array<Record<string, unknown>> {
+    const credentials: Array<Record<string, unknown>> = [];
+    const visited = new WeakSet<object>();
+    const fingerprints = new Set<string>();
+
+    const addCredential = (candidate: Record<string, unknown>) => {
+      const subject = Array.isArray(candidate.credentialSubject)
+        ? candidate.credentialSubject[0]
+        : candidate.credentialSubject;
+      const typeTokens = Array.isArray(candidate.type)
+        ? candidate.type.map((token) => String(token || '').trim()).filter(Boolean)
+        : typeof candidate.type === 'string'
+          ? [candidate.type.trim()]
+          : [];
+      const fingerprint = JSON.stringify({
+        id: candidate.id || '',
+        issuer: candidate.issuer || '',
+        type: typeTokens,
+        subjectId: typeof subject === 'object' && subject ? (subject as any).id || '' : '',
+      });
+      if (fingerprints.has(fingerprint)) {
+        return;
+      }
+      fingerprints.add(fingerprint);
+      credentials.push(candidate);
+    };
+
+    const walk = (node: unknown) => {
+      if (!node || typeof node !== 'object') {
+        return;
+      }
+      if (visited.has(node as object)) {
+        return;
+      }
+      visited.add(node as object);
+      if (this.isCredentialLikeObject(node)) {
+        addCredential(node as Record<string, unknown>);
+      }
+      if (Array.isArray(node)) {
+        node.forEach((entry) => walk(entry));
+        return;
+      }
+      const candidate = node as Record<string, unknown>;
+      if (Array.isArray(candidate.data)) {
+        candidate.data.forEach((entry) => walk(entry));
+      }
+      if (candidate.body) {
+        walk(candidate.body);
+      }
+      if (candidate.resource) {
+        walk(candidate.resource);
+      }
+    };
+
+    walk(icaResponse);
+    return credentials;
+  }
+
+  private isCredentialLikeObject(candidate: unknown): candidate is Record<string, unknown> {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      return false;
+    }
+    const credential = candidate as Record<string, unknown>;
+    const subject = credential.credentialSubject;
+    if (!subject || (typeof subject !== 'object' && !Array.isArray(subject))) {
+      return false;
+    }
+    const typeTokens = Array.isArray(credential.type)
+      ? credential.type.map((token) => String(token || '').trim()).filter(Boolean)
+      : typeof credential.type === 'string'
+        ? [credential.type.trim()]
+        : [];
+    return !!credential.issuer
+      || typeTokens.includes('VerifiableCredential')
+      || typeTokens.some((token) => /Credential$/i.test(token));
   }
 
   /**

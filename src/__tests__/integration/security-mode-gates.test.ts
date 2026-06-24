@@ -4,6 +4,7 @@ import { createApiRouter } from '../../routes/api';
 import { AppAuthorizationManager } from '../../managers/AppAuthorizationManager';
 import {
   buildDeterministicIdTokenFixture,
+  buildDeterministicVpTokenFixture,
   DeterministicJwtTokenVerifier,
 } from '../utils/deterministic-jwt-fixtures';
 
@@ -192,7 +193,7 @@ describe('SECURITY_MODE content-type gates', () => {
     };
 
     const appAuthManager = {
-      verifyIdToken: jest.fn(async () => {
+      verifyBearerToken: jest.fn(async () => {
         throw new Error('bad token');
       }),
     };
@@ -203,7 +204,7 @@ describe('SECURITY_MODE content-type gates', () => {
       .set('Authorization', 'Bearer invalid-token')
       .send({});
 
-    expect(appAuthManager.verifyIdToken).toHaveBeenCalledWith('invalid-token');
+    expect(appAuthManager.verifyBearerToken).toHaveBeenCalledWith('invalid-token');
     expect(response.status).toBe(401);
     expect(response.text || '').toContain('Invalid Bearer token');
   });
@@ -219,7 +220,7 @@ describe('SECURITY_MODE content-type gates', () => {
     };
 
     const appAuthManager = {
-      verifyIdToken: jest.fn(async () => ({ sub: 'test-client' })),
+      verifyBearerToken: jest.fn(async () => ({ sub: 'test-client' })),
     };
     const { app } = buildTestApp({ appAuthManager });
     const response = await request(app)
@@ -228,7 +229,7 @@ describe('SECURITY_MODE content-type gates', () => {
       .set('Authorization', 'Bearer valid-token')
       .send({});
 
-    expect(appAuthManager.verifyIdToken).toHaveBeenCalledWith('valid-token');
+    expect(appAuthManager.verifyBearerToken).toHaveBeenCalledWith('valid-token');
     // Should fail later due to tenant setup in this test harness, not due to bearer auth.
     expect(response.status).toBe(404);
   });
@@ -244,7 +245,7 @@ describe('SECURITY_MODE content-type gates', () => {
     };
 
     const appAuthManager = {
-      verifyIdToken: jest.fn(async () => ({
+      verifyBearerToken: jest.fn(async () => ({
         valid: true,
         payload: { email: 'controller@example.org', sub: 'controller-sub-001' },
       })),
@@ -292,7 +293,7 @@ describe('SECURITY_MODE content-type gates', () => {
       .send({ request: 'opaque-jwe' });
 
     expect(response.status).toBe(202);
-    expect(appAuthManager.verifyIdToken).toHaveBeenCalledWith('valid-token');
+    expect(appAuthManager.verifyBearerToken).toHaveBeenCalledWith('valid-token');
     expect(queueAdapter.addJob).toHaveBeenCalledTimes(1);
     const queuedJob = queueAdapter.addJob.mock.calls[0][1];
     expect(queuedJob.content.meta.bearer.jwt.payload).toEqual({
@@ -417,5 +418,127 @@ describe('SECURITY_MODE content-type gates', () => {
       tenant_id: 'acme-id',
       sub: 'controller-sub-001',
     });
+  });
+
+  it('accepts one deterministically signed controller proof bearer on host lifecycle routes in strict mode', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'true',
+      FHIR_LEGACY: 'true',
+      DIDCOMM_PLAIN: 'true',
+    };
+
+    const fixture = await buildDeterministicVpTokenFixture({
+      seed: 'gw-security-mode-vp-seed-001',
+      issuerDid: 'did:web:controller.demo.example',
+      audience: 'did:web:gw.demo.example#tenant_lifecycle',
+      credentials: [
+        {
+          credential: {
+            '@context': ['https://www.w3.org/2018/credentials/v1'],
+            type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
+            issuer: 'did:web:ica.demo.example',
+            issuanceDate: '2040-01-01T00:00:00.000Z',
+            credentialSubject: {
+              id: 'did:web:controller.demo.example',
+              memberOf: { taxID: 'B12345678' },
+              hasOccupation: { identifier: { value: 'RESPRSN' } },
+            },
+          },
+        },
+      ],
+    });
+
+    const appAuthManager = new AppAuthorizationManager(
+      {
+        get: jest.fn(),
+        put: jest.fn(),
+        createNewVault: jest.fn(),
+        vaultExists: jest.fn(),
+        getVaultConfig: jest.fn(),
+        createNewSection: jest.fn(),
+        updateSection: jest.fn(),
+        getAllSections: jest.fn(),
+        sectionExists: jest.fn(),
+        getContainersListInSection: jest.fn(),
+        getContainersInSection: jest.fn(),
+        getHistory: jest.fn(),
+        query: jest.fn(),
+        delete: jest.fn(),
+        purge: jest.fn(),
+      } as any,
+      {
+        verify: jest.fn(async () => ({ valid: false, error: 'not an id token' })),
+      } as any,
+      {
+        getPublicVerificationKey: jest.fn(),
+        init: jest.fn(),
+        provisionKeys: jest.fn(),
+        getPublicJwks: jest.fn(),
+        getPublicEncryptionKey: jest.fn(),
+        getHostPublicJwkSet: jest.fn(),
+        decodeRequest: jest.fn(),
+        signWithManagedKey: jest.fn(),
+        signWithReconstructedKey: jest.fn(),
+        encodeResponse: jest.fn(),
+        createDetachedJws: jest.fn(),
+        createCompactJws: jest.fn(),
+        protectConfidentialData: jest.fn(),
+        unprotectConfidentialData: jest.fn(),
+        getHmacBase64Url: jest.fn(),
+        protectAttributesNameAndValue: jest.fn(),
+      } as any,
+      {
+        verifyJws: jest.fn(),
+      } as any,
+    );
+    const tenantsCacheManager = {
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#registry:org.schema',
+        selector: { section: 'registry', format: 'org.schema' },
+        serviceEndpoint: 'organization',
+        actions: ['_disable'],
+      }]),
+      getTenant: jest.fn(),
+      getCollectionName: jest.fn(),
+    };
+    const kmsService = {
+      decodeRequest: jest.fn(async () => ({
+        content: {
+          thid: 'disable-thid-001',
+          iss: 'did:web:portal.example.org',
+          meta: {
+            jwe: { header: { jwk: { kty: 'EC', crv: 'P-256', x: 'x', y: 'y' } } },
+          },
+          body: {
+            data: [{
+              meta: {
+                claims: {
+                  'org.schema.Organization.identifier.value': 'B12345678',
+                },
+              },
+            }],
+          },
+        },
+      })),
+      getHmacBase64Url: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getPublicVerificationKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+    };
+    const { app, queueAdapter } = buildTestApp({ appAuthManager, tenantsCacheManager, kmsService });
+    const response = await request(app)
+      .post('/host/cds-es/v1/test/registry/org.schema/Organization/_disable')
+      .set('Authorization', `Bearer ${fixture.compactToken}`)
+      .type('form')
+      .send({ request: 'opaque-jwe' });
+
+    expect(response.status).toBe(202);
+    expect(queueAdapter.addJob).toHaveBeenCalledTimes(1);
+    const queuedJob = queueAdapter.addJob.mock.calls[0][1];
+    expect(queuedJob.content.meta.bearer.jwt.payload.iss).toBe('did:web:controller.demo.example');
+    expect(queuedJob.content.meta.bearer.jwt.payload.vp).toBeDefined();
   });
 });
