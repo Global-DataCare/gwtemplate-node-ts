@@ -4,7 +4,7 @@
     "title": "Gateway API - EXTENSIONS",
     "version": "1.0.3",
     "description": "Extension profile including non-core and vertical-specific capabilities on top of core and compat.",
-    "x-profile-generated-at": "2026-06-24T01:17:12.093Z",
+    "x-profile-generated-at": "2026-06-24T07:44:21.590Z",
     "x-profile-name": "extension"
   },
   "servers": [],
@@ -947,7 +947,7 @@
                     "Consent.action": "LOINC|48765-2",
                     "Consent.actor-identifier": "{{physicianDid}}",
                     "Consent.actor-role": "ISCO-08|2211",
-                    "Consent.attachment-contentType": "application/odrl+json",
+                    "Consent.attachment-contenttype": "application/odrl+json",
                     "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
                   }
                 },
@@ -2055,7 +2055,7 @@
                     "Consent.action": "LOINC|48765-2",
                     "Consent.actor-identifier": "{{physicianDid}}",
                     "Consent.actor-role": "ISCO-08|2211",
-                    "Consent.attachment-contentType": "application/odrl+json",
+                    "Consent.attachment-contenttype": "application/odrl+json",
                     "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
                   }
                 },

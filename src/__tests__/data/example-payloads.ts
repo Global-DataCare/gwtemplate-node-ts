@@ -908,7 +908,7 @@ export const CONSENT_CREATION_MESSAGE = {
           "Consent.action": HealthcareConsentActions.AllergiesAndIntolerances,
           "Consent.actor-identifier": "{{physicianDid}}",
           "Consent.actor-role": HealthcareActorRoles.Physician,
-          "Consent.attachment-contentType": "application/odrl+json",
+          "Consent.attachment-contenttype": "application/odrl+json",
           "Consent.attachment-data": "eyAiQGNvbnRleHQiOiAiaHR0cDovL3d3dy53My5vcmcvbnMvb2RybC5qc29ubGQiLCAiQHR5cGUiOiAiQWdyZWVtZW50Ii...sgIlRSRUFUIiB9XSB9XSB9"
         }
       },

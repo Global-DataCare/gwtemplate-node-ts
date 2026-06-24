@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [1.14.9] - 2026-06-24
+
+### Changed
+- Updated the shared dependency target to `gdc-common-utils-ts@^2.0.12`.
+
+### Fixed
+- Regenerated Swagger/OpenAPI examples and profile documents against the
+  corrected shared consent claim key so generated GW docs no longer expose the
+  camelCase form `Consent.attachment-contentType`.
+
 ## [1.14.8] - 2026-06-24
 
 ### Changed
