@@ -31,6 +31,18 @@ type SecurityMode = 'strict' | 'compat' | 'demo';
 type ParsedContentType = 'secure-form' | 'didcomm-plain' | 'json' | 'fhir' | 'unsupported';
 const DIDCOMM_PLAINTEXT_JSON_LEGACY_MEDIA_TYPE = 'application/didcomm-plaintext+json';
 
+function getVerifiedBearerPayload(verificationResult: any): Record<string, any> {
+  if (!verificationResult || typeof verificationResult !== 'object') return {};
+  const payload = (verificationResult as any).payload;
+  if (payload && typeof payload === 'object') {
+    return payload as Record<string, any>;
+  }
+  const clone = { ...(verificationResult as Record<string, any>) };
+  delete (clone as any).valid;
+  delete (clone as any).error;
+  return clone;
+}
+
 function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
   const normalized = String(value).trim().toLowerCase();
@@ -679,6 +691,117 @@ export function createApiRouter(
    *         description: Unauthorized. Invalid or missing Bearer token for legacy flow, or failed JWE decryption/JWS verification for secure flow.
    *       '404':
    *         description: Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or network selector).
+   *
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_issue:
+   *   post:
+   *     tags:
+   *       - 1.1 Organization Registration
+   *     summary: Reverify an existing legal organization and reissue one controller activation code
+   *     description: |
+   *       Existing-tenant recovery/reactivation route.
+   *
+   *       Responsibilities of this issue flow:
+   *       - carry the signed terms PDF evidence or PDF URL attachment again
+   *       - carry the current controller business binding key in `body.data[].resource.controller.publicKeyJwk`
+   *       - forward the legal evidence to ICA `_verify`
+   *       - refresh the hosted legal-organization verification result without creating a new commercial Offer
+   *       - reserve/reissue one new activation code for the current legal representative/controller so the frontend can continue with `Token/_exchange` + `Device/_dcr`
+   *
+   *       Commercial rule:
+   *       - this route must not overwrite the already contracted seat count
+   *       - this route must not create a new Offer or require `Order/_batch`
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *     requestBody:
+   *       description: |
+   *         Production: only `application/x-www-form-urlencoded` is accepted
+   *         (secure JWE envelope with `request=`).
+   *         Demo/Test-Network: `application/didcomm-plain+json` is canonical,
+   *         and `application/json` is also accepted for simplicity.
+   *       required: true
+   *       content:
+   *         application/didcomm-plain+json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/OrganizationVerificationTransactionPlaintextMessage'
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/DidcommPlaintextMessage'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/SecureRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: |
+   *           Accepted. The reissue job has been queued. The client should poll
+   *           the URL provided in the `Location` header to get the result.
+   *       '400':
+   *         description: Bad Request. The payload is malformed.
+   *       '401':
+   *         description: Unauthorized. Invalid or missing Bearer token for legacy flow, or failed JWE decryption/JWS verification for secure flow.
+   *       '404':
+   *         description: Not Found. The requested endpoint path does not exist (e.g., invalid jurisdiction or network selector).
+   *
+   * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_issue-response:
+   *   post:
+   *     tags:
+   *       - 1.1 Organization Registration
+   *     summary: Poll the existing-tenant reissue result
+   *     description: |
+   *       Polls the asynchronous job submitted to `.../Organization/_issue`.
+   *
+   *       Polling semantics:
+   *       - submit (`_issue`) returns immediate errors if the request cannot be accepted/enqueued
+   *       - poll (`_issue-response`) returns `202` while pending, then `200` with:
+   *         - `resource.icaResponse`: the verification payload returned by ICA `_verify`
+   *         - `meta.claims`: refreshed organization/controller claims plus one reissued activation code for `Token/_exchange` + `Device/_dcr`
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *       - $ref: '#/components/parameters/Thid'
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/AsyncPollRequest'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/AsyncPollRequest'
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             $ref: '#/components/schemas/AsyncPollRequest'
+   *           examples:
+   *             message:
+   *               $ref: '#/components/examples/AsyncPollRequest'
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202':
+   *         description: Pending. Retry later.
+   *         headers:
+   *           Retry-After:
+   *             schema: { type: string, example: '5' }
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/AsyncPollPending' }
+   *       '200':
+   *         description: Completed. Returns either JSON (legacy) or `response=<jwe>` (secure).
+   *         content:
+   *           application/json:
+   *             schema: { type: object }
+   *       '400': { description: Missing or invalid thid. }
+   *       '404': { description: thid not found. }
+   *       '500': { description: Job failed or response decode failed. }
    *
    * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction:
    *   post:
@@ -2490,6 +2613,7 @@ export function createApiRouter(
       const authToken = req.headers.authorization;
       const enforceBearerValidation = !allowsInsecureBearerBySecurityMode();
       const requireBearerHeader = !allowsInsecureBearerBySecurityMode();
+      let verifiedBearerPayload: Record<string, any> = {};
       if (requireBearerHeader && (!authToken || !authToken.startsWith('Bearer '))) {
         return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
       }
@@ -2505,7 +2629,8 @@ export function createApiRouter(
         }
         try {
           const bearerToken = authToken?.split(' ')[1] || '';
-          await appAuthManager.verifyIdToken(bearerToken);
+          const verificationResult = await appAuthManager.verifyIdToken(bearerToken);
+          verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
         } catch (error: any) {
           return sendDidcommEarlyError(
             req,
@@ -2533,7 +2658,7 @@ export function createApiRouter(
             ...legacyMeta,
             bearer: {
               token: authToken,
-              jwt: { header: { alg: '', kid: '' }, payload: {} },
+              jwt: { header: { alg: '', kid: '' }, payload: verifiedBearerPayload },
             },
           },
         },
@@ -2636,6 +2761,7 @@ export function createApiRouter(
     const contentType = normalizeContentType(contentTypeHeader);
     const parsedContentType = parseIncomingContentType(contentType);
     let jobRequest: JobRequest;
+    let verifiedBearerPayload: Record<string, any> = {};
 
     try {
       if (!isContentTypeAllowedBySecurityPolicy(parsedContentType)) {
@@ -2660,6 +2786,47 @@ export function createApiRouter(
             "Missing 'request' parameter in form-encoded body.",
           );
         }
+        const authToken = req.headers.authorization;
+        const allowNoBearerForActivate = isHostOrganizationActivateRoute(
+          tenantId,
+          section,
+          req.params.format,
+          resourceType,
+          action,
+        );
+        const isIdentityDcrRoute =
+          section === 'identity'
+          && String(req.params.format || '').toLowerCase() === 'openid'
+          && String(resourceType || '').toLowerCase() === 'device'
+          && action === '_dcr';
+        const requireBearerHeader = section !== 'ping' && !allowNoBearerForActivate;
+        if (requireBearerHeader && (!authToken || !authToken.startsWith('Bearer '))) {
+          return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
+        }
+        if (requireBearerHeader && !isIdentityDcrRoute) {
+          if (!appAuthManager) {
+            return sendDidcommEarlyError(
+              req,
+              res,
+              500,
+              IssueType.Exception,
+              'Bearer validation is required by SECURITY_MODE but AppAuthorizationManager is not configured.',
+            );
+          }
+          try {
+            const bearerToken = authToken?.split(' ')[1] || '';
+            const verificationResult = await appAuthManager.verifyIdToken(bearerToken);
+            verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
+          } catch (error: any) {
+            return sendDidcommEarlyError(
+              req,
+              res,
+              401,
+              IssueType.Security,
+              `Invalid Bearer token: ${error?.message || 'verification failed'}`,
+            );
+          }
+        }
         // The KMS decrypts the JWE using the HOST's key and returns the inner JWS, but does not verify it.
         const decodedJob = await kmsService.decodeRequest(req.body.request);
         // The Bearer token (e.g., Firebase id_token) is still an HTTP concern, but some identity endpoints
@@ -2668,7 +2835,10 @@ export function createApiRouter(
         if (bearerToken) {
           (decodedJob as any).content = (decodedJob as any).content || {};
           (decodedJob as any).content.meta = (decodedJob as any).content.meta || {};
-          (decodedJob as any).content.meta.bearer = { token: bearerToken, jwt: { header: {}, payload: {} } };
+          (decodedJob as any).content.meta.bearer = {
+            token: bearerToken,
+            jwt: { header: {}, payload: verifiedBearerPayload },
+          };
         }
 
         // --- Signature Verification & Sender Key Resolution (Orchestrator Logic) ---
@@ -2813,7 +2983,8 @@ export function createApiRouter(
           }
           try {
             const bearerToken = authToken?.split(' ')[1] || '';
-            await appAuthManager.verifyIdToken(bearerToken);
+            const verificationResult = await appAuthManager.verifyIdToken(bearerToken);
+            verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
           } catch (error: any) {
             return sendDidcommEarlyError(
               req,
@@ -2856,8 +3027,7 @@ export function createApiRouter(
               ...legacyMeta,
               bearer: {
                 token: authToken,
-                // TODO: This structure should be populated by a real JWT verification function.
-                jwt: { header: { alg: '', kid: '' }, payload: {} },
+                jwt: { header: { alg: '', kid: '' }, payload: verifiedBearerPayload },
               },
             },
           },

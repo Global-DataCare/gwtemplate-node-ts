@@ -98,9 +98,9 @@ function loadSwaggerSpecFromDisk(): any {
 let swaggerSpec: any = loadSwaggerSpecFromDisk();
 
 const OPENAPI_PROFILE_DOCS = [
-  { name: 'CORE', url: '/artifacts/openapi-profiles/openapi-core.json' },
-  { name: 'COMPAT', url: '/artifacts/openapi-profiles/openapi-compat.json' },
-  { name: 'EXTENSIONS', url: '/artifacts/openapi-profiles/openapi-extension.json' },
+  { name: 'CORE', url: '/docs/openapi-profiles/openapi-core.json' },
+  { name: 'COMPAT', url: '/docs/openapi-profiles/openapi-compat.json' },
+  { name: 'EXTENSIONS', url: '/docs/openapi-profiles/openapi-extension.json' },
   { name: 'RUNTIME', url: '/swagger-spec.json' },
 ];
 
@@ -388,8 +388,8 @@ async function startServer(options?: StartServerOptions) {
   });
 
   app.use(
-    '/artifacts/openapi-profiles',
-    express.static(path.resolve(process.cwd(), 'artifacts', 'openapi-profiles'), {
+    '/docs/openapi-profiles',
+    express.static(path.resolve(process.cwd(), 'docs', 'openapi-profiles'), {
       setHeaders: (res) => {
         res.setHeader('Cache-Control', 'no-store');
       },

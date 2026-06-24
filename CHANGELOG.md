@@ -1,12 +1,36 @@
 ## [Unreleased]
 
+## [1.14.8] - 2026-06-24
+
 ### Changed
-- Updated confidential-storage persistence so small JWE payloads stay inline by
-  default while larger payloads are externalized to blob storage with persisted
-  blob metadata (`blobRef`, size, hash, provider metadata).
-- Added a Firestore-specific persisted-document guardrail so records can be
-  externalized before they approach the 1 MiB document limit even when the JWE
-  itself is below the global inline threshold.
+- Updated the shared dependency target to `gdc-common-utils-ts@^2.0.11`.
+- Moved the versioned generated OpenAPI profile documents out of
+  `artifacts/openapi-profiles` and into `docs/openapi-profiles` so `artifacts/`
+  can remain reserved for ephemeral logs, traces, and local test output while
+  Swagger UI still serves the profile selector at runtime.
+- Added deterministic demo token test fixtures that reuse the shared
+  `gdc-common-utils-ts` JWT/JWK helpers so GW tests regenerate stable `id_token`
+  and `vp_token` signers from fixed seeds instead of embedding ad hoc literal
+  keys.
+
+### Fixed
+- Reused already assigned controller/employee seats during
+  `Organization/_issue` before consuming an `available` pool license, allowing
+  reinstalls/rebinds to reissue activation codes for the same actor instead of
+  failing on exhausted free stock.
+- Fixed host legal-organization onboarding so GW no longer derives the ICA
+  verification route jurisdiction from `HOST_JURISDICTION`. `_transaction`
+  now resolves the ICA route scope from the configured trusted ICA and returns
+  a functional `400 OperationOutcome` when that jurisdiction cannot be
+  resolved in demo/local environments instead of drifting into downstream
+  `500` failures.
+- Added controller identity resolution for `Organization/_issue` so demo mode
+  can accept payload fallbacks while strict mode reuses the verified bearer
+  payload and persisted controller role when available.
+
+## [1.14.7] - 2026-06-23
+
+### Changed
 - Clarified docs, Swagger/OpenAPI descriptions, and host-flow comments so
   `Organization/_transaction` is treated as the canonical legal-organization
   onboarding step and `Organization/_activate` is documented as legacy
@@ -15,17 +39,30 @@
   host/deployment, configured explicitly via `ICA_URL_*`,
   `ICA_JURISDICTION`, and optionally `ICA_DID_WEB`, rather than a dynamic list
   of trusted ICAs selected from CA/issuer metadata.
+- Added host `Organization/_issue` as the existing-tenant reverify/rebind path:
+  it reuses ICA `_verify`, does not create a new Offer, and reissues one
+  controller activation code from the already contracted seat pool so the
+  frontend can continue with `Token/_exchange` + `Device/_dcr`.
+- Added controller identity resolution for `Organization/_issue` so demo mode
+  can accept payload fallbacks while strict mode reuses the verified bearer
+  payload and persisted controller role when available.
+- Added deterministic demo-token test fixtures for `id_token` and `vp_token`
+  so security-sensitive GW tests can regenerate stable EC signing keys from a
+  fixed seed, verify real JOSE signatures locally, and expose the exact
+  `header.payload` bytes that KMS-backed BFF/controller signers would sign in
+  production.
+
+### Fixed
 - Fixed host legal-organization onboarding so GW no longer derives the ICA
   verification route jurisdiction from `HOST_JURISDICTION`. `_transaction`
   now resolves the ICA route scope from the configured trusted ICA and returns
   a functional `400 OperationOutcome` when that jurisdiction cannot be
   resolved in demo/local environments instead of drifting into downstream
   `500` failures.
-- Documented the current shared `BundleEntryEditor` surface used by GW and
-  added an executable contract test that makes explicit that
-  `asVitalSign()`/`asObservation()` are available while
-  AllergyIntolerance/MedicationStatement/Condition still use generic
-  `setClaim(...)`/`getClaim(...)` editing in this repo.
+- Reused already assigned controller/employee seats during `Organization/_issue`
+  before consuming an `available` pool license, allowing reinstalls/rebinds to
+  reissue activation codes for the same actor instead of failing on exhausted
+  free stock.
 
 ## [1.14.6] - 2026-06-23
 

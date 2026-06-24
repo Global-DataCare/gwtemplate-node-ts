@@ -12,9 +12,13 @@ npm run build:openapi-profiles
 
 Output files:
 
-- `artifacts/openapi-profiles/openapi-core.json`
-- `artifacts/openapi-profiles/openapi-compat.json`
-- `artifacts/openapi-profiles/openapi-extension.json`
+- `docs/openapi-profiles/openapi-core.json`
+- `docs/openapi-profiles/openapi-compat.json`
+- `docs/openapi-profiles/openapi-extension.json`
+
+These generated profiles are versioned documentation artifacts, not ephemeral
+test output. `artifacts/` remains reserved for local logs, runtime traces, and
+other non-versioned build/test byproducts.
 
 ## Profile Intent
 

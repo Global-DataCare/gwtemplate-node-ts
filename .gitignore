@@ -1,4 +1,5 @@
 # Added
+artifacts/
 admin*.*
 **/*.txt
 **/.DS_Store

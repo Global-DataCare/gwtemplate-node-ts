@@ -143,9 +143,13 @@ type LegalOrganizationVerificationTransactionResponseResource = Readonly<{
   icaResponse: unknown;
   next: LegalOrganizationVerificationTransactionNextStep;
 }>;
+type LegalOrganizationIssueResponseResource = Readonly<{
+  icaResponse: unknown;
+}>;
 const ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE_TYPE = 'Organization-verification-transaction-response-v1.0';
 const ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST_TYPE = 'Organization-verification-transaction-request-v1.0';
 const ORGANIZATION_VERIFICATION_TRANSACTION_NEXT_ACTION = 'Order/_batch';
+const ORGANIZATION_ISSUE_RESPONSE_TYPE = 'Organization-issue-response-v1.0';
 /**
  * Technical runtime marker copied outside encrypted employee content for the
  * host bootstrap controller created during tenant onboarding.
@@ -1361,6 +1365,9 @@ export class HostingManager {
           if (job.action === '_transaction') {
             return await this.processOrganizationVerificationTransaction(job);
           }
+          if (job.action === '_issue') {
+            return await this.processOrganizationIssue(job);
+          }
           if (job.action === '_activate') {
             return await this.processOrganizationActivation(job, environment);
           }
@@ -1538,6 +1545,57 @@ export class HostingManager {
     };
   }
 
+  private async processOrganizationIssue(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const issuerDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const entry = (job.content?.body?.data?.[0] || {}) as LegalOrganizationVerificationTransactionEntry;
+    const claims = normalizeContextualizedClaims(entry.meta?.claims || {});
+    const resource = (entry.resource || {}) as LegalOrganizationVerificationTransactionResource;
+    const requestedSector = String(claims[ClaimsServiceSchemaorg.category] || '').trim();
+    const resourceType = String(resource.verification?.resourceType || 'contract').trim() || 'contract';
+    if (!requestedSector) {
+      throw new ManagerError(`Missing required claim: '${ClaimsServiceSchemaorg.category}'`, IssueType.Required);
+    }
+
+    const icaResponse = await this.forwardOrganizationVerificationTransactionToIca({
+      job,
+      entry,
+      claims,
+      resource,
+      requestedSector,
+      resourceType,
+    });
+
+    const processedClaims = await this.createOrganizationIssueClaimsFromClaims({
+      claims,
+      environment: resourceType,
+      fallbackAlternateName: job.tenantId,
+      bearerPayload: (job.content as any)?.meta?.bearer?.jwt?.payload,
+    });
+
+    return {
+      jti: uuidv4(),
+      type: 'hosting-response',
+      thid: job.content?.thid as string,
+      iss: issuerDid,
+      aud: job.content?.iss as string,
+      body: {
+        resourceType: 'Bundle',
+        type: getBundleResponseTypeForAction(job.action),
+        total: 1,
+        data: [{
+          type: ORGANIZATION_ISSUE_RESPONSE_TYPE,
+          meta: {
+            claims: processedClaims,
+          },
+          resource: this.buildOrganizationIssueResponseResource(icaResponse),
+          response: {
+            status: '200',
+          },
+        }],
+      },
+    };
+  }
+
   /**
    * Projects the host `_transaction-response` contract into one explicit object
    * that portal/BFF callers can consume without reverse-engineering GW state.
@@ -1569,6 +1627,14 @@ export class HostingManager {
           identifierClaim: ClaimsOrderSchemaorg.acceptedOfferIdentifier,
         },
       },
+    };
+  }
+
+  private buildOrganizationIssueResponseResource(
+    icaResponse: unknown,
+  ): LegalOrganizationIssueResponseResource {
+    return {
+      icaResponse,
     };
   }
 
@@ -1606,7 +1672,6 @@ export class HostingManager {
       ...normalizedClaims,
       ...(alternateName ? { [ClaimsOrganizationSchemaorg.alternateName]: alternateName } : {}),
     };
-    validateNewOrganizationClaims(enrichedClaims);
 
     if (!alternateName) {
       throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
@@ -1684,6 +1749,190 @@ export class HostingManager {
     const secureTenantRegistrationDoc = await this.kmsService.protectConfidentialData(tenantRegistrationDoc, 'host');
     await this.vaultRepository.put(hostCollectionName!, [secureTenantRegistrationDoc], getEnvSectionId('tenants'));
     return processedClaims;
+  }
+
+  private async createOrganizationIssueClaimsFromClaims(input: {
+    claims: ClaimsRecord;
+    environment?: string;
+    fallbackAlternateName?: string;
+    bearerPayload?: Record<string, any>;
+  }): Promise<ClaimsRecord> {
+    const normalizedClaims = this.applyLegalOrganizationIdentityCompatibility(input.claims);
+    const alternateName = String(
+      normalizedClaims[ClaimsOrganizationSchemaorg.alternateName]
+      || input.fallbackAlternateName
+      || '',
+    ).trim();
+    const enrichedClaims: ClaimsRecord = {
+      ...normalizedClaims,
+      ...(alternateName ? { [ClaimsOrganizationSchemaorg.alternateName]: alternateName } : {}),
+    };
+    validateNewOrganizationClaims(enrichedClaims);
+
+    if (!alternateName) {
+      throw new ManagerError(`Missing required claim: '${ClaimsOrganizationSchemaorg.alternateName}'`, IssueType.Required);
+    }
+    if (!isValidTenantAlternateName(alternateName)) {
+      throw new ManagerError(`Invalid alternateName format: '${alternateName}'`, IssueType.Value);
+    }
+
+    const requestedSector = enrichedClaims[ClaimsServiceSchemaorg.category] as Sector;
+    if (!requestedSector) {
+      throw new ManagerError(`Missing required claim for existing tenant: '${ClaimsServiceSchemaorg.category}'`, IssueType.Required);
+    }
+    if (requestedSector === Sector.SYSTEM) {
+      throw new ManagerError("The 'system' sector is a reserved keyword and cannot be used by tenants.", IssueType.Forbidden);
+    }
+    if (!this.config.sectorsAllowed.includes(requestedSector)) {
+      throw new ManagerError(`The requested sector '${requestedSector}' is not supported by this gateway.`, IssueType.Value);
+    }
+
+    const vaultId = getTenantVaultId(requestedSector, alternateName);
+    if (!await this.vaultRepository.vaultExists(vaultId)) {
+      throw new ManagerError(`Tenant not found for Organization/_issue: '${vaultId}'`, IssueType.NotFound);
+    }
+
+    const controllerIdentity = await this.resolveOrganizationIssueControllerIdentity({
+      claims: enrichedClaims,
+      bearerPayload: input.bearerPayload,
+      tenantVaultId: vaultId,
+    });
+    const claimsForValidation: ClaimsRecord = {
+      ...enrichedClaims,
+      ...(controllerIdentity.email && !enrichedClaims[ClaimsPersonSchemaorg.email]
+        ? { [ClaimsPersonSchemaorg.email]: controllerIdentity.email }
+        : {}),
+      ...(controllerIdentity.role && !getPersonOccupationClaim(enrichedClaims as Record<string, any> | undefined)
+        ? { [ClaimsPersonSchemaorg.hasOccupation]: controllerIdentity.role }
+        : {}),
+    };
+    validateNewOrganizationClaims(claimsForValidation);
+
+    const { organization, service } = this.extractResources(claimsForValidation, input.environment);
+    const processedService = await this._handleServiceAttachment(service);
+    let processedClaims: ClaimsRecord = { ...claimsForValidation, ...(processedService?.meta.claims || {}) };
+
+    const jurisdiction = processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string;
+    const isIndividualOrg = !!processedClaims['org.schema.Organization.owner.telephone'];
+    if (!processedClaims[ClaimsOrganizationSchemaorg.identifier]) {
+      if (!isIndividualOrg) {
+        (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = createOrganizationUrn({
+          namespace: this.config.namespace,
+          network: this.getCurrentUrnNetwork(),
+          jurisdiction,
+          sector: requestedSector,
+          idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+          idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+        });
+      } else {
+        (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = alternateName || organization.id;
+      }
+    }
+
+    const { email: legalRepEmail, role: legalRepRole } = await this.resolveOrganizationIssueControllerIdentity({
+      claims: processedClaims,
+      bearerPayload: input.bearerPayload,
+      tenantVaultId: vaultId,
+    });
+    if (!legalRepEmail) {
+      throw new ManagerError(`Missing required claim for Organization/_issue: '${ClaimsPersonSchemaorg.email}'`, IssueType.Required);
+    }
+    if (!legalRepRole) {
+      throw new ManagerError('Missing required controller occupation claim for Organization/_issue.', IssueType.Required);
+    }
+
+    try {
+      const { activationCode } = await issueActivationCodeFromPool({
+        vaultRepository: this.vaultRepository,
+        kmsService: this.kmsService,
+        tenantVaultId: vaultId,
+        userClass: 'employee',
+        type: 'mobile',
+        email: legalRepEmail,
+        role: legalRepRole,
+      });
+      (processedClaims as any)['org.schema.IndividualProduct.serialNumber'] = activationCode;
+      (processedClaims as any)['org.schema.IndividualProduct.category'] = 'professional';
+    } catch (error: any) {
+      throw new ManagerError(
+        `Unable to issue a controller activation code for existing tenant '${vaultId}': ${String(error?.message || error)}`,
+        IssueType.Conflict,
+      );
+    }
+
+    return processedClaims;
+  }
+
+  private async resolveOrganizationIssueControllerIdentity(input: {
+    claims: ClaimsRecord;
+    bearerPayload?: Record<string, any>;
+    tenantVaultId: string;
+  }): Promise<{ email?: string; role?: string; }> {
+    const emailFromPayload = normalizeIndexedEmail(input.claims[ClaimsPersonSchemaorg.email]) as string | undefined;
+    const emailFromBearer = normalizeIndexedEmail(
+      (input.bearerPayload?.email as string | undefined)
+      || (input.bearerPayload?.upn as string | undefined)
+      || (input.bearerPayload?.preferred_username as string | undefined),
+    ) as string | undefined;
+    const roleFromPayload = getPersonOccupationClaim(input.claims as Record<string, any> | undefined);
+    const isDemoMode = this.config.securityMode === 'demo';
+
+    const email = isDemoMode
+      ? (emailFromPayload || emailFromBearer)
+      : emailFromBearer;
+    let role = roleFromPayload || await this.findStoredControllerRoleByEmail(input.tenantVaultId, email);
+
+    if (isDemoMode && !role) {
+      role = 'ISCO-08|1120';
+      console.log('[GW][demo] Organization/_issue controller role fallback applied', {
+        tenantVaultId: input.tenantVaultId,
+        email,
+        role,
+      });
+    }
+    if (isDemoMode) {
+      console.log('[GW][demo] Organization/_issue controller identity resolved', {
+        tenantVaultId: input.tenantVaultId,
+        email,
+        role,
+        usedBearerEmail: email === emailFromBearer && !!emailFromBearer,
+        usedPayloadEmail: email === emailFromPayload && !!emailFromPayload,
+      });
+    }
+    return { email, role };
+  }
+
+  private async findStoredControllerRoleByEmail(
+    tenantVaultId: string,
+    email: string | undefined,
+  ): Promise<string | undefined> {
+    const normalizedEmail = normalizeIndexedEmail(email) as string | undefined;
+    if (!normalizedEmail) return undefined;
+
+    const employeeDocs = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+      tenantVaultId,
+      getEnvSectionId('employees'),
+    );
+    for (const employeeDoc of employeeDocs) {
+      let claims = (employeeDoc?.content as any)?.claims as Record<string, any> | undefined;
+      if (!claims && typeof (this.kmsService as any)?.unprotectConfidentialData === 'function') {
+        try {
+          const unprotected = await (this.kmsService as any).unprotectConfidentialData(employeeDoc, tenantVaultId);
+          claims = unprotected?.claims as Record<string, any> | undefined;
+        } catch {
+          claims = claims || undefined;
+        }
+      }
+      const storedEmail = normalizeIndexedEmail(claims?.[ClaimsPersonSchemaorg.email]) as string | undefined;
+      if (!storedEmail || storedEmail !== normalizedEmail) {
+        continue;
+      }
+      const storedRole = getPersonOccupationClaim(claims);
+      if (storedRole) {
+        return storedRole;
+      }
+    }
+    return undefined;
   }
 
   private getIcaVerifyBaseUrl(): string {

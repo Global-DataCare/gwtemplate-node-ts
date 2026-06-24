@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 const inputPath = path.resolve(ROOT, 'swagger-spec.json');
-const outDir = path.resolve(ROOT, 'artifacts', 'openapi-profiles');
+const outDir = path.resolve(ROOT, 'docs', 'openapi-profiles');
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));

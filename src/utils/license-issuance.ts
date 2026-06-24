@@ -8,6 +8,7 @@ import type { IVaultRepository } from '../database/repositories/vault/vault.repo
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { getEnvSectionId } from './section-env';
 import {
+  LICENSE_STATUS_ACTIVE,
   LICENSE_STATUS_AVAILABLE,
   LICENSE_STATUS_ISSUED,
   LICENSE_TYPE_MOBILE,
@@ -15,6 +16,8 @@ import {
   LICENSE_USER_CLASS_EMPLOYEE,
   LICENSE_USER_CLASS_INDIVIDUAL,
 } from '../constants/domain';
+import { normalizeIndexedEmail } from './indexed-contact';
+import { normalizeCodeSystemAndValue } from './normalize-codeAndSystem';
 
 export type IssueActivationCodeParams = {
   vaultRepository: IVaultRepository;
@@ -41,7 +44,39 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
   const { vaultRepository, kmsService, tenantVaultId, userClass, type, email, role } = params;
 
   const all = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(tenantVaultId, getEnvSectionId('device-licenses'));
-  const match = all.find((doc) => {
+  const normalizedEmail = normalizeIndexedEmail(email);
+  const normalizedRole = normalizeCodeSystemAndValue(role);
+  const now = Math.floor(Date.now() / 1000);
+
+  const actorMatches = all.filter((doc) => {
+    const license = doc?.content as any;
+    if (!license || license.userClass !== userClass) {
+      return false;
+    }
+    if (license.exp && Number(license.exp) < now) {
+      return false;
+    }
+    const issuedEmail = normalizeIndexedEmail(String(license.issuedToEmail || ''));
+    const issuedRole = normalizeCodeSystemAndValue(String(license.issuedToRole || ''));
+    return Boolean(issuedEmail && issuedRole && issuedEmail === normalizedEmail && issuedRole === normalizedRole);
+  });
+
+  const existingMatch = actorMatches
+    .sort((left, right) => {
+      const leftLicense = left.content as any;
+      const rightLicense = right.content as any;
+      const leftTypeScore = leftLicense?.type === type ? 1 : 0;
+      const rightTypeScore = rightLicense?.type === type ? 1 : 0;
+      if (leftTypeScore !== rightTypeScore) return rightTypeScore - leftTypeScore;
+      const leftStatus = String(leftLicense?.status || left.status || '');
+      const rightStatus = String(rightLicense?.status || right.status || '');
+      const leftReusableScore = leftStatus === LICENSE_STATUS_ACTIVE || leftStatus === LICENSE_STATUS_ISSUED ? 1 : 0;
+      const rightReusableScore = rightStatus === LICENSE_STATUS_ACTIVE || rightStatus === LICENSE_STATUS_ISSUED ? 1 : 0;
+      if (leftReusableScore !== rightReusableScore) return rightReusableScore - leftReusableScore;
+      return Number(right.sequence || 0) - Number(left.sequence || 0);
+    })[0];
+
+  const availableSameType = all.find((doc) => {
     const license = doc?.content as any;
     const status = String((license && license.status) || doc.status || '');
     return (
@@ -52,13 +87,23 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
       !license.activationCode
     );
   });
+  const availableAnyType = all.find((doc) => {
+    const license = doc?.content as any;
+    const status = String((license && license.status) || doc.status || '');
+    return (
+      license &&
+      license.userClass === userClass &&
+      status === LICENSE_STATUS_AVAILABLE &&
+      !license.activationCode
+    );
+  });
+  const match = existingMatch || availableSameType || availableAnyType;
 
   if (!match) {
-    throw new Error(`No available license found for userClass='${userClass}' and type='${type}'.`);
+    throw new Error(`No reusable or available license found for userClass='${userClass}'.`);
   }
 
   const activationCode = `lic-${randomBytes(9).toString('base64url')}`;
-  const now = Math.floor(Date.now() / 1000);
 
   const license = match.content as DeviceLicense & Record<string, any>;
   license.activationCode = activationCode;
@@ -66,6 +111,9 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
   license.issuedToRole = role;
   license.issuedAt = now;
   license.status = LICENSE_STATUS_ISSUED;
+  delete license.activatedAt;
+  delete license.deviceId;
+  delete license.deviceInfo;
 
   match.status = LICENSE_STATUS_ISSUED;
   match.sequence = (match.sequence || 0) + 1;

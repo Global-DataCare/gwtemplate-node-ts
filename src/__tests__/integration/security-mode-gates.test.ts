@@ -1,29 +1,34 @@
 import express from 'express';
 import request from 'supertest';
 import { createApiRouter } from '../../routes/api';
+import { AppAuthorizationManager } from '../../managers/AppAuthorizationManager';
+import {
+  buildDeterministicIdTokenFixture,
+  DeterministicJwtTokenVerifier,
+} from '../utils/deterministic-jwt-fixtures';
 
-function buildTestApp(options?: { appAuthManager?: any }) {
+function buildTestApp(options?: { appAuthManager?: any; tenantsCacheManager?: any; kmsService?: any }) {
   const app = express();
-  app.use(express.json({ type: '*/*' }));
+  app.use(express.json({ type: ['application/json', 'application/didcomm-plain+json', 'application/fhir+json'] }));
   app.use(express.urlencoded({ extended: true }));
 
   const queueAdapter = {
     addJob: jest.fn(),
   } as any;
 
-  const tenantsCacheManager = {
+  const tenantsCacheManager = options?.tenantsCacheManager || {
     getDidServiceConfig: jest.fn(),
     getTenant: jest.fn(),
     getCollectionName: jest.fn(),
-  } as any;
+  };
 
-  const kmsService = {
+  const kmsService = options?.kmsService || {
     decodeRequest: jest.fn(),
     getHmacBase64Url: jest.fn(),
     unprotectConfidentialData: jest.fn(),
     getPublicVerificationKey: jest.fn(),
     createDetachedJws: jest.fn(),
-  } as any;
+  };
 
   const asyncResponseStore = {
     get: jest.fn(),
@@ -51,7 +56,7 @@ function buildTestApp(options?: { appAuthManager?: any }) {
       options?.appAuthManager,
     ),
   );
-  return app;
+  return { app, queueAdapter, tenantsCacheManager };
 }
 
 describe('SECURITY_MODE content-type gates', () => {
@@ -72,7 +77,7 @@ describe('SECURITY_MODE content-type gates', () => {
       DIDCOMM_PLAIN: 'false',
     };
 
-    const app = buildTestApp();
+    const { app } = buildTestApp();
     const response = await request(app)
       .post(targetPath)
       .set('Content-Type', 'application/json')
@@ -90,7 +95,7 @@ describe('SECURITY_MODE content-type gates', () => {
       DIDCOMM_PLAIN: 'false',
     };
 
-    const app = buildTestApp();
+    const { app } = buildTestApp();
     const response = await request(app)
       .post(targetPath)
       .set('Content-Type', 'application/json')
@@ -108,7 +113,7 @@ describe('SECURITY_MODE content-type gates', () => {
       DIDCOMM_PLAIN: 'false',
     };
 
-    const app = buildTestApp();
+    const { app } = buildTestApp();
     const response = await request(app)
       .post(targetPath)
       .set('Content-Type', 'application/fhir+json')
@@ -127,7 +132,7 @@ describe('SECURITY_MODE content-type gates', () => {
       DIDCOMM_PLAIN: 'false',
     };
 
-    const app = buildTestApp();
+    const { app } = buildTestApp();
     const response = await request(app)
       .post(targetPath)
       .set('Content-Type', 'application/didcomm-plain+json')
@@ -146,7 +151,7 @@ describe('SECURITY_MODE content-type gates', () => {
       DIDCOMM_PLAIN: 'true',
     };
 
-    const app = buildTestApp();
+    const { app } = buildTestApp();
     const response = await request(app)
       .post('/host/cds-es/v1/test/registry/org.schema/Organization/_activate')
       .set('Content-Type', 'application/json')
@@ -166,7 +171,7 @@ describe('SECURITY_MODE content-type gates', () => {
       DIDCOMM_PLAIN: 'true',
     };
 
-    const app = buildTestApp();
+    const { app } = buildTestApp();
     const response = await request(app)
       .post(credentialPath)
       .set('Content-Type', 'application/json')
@@ -191,7 +196,7 @@ describe('SECURITY_MODE content-type gates', () => {
         throw new Error('bad token');
       }),
     };
-    const app = buildTestApp({ appAuthManager });
+    const { app } = buildTestApp({ appAuthManager });
     const response = await request(app)
       .post(credentialPath)
       .set('Content-Type', 'application/json')
@@ -216,7 +221,7 @@ describe('SECURITY_MODE content-type gates', () => {
     const appAuthManager = {
       verifyIdToken: jest.fn(async () => ({ sub: 'test-client' })),
     };
-    const app = buildTestApp({ appAuthManager });
+    const { app } = buildTestApp({ appAuthManager });
     const response = await request(app)
       .post(credentialPath)
       .set('Content-Type', 'application/json')
@@ -226,5 +231,191 @@ describe('SECURITY_MODE content-type gates', () => {
     expect(appAuthManager.verifyIdToken).toHaveBeenCalledWith('valid-token');
     // Should fail later due to tenant setup in this test harness, not due to bearer auth.
     expect(response.status).toBe(404);
+  });
+
+  it('propagates verified bearer payload into Organization/_issue jobs in strict mode', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'true',
+      FHIR_LEGACY: 'true',
+      DIDCOMM_PLAIN: 'true',
+    };
+
+    const appAuthManager = {
+      verifyIdToken: jest.fn(async () => ({
+        valid: true,
+        payload: { email: 'controller@example.org', sub: 'controller-sub-001' },
+      })),
+    };
+    const tenantsCacheManager = {
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#registry:org.schema',
+        selector: { section: 'registry', format: 'org.schema' },
+        serviceEndpoint: 'organization',
+        actions: ['_issue'],
+      }]),
+      getTenant: jest.fn(),
+      getCollectionName: jest.fn(),
+    };
+    const kmsService = {
+      decodeRequest: jest.fn(async () => ({
+        content: {
+          thid: 'issue-thid-001',
+          iss: 'did:web:portal.example.org',
+          meta: {
+            jwe: { header: { jwk: { kty: 'EC', crv: 'P-256', x: 'x', y: 'y' } } },
+          },
+          body: {
+            data: [{
+              meta: {
+                claims: {
+                  'org.schema.Organization.alternateName': 'acme-health',
+                  'org.schema.Service.category': 'health-care',
+                },
+              },
+            }],
+          },
+        },
+      })),
+      getHmacBase64Url: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getPublicVerificationKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+    };
+    const { app, queueAdapter } = buildTestApp({ appAuthManager, tenantsCacheManager, kmsService });
+    const response = await request(app)
+      .post('/host/cds-es/v1/health-care/registry/org.schema/Organization/_issue')
+      .set('Authorization', 'Bearer valid-token')
+      .type('form')
+      .send({ request: 'opaque-jwe' });
+
+    expect(response.status).toBe(202);
+    expect(appAuthManager.verifyIdToken).toHaveBeenCalledWith('valid-token');
+    expect(queueAdapter.addJob).toHaveBeenCalledTimes(1);
+    const queuedJob = queueAdapter.addJob.mock.calls[0][1];
+    expect(queuedJob.content.meta.bearer.jwt.payload).toEqual({
+      email: 'controller@example.org',
+      sub: 'controller-sub-001',
+    });
+  });
+
+  it('accepts a deterministically signed id_token from one virtual BFF issuer in strict mode', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'true',
+      FHIR_LEGACY: 'true',
+      DIDCOMM_PLAIN: 'true',
+    };
+
+    const fixture = await buildDeterministicIdTokenFixture({
+      seed: 'gw-security-mode-seed-001',
+      issuer: 'did:web:bff.demo.example',
+      audience: 'gw-demo-audience',
+      subject: 'controller-sub-001',
+      email: 'controller@example.org',
+      extraClaims: {
+        tenant_id: 'acme-id',
+      },
+    });
+    const tokenVerifier = new DeterministicJwtTokenVerifier({
+      issuer: 'did:web:bff.demo.example',
+      audience: 'gw-demo-audience',
+      publicJwk: fixture.publicJwk,
+    });
+    const appAuthManager = new AppAuthorizationManager(
+      {
+        get: jest.fn(),
+        put: jest.fn(),
+        createNewVault: jest.fn(),
+        vaultExists: jest.fn(),
+        getVaultConfig: jest.fn(),
+        createNewSection: jest.fn(),
+        updateSection: jest.fn(),
+        getAllSections: jest.fn(),
+        sectionExists: jest.fn(),
+        getContainersListInSection: jest.fn(),
+        getContainersInSection: jest.fn(),
+        getHistory: jest.fn(),
+        query: jest.fn(),
+        delete: jest.fn(),
+        purge: jest.fn(),
+      } as any,
+      tokenVerifier,
+      {
+        getPublicVerificationKey: jest.fn(),
+        init: jest.fn(),
+        provisionKeys: jest.fn(),
+        getPublicJwks: jest.fn(),
+        getPublicEncryptionKey: jest.fn(),
+        getHostPublicJwkSet: jest.fn(),
+        decodeRequest: jest.fn(),
+        signWithManagedKey: jest.fn(),
+        signWithReconstructedKey: jest.fn(),
+        encodeResponse: jest.fn(),
+        createDetachedJws: jest.fn(),
+        createCompactJws: jest.fn(),
+        protectConfidentialData: jest.fn(),
+        unprotectConfidentialData: jest.fn(),
+        getHmacBase64Url: jest.fn(),
+        protectAttributesNameAndValue: jest.fn(),
+      } as any,
+      {
+        verifyJws: jest.fn(),
+      } as any,
+    );
+    const tenantsCacheManager = {
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#registry:org.schema',
+        selector: { section: 'registry', format: 'org.schema' },
+        serviceEndpoint: 'organization',
+        actions: ['_issue'],
+      }]),
+      getTenant: jest.fn(),
+      getCollectionName: jest.fn(),
+    };
+    const kmsService = {
+      decodeRequest: jest.fn(async () => ({
+        content: {
+          thid: 'issue-thid-oidc-001',
+          iss: 'did:web:portal.example.org',
+          meta: {
+            jwe: { header: { jwk: { kty: 'EC', crv: 'P-256', x: 'x', y: 'y' } } },
+          },
+          body: {
+            data: [{
+              meta: {
+                claims: {
+                  'org.schema.Organization.alternateName': 'acme-health',
+                  'org.schema.Service.category': 'health-care',
+                },
+              },
+            }],
+          },
+        },
+      })),
+      getHmacBase64Url: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getPublicVerificationKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+    };
+    const { app, queueAdapter } = buildTestApp({ appAuthManager, tenantsCacheManager, kmsService });
+    const response = await request(app)
+      .post('/host/cds-es/v1/health-care/registry/org.schema/Organization/_issue')
+      .set('Authorization', `Bearer ${fixture.compactToken}`)
+      .type('form')
+      .send({ request: 'opaque-jwe' });
+
+    expect(response.status).toBe(202);
+    expect(queueAdapter.addJob).toHaveBeenCalledTimes(1);
+    const queuedJob = queueAdapter.addJob.mock.calls[0][1];
+    expect(queuedJob.content.meta.bearer.jwt.payload).toMatchObject({
+      email: 'controller@example.org',
+      tenant_id: 'acme-id',
+      sub: 'controller-sub-001',
+    });
   });
 });

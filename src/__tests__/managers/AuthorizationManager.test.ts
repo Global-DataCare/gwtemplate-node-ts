@@ -10,6 +10,10 @@ import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { getTenantVaultId } from '../../utils/tenant';
 import { getEnvSectionId } from '../../utils/section-env';
+import {
+  buildDeterministicIdTokenFixture,
+  DeterministicJwtTokenVerifier,
+} from '../utils/deterministic-jwt-fixtures';
 
 // --- Mocks ---
 
@@ -19,7 +23,7 @@ const mockVaultRepository: jest.Mocked<IVaultRepository> = {
   // Other methods required by the interface
   createNewVault: jest.fn(), vaultExists: jest.fn(), getVaultConfig: jest.fn(),
   createNewSection: jest.fn(), updateSection: jest.fn(), getAllSections: jest.fn(),
-  sectionExists: jest.fn(), getContainersListInSection: jest.fn(), getContainersInSection: jest.fn(),
+  sectionExists: jest.fn(), getContainersListInSection: jest.fn(), listContainersInSection: jest.fn(), getContainersInSection: jest.fn(),
   getHistory: jest.fn(), query: jest.fn(), delete: jest.fn(), purge: jest.fn(),
 };
 
@@ -83,6 +87,35 @@ describe('AppAuthorizationManager', () => {
         // Act & Assert
         await expect(manager.verifyIdToken('invalid.id.token'))
             .rejects.toThrow('ID token is invalid: Invalid signature');
+    });
+
+    it('should validate one deterministically signed id_token through a local virtual BFF verifier', async () => {
+      const fixture = await buildDeterministicIdTokenFixture({
+        seed: 'gw-auth-manager-seed-001',
+        issuer: 'did:web:bff.demo.example',
+        audience: 'gw-demo-audience',
+        subject: 'controller-sub-001',
+        email: 'controller@example.org',
+      });
+      const verifier = new DeterministicJwtTokenVerifier({
+        issuer: 'did:web:bff.demo.example',
+        audience: 'gw-demo-audience',
+        publicJwk: fixture.publicJwk,
+      });
+      manager = new AppAuthorizationManager(
+        mockVaultRepository,
+        verifier,
+        mockKmsService,
+        mockCryptographyService,
+      );
+
+      const result = await manager.verifyIdToken(fixture.compactToken);
+
+      expect(result.valid).toBe(true);
+      expect(result.payload).toMatchObject({
+        email: 'controller@example.org',
+        sub: 'controller-sub-001',
+      });
     });
   });
   

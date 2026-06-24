@@ -7,15 +7,21 @@ import {
 import { DefaultActivationTrustAdapter } from '../../../adapters/activation-trust.adapter';
 import { IClearingHouseService } from '../../../services/ClearingHouseService';
 import { ITrustRegistryAdapter } from '../../../adapters/trust-registry.adapter';
+import { buildDeterministicVpTokenFixture } from '../../utils/deterministic-jwt-fixtures';
 
 const TEST_ORGANIZATION_DID = 'did:web:provider.example:health-care:organization:taxid:VATES-ESB00112233';
 
 describe('DefaultActivationTrustAdapter', () => {
+  const previousEnv = process.env;
   const vpTokenCompact = [
     Buffer.from(JSON.stringify({ alg: 'ML-DSA-44', typ: 'JWT' })).toString('base64url'),
     Buffer.from(JSON.stringify({ sub: 'did:web:controller.example.com' })).toString('base64url'),
     'mock-signature',
   ].join('.');
+
+  afterEach(() => {
+    process.env = previousEnv;
+  });
 
   it('marks strict trust checks in test-network/network and delegates VP verification', async () => {
     const clearingHouseService: IClearingHouseService = {
@@ -81,6 +87,52 @@ describe('DefaultActivationTrustAdapter', () => {
     })).resolves.toMatchObject({
       organizationDid: TEST_ORGANIZATION_DID,
       trustPolicy: { networkMode: 'network' },
+    });
+  });
+
+  it('verifies one deterministically signed ES384 vp_token in strict mode when the controller JWK is embedded', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      NODE_ENV: 'test',
+    };
+
+    const clearingHouseService: IClearingHouseService = {
+      verifyVpToken: jest.fn(async () => ({
+        acr: 'urn:test:acr',
+        ledgerVerified: true,
+      })),
+    };
+    const trustRegistryAdapter: ITrustRegistryAdapter = {
+      verifyActivationTrust: jest.fn(async () => ({
+        revocationChecked: true,
+        issuerKeyStatusChecked: true,
+        subjectKeyStatusChecked: true,
+        onChainChecked: false,
+      })),
+    };
+    const organizationCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL);
+    organizationCredential.credentialSubject.id = TEST_ORGANIZATION_DID;
+    const representativeCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL);
+    const vpFixture = await buildDeterministicVpTokenFixture({
+      seed: 'gw-activation-trust-seed-001',
+      issuerDid: 'did:web:controller.demo.example',
+      audience: 'did:web:host.demo.example',
+      credentials: [
+        organizationCredential,
+        representativeCredential,
+      ],
+    });
+    const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
+
+    await expect(adapter.evaluate({
+      networkMode: 'test-network',
+      vpToken: vpFixture.compactToken,
+      organizationCredential,
+      representativeCredential,
+    })).resolves.toMatchObject({
+      organizationDid: TEST_ORGANIZATION_DID,
+      trustPolicy: { networkMode: 'test-network' },
     });
   });
 });

@@ -49,9 +49,9 @@ docs/
 - **GW lifecycle current vs target**: [90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md) separates what is already implemented from the target normalized `PATCH`-based contract for SDK alignment.
 - **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
-  - `artifacts/openapi-profiles/openapi-core.json`
-  - `artifacts/openapi-profiles/openapi-compat.json`
-  - `artifacts/openapi-profiles/openapi-extension.json`
+  - `docs/openapi-profiles/openapi-core.json`
+  - `docs/openapi-profiles/openapi-compat.json`
+  - `docs/openapi-profiles/openapi-extension.json`
   See `docs/OPENAPI_PROFILES.md`.
 - **Docs QA (Flow Report)**: `artifacts/api-integrators-guide.flow-report.json` is generated via `npm run docs:flow-report` and captures the onboarding journey requests/responses.
 - **Contract-check intent**: The flow report is used as a reproducible docs/examples contract check and to keep Swagger examples aligned with real responses.

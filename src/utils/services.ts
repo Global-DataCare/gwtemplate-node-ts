@@ -505,7 +505,7 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
     createDidEndpointConfigFromSelector(
       { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
       ['Organization'],
-      ['_batch', '_transaction', '_activate', ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE],
+      ['_batch', '_transaction', '_issue', '_activate', ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE],
     ),
   );
   services.push(
