@@ -18,6 +18,9 @@
   (`src/utils/swagger-spec.ts` and `scripts/generate-swagger-spec.mts`) so
   tests and generated profile documents consume the same organization
   controller example set.
+- Moved generated core flow examples out of `artifacts/` and into
+  `docs/openapi-examples/core-flow-examples.json` so versioned example
+  documents live alongside the rest of the published API contract.
 
 ## [1.14.9] - 2026-06-24
 

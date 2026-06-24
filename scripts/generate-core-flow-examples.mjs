@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
 const srcPath = path.resolve(ROOT, 'src/__tests__/data/example-payloads.ts');
-const outPath = path.resolve(ROOT, 'artifacts/core-flow-examples.json');
+const outPath = path.resolve(ROOT, 'docs/openapi-examples/core-flow-examples.json');
 
 const mod = await import(pathToFileURL(srcPath).href);
 
