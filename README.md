@@ -22,6 +22,12 @@ FHIR-like `Communication` vs internal `CommMsgExtended`, read first:
 
 ## Repository Navigation
 
+- Canonical local/GKE/live operations index:
+  - local demo/runtime: [TESTING.md](TESTING.md)
+  - deployment details and env split: [DEPLOY.md](DEPLOY.md)
+  - API/docs index: [docs/README.md](docs/README.md)
+  - current controller lifecycle contract: [docs-v2/18-organization-controller-lifecycle.md](docs-v2/18-organization-controller-lifecycle.md)
+  - SDK live controller proof runner: [gdc-sdk-node-ts/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md)
 - Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
 - Testing and live E2E operations: [TESTING.md](TESTING.md)
 - Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)
@@ -50,6 +56,65 @@ For the canonical ICA + GW + SDK Node live verification workflow, including:
 - the exact env vars that avoid ICA URL / jurisdiction / host-network mistakes
 
 go first to [TESTING.md](TESTING.md).
+
+## Canonical Operations
+
+If you only need the current operational path, use these exact commands.
+
+### 1. Build the local GW image
+
+```bash
+./docker_build_local.sh
+```
+
+This is the canonical local image build for this repo. It uses the workspace
+root as Docker context and produces the local image `gwtemplate`.
+
+### 2. Deploy the current GW to GKE
+
+```bash
+SKIP_BUILD=true ./cloud_deploy.sh gke gdc demo-deploy.config
+```
+
+Use this after `./docker_build_local.sh`.
+
+This is the canonical GKE path in this repo:
+
+- runtime app config comes from `.env.gke.gdc`
+- cluster/image/static-IP config comes from `demo-deploy.config`
+- `SKIP_BUILD=true` re-tags and pushes the already-built local image
+  `gwtemplate`
+
+Do not treat `cloud_deploy.sh staging` and `cloud_deploy.sh gke gdc` as
+interchangeable:
+
+- `cloud_deploy.sh staging` is the Cloud Run path and expects `.env.deploy.*`
+- `cloud_deploy.sh gke gdc demo-deploy.config` is the GKE path and is the
+  current canonical deploy path for this workspace
+
+For the detailed split between Cloud Run, GKE, `.env.gke.gdc`, and
+`demo-deploy.config`, see [DEPLOY.md](DEPLOY.md).
+
+### 3. Prove controller lifecycle with VP bearer
+
+From `gdc-sdk-node-ts`:
+
+```bash
+cd ../gdc-sdk-node-ts
+npm run test:e2e:live-controller-lifecycle
+```
+
+That live runner:
+
+- starts ICA + GW locally
+- uses `TEST-A4-Antifraud.pdf` by default
+- runs `Organization/_transaction`
+- confirms the legal-organization order
+- rebuilds a controller `vp_token`
+- uses `Authorization: Bearer <vp_token>` for tenant `disable` and `purge`
+
+For the exact runner contract, see:
+- [gdc-sdk-node-ts/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md)
 
 ## 1) Clone repository
 
@@ -127,7 +192,15 @@ That is the clean local repro path for the individual onboarding flow through Sw
 
 ## 5.B) GKE demo deployment from the repo root
 
-For the current non-Fabric demo path, the root deploy entrypoint also supports GKE:
+The canonical GKE path is:
+
+```bash
+./docker_build_local.sh
+SKIP_BUILD=true ./cloud_deploy.sh gke gdc demo-deploy.config
+```
+
+If you explicitly want the script to build and push in one step, the root
+deploy entrypoint also supports GKE directly:
 
 ```bash
 source demo-deploy.config
