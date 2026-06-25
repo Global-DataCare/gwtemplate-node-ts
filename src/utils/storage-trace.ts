@@ -16,7 +16,7 @@ export function isStorageTraceEnabled(): boolean {
 }
 
 export function appendStorageTrace(
-  backend: 'firestore' | 'gcs',
+  backend: 'firestore' | 'gcs' | 'ipfs',
   operation: string,
   details: Record<string, unknown>,
 ): void {

@@ -1,10 +1,15 @@
 ## [Unreleased]
 
+## [1.15.0] - 2026-06-25
+
 ### Added
 - Added a dedicated `docs-v2/18-organization-controller-lifecycle.md` guide
   that explains the narrow controller recovery/rebind lifecycle, the direct GW
   route order, and the relationship to the canonical `gdc-sdk-node-ts`
   executable proof.
+- Added optional `STORAGE_PROVIDER=ipfs` support through a Kubo-backed
+  `IpfsStorageAdapter`, plus local IPFS compose/runtime templates for the
+  supported `DB_PROVIDER=postgres` + `STORAGE_PROVIDER=ipfs` profile.
 
 ### Changed
 - Extended the generated Swagger/OpenAPI examples so the organization
@@ -30,10 +35,13 @@
   target `Organization.identifier.value`. Representative-role and
   subject-to-signer binding checks remain future tightening work until the
   example VC/VP contract is finalized.
+- Documented and tested the open-source persistence profile that stores vault
+  metadata in PostgreSQL and confidential blobs in IPFS/Kubo.
 
 ### Testing
 - `npm test -- --runTestsByPath src/__tests__/integration/server.robustness.test.ts`
 - `npm test -- --runTestsByPath src/__tests__/integration/security-mode-gates.test.ts src/__tests__/managers/AuthorizationManager.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/unit/config/server-config.test.ts src/__tests__/unit/database/storage/ipfs.storage.adapter.test.ts src/__tests__/integration/repositories/postgres.vault.repository.it.spec.ts`
 - `npm run build`
 
 ## [1.14.9] - 2026-06-24

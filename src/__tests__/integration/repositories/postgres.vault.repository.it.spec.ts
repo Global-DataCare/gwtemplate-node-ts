@@ -5,6 +5,8 @@ import { PostgresVaultRepository } from '../../../database/repositories/postgres
 import { ensurePostgresVaultSchema } from '../../../database/repositories/postgres/postgres.schema';
 import { getEnvSectionId } from '../../../utils/section-env';
 import type { IConfidentialBlobStore } from '../../../database/storage/IConfidentialBlobStore';
+import { StorageAdapterConfidentialBlobStore } from '../../../database/storage/storage-adapter-confidential-blob.store';
+import { IpfsStorageAdapter } from '../../../database/storage/ipfs.storage.adapter';
 import { CONFIDENTIAL_JWE_INLINE_MAX_BYTES_ENV } from '../../../database/repositories/vault/confidential-storage-persistence';
 
 const HOST_COLLECTION = 'host-system-eu_vat_esx0000000x_system';
@@ -117,6 +119,70 @@ describe('PostgresVaultRepository (Integration)', () => {
       provider: 'mem',
       contentType: 'application/jose+json',
     });
+  });
+
+  it('supports the postgres + ipfs storage profile for oversized confidential payloads', async () => {
+    process.env[CONFIDENTIAL_JWE_INLINE_MAX_BYTES_ENV] = SMALL_INLINE_THRESHOLD_BYTES;
+    const sectionId = getEnvSectionId('employees');
+    const largeDoc = buildExampleConfidentialStorageDoc({
+      jwe: {
+        ...buildExampleConfidentialJwe(),
+        ciphertext: LARGE_CIPHERTEXT,
+      },
+    });
+    const storedBytes = new Map<string, Uint8Array>();
+    const ipfsFetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const mfsPath = url.searchParams.get('arg') || '';
+      const blobRef = mfsPath.split('/').pop() || '';
+      if (url.pathname.endsWith('/files/write')) {
+        storedBytes.set(blobRef, new Uint8Array(Buffer.from(JSON.stringify(largeDoc.jwe))));
+        return new Response('{}', { status: 200 });
+      }
+      if (url.pathname.endsWith('/files/stat')) {
+        return new Response(JSON.stringify({ Hash: `bafy-${blobRef}` }), { status: 200 });
+      }
+      if (url.pathname.endsWith('/files/read')) {
+        const dataBytes = storedBytes.get(blobRef);
+        if (!dataBytes) {
+          return new Response('not found', { status: 404, statusText: 'Not Found' });
+        }
+        return new Response(Buffer.from(dataBytes), { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call: ${url.toString()}`);
+    }) as typeof fetch;
+    const blobStore = new StorageAdapterConfidentialBlobStore(
+      new IpfsStorageAdapter({
+        apiUrl: 'http://127.0.0.1:5001',
+        gatewayUrl: 'http://127.0.0.1:8080',
+        fetchImpl: ipfsFetch,
+      }),
+      'ipfs',
+    );
+    repository = new PostgresVaultRepository(pool, HOST_COLLECTION, 'vault_test', blobStore);
+
+    await repository.put(TENANT_VAULT_ID, [largeDoc], sectionId);
+
+    const rawStored = await pool.query(
+      'SELECT payload_json FROM "vault_test"."vault_documents" WHERE collection_name = $1 AND section_id = $2 AND document_id = $3',
+      [TENANT_VAULT_ID, sectionId, largeDoc.id],
+    );
+    expect(rawStored.rows[0].payload_json.jwe).toBeUndefined();
+    expect(rawStored.rows[0].payload_json.blob).toMatchObject({
+      provider: 'ipfs',
+      blobRef: expect.stringMatching(/^z/),
+      contentType: 'application/jose+json',
+    });
+
+    const hydrated = await repository.get(TENANT_VAULT_ID, largeDoc.id, sectionId);
+    expect(hydrated).toMatchObject({
+      ...largeDoc,
+      blob: {
+        provider: 'ipfs',
+        blobRef: rawStored.rows[0].payload_json.blob.blobRef,
+      },
+    });
+    expect((hydrated as { jwe?: unknown }).jwe).toEqual(largeDoc.jwe);
   });
 
   it('finds a document by indexed attributes using the where query format', async () => {

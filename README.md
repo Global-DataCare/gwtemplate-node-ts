@@ -40,9 +40,11 @@ FHIR-like `Communication` vs internal `CommMsgExtended`, read first:
 - Local environment template: [env.example](env.example)
 - Local demo template: [env.local-demo.example](env.local-demo.example)
 - Firestore demo template: [env.firestore-demo.example](env.firestore-demo.example)
+- Local IPFS template: [env.local-ipfs.example](env.local-ipfs.example)
 - Local PostgreSQL overrides template: [env.local-postgres.example](env.local-postgres.example)
 - Cloud Supabase overrides template: [env.cloud-supabase.example](env.cloud-supabase.example)
 - Local PostgreSQL container: [docker-compose.postgres.yml](docker-compose.postgres.yml)
+- Local IPFS container: [docker-compose.ipfs.yml](docker-compose.ipfs.yml)
 
 ## Quick test
 
@@ -419,6 +421,27 @@ cp env.firestore-demo.example .env.firestore-demo
 3. Run the API:
 ```bash
 npm run api:local-firestore-demo
+```
+
+#### Option B3: Using Node.js with PostgreSQL + IPFS (open-source profile)
+
+This method keeps demo mode (`NODE_ENV=demo`) while persisting vault metadata in
+PostgreSQL and confidential blobs in a local Kubo node.
+
+1. Start the local dependencies:
+```bash
+npm run db:local-postgres:up
+npm run ipfs:local:up
+```
+
+2. Create your local profile:
+```bash
+cp env.local-ipfs.example .env.local-ipfs
+```
+
+3. Run the API:
+```bash
+npm run api:local-ipfs
 ```
 
 #### Option C: Using Docker

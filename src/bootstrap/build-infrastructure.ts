@@ -9,6 +9,7 @@ import { SupabaseStorageAdapter } from '../database/storage/supabase.storage.ada
 import { VaultMemRepository } from '../database/repositories/vault/vault.mem.repository';
 import type { IStorageAdapter } from '../database/storage/IStorageAdapter';
 import { GcsStorageAdapter } from '../database/storage/gcs.storage.adapter';
+import { IpfsStorageAdapter } from '../database/storage/ipfs.storage.adapter';
 import { StorageMemAdapter } from '../database/storage/mem.storage.adapter';
 import { StorageAdapterConfidentialBlobStore } from '../database/storage/storage-adapter-confidential-blob.store';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
@@ -57,6 +58,19 @@ export async function buildInfrastructure(options: {
       publicBucket: config.supabase.storagePublic !== false,
     });
     console.log(`[GW-API] Using Supabase Storage Adapter with bucket: ${config.supabase.storageBucket}`);
+  } else if (config.storageProvider === 'ipfs') {
+    if (!config.ipfs?.apiUrl) {
+      throw new Error("STORAGE_PROVIDER is 'ipfs', but IPFS_API_URL is not configured.");
+    }
+    if (!config.ipfs?.gatewayUrl) {
+      throw new Error("STORAGE_PROVIDER is 'ipfs', but IPFS_GATEWAY_URL is not configured.");
+    }
+    storageAdapter = new IpfsStorageAdapter({
+      apiUrl: config.ipfs.apiUrl,
+      gatewayUrl: config.ipfs.gatewayUrl,
+      mfsRoot: config.ipfs.mfsRoot,
+    });
+    console.log(`[GW-API] Using IPFS Storage Adapter with API: ${config.ipfs.apiUrl}`);
   } else {
     storageAdapter = new StorageMemAdapter();
     console.log('[GW-API] Using In-Memory Storage Adapter.');

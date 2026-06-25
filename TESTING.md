@@ -42,6 +42,9 @@ Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-cl
     # GCS E2E (requires valid credentials + bucket)
     GCS_E2E=true
 
+    # IPFS E2E (requires local Kubo node)
+    IPFS_E2E=true
+
     # Legacy API E2E (requires a real Firebase Auth user)
     TEST_USER_EMAIL=you@example.com
     TEST_USER_PASSWORD=your-password
@@ -51,6 +54,7 @@ Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-cl
     - If you need a different profile, set `JEST_ENV_FILE=<filename>` before running the E2E suite.
     - Firestore E2E runs only when `FIRESTORE_E2E=true` and either `FIRESTORE_EMULATOR_HOST` or valid Google credentials are present.
     - GCS E2E runs only when `GCS_E2E=true` and `GCS_BUCKET_NAME` is set.
+    - IPFS E2E runs only when `IPFS_E2E=true`. Start Kubo with `npm run ipfs:local:up`.
 
 ## 4. Authentication Clarity (Real vs Simulated)
 

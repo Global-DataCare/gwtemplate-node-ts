@@ -37,7 +37,7 @@ export interface DownloadResult {
 /**
  * Defines the interface for a generic file storage adapter.
  * This abstraction allows the application to interact with different
- * cloud storage providers (like Google Cloud Storage, AWS S3) in a uniform way.
+ * cloud storage providers (like Google Cloud Storage, IPFS/Kubo, AWS S3) in a uniform way.
  */
 export interface IStorageAdapter {
   /**

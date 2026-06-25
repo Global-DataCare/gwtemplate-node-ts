@@ -170,6 +170,30 @@ describe('server-config sector resolution', () => {
     resetServerConfig();
   });
 
+  it('should expose IPFS storage settings from environment', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      STORAGE_PROVIDER: 'ipfs',
+      IPFS_API_URL: 'http://127.0.0.1:5001',
+      IPFS_GATEWAY_URL: 'http://127.0.0.1:8080',
+      IPFS_MFS_ROOT: '/gwtemplate/blobs',
+    };
+
+    resetServerConfig();
+    const config = getConfig();
+
+    expect(config.storageProvider).toBe('ipfs');
+    expect(config.ipfs).toEqual({
+      apiUrl: 'http://127.0.0.1:5001',
+      gatewayUrl: 'http://127.0.0.1:8080',
+      mfsRoot: '/gwtemplate/blobs',
+    });
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
   it('should accept every SECURITY_MODE x NETWORK_MODE pair independently', () => {
     const previousEnv = process.env;
     const securityModes = ['strict', 'compat', 'demo'] as const;

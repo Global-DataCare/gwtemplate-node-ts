@@ -60,6 +60,11 @@ export interface IServerConfig {
     storageBucket?: string;
     storagePublic?: boolean;
   };
+  ipfs?: {
+    apiUrl?: string;
+    gatewayUrl?: string;
+    mfsRoot?: string;
+  };
   kekSecret?: string;
   host: {
     legalName?: string;

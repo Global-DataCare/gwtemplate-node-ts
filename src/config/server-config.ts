@@ -210,6 +210,11 @@ export function getConfig(): IServerConfig {
         storageBucket: process.env.SUPABASE_STORAGE_BUCKET,
         storagePublic: parseBooleanEnv(process.env.SUPABASE_STORAGE_PUBLIC, true),
       },
+      ipfs: {
+        apiUrl: process.env.IPFS_API_URL,
+        gatewayUrl: process.env.IPFS_GATEWAY_URL,
+        mfsRoot: process.env.IPFS_MFS_ROOT,
+      },
       kekSecret: process.env.KEK_SECRET,
       host: {
         legalName: getHostEnv('LEGAL_NAME'),
