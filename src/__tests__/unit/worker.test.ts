@@ -73,7 +73,7 @@ describe('Worker', () => {
     expect(mockIndividualManager.process).toHaveBeenCalledTimes(1);
     expect(mockIndividualManager.process).toHaveBeenCalledWith(job);
     expect(mockKmsService.encodeResponse).toHaveBeenCalledTimes(1);
-    expect(mockKmsService.getPublicEncryptionKey).toHaveBeenCalledWith(vaultId);
+    expect(mockKmsService.getPublicEncryptionKey).toHaveBeenCalledWith('host');
     expect(mockKmsService.protectConfidentialData).not.toHaveBeenCalled();
   });
 
@@ -194,7 +194,7 @@ describe('Worker', () => {
     };
 
     mockFamilyManager.process.mockResolvedValue(managerResponse);
-    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'tenant-key' } as any);
+    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'host-key' } as any);
     mockKmsService.encodeResponse.mockResolvedValue('encrypted-document-reference-response');
 
     await worker.process(jobName, job);
@@ -241,11 +241,54 @@ describe('Worker', () => {
       expect(mockKmsService.encodeResponse).toHaveBeenCalledWith(
         mockManagerResponse,
         [mockRecipientPublicEncryptionKey],
-        'health-care_acme' // senderVaultId
+        'host'
       );
 
       // It MUST NOT call protectConfidentialData, which is for at-rest storage in the main vault.
       expect(mockKmsService.protectConfidentialData).not.toHaveBeenCalled();
+    });
+
+    it('should encrypt plaintext tenant responses to host so legacy flows do not depend on tenant KMS state', async () => {
+      const resourceType = 'Employee';
+      const jobName = createJobName('health-care_acme', resourceType, '_batch');
+      const job: JobRequest = {
+        ...testCreateCustomerJobRequestProfessionalOnboarding,
+        tenantId: 'acme',
+        sector: 'health-care',
+        section: 'entity',
+        format: 'org.schema',
+        resourceType,
+        contentType: 'application/json',
+      };
+
+      const mockManagerResponse: IDecodedDidcommPayload = {
+        jti: 'mock-jti-response-legacy-tenant',
+        type: 'batch-response',
+        iss: API_BASE_URL,
+        aud: 'urn:did:example:123',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        thid: job.content!.thid,
+        body: { data: [{ type: 'Employee-form-v1.0' }] },
+      };
+
+      const mockEmployeeManager = mock<IJobProcessor>();
+      const registryWithEmployee = mock<ManagerRegistry>({
+        employeeManager: mockEmployeeManager,
+      });
+      const localWorker = new Worker(registryWithEmployee, API_BASE_URL, mockKmsService);
+
+      mockEmployeeManager.process.mockResolvedValue(mockManagerResponse);
+      mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kty: 'OKP', crv: 'ML-KEM-768', kid: 'host-key', x: '...' } as any);
+      mockKmsService.encodeResponse.mockResolvedValue('encrypted-host-response');
+
+      await localWorker.process(jobName, job);
+
+      expect(mockKmsService.getPublicEncryptionKey).toHaveBeenCalledWith('host');
+      expect(mockKmsService.encodeResponse).toHaveBeenCalledWith(
+        mockManagerResponse,
+        [expect.objectContaining({ kid: 'host-key' })],
+        'host',
+      );
     });
   });
 });

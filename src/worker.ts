@@ -160,17 +160,19 @@ export class Worker {
         // --- FLOW B: LEGACY / PLAINTEXT FLOW ---
         // The original request was unencrypted (e.g., application/json). We must still
         // encrypt the response for secure storage in the AsyncResponseStore.
-        // The recipient is determined by the nature of the job.
-        let recipientVaultId: string;
-        if (jobInfo.resourceType === 'Organization' && job.tenantId === 'host') {
-          // Special case (legacy plaintext onboarding):
-          // Encrypt-to-host so the polling handler can always decrypt, even before the new tenant's keys exist.
-          recipientVaultId = 'host';
-          responseSenderVaultId = 'host';
-        } else {
-          // Default Case: An existing tenant is processing a job. Encrypt for the tenant itself.
-          recipientVaultId = senderVaultId;
-        }
+        //
+        // IMPORTANT:
+        // Plaintext routes are polled by the gateway itself, and the polling handler
+        // always decrypts server-side before returning the business payload. Therefore
+        // the async artifact only needs to be decryptable by the host runtime.
+        //
+        // Encrypting plaintext artifacts to the tenant vault makes the flow fragile:
+        // after restarts / pod moves, the tenant vault may still exist while its
+        // ephemeral in-memory KMS material is unavailable, causing unrelated legacy
+        // routes (e.g. Employee/_batch after _activate) to fail during response
+        // packaging. Encrypt-to-host avoids that runtime coupling.
+        const recipientVaultId = 'host';
+        responseSenderVaultId = 'host';
 
         const encryptionKey = await this.kmsService.getPublicEncryptionKey(recipientVaultId);
         if (!encryptionKey) {
