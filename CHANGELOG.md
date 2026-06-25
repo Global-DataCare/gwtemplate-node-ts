@@ -5,6 +5,9 @@
   that explains the narrow controller recovery/rebind lifecycle, the direct GW
   route order, and the relationship to the canonical `gdc-sdk-node-ts`
   executable proof.
+- Added `npm run kms:audit` to report tenants/host missing persisted
+  `wrapped_keys` and flag whether confidential-data decryption or HMAC-backed
+  search is at risk.
 
 ### Changed
 - Extended the generated Swagger/OpenAPI examples so the organization
@@ -36,10 +39,20 @@
   completed activation response again includes `org.schema.Offer.identifier`
   and the follow-up `Order/_batch` step can confirm the generated Offer for
   employee-seat licensing and activation-code issuance.
+- Persisted tenant and host KMS key material as wrapped records in the host
+  vault so plaintext async flows keep encrypting responses to the tenant after
+  process restarts or pod hops instead of failing when `_managedKeys` memory is
+  empty. `KmsService.init()` now reuses persisted host keys instead of silently
+  reprovisioning a new host keyset on each restart.
+- Restored the documented tenant `didDocument` fallback for public encryption
+  key resolution so legacy tenants can still receive plaintext async responses
+  when their published ML-KEM key exists even if wrapped private material is
+  missing in the current process.
 
 ### Testing
 - `npm test -- --runTestsByPath src/__tests__/integration/server.robustness.test.ts`
 - `npm test -- --runTestsByPath src/__tests__/integration/security-mode-gates.test.ts src/__tests__/managers/AuthorizationManager.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/unit/services/KmsService.test.ts src/__tests__/integration/tenant-kms-rehydration.api.test.ts`
 - `npm run build`
 
 ## [1.14.9] - 2026-06-24

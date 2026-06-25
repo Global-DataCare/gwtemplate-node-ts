@@ -10,7 +10,8 @@ import { JWK } from '../../../gdc-backend-utils-node/models/jwk';
 import { DataCompactJWT } from 'gdc-common-utils-ts/models/jwt';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
-import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import { InMemoryEnvelopeAdapter } from '../../../services/kms-envelope-adapter';
+import { InMemoryWrappedKeyRepository } from '../../../services/wrapped-key-repository';
 
 // Mock the dependency
 const mockCryptoService: jest.Mocked<ICryptography> = {
@@ -36,11 +37,13 @@ const mockCryptoService: jest.Mocked<ICryptography> = {
 
 const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
   findTenantByDid: jest.fn(),
+  getDidDocument: jest.fn(),
 } as any;
 
 
 describe('KmsService', () => {
   let kmsService: KmsService;
+  let wrappedKeyRepository: InMemoryWrappedKeyRepository;
 
   // Define mock keys that will be returned by the crypto service
   const mockMldsaPublicKey: MldsaPublicJwk & { kid: string } = { kty: 'AKP', alg: 'ML-DSA-65', kid: 'mock-dsa-kid', pub: 'mock-dsa-pub-key' };
@@ -56,7 +59,11 @@ describe('KmsService', () => {
     mockCryptoService.generateKeyPairMlDsa.mockResolvedValue({ publicJWKey: mockMldsaPublicKey, secretKeyBytes: mockMldsaSecretKey });
     mockCryptoService.generateKeyPairMlKem.mockResolvedValue({ publicJWKey: mockMlkemPublicKey, secretKeyBytes: mockMlkemSecretKey });
 
-    kmsService = new KmsService(mockCryptoService, mockTenantsCacheManager);
+    wrappedKeyRepository = new InMemoryWrappedKeyRepository();
+    kmsService = new KmsService(mockCryptoService, mockTenantsCacheManager, {
+      wrappedKeyRepository,
+      envelopeAdapter: new InMemoryEnvelopeAdapter(),
+    });
   });
 
   describe('provisionKeys', () => {
@@ -226,6 +233,68 @@ describe('KmsService', () => {
       const unprotectedContent = await kmsService.unprotectConfidentialData(protectedDoc, entityId);
       expect(mockCryptoService.decrypt).toHaveBeenCalledWith(mockEncryptedData, expect.any(Uint8Array), entityId);
       expect(unprotectedContent).toEqual(docContent);
+    });
+  });
+
+  describe('wrapped key rehydration', () => {
+    it('reloads a tenant public encryption key from persisted wrapped records after restart', async () => {
+      await kmsService.provisionKeys('tenant-123');
+
+      const restartedKmsService = new KmsService(mockCryptoService, mockTenantsCacheManager, {
+        wrappedKeyRepository,
+        envelopeAdapter: new InMemoryEnvelopeAdapter(),
+      });
+      await restartedKmsService.init();
+
+      const publicKey = await restartedKmsService.getPublicEncryptionKey('tenant-123');
+      expect(publicKey).toEqual(expect.objectContaining({ kid: mockMlkemPublicKey.kid }));
+    });
+
+    it('reloads a tenant private encryption key by recipient kid when decoding after restart', async () => {
+      await kmsService.provisionKeys('tenant-123');
+
+      const restartedKmsService = new KmsService(mockCryptoService, mockTenantsCacheManager, {
+        wrappedKeyRepository,
+        envelopeAdapter: new InMemoryEnvelopeAdapter(),
+      });
+      await restartedKmsService.init();
+
+      const message = 'compact-jwe-string';
+      const mockDecryptedBytes = Content.stringToBytesUTF8(JSON.stringify({ body: { ok: true } }));
+      const mockProtectedHeader = { enc: 'A256GCM', skid: 'sender-key-id' };
+
+      mockCryptoService.getRecipientKidsFromJwe.mockReturnValue([mockMlkemPublicKey.kid]);
+      mockCryptoService.decryptJwe.mockResolvedValue({ decryptedBytes: mockDecryptedBytes, protectedHeader: mockProtectedHeader });
+
+      const jobRequest = await restartedKmsService.decodeRequest(message);
+
+      expect(mockCryptoService.decryptJwe).toHaveBeenCalledWith(
+        message,
+        expect.objectContaining({ kid: mockMlkemPublicKey.kid, dBytes: expect.any(Uint8Array) }),
+      );
+      expect(jobRequest.content?.body).toEqual({ ok: true });
+    });
+  });
+
+  describe('didDocument public-key fallback', () => {
+    it('resolves the tenant public encryption key from the persisted didDocument when wrapped keys are absent', async () => {
+      mockTenantsCacheManager.getDidDocument.mockResolvedValue({
+        id: 'did:web:tenant.example.com',
+        verificationMethod: [
+          {
+            id: 'did:web:tenant.example.com#enc-1',
+            type: 'JsonWebKey',
+            controller: 'did:web:tenant.example.com',
+            publicKeyJwk: mockMlkemPublicKey,
+          },
+        ],
+        keyAgreement: ['did:web:tenant.example.com#enc-1'],
+      } as any);
+
+      const publicKey = await kmsService.getPublicEncryptionKey('legacy-tenant');
+
+      expect(publicKey).toEqual(mockMlkemPublicKey);
+      expect(mockTenantsCacheManager.getDidDocument).toHaveBeenCalledWith('legacy-tenant');
     });
   });
 });
