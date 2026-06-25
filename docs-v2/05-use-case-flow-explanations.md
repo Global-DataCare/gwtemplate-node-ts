@@ -53,6 +53,8 @@ Current GW-aligned transport choice:
 - for research digital twin ingestion, teach
   `digitaltwin/org.hl7.fhir.api/Composition/_batch`,
 - the emitted batch may contain multiple `body.data[]` entries.
+- for the still-missing separate research store and cross-twin search plan, see
+  [20-research-digital-twin-store-and-search-plan.md](./20-research-digital-twin-store-and-search-plan.md)
 
 ## Why Communication is central
 
