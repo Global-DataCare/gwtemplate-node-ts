@@ -19,7 +19,7 @@ import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { KmsService } from '../services/KmsService';
 import { DemoKmsService } from '../services/DemoKmsService';
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
-import { AesGcmEnvelopeAdapter, InMemoryEnvelopeAdapter } from '../services/kms-envelope-adapter';
+import { createEnvelopeAdapter } from '../services/envelope-adapter-factory';
 import { VaultWrappedKeyRepository } from '../services/wrapped-key-repository';
 
 export async function buildInfrastructure(options: {
@@ -88,12 +88,11 @@ export async function buildInfrastructure(options: {
   let kmsService: IKmsService;
   const tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, hostCollectionName);
   const wrappedKeyRepository = new VaultWrappedKeyRepository(vaultRepository, hostCollectionName);
-  const envelopeAdapter = config.kekSecret
-    ? new AesGcmEnvelopeAdapter(config.kekSecret)
-    : new InMemoryEnvelopeAdapter();
-  if (!config.kekSecret) {
-    console.warn('[GW-API] KEK_SECRET is not configured. Wrapped key persistence falls back to a development envelope adapter.');
+  const { adapter: envelopeAdapter, provider: envelopeProvider } = createEnvelopeAdapter(config);
+  if (envelopeProvider === 'memory') {
+    console.warn('[GW-API] Envelope provider is memory. Use this only for dev/test.');
   }
+  console.log(`[GW-API] Using envelope provider: ${envelopeProvider}`);
   if (config.nodeEnv === 'demo') {
     const realKmsService = new KmsService(cryptographyService, tenantManager, {
       wrappedKeyRepository,

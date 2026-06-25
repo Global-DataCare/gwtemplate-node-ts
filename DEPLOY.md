@@ -78,6 +78,7 @@ Contiene la configuración interna de la aplicación:
 
 - identidad del host
 - providers (`firestore`, `gcs`, `mem`, etc.)
+- provider de custodia raíz para `wrapped_keys`
 - modo de seguridad
 - flags demo
 - URLs lógicas del host
@@ -88,7 +89,19 @@ Ejemplos:
 - `HOST_LEGAL_NAME`
 - `DB_PROVIDER`
 - `STORAGE_PROVIDER`
+- `ENVELOPE_PROVIDER`
 - `HOST_PUBLIC_URL`
+
+Regla de custodia:
+
+- `ENVELOPE_PROVIDER=memory` solo para dev/test
+- `ENVELOPE_PROVIDER=local` usa `KEK_SECRET` y es compat/local
+- `ENVELOPE_PROVIDER=gcp-kms` es el objetivo productivo en GCP
+- `ENVELOPE_PROVIDER=hashicorp-transit` es la opción portable/open source
+
+No uses solo la palabra `vault` para este tema en docs operativos, porque GW ya
+usa `vault` para almacenamiento confidencial y el provider externo de custodia
+raíz puede ser `HashiCorp Transit`.
 
 ### `demo-deploy.config`
 

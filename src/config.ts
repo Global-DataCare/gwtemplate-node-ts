@@ -60,7 +60,20 @@ export interface IServerConfig {
     storageBucket?: string;
     storagePublic?: boolean;
   };
+  envelope?: {
+    provider?: 'memory' | 'local' | 'gcp-kms' | 'hashicorp-transit';
+  };
   kekSecret?: string;
+  gcpKms?: {
+    keyName?: string;
+  };
+  hashicorpTransit?: {
+    baseUrl?: string;
+    mountPath?: string;
+    keyName?: string;
+    token?: string;
+    namespace?: string;
+  };
   host: {
     legalName?: string;
     jurisdiction?: string;

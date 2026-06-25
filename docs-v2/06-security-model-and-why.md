@@ -53,6 +53,13 @@ Controls are distributed across:
 - cryptographic verification paths,
 - auditable async submit/poll model.
 
+## Key custody boundary
+
+For the current operational custody model and the explicit audit caveat around
+`KEK_SECRET`, read:
+
+- [19-key-custody-and-audit-readiness.md](./19-key-custody-and-audit-readiness.md)
+
 Read next:
 
 - [Communication layering 101](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)

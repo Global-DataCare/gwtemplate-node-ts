@@ -1,13 +1,21 @@
-## [Unreleased]
+## [1.16.0] - 2026-06-26
 
 ### Added
 - Added a dedicated `docs-v2/18-organization-controller-lifecycle.md` guide
   that explains the narrow controller recovery/rebind lifecycle, the direct GW
   route order, and the relationship to the canonical `gdc-sdk-node-ts`
   executable proof.
+- Added `docs-v2/19-key-custody-and-audit-readiness.md` so the current KMS
+  persistence model, the residual `KEK_SECRET` weakness, and the production
+  migration target toward external KMS/HSM custody are documented in the v2
+  docs set.
 - Added `npm run kms:audit` to report tenants/host missing persisted
   `wrapped_keys` and flag whether confidential-data decryption or HMAC-backed
   search is at risk.
+- Added explicit envelope-root provider selection for wrapped key custody:
+  `memory`, `local`, `gcp-kms`, and `hashicorp-transit`. The HashiCorp option
+  is named after the Transit engine on purpose so it is not confused with the
+  GW confidential storage vault.
 
 ### Changed
 - Extended the generated Swagger/OpenAPI examples so the organization
@@ -33,6 +41,9 @@
   target `Organization.identifier.value`. Representative-role and
   subject-to-signer binding checks remain future tightening work until the
   example VC/VP contract is finalized.
+- Bootstrapping now resolves wrapped-key envelope custody through an explicit
+  provider factory instead of implicitly falling back from `KEK_SECRET` to
+  in-memory behavior.
 
 ### Fixed
 - Restored legacy host `Organization/_activate` commercial continuity so the

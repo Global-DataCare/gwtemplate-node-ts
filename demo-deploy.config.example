@@ -25,6 +25,8 @@ export GDC_GSA_EMAIL="gwtemplate-gke@globaldatacare-test.iam.gserviceaccount.com
 # Runtime env comes from `.env.gke.<profile>`.
 # If you need the provisional startup workaround for a Firestore auth incident,
 # set `STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR=true` there, not here.
+# The same runtime env file should also define `ENVELOPE_PROVIDER` and any
+# provider-specific root-custody settings such as `GCP_KMS_KEY_NAME`.
 
 # Optional external ICA URL. Leave empty while GW runs standalone.
 export DATASPACE_ICA_EXTERNAL_URL=""
