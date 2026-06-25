@@ -31,6 +31,12 @@
   subject-to-signer binding checks remain future tightening work until the
   example VC/VP contract is finalized.
 
+### Fixed
+- Restored legacy host `Organization/_activate` commercial continuity so the
+  completed activation response again includes `org.schema.Offer.identifier`
+  and the follow-up `Order/_batch` step can confirm the generated Offer for
+  employee-seat licensing and activation-code issuance.
+
 ### Testing
 - `npm test -- --runTestsByPath src/__tests__/integration/server.robustness.test.ts`
 - `npm test -- --runTestsByPath src/__tests__/integration/security-mode-gates.test.ts src/__tests__/managers/AuthorizationManager.test.ts`

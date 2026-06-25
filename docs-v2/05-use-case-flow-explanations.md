@@ -20,6 +20,40 @@ This section explains the intent behind the core operational flow shape.
 - Write path favors canonical communication/document ingestion.
 - Read path favors bundle/document retrieval and indexed attributes.
 
+## Research digital twin push flow
+
+For research-oriented digital twin updates, do not teach a cross-tenant pull
+model where the research tenant reads directly from every provider tenant.
+
+The v2 operational model is:
+
+1. an individual controller grants a research authorization through consent or
+   equivalent policy,
+2. the tenant that maintains the individual's operational index receives the new
+   index update,
+3. that source tenant evaluates whether a specific anonymization or
+   `digitaltwin` receiver is authorized for that subject and purpose,
+4. if authorized, the source tenant emits a derived and anonymized payload to
+   the receiver's `digitaltwin` ingestion endpoint,
+5. the receiver stores the result in its separate research/digital twin scope.
+
+Important separation rules:
+
+- tenant `Service.*` claims describe published service capability, not a
+  subject-specific research authorization,
+- the individual authorization is separate from tenant service publication,
+- the source tenant pushes derived anonymized artifacts, not its full
+  operational index,
+- the receiver is identified by its public `did:web` and resolved
+  `didDocument.service[].serviceEndpoint`.
+
+Current GW-aligned transport choice:
+
+- for individual operational index exchange, teach `Communication`,
+- for research digital twin ingestion, teach
+  `digitaltwin/org.hl7.fhir.api/Composition/_batch`,
+- the emitted batch may contain multiple `body.data[]` entries.
+
 ## Why Communication is central
 
 `Communication` is the canonical auditable request envelope for several cross-resource flows.

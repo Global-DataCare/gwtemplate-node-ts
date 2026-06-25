@@ -56,6 +56,7 @@ import { getEnvSectionId } from '../utils/section-env';
 import { normalizeIndexedEmail, splitIndexedEmails, splitIndexedPhones } from '../utils/indexed-contact';
 import {
   buildOfferOrderIndexedAttributes,
+  readProjectedOfferOrderClaims,
 } from '../utils/offer-order-read-model';
 import { HostingOfferOrderService } from './hosting/HostingOfferOrderService';
 import { HostingLifecycleService } from './hosting/HostingLifecycleService';
@@ -2346,6 +2347,18 @@ export class HostingManager {
         requestedSector,
       );
     }
+    const requestedEmployeeSeats = Number(processedClaims[ClaimsOrganizationSchemaorg.numberOfEmployees] || 0);
+    if (Number.isFinite(requestedEmployeeSeats) && requestedEmployeeSeats > 0) {
+      const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+      const offerClaims = generateLicenseOffer(
+        requestedEmployeeSeats,
+        hostDid,
+        processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+        requestedSector,
+        this.config.allowedPaymentMethods,
+      );
+      Object.assign(processedClaims, offerClaims);
+    }
 
     const tenantCollectionName = generateTenantCollectionNameFromClaims(processedClaims);
     await this.vaultRepository.createNewVault({ id: tenantCollectionName });
@@ -2841,6 +2854,13 @@ export class HostingManager {
     );
 
     if (decryptedContent?.status !== EntityLifecycleStatus.Pending) {
+      const projectedClaims = readProjectedOfferOrderClaims(secureDoc);
+      if (
+        decryptedContent?.status === EntityLifecycleStatus.Active
+        && String(projectedClaims[ClaimsOfferSchemaorg.identifier] || '').trim() === offerId
+      ) {
+        return this.processActivatedTenantOrderEntry(claims, offerId, projectedClaims);
+      }
       throw new ManagerError(`Found registration for offerId '${offerId}', but it is not in 'pending' state.`, IssueType.Conflict);
     }
 
@@ -3053,6 +3073,141 @@ export class HostingManager {
     offerId: string,
   ): Promise<BundleEntry | ErrorEntry> {
     return this.offerOrderService.processLicenseOrderEntry(orderClaims, offerId);
+  }
+
+  private async processActivatedTenantOrderEntry(
+    orderClaims: ClaimsRecord,
+    offerId: string,
+    matchedOfferClaims: ClaimsRecord,
+  ): Promise<BundleEntry | ErrorEntry> {
+    const verification = await verifyOrderPaymentConfirmation({ orderClaims, offerClaims: matchedOfferClaims });
+    if (!verification.verified) {
+      throw new ManagerError(`Payment confirmation failed for offerId '${offerId}'.`, IssueType.Conflict);
+    }
+
+    const tenantId = String(matchedOfferClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+    const sector = String(
+      matchedOfferClaims[ClaimsOfferSchemaorg.category]
+      || matchedOfferClaims[ClaimsServiceSchemaorg.category]
+      || '',
+    ).trim();
+    if (!tenantId || !sector) {
+      throw new ManagerError('Activated tenant Offer is missing tenant alternateName or sector.', IssueType.Required);
+    }
+
+    const tenantVaultId = getTenantVaultId(sector as Sector, tenantId);
+    const quantity = Number(matchedOfferClaims[ClaimsOfferSchemaorg.eligibleQuantityValue] || 1);
+    const expiryDate = new Date(Date.now());
+    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    const exp = Math.floor(expiryDate.getTime() / 1000);
+    const licenseDocs: ConfidentialStorageDoc[] = [];
+    for (let i = 0; i < quantity; i++) {
+      const licenseId = uuidv4();
+      const license: DeviceLicense = {
+        id: licenseId,
+        tenantId,
+        orderId: verification.invoiceId || offerId,
+        userClass: 'employee',
+        userCategory: 'default',
+        type: 'mobile',
+        status: 'available',
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        exp,
+      };
+      licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
+    }
+    await this.vaultRepository.put(tenantVaultId, licenseDocs, getEnvSectionId('device-licenses'));
+
+    let activationCode: string | undefined;
+    const legalRepEmail = matchedOfferClaims[ClaimsPersonSchemaorg.email] as string | undefined;
+    const legalRepRole = getPersonOccupationClaim(matchedOfferClaims as Record<string, any> | undefined);
+    if (legalRepEmail && legalRepRole) {
+      try {
+        ({ activationCode } = await issueActivationCodeFromPool({
+          vaultRepository: this.vaultRepository,
+          kmsService: this.kmsService,
+          tenantVaultId,
+          userClass: 'employee',
+          type: 'mobile',
+          email: legalRepEmail,
+          role: legalRepRole,
+        }));
+      } catch (e: any) {
+        this.logger.warn?.(
+          `[HostingManager] Failed to auto-issue legal rep activation code after activation order: ${String(e?.message || e)}`,
+        );
+      }
+    }
+
+    const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const tenantDid = String(matchedOfferClaims[ClaimsOrganizationSchemaorg.identifier] || '').trim() || `urn:tenant:${tenantId}`;
+    const paymentCommunication = await buildPaymentCommunication({
+      offerId,
+      tenantId,
+      tenantDid,
+      senderDid: hostDid,
+      email: matchedOfferClaims[ClaimsPersonSchemaorg.email] as string | undefined,
+      legalName: matchedOfferClaims[ClaimsOrganizationSchemaorg.legalName] as string | undefined,
+      addressCountry: matchedOfferClaims[ClaimsOrganizationSchemaorg.addressCountry] as string | undefined,
+      addressRegion: matchedOfferClaims[ClaimsOrganizationSchemaorg.addressRegion] as string | undefined,
+      addressLocality: matchedOfferClaims[ClaimsOrganizationSchemaorg.addressLocality] as string | undefined,
+      postalCode: matchedOfferClaims[ClaimsOrganizationSchemaorg.postalCode] as string | undefined,
+      streetAddress: matchedOfferClaims[ClaimsOrganizationSchemaorg.streetAddress] as string | undefined,
+      activationCode,
+      activationCategory: activationCode ? 'professional' : undefined,
+      paymentMethod: verification.paymentMethod,
+      paymentUrl: verification.paymentUrl,
+      invoiceId: verification.invoiceId,
+      paymentConfirmed: true,
+      ...readOfferPaymentContext(matchedOfferClaims),
+    });
+    paymentCommunication.claims[ClaimsOrganizationSchemaorg.alternateName] = tenantId;
+
+    const invoiceBundle = buildGatewayInvoiceBundle({
+      invoiceId: String(
+        paymentCommunication.claims[ClaimsOrderSchemaorg.partOfInvoice]
+        || verification.invoiceId
+        || offerId,
+      ),
+      subjectReference: tenantDid,
+      issuerReference: hostDid,
+      recipientReference: tenantDid,
+      issuedAt: String(
+        paymentCommunication.claims['org.schema.Order.invoiceIssuedAt']
+        || new Date().toISOString(),
+      ),
+      amount: String(matchedOfferClaims[ClaimsOfferSchemaorg.price] || ''),
+      currency: String(matchedOfferClaims[ClaimsOfferSchemaorg.priceCurrency] || ''),
+      paymentMethod: verification.paymentMethod,
+      paymentUrl: verification.paymentUrl,
+    });
+
+    const hostCollectionName = this.hostRuntime.hostCollectionName;
+    if (!hostCollectionName) {
+      throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
+    }
+    const communicationDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
+      id: paymentCommunication.communicationId,
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      meta: { claims: paymentCommunication.claims },
+      indexed: {
+        attributes: buildOfferOrderIndexedAttributes(paymentCommunication.claims),
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
+      content: { claims: paymentCommunication.claims, invoiceBundle },
+    };
+    const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, 'host');
+    await this.vaultRepository.put(hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
+
+    return {
+      type: 'Organization-order-response-v1.0',
+      meta: { claims: paymentCommunication.claims },
+      resource: invoiceBundle as any,
+      response: { status: '201' },
+    };
   }
 
   /**

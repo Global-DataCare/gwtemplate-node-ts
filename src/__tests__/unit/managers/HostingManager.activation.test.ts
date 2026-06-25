@@ -9,10 +9,16 @@ import { ILogger } from '../../../loggers/ILogger';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import {
+  ClaimsOfferSchemaorg,
+  ClaimsOrderSchemaorg,
+  ClaimsOrganizationSchemaorg,
+  ClaimsServiceSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
 import { LifecycleRequestType } from 'gdc-common-utils-ts/constants/lifecycle';
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import { testDefaultHostServiceTypeClaim } from '../../data/organization.data';
+import { ORGANIZATION_ORDER_REQUEST } from '../../data/example-payloads';
 import * as tenantUtils from '../../../utils/tenant';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { getTenantAuthorizationLifecycle } from '../../../utils/tenant-lifecycle';
@@ -138,6 +144,7 @@ describe('HostingManager activation flow', () => {
       demoAllowInsecureBearer: false,
       nodeEnv: 'test',
       port: 3000,
+      maxHeaderSize: 16384,
       apiHostname: 'testhost',
       hostExternalDomain: 'testhost.com',
       apiBaseUrl: 'http://testhost:3000',
@@ -470,6 +477,41 @@ describe('HostingManager activation flow', () => {
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('_activate received deprecated legacy compatibility field(s): organizationCredential, representativeCredential'),
     );
+  });
+
+  it('should return an Offer from _activate and accept the follow-up Order', async () => {
+    const activationResponse = await hostingManager.process(buildActivationJob());
+    const activationClaims = activationResponse.body.data[0].meta?.claims as Record<string, unknown>;
+    const offerId = String(activationClaims[ClaimsOfferSchemaorg.identifier] || '');
+
+    expect(offerId).toContain(':Offer:');
+
+    const orderJob: JobRequest = {
+      id: 'activation-order-job-id',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId: 'host',
+      jurisdiction: 'es',
+      sector: 'test-network' as Sector,
+      section: 'registry',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: 'Order',
+      content: structuredClone(ORGANIZATION_ORDER_REQUEST) as any,
+      httpMethod: 'POST',
+      requestUrl: '/host/cds-es/v1/test-network/registry/org.schema/Order/_batch',
+    };
+    orderJob.content!.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    orderJob.content!.body.data[0].meta.claims[ClaimsOrderSchemaorg.paymentMethod] = 'Stripe';
+    orderJob.content!.body.data[0].meta.claims[ClaimsOrderSchemaorg.partOfInvoice] = 'in_activation_follow_up';
+
+    const orderResponse = await hostingManager.process(orderJob);
+
+    expect(orderResponse.body.data[0].response.status).toBe('201');
+    expect(
+      orderResponse.body.data[0].meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier],
+    ).toBe(offerId);
   });
 
   it('should activate when the representative credential uses a non-did credentialSubject.id', async () => {

@@ -162,7 +162,7 @@ const swaggerDefinition = {
             'Demo/Test-Network note: in non-production environments signature checks may be bypassed, but token format must still be JWT-like (`header.payload.signature`).',
             'Example token you can paste in Swagger "Authorize": `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJkZW1vLXVzZXIiLCJlbWFpbCI6ImRlbW9AZXhhbXBsZS5vcmcifQ.demo`.',
             '',
-            'Production note: token validation is environment-dependent and typically expects a Firebase id_token for end-user identity.',
+            'Production note: token validation is environment-dependent and accepts either one end-user `id_token` or one controller proof bearer (`vp_token` compact JWT) when the route policy allows controller wallet proof.',
           ].join('\n'),
       },
     },
