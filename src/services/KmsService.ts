@@ -21,6 +21,9 @@ import { ParameterData } from 'gdc-common-utils-ts/models/params';
 import { InMemoryKeyMaterialProvider } from './in-memory-key-material-provider';
 import type { KeyMaterialProvider, KeyMaterialPurpose } from './key-material-provider';
 import { TenantKeyCache } from './tenant-key-cache';
+import type { KmsEnvelopeAdapter } from './kms-envelope-adapter';
+import { InMemoryEnvelopeAdapter } from './kms-envelope-adapter';
+import type { WrappedKeyPurpose, WrappedKeyRepository } from './wrapped-key-repository';
 
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 
@@ -89,18 +92,26 @@ export class KmsService implements IKmsService {
   private _managedKeys: Map<string, EntityKeysSet>;
   private keyVersions: Map<string, number>;
   private keyMaterialProvider: KeyMaterialProvider<EntityKeysSet>;
+  private wrappedKeyRepository?: WrappedKeyRepository;
+  private envelopeAdapter: KmsEnvelopeAdapter;
   private isHostInitialized: boolean = false;
 
   constructor(
     cryptographyService: ICryptography,
     tenantsCacheManager: TenantsCacheManager,
-    keyMaterialProvider?: KeyMaterialProvider<EntityKeysSet>,
+    options?: {
+      keyMaterialProvider?: KeyMaterialProvider<EntityKeysSet>;
+      wrappedKeyRepository?: WrappedKeyRepository;
+      envelopeAdapter?: KmsEnvelopeAdapter;
+    },
     ) {
     this.crypto = cryptographyService;
     this.tenantsCacheManager = tenantsCacheManager;
     this._managedKeys = new Map();
     this.keyVersions = new Map();
-    this.keyMaterialProvider = keyMaterialProvider || this.buildDefaultKeyMaterialProvider();
+    this.wrappedKeyRepository = options?.wrappedKeyRepository;
+    this.envelopeAdapter = options?.envelopeAdapter || new InMemoryEnvelopeAdapter();
+    this.keyMaterialProvider = options?.keyMaterialProvider || this.buildDefaultKeyMaterialProvider();
   }
 
   /**
@@ -109,13 +120,14 @@ export class KmsService implements IKmsService {
    */
   async init(): Promise<void> {
     if (this.isHostInitialized) {
-      // console.log('[KmsService] Host keys already initialized.');
       return;
     }
-    // console.log('[KmsService] Initializing host keys...');
-    await this.provisionKeys('host');
+    try {
+      await this.getEntityKeys('host', 'all');
+    } catch {
+      await this.provisionKeys('host');
+    }
     this.isHostInitialized = true;
-    // console.log('[KmsService] Host keys initialized successfully.');
   }
 
   private checkInitialized(): void {
@@ -175,15 +187,18 @@ export class KmsService implements IKmsService {
     const legacySigningKeyPair = await this.provisionLegacySigningKey(entityVaultId, process.env.LEGACY_SIGN_ALG);
 
     // In a production vault, the `dataEncryptionKey` would be encrypted with the Host KEK here before storage.
-    this._managedKeys.set(entityVaultId, { 
+    const keyVersion = String((this.keyVersions.get(entityVaultId) || 0) + 1);
+    const entityKeys: EntityKeysSet = {
       commSigningKeyPair: { publicJWKey: commSigningKeyPair.publicJWKey, secretKeyBytes: commSigningKeyPair.secretKeyBytes },
       vcSigningKeyPair: { publicJWKey: vcSigningKeyPair.publicJWKey, secretKeyBytes: vcSigningKeyPair.secretKeyBytes },
       ...(legacySigningKeyPair ? { legacySigningKeyPair } : {}),
       encryptionKeyPair: { publicJWKey: encryptionKeyPair.publicJWKey, secretKeyBytes: encryptionKeyPair.secretKeyBytes },
       dataEncryptionKey: dataEncryptionKey,
       hmacKey: hmacKey
-    });
-    this.keyVersions.set(entityVaultId, (this.keyVersions.get(entityVaultId) || 0) + 1);
+    };
+    this._managedKeys.set(entityVaultId, entityKeys);
+    this.keyVersions.set(entityVaultId, Number(keyVersion));
+    await this.persistWrappedKeys(entityVaultId, keyVersion, entityKeys);
     this.keyMaterialProvider.invalidate(entityVaultId, 'all');
     
     const publicJwkSet = {
@@ -255,7 +270,7 @@ export class KmsService implements IKmsService {
     try {
       keySet = await this.getEntityKeys(entityVaultId, 'encryption');
     } catch {
-      return undefined;
+      return await this.resolveTenantEncryptionKeyFromDidDocument(entityVaultId, crv);
     }
 
     // For now, we only support one key type, so we ignore the 'crv' parameter.
@@ -266,7 +281,7 @@ export class KmsService implements IKmsService {
     }
     
     // Placeholder for legacy P-256 key lookup
-    return undefined;
+    return await this.resolveTenantEncryptionKeyFromDidDocument(entityVaultId, crv);
   }
 
   /**
@@ -337,6 +352,10 @@ export class KmsService implements IKmsService {
         foundKey = { ...keySet.encryptionKeyPair.publicJWKey, dBytes: keySet.encryptionKeyPair.secretKeyBytes };
         break;
       }
+    }
+
+    if (!foundKey) {
+      foundKey = await this.findManagedPrivateEncryptionKeyByRecipientKids(recipientKids);
     }
 
     if (!foundKey) {
@@ -720,11 +739,15 @@ export class KmsService implements IKmsService {
       cache,
       loader: async (entityVaultId: string, _purpose: KeyMaterialPurpose) => {
         const keyMaterial = this._managedKeys.get(entityVaultId);
-        if (!keyMaterial) {
-          throw new Error(`Keys not found for entity: ${entityVaultId}`);
+        if (keyMaterial) {
+          const keyVersion = String(this.keyVersions.get(entityVaultId) || 0);
+          return { keyMaterial, keyVersion };
         }
-        const keyVersion = String(this.keyVersions.get(entityVaultId) || 0);
-        return { keyMaterial, keyVersion };
+
+        const rehydrated = await this.loadWrappedKeys(entityVaultId);
+        this._managedKeys.set(entityVaultId, rehydrated.keyMaterial);
+        this.keyVersions.set(entityVaultId, Number(rehydrated.keyVersion));
+        return rehydrated;
       },
     });
   }
@@ -732,5 +755,187 @@ export class KmsService implements IKmsService {
   private async getEntityKeys(entityVaultId: string, purpose: KeyMaterialPurpose): Promise<EntityKeysSet> {
     const record = await this.keyMaterialProvider.get(entityVaultId, purpose);
     return record.keyMaterial;
+  }
+
+  private async persistWrappedKeys(entityVaultId: string, keyVersion: string, entityKeys: EntityKeysSet): Promise<void> {
+    if (!this.wrappedKeyRepository) {
+      return;
+    }
+
+    await Promise.all([
+      this.persistWrappedKeyRecord(entityVaultId, 'comm_sig', keyVersion, {
+        publicJwk: entityKeys.commSigningKeyPair.publicJWKey,
+        secretKeyBytes: Buffer.from(entityKeys.commSigningKeyPair.secretKeyBytes).toString('base64url'),
+      }, entityKeys.commSigningKeyPair.publicJWKey.kid),
+      this.persistWrappedKeyRecord(entityVaultId, 'vc_sign', keyVersion, {
+        publicJwk: entityKeys.vcSigningKeyPair.publicJWKey,
+        secretKeyBytes: Buffer.from(entityKeys.vcSigningKeyPair.secretKeyBytes).toString('base64url'),
+        legacySigningKeyPair: entityKeys.legacySigningKeyPair ? {
+          publicJwk: entityKeys.legacySigningKeyPair.publicJWKey,
+          secretKeyBytes: Buffer.from(entityKeys.legacySigningKeyPair.secretKeyBytes).toString('base64url'),
+        } : undefined,
+      }, entityKeys.vcSigningKeyPair.publicJWKey.kid),
+      this.persistWrappedKeyRecord(entityVaultId, 'encryption', keyVersion, {
+        publicJwk: entityKeys.encryptionKeyPair.publicJWKey,
+        secretKeyBytes: Buffer.from(entityKeys.encryptionKeyPair.secretKeyBytes).toString('base64url'),
+      }, entityKeys.encryptionKeyPair.publicJWKey.kid),
+      this.persistWrappedKeyRecord(entityVaultId, 'storage', keyVersion, {
+        dataEncryptionKey: Buffer.from(entityKeys.dataEncryptionKey).toString('base64url'),
+      }),
+      this.persistWrappedKeyRecord(entityVaultId, 'hmac', keyVersion, {
+        hmacKey: Buffer.from(entityKeys.hmacKey).toString('base64url'),
+      }),
+    ]);
+  }
+
+  private async persistWrappedKeyRecord(
+    entityVaultId: string,
+    purpose: WrappedKeyPurpose,
+    keyVersion: string,
+    payload: Record<string, unknown>,
+    kid?: string,
+  ): Promise<void> {
+    if (!this.wrappedKeyRepository) {
+      return;
+    }
+    const wrappedKeyMaterial = await this.envelopeAdapter.wrapKeyMaterial(
+      Content.stringToBytesUTF8(JSON.stringify(payload)),
+      { entityVaultId, purpose },
+    );
+    await this.wrappedKeyRepository.put({
+      entityVaultId,
+      purpose,
+      keyVersion,
+      wrappedKeyMaterial,
+      updatedAt: new Date().toISOString(),
+      ...(kid ? { kid } : {}),
+    });
+  }
+
+  private async loadWrappedKeys(entityVaultId: string): Promise<{ keyMaterial: EntityKeysSet; keyVersion: string }> {
+    if (!this.wrappedKeyRepository) {
+      throw new Error(`Keys not found for entity: ${entityVaultId}`);
+    }
+
+    const [commSig, vcSign, encryption, storage, hmac] = await Promise.all([
+      this.wrappedKeyRepository.get(entityVaultId, 'comm_sig'),
+      this.wrappedKeyRepository.get(entityVaultId, 'vc_sign'),
+      this.wrappedKeyRepository.get(entityVaultId, 'encryption'),
+      this.wrappedKeyRepository.get(entityVaultId, 'storage'),
+      this.wrappedKeyRepository.get(entityVaultId, 'hmac'),
+    ]);
+
+    if (!commSig || !vcSign || !encryption || !storage || !hmac) {
+      throw new Error(`Keys not found for entity: ${entityVaultId}`);
+    }
+
+    const keyVersion = [commSig, vcSign, encryption, storage, hmac]
+      .map((record) => record.keyVersion)
+      .sort((left, right) => Number(left) - Number(right))
+      .at(-1) || '0';
+
+    const commSigPayload = await this.unwrapRecordPayload(entityVaultId, commSig);
+    const vcSignPayload = await this.unwrapRecordPayload(entityVaultId, vcSign);
+    const encryptionPayload = await this.unwrapRecordPayload(entityVaultId, encryption);
+    const storagePayload = await this.unwrapRecordPayload(entityVaultId, storage);
+    const hmacPayload = await this.unwrapRecordPayload(entityVaultId, hmac);
+
+    return {
+      keyVersion,
+      keyMaterial: {
+        commSigningKeyPair: {
+          publicJWKey: commSigPayload.publicJwk,
+          secretKeyBytes: Buffer.from(String(commSigPayload.secretKeyBytes), 'base64url'),
+        },
+        vcSigningKeyPair: {
+          publicJWKey: vcSignPayload.publicJwk,
+          secretKeyBytes: Buffer.from(String(vcSignPayload.secretKeyBytes), 'base64url'),
+        },
+        ...(vcSignPayload.legacySigningKeyPair ? {
+          legacySigningKeyPair: {
+            publicJWKey: vcSignPayload.legacySigningKeyPair.publicJwk,
+            secretKeyBytes: Buffer.from(String(vcSignPayload.legacySigningKeyPair.secretKeyBytes), 'base64url'),
+          },
+        } : {}),
+        encryptionKeyPair: {
+          publicJWKey: encryptionPayload.publicJwk,
+          secretKeyBytes: Buffer.from(String(encryptionPayload.secretKeyBytes), 'base64url'),
+        },
+        dataEncryptionKey: Buffer.from(String(storagePayload.dataEncryptionKey), 'base64url'),
+        hmacKey: Buffer.from(String(hmacPayload.hmacKey), 'base64url'),
+      },
+    };
+  }
+
+  private async unwrapRecordPayload(entityVaultId: string, record: { purpose: WrappedKeyPurpose; wrappedKeyMaterial: string }): Promise<any> {
+    const plaintext = await this.envelopeAdapter.unwrapKeyMaterial(record.wrappedKeyMaterial, {
+      entityVaultId,
+      purpose: record.purpose,
+    });
+    return JSON.parse(Content.bytesToStringUTF8(plaintext));
+  }
+
+  private async findManagedPrivateEncryptionKeyByRecipientKids(recipientKids: string[]): Promise<MlkemPrivateJwk | undefined> {
+    if (!this.wrappedKeyRepository) {
+      return undefined;
+    }
+
+    for (const kid of recipientKids) {
+      const record = await this.wrappedKeyRepository.findByKid(kid, 'encryption');
+      if (!record) {
+        continue;
+      }
+      const keySet = await this.getEntityKeys(record.entityVaultId, 'encryption');
+      if (keySet.encryptionKeyPair.publicJWKey.kid === kid) {
+        return {
+          ...keySet.encryptionKeyPair.publicJWKey,
+          dBytes: keySet.encryptionKeyPair.secretKeyBytes,
+        };
+      }
+    }
+
+    return undefined;
+  }
+
+  private async resolveTenantEncryptionKeyFromDidDocument(
+    entityVaultId: string,
+    crv?: string,
+  ): Promise<MlkemPublicJwk | undefined> {
+    const didDocument = await this.tenantsCacheManager.getDidDocument?.(entityVaultId);
+    if (!didDocument) {
+      return undefined;
+    }
+
+    const preferredCrv = crv || 'ML-KEM-768';
+    const verificationMethods = Array.isArray(didDocument.verificationMethod)
+      ? didDocument.verificationMethod
+      : [];
+
+    const referencedKeyIds = new Set<string>();
+    const keyAgreement = Array.isArray(didDocument.keyAgreement) ? didDocument.keyAgreement : [];
+    for (const agreementEntry of keyAgreement) {
+      if (typeof agreementEntry === 'string') {
+        referencedKeyIds.add(agreementEntry);
+      } else if (agreementEntry && typeof agreementEntry === 'object' && typeof (agreementEntry as VerificationMethod).id === 'string') {
+        referencedKeyIds.add((agreementEntry as VerificationMethod).id);
+      }
+    }
+
+    const candidateMethods = verificationMethods.filter((method) => {
+      const publicJwk = method?.publicKeyJwk as MlkemPublicJwk | undefined;
+      if (!publicJwk || publicJwk.kty !== 'OKP') return false;
+      if (publicJwk.crv !== preferredCrv) return false;
+      if (referencedKeyIds.size === 0) return true;
+      return referencedKeyIds.has(method.id);
+    });
+
+    const directKeyAgreementMatch = keyAgreement.find((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      const publicJwk = (entry as VerificationMethod).publicKeyJwk as MlkemPublicJwk | undefined;
+      return publicJwk?.kty === 'OKP' && publicJwk?.crv === preferredCrv;
+    }) as VerificationMethod | undefined;
+
+    const selected = candidateMethods[0] || directKeyAgreementMatch;
+    return selected?.publicKeyJwk as MlkemPublicJwk | undefined;
   }
 }
