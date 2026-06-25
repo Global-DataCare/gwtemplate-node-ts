@@ -23,3 +23,4 @@ Source-of-truth references used by both docs trees:
 Current v2 additions introduced directly in `docs-v2/*`:
 
 - [18-organization-controller-lifecycle.md](./18-organization-controller-lifecycle.md)
+- [20-research-digital-twin-store-and-search-plan.md](./20-research-digital-twin-store-and-search-plan.md)

@@ -65,7 +65,20 @@ export interface IServerConfig {
     gatewayUrl?: string;
     mfsRoot?: string;
   };
+  envelope?: {
+    provider?: 'memory' | 'local' | 'gcp-kms' | 'hashicorp-transit';
+  };
   kekSecret?: string;
+  gcpKms?: {
+    keyName?: string;
+  };
+  hashicorpTransit?: {
+    baseUrl?: string;
+    mountPath?: string;
+    keyName?: string;
+    token?: string;
+    namespace?: string;
+  };
   host: {
     legalName?: string;
     jurisdiction?: string;

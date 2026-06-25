@@ -52,6 +52,28 @@ That does not mean GW is downstream from SDKs in authority. It means reusable
 SDK semantics should be shaped cleanly before being specialized, while GW
 remains the authority on real route/manager behavior.
 
+## Runtime Queue And Vault Note
+
+Current GW template implementation uses concrete backend adapters.
+
+Today the default bootstrap path uses:
+
+- `VaultMemRepository` for volatile in-process storage in the default memory
+  setup
+- `QueueAdapterMem` as the current in-memory queue adapter
+- an in-process worker that consumes queued jobs and updates the async response
+  store
+
+This is suitable for:
+
+- local development
+- unit/integration tests
+- reference flows where durability is not yet the target
+
+It is not the final shape for durable multi-instance deployments. In a durable
+GW deployment, the queue adapter may be replaced by a backend-specific adapter
+while preserving the same route/manager contract.
+
 ## Naming Rule
 
 At the gateway layer, endpoint and manager names must describe actual backend

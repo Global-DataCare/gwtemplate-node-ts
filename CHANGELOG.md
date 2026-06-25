@@ -1,4 +1,70 @@
-## [Unreleased]
+## [1.16.0] - 2026-06-26
+
+### Added
+- Added a dedicated `docs-v2/18-organization-controller-lifecycle.md` guide
+  that explains the narrow controller recovery/rebind lifecycle, the direct GW
+  route order, and the relationship to the canonical `gdc-sdk-node-ts`
+  executable proof.
+- Added `docs-v2/19-key-custody-and-audit-readiness.md` so the current KMS
+  persistence model, the residual `KEK_SECRET` weakness, and the production
+  migration target toward external KMS/HSM custody are documented in the v2
+  docs set.
+- Added `npm run kms:audit` to report tenants/host missing persisted
+  `wrapped_keys` and flag whether confidential-data decryption or HMAC-backed
+  search is at risk.
+- Added explicit envelope-root provider selection for wrapped key custody:
+  `memory`, `local`, `gcp-kms`, and `hashicorp-transit`. The HashiCorp option
+  is named after the Transit engine on purpose so it is not confused with the
+  GW confidential storage vault.
+
+### Changed
+- Extended the generated Swagger/OpenAPI examples so the organization
+  controller lifecycle now exposes explicit request, poll-request, and
+  completed poll-response examples for:
+  - `Organization/_issue`
+  - `Organization/_activate`
+  - `Token/_exchange-response`
+  - `Device/_dcr-response`
+- Aligned both Swagger generation paths
+  (`src/utils/swagger-spec.ts` and `scripts/generate-swagger-spec.mts`) so
+  tests and generated profile documents consume the same organization
+  controller example set.
+- Moved generated core flow examples out of `artifacts/` and into
+  `docs/openapi-examples/core-flow-examples.json` so versioned example
+  documents live alongside the rest of the published API contract.
+- Updated controller-facing bearer authentication so host registry and other
+  bearer-protected API routes can accept either a verified `id_token` or one
+  signed controller proof bearer (`vp_token` compact JWT with embedded public
+  JWK). `Token/_exchange` remains `id_token`-specific.
+- Tightened host tenant lifecycle authorization so controller proof bearers
+  must carry a legal representative VC whose `memberOf.taxID` matches the
+  target `Organization.identifier.value`. Representative-role and
+  subject-to-signer binding checks remain future tightening work until the
+  example VC/VP contract is finalized.
+- Bootstrapping now resolves wrapped-key envelope custody through an explicit
+  provider factory instead of implicitly falling back from `KEK_SECRET` to
+  in-memory behavior.
+
+### Fixed
+- Restored legacy host `Organization/_activate` commercial continuity so the
+  completed activation response again includes `org.schema.Offer.identifier`
+  and the follow-up `Order/_batch` step can confirm the generated Offer for
+  employee-seat licensing and activation-code issuance.
+- Persisted tenant and host KMS key material as wrapped records in the host
+  vault so plaintext async flows keep encrypting responses to the tenant after
+  process restarts or pod hops instead of failing when `_managedKeys` memory is
+  empty. `KmsService.init()` now reuses persisted host keys instead of silently
+  reprovisioning a new host keyset on each restart.
+- Restored the documented tenant `didDocument` fallback for public encryption
+  key resolution so legacy tenants can still receive plaintext async responses
+  when their published ML-KEM key exists even if wrapped private material is
+  missing in the current process.
+
+### Testing
+- `npm test -- --runTestsByPath src/__tests__/integration/server.robustness.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/integration/security-mode-gates.test.ts src/__tests__/managers/AuthorizationManager.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/unit/services/KmsService.test.ts src/__tests__/integration/tenant-kms-rehydration.api.test.ts`
+- `npm run build`
 
 ## [1.15.0] - 2026-06-25
 

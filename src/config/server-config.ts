@@ -215,7 +215,27 @@ export function getConfig(): IServerConfig {
         gatewayUrl: process.env.IPFS_GATEWAY_URL,
         mfsRoot: process.env.IPFS_MFS_ROOT,
       },
+      envelope: {
+        provider: (() => {
+          const value = String(process.env.ENVELOPE_PROVIDER || '').trim().toLowerCase();
+          if (!value) return undefined;
+          if (value === 'memory' || value === 'local' || value === 'gcp-kms' || value === 'hashicorp-transit') {
+            return value;
+          }
+          throw new Error("Config Error: Invalid ENVELOPE_PROVIDER. Allowed: memory, local, gcp-kms, hashicorp-transit");
+        })(),
+      },
       kekSecret: process.env.KEK_SECRET,
+      gcpKms: {
+        keyName: process.env.GCP_KMS_KEY_NAME,
+      },
+      hashicorpTransit: {
+        baseUrl: process.env.HASHICORP_TRANSIT_BASE_URL,
+        mountPath: process.env.HASHICORP_TRANSIT_MOUNT_PATH,
+        keyName: process.env.HASHICORP_TRANSIT_KEY_NAME,
+        token: process.env.HASHICORP_TRANSIT_TOKEN,
+        namespace: process.env.HASHICORP_NAMESPACE,
+      },
       host: {
         legalName: getHostEnv('LEGAL_NAME'),
         jurisdiction: getHostEnv('JURISDICTION'),

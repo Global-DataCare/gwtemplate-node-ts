@@ -96,6 +96,27 @@ The important rule is:
 - the canonical semantics are still claims-first
 - consent-related exchange belongs to the same `Communication`-centric index model
 
+Research authorization rule:
+
+- do not encode a subject-specific research delegation in tenant `Service.*`
+  claims
+- use `Service.serviceType` only to declare that a tenant publishes a research
+  or `digitaltwin` capability
+- model the individual controller's authorization separately in `Consent` or an
+  equivalent policy artifact
+- that authorization should identify at least:
+  - authorized receiver `did:web`
+  - purpose `research`
+  - subject/pseudonymous subject scope
+
+Operational consequence:
+
+- when the source tenant updates the individual's operational index, it may
+  emit a derived anonymized payload to the authorized receiver
+- this is a push flow from the source index tenant to the receiver's
+  `digitaltwin` endpoint, not a pull flow where the receiver reads every source
+  tenant directly
+
 ### Index ingestion and updates
 
 Use `Communication` as the secure exchange envelope.
@@ -107,6 +128,20 @@ Embedded payload data should be modeled first as:
 If a versioned FHIR document is additionally carried, it is a projection around that canonical semantic model.
 
 - [12-communication-batch-index-data.md](./12-communication-batch-index-data.md)
+
+### Research digital twin ingestion
+
+When index changes must feed an authorized research or anonymization service,
+the recommended v2 teaching model is:
+
+1. keep the operational individual index flow in `Communication`,
+2. derive the research-safe anonymized artifact from those accepted changes,
+3. submit that derived artifact to the receiver through
+   `digitaltwin/org.hl7.fhir.api/Composition/_batch`.
+
+Do not teach this as "all index providers automatically feed the research
+tenant". The feed is conditioned by subject authorization and receiver
+capability.
 
 ### Summary retrieval
 

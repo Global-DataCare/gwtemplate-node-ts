@@ -36,3 +36,4 @@ Without that split, examples drift, claims drift, and different sectors start te
 - [Communication layering 101](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
 - [SDK package boundaries](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-SDK_PACKAGE_BOUNDARIES.md)
 - [GW core integration baseline](../docs/API_CORE_INTEGRATION.md)
+- [20-research-digital-twin-store-and-search-plan.md](./20-research-digital-twin-store-and-search-plan.md)

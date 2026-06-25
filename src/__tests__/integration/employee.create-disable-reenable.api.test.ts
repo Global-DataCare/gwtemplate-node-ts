@@ -1,0 +1,125 @@
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import type { StoryHarness } from './helpers/story-flow';
+import {
+  installBasicJsonFetchMock,
+  onboardTenantViaActivateAndOrder,
+  pollJsonBody,
+  startStoryServer,
+  stopStoryServer,
+} from './helpers/story-flow';
+import { invokeExpress } from './helpers/invokeExpress';
+import { EMPLOYEE_REGISTRATION_REQUEST } from '../data/example-payloads';
+
+describe('Employee create/disable/re-enable route story', () => {
+  let harness: StoryHarness;
+  let tenantId: string;
+  let originalFetch: typeof global.fetch;
+
+  beforeAll(async () => {
+    originalFetch = installBasicJsonFetchMock();
+    harness = await startStoryServer();
+    tenantId = await onboardTenantViaActivateAndOrder(harness.app, harness.queueAdapter);
+  });
+
+  afterAll(async () => {
+    global.fetch = originalFetch;
+    await stopStoryServer(harness);
+  });
+
+  it('creates an employee, disables it, and re-enables the same business identity', async () => {
+    const employeeUrl = `/${tenantId}/cds-es/v1/health-care/entity/org.schema/Employee/_batch`;
+
+    const createPayload = structuredClone(EMPLOYEE_REGISTRATION_REQUEST) as any;
+    createPayload.thid = 'employee-create-story-thid';
+    createPayload.jti = 'employee-create-story-jti';
+    createPayload.body.data[0].resource = {
+      meta: {
+        claims: {
+          ...(createPayload.body.data[0].meta?.claims || {}),
+        },
+      },
+    };
+    createPayload.body.data[0].meta = {};
+    createPayload.body.data[0].request = { method: 'POST' };
+
+    const createSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: employeeUrl,
+      headers: { 'content-type': 'application/json' },
+      body: createPayload,
+    });
+
+    expect(createSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+
+    const createPoll = await pollJsonBody(harness.app, createSubmit.headers.location, createPayload.thid);
+    expect(createPoll.status).toBe(200);
+
+    const createdEntry = createPoll.body.data[0];
+    const employeeId = String(createdEntry.resource?.id || '');
+    expect(createdEntry.response.status).toBe('201');
+    expect(employeeId).toBeTruthy();
+
+    const disablePayload = structuredClone(EMPLOYEE_REGISTRATION_REQUEST) as any;
+    disablePayload.thid = 'employee-disable-story-thid';
+    disablePayload.jti = 'employee-disable-story-jti';
+    disablePayload.body.data[0].resource = {
+      meta: {
+        claims: {
+          ...(disablePayload.body.data[0].meta?.claims || {}),
+          'org.schema.Person.identifier': `urn:uuid:${employeeId}`,
+        },
+      },
+    };
+    disablePayload.body.data[0].meta = {};
+    disablePayload.body.data[0].request = { method: 'DELETE' };
+
+    const disableSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: employeeUrl,
+      headers: { 'content-type': 'application/json' },
+      body: disablePayload,
+    });
+
+    expect(disableSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+
+    const disablePoll = await pollJsonBody(harness.app, disableSubmit.headers.location, disablePayload.thid);
+    expect(disablePoll.status).toBe(200);
+
+    const disabledEntry = disablePoll.body.data[0];
+    expect(disabledEntry.response.status).toBe('200');
+    expect(disabledEntry.resource?.id).toBe(employeeId);
+
+    const reenablePayload = structuredClone(EMPLOYEE_REGISTRATION_REQUEST) as any;
+    reenablePayload.thid = 'employee-reenable-story-thid';
+    reenablePayload.jti = 'employee-reenable-story-jti';
+    reenablePayload.body.data[0].resource = {
+      meta: {
+        claims: {
+          ...(reenablePayload.body.data[0].meta?.claims || {}),
+          'org.schema.Person.identifier': `urn:uuid:${employeeId}`,
+        },
+      },
+    };
+    reenablePayload.body.data[0].meta = {};
+    reenablePayload.body.data[0].request = { method: 'POST' };
+
+    const reenableSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: employeeUrl,
+      headers: { 'content-type': 'application/json' },
+      body: reenablePayload,
+    });
+
+    expect(reenableSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+
+    const reenablePoll = await pollJsonBody(harness.app, reenableSubmit.headers.location, reenablePayload.thid);
+    expect(reenablePoll.status).toBe(200);
+
+    const reenabledEntry = reenablePoll.body.data[0];
+    expect(reenabledEntry.response.status).toBe('200');
+    expect(reenabledEntry.resource?.id).toBe(employeeId);
+  });
+});

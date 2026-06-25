@@ -52,3 +52,4 @@ Teaching rule:
 - `docs-v2/07-didweb-pqc-and-trust-chain.md`
 - `docs-v2/09-api-integrators-guide.md`
 - `docs-v2/17-clinical-bundle-readers.md`
+- `docs-v2/19-key-custody-and-audit-readiness.md`
