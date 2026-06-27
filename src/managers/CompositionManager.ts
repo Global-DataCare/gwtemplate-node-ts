@@ -8,9 +8,26 @@ import type { BundleEntryResponse, BundleJsonApi, ErrorEntry } from 'gdc-common-
 import type { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { createOperationOutcome } from '../utils/outcome';
-import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
+import {
+  buildFhirClaimKeys,
+  canonicalizeFhirClaims,
+  getClaimValue,
+  getFirstClaimValueByKeys,
+  normalizeContextualizedClaims,
+} from '../utils/claims';
+import { filterCompositionMatchesBySectionsAndTypes, filterDocumentReferenceMatches } from '../utils/composition-search';
+import {
+  extractTokenCode,
+  normalizeReference,
+  pickLatestIsoDate,
+  resolveBundleEntryFullUrl,
+  resolveBundleEntryKey,
+  tokenToCoding,
+} from '../utils/fhir-data-utils';
+import { buildFhirResourceFromIndexedClaims } from '../utils/fhir-resource-rehydration';
 import { getTenantVaultId } from '../utils/tenant';
 import { getSubjectScopedSectionId, SubjectSectionScope } from '../utils/individual-sections';
+import { getEnvSectionId } from '../utils/section-env';
 import {
   extractLedgerSafeResearchTags,
   normalizeFhirIngestionFormat,
@@ -23,57 +40,51 @@ import type { IJobProcessor } from './registry';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 import {
-  extractSearchFiltersFromParametersResource,
-  extractSearchFiltersFromRequestUrl,
-  extractSearchResourceTarget,
-  SearchFilters,
+  extractCompositionExcludedSearchSections,
+  extractCompositionSearchSections,
+  extractCompositionSearchSubject,
+  extractCompositionSearchTypes,
+  extractCommunicationSearchFilters,
+  extractDocumentReferenceSearchFilters,
+  extractRequestedBundleType,
+  extractSearchResourceType,
 } from '../utils/search-request';
 import { HealthcareBasicSections } from '../shared/healthcare-constants';
+import { GatewayLocalFhirResourceTypes, ResourceTypesFhirR4 } from '../shared/fhir-constants';
+import { GatewayEnvelopeTypes, GatewayResponseEntryTypes } from '../shared/gateway-response-types';
+import { DataCollectionIds } from '../shared/data-collections';
+import { BundleType } from '../utils/bundle';
 import type { ITenantsManager } from './ITenantsManager';
+import { TwinCompositionManager, TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG } from './TwinCompositionManager';
 
-type IpsSectionProjectionConfig = {
-  sectionIds: string[];
-  resourceType: string;
-};
+/**
+ * Canonical HL7 IPS "all sections" example used to validate the current
+ * section-first digital twin search contract:
+ * https://build.fhir.org/ig/HL7/fhir-ips/en/Bundle-bundle-ips-all-sections.json.html
+ *
+ * The gateway exposes those sections through `HealthcareSummarySections`,
+ * which extends the upstream common-utils basic catalog with the IPS-specific
+ * tokens still missing there.
+ */
+export const IPS_ALL_SECTIONS_EXAMPLE_URL =
+  'https://build.fhir.org/ig/HL7/fhir-ips/en/Bundle-bundle-ips-all-sections.json.html' as const;
 
-const IPS_SECTION_PROJECTION_CONFIG: Readonly<Record<string, readonly IpsSectionProjectionConfig[]>> = Object.freeze({
-  [HealthcareBasicSections.HistoryOfMedicationUse.attributeValue]: Object.freeze([
-    { sectionIds: ['medications'], resourceType: 'MedicationStatement' },
-  ]),
-  [HealthcareBasicSections.AllergiesAndIntolerances.attributeValue]: Object.freeze([
-    { sectionIds: ['allergies'], resourceType: 'AllergyIntolerance' },
-  ]),
-  [HealthcareBasicSections.ProblemList.attributeValue]: Object.freeze([
-    { sectionIds: ['conditions'], resourceType: 'Condition' },
-  ]),
-  [HealthcareBasicSections.Results.attributeValue]: Object.freeze([
-    { sectionIds: ['observations'], resourceType: 'Observation' },
-    { sectionIds: ['diagnostic-reports'], resourceType: 'DiagnosticReport' },
-  ]),
-  [HealthcareBasicSections.Procedures.attributeValue]: Object.freeze([
-    { sectionIds: ['procedures'], resourceType: 'Procedure' },
-  ]),
-  [HealthcareBasicSections.Immunizations.attributeValue]: Object.freeze([
-    { sectionIds: ['immunizations'], resourceType: 'Immunization' },
-  ]),
-  [HealthcareBasicSections.FunctionalStatus.attributeValue]: Object.freeze([
-    { sectionIds: ['observations'], resourceType: 'Observation' },
-  ]),
-  [HealthcareBasicSections.PlanOfCare.attributeValue]: Object.freeze([
-    { sectionIds: ['care-plans'], resourceType: 'CarePlan' },
-  ]),
-  [HealthcareBasicSections.SocialHistory.attributeValue]: Object.freeze([
-    { sectionIds: ['observations'], resourceType: 'Observation' },
-  ]),
-  [HealthcareBasicSections.VitalSigns.attributeValue]: Object.freeze([
-    { sectionIds: ['observations'], resourceType: 'Observation' },
-  ]),
-  [HealthcareBasicSections.MedicalDevices.attributeValue]: Object.freeze([]),
-});
-
+/**
+ * Internal subject-scoped storage collection ids used to fan out a digital
+ * twin `Composition/_search` into resource-family indexes.
+ *
+ * These are not IPS section tokens and they are not equivalent to
+ * `HealthcareSummarySections`:
+ * - `HealthcareSummarySections` is the public/documental section taxonomy
+ *   expressed as LOINC tokens
+ * - `DIGITAL_TWIN_RESOURCE_COLLECTION_IDS` is the private persistence taxonomy
+ *   expressed as per-family collection suffixes such as `medications` or
+ *   `observations`
+ */
 const SUMMARY_OPERATION_ACTION = '$summary';
 const SUMMARY_OPERATION_CANONICAL_RESOURCE_TYPE = 'subject';
 const SUMMARY_OPERATION_ALIAS_RESOURCE_TYPE = 'patient';
+const SUMMARY_OPERATION_RESEARCHSUBJECT_RESOURCE_TYPE = 'researchsubject';
 const SUMMARY_OPERATION_ALLOWED_SECTOR_PREFIXES = Object.freeze([
   'health-',
   'animal-',
@@ -81,19 +92,37 @@ const SUMMARY_OPERATION_ALLOWED_SECTOR_PREFIXES = Object.freeze([
 ] as const);
 
 /**
- * Stores Unified Health Index updates as Composition-style flat claims.
+ * Legacy/compatibility manager for direct `Composition` and `Bundle` jobs.
  *
- * Notes:
- * - Input may arrive as FHIR Bundle (`body.entry[]`) or JSON:API Primary Document (`body.data[]`).
- * - Storage is per individual under `individual_composition_<subjectHash>`.
- * - This is a minimal implementation to support demo/SDK flows; indexing semantics can be refined later.
+ * Current responsibility boundary:
+ * - `individual`
+ *   - still handles the lower-level direct `Composition` / `Bundle` routes
+ *     that remain exposed for compatibility
+ *   - still resolves `Subject/$summary` and direct document retrieval
+ *   - is also called indirectly by `CommunicationManager` when a
+ *     `Communication` envelope embeds `Subject/$summary` or `Bundle/_search`
+ * - `digitaltwin`
+ *   - ingestion of pre-converted twin `Composition` payloads still lands here
+ *   - public twin search semantics no longer belong conceptually to this class
+ *   - those are delegated to `TwinCompositionManager`
+ *
+ * Important clarification:
+ * - the canonical public read model for `individual` is `Communication`
+ *   carrying structured requests, not teaching users to call direct
+ *   `individual/.../Composition` routes first
+ * - the direct `individual/.../Composition` routes therefore exist mainly as
+ *   compatibility / lower-level plumbing and test anchors
  */
 export class CompositionManager implements IJobProcessor {
+  private readonly twinCompositionManager: TwinCompositionManager;
+
   constructor(
     private readonly vaultRepository: IVaultRepository,
     private readonly blockchainAdapter?: IBlockchainAdapter,
     private readonly tenantsCacheManager?: ITenantsManager,
-  ) {}
+  ) {
+    this.twinCompositionManager = new TwinCompositionManager(vaultRepository);
+  }
 
   private async tenantExists(tenantVaultId: string): Promise<boolean> {
     if (this.tenantsCacheManager) {
@@ -132,8 +161,17 @@ export class CompositionManager implements IJobProcessor {
     }
     if (
       isSummaryOperation
-      && normalizedResourceType !== SUMMARY_OPERATION_CANONICAL_RESOURCE_TYPE
-      && normalizedResourceType !== SUMMARY_OPERATION_ALIAS_RESOURCE_TYPE
+      && !(
+        (normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN && normalizedResourceType === SUMMARY_OPERATION_RESEARCHSUBJECT_RESOURCE_TYPE)
+        || (
+          normalizedSection !== SUBJECT_SECTION_DIGITAL_TWIN
+          && normalizedResourceType === SUMMARY_OPERATION_CANONICAL_RESOURCE_TYPE
+        )
+        || (
+          normalizedSection !== SUBJECT_SECTION_DIGITAL_TWIN
+          && normalizedResourceType === SUMMARY_OPERATION_ALIAS_RESOURCE_TYPE
+        )
+      )
     ) {
       throw new Error(`Unsupported resourceType '${job.resourceType}' for CompositionManager summary operation.`);
     }
@@ -158,23 +196,23 @@ export class CompositionManager implements IJobProcessor {
 
       const searchResourceType = isSummaryOperation
         ? 'bundle'
-        : this.extractSearchResourceType(body);
+        : extractSearchResourceType(body);
       const useDocumentReferenceSection = searchResourceType === 'documentreference';
       const useCommunicationSection = searchResourceType === 'communication';
-      const searchSubject = this.extractSearchSubject(body);
-      if (!searchSubject) {
+      const searchSubject = extractCompositionSearchSubject(body);
+      if (!searchSubject && normalizedSection !== SUBJECT_SECTION_DIGITAL_TWIN) {
         throw new Error('Missing required subject search parameter for Composition search.');
       }
-      const searchSections = this.extractSearchSections(body);
-      const excludedSearchSections = this.extractExcludedSearchSections(body);
+      const searchSections = extractCompositionSearchSections(body);
+      const excludedSearchSections = extractCompositionExcludedSearchSections(body);
       const searchTypes = isSummaryOperation
         ? this.extractSummaryTypes(body)
-        : this.extractSearchTypes(body);
+        : extractCompositionSearchTypes(body);
       const requestedBundleType = isSummaryOperation
         ? 'document'
-        : this.extractRequestedBundleType(body);
-      const documentReferenceFilters = this.extractDocumentReferenceSearchFilters(body);
-      const communicationFilters = this.extractCommunicationSearchFilters(body);
+        : extractRequestedBundleType(body);
+      const documentReferenceFilters = extractDocumentReferenceSearchFilters(body);
+      const communicationFilters = extractCommunicationSearchFilters(body);
 
       if (this.isIpsBundleDocumentRequest(searchResourceType, requestedBundleType, searchTypes)) {
         const consolidatedBundle = await this.buildConsolidatedIpsBundleDocument({
@@ -185,13 +223,14 @@ export class CompositionManager implements IJobProcessor {
           excludedSections: excludedSearchSections,
           requiredTypes: searchTypes,
         });
+        const projectedBundle = this.projectSummaryBundleByFormat(consolidatedBundle, normalizedFormat);
 
         const responseBundle: BundleJsonApi = {
-          resourceType: 'Bundle',
-          type: 'batch-response',
+          resourceType: ResourceTypesFhirR4.Bundle,
+          type: BundleType.BatchResponse,
           data: [{
-            type: isSummaryOperation ? 'Bundle-summary-response-v1.0' : 'Bundle-search-response-v1.0',
-            resource: consolidatedBundle,
+            type: isSummaryOperation ? GatewayResponseEntryTypes.BundleSummary : GatewayResponseEntryTypes.BundleSearch,
+            resource: projectedBundle,
             response: { status: '200' },
           } as any],
           total: 1,
@@ -199,7 +238,36 @@ export class CompositionManager implements IJobProcessor {
 
         return {
           jti: randomUUID(),
-          type: 'transaction-response',
+          type: GatewayEnvelopeTypes.TransactionResponse,
+          thid: job.content?.thid as string,
+          iss: job.content?.aud as string,
+          aud: job.content?.iss as string,
+          body: responseBundle,
+        };
+      }
+
+      if (normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN && searchResourceType === 'composition' && !searchSubject) {
+        const matches = await this.twinCompositionManager.searchBySectionAndClaims({
+          tenantVaultId,
+          requiredSections: searchSections,
+          excludedSections: excludedSearchSections,
+          body,
+          filterMatchesBySectionsAndTypes: this.filterMatchesBySectionsAndTypes.bind(this),
+        });
+        const responseBundle: BundleJsonApi = {
+          resourceType: ResourceTypesFhirR4.Bundle,
+          type: BundleType.BatchResponse,
+          data: [{
+            type: GatewayResponseEntryTypes.CompositionSearch,
+            resource: { total: matches.length, data: matches },
+            response: { status: '200' },
+          } as any],
+          total: 1,
+        };
+
+        return {
+          jti: randomUUID(),
+          type: GatewayEnvelopeTypes.TransactionResponse,
           thid: job.content?.thid as string,
           iss: job.content?.aud as string,
           aud: job.content?.iss as string,
@@ -208,7 +276,7 @@ export class CompositionManager implements IJobProcessor {
       }
 
       const sectionId = getSubjectScopedSectionId(
-        searchSubject,
+        searchSubject!,
         scope,
         useDocumentReferenceSection ? 'document-references' : useCommunicationSection ? 'communications' : 'composition',
       );
@@ -219,14 +287,14 @@ export class CompositionManager implements IJobProcessor {
           ? await this.filterCommunicationMatches(tenantVaultId, searchSubject, scope, matchesRaw, communicationFilters)
           : this.filterMatchesBySectionsAndTypes(matchesRaw, searchSections, excludedSearchSections, searchTypes);
       const responseBundle: BundleJsonApi = {
-        resourceType: 'Bundle',
-        type: 'batch-response',
+        resourceType: ResourceTypesFhirR4.Bundle,
+        type: BundleType.BatchResponse,
         data: [{
           type: useDocumentReferenceSection
-            ? 'DocumentReference-search-response-v1.0'
+            ? GatewayResponseEntryTypes.DocumentReferenceSearch
             : useCommunicationSection
-              ? 'Communication-search-response-v1.0'
-              : 'Composition-search-response-v1.0',
+              ? GatewayResponseEntryTypes.CommunicationSearch
+              : GatewayResponseEntryTypes.CompositionSearch,
           resource: { total: matches.length, data: matches },
           response: { status: '200' },
         } as any],
@@ -235,7 +303,7 @@ export class CompositionManager implements IJobProcessor {
 
       return {
         jti: randomUUID(),
-        type: 'transaction-response',
+        type: GatewayEnvelopeTypes.TransactionResponse,
         thid: job.content?.thid as string,
         iss: job.content?.aud as string,
         aud: job.content?.iss as string,
@@ -248,11 +316,11 @@ export class CompositionManager implements IJobProcessor {
       try {
         const resourceType = String(entry?.resource?.resourceType || entry?.type || '').trim();
         const responseAction = `${normalizedAction}-response`;
-        if (resourceType === 'OperationOutcome') {
+        if (resourceType === GatewayLocalFhirResourceTypes.OperationOutcome) {
           // Preconversion may include row-level OperationOutcome entries as warnings.
           // They are informational and should not be persisted as Composition claims.
           responseEntries.push({
-            type: 'OperationOutcome',
+            type: GatewayResponseEntryTypes.OperationOutcome,
             response: {
               status: '200',
               location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/Composition/${responseAction}`,
@@ -355,7 +423,7 @@ export class CompositionManager implements IJobProcessor {
 
     return {
       jti: randomUUID(),
-      type: 'transaction-response',
+      type: GatewayEnvelopeTypes.TransactionResponse,
       thid: job.content?.thid as string,
       iss: job.content?.aud as string,
       aud: job.content?.iss as string,
@@ -368,243 +436,17 @@ export class CompositionManager implements IJobProcessor {
     return SUMMARY_OPERATION_ALLOWED_SECTOR_PREFIXES.some((prefix) => normalizedSector.startsWith(prefix));
   }
 
-  private extractSearchSubject(body: any): string {
-    return this.getFirstSearchFilter(body, ['subject', 'composition.subject']);
-  }
-
-  private extractSearchSections(body: any): string[] {
-    const result = new Set<string>();
-    for (const value of this.getSearchFilterValues(body, ['section', 'composition.section'])) {
-      result.add(value);
-    }
-    return [...result];
-  }
-
-  private extractExcludedSearchSections(body: any): string[] {
-    const result = new Set<string>();
-
-    const parameters = Array.isArray(body?.parameter) ? body.parameter : [];
-    for (const p of parameters) {
-      const name = String(p?.name || '').toLowerCase();
-      if (
-        name !== 'section:not'
-        && name !== 'composition.section:not'
-        && name !== 'exclude-section'
-        && name !== 'exclude-sections'
-      ) continue;
-      const value = String(p?.valueString || p?.valueCode || p?.valueCoding?.code || '').trim();
-      if (!value) continue;
-      value.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
-    }
-
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-    for (const wrapper of wrappers) {
-      const requestUrl = String(wrapper?.request?.url || '').trim();
-      if (!requestUrl) continue;
-      const queryIndex = requestUrl.indexOf('?');
-      if (queryIndex < 0) continue;
-      const query = requestUrl.slice(queryIndex + 1);
-      const params = new URLSearchParams(query);
-      const excludedRaw = String(
-        params.get('section:not')
-          || params.get('composition.section:not')
-          || params.get('exclude-section')
-          || params.get('exclude-sections')
-          || '',
-      ).trim();
-      if (!excludedRaw) continue;
-      excludedRaw.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
-    }
-
-    return Array.from(result);
-  }
-
-  private extractSearchTypes(body: any): string[] {
-    const result = new Set<string>();
-
-    const parameters = Array.isArray(body?.parameter) ? body.parameter : [];
-    for (const p of parameters) {
-      const name = String(p?.name || '').toLowerCase();
-      if (name !== 'composition.type' && name !== 'document-type') continue;
-      const value = String(
-        p?.valueString
-          || p?.valueCode
-          || (p?.valueCoding?.system && p?.valueCoding?.code ? `${p.valueCoding.system}|${p.valueCoding.code}` : '')
-          || '',
-      ).trim();
-      if (!value) continue;
-      value.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
-    }
-
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-    for (const wrapper of wrappers) {
-      const requestUrl = String(wrapper?.request?.url || '').trim();
-      if (!requestUrl) continue;
-      const queryIndex = requestUrl.indexOf('?');
-      if (queryIndex < 0) continue;
-      const query = requestUrl.slice(queryIndex + 1);
-      const params = new URLSearchParams(query);
-      const typeRaw = String(
-        params.get('composition.type')
-          || '',
-      ).trim();
-      if (!typeRaw) continue;
-      typeRaw.split(',').map((v) => v.trim()).filter(Boolean).forEach((v) => result.add(v));
-    }
-
-    return Array.from(result);
-  }
-
   private extractSummaryTypes(body: any): string[] {
-    const explicitTypes = this.extractSearchTypes(body);
+    const explicitTypes = extractCompositionSearchTypes(body);
     if (explicitTypes.length > 0) return explicitTypes;
     return [HealthcareBasicSections.PatientSummaryDocument.attributeValue];
-  }
-
-  private extractRequestedBundleType(body: any): string {
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-    for (const wrapper of wrappers) {
-      const requestUrl = String(wrapper?.request?.url || '').trim();
-      if (!requestUrl) continue;
-      const queryIndex = requestUrl.indexOf('?');
-      if (queryIndex < 0) continue;
-      const params = new URLSearchParams(requestUrl.slice(queryIndex + 1));
-      const bundleType = String(params.get('type') || '').trim();
-      if (bundleType) return bundleType;
-    }
-    return '';
-  }
-
-  private extractSearchResourceType(body: any): string {
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-    for (const wrapper of wrappers) {
-      const requestUrl = String(wrapper?.request?.url || '').trim();
-      if (!requestUrl) continue;
-      const target = extractSearchResourceTarget(requestUrl);
-      if (!target) continue;
-      return target.toLowerCase();
-    }
-    return 'composition';
-  }
-
-  private extractDocumentReferenceSearchFilters(body: any): {
-    identifier?: string;
-    attachmentHash?: string;
-  } {
-    const identifier = this.getFirstSearchFilter(body, ['identifier', 'documentreference.identifier']);
-    const attachmentHash = this.getFirstSearchFilter(body, [
-      'contenthash',
-      'documentreference.contenthash',
-      'attachment.hash',
-    ]);
-    return {
-      identifier: identifier || undefined,
-      attachmentHash: attachmentHash || undefined,
-    };
-  }
-
-  private extractCommunicationSearchFilters(body: any): {
-    identifier?: string;
-    thid?: string;
-    pthid?: string;
-    attachmentHash?: string;
-  } {
-    const identifier = this.getFirstSearchFilter(body, ['identifier', 'communication.identifier']);
-    const thid = this.getFirstSearchFilter(body, ['thid']);
-    const pthid = this.getFirstSearchFilter(body, ['pthid']);
-    const attachmentHash = this.getFirstSearchFilter(body, [
-      'contenthash',
-      'documentreference.contenthash',
-      'attachment.hash',
-    ]);
-    return {
-      identifier: identifier || undefined,
-      thid: thid || undefined,
-      pthid: pthid || undefined,
-      attachmentHash: attachmentHash || undefined,
-    };
-  }
-
-  private collectSearchFilters(body: any): SearchFilters {
-    const filters: SearchFilters = {};
-    const merge = (source: SearchFilters) => {
-      for (const [key, values] of Object.entries(source)) {
-        if (!filters[key]) {
-          filters[key] = [];
-        }
-        filters[key].push(...values);
-      }
-    };
-
-    if (Array.isArray(body?.parameter)) {
-      merge(extractSearchFiltersFromParametersResource({ resourceType: 'Parameters', parameter: body.parameter }));
-    }
-
-    const wrappers = [
-      ...(Array.isArray(body?.entry) ? body.entry : []),
-      ...(Array.isArray(body?.data) ? body.data : []),
-    ];
-
-    for (const wrapper of wrappers) {
-      merge(extractSearchFiltersFromRequestUrl(wrapper?.request?.url));
-      if (wrapper?.resource?.resourceType === 'Parameters') {
-        merge(extractSearchFiltersFromParametersResource(wrapper.resource));
-      }
-    }
-
-    return filters;
-  }
-
-  private getSearchFilterValues(body: any, names: string[]): string[] {
-    const filters = this.collectSearchFilters(body);
-    const values: string[] = [];
-    for (const name of names) {
-      values.push(...(filters[name] || []));
-    }
-    return values.map((value) => String(value).trim()).filter(Boolean);
-  }
-
-  private getFirstSearchFilter(body: any, names: string[]): string {
-    return this.getSearchFilterValues(body, names)[0] || '';
   }
 
   private filterDocumentReferenceMatches(
     matches: any[],
     filters: { identifier?: string; attachmentHash?: string },
   ): any[] {
-    if (!Array.isArray(matches)) return [];
-    const requiredIdentifier = String(filters.identifier || '').trim();
-    const requiredAttachmentHash = String(filters.attachmentHash || '').trim();
-    if (!requiredIdentifier && !requiredAttachmentHash) return matches;
-
-    return matches.filter((record: any) => {
-      const identifier = String(
-        record?.['DocumentReference.identifier']
-          || record?.['org.hl7.fhir.r4.DocumentReference.identifier']
-          || '',
-      ).trim();
-      const attachmentHash = String(
-        record?.['DocumentReference.contenthash']
-          || record?.['org.hl7.fhir.r4.DocumentReference.contenthash']
-          || '',
-      ).trim();
-
-      if (requiredIdentifier && identifier !== requiredIdentifier) return false;
-      if (requiredAttachmentHash && attachmentHash !== requiredAttachmentHash) return false;
-      return true;
-    });
+    return filterDocumentReferenceMatches(matches, filters);
   }
 
   private isIpsBundleDocumentRequest(
@@ -617,7 +459,7 @@ export class CompositionManager implements IJobProcessor {
     if (!Array.isArray(requiredTypes) || requiredTypes.length === 0) return false;
 
     const ipsCode = HealthcareBasicSections.PatientSummaryDocument.code;
-    return requiredTypes.some((value) => this.extractTokenCode(value) === ipsCode);
+    return requiredTypes.some((value) => extractTokenCode(value) === ipsCode);
   }
 
   private async buildConsolidatedIpsBundleDocument(params: {
@@ -653,24 +495,24 @@ export class CompositionManager implements IJobProcessor {
       includedSectionTokens.add(sectionToken);
       this.ensureSection(sectionRefs, sectionToken);
 
-      const authorReference = this.normalizeReference(getClaimValue<string>(compositionRecord, 'Composition.author'));
+      const authorReference = normalizeReference(getClaimValue<string>(compositionRecord, 'Composition.author'));
       if (authorReference) authorRefs.add(authorReference);
-      const compositionDate = this.normalizeReference(getClaimValue<string>(compositionRecord, 'Composition.date'));
+      const compositionDate = normalizeReference(getClaimValue<string>(compositionRecord, 'Composition.date'));
       if (compositionDate) compositionDates.push(compositionDate);
     }
 
     for (const sectionToken of includedSectionTokens) {
-      const projectionConfigs = IPS_SECTION_PROJECTION_CONFIG[sectionToken] || [];
+      const projectionConfigs = TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG[sectionToken] || [];
       for (const projectionConfig of projectionConfigs) {
-        for (const sectionIdSuffix of projectionConfig.sectionIds) {
-          const resourceSectionId = getSubjectScopedSectionId(params.subject, params.scope, sectionIdSuffix);
+        for (const collectionIdSuffix of projectionConfig.collectionIds) {
+          const resourceSectionId = getSubjectScopedSectionId(params.subject, params.scope, collectionIdSuffix);
           const resourceRecords = await this.vaultRepository.listContainersInSection(params.tenantVaultId, resourceSectionId);
           for (const resourceRecord of resourceRecords) {
-            const resource = this.buildFhirResourceFromIndexedClaims(projectionConfig.resourceType, resourceRecord);
-            const entryKey = this.resolveEntryKey(undefined, resource);
+            const resource = buildFhirResourceFromIndexedClaims(projectionConfig.resourceType, resourceRecord);
+            const entryKey = resolveBundleEntryKey(undefined, resource);
             if (!bundleEntries.has(entryKey)) {
               bundleEntries.set(entryKey, {
-                fullUrl: this.resolveBundleEntryFullUrl(undefined, { resource }),
+                fullUrl: resolveBundleEntryFullUrl(undefined, { resource }),
                 resource,
               });
             }
@@ -680,24 +522,41 @@ export class CompositionManager implements IJobProcessor {
       }
     }
 
-    const documentReferenceSectionId = getSubjectScopedSectionId(params.subject, params.scope, 'document-references');
+    const documentReferenceSectionId = getSubjectScopedSectionId(params.subject, params.scope, DataCollectionIds.documentReferences);
     const documentReferenceRecords = await this.vaultRepository.listContainersInSection(params.tenantVaultId, documentReferenceSectionId);
     for (const documentReferenceRecord of documentReferenceRecords) {
-      const resource = this.buildFhirResourceFromIndexedClaims('DocumentReference', documentReferenceRecord);
-      const entryKey = this.resolveEntryKey(undefined, resource);
+      const resource = buildFhirResourceFromIndexedClaims(ResourceTypesFhirR4.DocumentReference, documentReferenceRecord);
+      const entryKey = resolveBundleEntryKey(undefined, resource);
       if (!bundleEntries.has(entryKey)) {
         bundleEntries.set(entryKey, {
-          fullUrl: this.resolveBundleEntryFullUrl(undefined, { resource }),
+          fullUrl: resolveBundleEntryFullUrl(undefined, { resource }),
           resource,
         });
       }
     }
 
     const compositionId = `ips-composition-${determineResourceId(params.subject, process.env.NODE_ENV)}`;
+    const compositionIdentifier = `urn:uuid:${compositionId}`;
+    const compositionSectionTokens = Array.from(sectionRefs.keys());
+    const compositionClaims: Record<string, any> = {
+      '@context': 'org.hl7.fhir.r4',
+      'Composition.identifier': compositionIdentifier,
+      'Composition.subject': params.subject,
+      'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+      'Composition.date': pickLatestIsoDate(compositionDates),
+      'Composition.section': compositionSectionTokens.join(','),
+    };
+    if (authorRefs.size > 0) {
+      compositionClaims['Composition.author'] = Array.from(authorRefs).join(',');
+    }
     const compositionResource: Record<string, any> = {
       resourceType: 'Composition',
       id: compositionId,
+      identifier: [{ value: compositionIdentifier }],
       status: 'final',
+      meta: {
+        claims: compositionClaims,
+      },
       type: {
         coding: [{
           system: HealthcareBasicSections.PatientSummaryDocument.system,
@@ -706,13 +565,13 @@ export class CompositionManager implements IJobProcessor {
         }],
       },
       subject: { reference: params.subject },
-      date: this.pickLatestIsoDate(compositionDates),
+      date: compositionClaims['Composition.date'],
       title: 'International Patient Summary',
-      section: Array.from(sectionRefs.entries()).map(([sectionToken, refs]) => ({
+      section: compositionSectionTokens.map((sectionToken) => ({
         code: {
-          coding: [this.tokenToCoding(sectionToken)],
+          coding: [tokenToCoding(sectionToken)],
         },
-        entry: Array.from(refs).map((reference) => ({ reference })),
+        entry: Array.from(sectionRefs.get(sectionToken) || []).map((reference) => ({ reference })),
       })),
       ...(authorRefs.size > 0 ? {
         author: Array.from(authorRefs).map((reference) => ({ reference })),
@@ -724,7 +583,7 @@ export class CompositionManager implements IJobProcessor {
       type: 'document',
       entry: [
         {
-          fullUrl: `Composition/${compositionId}`,
+          fullUrl: compositionIdentifier,
           resource: compositionResource,
         },
         ...Array.from(bundleEntries.entries()).map(([reference, entry]) => ({
@@ -735,32 +594,33 @@ export class CompositionManager implements IJobProcessor {
     };
   }
 
-  private resolveEntryKey(reference: string | undefined, resource: Record<string, any>): string {
-    return this.normalizeReference(reference)
-      || this.normalizeReference(resource?.identifier?.[0]?.value)
-      || this.normalizeReference(resource?.resourceType && resource?.id ? `${resource.resourceType}/${resource.id}` : '')
-      || `${String(resource?.resourceType || 'Resource')}/${determineResourceId(String(resource?.id || randomUUID()), process.env.NODE_ENV)}`;
-  }
+  private projectSummaryBundleByFormat(bundle: Record<string, any>, format: string): Record<string, any> {
+    if (String(format || '').trim().toLowerCase() !== 'org.hl7.fhir.api') {
+      return bundle;
+    }
 
-  private resolveBundleEntryFullUrl(
-    reference: string | undefined,
-    entry: { fullUrl?: string; resource?: Record<string, any> },
-  ): string | undefined {
-    return this.normalizeReference(entry?.fullUrl)
-      || this.normalizeReference(reference)
-      || this.normalizeReference(entry?.resource?.identifier?.[0]?.value)
-      || this.normalizeReference(
-        entry?.resource?.resourceType && entry?.resource?.id
-          ? `${entry.resource.resourceType}/${entry.resource.id}`
-          : '',
-      )
-      || undefined;
-  }
-
-  private normalizeReference(value: unknown): string | undefined {
-    if (typeof value !== 'string') return undefined;
-    const normalized = value.trim();
-    return normalized || undefined;
+    return {
+      resourceType: ResourceTypesFhirR4.Bundle,
+      type: bundle.type || 'document',
+      entry: Array.isArray(bundle.entry)
+        ? bundle.entry.map((entry: any) => {
+          const resource = entry?.resource || {};
+          const claims = resource?.meta?.claims && typeof resource.meta.claims === 'object'
+            ? canonicalizeFhirClaims(resource.meta.claims as Record<string, any>)
+            : {};
+          return {
+            fullUrl: String(entry?.fullUrl || '').trim() || `urn:uuid:${String(resource?.id || randomUUID())}`,
+            resource: {
+              resourceType: String(resource?.resourceType || 'Resource'),
+              id: String(resource?.id || ''),
+              meta: {
+                claims,
+              },
+            },
+          };
+        })
+        : [],
+    };
   }
 
   private addSectionReference(sectionRefs: Map<string, Set<string>>, sectionToken: string, reference: string): void {
@@ -776,127 +636,8 @@ export class CompositionManager implements IJobProcessor {
 
   private matchesRequiredTypes(actualType: string, requiredTypes: string[]): boolean {
     if (!requiredTypes.length) return true;
-    const actualCode = this.extractTokenCode(actualType);
-    return requiredTypes.some((requiredType) => this.extractTokenCode(requiredType) === actualCode);
-  }
-
-  private extractTokenCode(value: string): string {
-    const normalized = String(value || '').trim();
-    if (!normalized) return '';
-    const parts = normalized.split('|');
-    return parts.length > 1 ? parts[parts.length - 1] : normalized;
-  }
-
-  private tokenToCoding(value: string): { system?: string; code: string } {
-    const normalized = String(value || '').trim();
-    const [left, right] = normalized.split('|');
-    if (!right) {
-      return { code: left };
-    }
-    if (/^https?:\/\//i.test(left)) {
-      return { system: left, code: right };
-    }
-    if (left.toUpperCase() === 'LOINC') {
-      return { system: 'http://loinc.org', code: right };
-    }
-    return { system: left, code: right };
-  }
-
-  private pickLatestIsoDate(values: string[]): string {
-    const sorted = values
-      .map((value) => String(value || '').trim())
-      .filter(Boolean)
-      .sort();
-    return sorted[sorted.length - 1] || new Date().toISOString();
-  }
-
-  private buildFhirResourceFromIndexedClaims(resourceType: string, record: Record<string, any>): Record<string, any> {
-    const claims = normalizeContextualizedClaims(record || {});
-    const subject =
-      this.normalizeReference(getClaimValue<string>(claims, `${resourceType}.subject`))
-      || this.normalizeReference(getClaimValue<string>(claims, `${resourceType}.patient`));
-    const identifier = this.normalizeReference(
-      getClaimValue<string>(claims, `${resourceType}.identifier`)
-      || getClaimValue<string>(claims, `${resourceType}.identifier.value`),
-    );
-    const codeToken = this.normalizeReference(getClaimValue<string>(claims, `${resourceType}.code`));
-    const status = this.normalizeReference(getClaimValue<string>(claims, `${resourceType}.status`));
-    const noteText = this.normalizeReference(getClaimValue<string>(claims, `${resourceType}.note`));
-    const effective = this.normalizeReference(
-      getClaimValue<string>(claims, `${resourceType}.effective`)
-      || getClaimValue<string>(claims, `${resourceType}.effectiveDateTime`)
-      || getClaimValue<string>(claims, `${resourceType}.date`),
-    );
-    const codeText = this.normalizeReference(getClaimValue<string>(claims, `${resourceType}.code-text`));
-    const medicationText = this.normalizeReference(getClaimValue<string>(claims, 'MedicationStatement.medication-text'));
-
-    const resource: Record<string, any> = {
-      resourceType,
-      id: String(record?.id || determineResourceId(identifier || randomUUID(), process.env.NODE_ENV)),
-      meta: {
-        claims,
-      },
-    };
-
-    if (identifier) {
-      resource.identifier = [{ value: identifier }];
-    }
-    if (subject) {
-      if (resourceType === 'AllergyIntolerance' || resourceType === 'Immunization' || resourceType === 'RelatedPerson') {
-        resource.patient = { reference: subject };
-      } else {
-        resource.subject = { reference: subject };
-      }
-    }
-    if (status) {
-      resource.status = status;
-    }
-    if (effective) {
-      if (resourceType === 'MedicationStatement') {
-        resource.effectiveDateTime = effective;
-      } else if (resourceType === 'Observation') {
-        resource.effectiveDateTime = effective;
-      } else if (resourceType === 'DocumentReference') {
-        resource.date = effective;
-      } else {
-        resource.recordedDate = effective;
-      }
-    }
-    if (noteText) {
-      resource.note = [{ text: noteText }];
-    }
-
-    if (resourceType === 'MedicationStatement' && medicationText) {
-      resource.medicationCodeableConcept = { text: medicationText };
-    } else if (codeText || codeToken) {
-      resource.code = {
-        ...(codeText ? { text: codeText } : {}),
-        ...(codeToken ? { coding: [this.tokenToCoding(codeToken)] } : {}),
-      };
-    }
-
-    if (resourceType === 'DocumentReference') {
-      const contentType = this.normalizeReference(getClaimValue<string>(claims, 'DocumentReference.contenttype'));
-      const description = this.normalizeReference(getClaimValue<string>(claims, 'DocumentReference.description'));
-      const contentHash = this.normalizeReference(getClaimValue<string>(claims, 'DocumentReference.contenthash'));
-      const location = this.normalizeReference(getClaimValue<string>(claims, 'DocumentReference.location'));
-      if (description) resource.description = description;
-      resource.content = [{
-        attachment: {
-          ...(contentType ? { contentType } : {}),
-          ...(location ? { url: location } : {}),
-          ...(contentHash ? { id: contentHash } : {}),
-        },
-      }];
-      if (subject) {
-        resource.subject = { reference: subject };
-      }
-      if (effective) {
-        resource.date = effective;
-      }
-    }
-
-    return resource;
+    const actualCode = extractTokenCode(actualType);
+    return requiredTypes.some((requiredType) => extractTokenCode(requiredType) === actualCode);
   }
 
   private filterMatchesBySectionsAndTypes(
@@ -905,82 +646,12 @@ export class CompositionManager implements IJobProcessor {
     excludedSections: string[],
     requiredTypes: string[],
   ): any[] {
-    if (!Array.isArray(matches)) return [];
-    const hasSectionFilter = Array.isArray(requiredSections) && requiredSections.length > 0;
-    const hasExcludedSectionFilter = Array.isArray(excludedSections) && excludedSections.length > 0;
-    const hasTypeFilter = Array.isArray(requiredTypes) && requiredTypes.length > 0;
-    if (!hasSectionFilter && !hasExcludedSectionFilter && !hasTypeFilter) return matches;
-
-    const requiredSectionSet = new Set(requiredSections.map((s) => String(s || '').trim()).filter(Boolean));
-    const excludedSectionSet = new Set(excludedSections.map((s) => String(s || '').trim()).filter(Boolean));
-    const requiredTypeSet = new Set(requiredTypes.map((s) => String(s || '').trim()).filter(Boolean));
-
-    return matches.filter((record: any) => {
-      if (hasSectionFilter || hasExcludedSectionFilter) {
-        const sectionKeys = [
-          'Composition.section',
-          'org.hl7.fhir.r4.Composition.section',
-          'org.hl7.fhir.api.Composition.section',
-        ];
-        let sectionValue = '';
-        for (const key of sectionKeys) {
-          const candidate = String(record?.[key] || '').trim();
-          if (candidate) {
-            sectionValue = candidate;
-            break;
-          }
-        }
-        if (!sectionValue) return false;
-        const gotSections = new Set(sectionValue.split(',').map((v: string) => v.trim()).filter(Boolean));
-
-        if (hasExcludedSectionFilter) {
-          for (const excluded of excludedSectionSet) {
-            if (gotSections.has(excluded)) {
-              return false;
-            }
-          }
-        }
-
-        if (hasSectionFilter) {
-          let sectionMatched = false;
-          for (const req of requiredSectionSet) {
-            if (gotSections.has(req)) {
-              sectionMatched = true;
-              break;
-            }
-          }
-          if (!sectionMatched) return false;
-        }
-      }
-
-      if (hasTypeFilter) {
-        const typeKeys = [
-          'Composition.type',
-          'org.hl7.fhir.r4.Composition.type',
-          'org.hl7.fhir.api.Composition.type',
-        ];
-        let typeValue = '';
-        for (const key of typeKeys) {
-          const candidate = String(record?.[key] || '').trim();
-          if (candidate) {
-            typeValue = candidate;
-            break;
-          }
-        }
-        if (!typeValue) return false;
-        const gotTypes = new Set(typeValue.split(',').map((v: string) => v.trim()).filter(Boolean));
-        let typeMatched = false;
-        for (const req of requiredTypeSet) {
-          if (gotTypes.has(req)) {
-            typeMatched = true;
-            break;
-          }
-        }
-        if (!typeMatched) return false;
-      }
-
-      return true;
-    });
+    return filterCompositionMatchesBySectionsAndTypes(
+      matches,
+      requiredSections,
+      excludedSections,
+      requiredTypes,
+    );
   }
 
   private async filterCommunicationMatches(
@@ -1004,9 +675,7 @@ export class CompositionManager implements IJobProcessor {
         documentReferences
           .filter((record: any) => {
             const attachmentHash = String(
-              record?.['DocumentReference.contenthash']
-                || record?.['org.hl7.fhir.r4.DocumentReference.contenthash']
-                || '',
+              getFirstClaimValueByKeys(record, buildFhirClaimKeys('DocumentReference.contenthash')) || '',
             ).trim();
             return attachmentHash === filters.attachmentHash;
           })

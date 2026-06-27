@@ -13,6 +13,8 @@ import {
 } from 'gdc-common-utils-ts/utils/communication-participant-search';
 import { SearchBundleTypes } from 'gdc-common-utils-ts/utils/fhir-search';
 import { HealthcareBasicSections } from '../shared/healthcare-constants';
+import { GatewayLocalFhirResourceTypes, ResourceTypesFhirR4 } from '../shared/fhir-constants';
+import { DataCollectionIds, FhirResourceTypeDataCollections } from '../shared/data-collections';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { determineResourceId } from '../utils/resource';
@@ -29,7 +31,8 @@ import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import { applyFhirCidVersioningToEntry, fhirResourceToCid } from '../utils/fhir-versioning';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { persistConsentRuleAndAttachment } from '../utils/consent-storage';
-import { SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
+import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
+import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -47,7 +50,7 @@ type SupportedProjectedResourceType =
   | 'Consent';
 
 type ProjectionConfig = {
-  section: string;
+  collectionId: string;
   subjectClaimKeys: string[];
   identifierClaimKeys: string[];
 };
@@ -60,67 +63,67 @@ type ResolvedCommunicationAttachment = {
 
 const PROJECTED_RESOURCE_CONFIG: Record<SupportedProjectedResourceType, ProjectionConfig> = {
   MedicationStatement: {
-    section: 'medications',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.MedicationStatement],
     subjectClaimKeys: ['MedicationStatement.subject', 'MedicationStatement.patient'],
     identifierClaimKeys: ['MedicationStatement.identifier', 'MedicationStatement.identifier.value'],
   },
   Observation: {
-    section: 'observations',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Observation],
     subjectClaimKeys: ['Observation.subject', 'Observation.patient'],
     identifierClaimKeys: ['Observation.identifier', 'Observation.identifier.value'],
   },
   AllergyIntolerance: {
-    section: 'allergies',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.AllergyIntolerance],
     subjectClaimKeys: ['AllergyIntolerance.patient', 'AllergyIntolerance.subject'],
     identifierClaimKeys: ['AllergyIntolerance.identifier', 'AllergyIntolerance.identifier.value'],
   },
   Condition: {
-    section: 'conditions',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Condition],
     subjectClaimKeys: ['Condition.subject', 'Condition.patient'],
     identifierClaimKeys: ['Condition.identifier', 'Condition.identifier.value'],
   },
   Procedure: {
-    section: 'procedures',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Procedure],
     subjectClaimKeys: ['Procedure.subject', 'Procedure.patient'],
     identifierClaimKeys: ['Procedure.identifier', 'Procedure.identifier.value'],
   },
   ImagingStudy: {
-    section: 'imaging-studies',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.ImagingStudy],
     subjectClaimKeys: ['ImagingStudy.subject', 'ImagingStudy.patient'],
     identifierClaimKeys: ['ImagingStudy.identifier', 'ImagingStudy.identifier.value'],
   },
   Immunization: {
-    section: 'immunizations',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Immunization],
     subjectClaimKeys: ['Immunization.patient', 'Immunization.subject'],
     identifierClaimKeys: ['Immunization.identifier', 'Immunization.identifier.value'],
   },
   RelatedPerson: {
-    section: 'related-persons',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.RelatedPerson],
     subjectClaimKeys: ['RelatedPerson.patient', 'RelatedPerson.subject'],
     identifierClaimKeys: ['RelatedPerson.identifier', 'RelatedPerson.identifier.value'],
   },
   DiagnosticReport: {
-    section: 'diagnostic-reports',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.DiagnosticReport],
     subjectClaimKeys: ['DiagnosticReport.subject', 'DiagnosticReport.patient'],
     identifierClaimKeys: ['DiagnosticReport.identifier', 'DiagnosticReport.identifier.value'],
   },
   CarePlan: {
-    section: 'care-plans',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.CarePlan],
     subjectClaimKeys: ['CarePlan.subject', 'CarePlan.patient'],
     identifierClaimKeys: ['CarePlan.identifier', 'CarePlan.identifier.value'],
   },
   Encounter: {
-    section: 'encounters',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Encounter],
     subjectClaimKeys: ['Encounter.subject', 'Encounter.patient'],
     identifierClaimKeys: ['Encounter.identifier', 'Encounter.identifier.value'],
   },
   AdverseEvent: {
-    section: 'adverse-events',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.AdverseEvent],
     subjectClaimKeys: ['AdverseEvent.subject', 'AdverseEvent.patient'],
     identifierClaimKeys: ['AdverseEvent.identifier', 'AdverseEvent.identifier.value'],
   },
   Consent: {
-    section: 'consents',
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Consent],
     subjectClaimKeys: ['Consent.subject', 'Consent.patient'],
     identifierClaimKeys: ['Consent.identifier', 'Consent.identifier.value'],
   },
@@ -135,14 +138,34 @@ interface CommunicationManagerOptions {
 
 const COMMUNICATION_RESOURCE_TYPE = 'Communication' as const;
 const COMMUNICATION_ENTRY_TYPE = 'CommMsgExtended' as const;
-const COMMUNICATION_SECTION_NAME = 'communications' as const;
-const FHIR_PARAMETERS_RESOURCE_TYPE = 'Parameters' as const;
-const SEARCH_RESPONSE_ENTRY_TYPE = 'Communication-search-response-v1.0' as const;
+const COMMUNICATION_SECTION_NAME = DataCollectionIds.communications;
+const FHIR_PARAMETERS_RESOURCE_TYPE = GatewayLocalFhirResourceTypes.Parameters;
+const SEARCH_RESPONSE_ENTRY_TYPE = GatewayResponseEntryTypes.CommunicationSearch;
 const COMMUNICATION_SECTION_PREFIX = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_${COMMUNICATION_SECTION_NAME}_`);
 
 /**
- * Manages the business logic for converting FHIR Communication resources
- * into the internal CommMsgExtended format.
+ * Processes the canonical `Communication` transport envelope used by the
+ * operational `individual` flows.
+ *
+ * Architectural intent:
+ * - `individual` is the operational subject-index plane.
+ * - The public read model for `individual` is not "one `_search` endpoint per
+ *   clinical resource type".
+ * - Instead, `Communication` carries the auditable request envelope and may
+ *   embed references to:
+ *   - `Subject/$summary` for canonical subject-summary retrieval
+ *   - `Subject/_search` for structured subject-location requests
+ *   - `Bundle/_search` for document/section retrieval
+ *
+ * The same manager also projects attached document content into internal
+ * subject-scoped storage sections so later summary/document retrieval can be
+ * resolved deterministically.
+ *
+ * Important boundary:
+ * - `individual` is for operational subject reads and document retrieval.
+ * - `digitaltwin` is a different plane with different search semantics.
+ * - `digitaltwin` should not be documented as "the same thing as individual
+ *   but under another path".
  */
 export class CommunicationManager implements IJobProcessor {
   private readonly tenantsCacheManager: ITenantsManager;
@@ -233,7 +256,7 @@ export class CommunicationManager implements IJobProcessor {
           response: {
             status: '500',
             outcome: {
-              resourceType: 'OperationOutcome',
+              resourceType: GatewayLocalFhirResourceTypes.OperationOutcome,
               issue: [{
                 severity: 'error',
                 code: 'processing',
@@ -242,14 +265,14 @@ export class CommunicationManager implements IJobProcessor {
             }
           },
           id: resourceId,
-          type: 'OperationOutcome',
+          type: GatewayResponseEntryTypes.OperationOutcome,
           meta: entry.meta,
         });
       }
     }
 
     const responseBundle: BundleJsonApi<BundleEntryResponse | ErrorEntry> = {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: `${job.action}-response`, // FHIR based: batch-resonse, transaction-response
       data: bundleEntries,
     };
@@ -372,8 +395,10 @@ export class CommunicationManager implements IJobProcessor {
   private isSummaryOperationReference(reference: string): boolean {
     return reference.includes('/subject/$summary')
       || reference.includes('/patient/$summary')
+      || reference.includes('/researchsubject/$summary')
       || reference.startsWith('subject/$summary')
-      || reference.startsWith('patient/$summary');
+      || reference.startsWith('patient/$summary')
+      || reference.startsWith('researchsubject/$summary');
   }
 
   private isSubjectSearchReference(reference: string): boolean {
@@ -422,10 +447,13 @@ export class CommunicationManager implements IJobProcessor {
     const query = search.startsWith('?') ? search.slice(1) : search;
     const normalizedPath = cleanPath.toLowerCase();
     if (this.isSummaryOperationReference(normalizedPath)) {
+      const summaryResourceType = normalizedPath.includes('researchsubject/$summary')
+        ? 'ResearchSubject'
+        : 'Subject';
       return {
         section,
         format,
-        resourceType: 'Subject',
+        resourceType: summaryResourceType,
         action: '$summary',
         body: this.buildSummaryParametersBody(query),
       };
@@ -556,9 +584,15 @@ export class CommunicationManager implements IJobProcessor {
     const embeddedClaims = payloadComposition?.meta?.claims && typeof payloadComposition.meta.claims === 'object'
       ? normalizeContextualizedClaims(payloadComposition.meta.claims as Record<string, any>)
       : undefined;
-    const payloadSection = this.extractCompositionSectionFromCommunicationPayload(fhirResource);
+    const payloadSections = this.extractCompositionSectionsFromCommunicationPayload(fhirResource);
+    const payloadSection = payloadSections[0];
     const payloadType = this.extractCompositionTypeFromCommunicationPayload(fhirResource);
-    const sectionCode = claimsSection || payloadSection || HealthcareBasicSections.HistoryOfMedicationUse.attributeValue;
+    const sectionCodes = Array.from(new Set([
+      claimsSection,
+      ...payloadSections,
+      payloadSection,
+      HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+    ].map((value) => String(value || '').trim()).filter(Boolean)));
     const typeCode = claimsType || payloadType || HealthcareBasicSections.PatientSummaryDocument.attributeValue;
 
     const sent = String(
@@ -573,44 +607,54 @@ export class CommunicationManager implements IJobProcessor {
       || this.getFirstClaimValue(embeddedClaims || {}, ['Composition.identifier', 'Composition.identifier.value'])
       || this.normalizeOptionalString(payloadComposition?.id)
       || `urn:uuid:${uuidv4()}`;
-    const claims = normalizeContextualizedClaims({
-      '@context': 'org.hl7.fhir.r4',
-      'Composition.identifier': compositionIdentifier,
-      'Composition.subject': subject,
-      'Composition.section': sectionCode,
-      'Composition.author': serverDid,
-      'Composition.date': sent,
-      'Composition.type': typeCode,
-      'Composition.source': 'Communication',
-    });
-    if (embeddedClaims) {
-      Object.assign(claims, embeddedClaims);
-    }
     const fallbackId =
       this.normalizeOptionalString(payloadComposition?.id)
       || determineResourceId(compositionIdentifier, process.env.NODE_ENV);
-    applyFhirCidVersioningToEntry({
-      entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: 'Composition', id: fallbackId } },
-      claims,
-      resourceType: 'Composition',
-      resourceId: fallbackId,
-    });
-    const contentVersionId = claimsToContentCid(claims).cid;
-    claims['Composition.meta.versionId'] = contentVersionId;
-    claims['org.hl7.fhir.r4.Composition.meta.versionId'] = contentVersionId;
-    const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
-    const versionId = this.normalizeOptionalString(
-      claims['Composition.meta.versionId']
-      || claims['org.hl7.fhir.r4.Composition.meta.versionId'],
-    );
-    if (versionId) {
-      const exists = await this.hasSectionRecordWithClaims(tenantVaultId, sectionId, [
-        { name: 'Composition.meta.versionId', value: versionId },
-      ]);
-      if (exists) return;
+
+    for (const sectionCode of sectionCodes) {
+      const claims = normalizeContextualizedClaims({
+        '@context': 'org.hl7.fhir.r4',
+        'Composition.identifier': compositionIdentifier,
+        'Composition.subject': subject,
+        'Composition.section': sectionCode,
+        'Composition.author': serverDid,
+        'Composition.date': sent,
+        'Composition.type': typeCode,
+        'Composition.source': 'Communication',
+      });
+      if (embeddedClaims) {
+        Object.assign(claims, embeddedClaims, { 'Composition.section': sectionCode });
+      }
+      applyFhirCidVersioningToEntry({
+        entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: 'Composition', id: fallbackId } },
+        claims,
+        resourceType: 'Composition',
+        resourceId: fallbackId,
+      });
+      const contentVersionId = claimsToContentCid(claims).cid;
+      claims['Composition.meta.versionId'] = contentVersionId;
+      claims['org.hl7.fhir.r4.Composition.meta.versionId'] = contentVersionId;
+
+      const individualSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
+      const digitalTwinSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_DIGITAL_TWIN, 'composition');
+      const versionId = this.normalizeOptionalString(
+        claims['Composition.meta.versionId']
+        || claims['org.hl7.fhir.r4.Composition.meta.versionId'],
+      );
+      if (versionId) {
+        const exists = await this.hasSectionRecordWithClaims(tenantVaultId, individualSectionId, [
+          { name: 'Composition.meta.versionId', value: versionId },
+        ]);
+        if (exists) continue;
+      }
+      const recordId = this.buildStableProjectionRecordId(
+        'composition-from-communication',
+        `${compositionIdentifier}|${sectionCode}`,
+      );
+      const record = { id: recordId, ...claims } as any;
+      await this.vaultRepository.put(tenantVaultId, [record], individualSectionId);
+      await this.vaultRepository.put(tenantVaultId, [record], digitalTwinSectionId);
     }
-    const recordId = this.buildStableProjectionRecordId('composition-from-communication', compositionIdentifier);
-    await this.vaultRepository.put(tenantVaultId, [{ id: recordId, ...claims } as any], sectionId);
   }
 
   private async persistCommunicationChannelRecord(
@@ -690,31 +734,38 @@ export class CommunicationManager implements IJobProcessor {
     await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
   }
 
-  private extractCompositionSectionFromCommunicationPayload(fhirResource: FhirCommunication): string | undefined {
+  private extractCompositionSectionsFromCommunicationPayload(fhirResource: FhirCommunication): string[] {
     const payload = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload[0] : undefined;
     const fromCodeableConcept = payload?.contentCodeableConcept?.coding?.[0];
     if (fromCodeableConcept?.system && fromCodeableConcept?.code) {
-      return `${fromCodeableConcept.system}|${fromCodeableConcept.code}`;
+      return [this.toCanonicalCodingToken(fromCodeableConcept.system, fromCodeableConcept.code)];
     }
 
     const resolvedAttachment = this.resolveCommunicationPayloadAttachment(payload);
     const contentType = String(resolvedAttachment?.documentAttachment?.contentType || '').toLowerCase();
     const encodedData = String(resolvedAttachment?.documentAttachment?.data || '').trim();
-    if (!encodedData || !contentType.includes('json')) return undefined;
+    if (!encodedData || !contentType.includes('json')) return [];
 
     try {
       const decoded = Buffer.from(encodedData, 'base64').toString('utf8');
       const parsed = this.parseDocumentBundle(decoded);
-      if (!parsed) return undefined;
+      if (!parsed) return [];
       const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
-      const sectionCoding = compositionEntry?.resource?.section?.[0]?.code?.coding?.[0];
-      if (sectionCoding?.system && sectionCoding?.code) {
-        return `${sectionCoding.system}|${sectionCoding.code}`;
-      }
+      const sectionCodes = Array.isArray(compositionEntry?.resource?.section)
+        ? compositionEntry.resource.section
+          .map((section: any) => {
+            const sectionCoding = section?.code?.coding?.[0];
+            return sectionCoding?.system && sectionCoding?.code
+              ? this.toCanonicalCodingToken(sectionCoding.system, sectionCoding.code)
+              : '';
+          })
+          .filter(Boolean)
+        : [];
+      if (sectionCodes.length > 0) return sectionCodes;
     } catch {
-      return undefined;
+      return [];
     }
-    return undefined;
+    return [];
   }
 
   private extractCompositionTypeFromCommunicationPayload(fhirResource: FhirCommunication): string | undefined {
@@ -731,13 +782,23 @@ export class CommunicationManager implements IJobProcessor {
       const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
       const coding = compositionEntry?.resource?.type?.coding?.[0];
       if (coding?.system && coding?.code) {
-        return `${coding.system}|${coding.code}`;
+        return this.toCanonicalCodingToken(coding.system, coding.code);
       }
     } catch {
       return undefined;
     }
 
     return undefined;
+  }
+
+  private toCanonicalCodingToken(system: string, code: string): string {
+    const normalizedSystem = String(system || '').trim();
+    const normalizedCode = String(code || '').trim();
+    if (!normalizedSystem || !normalizedCode) return '';
+    if (normalizedSystem === 'http://loinc.org') {
+      return `LOINC|${normalizedCode}`;
+    }
+    return `${normalizedSystem}|${normalizedCode}`;
   }
 
   private async persistDocumentReferenceProjectionFromCommunication(
@@ -909,7 +970,7 @@ export class CommunicationManager implements IJobProcessor {
           `${resourceType}.meta.versionId`,
         ]);
 
-        const sectionId = getSubjectScopedSectionId(subjectRef, SUBJECT_SECTION_INDIVIDUAL, config.section);
+        const sectionId = getSubjectScopedSectionId(subjectRef, SUBJECT_SECTION_INDIVIDUAL, config.collectionId);
         if (versionId) {
           const alreadyIndexed = await this.hasSectionRecordWithClaims(tenantVaultId, sectionId, [
             { name: `${resourceType}.meta.versionId`, value: versionId },
@@ -924,7 +985,9 @@ export class CommunicationManager implements IJobProcessor {
           indexed: { attributes: this.buildIndexedAttributesFromClaims(claims) },
         };
         await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
-        if (resourceType === 'Consent') {
+        const digitalTwinSectionId = getSubjectScopedSectionId(subjectRef, SUBJECT_SECTION_DIGITAL_TWIN, config.collectionId);
+        await this.vaultRepository.put(tenantVaultId, [record as any], digitalTwinSectionId);
+        if (resourceType === 'Consent' && this.getFirstClaimValue(claims, ['Consent.decision', 'org.hl7.fhir.api.Consent.decision'])) {
           await persistConsentRuleAndAttachment({
             vaultRepository: this.vaultRepository,
             tenantVaultId,
@@ -951,6 +1014,22 @@ export class CommunicationManager implements IJobProcessor {
     return subject?.replace(/^Patient\//i, '').trim() || undefined;
   }
 
+  private resolveProjectedResourceCanonicalSubject(
+    resourceSubjectRef: string | undefined,
+    communicationSubject: string | undefined,
+  ): string {
+    const normalizedResourceSubject = String(resourceSubjectRef || '').replace(/^Patient\//i, '').trim();
+    const normalizedCommunicationSubject = String(communicationSubject || '').replace(/^Patient\//i, '').trim();
+    if (!normalizedResourceSubject) return normalizedCommunicationSubject;
+    if (!normalizedCommunicationSubject) return normalizedResourceSubject;
+
+    const looksLikeLocalBundleSubject =
+      /^urn:/i.test(normalizedResourceSubject)
+      || /^https?:\/\//i.test(normalizedResourceSubject)
+      || /^Patient\//i.test(String(resourceSubjectRef || '').trim());
+    return looksLikeLocalBundleSubject ? normalizedCommunicationSubject : normalizedResourceSubject;
+  }
+
   private getFirstClaimValue(claims: Record<string, any>, keys: string[]): string | undefined {
     for (const key of keys) {
       const value = getClaimValue<string>(claims, key);
@@ -974,12 +1053,12 @@ export class CommunicationManager implements IJobProcessor {
       '@context': 'org.hl7.fhir.api',
     };
 
-    const subjectRef = String(
+    const resourceSubjectRef = String(
       resource?.subject?.reference
       || resource?.patient?.reference
-      || communicationSubject
       || '',
-    ).replace(/^Patient\//i, '').trim();
+    ).trim();
+    const subjectRef = this.resolveProjectedResourceCanonicalSubject(resourceSubjectRef, communicationSubject);
     if (subjectRef) {
       baseClaims[`${resourceType}.subject`] = subjectRef;
       if (resourceType === 'AllergyIntolerance' || resourceType === 'Immunization' || resourceType === 'RelatedPerson') {
@@ -1012,10 +1091,21 @@ export class CommunicationManager implements IJobProcessor {
       || resource?.medicationCodeableConcept?.coding?.[0]
       || resource?.vaccineCode?.coding?.[0]
       || resource?.category?.[0]?.coding?.[0];
+    const codeDisplay = String(codeCoding?.display || '').trim();
+    if (codeDisplay) {
+      baseClaims[`${resourceType}.CodeDisplay`] = codeDisplay;
+    }
+    if (codeableText) {
+      baseClaims[`${resourceType}.CodeTextLocal`] = codeableText;
+    }
     const codeSystem = String(codeCoding?.system || '').trim();
     const codeValue = String(codeCoding?.code || '').trim();
     if (codeValue) {
       baseClaims[`${resourceType}.code`] = codeSystem ? `${codeSystem}|${codeValue}` : codeValue;
+    }
+    const userSelectedRaw = codeCoding?.userSelected;
+    if (typeof userSelectedRaw === 'boolean') {
+      baseClaims[`${resourceType}.user-selected`] = String(userSelectedRaw);
     }
 
     const noteText = String(resource?.note?.[0]?.text || '').trim();
@@ -1042,10 +1132,9 @@ export class CommunicationManager implements IJobProcessor {
     }
 
     if (resourceType === 'MedicationStatement') {
-      const userSelectedRaw = resource?.medicationCodeableConcept?.coding?.[0]?.userSelected;
-      baseClaims['MedicationStatement.user-selected'] = String(
-        typeof userSelectedRaw === 'boolean' ? userSelectedRaw : true,
-      );
+      if (!baseClaims['MedicationStatement.user-selected']) {
+        baseClaims['MedicationStatement.user-selected'] = 'true';
+      }
     }
 
     return normalizeContextualizedClaims(baseClaims);

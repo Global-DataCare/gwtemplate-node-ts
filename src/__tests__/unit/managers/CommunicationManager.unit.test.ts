@@ -502,9 +502,18 @@ describe('CommunicationManager Unit Tests', () => {
               resourceType: 'MedicationStatement',
               id: 'medication-001',
               status: 'active',
+              language: 'es',
               subject: { reference: subjectDid },
               effectiveDateTime: '2026-05-22T10:00:00Z',
-              medicationCodeableConcept: { text: 'Paracetamol 500mg' },
+              medicationCodeableConcept: {
+                text: 'Paracetamol 500mg',
+                coding: [{
+                  system: 'http://www.nlm.nih.gov/research/umls/rxnorm',
+                  code: '161',
+                  display: 'Paracetamol 500 MG Oral Tablet',
+                  userSelected: true,
+                }],
+              },
               identifier: [{ value: 'urn:uuid:medication-001' }],
             },
           },
@@ -513,11 +522,17 @@ describe('CommunicationManager Unit Tests', () => {
               resourceType: 'Observation',
               id: 'observation-001',
               status: 'final',
+              language: 'es',
               subject: { reference: subjectDid },
               effectiveDateTime: '2026-05-22T11:00:00Z',
               code: {
-                coding: [{ system: 'http://loinc.org', code: '8310-5' }],
-                text: 'Body temperature',
+                coding: [{
+                  system: 'http://loinc.org',
+                  code: '85354-9',
+                  display: 'Blood pressure panel with all children optional',
+                  userSelected: true,
+                }],
+                text: 'Tension arterial',
               },
               identifier: [{ value: 'urn:uuid:observation-001' }],
             },
@@ -601,10 +616,30 @@ describe('CommunicationManager Unit Tests', () => {
         medicationRecord['MedicationStatement.identifier']
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.identifier'],
       ).toBe('urn:uuid:medication-001');
+      expect(
+        medicationRecord['MedicationStatement.CodeDisplay']
+        || medicationRecord['org.hl7.fhir.api.MedicationStatement.CodeDisplay'],
+      ).toBe('Paracetamol 500 MG Oral Tablet');
+      expect(
+        medicationRecord['MedicationStatement.CodeTextLocal']
+        || medicationRecord['org.hl7.fhir.api.MedicationStatement.CodeTextLocal'],
+      ).toBe('Paracetamol 500mg');
+      expect(
+        medicationRecord['MedicationStatement.language']
+        || medicationRecord['org.hl7.fhir.api.MedicationStatement.language'],
+      ).toBe('es');
+      expect(
+        medicationRecord['MedicationStatement.user-selected']
+        || medicationRecord['org.hl7.fhir.api.MedicationStatement.user-selected'],
+      ).toBe('true');
       expect(medicationRecord.indexed?.attributes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.subject', value: subjectDid }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.identifier', value: 'urn:uuid:medication-001' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.CodeDisplay', value: 'Paracetamol 500 MG Oral Tablet' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.CodeTextLocal', value: 'Paracetamol 500mg' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.language', value: 'es' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.user-selected', value: 'true' }),
         ]),
       );
 
@@ -622,10 +657,30 @@ describe('CommunicationManager Unit Tests', () => {
         observationRecord['Observation.identifier']
         || observationRecord['org.hl7.fhir.api.Observation.identifier'],
       ).toBe('urn:uuid:observation-001');
+      expect(
+        observationRecord['Observation.CodeDisplay']
+        || observationRecord['org.hl7.fhir.api.Observation.CodeDisplay'],
+      ).toBe('Blood pressure panel with all children optional');
+      expect(
+        observationRecord['Observation.CodeTextLocal']
+        || observationRecord['org.hl7.fhir.api.Observation.CodeTextLocal'],
+      ).toBe('Tension arterial');
+      expect(
+        observationRecord['Observation.language']
+        || observationRecord['org.hl7.fhir.api.Observation.language'],
+      ).toBe('es');
+      expect(
+        observationRecord['Observation.user-selected']
+        || observationRecord['org.hl7.fhir.api.Observation.user-selected'],
+      ).toBe('true');
       expect(observationRecord.indexed?.attributes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.subject', value: subjectDid }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.identifier', value: 'urn:uuid:observation-001' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.CodeDisplay', value: 'Blood pressure panel with all children optional' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.CodeTextLocal', value: 'Tension arterial' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.language', value: 'es' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.user-selected', value: 'true' }),
         ]),
       );
     });
@@ -745,6 +800,141 @@ describe('CommunicationManager Unit Tests', () => {
         medicationRecord['MedicationStatement.identifier']
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.identifier'],
       ).toBe('urn:uuid:medication-embedded-001');
+    });
+
+    it('projects one Composition index per IPS section into individual and digitaltwin scopes', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+
+      const documentBundle = {
+        resourceType: 'Bundle',
+        type: 'document',
+        entry: [
+          {
+            resource: {
+              resourceType: 'Composition',
+              id: 'ips-composition-sections-001',
+              status: 'final',
+              subject: { reference: subjectDid },
+              type: {
+                coding: [{ system: 'http://loinc.org', code: '60591-5' }],
+              },
+              section: [
+                {
+                  code: {
+                    coding: [{ system: 'http://loinc.org', code: '10160-0' }],
+                  },
+                },
+                {
+                  code: {
+                    coding: [{ system: 'http://loinc.org', code: '8716-3' }],
+                  },
+                },
+              ],
+            },
+          },
+          {
+            resource: {
+              resourceType: 'MedicationStatement',
+              id: 'medication-sections-001',
+              status: 'active',
+              subject: { reference: subjectDid },
+              medicationCodeableConcept: { text: 'Paracetamol 500mg' },
+              identifier: [{ value: 'urn:uuid:medication-sections-001' }],
+            },
+          },
+          {
+            resource: {
+              resourceType: 'Observation',
+              id: 'observation-sections-001',
+              status: 'final',
+              subject: { reference: subjectDid },
+              code: {
+                coding: [{ system: 'http://loinc.org', code: '85354-9', display: 'Blood pressure panel with all children optional' }],
+                text: 'Blood pressure',
+              },
+              identifier: [{ value: 'urn:uuid:observation-sections-001' }],
+            },
+          },
+        ],
+      };
+
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: {
+          jti: randomUUID(),
+          thid: 'thread-composition-sections-001',
+          iss: 'did:web:sender.example',
+          aud: 'did:web:receiver.example',
+          exp: Math.floor(Date.now() / 1000) + 300,
+          type: 'org.hl7.fhir.r4.Bundle',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            data: [
+              {
+                type: 'Communication',
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.r4',
+                    'Communication.identifier': 'comm-composition-sections-001',
+                    'Communication.subject': subjectDid,
+                    'Communication.sent': '2026-05-22T10:00:00Z',
+                    'Composition.type': 'http://loinc.org|60591-5',
+                  },
+                },
+                resource: {
+                  resourceType: 'Communication',
+                  status: 'completed',
+                  subject: { reference: subjectDid },
+                  sent: '2026-05-22T10:00:00Z',
+                  payload: [
+                    {
+                      contentAttachment: {
+                        contentType: 'application/fhir+json',
+                        title: 'ips-sections.json',
+                        data: Buffer.from(JSON.stringify(documentBundle), 'utf8').toString('base64'),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          } as any,
+        },
+      };
+
+      await communicationManager.process(job);
+
+      const tenantVaultId = 'health-care_acme';
+      const individualCompositionSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'composition');
+      const digitalTwinCompositionSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
+      const compositionPuts = mockVaultRepository.put.mock.calls.filter(
+        (args) =>
+          args[0] === tenantVaultId
+          && (args[2] === individualCompositionSectionId || args[2] === digitalTwinCompositionSectionId),
+      );
+
+      expect(compositionPuts).toHaveLength(4);
+      const projectedSections = compositionPuts.flatMap((args) =>
+        ((args[1] as any[]) || []).map((record) =>
+          record['Composition.section'] || record['org.hl7.fhir.r4.Composition.section'],
+        ),
+      );
+      expect(projectedSections).toEqual(expect.arrayContaining([
+        'LOINC|10160-0',
+        'LOINC|8716-3',
+      ]));
     });
 
     it('does not project duplicate clinical resources when the replayed IPS changes container ids, dates, and narrative text', async () => {

@@ -1,6 +1,13 @@
 // File: src/__tests__/unit/utils/claims.test.ts
 
-import { getClaimValue, normalizeContextualizedClaims, processResponseModesClaim } from '../../../utils/claims';
+import {
+  buildFhirClaimKeys,
+  getClaimValue,
+  getFirstClaimValueByKeys,
+  normalizeContextualizedClaims,
+  processResponseModesClaim,
+  stripKnownFhirClaimContextPrefix,
+} from '../../../utils/claims';
 
 describe('processResponseModesClaim', () => {
   const propertyId = 'net.openid.connect.discovery.response_modes_supported';
@@ -126,5 +133,27 @@ describe('normalizeContextualizedClaims', () => {
       'Organization.identifier.value': 'A12345678',
       'Service.category': 'health-care',
     });
+  });
+});
+
+describe('FHIR claim key helpers', () => {
+  test('builds canonical plus contextualized FHIR claim keys centrally', () => {
+    expect(buildFhirClaimKeys('Composition.type')).toEqual([
+      'Composition.type',
+      'org.hl7.fhir.api.Composition.type',
+      'org.hl7.fhir.r4.Composition.type',
+    ]);
+  });
+
+  test('strips supported FHIR context prefixes from claim keys', () => {
+    expect(stripKnownFhirClaimContextPrefix('org.hl7.fhir.r4.Composition.section')).toBe('Composition.section');
+    expect(stripKnownFhirClaimContextPrefix('org.hl7.fhir.api.Composition.section')).toBe('Composition.section');
+  });
+
+  test('reads the first available value across canonical and contextual aliases', () => {
+    const claims = {
+      'org.hl7.fhir.r4.DocumentReference.identifier': 'urn:uuid:doc-1',
+    };
+    expect(getFirstClaimValueByKeys(claims, buildFhirClaimKeys('DocumentReference.identifier'))).toBe('urn:uuid:doc-1');
   });
 });

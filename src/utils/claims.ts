@@ -80,6 +80,70 @@ export function getClaimValue<T = any>(claims: Record<string, any>, key: string)
   return undefined;
 }
 
+const DEFAULT_FHIR_CLAIM_CONTEXTS = Object.freeze([
+  'org.hl7.fhir.api',
+  'org.hl7.fhir.r4',
+] as const);
+
+export function getSupportedFhirClaimContexts(): string[] {
+  const configured = String(process.env.CLAIMS_FHIR_CONTEXT_PREFIXES || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return Array.from(new Set([...(configured.length > 0 ? configured : []), ...DEFAULT_FHIR_CLAIM_CONTEXTS]));
+}
+
+export function stripKnownFhirClaimContextPrefix(key: string): string {
+  const trimmedKey = String(key || '').trim();
+  if (!trimmedKey) return trimmedKey;
+
+  for (const context of getSupportedFhirClaimContexts()) {
+    const prefix = context.endsWith('.') ? context : `${context}.`;
+    if (trimmedKey.startsWith(prefix)) return trimmedKey.slice(prefix.length);
+  }
+
+  if (trimmedKey.startsWith('api.')) return trimmedKey.slice('api.'.length);
+  return trimmedKey;
+}
+
+export function canonicalizeFhirClaims(rawClaims: Record<string, any>, targetContext = 'org.hl7.fhir.api'): Record<string, any> {
+  const canonicalClaims: Record<string, any> = {
+    '@context': targetContext,
+  };
+
+  for (const [key, value] of Object.entries(rawClaims || {})) {
+    if (key === '@type') {
+      canonicalClaims[key] = value;
+      continue;
+    }
+    if (key === '@context') continue;
+    canonicalClaims[stripKnownFhirClaimContextPrefix(key)] = value;
+  }
+
+  return sortClaimsAlphabetically(canonicalClaims);
+}
+
+export function buildContextualClaimKeys(baseKey: string, contexts: string[]): string[] {
+  const canonicalKey = String(baseKey || '').trim();
+  if (!canonicalKey) return [];
+  return Array.from(new Set([
+    canonicalKey,
+    ...contexts.map((context) => `${context}.${canonicalKey}`),
+  ]));
+}
+
+export function buildFhirClaimKeys(baseKey: string): string[] {
+  return buildContextualClaimKeys(stripKnownFhirClaimContextPrefix(baseKey), getSupportedFhirClaimContexts());
+}
+
+export function getFirstClaimValueByKeys<T = any>(claims: Record<string, any>, keys: string[]): T | undefined {
+  for (const key of keys) {
+    const value = getClaimValue<T>(claims, key);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
 /**
  * Normalizes a claims object where `@context` defines the namespace prefix (e.g., `org.schema`)
  * and clients may send "contextualized" keys without that prefix (e.g., `Offer.identifier`).
@@ -162,9 +226,7 @@ function stripContextualPrefix(key: string, context: string): string {
 
   const normalizedContext = String(context || '').trim().toLowerCase();
   if (normalizedContext === 'api' || normalizedContext.startsWith('org.hl7.fhir')) {
-    if (trimmedKey.startsWith('org.hl7.fhir.api.')) return trimmedKey.slice('org.hl7.fhir.api.'.length);
-    if (trimmedKey.startsWith('org.hl7.fhir.r4.')) return trimmedKey.slice('org.hl7.fhir.r4.'.length);
-    if (trimmedKey.startsWith('api.')) return trimmedKey.slice('api.'.length);
+    return stripKnownFhirClaimContextPrefix(trimmedKey);
   }
   if (normalizedContext.startsWith('org.schema') && trimmedKey.startsWith('org.schema.')) {
     return trimmedKey.slice('org.schema.'.length);

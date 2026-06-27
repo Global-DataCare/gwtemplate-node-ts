@@ -20,6 +20,7 @@ import type { ICredentialLedgerAdapter } from '../adapters/ICredentialLedgerAdap
 import { IndividualManager } from '../managers/IndividualManager';
 import { FamilyManager } from '../managers/FamilyManager';
 import { CompositionManager } from '../managers/CompositionManager';
+import { TwinCompositionManager } from '../managers/TwinCompositionManager';
 import { DocumentReferenceManager } from '../managers/DocumentReferenceManager';
 import { CommunicationManager } from '../managers/CommunicationManager';
 import { DeviceRegistrationManager } from '../managers/DeviceRegistrationManager';
@@ -148,6 +149,7 @@ export function buildManagers(options: {
   );
 
   const compositionManager = new CompositionManager(vaultRepository, blockchainAdapter, tenantManager);
+  const twinCompositionManager = new TwinCompositionManager(vaultRepository, compositionManager);
   const documentReferenceManager = new DocumentReferenceManager(vaultRepository, blockchainAdapter, tenantManager);
   const communicationManager = new CommunicationManager({
     tenantsCacheManager: tenantManager,
@@ -184,6 +186,7 @@ export function buildManagers(options: {
     individualManager,
     familyManager,
     compositionManager,
+    twinCompositionManager,
     documentReferenceManager,
     communicationManager,
     deviceRegistrationManager,

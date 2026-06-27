@@ -680,6 +680,355 @@ describe('MedicationStatement API (integration)', () => {
     }
   });
 
+  it('mirrors medication updates into digital twin scope and finds twins by medication text and code', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.DB_PROVIDER = 'mem';
+    process.env.STORAGE_PROVIDER = 'mem';
+    process.env.QUEUE_PROVIDER = 'mem';
+    process.env.SECTORS_ALLOWED = 'health-care';
+    process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
+    process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.HOST_COVERAGE_SCOPE = 'EU';
+    process.env.ORG_HOST_ID_TYPE = 'TAX';
+    process.env.ORG_HOST_ID_VALUE = 'A0011223344';
+    process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
+    process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
+    process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.JSON_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+
+    resetServerConfig();
+
+    const { app, queueAdapter, tenantManager, vaultRepository, kmsService } = await startServer({ listen: false });
+    try {
+      const hostBootstrapClaims = {
+        [ClaimsOrganizationSchemaorg.addressCountry]: process.env.ORG_HOST_JURISDICTION,
+        [ClaimsOrganizationSchemaorg.identifierType]: process.env.ORG_HOST_ID_TYPE,
+        [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
+        [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+      };
+      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const tenantClaims = {
+        ...(testPayloadCreateTenant1.body.data[0].meta.claims as any),
+        [ClaimsServiceSchemaorg.category]: 'health-care',
+      };
+      const tenantVaultId = getTenantVaultId('health-care', testTenant1TenantId);
+
+      const tenantConfig = {
+        claims: tenantClaims,
+        didConfig: { service: initializeTenantServicesConfig(Sector.HEALTH_CARE) },
+        didDocument: { id: 'did:web:api.acme.org', '@context': 'https://www.w3.org/ns/did/v1' },
+      };
+
+      await kmsService.provisionKeys(tenantVaultId);
+      const secureTenantRecord = await kmsService.protectConfidentialData(
+        { id: tenantVaultId, sequence: 0, content: tenantConfig } as any,
+        'host',
+      );
+      await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
+      await tenantManager.getTenant(tenantVaultId);
+
+      const subjectDid = 'did:web:api.acme.org:individual:twin-subject-001';
+      const communicationThid = 'communication-digitaltwin-medication-001';
+      const medicationCode = 'http://www.nlm.nih.gov/research/umls/rxnorm|161';
+      const embeddedMedicationBundle = {
+        resourceType: 'Bundle',
+        type: 'document',
+        entry: [
+          {
+            resource: {
+              resourceType: 'Composition',
+              id: 'digitaltwin-composition-001',
+              status: 'final',
+              subject: { reference: subjectDid },
+              date: '2026-05-22T10:00:00Z',
+              type: {
+                coding: [{
+                  system: HealthcareBasicSections.PatientSummaryDocument.system,
+                  code: HealthcareBasicSections.PatientSummaryDocument.code,
+                }],
+              },
+              section: [
+                {
+                  code: { coding: [{
+                    system: HealthcareBasicSections.HistoryOfMedicationUse.system,
+                    code: HealthcareBasicSections.HistoryOfMedicationUse.code,
+                  }] },
+                  entry: [{ reference: 'MedicationStatement/medication-digitaltwin-001' }],
+                },
+              ],
+            },
+          },
+          {
+            resource: {
+              resourceType: 'MedicationStatement',
+              id: 'medication-digitaltwin-001',
+              status: 'active',
+              language: 'es',
+              subject: { reference: subjectDid },
+              effectiveDateTime: '2026-05-22T10:00:00Z',
+              medicationCodeableConcept: {
+                text: 'Paracetamol 500mg cada 8 horas',
+                coding: [{
+                  system: 'http://www.nlm.nih.gov/research/umls/rxnorm',
+                  code: '161',
+                  display: 'Paracetamol 500 MG Oral Tablet',
+                  userSelected: true,
+                }],
+              },
+              note: [{ text: 'Frecuencia reportada por paciente: cada 8 horas' }],
+              identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:medication-digitaltwin-001' }],
+            },
+          },
+        ],
+      };
+      const documentReference = {
+        resourceType: 'DocumentReference',
+        id: 'digitaltwin-document-reference-001',
+        subject: { reference: subjectDid },
+        date: '2026-05-22T10:00:00Z',
+        description: 'Medication digital twin update',
+        identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:digitaltwin-document-reference-001' }],
+        content: [
+          {
+            attachment: {
+              contentType: 'application/fhir+json',
+              title: 'digitaltwin-medications.json',
+              data: Buffer.from(JSON.stringify(embeddedMedicationBundle), 'utf8').toString('base64'),
+            },
+          },
+        ],
+      };
+
+      const submitResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: communicationThid,
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                resource: {
+                  resourceType: 'Communication',
+                  status: 'completed',
+                  subject: { reference: subjectDid },
+                  sent: '2026-05-22T10:00:00Z',
+                  payload: [
+                    {
+                      contentAttachment: {
+                        contentType: 'application/fhir+json',
+                        title: 'digitaltwin-document-reference.json',
+                        data: Buffer.from(JSON.stringify(documentReference), 'utf8').toString('base64'),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(submitResp.status).toBe(202);
+
+      let communicationPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: communicationThid },
+        });
+        if (pollResp.status === 200) {
+          communicationPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(communicationPayload?.data?.[0]?.response?.status).toBe('200');
+
+      const digitalTwinMedicationsSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'medications');
+      const digitalTwinRecords = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinMedicationsSection);
+      expect(digitalTwinRecords).toHaveLength(1);
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.medication-text']).toBe('Paracetamol 500mg cada 8 horas');
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.CodeDisplay']).toBe('Paracetamol 500 MG Oral Tablet');
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.CodeTextLocal']).toBe('Paracetamol 500mg cada 8 horas');
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.language']).toBe('es');
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.user-selected']).toBe('true');
+
+      const searchByTextThid = 'digitaltwin-medication-text-search-001';
+      const textSearchResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: searchByTextThid,
+          body: {
+            data: [
+              {
+                type: 'MedicationStatement-search-request-v1.0',
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.api',
+                    'MedicationStatement.medication-text': 'paracetamol',
+                  },
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(textSearchResp.status).toBe(202);
+
+      let textSearchPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: searchByTextThid },
+        });
+        if (pollResp.status === 200) {
+          textSearchPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(textSearchPayload?.data?.[0]?.resource?.total).toBe(1);
+      expect(textSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.subject']).toBe(subjectDid);
+
+      const searchByDisplayThid = 'digitaltwin-medication-display-search-001';
+      const displaySearchResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: searchByDisplayThid,
+          body: {
+            data: [
+              {
+                type: 'MedicationStatement-search-request-v1.0',
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.api',
+                    'MedicationStatement.CodeDisplay': 'oral tablet',
+                  },
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(displaySearchResp.status).toBe(202);
+
+      let displaySearchPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: searchByDisplayThid },
+        });
+        if (pollResp.status === 200) {
+          displaySearchPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(displaySearchPayload?.data?.[0]?.resource?.total).toBe(1);
+      expect(displaySearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.subject']).toBe(subjectDid);
+
+      const searchByLocalTextThid = 'digitaltwin-medication-localtext-search-001';
+      const localTextSearchResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: searchByLocalTextThid,
+          body: {
+            data: [
+              {
+                type: 'MedicationStatement-search-request-v1.0',
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.api',
+                    'MedicationStatement.CodeTextLocal': 'cada 8 horas',
+                  },
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(localTextSearchResp.status).toBe(202);
+
+      let localTextSearchPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: searchByLocalTextThid },
+        });
+        if (pollResp.status === 200) {
+          localTextSearchPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(localTextSearchPayload?.data?.[0]?.resource?.total).toBe(1);
+      expect(localTextSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.subject']).toBe(subjectDid);
+
+      const searchByCodeThid = 'digitaltwin-medication-code-search-001';
+      const codeSearchResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: searchByCodeThid,
+          body: {
+            data: [
+              {
+                type: 'MedicationStatement-search-request-v1.0',
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.api',
+                    'MedicationStatement.code': medicationCode,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(codeSearchResp.status).toBe(202);
+
+      let codeSearchPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: searchByCodeThid },
+        });
+        if (pollResp.status === 200) {
+          codeSearchPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(codeSearchPayload?.data?.[0]?.resource?.total).toBe(1);
+      expect(codeSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
+    } finally {
+      queueAdapter.stop();
+    }
+  });
+
   it('returns the IPS example sections with two extra MedicationStatement resources after two later medication communications', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';

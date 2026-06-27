@@ -12,6 +12,7 @@ import { getTenantVaultId } from '../utils/tenant';
 import { getSubjectScopedSectionId, SubjectSectionScope } from '../utils/individual-sections';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 import type { ITenantsManager } from './ITenantsManager';
+import { getEnvSectionId } from '../utils/section-env';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -25,6 +26,30 @@ type FhirBundleLike = {
   entry?: FhirBundleEntryLike[];
 };
 
+/**
+ * Handles the current `MedicationStatement` write/search MVP.
+ *
+ * Important status note:
+ * - This manager supports operational subject-scoped medication persistence.
+ * - It also mirrors accepted operational medication updates into the tenant's
+ *   `digitaltwin` scope.
+ * - The current `digitaltwin/.../MedicationStatement/_search` behavior is a
+ *   stepping stone used to prove claim extraction and deterministic text/code
+ *   matching.
+ *
+ * It is NOT the intended long-term public digital twin contract.
+ *
+ * Target architecture:
+ * - `individual` should not teach direct resource-type `_search` as the main
+ *   public read model; operational reads are centered on `Communication`,
+ *   `Subject/$summary`, and document retrieval.
+ * - `digitaltwin` search should evolve toward `Composition/_search` returning
+ *   0..n twin documents, while using internal `MedicationStatement` claims as
+ *   matching criteria.
+ *
+ * Read this manager as "current MVP compatibility/runtime behavior", not as
+ * the final research search surface.
+ */
 export class MedicationStatementManager implements IJobProcessor {
   constructor(
     private readonly vaultRepository: IVaultRepository,
@@ -36,6 +61,81 @@ export class MedicationStatementManager implements IJobProcessor {
       return this.tenantsCacheManager.tenantExists(tenantVaultId);
     }
     return this.vaultRepository.vaultExists(tenantVaultId);
+  }
+
+  private buildIndexedAttributesFromClaims(
+    claims: Record<string, any>,
+  ): Array<{ name: string; value: string; unique?: boolean }> {
+    const attributes: Array<{ name: string; value: string; unique?: boolean }> = [];
+    for (const [key, value] of Object.entries(claims)) {
+      if (key === '@context' || key === '@type' || value === undefined || value === null || Array.isArray(value)) {
+        continue;
+      }
+      const normalized = String(value).trim();
+      if (!normalized) continue;
+      attributes.push({
+        name: key,
+        value: normalized,
+        unique: key.endsWith('.identifier') || key.endsWith('.identifier.value'),
+      });
+    }
+    return attributes;
+  }
+
+  private async searchDigitalTwinMedications(
+    tenantVaultId: string,
+    claims: Record<string, any>,
+  ): Promise<any[]> {
+    const allSections = await this.vaultRepository.getAllSections(tenantVaultId);
+    const digitalTwinMedicationPrefix = getEnvSectionId(`${SUBJECT_SECTION_DIGITAL_TWIN}_medications_`);
+    const sectionIds = allSections.filter((sectionId) => String(sectionId || '').startsWith(digitalTwinMedicationPrefix));
+    const filters = Object.entries(claims)
+      .filter(([k, v]) => k !== '@context' && v !== undefined && v !== null && String(v).trim() !== '');
+
+    const matches: any[] = [];
+    for (const sectionId of sectionIds) {
+      const records = await this.vaultRepository.listContainersInSection<any>(tenantVaultId, sectionId);
+      for (const record of records) {
+        const recordMatches = filters.every(([name, value]) => this.matchesDigitalTwinFilter(record, name, String(value).trim()));
+        if (recordMatches) matches.push(record);
+      }
+    }
+
+    return matches;
+  }
+
+  private matchesDigitalTwinFilter(record: Record<string, any>, claimName: string, expectedValue: string): boolean {
+    const actualValue = this.readRecordClaimValue(record, claimName);
+    if (!actualValue || !expectedValue) return false;
+
+    const normalizedClaimName = claimName.toLowerCase();
+    if (
+      normalizedClaimName.endsWith('.medication-text')
+      || normalizedClaimName.endsWith('.code-text')
+      || normalizedClaimName.endsWith('.codedisplay')
+      || normalizedClaimName.endsWith('.codetextlocal')
+      || normalizedClaimName.endsWith('.note')
+    ) {
+      return actualValue.toLowerCase().includes(expectedValue.toLowerCase());
+    }
+
+    return actualValue === expectedValue;
+  }
+
+  private readRecordClaimValue(record: Record<string, any>, claimName: string): string {
+    const directValue = getClaimValue<string>(record, claimName);
+    if (typeof directValue === 'string' && directValue.trim()) return directValue.trim();
+
+    const canonicalClaimName = String(claimName || '')
+      .replace(/^org\.hl7\.fhir\.api\./i, '')
+      .replace(/^org\.hl7\.fhir\.r4\./i, '')
+      .trim();
+    if (canonicalClaimName && canonicalClaimName !== claimName) {
+      const canonicalValue = getClaimValue<string>(record, canonicalClaimName);
+      if (typeof canonicalValue === 'string' && canonicalValue.trim()) return canonicalValue.trim();
+    }
+
+    return '';
   }
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
@@ -89,8 +189,18 @@ export class MedicationStatementManager implements IJobProcessor {
             getClaimValue<string>(claims, 'MedicationStatement.identifier') ||
             getClaimValue<string>(claims, 'MedicationStatement.identifier.value');
           const id = String(entry?.resource?.id || determineResourceId(identifierClaim, process.env.NODE_ENV));
+          const indexedAttributes = this.buildIndexedAttributesFromClaims(claims);
+          const record = {
+            id,
+            ...claims,
+            indexed: { attributes: indexedAttributes },
+          } as any;
           const sectionId = getSubjectScopedSectionId(subject, scope, 'medications');
-          await this.vaultRepository.put(tenantVaultId, [{ id, ...claims } as any], sectionId);
+          await this.vaultRepository.put(tenantVaultId, [record], sectionId);
+          if (scope === SUBJECT_SECTION_INDIVIDUAL) {
+            const digitalTwinSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_DIGITAL_TWIN, 'medications');
+            await this.vaultRepository.put(tenantVaultId, [record], digitalTwinSectionId);
+          }
 
           responseEntries.push({
             type: 'MedicationStatement',
@@ -117,16 +227,21 @@ export class MedicationStatementManager implements IJobProcessor {
       const subject =
         getClaimValue<string>(claims, 'MedicationStatement.subject') ||
         getClaimValue<string>(claims, 'MedicationStatement.patient');
-      if (!subject) {
+      if (!subject && scope !== SUBJECT_SECTION_DIGITAL_TWIN) {
         throw new ManagerError('Missing MedicationStatement.subject claim for search.', IssueType.Required);
       }
 
       const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
-      const sectionId = getSubjectScopedSectionId(subject, scope, 'medications');
       const where = Object.entries(claims)
         .filter(([k, v]) => k !== '@context' && v !== undefined && v !== null && String(v).trim() !== '')
-        .map(([name, value]) => ({ name, value }));
-      const matches = await this.vaultRepository.query(tenantVaultId, { sectionId, where }, { hydrate: false });
+        .map(([name, value]) => ({ name, value: String(value).trim() }));
+      let matches: any[];
+      if (scope === SUBJECT_SECTION_DIGITAL_TWIN && !subject) {
+        matches = await this.searchDigitalTwinMedications(tenantVaultId, claims);
+      } else {
+        const sectionId = getSubjectScopedSectionId(subject!, scope, 'medications');
+        matches = await this.vaultRepository.query(tenantVaultId, { sectionId, where }, { hydrate: false });
+      }
       responseEntries.push({
         type: 'MedicationStatement-search-response-v1.0',
         resource: { total: matches.length, data: matches },

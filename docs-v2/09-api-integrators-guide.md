@@ -143,6 +143,17 @@ Do not teach this as "all index providers automatically feed the research
 tenant". The feed is conditioned by subject authorization and receiver
 capability.
 
+For the current public search contract after those projections exist:
+
+- use `digitaltwin/.../Composition/_search`,
+- send the IPS `section` token first,
+- then send resource-scoped textual filters such as
+  `MedicationStatement.code-display`, `MedicationStatement.code-text`,
+  `Observation.code-display`, or `Observation.code-text`,
+- expect matched `Composition` results, not leaf clinical resources.
+
+- [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)
+
 ### Summary retrieval
 
 Target summary semantics are:

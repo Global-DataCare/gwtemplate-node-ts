@@ -34,6 +34,7 @@ export interface ManagerRegistry {
   individualManager?: IJobProcessor;
   consentManager?: IJobProcessor;
   compositionManager?: IJobProcessor;
+  twinCompositionManager?: IJobProcessor;
   documentReferenceManager?: IJobProcessor;
   communicationManager?: IJobProcessor;
   deviceRegistrationManager?: IJobProcessor;

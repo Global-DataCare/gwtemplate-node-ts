@@ -30,6 +30,7 @@ FHIR-like `Communication` vs internal `CommMsgExtended`, read first:
   - SDK live controller proof runner: [gdc-sdk-node-ts/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md)
 - Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
 - Key custody and audit posture: [docs-v2/19-key-custody-and-audit-readiness.md](docs-v2/19-key-custody-and-audit-readiness.md)
+- Environment-variable reference: [docs-v2/22-environment-variables-reference.md](docs-v2/22-environment-variables-reference.md)
 - Testing and live E2E operations: [TESTING.md](TESTING.md)
 - Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)
 - Main docs index: [docs/README.md](docs/README.md)

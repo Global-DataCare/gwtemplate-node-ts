@@ -1,3 +1,40 @@
+## [1.17.0] - 2026-06-27
+
+### Added
+- Added the digital twin research search and materialization contract to the
+  v2 docs set, including the technical backlog, environment variable
+  reference, and the dedicated `Composition/_search` contract:
+  - `docs-v2/21-research-digital-twin-technical-backlog.md`
+  - `docs-v2/22-environment-variables-reference.md`
+  - `docs-v2/23-digital-twin-composition-search-contract.md`
+- Added the official HL7 IPS all-sections fixture plus TDD coverage for
+  section-first twin search and `ResearchSubject/$summary` materialization:
+  - `src/__tests__/data/fhir-ips-bundle-all-sections.json`
+  - `src/__tests__/unit/managers/CompositionManager.test.ts`
+  - `src/__tests__/integration/composition.bundle-search.api.test.ts`
+
+### Changed
+- Separated `individual` and `digitaltwin` orchestration more explicitly:
+  `TwinCompositionManager` now owns digital twin `Composition` routing while
+  `CompositionManager` remains focused on individual/compatibility summary and
+  bundle retrieval paths.
+- Completed the research twin sharing flow so
+  `digitaltwin/.../Composition/_search` discovers matching twin indexes by IPS
+  section plus textual resource claims, and selected twins can now be
+  materialized through `digitaltwin/<format>/Communication/_batch` targeting
+  `ResearchSubject/$summary`.
+- `org.hl7.fhir.r4` twin materialization now returns a document-style
+  `Bundle`, while `org.hl7.fhir.api` returns claims-first resources with
+  canonical `meta.claims` and stable `urn:uuid:` bundle entry `fullUrl`
+  values.
+- Refactored search parsing, composition filtering, FHIR data helpers, and
+  indexed-claim resource rehydration out of `CompositionManager` into reusable
+  utilities so the manager no longer carries most of the request-shape and
+  reconstruction plumbing.
+- Extended runtime capabilities, routing, shared section/catalog constants,
+  JSDoc, environment templates, and generated OpenAPI profile documents to
+  match the implemented digital twin search and materialization behavior.
+
 ## [1.16.0] - 2026-06-26
 
 ### Added
@@ -9,6 +46,14 @@
   persistence model, the residual `KEK_SECRET` weakness, and the production
   migration target toward external KMS/HSM custody are documented in the v2
   docs set.
+- Added `docs-v2/21-research-digital-twin-technical-backlog.md` so the
+  separate research-store plan now has a code-targeted backlog for
+  `server-config.ts`, research-store adapters, and the initial explicit
+  `digitaltwin` search contract.
+- Added `docs-v2/23-digital-twin-composition-search-contract.md` so the
+  now-implemented `digitaltwin/.../Composition/_search` contract has one
+  concise source of truth for accepted parameters, section/resource support,
+  and step-by-step test flow.
 - Added `npm run kms:audit` to report tenants/host missing persisted
   `wrapped_keys` and flag whether confidential-data decryption or HMAC-backed
   search is at risk.
@@ -44,12 +89,28 @@
 - Bootstrapping now resolves wrapped-key envelope custody through an explicit
   provider factory instead of implicitly falling back from `KEK_SECRET` to
   in-memory behavior.
+- Operational `MedicationStatement` updates now mirror into the tenant
+  `digitaltwin` scope, and GW exposes
+  `digitaltwin/org.hl7.fhir.api/MedicationStatement/_search` for
+  tenant-scoped twin discovery by canonical medication claims.
+- `Communication`-driven IPS ingestion now mirrors projected clinical
+  resources and per-section `Composition` indexes into `digitaltwin`, and
+  GW exposes `digitaltwin/org.hl7.fhir.r4/Composition/_search` plus
+  `digitaltwin/org.hl7.fhir.api/Composition/_search` for section-first twin
+  discovery by IPS section token and resource-scoped textual claims such as
+  `MedicationStatement.code-display`, `MedicationStatement.code-text`,
+  `Observation.code-display`, and `Observation.code-text`.
 
 ### Fixed
 - Restored legacy host `Organization/_activate` commercial continuity so the
   completed activation response again includes `org.schema.Offer.identifier`
   and the follow-up `Order/_batch` step can confirm the generated Offer for
   employee-seat licensing and activation-code issuance.
+- Employee `DELETE` disable and `Employee/_purge` now resolve the target actor
+  from explicit `Bundle.entry.resource.id` before deriving fallback IDs from
+  claims, so SDK callers that send the canonical employee `resource.id` no
+  longer hit random UUID lookups and false `404 Employee with ID ... not
+  found` responses.
 - Persisted tenant and host KMS key material as wrapped records in the host
   vault so plaintext async flows keep encrypting responses to the tenant after
   process restarts or pod hops instead of failing when `_managedKeys` memory is
@@ -59,11 +120,25 @@
   key resolution so legacy tenants can still receive plaintext async responses
   when their published ML-KEM key exists even if wrapped private material is
   missing in the current process.
+- Medication digital twin search now supports deterministic medication
+  text/code lookup over mirrored `MedicationStatement` claims, so updating an
+  individual's medication can update the mirrored twin and make it searchable
+  by medication text or code.
+- Full IPS document ingestion no longer fails when an embedded `Consent`
+  lacks the rule-specific `Consent.decision` claim; the resource is still
+  projected, while consent-rule persistence now runs only when the minimal
+  rule claim set is present.
 
 ### Testing
 - `npm test -- --runTestsByPath src/__tests__/integration/server.robustness.test.ts`
 - `npm test -- --runTestsByPath src/__tests__/integration/security-mode-gates.test.ts src/__tests__/managers/AuthorizationManager.test.ts`
 - `npm test -- --runTestsByPath src/__tests__/unit/services/KmsService.test.ts src/__tests__/integration/tenant-kms-rehydration.api.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/unit/managers/MedicationStatementManager.test.ts src/__tests__/unit/utils/services.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/unit/managers/CompositionManager.test.ts src/__tests__/unit/managers/CommunicationManager.unit.test.ts src/__tests__/unit/utils/services.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/integration/medication-statement.api.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/integration/composition.bundle-search.api.test.ts`
+- `npm test -- --runTestsByPath src/__tests__/unit/utils/swagger-spec.test.ts`
+- `npm run build:swagger`
 - `npm run build`
 
 ## [1.15.0] - 2026-06-25
@@ -334,6 +409,33 @@
 - `npm run api:local-firestore-demo` + `HOST_ID_VALUE=... npm run test:e2e:live-gw`
 
 ## [Unreleased]
+
+### Changed
+- Moved `Composition`/`Bundle` search request parsing out of
+  `src/managers/CompositionManager.ts` into `src/utils/search-request.ts` so
+  subject, section, exclusion, type, bundle-type, `DocumentReference`, and
+  `Communication` filter extraction no longer lives as manager-private logic.
+- Kept the public `Composition/_search` and `Subject/$summary` contracts
+  unchanged while reducing `CompositionManager` coupling to FHIR search-body
+  shapes and adding dedicated parser coverage in
+  `src/__tests__/unit/utils/search-request.test.ts`.
+- Moved indexed-claim FHIR resource rehydration out of
+  `src/managers/CompositionManager.ts` into
+  `src/utils/fhir-resource-rehydration.ts`, replacing ad hoc string-literal
+  resource branching with shared `ResourceTypesFhirR4` constants and explicit
+  resource-family maps for subject/patient and effective-date semantics.
+- Completed the research twin sharing flow so `digitaltwin/.../Composition/_search`
+  discovers matching twin indexes by IPS section plus textual resource claims,
+  and selected twins can now be materialized through
+  `digitaltwin/<format>/Communication/_batch` targeting
+  `ResearchSubject/$summary`:
+  - `org.hl7.fhir.r4` returns a document-style `Bundle`
+  - `org.hl7.fhir.api` returns claims-first resources with canonical
+    `meta.claims`
+- Published digital twin runtime capabilities for `Communication/_batch` and
+  `ResearchSubject/$summary`, and normalized claims-first summary output so
+  contextualized FHIR claim keys are emitted canonically, for example
+  `MedicationStatement.subject` instead of `org.hl7.fhir.r4.MedicationStatement.subject`.
 
 ## [1.14.3] - 2026-06-18
 

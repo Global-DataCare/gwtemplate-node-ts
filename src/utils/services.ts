@@ -317,6 +317,58 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
 
   // Digital twin ingestion for research sectors uses flat interoperable claims (`org.hl7.fhir.api`)
   // wrapped in Composition resources.
+  if (isFhir || isResearch) {
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
+        ['MedicationStatement'],
+        ['_search'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
+        ['Composition'],
+        ['_search'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
+        ['Composition'],
+        ['_search'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
+        ['Communication'],
+        ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
+        ['Communication'],
+        ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
+        ['ResearchSubject'],
+        ['$summary'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
+        ['ResearchSubject'],
+        ['$summary'],
+      ),
+    );
+  }
+
   if (isResearch) {
     services.push(
       createDidEndpointConfigFromSelector(
