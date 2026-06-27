@@ -83,6 +83,14 @@ Resource-scoped text filters accepted by the current implementation:
 - `<ResourceType>.code-text-local`
 - `<ResourceType>.CodeTextLocal`
 
+Current support rule:
+
+- every supported `section -> resourceType` mapping should accept both
+  `code-display` and `code-text` textual matching
+- tests should exist for each supported section/resource pair
+- token/code exact matching and date/period range filters are planned next, but
+  they are not the MVP contract today
+
 Special compatibility rule for medications:
 
 - `MedicationStatement.code-text` may match either:
@@ -212,6 +220,7 @@ Current supported section-first contract:
 | Immunizations | `LOINC|11369-6` | `Immunization` | `immunizations` |
 | Functional Status | `LOINC|47420-5` | `Condition` | `conditions` |
 | Plan of Care | `LOINC|18776-5` | `CarePlan` | `care-plans` |
+| Plan of Treatment | `LOINC|18776-5` | `CarePlan` | `care-plans` |
 | Social History | `LOINC|29762-2` | `Observation` | `observations` |
 | Vital Signs | `LOINC|8716-3` | `Observation` | `observations` |
 | Advance Directives | `LOINC|42348-3` | `Consent` | `consents` |
