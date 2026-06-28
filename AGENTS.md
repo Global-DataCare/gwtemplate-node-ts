@@ -32,6 +32,17 @@ Primary references:
 - `credentialSubject.hasOccupation.identifier.value = "RESPRSN"`
 - avoid `|RESPRSN` as canonical output.
 
+## Naming Discipline
+1. Keep the common concept first and the specialization last.
+2. Prefer names such as:
+- `UserProfileIndexStoreInMemory`
+- `UserProfileIndexStoreFirestore`
+- `UserProfileVaultFirestore`
+3. Avoid inverted names such as:
+- `InMemoryUserProfileIndexStore`
+- `FirestoreUserProfileIndexStore`
+4. The reason is programming/autocomplete consistency across backend and SDK runtimes.
+
 ## TDD Policy
 For any endpoint/manager behavior change:
 1. Add failing unit test in manager layer.

@@ -17,6 +17,7 @@ describe('Worker', () => {
   let mockIndividualManager: MockProxy<IJobProcessor>;
   let mockFamilyManager: MockProxy<IJobProcessor>;
   let mockDocumentReferenceManager: MockProxy<IJobProcessor>;
+  let mockTwinCompositionManager: MockProxy<IJobProcessor>;
   let mockKmsService: MockProxy<IKmsService>;
   const API_BASE_URL = 'https://api.example.com';
 
@@ -24,11 +25,13 @@ describe('Worker', () => {
     mockIndividualManager = mock<IJobProcessor>();
     mockFamilyManager = mock<IJobProcessor>();
     mockDocumentReferenceManager = mock<IJobProcessor>();
+    mockTwinCompositionManager = mock<IJobProcessor>();
     mockKmsService = mock<IKmsService>();
     mockManagerRegistry = mock<ManagerRegistry>({
       individualManager: mockIndividualManager,
       familyManager: mockFamilyManager,
       documentReferenceManager: mockDocumentReferenceManager,
+      twinCompositionManager: mockTwinCompositionManager,
     });
     
     worker = new Worker(mockManagerRegistry, API_BASE_URL, mockKmsService);
@@ -201,6 +204,45 @@ describe('Worker', () => {
 
     expect(mockFamilyManager.process).toHaveBeenCalledTimes(1);
     expect(mockFamilyManager.process).toHaveBeenCalledWith(job);
+    expect(mockDocumentReferenceManager.process).not.toHaveBeenCalled();
+  });
+
+  it('should route digitaltwin Composition jobs to the TwinCompositionManager', async () => {
+    const jobName = createJobName('animal-research_acme', 'Composition', '_search');
+    const job: JobRequest = {
+      ...testCreateCustomerJobRequestProfessionalOnboarding,
+      tenantId: 'acme',
+      sector: 'animal-research',
+      section: 'digitaltwin',
+      format: 'org.hl7.fhir.api',
+      action: '_search',
+      resourceType: 'Composition',
+      contentType: 'application/json',
+      content: {
+        ...(testCreateCustomerJobRequestProfessionalOnboarding.content || {}),
+        thid: 'thid-twin-composition-001',
+        body: { resourceType: 'Parameters', parameter: [] },
+      } as any,
+    };
+
+    const managerResponse: IDecodedDidcommPayload = {
+      jti: 'mock-jti-twin-composition',
+      type: 'transaction-response',
+      iss: API_BASE_URL,
+      aud: 'did:web:client.example.com',
+      exp: Math.floor(Date.now() / 1000) + 300,
+      thid: job.content?.thid as string,
+      body: { data: [] },
+    };
+
+    mockTwinCompositionManager.process.mockResolvedValue(managerResponse);
+    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'tenant-key' } as any);
+    mockKmsService.encodeResponse.mockResolvedValue('encrypted-twin-composition-response');
+
+    await worker.process(jobName, job);
+
+    expect(mockTwinCompositionManager.process).toHaveBeenCalledTimes(1);
+    expect(mockTwinCompositionManager.process).toHaveBeenCalledWith(job);
     expect(mockDocumentReferenceManager.process).not.toHaveBeenCalled();
   });
 

@@ -82,7 +82,8 @@ describe('Service Initialization Utilities', () => {
       const digitalTwinService = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
-          (s as any).selector?.format === 'org.hl7.fhir.api',
+          (s as any).selector?.format === 'org.hl7.fhir.api' &&
+          s.actions?.includes('_batch'),
       );
       expect(digitalTwinService).toBeDefined();
       expect(digitalTwinService!.serviceEndpoint).toContain('Composition');
@@ -196,6 +197,15 @@ describe('Service Initialization Utilities', () => {
       );
       expect(subjectSearchService).toBeDefined();
 
+      const digitalTwinCompositionSearchService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.r4' &&
+          s.serviceEndpoint === 'Composition' &&
+          (s.actions || []).includes('_search'),
+      );
+      expect(digitalTwinCompositionSearchService).toBeDefined();
+
       const individualPdfDraftService = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'individual' &&
@@ -238,7 +248,8 @@ describe('Service Initialization Utilities', () => {
       const digitalTwinService = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
-          (s as any).selector?.format === 'org.hl7.fhir.api',
+          (s as any).selector?.format === 'org.hl7.fhir.api' &&
+          s.actions?.includes('_batch'),
       );
 
       expect(digitalTwinService).toBeDefined();
@@ -248,11 +259,39 @@ describe('Service Initialization Utilities', () => {
       const digitalTwinR4Service = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
-          (s as any).selector?.format === 'org.hl7.fhir.r4',
+          (s as any).selector?.format === 'org.hl7.fhir.r4' &&
+          s.actions?.includes('_batch'),
       );
       expect(digitalTwinR4Service).toBeDefined();
       expect(digitalTwinR4Service!.serviceEndpoint).toContain('Composition');
       expect(digitalTwinR4Service!.actions).toEqual(['_batch']);
+
+      const digitalTwinMedicationSearchService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.api' &&
+          s.actions?.includes('_search') &&
+          String(s.serviceEndpoint || '').includes('MedicationStatement'),
+      );
+      expect(digitalTwinMedicationSearchService).toBeDefined();
+
+      const digitalTwinCompositionSearchService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.api' &&
+          s.actions?.includes('_search') &&
+          String(s.serviceEndpoint || '') === 'Composition',
+      );
+      expect(digitalTwinCompositionSearchService).toBeDefined();
+
+      const digitalTwinCompositionR4SearchService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.r4' &&
+          s.actions?.includes('_search') &&
+          String(s.serviceEndpoint || '') === 'Composition',
+      );
+      expect(digitalTwinCompositionR4SearchService).toBeDefined();
     });
 
     it('should filter tenant discovery endpoints to indexing-only capabilities when serviceType excludes digital twin', () => {
@@ -352,7 +391,7 @@ describe('Service Initialization Utilities', () => {
       const orderRegistry = registryServices.find((s: DidService) => s.serviceEndpoint === 'Order');
       const offerRegistry = registryServices.find((s: DidService) => s.serviceEndpoint === 'Offer');
       expect((organizationRegistry as any)?.selector?.sector).toBe('test');
-      expect(organizationRegistry?.actions).toEqual(['_batch', '_transaction', '_activate', '_disable', '_enable', '_purge']);
+      expect(organizationRegistry?.actions).toEqual(['_batch', '_transaction', '_issue', '_activate', '_disable', '_enable', '_purge']);
       expect(orderRegistry?.actions).toEqual(['_batch', '_search']);
       expect(offerRegistry?.actions).toEqual(['_search']);
 

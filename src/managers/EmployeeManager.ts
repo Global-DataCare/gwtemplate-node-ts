@@ -273,20 +273,22 @@ export class EmployeeManager {
     const { request, meta: entryMeta, type } = requestEntry;
     const claims = entryMeta?.claims;
 
-    if (!request || !claims) {
-      throw new ManagerError('Entry requires a request object and meta.claims.', IssueType.Required);
+    if (!request) {
+      throw new ManagerError('Entry requires a request object.', IssueType.Required);
     }
 
-    const identifierClaim = claims[ClaimsPersonSchemaorg.identifier];
-    if (!identifierClaim) {
-      throw new ManagerError('Missing identifier claim for operation on Employee.', IssueType.Required);
+    const employeeId = this.resolveEmployeeId(requestEntry, environment);
+    if (!employeeId) {
+      throw new ManagerError('Employee entry requires resource.id or identifier claim.', IssueType.Required);
     }
-    const employeeId = determineResourceId(identifierClaim, environment);
 
     switch (request.method) {
       case 'POST':
         if (action === ACTION_PURGE) {
-          return this.purgeEmployee(vaultId, employeeId, claims, type);
+          return this.purgeEmployee(vaultId, employeeId, claims || {}, type);
+        }
+        if (!claims) {
+          throw new ManagerError('Entry requires meta.claims.', IssueType.Required);
         }
         return this.createEmployee(vaultId, tenantId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction);
       case 'DELETE':
@@ -294,6 +296,18 @@ export class EmployeeManager {
       default:
         throw new ManagerError(`Unsupported request method: '${request.method}'`, IssueType.NotSupported);
     }
+  }
+
+  private resolveEmployeeId(entry: BundleEntryRequest, environment?: string): string | undefined {
+    const explicitResourceId = String((entry as any)?.resource?.id || '').trim();
+    if (explicitResourceId) return explicitResourceId;
+
+    const identifierClaim = entry.meta?.claims?.[ClaimsPersonSchemaorg.identifier];
+    if (typeof identifierClaim !== 'string' || !identifierClaim.trim()) {
+      return undefined;
+    }
+
+    return determineResourceId(identifierClaim, environment);
   }
 
   private async createEmployee(

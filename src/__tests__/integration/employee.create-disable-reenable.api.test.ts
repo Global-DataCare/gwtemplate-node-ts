@@ -64,10 +64,10 @@ describe('Employee create/disable/re-enable route story', () => {
     disablePayload.thid = 'employee-disable-story-thid';
     disablePayload.jti = 'employee-disable-story-jti';
     disablePayload.body.data[0].resource = {
+      id: employeeId,
       meta: {
         claims: {
           ...(disablePayload.body.data[0].meta?.claims || {}),
-          'org.schema.Person.identifier': `urn:uuid:${employeeId}`,
         },
       },
     };
@@ -95,10 +95,10 @@ describe('Employee create/disable/re-enable route story', () => {
     reenablePayload.thid = 'employee-reenable-story-thid';
     reenablePayload.jti = 'employee-reenable-story-jti';
     reenablePayload.body.data[0].resource = {
+      id: employeeId,
       meta: {
         claims: {
           ...(reenablePayload.body.data[0].meta?.claims || {}),
-          'org.schema.Person.identifier': `urn:uuid:${employeeId}`,
         },
       },
     };
@@ -121,5 +121,96 @@ describe('Employee create/disable/re-enable route story', () => {
     const reenabledEntry = reenablePoll.body.data[0];
     expect(reenabledEntry.response.status).toBe('200');
     expect(reenabledEntry.resource?.id).toBe(employeeId);
+  });
+
+  it('disables and purges an employee using resource.id even when the identifier claim is not a UUID', async () => {
+    const employeeUrl = `/${tenantId}/cds-es/v1/health-care/entity/org.schema/Employee/_batch`;
+
+    const createPayload = structuredClone(EMPLOYEE_REGISTRATION_REQUEST) as any;
+    createPayload.thid = 'employee-create-purge-story-thid';
+    createPayload.jti = 'employee-create-purge-story-jti';
+    createPayload.body.data[0].resource = {
+      meta: {
+        claims: {
+          ...(createPayload.body.data[0].meta?.claims || {}),
+        },
+      },
+    };
+    createPayload.body.data[0].meta = {};
+    createPayload.body.data[0].request = { method: 'POST' };
+
+    const createSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: employeeUrl,
+      headers: { 'content-type': 'application/json' },
+      body: createPayload,
+    });
+
+    expect(createSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+
+    const createPoll = await pollJsonBody(harness.app, createSubmit.headers.location, createPayload.thid);
+    expect(createPoll.status).toBe(200);
+
+    const employeeId = String(createPoll.body.data[0].resource?.id || '');
+    expect(employeeId).toBeTruthy();
+
+    const disablePayload = structuredClone(EMPLOYEE_REGISTRATION_REQUEST) as any;
+    disablePayload.thid = 'employee-disable-purge-story-thid';
+    disablePayload.jti = 'employee-disable-purge-story-jti';
+    disablePayload.body.data[0].resource = {
+      id: employeeId,
+      meta: {
+        claims: {
+          ...(disablePayload.body.data[0].meta?.claims || {}),
+        },
+      },
+    };
+    disablePayload.body.data[0].meta = {};
+    disablePayload.body.data[0].request = { method: 'DELETE' };
+
+    const disableSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: employeeUrl,
+      headers: { 'content-type': 'application/json' },
+      body: disablePayload,
+    });
+
+    expect(disableSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+
+    const disablePoll = await pollJsonBody(harness.app, disableSubmit.headers.location, disablePayload.thid);
+    expect(disablePoll.status).toBe(200);
+    expect(disablePoll.body.data[0].response.status).toBe('200');
+
+    const purgePayload = structuredClone(EMPLOYEE_REGISTRATION_REQUEST) as any;
+    purgePayload.thid = 'employee-purge-story-thid';
+    purgePayload.jti = 'employee-purge-story-jti';
+    purgePayload.body.data[0].type = 'Employee-purge-request-v1.0';
+    purgePayload.body.data[0].resource = {
+      id: employeeId,
+      meta: {
+        claims: {
+          ...(purgePayload.body.data[0].meta?.claims || {}),
+        },
+      },
+    };
+    purgePayload.body.data[0].meta = {};
+    purgePayload.body.data[0].request = { method: 'POST' };
+
+    const purgeSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: employeeUrl.replace('/_batch', '/_purge'),
+      headers: { 'content-type': 'application/json' },
+      body: purgePayload,
+    });
+
+    expect(purgeSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+
+    const purgePoll = await pollJsonBody(harness.app, purgeSubmit.headers.location, purgePayload.thid);
+    expect(purgePoll.status).toBe(200);
+    expect(purgePoll.body.data[0].response.status).toBe('200');
+    expect(purgePoll.body.data[0].resource?.id).toBe(employeeId);
   });
 });

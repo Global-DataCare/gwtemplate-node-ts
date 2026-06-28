@@ -39,7 +39,7 @@
 import {
   HealthcareConsentActions,
   HealthcareConsentPurposes,
-} from '../../shared/healthcare-constants';
+} from 'gdc-common-utils-ts/constants/index';
 import { Sector, knownDomainsReversedEnum } from 'gdc-common-utils-ts/models/urlPath';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import {

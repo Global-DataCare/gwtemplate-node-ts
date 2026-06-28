@@ -5,6 +5,9 @@ import {
   parseAndValidateMainSector,
   parseAndValidateSectors,
   parseAndValidateSubsectors,
+  parseResearchStoreCodeIndexMode,
+  parseResearchStoreProvider,
+  parseResearchStoreTextSearchMode,
   parseNetworkMode,
   parseSecurityMode,
   resetServerConfig,
@@ -89,6 +92,23 @@ describe('server-config sector resolution', () => {
     expect(parseNetworkMode(undefined, 'staging')).toBe('test-network');
     expect(parseNetworkMode(undefined, 'test')).toBe('test');
     expect(() => parseNetworkMode('invalid-mode')).toThrow(/Invalid NETWORK_MODE/);
+  });
+
+  it('should parse research store mode values', () => {
+    expect(parseResearchStoreProvider(undefined)).toBeUndefined();
+    expect(parseResearchStoreProvider('postgres')).toBe('postgres');
+    expect(parseResearchStoreProvider('supabase')).toBe('supabase');
+    expect(parseResearchStoreProvider('firestore')).toBe('firestore');
+    expect(() => parseResearchStoreProvider('mongo')).toThrow(/Invalid RESEARCH_STORE_PROVIDER/);
+
+    expect(parseResearchStoreTextSearchMode(undefined)).toBeUndefined();
+    expect(parseResearchStoreTextSearchMode('postgres-simple')).toBe('postgres-simple');
+    expect(parseResearchStoreTextSearchMode('postgres-tsvector')).toBe('postgres-tsvector');
+    expect(() => parseResearchStoreTextSearchMode('ilike')).toThrow(/Invalid RESEARCH_STORE_TEXT_SEARCH_MODE/);
+
+    expect(parseResearchStoreCodeIndexMode(undefined)).toBeUndefined();
+    expect(parseResearchStoreCodeIndexMode('normalized-claims-v1')).toBe('normalized-claims-v1');
+    expect(() => parseResearchStoreCodeIndexMode('legacy')).toThrow(/Invalid RESEARCH_STORE_CODE_INDEX_MODE/);
   });
 
   it('should expose security and network flags from environment', () => {
@@ -188,6 +208,176 @@ describe('server-config sector resolution', () => {
       apiUrl: 'http://127.0.0.1:5001',
       gatewayUrl: 'http://127.0.0.1:8080',
       mfsRoot: '/gwtemplate/blobs',
+    });
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
+  it('should default the research store block to disabled without changing runtime behavior', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      RESEARCH_STORE_ENABLED: '',
+      RESEARCH_STORE_PROVIDER: '',
+      RESEARCH_STORE_SEPARATE_DB: '',
+      RESEARCH_STORE_POSTGRES_HOST: '',
+      RESEARCH_STORE_POSTGRES_PORT: '',
+      RESEARCH_STORE_POSTGRES_DB: '',
+      RESEARCH_STORE_POSTGRES_USER: '',
+      RESEARCH_STORE_POSTGRES_PASSWORD: '',
+      RESEARCH_STORE_POSTGRES_SCHEMA: '',
+      RESEARCH_STORE_POSTGRES_SSL: '',
+      RESEARCH_STORE_INDEX_PREFIX: '',
+      RESEARCH_STORE_DEFAULT_LOCALE: '',
+      RESEARCH_STORE_TEXT_SEARCH_MODE: '',
+      RESEARCH_STORE_CODE_INDEX_MODE: '',
+    };
+
+    resetServerConfig();
+    const config = getConfig();
+
+    expect(config.researchStore).toEqual({
+      enabled: false,
+      provider: undefined,
+      separateDb: true,
+      indexPrefix: '',
+      defaultLocale: '',
+      textSearchMode: undefined,
+      codeIndexMode: undefined,
+      postgres: undefined,
+    });
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
+  it('should expose dedicated research-store postgres settings when enabled', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      RESEARCH_STORE_ENABLED: 'true',
+      RESEARCH_STORE_PROVIDER: 'postgres',
+      RESEARCH_STORE_SEPARATE_DB: 'true',
+      RESEARCH_STORE_POSTGRES_HOST: 'research-pg.internal',
+      RESEARCH_STORE_POSTGRES_PORT: '6543',
+      RESEARCH_STORE_POSTGRES_DB: 'gw_research',
+      RESEARCH_STORE_POSTGRES_USER: 'gw_research_user',
+      RESEARCH_STORE_POSTGRES_PASSWORD: 'secret',
+      RESEARCH_STORE_POSTGRES_SCHEMA: 'digital_twin',
+      RESEARCH_STORE_POSTGRES_SSL: 'true',
+      RESEARCH_STORE_INDEX_PREFIX: 'rtwin',
+      RESEARCH_STORE_DEFAULT_LOCALE: 'es',
+      RESEARCH_STORE_TEXT_SEARCH_MODE: 'postgres-tsvector',
+      RESEARCH_STORE_CODE_INDEX_MODE: 'normalized-claims-v1',
+    };
+
+    resetServerConfig();
+    const config = getConfig();
+
+    expect(config.researchStore).toEqual({
+      enabled: true,
+      provider: 'postgres',
+      separateDb: true,
+      indexPrefix: 'rtwin',
+      defaultLocale: 'es',
+      textSearchMode: 'postgres-tsvector',
+      codeIndexMode: 'normalized-claims-v1',
+      postgres: {
+        host: 'research-pg.internal',
+        port: 6543,
+        database: 'gw_research',
+        user: 'gw_research_user',
+        password: 'secret',
+        ssl: true,
+        schema: 'digital_twin',
+      },
+    });
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
+  it('should require a research-store provider when the research store is enabled', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      RESEARCH_STORE_ENABLED: 'true',
+      RESEARCH_STORE_PROVIDER: '',
+    };
+
+    resetServerConfig();
+    expect(() => getConfig()).toThrow(/RESEARCH_STORE_PROVIDER is required/);
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
+  it('should require dedicated research-store postgres settings when separateDb is true', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      RESEARCH_STORE_ENABLED: 'true',
+      RESEARCH_STORE_PROVIDER: 'postgres',
+      RESEARCH_STORE_SEPARATE_DB: 'true',
+      RESEARCH_STORE_POSTGRES_HOST: '',
+      RESEARCH_STORE_POSTGRES_PORT: '',
+      RESEARCH_STORE_POSTGRES_DB: '',
+      RESEARCH_STORE_POSTGRES_USER: '',
+      RESEARCH_STORE_POSTGRES_PASSWORD: '',
+    };
+
+    resetServerConfig();
+    expect(() => getConfig()).toThrow(/Dedicated RESEARCH_STORE_POSTGRES_\* settings are required/);
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
+  it('should allow explicit shared-db opt-in for the research store', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      DB_PROVIDER: 'postgres',
+      POSTGRES_HOST: 'main-pg.internal',
+      POSTGRES_PORT: '5432',
+      POSTGRES_DB: 'gw_main',
+      POSTGRES_USER: 'gw_main_user',
+      POSTGRES_PASSWORD: 'main-secret',
+      POSTGRES_SCHEMA: 'public',
+      POSTGRES_SSL: 'false',
+      RESEARCH_STORE_ENABLED: 'true',
+      RESEARCH_STORE_PROVIDER: 'postgres',
+      RESEARCH_STORE_SEPARATE_DB: 'false',
+      RESEARCH_STORE_POSTGRES_HOST: '',
+      RESEARCH_STORE_POSTGRES_PORT: '',
+      RESEARCH_STORE_POSTGRES_DB: '',
+      RESEARCH_STORE_POSTGRES_USER: '',
+      RESEARCH_STORE_POSTGRES_PASSWORD: '',
+      RESEARCH_STORE_POSTGRES_SCHEMA: '',
+      RESEARCH_STORE_POSTGRES_SSL: '',
+    };
+
+    resetServerConfig();
+    const config = getConfig();
+
+    expect(config.researchStore).toEqual({
+      enabled: true,
+      provider: 'postgres',
+      separateDb: false,
+      indexPrefix: undefined,
+      defaultLocale: undefined,
+      textSearchMode: undefined,
+      codeIndexMode: undefined,
+      postgres: {
+        host: 'main-pg.internal',
+        port: 5432,
+        database: 'gw_main',
+        user: 'gw_main_user',
+        password: 'main-secret',
+        ssl: false,
+        schema: 'public',
+      },
     });
 
     process.env = previousEnv;

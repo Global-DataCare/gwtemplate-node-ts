@@ -1651,6 +1651,80 @@ export function createApiRouter(
    *     responses:
    *       '202': { description: Accepted. Poll the Location URL for the result. }
    *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_search:
+   *   post:
+   *     tags:
+   *       - 9. Research Digital Twin
+   *     summary: Search digital twin Composition indexes by IPS section and textual claims
+   *     description: |
+   *       Submits an async section-first digital twin search request.
+   *
+   *       Public search intent:
+   *       - the result artifact is `Composition`
+   *       - the client filters by IPS `section` first
+   *       - the client then adds resource-scoped textual filters such as
+   *         `MedicationStatement.code-display`, `MedicationStatement.code-text`,
+   *         `Observation.code-display`, or `Observation.code-text`
+   *       - internal matching may fan out to indexed resource families for the
+   *         requested section, but the response returns matched `Composition`
+   *         projections rather than leaf resources
+   *
+   *       Current runtime rules:
+   *       - request body should carry a FHIR `Parameters` resource
+   *       - `section` is required
+   *       - at least one resource-scoped claim filter is required
+   *       - one resource family per request is supported today
+   *       - poll completion on the existing `_batch-response` path with the
+   *         same `thid`
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plain+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the `_batch-response` URL for the result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_search:
+   *   post:
+   *     tags:
+   *       - 9. Research Digital Twin
+   *     summary: Search strict FHIR R4 digital twin Composition indexes by IPS section and textual claims
+   *     description: |
+   *       Same section-first digital twin search contract as
+   *       `org.hl7.fhir.api/Composition/_search`, but with the versioned
+   *       format segment used by strict FHIR clients.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plain+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the `_batch-response` URL for the result. }
+   *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response:
    *   post:
    *     tags:

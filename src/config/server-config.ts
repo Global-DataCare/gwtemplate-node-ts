@@ -8,6 +8,9 @@ const MAIN_SECTORS = ['animal', 'health'] as const;
 const SUBSECTORS = ['research', 'care', 'index', 'tech'] as const;
 
 export type NetworkMode = 'test' | 'local-network' | 'test-network' | 'network';
+export type ResearchStoreProvider = 'postgres' | 'supabase' | 'firestore';
+export type ResearchStoreTextSearchMode = 'postgres-simple' | 'postgres-tsvector';
+export type ResearchStoreCodeIndexMode = 'normalized-claims-v1';
 
 type MainSector = typeof MAIN_SECTORS[number];
 type Subsector = typeof SUBSECTORS[number];
@@ -21,6 +24,70 @@ function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
   if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'enabled') return true;
   if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'disabled') return false;
   return fallback;
+}
+
+function hasAnyConfiguredValue(values: Array<string | number | boolean | undefined>): boolean {
+  return values.some((value) => {
+    if (value === undefined) return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    return true;
+  });
+}
+
+export function parseResearchStoreProvider(value: string | undefined): ResearchStoreProvider | undefined {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === 'postgres' || normalized === 'supabase' || normalized === 'firestore') {
+    return normalized;
+  }
+  throw new Error('Config Error: Invalid RESEARCH_STORE_PROVIDER. Allowed: postgres, supabase, firestore');
+}
+
+/**
+ * Parses the planned text-search mode for the separate research store.
+ *
+ * This setting is easy to misread, so keep the mental model explicit:
+ * - it does not change the current operational vault search,
+ * - it does not enable fuzzy search by itself,
+ * - it selects how a future research-store adapter should index/search
+ *   human-readable text fields that were explicitly allowlisted.
+ *
+ * Values:
+ * - `postgres-simple`:
+ *   Conservative default for an initial MVP. Think "basic PostgreSQL-backed
+ *   normalized text search" without promising advanced linguistic behavior.
+ * - `postgres-tsvector`:
+ *   PostgreSQL full-text-oriented mode for a later, more explicit text index.
+ */
+export function parseResearchStoreTextSearchMode(value: string | undefined): ResearchStoreTextSearchMode | undefined {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === 'postgres-simple' || normalized === 'postgres-tsvector') {
+    return normalized;
+  }
+  throw new Error('Config Error: Invalid RESEARCH_STORE_TEXT_SEARCH_MODE. Allowed: postgres-simple, postgres-tsvector');
+}
+
+/**
+ * Parses the planned code-index extraction mode for the separate research
+ * store.
+ *
+ * Current supported value:
+ * - `normalized-claims-v1`
+ *   Means the adapter/projector should derive exact code rows from canonical
+ *   allowlisted claims such as `*.code`, `*.type`, `*.category`, etc.,
+ *   especially values encoded as `SYSTEM|CODE`.
+ *
+ * This setting is intentionally versioned because future extraction rules may
+ * evolve without changing the meaning of the existing stored indexes.
+ */
+export function parseResearchStoreCodeIndexMode(value: string | undefined): ResearchStoreCodeIndexMode | undefined {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === 'normalized-claims-v1') {
+    return normalized;
+  }
+  throw new Error('Config Error: Invalid RESEARCH_STORE_CODE_INDEX_MODE. Allowed: normalized-claims-v1');
 }
 
 export function parseSecurityMode(value: string | undefined): 'strict' | 'compat' | 'demo' {
@@ -172,6 +239,53 @@ export function getConfig(): IServerConfig {
       false,
     );
     const demoAllowInsecureBearer = parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
+    const researchStoreEnabled = parseBooleanEnv(process.env.RESEARCH_STORE_ENABLED, false);
+    const researchStoreSeparateDb = parseBooleanEnv(process.env.RESEARCH_STORE_SEPARATE_DB, true);
+    const researchStoreProvider = parseResearchStoreProvider(process.env.RESEARCH_STORE_PROVIDER);
+    const researchStoreTextSearchMode = parseResearchStoreTextSearchMode(process.env.RESEARCH_STORE_TEXT_SEARCH_MODE);
+    const researchStoreCodeIndexMode = parseResearchStoreCodeIndexMode(process.env.RESEARCH_STORE_CODE_INDEX_MODE);
+    const researchStorePostgres = {
+      host: process.env.RESEARCH_STORE_POSTGRES_HOST,
+      port: process.env.RESEARCH_STORE_POSTGRES_PORT ? parseInt(process.env.RESEARCH_STORE_POSTGRES_PORT, 10) : undefined,
+      database: process.env.RESEARCH_STORE_POSTGRES_DB,
+      user: process.env.RESEARCH_STORE_POSTGRES_USER,
+      password: process.env.RESEARCH_STORE_POSTGRES_PASSWORD,
+      ssl: parseBooleanEnv(process.env.RESEARCH_STORE_POSTGRES_SSL, false),
+      schema: process.env.RESEARCH_STORE_POSTGRES_SCHEMA,
+    };
+    const researchStorePostgresConfigured = hasAnyConfiguredValue([
+      researchStorePostgres.host,
+      researchStorePostgres.port,
+      researchStorePostgres.database,
+      researchStorePostgres.user,
+      researchStorePostgres.password,
+      researchStorePostgres.schema,
+      process.env.RESEARCH_STORE_POSTGRES_SSL,
+    ]);
+
+    if (researchStoreEnabled && !researchStoreProvider) {
+      throw new Error('Config Error: RESEARCH_STORE_PROVIDER is required when RESEARCH_STORE_ENABLED=true');
+    }
+    if (researchStoreEnabled && researchStoreProvider === 'postgres' && researchStoreSeparateDb) {
+      const hasDedicatedPostgresConfig = hasAnyConfiguredValue([
+        researchStorePostgres.host,
+        researchStorePostgres.port,
+        researchStorePostgres.database,
+        researchStorePostgres.user,
+        researchStorePostgres.password,
+      ]);
+      if (!hasDedicatedPostgresConfig) {
+        throw new Error(
+          'Config Error: Dedicated RESEARCH_STORE_POSTGRES_* settings are required when RESEARCH_STORE_ENABLED=true, RESEARCH_STORE_PROVIDER=postgres, and RESEARCH_STORE_SEPARATE_DB=true',
+        );
+      }
+    }
+    if (!researchStoreEnabled && researchStorePostgresConfigured) {
+      console.warn('[Config] RESEARCH_STORE_POSTGRES_* is configured while RESEARCH_STORE_ENABLED=false. The research store remains disabled.');
+    }
+    if (researchStoreEnabled && researchStoreProvider === 'postgres' && !researchStoreSeparateDb && researchStorePostgresConfigured) {
+      console.warn('[Config] RESEARCH_STORE_SEPARATE_DB=false reuses the main operational PostgreSQL runtime by explicit opt-in. Dedicated RESEARCH_STORE_POSTGRES_* settings are ignored.');
+    }
 
     configInstance = {
       securityMode,
@@ -202,6 +316,30 @@ export function getConfig(): IServerConfig {
         ssl: parseBooleanEnv(process.env.POSTGRES_SSL, false),
         schema: process.env.POSTGRES_SCHEMA,
         maxPoolSize: process.env.POSTGRES_MAX_POOL_SIZE ? parseInt(process.env.POSTGRES_MAX_POOL_SIZE, 10) : undefined,
+      },
+      researchStore: {
+        enabled: researchStoreEnabled,
+        provider: researchStoreProvider,
+        separateDb: researchStoreSeparateDb,
+        indexPrefix: process.env.RESEARCH_STORE_INDEX_PREFIX,
+        defaultLocale: process.env.RESEARCH_STORE_DEFAULT_LOCALE,
+        textSearchMode: researchStoreTextSearchMode,
+        codeIndexMode: researchStoreCodeIndexMode,
+        postgres: researchStoreEnabled && researchStoreProvider === 'postgres'
+          ? (
+            researchStoreSeparateDb
+              ? researchStorePostgres
+              : {
+                  host: process.env.POSTGRES_HOST,
+                  port: process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT, 10) : undefined,
+                  database: process.env.POSTGRES_DB,
+                  user: process.env.POSTGRES_USER,
+                  password: process.env.POSTGRES_PASSWORD,
+                  ssl: parseBooleanEnv(process.env.POSTGRES_SSL, false),
+                  schema: process.env.POSTGRES_SCHEMA,
+                }
+          )
+          : undefined,
       },
       gcsBucketName: process.env.GCS_BUCKET_NAME,
       supabase: {

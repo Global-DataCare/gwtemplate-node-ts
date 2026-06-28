@@ -41,9 +41,22 @@ SECTOR="${SECTOR:-${E2E_SECTOR:-health-care}}"
 AUTH_BEARER="${AUTH_BEARER:-demo-token}"
 
 INDIVIDUAL_CONTROLLER_EMAIL="${INDIVIDUAL_CONTROLLER_EMAIL:-adult1@example.com}"
+INDIVIDUAL_CONTROLLER_PHONE="${INDIVIDUAL_CONTROLLER_PHONE:-}"
 INDIVIDUAL_MEMBER_EMAIL="${INDIVIDUAL_MEMBER_EMAIL:-child1@example.com}"
 INDIVIDUAL_ORGANIZATION_IDENTIFIER="${INDIVIDUAL_ORGANIZATION_IDENTIFIER:-00000000-0000-4000-8000-000000000001}"
 INDIVIDUAL_MEMBER_IDENTIFIER="${INDIVIDUAL_MEMBER_IDENTIFIER:-00000000-0000-4000-8000-000000000002}"
+INDIVIDUAL_ALTERNATE_NAME="${INDIVIDUAL_ALTERNATE_NAME:-Doraemon}"
+INDIVIDUAL_CONTROLLER_GIVEN_NAME="${INDIVIDUAL_CONTROLLER_GIVEN_NAME:-Dora}"
+INDIVIDUAL_CONTROLLER_FAMILY_NAME="${INDIVIDUAL_CONTROLLER_FAMILY_NAME:-Nobi}"
+INDIVIDUAL_CONTROLLER_ID_NUMBER="${INDIVIDUAL_CONTROLLER_ID_NUMBER:-ID-DEMO-DORAEMON-001}"
+INDIVIDUAL_CONTROLLER_COUNTRY="${INDIVIDUAL_CONTROLLER_COUNTRY:-ES}"
+INDIVIDUAL_CONTROLLER_CITY="${INDIVIDUAL_CONTROLLER_CITY:-Madrid}"
+INDIVIDUAL_CONTROLLER_ADDRESS="${INDIVIDUAL_CONTROLLER_ADDRESS:-Calle Demo 1}"
+INDIVIDUAL_CONTROLLER_POSTAL_CODE="${INDIVIDUAL_CONTROLLER_POSTAL_CODE:-28001}"
+INDIVIDUAL_CONTROLLER_BIRTHDATE="${INDIVIDUAL_CONTROLLER_BIRTHDATE:-1985-01-01}"
+INDIVIDUAL_CONTROLLER_GENDER="${INDIVIDUAL_CONTROLLER_GENDER:-F}"
+INDIVIDUAL_MEMBER_BIRTHDATE="${INDIVIDUAL_MEMBER_BIRTHDATE:-2010-01-01}"
+INDIVIDUAL_SIGNATURE_FLOW="${INDIVIDUAL_SIGNATURE_FLOW:-otp}"
 SIGNED_INDIVIDUAL_FORM_PDF_BASE64="${SIGNED_INDIVIDUAL_FORM_PDF_BASE64:-JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZG9iago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y=}"
 EXPECTED_SUBJECT_ID="${EXPECTED_SUBJECT_ID:-did:web:api.${TENANT_ID}.org:individual:subject-001}"
 
@@ -83,32 +96,77 @@ poll_async() {
 }
 
 echo "[individual] Rendering canonical individual-organization registration payload..."
+registration_fixture="FAMILY_REGISTRATION_REQUEST"
 registration_overrides="$(jq -n \
   --arg jti "$REGISTRATION_JTI" \
   --arg thid "$REGISTRATION_THID" \
-  --arg iss "$INDIVIDUAL_CONTROLLER_EMAIL" \
+  --arg iss "${INDIVIDUAL_CONTROLLER_EMAIL:-${INDIVIDUAL_CONTROLLER_PHONE}}" \
   --arg aud "$TENANT_DID_WEB" \
   --arg pdfBase64 "$SIGNED_INDIVIDUAL_FORM_PDF_BASE64" \
   --arg jurisdiction "$JURISDICTION" \
   --arg organizationIdentifier "$INDIVIDUAL_ORGANIZATION_IDENTIFIER" \
   --arg controllerEmail "$INDIVIDUAL_CONTROLLER_EMAIL" \
+  --arg controllerPhone "$INDIVIDUAL_CONTROLLER_PHONE" \
   --arg memberEmail "$INDIVIDUAL_MEMBER_EMAIL" \
   --arg memberIdentifier "$INDIVIDUAL_MEMBER_IDENTIFIER" \
   --arg sector "$SECTOR" \
+  --arg alternateName "$INDIVIDUAL_ALTERNATE_NAME" \
+  --arg controllerGivenName "$INDIVIDUAL_CONTROLLER_GIVEN_NAME" \
+  --arg controllerFamilyName "$INDIVIDUAL_CONTROLLER_FAMILY_NAME" \
+  --arg controllerIdNumber "$INDIVIDUAL_CONTROLLER_ID_NUMBER" \
+  --arg controllerCountry "$INDIVIDUAL_CONTROLLER_COUNTRY" \
+  --arg controllerCity "$INDIVIDUAL_CONTROLLER_CITY" \
+  --arg controllerAddress "$INDIVIDUAL_CONTROLLER_ADDRESS" \
+  --arg controllerPostalCode "$INDIVIDUAL_CONTROLLER_POSTAL_CODE" \
+  --arg controllerBirthdate "$INDIVIDUAL_CONTROLLER_BIRTHDATE" \
+  --arg controllerGender "$INDIVIDUAL_CONTROLLER_GENDER" \
+  --arg memberBirthdate "$INDIVIDUAL_MEMBER_BIRTHDATE" \
+  --arg signatureFlow "$INDIVIDUAL_SIGNATURE_FLOW" \
   '{
     "/jti": $jti,
     "/thid": $thid,
     "/iss": $iss,
     "/aud": $aud,
-    "/attachments/0/data/base64": $pdfBase64,
     "/body/data/0/meta/claims/Organization.address.addressCountry": $jurisdiction,
     "/body/data/0/meta/claims/Organization.identifier.value": $organizationIdentifier,
     "/body/data/0/meta/claims/Organization.owner.email": $controllerEmail,
+    "/body/data/0/meta/claims/Organization.owner.telephone": $controllerPhone,
     "/body/data/0/meta/claims/Person.email": $memberEmail,
     "/body/data/0/meta/claims/Person.identifier.value": $memberIdentifier,
-    "/body/data/0/meta/claims/Service.category": $sector
+    "/body/data/0/meta/claims/Service.category": $sector,
+    "/body/data/0/meta/kyc": {
+      "method": $signatureFlow,
+      "individualAlternateName": $alternateName,
+      "individualBirthDate": $memberBirthdate,
+      "controllerEmail": $controllerEmail,
+      "profile": {
+        "first_name": $controllerGivenName,
+        "last_name": $controllerFamilyName,
+        "id_number": $controllerIdNumber,
+        "country": $controllerCountry,
+        "city": $controllerCity,
+        "address": $controllerAddress,
+        "postal_code": $controllerPostalCode,
+        "phone_number": $controllerPhone,
+        "birthdate": $controllerBirthdate,
+        "gender": $controllerGender
+      }
+    }
   }')"
-registration_payload="$(render_example_payload FAMILY_REGISTRATION_REQUEST_INLINE_BASE64 "$registration_overrides")"
+
+if [[ "${INDIVIDUAL_SIGNATURE_FLOW}" == "certificate" ]]; then
+  registration_fixture="FAMILY_REGISTRATION_REQUEST_INLINE_BASE64"
+  registration_overrides="$(jq \
+    --arg pdfBase64 "$SIGNED_INDIVIDUAL_FORM_PDF_BASE64" \
+    '. + {"/attachments/0/data/base64": $pdfBase64}' \
+    <<<"${registration_overrides}")"
+else
+  registration_overrides="$(jq \
+    '. + {"/attachments": []}' \
+    <<<"${registration_overrides}")"
+fi
+
+registration_payload="$(render_example_payload "${registration_fixture}" "${registration_overrides}")"
 
 echo "[individual] POST ${INDIVIDUAL_ORGANIZATION_BATCH_URL}"
 registration_submit="$(curl -sS -X POST "${INDIVIDUAL_ORGANIZATION_BATCH_URL}" \

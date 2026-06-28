@@ -171,7 +171,12 @@ describe('EmployeeManager', () => {
       const entry = response.body.data[0] as any;
       expect(entry.type).toBe('Employee-license-offer-v1.0');
       expect(entry.meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeDefined();
-      expect(mockVaultRepository.put).not.toHaveBeenCalled();
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+      expect(mockVaultRepository.put).toHaveBeenCalledWith(
+        HOST_COLLECTION_NAME,
+        expect.any(Array),
+        getEnvSectionId('communications'),
+      );
     });
 
     it('should consume an available employee license before creating the employee', async () => {
@@ -306,9 +311,10 @@ describe('EmployeeManager', () => {
   });
 
   describe('Employee Deactivation (DELETE)', () => {
-    it('should suspend the employee without releasing or mutating device licenses', async () => {
+    it('should suspend the employee using resource.id without releasing or mutating device licenses', async () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       job.content!.body!.data[0].request.method = 'DELETE';
+      job.content!.body!.data[0].resource = { id: 'employee-to-disable' } as any;
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
 
       const existingEmployee: EntityConfig = {
@@ -332,7 +338,7 @@ describe('EmployeeManager', () => {
 
       expect(mockVaultRepository.get).toHaveBeenCalledWith(
         TENANT_VAULT_ID,
-        MOCKED_OCCUPATION_UUID,
+        'employee-to-disable',
         getEnvSectionId('employees'),
       );
       expect(mockVaultRepository.getContainersInSection).not.toHaveBeenCalledWith(
@@ -448,6 +454,41 @@ describe('EmployeeManager', () => {
   });
 
   describe('Employee Purge', () => {
+    it('should purge the employee using resource.id even when the identifier claim is not a UUID', async () => {
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      job.action = '_purge';
+      job.content!.body!.data[0].resource = { id: 'employee-to-purge' } as any;
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      const existingEmployee: EntityConfig = {
+        id: 'employee-to-purge',
+        type: EntityType.Person,
+        status: EntityLifecycleStatus.Inactive,
+        claims: testClaimsTenant1Receptionist1,
+        meta: { lastUpdated: '2026-05-25T00:00:00.000Z' },
+      };
+      const existingSecureDoc: ConfidentialStorageDoc = {
+        id: existingEmployee.id,
+        status: existingEmployee.status,
+        sequence: 1,
+        content: existingEmployee,
+      };
+
+      mockVaultRepository.get.mockResolvedValue(existingSecureDoc);
+      mockVaultRepository.getContainersInSection.mockResolvedValue([]);
+      mockVaultRepository.put.mockResolvedValue(true);
+
+      const response = await employeeManager.process(job);
+
+      expect(mockVaultRepository.get).toHaveBeenCalledWith(
+        TENANT_VAULT_ID,
+        'employee-to-purge',
+        getEnvSectionId('employees'),
+      );
+      expect((response.body.data[0] as any).response.status).toBe('200');
+      expect((response.body.data[0] as any).resource.id).toBe('employee-to-purge');
+    });
+
     it('should reject purge unless the employee is already inactive', async () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       job.action = '_purge';

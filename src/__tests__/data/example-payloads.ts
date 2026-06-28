@@ -9,7 +9,7 @@ import {
   HealthcareActorRoles,
   HealthcareConsentActions,
   HealthcareConsentPurposes,
-} from '../../shared/healthcare-constants';
+} from 'gdc-common-utils-ts/constants/index';
 import {
   ClaimsOrganizationSchemaorg,
   ClaimsPersonSchemaorg,

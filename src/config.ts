@@ -53,6 +53,54 @@ export interface IServerConfig {
     schema?: string;
     maxPoolSize?: number;
   };
+  /**
+   * Separate configuration block for the planned research/digital twin store.
+   *
+   * Key ideas:
+   * - This is not the main operational tenant vault.
+   * - `enabled=false` means "ignore all research-store wiring for now".
+   * - `separateDb=true` means operators must provide dedicated
+   *   `RESEARCH_STORE_POSTGRES_*` settings instead of implicitly reusing the
+   *   main `POSTGRES_*` connection.
+   *
+   * The following fields are intentionally explicit because they are easy to
+   * misunderstand:
+   * - `indexPrefix`:
+   *   Human-chosen prefix used by future research-store tables/indexes so they
+   *   are easy to recognize and avoid collisions with other schemas or
+   *   deployments. Example: `rtwin`.
+   * - `defaultLocale`:
+   *   Fallback locale for normalized text indexing when an incoming artifact
+   *   does not declare one. This does not translate text; it only tells the
+   *   indexer which locale to assume for tokenization/search defaults.
+   *   Example: `es` or `en`.
+   * - `textSearchMode`:
+   *   Planned text search strategy for normalized human-readable claims.
+   *   `postgres-simple` is the safer initial option. `postgres-tsvector`
+   *   implies a more PostgreSQL-native full-text indexing strategy.
+   * - `codeIndexMode`:
+   *   Planned code-index extraction strategy. The initial supported value,
+   *   `normalized-claims-v1`, means "extract deterministic code rows from the
+   *   allowlisted canonical claims model", for example `SYSTEM|CODE` values.
+   */
+  researchStore?: {
+    enabled: boolean;
+    provider?: 'postgres' | 'supabase' | 'firestore';
+    separateDb: boolean;
+    indexPrefix?: string;
+    defaultLocale?: string;
+    textSearchMode?: 'postgres-simple' | 'postgres-tsvector';
+    codeIndexMode?: 'normalized-claims-v1';
+    postgres?: {
+      host?: string;
+      port?: number;
+      database?: string;
+      user?: string;
+      password?: string;
+      ssl?: boolean;
+      schema?: string;
+    };
+  };
   gcsBucketName?: string;
   supabase?: {
     url?: string;

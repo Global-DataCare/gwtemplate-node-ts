@@ -81,6 +81,18 @@ operations and must not blur CRUD, search, lifecycle, or transport semantics.
 
 Use explicit names and keep docs/examples aligned with tested behavior.
 
+For specialized stores, vaults, and runtime adapters, keep the shared concept
+first and the specialization suffix last, for example:
+
+- `UserProfileIndexStoreInMemory`
+- `UserProfileIndexStoreFirestore`
+- `UserProfileVaultFirestore`
+
+Avoid inverted names such as:
+
+- `InMemoryUserProfileIndexStore`
+- `FirestoreUserProfileIndexStore`
+
 ## Test And Contract Policy
 
 GW tests must prove actual backend behavior, not aspirational SDK layering.

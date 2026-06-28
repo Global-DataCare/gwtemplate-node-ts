@@ -2,6 +2,20 @@ import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 
 export type SearchFilters = Record<string, string[]>;
+export type DocumentReferenceSearchFilters = {
+  identifier?: string;
+  attachmentHash?: string;
+};
+export type CommunicationSearchFilters = {
+  identifier?: string;
+  thid?: string;
+  pthid?: string;
+  attachmentHash?: string;
+};
+
+function dedupe(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)));
+}
 
 function splitValues(rawValue: string): string[] {
   return String(rawValue || '')
@@ -72,12 +86,125 @@ export function extractSearchFiltersFromRequestUrl(requestUrl: unknown): SearchF
   return filters;
 }
 
+export function collectSearchFiltersFromBody(body: any): SearchFilters {
+  const filters: SearchFilters = {};
+  const merge = (source: SearchFilters) => {
+    for (const [key, values] of Object.entries(source || {})) {
+      if (!filters[key]) {
+        filters[key] = [];
+      }
+      filters[key].push(...values);
+    }
+  };
+
+  if (Array.isArray(body?.parameter)) {
+    merge(extractSearchFiltersFromParametersResource({ resourceType: 'Parameters', parameter: body.parameter }));
+  }
+
+  const wrappers = [
+    ...(Array.isArray(body?.entry) ? body.entry : []),
+    ...(Array.isArray(body?.data) ? body.data : []),
+  ];
+
+  for (const wrapper of wrappers) {
+    merge(extractSearchFiltersFromRequestUrl(wrapper?.request?.url));
+    if (wrapper?.resource?.resourceType === 'Parameters') {
+      merge(extractSearchFiltersFromParametersResource(wrapper.resource));
+    }
+  }
+
+  return filters;
+}
+
+export function getSearchFilterValues(body: any, names: string[]): string[] {
+  const filters = collectSearchFiltersFromBody(body);
+  const values: string[] = [];
+  for (const name of names) {
+    values.push(...(filters[name] || []));
+  }
+  return dedupe(values);
+}
+
+export function getFirstSearchFilter(body: any, names: string[]): string {
+  return getSearchFilterValues(body, names)[0] || '';
+}
+
+export function extractDocumentReferenceSearchFilters(body: any): DocumentReferenceSearchFilters {
+  const identifier = getFirstSearchFilter(body, ['identifier', 'documentreference.identifier']);
+  const attachmentHash = getFirstSearchFilter(body, [
+    'contenthash',
+    'documentreference.contenthash',
+    'attachment.hash',
+  ]);
+  return {
+    identifier: identifier || undefined,
+    attachmentHash: attachmentHash || undefined,
+  };
+}
+
+export function extractCommunicationSearchFilters(body: any): CommunicationSearchFilters {
+  const identifier = getFirstSearchFilter(body, ['identifier', 'communication.identifier']);
+  const thid = getFirstSearchFilter(body, ['thid']);
+  const pthid = getFirstSearchFilter(body, ['pthid']);
+  const attachmentHash = getFirstSearchFilter(body, [
+    'contenthash',
+    'documentreference.contenthash',
+    'attachment.hash',
+  ]);
+  return {
+    identifier: identifier || undefined,
+    thid: thid || undefined,
+    pthid: pthid || undefined,
+    attachmentHash: attachmentHash || undefined,
+  };
+}
+
+export function extractCompositionSearchSubject(body: any): string {
+  return getFirstSearchFilter(body, ['subject', 'composition.subject']);
+}
+
+export function extractCompositionSearchSections(body: any): string[] {
+  return getSearchFilterValues(body, ['section', 'composition.section']);
+}
+
+export function extractCompositionExcludedSearchSections(body: any): string[] {
+  return getSearchFilterValues(body, [
+    'section:not',
+    'composition.section:not',
+    'exclude-section',
+    'exclude-sections',
+  ]);
+}
+
+export function extractCompositionSearchTypes(body: any): string[] {
+  return getSearchFilterValues(body, ['composition.type', 'document-type']);
+}
+
+export function extractRequestedBundleType(body: any): string {
+  return getFirstSearchFilter(body, ['type']);
+}
+
 export function extractSearchResourceTarget(requestUrl: unknown): string {
   const target = getRequestTarget(requestUrl);
   if (!target) return '';
   const withoutAction = target.endsWith('/_search') ? target.slice(0, -'/_search'.length) : target;
   const segments = withoutAction.split('/').filter(Boolean);
   return segments.length > 0 ? String(segments[segments.length - 1] || '').trim() : '';
+}
+
+export function extractSearchResourceType(body: any, fallbackResourceType = 'composition'): string {
+  const wrappers = [
+    ...(Array.isArray(body?.entry) ? body.entry : []),
+    ...(Array.isArray(body?.data) ? body.data : []),
+  ];
+  for (const wrapper of wrappers) {
+    const requestUrl = String(wrapper?.request?.url || '').trim();
+    if (!requestUrl) continue;
+    const target = extractSearchResourceTarget(requestUrl);
+    if (!target) continue;
+    return target.toLowerCase();
+  }
+  return String(fallbackResourceType || 'composition').trim().toLowerCase() || 'composition';
 }
 
 export function assertSearchRequestTarget(

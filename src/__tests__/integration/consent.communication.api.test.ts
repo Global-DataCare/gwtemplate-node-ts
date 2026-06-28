@@ -4,7 +4,7 @@ import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-
 import {
   HealthcareConsentActions,
   HealthcareConsentPurposes,
-} from '../../shared/healthcare-constants';
+} from 'gdc-common-utils-ts/constants/index';
 import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
 import { initializeTenantServicesConfig } from '../../utils/services';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';

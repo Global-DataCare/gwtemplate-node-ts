@@ -52,6 +52,13 @@ export class Worker {
         case 'Patient':
           manager = job.action === '$summary' ? this.managers.compositionManager : undefined;
           break;
+        case 'ResearchSubject':
+          manager = job.action === '$summary'
+            ? (job.section === 'digitaltwin'
+              ? this.managers.twinCompositionManager || this.managers.compositionManager
+              : this.managers.compositionManager)
+            : undefined;
+          break;
         case 'Organization':
           // Organization is overloaded:
           // - `registry/*/Organization` => host onboarding
@@ -77,6 +84,10 @@ export class Worker {
 	          manager = this.managers.individualManager;
 	          break;
         case 'Composition':
+          manager = job.section === 'digitaltwin'
+            ? this.managers.twinCompositionManager || this.managers.compositionManager
+            : this.managers.compositionManager;
+          break;
         case 'Bundle':
           manager = this.managers.compositionManager;
           break;

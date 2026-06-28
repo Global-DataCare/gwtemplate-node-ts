@@ -24,3 +24,12 @@ Current v2 additions introduced directly in `docs-v2/*`:
 
 - [18-organization-controller-lifecycle.md](./18-organization-controller-lifecycle.md)
 - [20-research-digital-twin-store-and-search-plan.md](./20-research-digital-twin-store-and-search-plan.md)
+  This v2 plan explicitly separates the implemented tenant medication twin MVP
+  from the proposed separate research-store rollout.
+- [21-research-digital-twin-technical-backlog.md](./21-research-digital-twin-technical-backlog.md)
+  This v2 backlog converts the digital twin plan into code-targeted work
+  streams for config, adapters, and the first explicit search contract.
+- [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)
+  This v2 contract document is the short operational read for the now-tested
+  `digitaltwin/.../Composition/_search` route, accepted parameters, and
+  section-to-resource support matrix.

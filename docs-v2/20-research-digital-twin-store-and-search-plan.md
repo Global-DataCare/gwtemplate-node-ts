@@ -15,6 +15,13 @@ Status:
 - anything marked `proposed` must not be presented as current behavior in
   OpenAPI, examples, or tests until implemented.
 
+Companion implementation backlog:
+
+- [21-research-digital-twin-technical-backlog.md](./21-research-digital-twin-technical-backlog.md)
+  This companion document maps the plan to concrete code targets such as
+  `server-config.ts`, research-store adapters, and the initial `_search`
+  contract backlog.
+
 ## Honest Current State
 
 Today GW already has:
@@ -24,7 +31,52 @@ Today GW already has:
 - research/digital twin ingestion routes using
   `digitaltwin/org.hl7.fhir.api/Composition/_batch`,
 - documentation for a push model from source tenant to authorized research
-  receiver.
+  receiver,
+- an MVP tenant-scoped digital twin mirror for `MedicationStatement` updates,
+- an MVP tenant-scoped digital twin search path that can find mirrored
+  medication twins by canonical medication text or code claims.
+
+Important architectural distinction:
+
+- `individual` operational reads are not the same thing as `digitaltwin`
+  search under another path,
+- `individual` is centered on `Communication`, `Subject/$summary`, and
+  document/section retrieval,
+- `digitaltwin` is centered on twin ingestion plus twin/cohort search and
+  should ultimately return matched twin documents (`Composition`), not just
+  matching leaf clinical resources.
+
+### Implemented today in this repository
+
+The currently implemented runtime behavior is intentionally modest:
+
+1. an operational medication update accepted for an individual can be mirrored
+   into that same tenant's `digitaltwin` scope,
+2. the mirrored twin artifact remains inside the current GW persistence plane,
+   not in a separate research database yet,
+3. the current searchable artifact family is `MedicationStatement`,
+4. the current search filters are still route/resource-specific rather than a
+   generic cross-resource research search API.
+
+For the implemented medication MVP, the practical effect is:
+
+- when an individual's medication is updated in the operational flow, the
+  tenant can update the individual's mirrored digital twin medication record,
+- the mirrored twin can then be found through
+  `digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
+- current search behavior supports exact code-style matches and case-insensitive
+  text matches over canonical medication claims such as medication text,
+  code-display, and local code text fields.
+
+This current MVP must be read as transitional runtime behavior.
+
+The target public search contract is not "search medications and return
+medications". The target contract is:
+
+- search `digitaltwin` using indexed claims derived from contained/related
+  resources,
+- return 0..n matched twin documents,
+- where each returned document represents one matched research subject / twin.
 
 Today GW does **not** yet define completely:
 
@@ -45,6 +97,13 @@ Keep three layers separate:
 3. host/operator search surface over that research store.
 
 Do not collapse them into one persistence model.
+
+Current implementation note:
+
+- the medication mirror/search MVP intentionally proves the ingestion and
+  search semantics first,
+- it does not yet satisfy the full separate-plane architecture described in
+  the rest of this document.
 
 Reasons:
 
@@ -300,7 +359,17 @@ The first version must keep search semantics explicit and testable.
 
 ### Proposed query contract
 
-The exact route is still open, but the semantics should be:
+The public route should converge on:
+
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_search`
+
+That route means:
+
+- search over indexed twin claims,
+- return matched twin documents (`Composition`),
+- not "search one leaf clinical resource type and return those leaf resources".
+
+The filter semantics should be:
 
 - `q`
   free-text search over normalized text index
@@ -334,19 +403,31 @@ Rule:
 
 Do not overload operational tenant `_search` routes for this plan.
 
+Current implementation note:
+
+- today there is a narrow tenant-scoped
+  `digitaltwin/org.hl7.fhir.api/MedicationStatement/_search` MVP,
+- that endpoint is useful as a stepping stone for medication twin discovery,
+- it must not be misdescribed as the final cross-resource or cross-tenant
+  research search contract.
+
 Recommended extension shape:
 
-- a dedicated research/digital twin search route or service namespace
+- a dedicated research/digital twin search route on `Composition/_search`
 - clearly separated from operational patient/subject summary routes
+- returning matched twin documents rather than matched leaf resources
 
-Example direction, still proposed:
+Implemented contract note:
 
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/Bundle/_search`
-- or host/operator-scoped research search route under a dedicated extension
-  namespace
+- the runtime now exposes a tested section-first
+  `digitaltwin/.../Composition/_search` contract,
+- the concise operational contract is documented in
+  [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md),
+- this plan remains the broader design/research document around separate-store
+  evolution and later multi-resource expansion.
 
-Which route wins is less important than keeping it separate from operational
-index read semantics.
+This route choice matters because the returned public artifact is intended to
+be the twin document (`Composition`) itself.
 
 ## Authorization and Governance Plan
 
@@ -390,14 +471,35 @@ This should be documented before production rollout, not after.
 - define proposed env/config names,
 - define accepted search parameter semantics.
 
-### Phase 1: separate store wiring
+### Phase 1: tenant-scoped MVP
+
+Status: implemented in part for `MedicationStatement`.
+
+- mirror accepted operational medication updates into tenant `digitaltwin`
+  scope,
+- expose one tenant-scoped digital twin medication search route,
+- support deterministic text/code matching over canonical medication claims,
+- keep the implementation inside the current GW persistence plane while the
+  separate-store contract is still being designed.
+
+This phase proves:
+
+- update propagation from operational index flow to twin scope,
+- canonical-claims search semantics for one artifact family,
+- testable behavior before introducing separate database complexity.
+
+### Phase 2: separate store wiring
+
+Status: proposed, not implemented yet.
 
 - add config parsing for `RESEARCH_STORE_*`,
 - add storage adapter abstraction for the research store,
 - persist accepted digital twin artifacts into separate research persistence,
 - keep no public search route yet.
 
-### Phase 2: normalized indexing
+### Phase 3: normalized indexing
+
+Status: proposed, not implemented yet.
 
 - implement extraction from accepted claims into:
   - artifact table
@@ -406,14 +508,18 @@ This should be documented before production rollout, not after.
 - define the allowlist for searchable claim paths
 - add deterministic normalization for code and text values
 
-### Phase 3: explicit search API
+### Phase 4: explicit search API
+
+Status: proposed, not implemented yet.
 
 - add one canonical research search endpoint,
 - document accepted filters,
 - return deterministic pagination,
 - add structured error behavior.
 
-### Phase 4: policy and audit hardening
+### Phase 5: policy and audit hardening
+
+Status: proposed, not implemented yet.
 
 - tie each stored artifact to authorization reference and derivation policy,
 - add access audit events,
@@ -444,6 +550,14 @@ The first deliverable should be modest:
 - support one explicit search endpoint,
 - keep the searchable claim allowlist short and documented.
 
+The currently implemented medication MVP is intentionally even smaller than
+that first full deliverable:
+
+- same-runtime twin mirroring instead of separate-store persistence,
+- one resource family (`MedicationStatement`) instead of a generic artifact
+  model,
+- tenant-scoped search instead of cross-tenant research search.
+
 Do **not** start with:
 
 - arbitrary JSON deep-query promises,
@@ -458,5 +572,6 @@ Until this plan is implemented, docs and API examples must continue to say:
 - GW supports digital twin ingestion,
 - GW teaches a push flow from source index tenant to authorized research
   receiver,
+- GW currently implements a tenant-scoped medication twin mirror/search MVP,
 - the separate research-store/search architecture is planned but not yet fully
   standardized in runtime configuration or public API.

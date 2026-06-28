@@ -1,5 +1,7 @@
 import { invokeExpress } from './helpers/invokeExpress';
 import { createHash } from 'crypto';
+import { readFileSync } from 'fs';
+import path from 'path';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
@@ -8,10 +10,46 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
-import { HealthcareBasicSections } from '../../shared/healthcare-constants';
+import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 import { testTenant1TenantId } from '../data/organization.data';
 
 describe('Composition Bundle _search API (integration)', () => {
+  function loadIpsAllSectionsFixture(subjectDid: string): any {
+    // Official HL7 IPS fixture used to feed individual, mirror into digitaltwin,
+    // and verify section-first `Composition/_search` behavior end to end:
+    // https://build.fhir.org/ig/HL7/fhir-ips/en/Bundle-bundle-ips-all-sections.json.html
+    const fixturePath = path.join(process.cwd(), 'src', '__tests__', 'data', 'fhir-ips-bundle-all-sections.json');
+    const bundle = JSON.parse(readFileSync(fixturePath, 'utf8'));
+    for (const entry of Array.isArray(bundle?.entry) ? bundle.entry : []) {
+      const resource = entry?.resource;
+      if (!resource || typeof resource !== 'object') continue;
+
+      if (resource?.subject?.reference) {
+        resource.subject.reference = subjectDid;
+      }
+      if (resource?.patient?.reference) {
+        resource.patient.reference = subjectDid;
+      }
+      if (resource?.medicationCodeableConcept?.coding?.[0]) {
+        resource.medicationCodeableConcept.coding[0].userSelected = true;
+        resource.medicationCodeableConcept.text ||= resource.medicationCodeableConcept.coding[0].display;
+      }
+      if (resource?.code?.coding?.[0]) {
+        resource.code.coding[0].userSelected = true;
+        resource.code.text ||= resource.code.coding[0].display;
+      }
+      if (resource?.vaccineCode?.coding?.[0]) {
+        resource.vaccineCode.coding[0].userSelected = true;
+        resource.vaccineCode.text ||= resource.vaccineCode.coding[0].display;
+      }
+      if (resource?.category?.[0]?.coding?.[0]) {
+        resource.category[0].coding[0].userSelected = true;
+        resource.category[0].text ||= resource.category[0].coding[0].display;
+      }
+    }
+    return bundle;
+  }
+
   afterEach(() => {
     resetServerConfig();
   });
@@ -536,6 +574,471 @@ describe('Composition Bundle _search API (integration)', () => {
         expect(searchPayload?.data?.[0]?.resource?.total).toBe(1);
         expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.['Communication.identifier']).toBe('comm-permission-001');
       }
+    } finally {
+      queueAdapter.stop();
+    }
+  });
+
+  it('ingests the IPS all-sections fixture through Communication and supports digitaltwin Composition/_search by section plus display/text', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.DB_PROVIDER = 'mem';
+    process.env.STORAGE_PROVIDER = 'mem';
+    process.env.QUEUE_PROVIDER = 'mem';
+    process.env.SECTORS_ALLOWED = 'health-care';
+    process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
+    process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.ORG_HOST_ID_TYPE = 'TAX';
+    process.env.ORG_HOST_ID_VALUE = 'A0011223344';
+    process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
+    process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
+    process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.JSON_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+
+    resetServerConfig();
+
+    const { app, queueAdapter, tenantManager, vaultRepository, kmsService } = await startServer({ listen: false });
+    try {
+      const hostBootstrapClaims = {
+        [ClaimsOrganizationSchemaorg.addressCountry]: process.env.ORG_HOST_JURISDICTION,
+        [ClaimsOrganizationSchemaorg.identifierType]: process.env.ORG_HOST_ID_TYPE,
+        [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
+        [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+      };
+      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
+
+      const tenantConfig = {
+        claims: tenantClaims,
+        didConfig: { service: initializeTenantServicesConfig(Sector.HEALTH_CARE) },
+        didDocument: { id: 'did:web:api.acme.org', '@context': 'https://www.w3.org/ns/did/v1' },
+      };
+
+      await kmsService.provisionKeys(tenantVaultId);
+      const secureTenantRecord = await kmsService.protectConfidentialData(
+        { id: tenantVaultId, sequence: 0, content: tenantConfig } as any,
+        'host',
+      );
+      await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
+      await tenantManager.getTenant(tenantVaultId);
+
+      const subjectDid = 'did:web:api.acme.org:individual:ips-all-sections-001';
+      const ipsBundle = loadIpsAllSectionsFixture(subjectDid);
+      const documentReference = {
+        resourceType: 'DocumentReference',
+        id: 'ips-all-sections-document-reference-001',
+        subject: { reference: subjectDid },
+        date: '2026-06-26T10:00:00Z',
+        description: 'IPS with all sections',
+        identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:ips-all-sections-document-reference-001' }],
+        content: [
+          {
+            attachment: {
+              contentType: 'application/fhir+json',
+              title: 'bundle-ips-all-sections.json',
+              data: Buffer.from(JSON.stringify(ipsBundle), 'utf8').toString('base64'),
+            },
+          },
+        ],
+      };
+
+      const submitResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'ips-all-sections-communication-001',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                resource: {
+                  resourceType: 'Communication',
+                  status: 'completed',
+                  subject: { reference: subjectDid },
+                  sent: '2026-06-26T10:00:00Z',
+                  payload: [
+                    {
+                      contentAttachment: {
+                        contentType: 'application/fhir+json',
+                        title: 'ips-document-reference.json',
+                        data: Buffer.from(JSON.stringify(documentReference), 'utf8').toString('base64'),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(submitResp.status).toBe(202);
+
+      let communicationPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'ips-all-sections-communication-001' },
+        });
+        if (pollResp.status === 200) {
+          communicationPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(communicationPayload?.data?.[0]?.response?.status).toBe('200');
+
+      const digitalTwinMedicationsSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'medications');
+      const digitalTwinObservationsSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'observations');
+      const digitalTwinCompositionSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
+      const medicationRecords = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinMedicationsSection);
+      const observationRecords = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinObservationsSection);
+      const compositionRecords = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinCompositionSection);
+      expect(medicationRecords.length).toBeGreaterThan(0);
+      expect(observationRecords.length).toBeGreaterThan(0);
+      expect(compositionRecords.some((record: any) =>
+        record['Composition.section'] === HealthcareBasicSections.HistoryOfMedicationUse.attributeValue
+        || record['org.hl7.fhir.r4.Composition.section'] === HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+      )).toBe(true);
+      expect(compositionRecords.some((record: any) =>
+        record['Composition.section'] === HealthcareBasicSections.VitalSigns.attributeValue
+        || record['org.hl7.fhir.r4.Composition.section'] === HealthcareBasicSections.VitalSigns.attributeValue,
+      )).toBe(true);
+
+      const searchCases = [
+        {
+          thid: 'ips-all-sections-med-search-001',
+          parameters: [
+            { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
+            { name: 'MedicationStatement.code-display', valueString: 'lisinopril' },
+            { name: 'MedicationStatement.code-text', valueString: 'lisinopril' },
+          ],
+        },
+        {
+          thid: 'ips-all-sections-vs-search-001',
+          parameters: [
+            { name: 'section', valueString: HealthcareBasicSections.VitalSigns.attributeValue },
+            { name: 'Observation.code-display', valueString: 'pressure' },
+            { name: 'Observation.code-text', valueString: 'pressure' },
+          ],
+        },
+      ];
+
+      for (const searchCase of searchCases) {
+        const searchResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
+          headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+          body: {
+            thid: searchCase.thid,
+            body: {
+              resourceType: 'Parameters',
+              parameter: searchCase.parameters,
+            },
+          },
+        });
+        expect(searchResp.status).toBe(202);
+
+        let searchPayload: any;
+        for (let i = 0; i < 50; i++) {
+          const pollResp = await invokeExpress(app, {
+            method: 'POST',
+            url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
+            headers: { 'content-type': 'application/json' },
+            body: { thid: searchCase.thid },
+          });
+          if (pollResp.status === 200) {
+            searchPayload = JSON.parse(pollResp.text);
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 50));
+        }
+
+        expect(searchPayload?.resourceType).toBe('Bundle');
+        expect(searchPayload?.data?.[0]?.type).toBe('Composition-search-response-v1.0');
+        expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
+        const firstMatch = searchPayload?.data?.[0]?.resource?.data?.[0];
+        expect(
+          firstMatch?.['Composition.subject']
+          || firstMatch?.['org.hl7.fhir.r4.Composition.subject']
+          || firstMatch?.meta?.claims?.['Composition.subject']
+          || firstMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'],
+        ).toBe(subjectDid);
+      }
+    } finally {
+      queueAdapter.stop();
+    }
+  });
+
+  it('materializes selected digital twins through Communication -> ResearchSubject/$summary in r4 and api formats', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.DB_PROVIDER = 'mem';
+    process.env.STORAGE_PROVIDER = 'mem';
+    process.env.QUEUE_PROVIDER = 'mem';
+    process.env.SECTORS_ALLOWED = 'health-care';
+    process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
+    process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.ORG_HOST_ID_TYPE = 'TAX';
+    process.env.ORG_HOST_ID_VALUE = 'A0011223344';
+    process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
+    process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
+    process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.JSON_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+
+    resetServerConfig();
+
+    const { app, queueAdapter, tenantManager, vaultRepository, kmsService } = await startServer({ listen: false });
+    try {
+      const hostBootstrapClaims = {
+        [ClaimsOrganizationSchemaorg.addressCountry]: process.env.ORG_HOST_JURISDICTION,
+        [ClaimsOrganizationSchemaorg.identifierType]: process.env.ORG_HOST_ID_TYPE,
+        [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
+        [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+      };
+      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
+
+      const tenantConfig = {
+        claims: tenantClaims,
+        didConfig: { service: initializeTenantServicesConfig(Sector.HEALTH_CARE) },
+        didDocument: { id: 'did:web:api.acme.org', '@context': 'https://www.w3.org/ns/did/v1' },
+      };
+
+      await kmsService.provisionKeys(tenantVaultId);
+      const secureTenantRecord = await kmsService.protectConfidentialData(
+        { id: tenantVaultId, sequence: 0, content: tenantConfig } as any,
+        'host',
+      );
+      await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
+      await tenantManager.getTenant(tenantVaultId);
+
+      const subjectDid = 'did:web:api.acme.org:individual:twin-materialization-001';
+      const ipsBundle = loadIpsAllSectionsFixture(subjectDid);
+      const documentReference = {
+        resourceType: 'DocumentReference',
+        id: 'ips-twin-materialization-document-reference-001',
+        subject: { reference: subjectDid },
+        date: '2026-06-26T10:00:00Z',
+        description: 'IPS twin materialization source',
+        identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:ips-twin-materialization-document-reference-001' }],
+        content: [
+          {
+            attachment: {
+              contentType: 'application/fhir+json',
+              title: 'bundle-ips-all-sections.json',
+              data: Buffer.from(JSON.stringify(ipsBundle), 'utf8').toString('base64'),
+            },
+          },
+        ],
+      };
+
+      const ingestResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'ips-twin-materialization-ingest-001',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                resource: {
+                  resourceType: 'Communication',
+                  status: 'completed',
+                  subject: { reference: subjectDid },
+                  sent: '2026-06-26T10:00:00Z',
+                  payload: [
+                    {
+                      contentAttachment: {
+                        contentType: 'application/fhir+json',
+                        title: 'ips-document-reference.json',
+                        data: Buffer.from(JSON.stringify(documentReference), 'utf8').toString('base64'),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(ingestResp.status).toBe(202);
+
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'ips-twin-materialization-ingest-001' },
+        });
+        if (pollResp.status === 200) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      const searchResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'ips-twin-materialization-search-001',
+          body: {
+            resourceType: 'Parameters',
+            parameter: [
+              { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
+              { name: 'MedicationStatement.code-display', valueString: 'lisinopril' },
+              { name: 'MedicationStatement.code-text', valueString: 'lisinopril' },
+            ],
+          },
+        },
+      });
+      expect(searchResp.status).toBe(202);
+
+      let searchPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'ips-twin-materialization-search-001' },
+        });
+        if (pollResp.status === 200) {
+          searchPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
+      const matchedSubject = searchPayload?.data?.[0]?.resource?.data?.[0]?.['Composition.subject']
+        || searchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.r4.Composition.subject']
+        || searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.claims?.['Composition.subject']
+        || searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'];
+      expect(matchedSubject).toBe(subjectDid);
+
+      const r4MaterializeResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'ips-twin-materialization-r4-001',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: { method: 'POST', url: 'digitaltwin/org.hl7.fhir.r4/Communication' },
+                resource: {
+                  resourceType: 'Communication',
+                  status: 'completed',
+                  subject: { reference: subjectDid },
+                  sent: '2026-06-26T11:00:00Z',
+                  payload: [
+                    {
+                      contentReference: {
+                        reference: `digitaltwin/org.hl7.fhir.r4/ResearchSubject/$summary?subject=${encodeURIComponent(subjectDid)}`,
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(r4MaterializeResp.status).toBe(202);
+
+      let r4Payload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'ips-twin-materialization-r4-001' },
+        });
+        if (pollResp.status === 200) {
+          r4Payload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(r4Payload?.data?.[0]?.type).toBe('Bundle-summary-response-v1.0');
+      expect(r4Payload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
+      expect(r4Payload?.data?.[0]?.resource?.type).toBe('document');
+      expect(r4Payload?.data?.[0]?.resource?.entry?.[0]?.fullUrl).toMatch(/^urn:uuid:/);
+      expect(r4Payload?.data?.[0]?.resource?.entry?.[0]?.resource?.resourceType).toBe('Composition');
+      expect(
+        r4Payload?.data?.[0]?.resource?.entry?.some((entry: any) => entry?.resource?.resourceType === 'MedicationStatement'),
+      ).toBe(true);
+      expect(
+        r4Payload?.data?.[0]?.resource?.entry?.some((entry: any) => entry?.resource?.resourceType === 'Observation'),
+      ).toBe(true);
+
+      const apiMaterializeResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'ips-twin-materialization-api-001',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              {
+                request: { method: 'POST', url: 'digitaltwin/org.hl7.fhir.api/Communication' },
+                resource: {
+                  resourceType: 'Communication',
+                  status: 'completed',
+                  subject: { reference: subjectDid },
+                  sent: '2026-06-26T11:05:00Z',
+                  payload: [
+                    {
+                      contentReference: {
+                        reference: `digitaltwin/org.hl7.fhir.api/ResearchSubject/$summary?subject=${encodeURIComponent(subjectDid)}`,
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(apiMaterializeResp.status).toBe(202);
+
+      let apiPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'ips-twin-materialization-api-001' },
+        });
+        if (pollResp.status === 200) {
+          apiPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(apiPayload?.data?.[0]?.type).toBe('Bundle-summary-response-v1.0');
+      expect(apiPayload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
+      expect(apiPayload?.data?.[0]?.resource?.entry?.[0]?.fullUrl).toMatch(/^urn:uuid:/);
+      const apiMedicationEntry = apiPayload?.data?.[0]?.resource?.entry
+        ?.find((entry: any) => entry?.resource?.resourceType === 'MedicationStatement');
+      expect(Object.keys(apiMedicationEntry.resource).sort()).toEqual(['id', 'meta', 'resourceType']);
+      expect(apiMedicationEntry.resource.meta.claims).toBeDefined();
+      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.subject']).toBe(subjectDid);
     } finally {
       queueAdapter.stop();
     }
