@@ -35,6 +35,19 @@ Default local channels:
 - local backend env is generated for GW CORE
 - `consentaccess-sc` is installed, approved, and committed on
   `health-care-local`
+- the identity-ledger contracts are installed, approved, and committed on
+  `identity-local`:
+  - `organization-sc`
+  - `cryptographickey-sc`
+  - `employee-sc`
+  - `evidence-sc`
+  - `credential-sc`
+  - `artifact-sc`
+  - `artifactevent-sc`
+  - `subjectkeybinding-sc`
+- GW CORE can register hosted tenant organizations on `identity-local`
+- GW CORE can register hosted tenant public keys on `cryptographickey-sc`
+- GW CORE can register subject-to-key bindings on `subjectkeybinding-sc`
 - GW CORE can create and update consent state that is reflected on-chain
 - canonical local consent lifecycle history grows as expected:
   - activate -> revision `1`
@@ -52,7 +65,7 @@ Default local channels:
 
 ## What Is Not Yet Proven By The Packaged Wrapper
 
-- identity/public-key lifecycle traceability on `identity-local`
+- identity artifact/evidence writeback from ICA `_verify`
 - a one-command `compat/legacy` local audited wrapper
 - a one-command `strict` local audited wrapper
 - deterministic keypair generation tied to a published audited compat script
@@ -60,6 +73,13 @@ Default local channels:
 - ML-DSA signed transport proof
 - digital twin search embedded into the same packaged closeout lifecycle
 - hard delete of consent state as the canonical on-chain lifecycle outcome
+
+Residual query gap:
+
+- direct reads of `cryptographickey-sc` and `subjectkeybinding-sc` are proven
+- the current `listKeysByOrg` query path still returns an empty list for
+  `urn:gdc:...` tenant ids and should be treated as a follow-up query/index bug,
+  not as missing onboarding writes
 
 The missing identity part is now specified in:
 

@@ -33,6 +33,8 @@ This folder is intentionally separate from `docs-v2/`.
 | Local Fabric multi-channel devnet | Done | `identity-local` + `health-care-local` validated |
 | Local `consentaccess-sc` lifecycle through GW CORE | Done | `activate -> revoke -> reactivate` validated on-chain |
 | Identity/public-key traceability contract design | Done | documented in `docs-internal/03-identity-ledger-contract-plan.md` |
+| `identity-local` audited smart-contract deployment flow | Done | `organization-sc`, `cryptographickey-sc`, `subjectkeybinding-sc`, `artifact-sc`, `artifactevent-sc`, `employee-sc`, `evidence-sc`, and `credential-sc` deploy and commit locally |
+| GW CORE onboarding writes to identity ledger | Done | tenant organization, cryptographic keys, and subject-key bindings validated on `identity-local` |
 | Canonical local demo individual bootstrap | Done | default alias remains `Doraemon` |
 | Wrapper command for newbie/auditor demo | Done | `npm run project:audit:demo` |
 | Internal traceability docs separate from `docs-v2` | Done | this `docs-internal/` folder |
@@ -40,7 +42,6 @@ This folder is intentionally separate from `docs-v2/`.
 | Exact current-state traceability note | Done | `docs-internal/02-current-state-traceability.md` |
 | `compat/legacy` packaged end-to-end runner | Pending | SDK/GW path exists conceptually, but this repo does not yet expose one audited single-command local wrapper |
 | `strict` packaged end-to-end runner | Pending | no audited local single-command path yet |
-| `identity-local` audited smart-contract deployment flow | Pending | organization/employee/key contracts exist, but the missing `subjectkeybinding-sc` plus GW wiring are not yet packaged and validated |
 | Deterministic keypair proof in closeout runbook | Pending | must be tied to the concrete compat runner, not documented aspirationally |
 | ML-KEM / ML-DSA strict transport/signature proof | Pending | target capability, not closeout evidence today |
 | Digital twin search inside the main closeout lifecycle | Pending | separate capability exists, but not yet folded into the canonical demo wrapper |
@@ -66,10 +67,11 @@ The minimum evidence package should contain:
 
 - `compat/legacy` is not yet packaged here as a one-command audited local flow.
 - `strict` is not yet packaged here as a one-command audited local flow.
-- `identity-local` still lacks the audited end-to-end smart-contract proof for
-  subject/key binding lifecycle.
 - Post-quantum transport/signature evidence is not yet demonstrated by this
   repository alone.
 - Digital twin search is not yet part of the canonical local closeout wrapper.
 - Current consent lifecycle proof is revocation/reactivation based. It is not a
   hard-delete lifecycle proof.
+- `cryptographickey-sc` direct reads are proven, but the current
+  `listKeysByOrg` query helper still needs follow-up for `urn:gdc:...`
+  organization ids.

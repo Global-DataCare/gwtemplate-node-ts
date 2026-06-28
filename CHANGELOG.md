@@ -27,6 +27,34 @@
   - newbie/auditor runbook
   - current-state traceability note
   - identity/artifact ledger contract plan for the next branch
+- Added audited local deployment support for the identity-ledger contracts on
+  `identity-local`, including:
+  - `organization-sc`
+  - `cryptographickey-sc`
+  - `employee-sc`
+  - `evidence-sc`
+  - `credential-sc`
+  - `artifact-sc`
+  - `artifactevent-sc`
+  - `subjectkeybinding-sc`
+- Added initial GW CORE identity-ledger onboarding wiring for organization
+  registration:
+  - organization writes to `organization-sc`
+  - public-key writes to `cryptographickey-sc`
+  - subject-to-key writes to `subjectkeybinding-sc`
+  - onboarding PDF/hash artifact writes to `artifact-sc` / `artifactevent-sc`
+- Added unit coverage for the new `HostingManager` identity-ledger wiring,
+  including the fallback path when a JWK thumbprint is unavailable.
+- Added `consentaccess`-style modular `lib/` layouts plus exhaustive JS test
+  coverage for the active identity/artifact ledger chaincodes:
+  - `organization-sc-javascript`
+  - `cryptographickey-sc-javascript`
+  - `artifact-sc-javascript`
+  - `artifactevent-sc-javascript`
+  - `subjectkeybinding-sc-javascript`
+  Each now ships with separated `constants`, `utils`, `exists`, `read`,
+  `write`, `history`, asset builder, contract tests, and helper/lib tests at
+  `100%` statements/branches/functions/lines.
 
 ### Changed
 - Local Fabric defaults now use explicit local channel names for
@@ -53,6 +81,26 @@
   The gateway still keeps a small local fallback layer for IPS summary
   sections and GW-specific response/index taxonomies that are not yet
   published upstream.
+- `scripts/bootstrap-local-fabric-stack.mjs` now deploys the identity
+  chaincodes before `consentaccess-sc` and `--restart-gw` now always closes any
+  process listening on `:3000`, not just the tracked PID file.
+- `scripts/prepare-consentaccess-local-fabric-env.sh` now enables the generic
+  identity ledger path in `.env.local-fabric` and exports the explicit
+  chaincode names used by `HostingManager`.
+- The Fabric devnet deploy helpers now support staging chaincode sources from
+  the sibling `gwtemplate-node-ts` repo into the devnet workspace, which makes
+  the audited local multi-repo lifecycle reproducible from a clean clone.
+- `organization-sc` now stores the canonical ICA-issued organization VC plus
+  `meta.audit`, and no longer persists parallel `governanceVc`,
+  `selfDescriptionVc`, `evidence`, `metadata`, or hosted-DID routing noise in
+  the organization asset itself.
+- `artifact-sc`, `artifactevent-sc`, and `subjectkeybinding-sc` now write
+  free-form payload extensions under `meta.attributes` instead of a parallel
+  top-level `metadata` bag, while keeping legacy-read compatibility for older
+  stored assets.
+- `src/blockchain/fabric/v3/manageAsset*.ts` wrappers now carry JSDoc that
+  clarifies their role as semantic aliases over generic Fabric `submit(...)`
+  calls instead of hidden special execution paths.
 
 ## [1.17.0] - 2026-06-27
 

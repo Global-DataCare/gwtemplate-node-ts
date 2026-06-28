@@ -2,7 +2,6 @@
 // File: src/managers/HostingManager.ts
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
-import { createHash } from 'crypto';
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 import { IServerConfig } from '../config';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
@@ -50,12 +49,6 @@ import { buildGatewayInvoiceBundle } from '../utils/invoice-bundle';
 import { verifyOrderPaymentConfirmation } from '../utils/payment-confirmation';
 import { buildPdfSignatureEvidence, PdfSignatureEvidence } from '../utils/pdf-evidence';
 import { getPersonOccupationClaim } from '../utils/occupation';
-import { ManageAssetOrganization } from '../blockchain/fabric/v3/manageAssetOrganization';
-import { ManageAssetArtifact } from '../blockchain/fabric/v3/manageAssetArtifact';
-import { ManageAssetArtifactEvent } from '../blockchain/fabric/v3/manageAssetArtifactEvent';
-import { ManageAssetCryptographicKey } from '../blockchain/fabric/v3/manageAssetCryptographicKey';
-import { ManageAssetSubjectKeyBinding } from '../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
-import { resolveIdentityChannel } from '../utils/ledger';
 import { slugFromDomain } from '../utils/slug';
 import { getEnvSectionId } from '../utils/section-env';
 import { normalizeIndexedEmail, splitIndexedEmails, splitIndexedPhones } from '../utils/indexed-contact';
@@ -90,6 +83,7 @@ import {
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
+import { registerOrganizationOnLedger } from '../utils/ledger-organization-registration';
 import { OrganizationDidBindingEntryTypes } from 'gdc-common-utils-ts/utils/organization-did-binding';
 import {
   DIDCOMM_DEFAULT_ACCEPT_HEADER,
@@ -2482,7 +2476,12 @@ export class HostingManager {
 
     if (this.isLedgerRegistrationEnabled()) {
       const serviceEvidence = this.extractServiceEvidence(processedService);
-      await this.registerOrganizationOnLedger({
+      await registerOrganizationOnLedger({
+        ledgerConfig: this.config.ledger,
+        hostJurisdiction: this.config.host.jurisdiction,
+        namespace: this.config.namespace,
+        hostExternalDomain: this.config.hostExternalDomain,
+        logger: this.logger,
         orgId: (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] || tenantUrn,
         organization,
         config: finalTenantConfig,
@@ -2915,7 +2914,12 @@ export class HostingManager {
 
     if (this.isLedgerRegistrationEnabled()) {
       const serviceEvidence = this.extractServiceEvidence(containedService || service);
-      await this.registerOrganizationOnLedger({
+      await registerOrganizationOnLedger({
+        ledgerConfig: this.config.ledger,
+        hostJurisdiction: this.config.host.jurisdiction,
+        namespace: this.config.namespace,
+        hostExternalDomain: this.config.hostExternalDomain,
+        logger: this.logger,
         orgId: tenantUrn,
         organization,
         config: finalTenantConfig,
@@ -3402,7 +3406,12 @@ export class HostingManager {
       const containedService = this.extractContainedService(contained);
       const serviceEvidence = this.extractServiceEvidence(containedService);
       const orgId = (allClaims as any)[ClaimsOrganizationSchemaorg.identifier] || org.id;
-      await this.registerOrganizationOnLedger({
+      await registerOrganizationOnLedger({
+        ledgerConfig: this.config.ledger,
+        hostJurisdiction: this.config.host.jurisdiction,
+        namespace: this.config.namespace,
+        hostExternalDomain: this.config.hostExternalDomain,
+        logger: this.logger,
         orgId,
         organization: org,
         config: hostConfig,
@@ -3991,225 +4000,6 @@ export class HostingManager {
     const evidence = verification?.evidence;
     if (!evidence) return undefined;
     return Array.isArray(evidence) ? evidence : [evidence];
-  }
-
-  private async registerOrganizationOnLedger(params: {
-    orgId: string;
-    organization: IncludedResource;
-    config: OrganizationConfig;
-    evidence?: PdfSignatureEvidence[];
-    role: 'host' | 'tenant';
-    sector: Sector;
-    jurisdiction?: string;
-  }): Promise<void> {
-    const mspId = this.config.ledger?.mspId || process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_ORG1;
-    if (!mspId) {
-      throw new ManagerError('Ledger MSP ID is missing. Set LEDGER_MSP_ID.', IssueType.Exception);
-    }
-    const chaincodeName = this.config.ledger?.chaincodeName || process.env.LEDGER_ORG_CHAINCODE;
-    const channelName = this.config.ledger?.channelName
-      || resolveIdentityChannel(params.jurisdiction || this.config.host.jurisdiction);
-    const manager = new ManageAssetOrganization({ chaincodeName, channelName });
-
-    const payload = {
-      orgId: params.orgId,
-      schemaUrl: this.config.ledger?.schemaUrl,
-      governanceVc: params.config.governanceVc,
-      selfDescriptionVc: params.config.selfDescriptionVc,
-      evidence: params.evidence,
-      keys: params.config.didDocument?.verificationMethod,
-      metadata: {
-        role: params.role,
-        sector: params.sector,
-        namespace: this.config.namespace,
-        host: this.config.hostExternalDomain,
-        organization: params.organization?.meta?.claims?.[ClaimsOrganizationSchemaorg.alternateName],
-      },
-    };
-
-    try {
-      await manager.createOrganization(mspId, params.orgId, payload);
-      await this.registerOrganizationKeysOnLedger({
-        mspId,
-        channelName,
-        orgId: params.orgId,
-        didDocumentId: params.config.didDocument?.id,
-        verificationMethods: params.config.didDocument?.verificationMethod,
-      });
-      await this.registerOrganizationArtifactsOnLedger({
-        mspId,
-        channelName,
-        orgId: params.orgId,
-        role: params.role,
-        evidence: params.evidence,
-      });
-    } catch (error: any) {
-      const message = String(error?.message || error);
-      if (message.includes('EvidenceAlreadyRegistered')) {
-        throw new ManagerError('Evidence already registered for another organization.', IssueType.Conflict);
-      }
-      if (message.includes('already exists')) {
-        throw new ManagerError('Organization already registered on ledger.', IssueType.Conflict);
-      }
-      throw new ManagerError(`Ledger registration failed: ${message}`, IssueType.Exception);
-    }
-  }
-
-  private async registerOrganizationKeysOnLedger(params: {
-    mspId: string;
-    channelName: string;
-    orgId: string;
-    didDocumentId?: string;
-    verificationMethods?: VerificationMethod[];
-  }): Promise<void> {
-    const methods = Array.isArray(params.verificationMethods) ? params.verificationMethods : [];
-    if (methods.length === 0) return;
-
-    const keyManager = new ManageAssetCryptographicKey({
-      chaincodeName: process.env.LEDGER_CRYPTOGRAPHIC_KEY_CHAINCODE || 'cryptographickey-sc',
-      channelName: params.channelName,
-    });
-    const bindingManager = new ManageAssetSubjectKeyBinding({
-      chaincodeName: process.env.LEDGER_SUBJECT_KEY_BINDING_CHAINCODE || 'subjectkeybinding-sc',
-      channelName: params.channelName,
-    });
-
-    for (const method of methods) {
-      const publicKeyJwk = method?.publicKeyJwk as PublicJwk | undefined;
-      if (!publicKeyJwk) continue;
-      const thumbprint = this.tryGetJwkThumbprint(publicKeyJwk);
-      if (!thumbprint) continue;
-      const keyId = thumbprint;
-      const use = String((publicKeyJwk as any)?.use || '').trim() || this.inferJwkUse(publicKeyJwk);
-      const relationship = use === 'enc' ? 'organization-encryption' : 'organization-signing';
-
-      const keyPayload = {
-        keyId,
-        orgId: params.orgId,
-        kid: publicKeyJwk.kid,
-        thumbprint,
-        kty: publicKeyJwk.kty,
-        crv: (publicKeyJwk as any).crv,
-        alg: (publicKeyJwk as any).alg,
-        use,
-        purpose: relationship,
-        status: 'active',
-        origin: 'did:web',
-      };
-
-      try {
-        await keyManager.registerKey(params.mspId, keyId, keyPayload);
-      } catch (error: any) {
-        const message = String(error?.message || error);
-        if (!message.includes('already exists')) throw error;
-      }
-
-      const bindingId = `organization_${params.orgId}__${keyId}`;
-      await bindingManager.upsertSubjectKeyBinding(params.mspId, bindingId, {
-        bindingId,
-        subjectType: 'organization',
-        subjectId: params.orgId,
-        parentOrgId: params.orgId,
-        keyId,
-        relationship,
-        status: 'active',
-        metadata: {
-          did: params.didDocumentId,
-          verificationMethodId: method?.id,
-          kid: publicKeyJwk.kid,
-        },
-      });
-    }
-  }
-
-  private async registerOrganizationArtifactsOnLedger(params: {
-    mspId: string;
-    channelName: string;
-    orgId: string;
-    role: 'host' | 'tenant';
-    evidence?: PdfSignatureEvidence[];
-  }): Promise<void> {
-    const evidenceList = Array.isArray(params.evidence) ? params.evidence : [];
-    if (evidenceList.length === 0) return;
-
-    const artifactManager = new ManageAssetArtifact({
-      chaincodeName: process.env.LEDGER_ARTIFACT_CHAINCODE || 'artifact-sc',
-      channelName: params.channelName,
-    });
-    const eventManager = new ManageAssetArtifactEvent({
-      chaincodeName: process.env.LEDGER_ARTIFACT_EVENT_CHAINCODE || 'artifactevent-sc',
-      channelName: params.channelName,
-    });
-
-    for (const evidence of evidenceList) {
-      const signedDigest = evidence?.digest?.find((item) => item?.type === 'SignedDocumentHash');
-      const unsignedDigest = evidence?.digest?.find((item) => item?.type === 'DocumentHash');
-      const signedHash = signedDigest?.hashValue;
-      const signedAlg = String(signedDigest?.hashAlg || 'SHA256').toLowerCase();
-      if (!signedHash) continue;
-
-      const artifactId = `artifact_${signedAlg}_${signedHash}`;
-      await artifactManager.upsertArtifact(params.mspId, artifactId, {
-        artifactId,
-        hash: signedHash,
-        hashAlg: signedAlg,
-        artifactType: 'pdf',
-        declaredBy: params.orgId,
-        declaredByType: params.role,
-        status: 'declared',
-        metadata: {
-          unsignedDocumentHash: unsignedDigest?.hashValue,
-          unsignedDocumentHashAlg: unsignedDigest?.hashAlg,
-          signatureType: evidence?.signature?.type,
-        },
-      });
-
-      const eventHashSource = JSON.stringify(evidence);
-      const eventId = `${artifactId}__signature-observed-${this.hashString(eventHashSource).slice(0, 24)}`;
-      try {
-        await eventManager.createArtifactEvent(params.mspId, eventId, {
-          eventId,
-          artifactId,
-          eventType: 'declaration',
-          eventSubType: 'pdf-signature-observed',
-          actor: params.orgId,
-          actorType: params.role,
-          status: 'active',
-          artifactHash: signedHash,
-          artifactHashAlg: signedAlg,
-          evidenceHash: this.hashString(eventHashSource),
-          evidenceHashAlg: 'sha256',
-          metadata: {
-            x5cLength: Array.isArray(evidence?.x5c) ? evidence.x5c.length : 0,
-            signatureType: evidence?.signature?.type,
-          },
-        });
-      } catch (error: any) {
-        const message = String(error?.message || error);
-        if (!message.includes('already exists')) throw error;
-      }
-    }
-  }
-
-  private tryGetJwkThumbprint(jwk?: PublicJwk): string | undefined {
-    if (!jwk) return undefined;
-    try {
-      return toJwkThumbprintSha256Urn(jwk);
-    } catch {
-      return undefined;
-    }
-  }
-
-  private inferJwkUse(jwk: PublicJwk): 'sig' | 'enc' {
-    const explicitUse = String((jwk as any)?.use || '').trim().toLowerCase();
-    if (explicitUse === 'enc') return 'enc';
-    const alg = String((jwk as any)?.alg || '').trim().toUpperCase();
-    if (alg.startsWith('ECDH') || alg.startsWith('ML-KEM')) return 'enc';
-    return 'sig';
-  }
-
-  private hashString(input: string): string {
-    return createHash('sha256').update(input).digest('hex');
   }
 
   private extractResources(claims: ClaimsRecord, environment?: string) {

@@ -56,6 +56,18 @@ export class ManageAsset {
     return JSON.parse(text) as T;
   }
 
+  /**
+   * Submits one explicit transaction function to the target chaincode.
+   *
+   * Higher-level wrappers such as `registerKey(...)` or `upsertArtifact(...)`
+   * are only semantic aliases over this method. They do not add extra Fabric
+   * behavior; they simply fix the chaincode function name and serialize the
+   * payload JSON for the caller.
+   *
+   * Use a domain-specific wrapper when one exists so the intent stays obvious
+   * in manager code. Fall back to `submit(...)` only for uncommon or
+   * temporary chaincode operations that do not yet have a dedicated helper.
+   */
   public async submit(mspId: string, fnName: string, ...args: string[]): Promise<object> {
     const result = await this.withContract(mspId, async ({ contract }) => {
       const proposal = contract.newProposal(fnName, {
@@ -69,6 +81,12 @@ export class ManageAsset {
     return this.parseJson<object>(result);
   }
 
+  /**
+   * Evaluates the default read function for the asset family.
+   *
+   * By convention this resolves to `read${ItemType}` unless a subclass
+   * overrides the mapping for legacy or irregular chaincode names.
+   */
   public async read(mspId: string, assetId: string): Promise<object> {
     const result = await this.withContract(mspId, async ({ contract }) => {
       return contract.evaluateTransaction(this.getReadFunction(), assetId);
@@ -76,6 +94,12 @@ export class ManageAsset {
     return this.parseJson<object>(result);
   }
 
+  /**
+   * Evaluates the default history function for the asset family.
+   *
+   * By convention this resolves to `get${ItemType}History` unless a subclass
+   * overrides the mapping for legacy or irregular chaincode names.
+   */
   public async history(mspId: string, assetId: string): Promise<object[]> {
     const result = await this.withContract(mspId, async ({ contract }) => {
       return contract.evaluateTransaction(this.getHistoryFunction(), assetId);

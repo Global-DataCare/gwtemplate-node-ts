@@ -15,6 +15,7 @@ import {
 } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { getEnvSectionId } from '../../../utils/section-env';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
@@ -43,6 +44,12 @@ jest.unstable_mockModule('uuid', () => uuidMock);
 
 const { v4: uuidv4, validate: uuidValidate } = await import('uuid');
 const { HostingManager } = await import('../../../managers/HostingManager');
+const { ManageAssetOrganization } = await import('../../../blockchain/fabric/v3/manageAssetOrganization');
+const { ManageAssetCryptographicKey } = await import('../../../blockchain/fabric/v3/manageAssetCryptographicKey');
+const { ManageAssetSubjectKeyBinding } = await import('../../../blockchain/fabric/v3/manageAssetSubjectKeyBinding');
+const { ManageAssetArtifact } = await import('../../../blockchain/fabric/v3/manageAssetArtifact');
+const { ManageAssetArtifactEvent } = await import('../../../blockchain/fabric/v3/manageAssetArtifactEvent');
+const { registerOrganizationOnLedger } = await import('../../../utils/ledger-organization-registration');
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
   upload: jest.fn(),
@@ -147,6 +154,7 @@ describe('HostingManager', () => {
       demoAllowInsecureBearer: true,
       nodeEnv: 'test',
       port: 3000,
+      maxHeaderSize: 16384,
       apiHostname: 'testhost',
       hostExternalDomain: 'testhost.com',
       apiBaseUrl: 'http://testhost:3000',
@@ -285,6 +293,236 @@ describe('HostingManager', () => {
     expect(createVaultSpy).not.toHaveBeenCalled();
     // Keys are not provisioned until the order is processed.
     expect(mockKmsService.provisionKeys).not.toHaveBeenCalledWith(tenantVaultId);
+  });
+
+  it('[ledger] registers organization, keys, bindings and artifacts on identity-local', async () => {
+    mockConfig.ledger = {
+      enabled: true,
+      mspId: 'Org1MSP',
+      chaincodeName: 'organization-sc',
+      schemaUrl: 'https://schema.example.org/organization',
+    };
+    const createOrganizationSpy = jest.spyOn(ManageAssetOrganization.prototype, 'createOrganization').mockResolvedValue({} as any);
+    const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
+    const upsertBindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
+    const upsertArtifactSpy = jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
+    const createArtifactEventSpy = jest.spyOn(ManageAssetArtifactEvent.prototype, 'createArtifactEvent').mockResolvedValue({} as any);
+
+    const signingJwk = {
+      kid: 'sig-key-1',
+      kty: 'EC',
+      crv: 'P-256',
+      x: 'f83OJ3D2xF4nA6J9x6fW3f0r0nD2wU6s5n4b3a2Z1YQ',
+      y: 'x_FEzRu9QkMNFcM8Qk4HkncNHNrF4Pjk6HoydxHDB6Q',
+      use: 'sig',
+      alg: 'ES256',
+    } as any;
+    const encryptionJwk = {
+      kid: 'enc-key-1',
+      kty: 'EC',
+      crv: 'P-256',
+      x: '2hJf4nA6J9x6fW3f0r0nD2wU6s5n4b3a2Z1YQf83OJ3',
+      y: '7hJf4nA6J9x6fW3f0r0nD2wU6s5n4b3a2Z1YQf83OJ3',
+      use: 'enc',
+      alg: 'ECDH-ES',
+    } as any;
+    const signedHash = 'signed-pdf-hash-001';
+    const unsignedHash = 'unsigned-pdf-hash-001';
+
+    await registerOrganizationOnLedger({
+      ledgerConfig: mockConfig.ledger,
+      hostJurisdiction: mockConfig.host.jurisdiction,
+      namespace: mockConfig.namespace,
+      hostExternalDomain: mockConfig.hostExternalDomain,
+      logger: mockLogger,
+      orgId: 'acme-id',
+      organization: {
+        id: 'urn:test:org:acme-id',
+        type: 'Organization',
+        meta: {
+          claims: {
+            [ClaimsOrganizationSchemaorg.alternateName]: 'acme-id',
+          },
+        },
+      } as any,
+      config: {
+        governanceVc: { id: 'urn:vc:governance:1' } as any,
+        selfDescriptionVc: { id: 'urn:vc:self-description:1' } as any,
+        didDocument: {
+          id: 'did:web:api.acme.org',
+          verificationMethod: [
+            { id: 'did:web:api.acme.org#sig-key-1', publicKeyJwk: signingJwk as any },
+            { id: 'did:web:api.acme.org#enc-key-1', publicKeyJwk: encryptionJwk as any },
+          ],
+        },
+      } as any,
+      evidence: [{
+        digest: [
+          { type: 'DocumentHash', hashAlg: 'SHA256', hashValue: unsignedHash },
+          { type: 'SignedDocumentHash', hashAlg: 'SHA256', hashValue: signedHash },
+        ],
+        signature: { type: 'pdf-pades', signatureValue: 'mock-signature' },
+        x5c: ['leaf-cert', 'issuer-cert'],
+      }] as any,
+      role: 'tenant',
+      sector: Sector.HEALTH_CARE,
+      jurisdiction: 'ES',
+    });
+
+    expect(createOrganizationSpy).toHaveBeenCalledTimes(1);
+    expect(createOrganizationSpy).toHaveBeenCalledWith('Org1MSP', 'acme-id', expect.objectContaining({
+      orgId: 'acme-id',
+      vc: expect.objectContaining({
+        id: 'urn:vc:governance:1',
+      }),
+    }));
+
+    const signingThumbprint = toJwkThumbprintSha256Urn(signingJwk as any);
+    const encryptionThumbprint = toJwkThumbprintSha256Urn(encryptionJwk as any);
+
+    expect(registerKeySpy).toHaveBeenCalledTimes(2);
+    expect(registerKeySpy).toHaveBeenNthCalledWith(1, 'Org1MSP', signingThumbprint, expect.objectContaining({
+      keyId: signingThumbprint,
+      orgId: 'acme-id',
+      kid: 'sig-key-1',
+      use: 'sig',
+      purpose: 'organization-signing',
+    }));
+    expect(registerKeySpy).toHaveBeenNthCalledWith(2, 'Org1MSP', encryptionThumbprint, expect.objectContaining({
+      keyId: encryptionThumbprint,
+      orgId: 'acme-id',
+      kid: 'enc-key-1',
+      use: 'enc',
+      purpose: 'organization-encryption',
+    }));
+
+    expect(upsertBindingSpy).toHaveBeenCalledTimes(2);
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Org1MSP', `organization_acme-id__${signingThumbprint}`, expect.objectContaining({
+      subjectType: 'organization',
+      subjectId: 'acme-id',
+      keyId: signingThumbprint,
+      relationship: 'organization-signing',
+      status: 'active',
+    }));
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Org1MSP', `organization_acme-id__${encryptionThumbprint}`, expect.objectContaining({
+      subjectType: 'organization',
+      subjectId: 'acme-id',
+      keyId: encryptionThumbprint,
+      relationship: 'organization-encryption',
+      status: 'active',
+    }));
+
+    expect(upsertArtifactSpy).toHaveBeenCalledTimes(1);
+    expect(upsertArtifactSpy).toHaveBeenCalledWith('Org1MSP', `artifact_sha256_${signedHash}`, expect.objectContaining({
+      artifactId: `artifact_sha256_${signedHash}`,
+      hash: signedHash,
+      hashAlg: 'sha256',
+      artifactType: 'pdf',
+      declaredBy: 'acme-id',
+      declaredByType: 'tenant',
+      status: 'declared',
+      meta: expect.objectContaining({
+        attributes: expect.objectContaining({
+          unsignedDocumentHash: unsignedHash,
+          signatureType: 'pdf-pades',
+        }),
+      }),
+    }));
+
+    expect(createArtifactEventSpy).toHaveBeenCalledTimes(1);
+    expect(createArtifactEventSpy).toHaveBeenCalledWith('Org1MSP', expect.stringContaining(`artifact_sha256_${signedHash}__signature-observed-`), expect.objectContaining({
+      artifactId: `artifact_sha256_${signedHash}`,
+      eventType: 'declaration',
+      eventSubType: 'pdf-signature-observed',
+      actor: 'acme-id',
+      actorType: 'tenant',
+      artifactHash: signedHash,
+      artifactHashAlg: 'sha256',
+      status: 'active',
+    }));
+  });
+
+  it('[ledger] falls back to verificationMethod id when a JWK thumbprint is unavailable', async () => {
+    mockConfig.ledger = {
+      enabled: true,
+      mspId: 'Org1MSP',
+      chaincodeName: 'organization-sc',
+      schemaUrl: 'https://schema.example.org/organization',
+    };
+    jest.spyOn(ManageAssetOrganization.prototype, 'createOrganization').mockResolvedValue({} as any);
+    const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
+    const upsertBindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetArtifactEvent.prototype, 'createArtifactEvent').mockResolvedValue({} as any);
+    await registerOrganizationOnLedger({
+      ledgerConfig: mockConfig.ledger,
+      hostJurisdiction: mockConfig.host.jurisdiction,
+      namespace: mockConfig.namespace,
+      hostExternalDomain: mockConfig.hostExternalDomain,
+      logger: mockLogger,
+      orgId: 'urn:test:org:fallback',
+      organization: {
+        id: 'urn:test:org:fallback',
+        type: 'Organization',
+        meta: {
+          claims: {
+            [ClaimsOrganizationSchemaorg.alternateName]: 'fallback-org',
+          },
+        },
+      } as any,
+      config: {
+        governanceVc: { id: 'urn:vc:governance:fallback' } as any,
+        didDocument: {
+          id: 'did:web:fallback.example.org',
+          verificationMethod: [
+            {
+              id: 'did:web:fallback.example.org#sig-akp',
+              publicKeyJwk: {
+                kid: 'sig-akp',
+                use: 'sig',
+              } as any,
+            },
+            {
+              id: 'did:web:fallback.example.org#enc-okp',
+              publicKeyJwk: {
+                kid: 'enc-okp',
+                use: 'enc',
+              } as any,
+            },
+          ],
+        },
+      } as any,
+      role: 'tenant',
+      sector: Sector.HEALTH_CARE,
+      jurisdiction: 'ES',
+    });
+
+    expect(registerKeySpy).toHaveBeenNthCalledWith(1, 'Org1MSP', 'did:web:fallback.example.org#sig-akp', expect.objectContaining({
+      keyId: 'did:web:fallback.example.org#sig-akp',
+      kid: 'sig-akp',
+      thumbprint: undefined,
+    }));
+    expect(registerKeySpy).toHaveBeenNthCalledWith(2, 'Org1MSP', 'did:web:fallback.example.org#enc-okp', expect.objectContaining({
+      keyId: 'did:web:fallback.example.org#enc-okp',
+      kid: 'enc-okp',
+      thumbprint: undefined,
+    }));
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Org1MSP', 'organization_urn:test:org:fallback__did:web:fallback.example.org#sig-akp', expect.objectContaining({
+      keyId: 'did:web:fallback.example.org#sig-akp',
+      meta: expect.objectContaining({
+        attributes: expect.objectContaining({
+          thumbprintMissing: true,
+        }),
+      }),
+    }));
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Org1MSP', 'organization_urn:test:org:fallback__did:web:fallback.example.org#enc-okp', expect.objectContaining({
+      keyId: 'did:web:fallback.example.org#enc-okp',
+      meta: expect.objectContaining({
+        attributes: expect.objectContaining({
+          thumbprintMissing: true,
+        }),
+      }),
+    }));
   });
 
   it('[5.1 TENANT] derives alternateName from identifier.value for legal organizations when omitted', async () => {
