@@ -7,6 +7,10 @@ export class ManageAssetCryptographicKey extends ManageAsset {
   constructor(options?: { chaincodeName?: string; channelName?: string }) {
     super('cryptographicKey', options);
   }
+
+  public async registerKey(mspId: string, keyId: string, payload: object): Promise<object> {
+    return this.submit(mspId, 'RegisterKey', keyId, JSON.stringify(payload));
+  }
 }
 
 export const manageAssetCryptographicKey = new ManageAssetCryptographicKey();
