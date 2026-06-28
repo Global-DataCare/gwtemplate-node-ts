@@ -46,6 +46,7 @@ This folder is intentionally separate from `docs-v2/`.
 | ML-KEM / ML-DSA strict transport/signature proof | Pending | target capability, not closeout evidence today |
 | Digital twin search inside the main closeout lifecycle | Pending | separate capability exists, but not yet folded into the canonical demo wrapper |
 | Formal closeout acceptance checklist signed against artifacts | Pending | should reference exact log and test outputs |
+| Local devnet fully vendored into `gwtemplate-node-ts` | Pending | local wrappers already live here, but the underlying Fabric devnet still comes from `../fabric-multicloud/devnet/fabric-v3` |
 
 ## Mandatory Evidence For Project Closure
 
@@ -75,3 +76,65 @@ The minimum evidence package should contain:
 - `cryptographickey-sc` direct reads are proven, but the current
   `listKeysByOrg` query helper still needs follow-up for `urn:gdc:...`
   organization ids.
+
+## TODO: Local Devnet Extraction
+
+Goal:
+
+- make the reproducible `local-network` flow runnable without depending on the
+  sibling `../fabric-multicloud/devnet/fabric-v3` path
+
+Current coupling points:
+
+- `scripts/bootstrap-local-fabric-stack.mjs`
+- `scripts/prepare-consentaccess-local-fabric-env.sh`
+- `scripts/ensure-fabric-devnet-env.sh`
+- `chaincode/scripts/consentaccess-local-devnet.sh`
+- PKI scripts that default `FABRIC_MULTICLOUD_DIR` to `../fabric-multicloud`
+
+Target local-only layout in this repo:
+
+- `local-devnet/fabric-v3/docker-compose*.yml`
+- `local-devnet/fabric-v3/scripts/00-copy-dev-cas.sh`
+- `local-devnet/fabric-v3/scripts/01-up-cas.sh`
+- `local-devnet/fabric-v3/scripts/02-bootstrap-network.sh`
+- `local-devnet/fabric-v3/scripts/04-generate-backend-env.sh`
+- `local-devnet/fabric-v3/organizations/` and channel-artifact outputs generated locally
+
+Execution plan:
+
+1. Copy or rewrite the minimum devnet assets needed for:
+   - CA startup
+   - network bootstrap
+   - backend env generation
+2. Introduce one local root variable, for example:
+   - `LOCAL_FABRIC_DEVNET_DIR=${ROOT}/local-devnet/fabric-v3`
+3. Update the current local wrappers to prefer that local path and only fall
+   back to `../fabric-multicloud/devnet/fabric-v3` during migration.
+4. Update PKI/devnet docs so `local-network` no longer looks coupled to staging
+   or multicloud workspaces.
+5. Add one CI-safe smoke that proves the local wrappers resolve the local path.
+
+What must be executed to prove the extraction:
+
+From `gwtemplate-node-ts`:
+
+```bash
+npm run pki:bundle -- --config scripts/examples/trust-bundle.local.example.json
+npm run local:fabric:stack
+bash ./scripts/smoke-consentaccess-local-network.sh
+bash ./scripts/smoke-consentaccess-lifecycle-local-network.sh
+```
+
+Optional end-to-end follow-up:
+
+```bash
+cd "$HOME/GITS/gdc-workspace/gdc-sdk-node-ts"
+npm run test:e2e:live-full-cycle
+```
+
+Acceptance criteria for this TODO:
+
+- local Fabric bootstrap no longer requires `../fabric-multicloud/devnet/fabric-v3`
+- docs reference the local vendored devnet first
+- the audited local lifecycle still passes with `identity-local` and `health-care-local`

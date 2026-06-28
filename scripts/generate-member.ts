@@ -4,11 +4,14 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import path from 'path';
 
 import {
+  buildX5cChain,
   bufferToPem,
   createCertificate,
   deriveKeyPair,
   generateMSPID,
   saveJwkDidAndCredential,
+  writeArtifactManifest,
+  writeX509ChainArtifacts,
 } from '../src/utils/pki';
 import { buildLeafCertificateName, loadOrganizationIdentity } from '../src/utils/organization-json';
 import { confirmOverwrite, getArgValue, getEnvName, loadKdfConfig, promptSeed } from './utils/pki-script-utils';
@@ -94,10 +97,23 @@ async function main() {
   writeFileSync(path.join(outDir, 'intermediatecerts', 'ica-cert.der'), icaCertDer);
   writeFileSync(path.join(outDir, 'cacerts', 'root-cert.pem'), bufferToPem(caCertDer, 'CERTIFICATE'));
   writeFileSync(path.join(outDir, 'intermediatecerts', 'ica-cert.pem'), bufferToPem(icaCertDer, 'CERTIFICATE'));
-  writeFileSync(path.join(outDir, 'x509-chain.der'), Buffer.concat([memberCert, icaCertDer, caCertDer]));
+  writeX509ChainArtifacts(outDir, [memberCert, icaCertDer, caCertDer]);
 
   const { d: _priv, ...pubJwk } = memberKeyPair.jwk;
-  await saveJwkDidAndCredential(memberAuthority, pubJwk, memberKeyPair.kid, outDir);
+  await saveJwkDidAndCredential(memberAuthority, pubJwk, memberKeyPair.kid, outDir, {
+    x5c: buildX5cChain([memberCert, icaCertDer, caCertDer]),
+    x5u: `https://${memberAuthority.domain}/.well-known/x509.der`,
+  });
+  writeArtifactManifest(outDir, memberAuthority, {
+    role: 'MEMBER',
+    did: `did:web:${memberAuthority.domain}`,
+    didFile: `did-${memberAuthority.domain}.json`,
+    jwksFile: `jwks-${memberAuthority.domain}.json`,
+    credentialFile: `LegalParticipantCredential-${memberAuthority.domain}.jsonld`,
+    x509DerFile: 'x509.der',
+    x509ChainDerFile: 'x509-chain.der',
+    extraFiles: ['signcerts/cert.der', 'signcerts/cert.pem', 'cacerts/root-cert.der', 'intermediatecerts/ica-cert.der'],
+  });
 }
 
 main().catch((error) => {

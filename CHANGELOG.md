@@ -1508,6 +1508,20 @@
 - **Module Interoperability Issues**: Standardized the import and usage of CommonJS modules like `express` across the application (`server.ts`, `discovery.ts`) to use the `import * as name` and `name.default()` pattern, resolving persistent compilation and runtime errors.
 - **E2E Test Polling Logic**: Corrected the E2E test to use the secure `POST` method with the `thid` in the `body` for polling, aligning with the server's implementation.
 
+## [Unreleased]
+
+### Added
+- Added `npm run pki:bundle` plus `scripts/generate-trust-bundle.ts` and
+  `scripts/examples/trust-bundle.local.example.json` to orchestrate
+  reproducible Root CA -> ICA -> host -> member trust material generation from
+  one config file.
+- Added SHA-256 `manifest.json` publication for generated PKI artifact
+  directories so local trust bundles can be inspected and audited offline.
+- Added `docs-v2/25-trust-bundle-and-local-network-runbook.md` and
+  `docs-internal/04-trust-bundle-operator-roles.md` to document the
+  reproducible trust bundle, operator roles, and the ownership split between
+  `gwtemplate-node-ts`, `dataspace-ica-ts`, and `gdc-sdk-node-ts`.
+
 # Changelog
 
 All notable changes to this project will be documented in this file.

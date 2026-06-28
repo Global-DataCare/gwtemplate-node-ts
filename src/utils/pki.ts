@@ -8,6 +8,7 @@ import { createGaiaXLegalParticipantCredential } from './credential-generators';
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'node:crypto';
 import { randomBytes } from '@noble/hashes/utils.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { scryptSync } from 'node:crypto';
@@ -37,6 +38,23 @@ export type AuthorityConfig = {
     sdFile?: string;    // automatically generated
 };
 
+type PublicArtifactOptions = {
+  x5c?: string[];
+  x5u?: string;
+  serviceBaseUrl?: string;
+};
+
+type ArtifactManifestOptions = {
+  role: 'CA' | 'ICA' | 'HOST' | 'TENANT' | 'MEMBER';
+  did: string;
+  jwksFile: string;
+  didFile: string;
+  credentialFile: string;
+  x509DerFile?: string;
+  x509ChainDerFile?: string;
+  extraFiles?: string[];
+};
+
 export function generateMSPID(entity: AuthorityConfig): string {
   return `${entity.legalRegistrationNumber}_${entity.domain}`.replace(/\./g, '_').toUpperCase();
 }
@@ -53,15 +71,95 @@ export function resolveOutputDirWithBase(baseDir: string, ...segments: string[])
   return dir;
 }
 
+export function derToBase64(der: Buffer): string {
+  return Buffer.from(der).toString('base64');
+}
+
+/**
+ * Serializes a certificate chain in the `x5c` format expected by JOSE/JWK consumers.
+ */
+export function buildX5cChain(chain: Buffer[]): string[] {
+  return chain.map((entry) => derToBase64(entry));
+}
+
+/**
+ * Publishes the concatenated DER chain both under the canonical discovery name and the explicit chain artifact.
+ */
+export function writeX509ChainArtifacts(outputDir: string, chain: Buffer[]): Buffer {
+  const concatenated = Buffer.concat(chain);
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.writeFileSync(path.join(outputDir, 'x509.der'), concatenated);
+  fs.writeFileSync(path.join(outputDir, 'x509-chain.der'), concatenated);
+  return concatenated;
+}
+
+function sha256File(filePath: string): string {
+  const content = fs.readFileSync(filePath);
+  return createHash('sha256').update(content).digest('hex');
+}
+
+/**
+ * Records the published trust artifacts with stable hashes so an operator can audit the generated bundle offline.
+ */
+export function writeArtifactManifest(
+  outputDir: string,
+  entity: AuthorityConfig,
+  options: ArtifactManifestOptions,
+): void {
+  const files = [
+    options.didFile,
+    options.jwksFile,
+    options.credentialFile,
+    ...(options.x509DerFile ? [options.x509DerFile] : []),
+    ...(options.x509ChainDerFile ? [options.x509ChainDerFile] : []),
+    ...(options.extraFiles || []),
+  ];
+
+  const uniqueFiles = Array.from(new Set(files));
+  const manifest = {
+    version: 1,
+    role: options.role,
+    domain: entity.domain,
+    did: options.did,
+    legalRegistrationNumber: entity.legalRegistrationNumber,
+    officialName: entity.officialName,
+    generatedAt: new Date().toISOString(),
+    files: uniqueFiles.map((relativePath) => {
+      const absolutePath = path.join(outputDir, relativePath);
+      return {
+        path: relativePath,
+        sha256: sha256File(absolutePath),
+      };
+    }),
+  };
+
+  fs.writeFileSync(path.join(outputDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+}
+
+/**
+ * Writes the public identity bundle for one entity:
+ * DID document, JWKS, and the self-description/credential used in the current stack.
+ */
 export async function saveJwkDidAndCredential(
   entity: AuthorityConfig,
   pubJwk: any,
   kid: string,
-  outputDir: string
+  outputDir: string,
+  options: PublicArtifactOptions = {},
 ) {
   const didID = `did:web:${entity.domain}`;
+  const serviceBaseUrl = String(options.serviceBaseUrl || `https://${entity.domain}`).replace(/\/+$/, '');
   const resolvedAlg = pubJwk.alg || (pubJwk.crv === 'P-384' ? 'ES384' : 'ES256');
-  const jwks = { keys: [{ ...pubJwk, kid, alg: resolvedAlg, use: pubJwk.use || 'sig' }] };
+  const publicJwk = {
+    ...pubJwk,
+    kid,
+    alg: resolvedAlg,
+    use: pubJwk.use || 'sig',
+    // `x5c` is the offline-friendly source of truth; `x5u` is the complementary online pointer.
+    ...(options.x5c?.length ? { x5c: options.x5c } : {}),
+    ...(options.x5u ? { x5u: options.x5u } : {}),
+  };
+  const jwks = { keys: [publicJwk] };
   const did = {
     '@context': 'https://www.w3.org/ns/did/v1',
     id: didID,
@@ -69,9 +167,27 @@ export async function saveJwkDidAndCredential(
       id: `${didID}#${kid}`,
       type: 'JsonWebKey2020',
       controller: didID,
-      publicKeyJwk: { ...pubJwk, kid, alg: resolvedAlg, use: pubJwk.use || 'sig' }
+      publicKeyJwk: publicJwk,
     }],
-    authentication: [`${didID}#${kid}`]
+    authentication: [`${didID}#${kid}`],
+    assertionMethod: [`${didID}#${kid}`],
+    service: [
+      {
+        id: `${didID}#did-document`,
+        type: 'LinkedDomains',
+        serviceEndpoint: `${serviceBaseUrl}/.well-known/did.json`,
+      },
+      {
+        id: `${didID}#jwks`,
+        type: 'JsonWebKeyService2020',
+        serviceEndpoint: `${serviceBaseUrl}/.well-known/jwks.json`,
+      },
+      {
+        id: `${didID}#x509`,
+        type: 'X509CertificateChainService2020',
+        serviceEndpoint: `${serviceBaseUrl}/.well-known/x509.der`,
+      },
+    ],
   };
   
   const termsAndConditionsHash = Buffer.from(sha256(Buffer.from('dummy terms content for test', 'utf8'))).toString('hex');
@@ -80,7 +196,7 @@ export async function saveJwkDidAndCredential(
     webDomain: `https://${entity.domain}`,
     officialName: entity.officialName,
     did: didID,
-    issuerDid: didID, // Self-issued
+    issuerDid: didID, // Current local trust bootstrap keeps this credential self-issued; the X.509 chain carries the CA-backed trust.
     vatId: entity.legalRegistrationNumber,
     countryCode: entity.countryCode,
     termsAndConditionsUrl: `https://${entity.domain}/terms`,
