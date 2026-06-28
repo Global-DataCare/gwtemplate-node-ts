@@ -10,7 +10,7 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
-import { HealthcareBasicSections } from '../../shared/healthcare-constants';
+import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 import { testTenant1TenantId } from '../data/organization.data';
 
 describe('Composition Bundle _search API (integration)', () => {

@@ -1,3 +1,59 @@
+## [1.18.0] - 2026-06-28
+
+### Added
+- Added `docs-v2/24-local-audit-fabric-runtime.md` to define the current
+  local ICA + GW CORE + Fabric baseline for auditors/integrators, including:
+  - the supported deterministic local Fabric devnet path
+  - the current local channel scope (`health-care-local` and `identity-local`,
+    with research later)
+  - the recommended responsibility split where GW CORE, not ICA, performs the
+    current business/audit Fabric writes
+  - the next implementation step for generic FHIR CID/version anchoring
+- Added unit coverage for local-vs-regional identity ledger channel
+  resolution in `src/__tests__/unit/utils/ledger.test.ts`.
+- Added `npm run local:fabric:stack`, a Node orchestrator that can bootstrap
+  the local Fabric devnet, prepare `.env.local-fabric`, deploy the local
+  consent-access chaincode, start GW CORE in background, and bootstrap tenant
+  `acme-id`.
+- Added `npm run project:audit:demo`, a wrapper command that packages the
+  current validated local closeout path in this repo:
+  - local Fabric bootstrap
+  - GW CORE startup
+  - canonical demo individual creation
+  - consent lifecycle smoke against `health-care-local`
+- Added `docs-internal/` as the semi-internal project traceability layer,
+  separate from `docs-v2`, including:
+  - closeout TODO/status
+  - newbie/auditor runbook
+  - current-state traceability note
+  - identity/artifact ledger contract plan for the next branch
+
+### Changed
+- Local Fabric defaults now use explicit local channel names for
+  `NETWORK_MODE=local-network`:
+  - consent-access and local healthcare writes default to `health-care-local`
+  - identity ledger fallback now defaults to `identity-local`
+  - `test-network` remains on the existing regional channel naming
+- `ConsentManager` now resolves consent-access writes from the explicit local
+  Fabric data-channel env when present, so `local-network` writes go to
+  `health-care-local` instead of the regional jurisdiction fallback.
+- `scripts/demo-create-individual-organization.sh` now defaults to the KYC /
+  OTP-style onboarding path for local demo flows:
+  - it no longer depends on a fake signed PDF
+  - it generates the canonical reusable individual alias `Doraemon` by default
+  - certificate-signed PDF onboarding remains available as an explicit opt-in
+- Updated the shared dependency target to `gdc-common-utils-ts@^2.0.16` and
+  aligned the research/digital-twin shared layer with the latest published
+  common-utils package boundary:
+  - `package.json`
+  - `package-lock.json`
+  - `src/shared/healthcare-constants.ts`
+  - `src/shared/fhir-constants.ts`
+  - `src/shared/data-collections.ts`
+  The gateway still keeps a small local fallback layer for IPS summary
+  sections and GW-specific response/index taxonomies that are not yet
+  published upstream.
+
 ## [1.17.0] - 2026-06-27
 
 ### Added

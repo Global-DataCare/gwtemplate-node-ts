@@ -30,6 +30,8 @@ FHIR-like `Communication` vs internal `CommMsgExtended`, read first:
   - SDK live controller proof runner: [gdc-sdk-node-ts/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md)
 - Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
 - Key custody and audit posture: [docs-v2/19-key-custody-and-audit-readiness.md](docs-v2/19-key-custody-and-audit-readiness.md)
+- Local audit/runtime with Fabric: [docs-v2/24-local-audit-fabric-runtime.md](docs-v2/24-local-audit-fabric-runtime.md)
+- Internal project traceability and closeout status: [docs-internal/00-project-closeout-todo.md](docs-internal/00-project-closeout-todo.md)
 - Environment-variable reference: [docs-v2/22-environment-variables-reference.md](docs-v2/22-environment-variables-reference.md)
 - Testing and live E2E operations: [TESTING.md](TESTING.md)
 - Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)
@@ -747,6 +749,7 @@ DEMO_ALLOW_INSECURE_BEARER=false
 
 For a deterministic Fabric v3 devnet (DEMO single-host or multi-org), see:
 - `../fabric-multicloud/devnet/fabric-v3/README.md`
+- local audit/operator profile in this repo: `docs-v2/24-local-audit-fabric-runtime.md`
 
 For the multi-cloud Fabric deployment plan and scripts, see:
 - `../fabric-multicloud/README.md`

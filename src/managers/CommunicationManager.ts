@@ -3,6 +3,12 @@
 // Description: Manager for handling business logic related to FHIR Communications.
 
 import { CommMsgExtended, DataEntry, FhirCommunication } from 'gdc-common-utils-ts/models/comm';
+import {
+  DataCollectionIds,
+  FhirResourceTypeDataCollections,
+  HealthcareBasicSections,
+  ResourceTypesFhirR4,
+} from 'gdc-common-utils-ts/constants/index';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
 import { claimsToContentCid } from 'gdc-common-utils-ts/utils/fhir-cid';
 import {
@@ -12,9 +18,7 @@ import {
   parseCommunicationParticipantSearchCriteria,
 } from 'gdc-common-utils-ts/utils/communication-participant-search';
 import { SearchBundleTypes } from 'gdc-common-utils-ts/utils/fhir-search';
-import { HealthcareBasicSections } from '../shared/healthcare-constants';
-import { GatewayLocalFhirResourceTypes, ResourceTypesFhirR4 } from '../shared/fhir-constants';
-import { DataCollectionIds, FhirResourceTypeDataCollections } from '../shared/data-collections';
+import { GatewayLocalFhirResourceTypes } from '../shared/fhir-constants';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { determineResourceId } from '../utils/resource';

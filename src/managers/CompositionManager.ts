@@ -1,36 +1,38 @@
 // src/managers/CompositionManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { randomUUID } from 'crypto';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import type { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import type { BundleEntryResponse, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import type { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
+import {
+  DataCollectionIds,
+  HealthcareBasicSections,
+  ResourceTypesFhirR4,
+} from 'gdc-common-utils-ts/constants/index';
 import { createOperationOutcome } from '../utils/outcome';
 import {
   buildFhirClaimKeys,
-  canonicalizeFhirClaims,
   getClaimValue,
   getFirstClaimValueByKeys,
   normalizeContextualizedClaims,
 } from '../utils/claims';
-import { filterCompositionMatchesBySectionsAndTypes, filterDocumentReferenceMatches } from '../utils/composition-search';
+import {
+  filterCommunicationMatches,
+  filterCompositionMatchesBySectionsAndTypes,
+  filterDocumentReferenceMatches,
+} from '../utils/composition-search';
 import {
   extractTokenCode,
-  normalizeReference,
-  pickLatestIsoDate,
-  resolveBundleEntryFullUrl,
-  resolveBundleEntryKey,
-  tokenToCoding,
 } from '../utils/fhir-data-utils';
-import { buildFhirResourceFromIndexedClaims } from '../utils/fhir-resource-rehydration';
 import { getTenantVaultId } from '../utils/tenant';
 import { getSubjectScopedSectionId, SubjectSectionScope } from '../utils/individual-sections';
 import { getEnvSectionId } from '../utils/section-env';
 import {
   extractLedgerSafeResearchTags,
   normalizeFhirIngestionFormat,
+  SupportedFhirIngestionFormat,
   validateFhirPayloadByVersion,
 } from '../utils/fhir-ingestion';
 import { determineResourceId } from '../utils/resource';
@@ -49,22 +51,21 @@ import {
   extractRequestedBundleType,
   extractSearchResourceType,
 } from '../utils/search-request';
-import { HealthcareBasicSections } from '../shared/healthcare-constants';
-import { GatewayLocalFhirResourceTypes, ResourceTypesFhirR4 } from '../shared/fhir-constants';
-import { GatewayEnvelopeTypes, GatewayResponseEntryTypes } from '../shared/gateway-response-types';
-import { DataCollectionIds } from '../shared/data-collections';
+import { GatewayLocalFhirResourceTypes } from '../shared/fhir-constants';
+import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { BundleType } from '../utils/bundle';
 import type { ITenantsManager } from './ITenantsManager';
-import { TwinCompositionManager, TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG } from './TwinCompositionManager';
+import { TwinCompositionManager } from './TwinCompositionManager';
+import { buildSearchMatchesResponse, buildTransactionResponse } from '../utils/didcomm-response';
+import { buildConsolidatedIpsBundleDocument, projectSummaryBundleByFormat } from '../utils/ips-bundle';
 
 /**
  * Canonical HL7 IPS "all sections" example used to validate the current
  * section-first digital twin search contract:
  * https://build.fhir.org/ig/HL7/fhir-ips/en/Bundle-bundle-ips-all-sections.json.html
  *
- * The gateway exposes those sections through `HealthcareSummarySections`,
- * which extends the upstream common-utils basic catalog with the IPS-specific
- * tokens still missing there.
+ * The gateway exposes those sections through the shared healthcare catalogs
+ * published by `gdc-common-utils-ts`.
  */
 export const IPS_ALL_SECTIONS_EXAMPLE_URL =
   'https://build.fhir.org/ig/HL7/fhir-ips/en/Bundle-bundle-ips-all-sections.json.html' as const;
@@ -90,6 +91,38 @@ const SUMMARY_OPERATION_ALLOWED_SECTOR_PREFIXES = Object.freeze([
   'animal-',
   'onehealth-',
 ] as const);
+
+type NormalizedCompositionJobContext = {
+  body: any;
+  entries: any[];
+  normalizedSection: string;
+  normalizedFormatRaw: string;
+  normalizedFormat: SupportedFhirIngestionFormat;
+  normalizedAction: string;
+  normalizedResourceType: string;
+  jurisdiction: string;
+  isSummaryOperation: boolean;
+  scope: SubjectSectionScope;
+};
+
+type CompositionSearchContext = {
+  tenantVaultId: string;
+  searchResourceType: string;
+  useDocumentReferenceSection: boolean;
+  useCommunicationSection: boolean;
+  searchSubject?: string;
+  searchSections: string[];
+  excludedSearchSections: string[];
+  searchTypes: string[];
+  requestedBundleType: string;
+  documentReferenceFilters: { identifier?: string; attachmentHash?: string };
+  communicationFilters: {
+    identifier?: string;
+    thid?: string;
+    pthid?: string;
+    attachmentHash?: string;
+  };
+};
 
 /**
  * Legacy/compatibility manager for direct `Composition` and `Bundle` jobs.
@@ -132,8 +165,17 @@ export class CompositionManager implements IJobProcessor {
   }
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const context = this.normalizeJobContext(job);
+
+    if (context.normalizedAction === '_search' || context.isSummaryOperation) {
+      return this.handleSearch(job, context);
+    }
+
+    return this.handleBatch(job, context);
+  }
+
+  private normalizeJobContext(job: JobRequest): NormalizedCompositionJobContext {
     const body = job.content?.body as any;
-    const entries: any[] = (Array.isArray(body?.data) && body.data) || (Array.isArray(body?.entry) && body.entry) || [];
     const normalizedSection = String(job.section || '').trim().toLowerCase();
     const normalizedFormatRaw = String(job.format || '').trim();
     const normalizedAction = String(job.action || '').trim();
@@ -181,141 +223,143 @@ export class CompositionManager implements IJobProcessor {
     if (isSummaryOperation && !this.isSupportedSummarySector(String(job.sector || ''))) {
       throw new Error(`Unsupported sector '${job.sector}' for summary operation.`);
     }
-    const normalizedFormat = normalizeFhirIngestionFormat(normalizedFormatRaw);
 
-    const scope: SubjectSectionScope =
-      normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN ? SUBJECT_SECTION_DIGITAL_TWIN : SUBJECT_SECTION_INDIVIDUAL;
+    return {
+      body,
+      entries: (Array.isArray(body?.data) && body.data) || (Array.isArray(body?.entry) && body.entry) || [],
+      normalizedSection,
+      normalizedFormatRaw,
+      normalizedFormat: normalizeFhirIngestionFormat(normalizedFormatRaw),
+      normalizedAction,
+      normalizedResourceType,
+      jurisdiction,
+      isSummaryOperation,
+      scope: normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN ? SUBJECT_SECTION_DIGITAL_TWIN : SUBJECT_SECTION_INDIVIDUAL,
+    };
+  }
 
-    const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
-    const cidMappings: FhirCidVersionMapping[] = [];
+  private async handleSearch(
+    job: JobRequest,
+    context: NormalizedCompositionJobContext,
+  ): Promise<IDecodedDidcommPayload> {
+    const search = await this.buildSearchContext(job, context);
 
-    if (normalizedAction === '_search' || isSummaryOperation) {
-      const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
-      const tenantExists = await this.tenantExists(tenantVaultId);
-      if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
+    if (this.isIpsBundleDocumentRequest(search.searchResourceType, search.requestedBundleType, search.searchTypes)) {
+      const consolidatedBundle = await buildConsolidatedIpsBundleDocument({
+        vaultRepository: this.vaultRepository,
+        tenantVaultId: search.tenantVaultId,
+        subject: search.searchSubject!,
+        scope: context.scope,
+        requiredSections: search.searchSections,
+        excludedSections: search.excludedSearchSections,
+        requiredTypes: search.searchTypes,
+      });
+      const projectedBundle = projectSummaryBundleByFormat(consolidatedBundle, context.normalizedFormat);
 
-      const searchResourceType = isSummaryOperation
-        ? 'bundle'
-        : extractSearchResourceType(body);
-      const useDocumentReferenceSection = searchResourceType === 'documentreference';
-      const useCommunicationSection = searchResourceType === 'communication';
-      const searchSubject = extractCompositionSearchSubject(body);
-      if (!searchSubject && normalizedSection !== SUBJECT_SECTION_DIGITAL_TWIN) {
-        throw new Error('Missing required subject search parameter for Composition search.');
-      }
-      const searchSections = extractCompositionSearchSections(body);
-      const excludedSearchSections = extractCompositionExcludedSearchSections(body);
-      const searchTypes = isSummaryOperation
-        ? this.extractSummaryTypes(body)
-        : extractCompositionSearchTypes(body);
-      const requestedBundleType = isSummaryOperation
-        ? 'document'
-        : extractRequestedBundleType(body);
-      const documentReferenceFilters = extractDocumentReferenceSearchFilters(body);
-      const communicationFilters = extractCommunicationSearchFilters(body);
-
-      if (this.isIpsBundleDocumentRequest(searchResourceType, requestedBundleType, searchTypes)) {
-        const consolidatedBundle = await this.buildConsolidatedIpsBundleDocument({
-          tenantVaultId,
-          subject: searchSubject,
-          scope,
-          requiredSections: searchSections,
-          excludedSections: excludedSearchSections,
-          requiredTypes: searchTypes,
-        });
-        const projectedBundle = this.projectSummaryBundleByFormat(consolidatedBundle, normalizedFormat);
-
-        const responseBundle: BundleJsonApi = {
-          resourceType: ResourceTypesFhirR4.Bundle,
-          type: BundleType.BatchResponse,
-          data: [{
-            type: isSummaryOperation ? GatewayResponseEntryTypes.BundleSummary : GatewayResponseEntryTypes.BundleSearch,
-            resource: projectedBundle,
-            response: { status: '200' },
-          } as any],
-          total: 1,
-        };
-
-        return {
-          jti: randomUUID(),
-          type: GatewayEnvelopeTypes.TransactionResponse,
-          thid: job.content?.thid as string,
-          iss: job.content?.aud as string,
-          aud: job.content?.iss as string,
-          body: responseBundle,
-        };
-      }
-
-      if (normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN && searchResourceType === 'composition' && !searchSubject) {
-        const matches = await this.twinCompositionManager.searchBySectionAndClaims({
-          tenantVaultId,
-          requiredSections: searchSections,
-          excludedSections: excludedSearchSections,
-          body,
-          filterMatchesBySectionsAndTypes: this.filterMatchesBySectionsAndTypes.bind(this),
-        });
-        const responseBundle: BundleJsonApi = {
-          resourceType: ResourceTypesFhirR4.Bundle,
-          type: BundleType.BatchResponse,
-          data: [{
-            type: GatewayResponseEntryTypes.CompositionSearch,
-            resource: { total: matches.length, data: matches },
-            response: { status: '200' },
-          } as any],
-          total: 1,
-        };
-
-        return {
-          jti: randomUUID(),
-          type: GatewayEnvelopeTypes.TransactionResponse,
-          thid: job.content?.thid as string,
-          iss: job.content?.aud as string,
-          aud: job.content?.iss as string,
-          body: responseBundle,
-        };
-      }
-
-      const sectionId = getSubjectScopedSectionId(
-        searchSubject!,
-        scope,
-        useDocumentReferenceSection ? 'document-references' : useCommunicationSection ? 'communications' : 'composition',
-      );
-      const matchesRaw = await this.vaultRepository.listContainersInSection(tenantVaultId, sectionId);
-      const matches = useDocumentReferenceSection
-        ? this.filterDocumentReferenceMatches(matchesRaw, documentReferenceFilters)
-        : useCommunicationSection
-          ? await this.filterCommunicationMatches(tenantVaultId, searchSubject, scope, matchesRaw, communicationFilters)
-          : this.filterMatchesBySectionsAndTypes(matchesRaw, searchSections, excludedSearchSections, searchTypes);
-      const responseBundle: BundleJsonApi = {
+      return buildTransactionResponse(job, {
         resourceType: ResourceTypesFhirR4.Bundle,
         type: BundleType.BatchResponse,
         data: [{
-          type: useDocumentReferenceSection
-            ? GatewayResponseEntryTypes.DocumentReferenceSearch
-            : useCommunicationSection
-              ? GatewayResponseEntryTypes.CommunicationSearch
-              : GatewayResponseEntryTypes.CompositionSearch,
-          resource: { total: matches.length, data: matches },
+          type: context.isSummaryOperation ? GatewayResponseEntryTypes.BundleSummary : GatewayResponseEntryTypes.BundleSearch,
+          resource: projectedBundle,
           response: { status: '200' },
         } as any],
         total: 1,
-      };
-
-      return {
-        jti: randomUUID(),
-        type: GatewayEnvelopeTypes.TransactionResponse,
-        thid: job.content?.thid as string,
-        iss: job.content?.aud as string,
-        aud: job.content?.iss as string,
-        body: responseBundle,
-      };
+      });
     }
 
-    for (const entry of entries) {
+    if (context.normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN && search.searchResourceType === 'composition' && !search.searchSubject) {
+      const matches = await this.twinCompositionManager.searchBySectionAndClaims({
+        tenantVaultId: search.tenantVaultId,
+        requiredSections: search.searchSections,
+        excludedSections: search.excludedSearchSections,
+        body: context.body,
+        filterMatchesBySectionsAndTypes: this.filterMatchesBySectionsAndTypes.bind(this),
+      });
+
+      return buildSearchMatchesResponse(job, GatewayResponseEntryTypes.CompositionSearch, matches);
+    }
+
+    const sectionId = getSubjectScopedSectionId(
+      search.searchSubject!,
+      context.scope,
+      search.useDocumentReferenceSection ? 'document-references' : search.useCommunicationSection ? 'communications' : 'composition',
+    );
+    const matchesRaw = await this.vaultRepository.listContainersInSection(search.tenantVaultId, sectionId);
+    const matches = search.useDocumentReferenceSection
+      ? this.filterDocumentReferenceMatches(matchesRaw, search.documentReferenceFilters)
+      : search.useCommunicationSection
+        ? await filterCommunicationMatches(
+          this.vaultRepository,
+          search.tenantVaultId,
+          search.searchSubject!,
+          context.scope,
+          matchesRaw,
+          search.communicationFilters,
+        )
+        : this.filterMatchesBySectionsAndTypes(
+          matchesRaw,
+          search.searchSections,
+          search.excludedSearchSections,
+          search.searchTypes,
+        );
+
+    const responseType = search.useDocumentReferenceSection
+      ? GatewayResponseEntryTypes.DocumentReferenceSearch
+      : search.useCommunicationSection
+        ? GatewayResponseEntryTypes.CommunicationSearch
+        : GatewayResponseEntryTypes.CompositionSearch;
+
+    return buildSearchMatchesResponse(job, responseType, matches);
+  }
+
+  private async buildSearchContext(
+    job: JobRequest,
+    context: NormalizedCompositionJobContext,
+  ): Promise<CompositionSearchContext> {
+    const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+    const tenantExists = await this.tenantExists(tenantVaultId);
+    if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
+
+    const searchResourceType = context.isSummaryOperation
+      ? 'bundle'
+      : extractSearchResourceType(context.body);
+    const searchSubject = extractCompositionSearchSubject(context.body);
+    if (!searchSubject && context.normalizedSection !== SUBJECT_SECTION_DIGITAL_TWIN) {
+      throw new Error('Missing required subject search parameter for Composition search.');
+    }
+
+    return {
+      tenantVaultId,
+      searchResourceType,
+      useDocumentReferenceSection: searchResourceType === 'documentreference',
+      useCommunicationSection: searchResourceType === 'communication',
+      searchSubject,
+      searchSections: extractCompositionSearchSections(context.body),
+      excludedSearchSections: extractCompositionExcludedSearchSections(context.body),
+      searchTypes: context.isSummaryOperation
+        ? this.extractSummaryTypes(context.body)
+        : extractCompositionSearchTypes(context.body),
+      requestedBundleType: context.isSummaryOperation
+        ? 'document'
+        : extractRequestedBundleType(context.body),
+      documentReferenceFilters: extractDocumentReferenceSearchFilters(context.body),
+      communicationFilters: extractCommunicationSearchFilters(context.body),
+    };
+  }
+
+  private async handleBatch(
+    job: JobRequest,
+    context: NormalizedCompositionJobContext,
+  ): Promise<IDecodedDidcommPayload> {
+    const responseEntries: (BundleEntryResponse | ErrorEntry)[] = [];
+    const cidMappings: FhirCidVersionMapping[] = [];
+
+    for (const entry of context.entries) {
       let rawClaims: Record<string, any> | undefined;
       try {
         const resourceType = String(entry?.resource?.resourceType || entry?.type || '').trim();
-        const responseAction = `${normalizedAction}-response`;
+        const responseAction = `${context.normalizedAction}-response`;
         if (resourceType === GatewayLocalFhirResourceTypes.OperationOutcome) {
           // Preconversion may include row-level OperationOutcome entries as warnings.
           // They are informational and should not be persisted as Composition claims.
@@ -323,7 +367,7 @@ export class CompositionManager implements IJobProcessor {
             type: GatewayResponseEntryTypes.OperationOutcome,
             response: {
               status: '200',
-              location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/Composition/${responseAction}`,
+              location: `/${job.tenantId}/cds-${context.jurisdiction}/v1/${job.sector}/${context.normalizedSection}/${context.normalizedFormat}/Composition/${responseAction}`,
               outcome: createOperationOutcome(
                 IssueLevel.Information,
                 IssueType.Value,
@@ -341,7 +385,7 @@ export class CompositionManager implements IJobProcessor {
         if (!rawClaims || typeof rawClaims !== 'object') {
           throw new Error('Missing meta.claims for Composition entry.');
         }
-        validateFhirPayloadByVersion(normalizedFormat, 'Composition', entry);
+        validateFhirPayloadByVersion(context.normalizedFormat, 'Composition', entry);
 
         const claims = normalizeContextualizedClaims(rawClaims) as Record<string, any>;
         const researchTags = extractLedgerSafeResearchTags(entry);
@@ -359,7 +403,7 @@ export class CompositionManager implements IJobProcessor {
         const entryRefs = getClaimValue<string>(claims, 'Composition.entry') || '';
         const type = getClaimValue<string>(claims, 'Composition.type') || 'LOINC|60591-5';
 
-        const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
+        const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
         const tenantExists = await this.tenantExists(tenantVaultId);
         if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
@@ -384,7 +428,7 @@ export class CompositionManager implements IJobProcessor {
           record.tag = researchTags;
         }
 
-        const sectionId = getSubjectScopedSectionId(subject, scope, 'composition');
+        const sectionId = getSubjectScopedSectionId(subject, context.scope, 'composition');
         await this.vaultRepository.put(tenantVaultId, [record], sectionId);
         if (versioning.mapping) cidMappings.push(versioning.mapping);
 
@@ -392,7 +436,7 @@ export class CompositionManager implements IJobProcessor {
           type: 'Composition',
           response: {
             status: '201',
-            location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/Composition/${responseAction}`,
+            location: `/${job.tenantId}/cds-${context.jurisdiction}/v1/${job.sector}/${context.normalizedSection}/${context.normalizedFormat}/Composition/${responseAction}`,
           },
           ...(researchTags && researchTags.length > 0 ? { meta: { tag: researchTags } } : {}),
         } as any);
@@ -410,25 +454,16 @@ export class CompositionManager implements IJobProcessor {
 
     await registerFhirCidMappings({
       blockchainAdapter: this.blockchainAdapter,
-      sector: job.sector,
-      jurisdiction,
+      sector: job.sector as string,
+      jurisdiction: context.jurisdiction,
       mappings: cidMappings,
     });
 
-    const responseBundle: BundleJsonApi = {
+    return buildTransactionResponse(job, {
       resourceType: 'Bundle',
       type: 'batch-response',
       data: responseEntries,
-    };
-
-    return {
-      jti: randomUUID(),
-      type: GatewayEnvelopeTypes.TransactionResponse,
-      thid: job.content?.thid as string,
-      iss: job.content?.aud as string,
-      aud: job.content?.iss as string,
-      body: responseBundle,
-    };
+    });
   }
 
   private isSupportedSummarySector(sector: string): boolean {
@@ -462,184 +497,6 @@ export class CompositionManager implements IJobProcessor {
     return requiredTypes.some((value) => extractTokenCode(value) === ipsCode);
   }
 
-  private async buildConsolidatedIpsBundleDocument(params: {
-    tenantVaultId: string;
-    subject: string;
-    scope: SubjectSectionScope;
-    requiredSections: string[];
-    excludedSections: string[];
-    requiredTypes: string[];
-  }): Promise<Record<string, any>> {
-    const compositionSectionId = getSubjectScopedSectionId(params.subject, params.scope, 'composition');
-    const compositionRecords = await this.vaultRepository.listContainersInSection(params.tenantVaultId, compositionSectionId);
-
-    const sectionRefs = new Map<string, Set<string>>();
-    const bundleEntries = new Map<string, { fullUrl?: string; resource: Record<string, any> }>();
-    const authorRefs = new Set<string>();
-    const compositionDates: string[] = [];
-    const includedSectionTokens = new Set<string>();
-
-    for (const compositionRecord of compositionRecords as Array<Record<string, any>>) {
-      const compositionType = String(
-        getClaimValue<string>(compositionRecord, 'Composition.type') || '',
-      ).trim();
-      if (!this.matchesRequiredTypes(compositionType, params.requiredTypes)) continue;
-
-      const sectionToken = String(
-        getClaimValue<string>(compositionRecord, 'Composition.section') || '',
-      ).trim();
-      if (!sectionToken) continue;
-      if (params.excludedSections.includes(sectionToken)) continue;
-      if (params.requiredSections.length > 0 && !params.requiredSections.includes(sectionToken)) continue;
-
-      includedSectionTokens.add(sectionToken);
-      this.ensureSection(sectionRefs, sectionToken);
-
-      const authorReference = normalizeReference(getClaimValue<string>(compositionRecord, 'Composition.author'));
-      if (authorReference) authorRefs.add(authorReference);
-      const compositionDate = normalizeReference(getClaimValue<string>(compositionRecord, 'Composition.date'));
-      if (compositionDate) compositionDates.push(compositionDate);
-    }
-
-    for (const sectionToken of includedSectionTokens) {
-      const projectionConfigs = TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG[sectionToken] || [];
-      for (const projectionConfig of projectionConfigs) {
-        for (const collectionIdSuffix of projectionConfig.collectionIds) {
-          const resourceSectionId = getSubjectScopedSectionId(params.subject, params.scope, collectionIdSuffix);
-          const resourceRecords = await this.vaultRepository.listContainersInSection(params.tenantVaultId, resourceSectionId);
-          for (const resourceRecord of resourceRecords) {
-            const resource = buildFhirResourceFromIndexedClaims(projectionConfig.resourceType, resourceRecord);
-            const entryKey = resolveBundleEntryKey(undefined, resource);
-            if (!bundleEntries.has(entryKey)) {
-              bundleEntries.set(entryKey, {
-                fullUrl: resolveBundleEntryFullUrl(undefined, { resource }),
-                resource,
-              });
-            }
-            this.addSectionReference(sectionRefs, sectionToken, entryKey);
-          }
-        }
-      }
-    }
-
-    const documentReferenceSectionId = getSubjectScopedSectionId(params.subject, params.scope, DataCollectionIds.documentReferences);
-    const documentReferenceRecords = await this.vaultRepository.listContainersInSection(params.tenantVaultId, documentReferenceSectionId);
-    for (const documentReferenceRecord of documentReferenceRecords) {
-      const resource = buildFhirResourceFromIndexedClaims(ResourceTypesFhirR4.DocumentReference, documentReferenceRecord);
-      const entryKey = resolveBundleEntryKey(undefined, resource);
-      if (!bundleEntries.has(entryKey)) {
-        bundleEntries.set(entryKey, {
-          fullUrl: resolveBundleEntryFullUrl(undefined, { resource }),
-          resource,
-        });
-      }
-    }
-
-    const compositionId = `ips-composition-${determineResourceId(params.subject, process.env.NODE_ENV)}`;
-    const compositionIdentifier = `urn:uuid:${compositionId}`;
-    const compositionSectionTokens = Array.from(sectionRefs.keys());
-    const compositionClaims: Record<string, any> = {
-      '@context': 'org.hl7.fhir.r4',
-      'Composition.identifier': compositionIdentifier,
-      'Composition.subject': params.subject,
-      'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
-      'Composition.date': pickLatestIsoDate(compositionDates),
-      'Composition.section': compositionSectionTokens.join(','),
-    };
-    if (authorRefs.size > 0) {
-      compositionClaims['Composition.author'] = Array.from(authorRefs).join(',');
-    }
-    const compositionResource: Record<string, any> = {
-      resourceType: 'Composition',
-      id: compositionId,
-      identifier: [{ value: compositionIdentifier }],
-      status: 'final',
-      meta: {
-        claims: compositionClaims,
-      },
-      type: {
-        coding: [{
-          system: HealthcareBasicSections.PatientSummaryDocument.system,
-          code: HealthcareBasicSections.PatientSummaryDocument.code,
-          display: 'Patient summary Document',
-        }],
-      },
-      subject: { reference: params.subject },
-      date: compositionClaims['Composition.date'],
-      title: 'International Patient Summary',
-      section: compositionSectionTokens.map((sectionToken) => ({
-        code: {
-          coding: [tokenToCoding(sectionToken)],
-        },
-        entry: Array.from(sectionRefs.get(sectionToken) || []).map((reference) => ({ reference })),
-      })),
-      ...(authorRefs.size > 0 ? {
-        author: Array.from(authorRefs).map((reference) => ({ reference })),
-      } : {}),
-    };
-
-    return {
-      resourceType: 'Bundle',
-      type: 'document',
-      entry: [
-        {
-          fullUrl: compositionIdentifier,
-          resource: compositionResource,
-        },
-        ...Array.from(bundleEntries.entries()).map(([reference, entry]) => ({
-          fullUrl: entry.fullUrl || reference,
-          resource: entry.resource,
-        })),
-      ],
-    };
-  }
-
-  private projectSummaryBundleByFormat(bundle: Record<string, any>, format: string): Record<string, any> {
-    if (String(format || '').trim().toLowerCase() !== 'org.hl7.fhir.api') {
-      return bundle;
-    }
-
-    return {
-      resourceType: ResourceTypesFhirR4.Bundle,
-      type: bundle.type || 'document',
-      entry: Array.isArray(bundle.entry)
-        ? bundle.entry.map((entry: any) => {
-          const resource = entry?.resource || {};
-          const claims = resource?.meta?.claims && typeof resource.meta.claims === 'object'
-            ? canonicalizeFhirClaims(resource.meta.claims as Record<string, any>)
-            : {};
-          return {
-            fullUrl: String(entry?.fullUrl || '').trim() || `urn:uuid:${String(resource?.id || randomUUID())}`,
-            resource: {
-              resourceType: String(resource?.resourceType || 'Resource'),
-              id: String(resource?.id || ''),
-              meta: {
-                claims,
-              },
-            },
-          };
-        })
-        : [],
-    };
-  }
-
-  private addSectionReference(sectionRefs: Map<string, Set<string>>, sectionToken: string, reference: string): void {
-    this.ensureSection(sectionRefs, sectionToken);
-    sectionRefs.get(sectionToken)!.add(reference);
-  }
-
-  private ensureSection(sectionRefs: Map<string, Set<string>>, sectionToken: string): void {
-    if (!sectionRefs.has(sectionToken)) {
-      sectionRefs.set(sectionToken, new Set<string>());
-    }
-  }
-
-  private matchesRequiredTypes(actualType: string, requiredTypes: string[]): boolean {
-    if (!requiredTypes.length) return true;
-    const actualCode = extractTokenCode(actualType);
-    return requiredTypes.some((requiredType) => extractTokenCode(requiredType) === actualCode);
-  }
-
   private filterMatchesBySectionsAndTypes(
     matches: any[],
     requiredSections: string[],
@@ -652,56 +509,5 @@ export class CompositionManager implements IJobProcessor {
       excludedSections,
       requiredTypes,
     );
-  }
-
-  private async filterCommunicationMatches(
-    tenantVaultId: string,
-    subject: string,
-    scope: SubjectSectionScope,
-    matches: any[],
-    filters: {
-      identifier?: string;
-      thid?: string;
-      pthid?: string;
-      attachmentHash?: string;
-    },
-  ): Promise<any[]> {
-    if (!Array.isArray(matches)) return [];
-    let allowedDocumentReferences: Set<string> | undefined;
-    if (filters.attachmentHash) {
-      const documentReferenceSectionId = getSubjectScopedSectionId(subject, scope, 'document-references');
-      const documentReferences = await this.vaultRepository.listContainersInSection(tenantVaultId, documentReferenceSectionId);
-      allowedDocumentReferences = new Set(
-        documentReferences
-          .filter((record: any) => {
-            const attachmentHash = String(
-              getFirstClaimValueByKeys(record, buildFhirClaimKeys('DocumentReference.contenthash')) || '',
-            ).trim();
-            return attachmentHash === filters.attachmentHash;
-          })
-          .map((record: any) => String(record?.id || '').trim())
-          .filter(Boolean),
-      );
-      if (allowedDocumentReferences.size === 0) return [];
-    }
-
-    return matches.filter((record: any) => {
-      const identifier = String(record?.['Communication.identifier'] || '').trim();
-      const thid = String(record?.thid || '').trim();
-      const pthid = String(record?.pthid || '').trim();
-      const contentReferences = String(record?.['Communication.content-reference'] || '').split(',').map((value: string) => value.trim()).filter(Boolean);
-
-      if (filters.identifier && identifier !== filters.identifier) return false;
-      if (filters.thid && thid !== filters.thid) return false;
-      if (filters.pthid && pthid !== filters.pthid) return false;
-      if (allowedDocumentReferences) {
-        const hasLinkedDocument = contentReferences.some((reference: string) => {
-          const referenceId = reference.replace(/^DocumentReference\//i, '').trim();
-          return allowedDocumentReferences?.has(referenceId);
-        });
-        if (!hasLinkedDocument) return false;
-      }
-      return true;
-    });
   }
 }

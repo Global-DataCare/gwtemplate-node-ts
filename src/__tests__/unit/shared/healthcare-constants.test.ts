@@ -1,11 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
-import { HealthcareBasicSections, HealthcareSummarySections } from '../../../shared/healthcare-constants';
+import { HealthcareBasicSections, HealthcareSummarySections } from 'gdc-common-utils-ts/constants/index';
 
 describe('shared healthcare constants', () => {
   it('extends HealthcareBasicSections with the IPS sections missing upstream', () => {
-    expect(HealthcareBasicSections.Alert.attributeValue).toBe('http://loinc.org|104605-1');
-    expect(HealthcareBasicSections.PregnancyHistory.attributeValue).toBe('http://loinc.org|10162-6');
-    expect(HealthcareBasicSections.GoalsAndPreferences.attributeValue).toBe('http://loinc.org|81338-6');
+    expect(HealthcareBasicSections.Alert.attributeValue).toBe('LOINC|104605-1');
+    expect(HealthcareBasicSections.PregnancyHistory.attributeValue).toBe('LOINC|10162-6');
+    expect(HealthcareBasicSections.GoalsAndPreferences.attributeValue).toBe('LOINC|81338-6');
   });
 
   it('exposes an IPS-oriented HealthcareSummarySections subset', () => {

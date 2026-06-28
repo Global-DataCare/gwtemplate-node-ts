@@ -1,7 +1,7 @@
 // src/api-examples/communication.examples.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { CommunicationCategoryCodes, HealthcareBasicSections } from '../shared/healthcare-constants';
+import { CommunicationCategoryCodes, HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 
 const IPS_BUNDLE_LIGHT_EXAMPLE = {
   resourceType: 'Bundle',

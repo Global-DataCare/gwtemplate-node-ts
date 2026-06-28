@@ -13,7 +13,7 @@ set -euo pipefail
 #
 # Important local assumptions:
 # - the real source of truth is the sibling repo `fabric-multicloud`
-# - the local devnet channel for consent access is `health-care-eu`
+# - the local devnet channel for consent access is `health-care-local`
 # - the smart contract is deployed as CCAAS, not as in-peer chaincode
 # - `weft` is optional here; when it is missing this script builds the standard
 #   Fabric CCAAS archive (`metadata.json` + `code.tar.gz`) directly
@@ -27,7 +27,7 @@ CHAINCODE_DIR="${ROOT}/consentaccess-sc-javascript"
 DEVNET_ROOT="${WORKSPACE_ROOT}/fabric-multicloud/devnet/fabric-v3"
 ENSURE_DEVNET_ENV_SCRIPT="${WORKSPACE_ROOT}/gwtemplate-node-ts/scripts/ensure-fabric-devnet-env.sh"
 
-CHANNEL_NAME="${CHANNEL_NAME:-health-care-eu}"
+CHANNEL_NAME="${CHANNEL_NAME:-${HLF_DATA_CHANNEL_NAME:-health-care-local}}"
 CHAINCODE_NAME="${CHAINCODE_NAME:-consentaccess-sc}"
 CHAINCODE_VERSION="${CHAINCODE_VERSION:-1.0}"
 CHAINCODE_SEQUENCE="${CHAINCODE_SEQUENCE:-1}"

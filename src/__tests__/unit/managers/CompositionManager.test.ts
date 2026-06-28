@@ -8,14 +8,17 @@ import {
 import { TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG } from '../../../managers/TwinCompositionManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
+import {
+  DataCollectionIds,
+  HealthcareBasicSections,
+  HealthcareSummarySections,
+} from 'gdc-common-utils-ts/constants/index';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
 import {
   COMPOSITION_BATCH_ENTRY_EXAMPLE,
   COMPOSITION_SEARCH_BUNDLE_EXAMPLE,
   COMPOSITION_SEARCH_PARAMETERS_EXAMPLE,
 } from '../../../api-examples';
-import { DataCollectionIds } from '../../../shared/data-collections';
-import { HealthcareBasicSections, HealthcareSummarySections } from '../../../shared/healthcare-constants';
 
 describe('CompositionManager', () => {
   const mockVaultRepository = {

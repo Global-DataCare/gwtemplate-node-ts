@@ -1,7 +1,7 @@
 import { invokeExpress } from './helpers/invokeExpress';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
-import { HealthcareBasicSections } from '../../shared/healthcare-constants';
+import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 import {
   buildDemoCommunicationDidcommRequest,
   demoCommunicationMedicationIpsDefaults,

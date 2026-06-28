@@ -224,7 +224,7 @@ async function registerConsentAccessRules(params: {
   if (!blockchainAdapter?.registerConsentAccessBundle) return;
   if (entries.length === 0) return;
 
-  const channel = `${sector}-${resolveConsentAccessChannelJurisdiction(jurisdiction)}`;
+  const channel = resolveConsentAccessChannelName(sector, jurisdiction);
   const chaincode = process.env.CONSENT_ACCESS_LEDGER_CHAINCODE || 'consentaccess-sc';
   for (const sourceEntry of entries) {
     const entryClaims = ((sourceEntry.resource as Record<string, unknown> | undefined)?.meta as { claims?: Record<string, unknown> } | undefined)?.claims || {};
@@ -260,4 +260,19 @@ async function registerConsentAccessRules(params: {
  */
 function resolveConsentAccessChannelJurisdiction(jurisdiction: string): string {
   return getJurisdictionGroup(String(jurisdiction || '').trim());
+}
+
+function resolveConsentAccessChannelName(sector: string, jurisdiction: string): string {
+  const explicitChannel = String(
+    process.env.LEDGER_DATA_CHANNEL_DEFAULT
+    || process.env.HLF_DATA_CHANNEL_NAME
+    || process.env.HLF_CHANNEL_NAME
+    || '',
+  ).trim();
+  if (explicitChannel) return explicitChannel;
+
+  const networkMode = String(process.env.NETWORK_MODE || '').trim().toLowerCase();
+  if (networkMode === 'local-network') return `${sector}-local`;
+
+  return `${sector}-${resolveConsentAccessChannelJurisdiction(jurisdiction)}`;
 }

@@ -313,6 +313,9 @@ Legacy note:
 
 `LEDGER_IDENTITY_CHANNEL_DEFAULT`
 - Default identity channel when no jurisdiction/sector override is applied.
+- Local recommendation:
+  - `local-network` -> `identity-local`
+  - `test-network` keeps the existing jurisdiction-derived fallback unless an explicit override is set.
 
 ## 13. Local Authority Artifact Overrides
 
