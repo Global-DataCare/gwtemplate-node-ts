@@ -15,6 +15,7 @@ import { ManageAssetCryptographicKey } from '../blockchain/fabric/v3/manageAsset
 import { ManageAssetSubjectKeyBinding } from '../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 import type { CryptographicKeyLedgerPayload } from '../blockchain/fabric/v3/manageAssetCryptographicKey';
 import {
+  resolveLedgerOrganizationId,
   hashLedgerString,
   inferLedgerJwkUse,
   tryGetJwkThumbprint,
@@ -51,9 +52,11 @@ export async function registerOrganizationOnLedger(params: {
   const channelName = params.ledgerConfig?.channelName
     || resolveIdentityChannel(params.jurisdiction || params.hostJurisdiction);
   const manager = new ManageAssetOrganization({ chaincodeName, channelName });
+  const organizationClaims = (params.organization?.meta as any)?.claims || (params.config as any)?.claims;
+  const ledgerOrgId = resolveLedgerOrganizationId(organizationClaims, params.orgId);
 
   const payload = {
-    orgId: params.orgId,
+    orgId: ledgerOrgId,
     vc: params.config.governanceVc || params.config.selfDescriptionVc,
   };
 
@@ -62,19 +65,19 @@ export async function registerOrganizationOnLedger(params: {
   }
 
   try {
-    await manager.createOrganization(mspId, params.orgId, payload);
+    await manager.createOrganization(mspId, ledgerOrgId, payload);
     await registerOrganizationKeysOnLedger({
       logger: params.logger,
       mspId,
       channelName,
-      orgId: params.orgId,
+      orgId: ledgerOrgId,
       didDocumentId: params.config.didDocument?.id,
       verificationMethods: params.config.didDocument?.verificationMethod,
     });
     await registerOrganizationArtifactsOnLedger({
       mspId,
       channelName,
-      orgId: params.orgId,
+      orgId: ledgerOrgId,
       role: params.role,
       evidence: params.evidence,
     });

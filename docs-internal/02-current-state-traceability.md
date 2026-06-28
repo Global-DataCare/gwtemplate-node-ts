@@ -48,6 +48,9 @@ Default local channels:
 - GW CORE can register hosted tenant organizations on `identity-local`
 - GW CORE can register hosted tenant public keys on `cryptographickey-sc`
 - GW CORE can register subject-to-key bindings on `subjectkeybinding-sc`
+- the current organization ledger id convention is claim-driven:
+  - `Organization.identifier.additionalType|Organization.identifier.value`
+  - example in the current EU-focused tests: `TAX|acme-id`
 - GW CORE can create and update consent state that is reflected on-chain
 - canonical local consent lifecycle history grows as expected:
   - activate -> revision `1`

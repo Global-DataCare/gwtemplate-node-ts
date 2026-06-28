@@ -1,5 +1,7 @@
 import { createHash } from 'crypto';
+import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 
 export function tryGetJwkThumbprint(jwk?: PublicJwk): string | undefined {
@@ -21,4 +23,33 @@ export function inferLedgerJwkUse(jwk: PublicJwk): 'sig' | 'enc' {
 
 export function hashLedgerString(input: string): string {
   return createHash('sha256').update(input).digest('hex');
+}
+
+export function buildLedgerOrganizationId(identifierType: string, identifierValue: string): string {
+  return `${identifierType}|${identifierValue}`;
+}
+
+/**
+ * Resolves the organization ledger identifier from the canonical legal-id
+ * claims used across GW onboarding.
+ *
+ * Format:
+ * - `identifier.additionalType|identifier.value`
+ *
+ * Examples for the current EU-focused code/tests:
+ * - `TAX|VATES-<local-id>`
+ * - `TAX|<local-tax-id>`
+ *
+ * Jurisdiction remains a separate concern carried by claims/VC fields such as
+ * `Organization.address.addressCountry` and, when a jurisdiction needs it,
+ * `Organization.address.addressRegion`.
+ */
+export function resolveLedgerOrganizationId(claims?: ClaimsRecord, fallbackOrgId?: string): string {
+  const identifierType = String(claims?.[ClaimsOrganizationSchemaorg.identifierType] || '').trim();
+  const identifierValue = String(claims?.[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
+  if (identifierType && identifierValue) {
+    return buildLedgerOrganizationId(identifierType, identifierValue);
+  }
+  if (fallbackOrgId) return fallbackOrgId;
+  throw new Error('Organization ledger identifier requires identifier.additionalType and identifier.value');
 }

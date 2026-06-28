@@ -328,6 +328,7 @@ describe('HostingManager', () => {
     } as any;
     const signedHash = 'signed-pdf-hash-001';
     const unsignedHash = 'unsigned-pdf-hash-001';
+    const ledgerOrgId = 'TAX|acme-id';
 
     await registerOrganizationOnLedger({
       ledgerConfig: mockConfig.ledger,
@@ -335,12 +336,15 @@ describe('HostingManager', () => {
       namespace: mockConfig.namespace,
       hostExternalDomain: mockConfig.hostExternalDomain,
       logger: mockLogger,
-      orgId: 'acme-id',
+      orgId: 'ignored-legacy-org-id',
       organization: {
         id: 'urn:test:org:acme-id',
         type: 'Organization',
         meta: {
           claims: {
+            [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+            [ClaimsOrganizationSchemaorg.identifierValue]: 'acme-id',
+            [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
             [ClaimsOrganizationSchemaorg.alternateName]: 'acme-id',
           },
         },
@@ -370,8 +374,8 @@ describe('HostingManager', () => {
     });
 
     expect(createOrganizationSpy).toHaveBeenCalledTimes(1);
-    expect(createOrganizationSpy).toHaveBeenCalledWith('Org1MSP', 'acme-id', expect.objectContaining({
-      orgId: 'acme-id',
+    expect(createOrganizationSpy).toHaveBeenCalledWith('Org1MSP', ledgerOrgId, expect.objectContaining({
+      orgId: ledgerOrgId,
       vc: expect.objectContaining({
         id: 'urn:vc:governance:1',
       }),
@@ -383,30 +387,30 @@ describe('HostingManager', () => {
     expect(registerKeySpy).toHaveBeenCalledTimes(2);
     expect(registerKeySpy).toHaveBeenNthCalledWith(1, 'Org1MSP', signingThumbprint, expect.objectContaining({
       keyId: signingThumbprint,
-      orgId: 'acme-id',
+      orgId: ledgerOrgId,
       kid: 'sig-key-1',
       use: 'sig',
       purpose: 'organization-signing',
     }));
     expect(registerKeySpy).toHaveBeenNthCalledWith(2, 'Org1MSP', encryptionThumbprint, expect.objectContaining({
       keyId: encryptionThumbprint,
-      orgId: 'acme-id',
+      orgId: ledgerOrgId,
       kid: 'enc-key-1',
       use: 'enc',
       purpose: 'organization-encryption',
     }));
 
     expect(upsertBindingSpy).toHaveBeenCalledTimes(2);
-    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Org1MSP', `organization_acme-id__${signingThumbprint}`, expect.objectContaining({
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Org1MSP', `organization_${ledgerOrgId}__${signingThumbprint}`, expect.objectContaining({
       subjectType: 'organization',
-      subjectId: 'acme-id',
+      subjectId: ledgerOrgId,
       keyId: signingThumbprint,
       relationship: 'organization-signing',
       status: 'active',
     }));
-    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Org1MSP', `organization_acme-id__${encryptionThumbprint}`, expect.objectContaining({
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Org1MSP', `organization_${ledgerOrgId}__${encryptionThumbprint}`, expect.objectContaining({
       subjectType: 'organization',
-      subjectId: 'acme-id',
+      subjectId: ledgerOrgId,
       keyId: encryptionThumbprint,
       relationship: 'organization-encryption',
       status: 'active',
@@ -418,7 +422,7 @@ describe('HostingManager', () => {
       hash: signedHash,
       hashAlg: 'sha256',
       artifactType: 'pdf',
-      declaredBy: 'acme-id',
+      declaredBy: ledgerOrgId,
       declaredByType: 'tenant',
       status: 'declared',
       meta: expect.objectContaining({
@@ -434,7 +438,7 @@ describe('HostingManager', () => {
       artifactId: `artifact_sha256_${signedHash}`,
       eventType: 'declaration',
       eventSubType: 'pdf-signature-observed',
-      actor: 'acme-id',
+      actor: ledgerOrgId,
       actorType: 'tenant',
       artifactHash: signedHash,
       artifactHashAlg: 'sha256',
@@ -454,18 +458,22 @@ describe('HostingManager', () => {
     const upsertBindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
     jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
     jest.spyOn(ManageAssetArtifactEvent.prototype, 'createArtifactEvent').mockResolvedValue({} as any);
+    const ledgerOrgId = 'TAX|fallback-org';
     await registerOrganizationOnLedger({
       ledgerConfig: mockConfig.ledger,
       hostJurisdiction: mockConfig.host.jurisdiction,
       namespace: mockConfig.namespace,
       hostExternalDomain: mockConfig.hostExternalDomain,
       logger: mockLogger,
-      orgId: 'urn:test:org:fallback',
+      orgId: 'legacy-fallback-id',
       organization: {
         id: 'urn:test:org:fallback',
         type: 'Organization',
         meta: {
           claims: {
+            [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+            [ClaimsOrganizationSchemaorg.identifierValue]: 'fallback-org',
+            [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
             [ClaimsOrganizationSchemaorg.alternateName]: 'fallback-org',
           },
         },
@@ -507,7 +515,8 @@ describe('HostingManager', () => {
       kid: 'enc-okp',
       thumbprint: undefined,
     }));
-    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Org1MSP', 'organization_urn:test:org:fallback__did:web:fallback.example.org#sig-akp', expect.objectContaining({
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Org1MSP', `organization_${ledgerOrgId}__did:web:fallback.example.org#sig-akp`, expect.objectContaining({
+      subjectId: ledgerOrgId,
       keyId: 'did:web:fallback.example.org#sig-akp',
       meta: expect.objectContaining({
         attributes: expect.objectContaining({
@@ -515,7 +524,8 @@ describe('HostingManager', () => {
         }),
       }),
     }));
-    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Org1MSP', 'organization_urn:test:org:fallback__did:web:fallback.example.org#enc-okp', expect.objectContaining({
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Org1MSP', `organization_${ledgerOrgId}__did:web:fallback.example.org#enc-okp`, expect.objectContaining({
+      subjectId: ledgerOrgId,
       keyId: 'did:web:fallback.example.org#enc-okp',
       meta: expect.objectContaining({
         attributes: expect.objectContaining({

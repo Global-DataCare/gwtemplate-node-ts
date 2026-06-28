@@ -375,10 +375,9 @@ export class HostingManager {
    *
    * This makes the path-facing tenant id (`alternateName`) explicit:
    * - tax-id-only onboarding becomes `taxID -> identifier.value -> alternateName`
-   * - if a jurisdiction uses a different legal identifier (for example, a
-   *   Canadian incorporation number) and sends it in `identifier.value`, that
-   *   legal identifier wins over `taxID` for `alternateName`, `tenantId`, and
-   *   `vaultId`.
+   * - if a jurisdiction uses a different legal registration identifier and
+   *   sends it in `identifier.value`, that legal identifier wins over `taxID`
+   *   for `alternateName`, `tenantId`, and `vaultId`.
    */
   private applyLegalOrganizationIdentityCompatibility(
     claims: ClaimsRecord,

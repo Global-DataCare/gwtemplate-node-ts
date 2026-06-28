@@ -98,6 +98,9 @@
   free-form payload extensions under `meta.attributes` instead of a parallel
   top-level `metadata` bag, while keeping legacy-read compatibility for older
   stored assets.
+- GW identity-ledger writes now derive the organization ledger id from the
+  canonical legal-id claims as `identifier.additionalType|identifier.value`
+  instead of using the opaque organization URN as the primary ledger key.
 - `src/blockchain/fabric/v3/manageAsset*.ts` wrappers now carry JSDoc that
   clarifies their role as semantic aliases over generic Fabric `submit(...)`
   calls instead of hidden special execution paths.
