@@ -26,6 +26,23 @@ This folder is intentionally separate from `docs-v2/`.
 - Current audited wrapper command:
   - `npm run project:audit:demo`
 
+## Current Document Inventory In This Folder
+
+- `00-project-closeout-todo.md`
+  - closeout status register and remaining gaps
+- `01-newbie-audit-runbook.md`
+  - shortest reproducible local audit path
+- `02-current-state-traceability.md`
+  - exact statement of what the packaged local proof already demonstrates
+- `03-identity-ledger-contract-plan.md`
+  - current identity-ledger contract split and remaining ledger-model rationale
+- `04-trust-bundle-operator-roles.md`
+  - operational role split for Root CA, ICA, host, tenant/member, and local Fabric ownership
+- `05-project-closure-use-cases-and-lifecycles-summary.md`
+  - use cases, lifecycle map, SDK surfaces, and reproducible local stack references
+- `06-project-closure-executive-summary.md`
+  - executive/project-memory draft in Spanish for Word/PDF conversion
+
 ## Current Closeout Matrix
 
 | Item | Status | Notes |
@@ -35,11 +52,15 @@ This folder is intentionally separate from `docs-v2/`.
 | Identity/public-key traceability contract design | Done | documented in `docs-internal/03-identity-ledger-contract-plan.md` |
 | `identity-local` audited smart-contract deployment flow | Done | `organization-sc`, `cryptographickey-sc`, `subjectkeybinding-sc`, `artifact-sc`, `artifactevent-sc`, `employee-sc`, `evidence-sc`, and `credential-sc` deploy and commit locally |
 | GW CORE onboarding writes to identity ledger | Done | tenant organization, cryptographic keys, and subject-key bindings validated on `identity-local` |
+| Inter-tenant contract VC semantic model | Done | closed in `docs-internal/03-identity-ledger-contract-plan.md` and aligned with GW/common-utils tests |
 | Canonical local demo individual bootstrap | Done | default alias remains `Doraemon` |
 | Wrapper command for newbie/auditor demo | Done | `npm run project:audit:demo` |
 | Internal traceability docs separate from `docs-v2` | Done | this `docs-internal/` folder |
 | Cross-repo newbie runbook | Done | `docs-internal/01-newbie-audit-runbook.md` |
 | Exact current-state traceability note | Done | `docs-internal/02-current-state-traceability.md` |
+| Trust bundle operator-role note | Done | `docs-internal/04-trust-bundle-operator-roles.md` |
+| Detailed use-case and lifecycle closeout annex | Done | `docs-internal/05-project-closure-use-cases-and-lifecycles-summary.md` |
+| Executive summary / project-memory draft | Done | `docs-internal/06-project-closure-executive-summary.md` |
 | `compat/legacy` packaged end-to-end runner | Pending | SDK/GW path exists conceptually, but this repo does not yet expose one audited single-command local wrapper |
 | `strict` packaged end-to-end runner | Pending | no audited local single-command path yet |
 | Deterministic keypair proof in closeout runbook | Pending | must be tied to the concrete compat runner, not documented aspirationally |

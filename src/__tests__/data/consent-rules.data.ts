@@ -2,9 +2,10 @@
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import { HealthcareActorRoles, HealthcareConsentActions, HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
+import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SUBJECT_DID } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 
-const testConsentSubject = 'did:web:api.acme.org:individual:123';
+const testConsentSubject = EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SUBJECT_DID;
 
 export const testConsentRulePermitOrgDid = {
   id: 'rule-org',

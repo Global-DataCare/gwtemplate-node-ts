@@ -12,6 +12,13 @@ import {
   testConsentRulePermitOrgDidMultiRole,
 } from '../data/consent-rules.data';
 import { IClearingHouseService } from '../../services/ClearingHouseService';
+import {
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+} from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
 
 describe('OpenIdAuthManager', () => {
   it('should issue a signed access_token for a tenant (org did rule)', async () => {
@@ -39,6 +46,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
       getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
     } as any;
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
@@ -50,6 +58,7 @@ describe('OpenIdAuthManager', () => {
       getAllSections: jest.fn(),
       sectionExists: jest.fn(),
       getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([
         { ...testConsentRulePermitOrgDid },
       ] as any),
@@ -138,6 +147,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
       getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
     } as any;
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
@@ -149,6 +159,7 @@ describe('OpenIdAuthManager', () => {
       getAllSections: jest.fn(),
       sectionExists: jest.fn(),
       getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([
         {
           ...testConsentRulePermitOrgDid,
@@ -230,6 +241,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
       getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
     } as any;
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
@@ -241,6 +253,7 @@ describe('OpenIdAuthManager', () => {
       getAllSections: jest.fn(),
       sectionExists: jest.fn(),
       getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([{ ...testConsentRulePermitJurisdiction }] as any),
       put: jest.fn(),
       get: jest.fn(),
@@ -315,6 +328,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
       getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
     } as any;
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
@@ -326,6 +340,7 @@ describe('OpenIdAuthManager', () => {
       getAllSections: jest.fn(),
       sectionExists: jest.fn(),
       getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([{ ...testConsentRulePermitEmailWildcardRole }] as any),
       put: jest.fn(),
       get: jest.fn(),
@@ -400,6 +415,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
       getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
     } as any;
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
@@ -411,6 +427,7 @@ describe('OpenIdAuthManager', () => {
       getAllSections: jest.fn(),
       sectionExists: jest.fn(),
       getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([{ ...testConsentRulePermitOrgDidMultiRole }] as any),
       put: jest.fn(),
       get: jest.fn(),
@@ -487,6 +504,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
       getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
     } as any;
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
@@ -498,6 +516,7 @@ describe('OpenIdAuthManager', () => {
       getAllSections: jest.fn(),
       sectionExists: jest.fn(),
       getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([{ ...testConsentRulePermitOrgDid }] as any),
       put: jest.fn(),
       get: jest.fn(),
@@ -566,6 +585,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
       getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
     } as any;
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
@@ -577,6 +597,7 @@ describe('OpenIdAuthManager', () => {
       getAllSections: jest.fn(),
       sectionExists: jest.fn(),
       getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([
         { ...testConsentRulePermitOrgDid },
         {
@@ -658,6 +679,7 @@ describe('OpenIdAuthManager', () => {
 
     const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
       getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
     } as any;
 
     const mockVaultRepository: jest.Mocked<IVaultRepository> = {
@@ -669,6 +691,7 @@ describe('OpenIdAuthManager', () => {
       getAllSections: jest.fn(),
       sectionExists: jest.fn(),
       getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([
         {
           ...testConsentRulePermitEmailWildcardRole,
@@ -727,5 +750,201 @@ describe('OpenIdAuthManager', () => {
     } as JobRequest);
 
     expect(response.body.access_token).toBeDefined();
+  });
+
+  it('should require and accept a matching inter-tenant contract for a foreign organization actor', async () => {
+    const mockKmsService: jest.Mocked<IKmsService> = {
+      init: jest.fn(),
+      provisionKeys: jest.fn(),
+      getPublicJwks: jest.fn(),
+      getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' } as any),
+      getPublicEncryptionKey: jest.fn(),
+      getHostPublicJwkSet: jest.fn(),
+      decodeRequest: jest.fn(),
+      signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
+      signWithReconstructedKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+      createCompactJws: jest.fn(),
+      encodeResponse: jest.fn(),
+      protectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getHmacBase64Url: jest.fn(),
+      protectAttributesNameAndValue: jest.fn(),
+    };
+
+    const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
+      getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
+    } as any;
+
+    const mockVaultRepository: jest.Mocked<IVaultRepository> = {
+      createNewVault: jest.fn(),
+      vaultExists: jest.fn().mockResolvedValue(true),
+      getVaultConfig: jest.fn().mockResolvedValue({ id: 'vault' } as any),
+      createNewSection: jest.fn(),
+      updateSection: jest.fn(),
+      getAllSections: jest.fn(),
+      sectionExists: jest.fn(),
+      getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
+      getContainersInSection: jest.fn().mockResolvedValue([
+        {
+          ...testConsentRulePermitOrgDid,
+          'Consent.actor-identifier': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
+          'Consent.purpose': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
+        },
+      ] as any),
+      put: jest.fn(),
+      get: jest.fn(),
+      getHistory: jest.fn(),
+      query: jest.fn(),
+      delete: jest.fn(),
+      purge: jest.fn(),
+    };
+
+    const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
+      verifyVpToken: jest.fn().mockResolvedValue({
+        acr: 'urn:antifraud:acr:openid4vp:employee',
+        amr: ['openid4vp', 'vc'],
+        vpHash: 'hash',
+        ledgerVerified: true,
+      }),
+    };
+
+    const vpPayload = createVP({
+      iss: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
+      sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
+    });
+    addVC(vpPayload, EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL);
+
+    const manager = new OpenIdAuthManager(
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockVaultRepository,
+      mockClearingHouse,
+    );
+
+    const response = await manager.process({
+      tenantId: 'acme',
+      jurisdiction: 'ES',
+      sector: 'health-care',
+      section: 'identity',
+      format: 'openid',
+      resourceType: 'smart',
+      action: 'token',
+      id: '',
+      sequence: 0,
+      status: 'DRAFT' as any,
+      createdAtTimestamp: Date.now(),
+      content: {
+        thid: 'thid',
+        iss: 'did:web:device.example',
+        aud: 'did:web:api.acme.org',
+        body: {
+          sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
+          scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+          purpose: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
+          vp_token: JSON.stringify(vpPayload),
+          acr_values: 'urn:antifraud:acr:openid4vp:employee',
+        },
+      } as any,
+    } as JobRequest);
+
+    expect(response.body.access_token).toBeDefined();
+  });
+
+  it('should deny a foreign organization actor when no matching inter-tenant contract is presented', async () => {
+    const mockKmsService: jest.Mocked<IKmsService> = {
+      init: jest.fn(),
+      provisionKeys: jest.fn(),
+      getPublicJwks: jest.fn(),
+      getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' } as any),
+      getPublicEncryptionKey: jest.fn(),
+      getHostPublicJwkSet: jest.fn(),
+      decodeRequest: jest.fn(),
+      signWithManagedKey: jest.fn(),
+      signWithReconstructedKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+      createCompactJws: jest.fn(),
+      encodeResponse: jest.fn(),
+      protectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getHmacBase64Url: jest.fn(),
+      protectAttributesNameAndValue: jest.fn(),
+    };
+
+    const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
+      getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
+    } as any;
+
+    const mockVaultRepository: jest.Mocked<IVaultRepository> = {
+      createNewVault: jest.fn(),
+      vaultExists: jest.fn().mockResolvedValue(true),
+      getVaultConfig: jest.fn().mockResolvedValue({ id: 'vault' } as any),
+      createNewSection: jest.fn(),
+      updateSection: jest.fn(),
+      getAllSections: jest.fn(),
+      sectionExists: jest.fn(),
+      getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
+      getContainersInSection: jest.fn().mockResolvedValue([
+        {
+          ...testConsentRulePermitOrgDid,
+          'Consent.actor-identifier': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
+          'Consent.purpose': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
+        },
+      ] as any),
+      put: jest.fn(),
+      get: jest.fn(),
+      getHistory: jest.fn(),
+      query: jest.fn(),
+      delete: jest.fn(),
+      purge: jest.fn(),
+    };
+
+    const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
+      verifyVpToken: jest.fn().mockResolvedValue({
+        acr: 'urn:antifraud:acr:openid4vp:employee',
+        amr: ['openid4vp', 'vc'],
+        vpHash: 'hash',
+        ledgerVerified: true,
+      }),
+    };
+
+    const manager = new OpenIdAuthManager(
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockVaultRepository,
+      mockClearingHouse,
+    );
+
+    await expect(manager.process({
+      tenantId: 'acme',
+      jurisdiction: 'ES',
+      sector: 'health-care',
+      section: 'identity',
+      format: 'openid',
+      resourceType: 'smart',
+      action: 'token',
+      id: '',
+      sequence: 0,
+      status: 'DRAFT' as any,
+      createdAtTimestamp: Date.now(),
+      content: {
+        thid: 'thid',
+        iss: 'did:web:device.example',
+        aud: 'did:web:api.acme.org',
+        body: {
+          sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
+          scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+          purpose: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
+          vp_token: JSON.stringify(createVP({
+            iss: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
+          })),
+          acr_values: 'urn:antifraud:acr:openid4vp:employee',
+        },
+      } as any,
+    } as JobRequest)).rejects.toThrow('No active inter-tenant access contract found');
   });
 });

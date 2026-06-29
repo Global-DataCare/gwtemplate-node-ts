@@ -202,6 +202,64 @@ como una secuencia segura:
 Esto deja una separación clara entre gestión de identidad, autorización y
 consumo de información clínica.
 
+Adicionalmente, para escenarios inter-organización ya queda fijado el modelo
+de cierre:
+
+- si el actor pertenece al mismo tenant que emite el token, aplica el flujo
+  habitual de consentimiento/autorización
+- si el actor pertenece a otro tenant, el gateway exige además una VP que
+  transporte una VC de contrato inter-tenant activa
+
+Esa VC contiene como `credentialSubject` un recurso FHIR `Contract`, mientras
+que las firmas de los controllers viven en `proof[]`. De esta forma, la
+credencial verificable actúa como contenedor jurídico y criptográfico, y FHIR
+mantiene el recurso interoperable del acuerdo.
+
+También queda cerrado que:
+
+- el PDF principal del acuerdo firmado se representa mediante
+  `Contract.instantiatesUri`
+- la factura o anexos no forman parte del mínimo obligatorio y, si existen,
+  quedan como soporte documental adicional
+
+Desde el punto de vista de producto y de futura adopción por integradores,
+también queda cerrado el naming de las dos superficies de alto nivel que deben
+enseñarse en la documentación 101:
+
+- `OrganizationControllerSdk`
+- `DigitalTwinSdk`
+
+La primera agrupa el gobierno del acuerdo y de las autorizaciones. La segunda
+agrupa la solicitud del SMART token, la búsqueda de gemelos digitales y la
+lectura o descarga de IPS.
+
+Esto permite explicar el caso de uso de forma comprensible para desarrolladores
+junior:
+
+1. una organización proveedora como `acme` publica y gobierna sus datos
+2. una organización consumidora como `lab` firma el acuerdo inter-tenant
+3. el investigador presenta una VP con la VC del contrato
+4. el gateway emite el SMART token si contrato, purpose, capability y políticas
+   coinciden
+5. con ese token, `DigitalTwinSdk` busca composiciones/gemelos digitales y
+   abre o descarga los IPS resultantes
+
+La validación de cierre ya deja probado, además, un caso didáctico concreto:
+
+- `Doraemon` con un IPS importado
+- `Novita` con dos medicaciones demo (`ibuprofen` y `paracetamol`)
+- búsquedas por `ibuprofen` o `paracetamol` que devuelven exactamente un único
+  digital twin, correspondiente a `Novita`
+
+Por tanto, la justificación puede afirmar con precisión que:
+
+- el backend GW y su contrato de rutas para research access quedan cerrados
+- el flujo funcional de contrato VC -> SMART token -> búsqueda de twin queda
+  probado
+- la futura convergencia pública en `sdk-node` y `sdk-front` es principalmente
+  una tarea de empaquetado documental y de fachada, no un vacío del modelo
+  backend ya validado
+
 ### 5.4 Soporte para criptografía moderna y evolución post-quantum
 
 La plataforma ya contempla una separación explícita entre:
@@ -335,13 +393,7 @@ desarrollado, sino también estructurado para ser integrado y auditado.
 
 ## 11. Alcance Pendiente y Límites del Cierre
 
-Persisten líneas de trabajo posteriores, especialmente en repositorios de
-producto o extensión, como:
-
-- `gdc-unid-node-ts
-- `uhc-unid-chat-node`
-
-Sin embargo, estas piezas deben considerarse evolución o adaptación de canal,
+Persisten líneas de trabajo posteriores. Sin embargo, estas piezas deben considerarse evolución o adaptación de canal,
 no una prueba de que el núcleo arquitectónico y funcional del proyecto siga
 abierto.
 
@@ -364,7 +416,7 @@ de integradores, auditores y clientes.
 
 ## 13. Documentación Complementaria Recomendada
 
-Se recomienda adjuntar a esta memoria:
+Se recomienda como documenatación complementaria:
 
 1. el anexo técnico detallado:
    [05-project-closure-use-cases-and-lifecycles-summary.md](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/docs-internal/05-project-closure-use-cases-and-lifecycles-summary.md)

@@ -328,7 +328,7 @@ describe('HostingManager', () => {
     } as any;
     const signedHash = 'signed-pdf-hash-001';
     const unsignedHash = 'unsigned-pdf-hash-001';
-    const ledgerOrgId = 'TAX|acme-id';
+    const ledgerOrgId = 'urn:org:tax:acme-id';
 
     await registerOrganizationOnLedger({
       ledgerConfig: mockConfig.ledger,
@@ -458,7 +458,7 @@ describe('HostingManager', () => {
     const upsertBindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
     jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
     jest.spyOn(ManageAssetArtifactEvent.prototype, 'createArtifactEvent').mockResolvedValue({} as any);
-    const ledgerOrgId = 'TAX|fallback-org';
+    const ledgerOrgId = 'urn:org:tax:fallback-org';
     await registerOrganizationOnLedger({
       ledgerConfig: mockConfig.ledger,
       hostJurisdiction: mockConfig.host.jurisdiction,

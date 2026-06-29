@@ -169,12 +169,143 @@ Non-negotiable dialogue order:
 
 Not the other way round.
 
+## 8.1 Inter-Tenant SMART Contract Gate
+
+Current closed scope for the closeout narrative:
+
+- two distinct tenants may participate in one access agreement
+- both tenants may be hosted by the same host/operator
+- the host enforces policy and token issuance, but is not yet modeled as the
+  semantic publisher of a host-aggregated `system/ResearchSubject.rs` scope
+
+Canonical example:
+
+- provider tenant: `acme-id` in `health-care`
+- consumer tenant: `lab-id` in `health-research`
+
+Sequence:
+
+1. subject data exists under the provider tenant
+2. subject-level permission/consent rules exist as usual
+3. provider and consumer controllers sign one inter-tenant contract VC whose
+   `credentialSubject` contains a FHIR `Contract`
+4. the consumer professional presents that contract VC inside a VP
+5. GW issues the SMART token only if:
+   - the actor belongs to the consumer organization declared in the contract
+   - the contract is active
+   - the contract provider matches the token issuer tenant
+   - the requested capability matches the allowed scope
+   - the requested purpose matches the allowed purpose
+6. after token issuance, the normal clinical read/search flow continues
+
+Important modeling rule:
+
+- the contract VC is an additional inter-tenant authorization gate
+- it does not replace subject consent
+- it does not claim host-side aggregate digital twin publication
+
+Contract semantics fixed for closeout:
+
+- primary agreement object: VC containing `credentialSubject = FHIR Contract`
+- controller signatures: VC `proof[]`
+- signed agreement PDF/CID: `Contract.instantiatesUri`
+- optional invoice/annexes: `Contract.supportingInfo`
+- derived FHIR audit view: `Contract.relevantHistory` via `Provenance`
+
+## 8.2 Canonical SDK Naming for Research Access
+
+For project closeout and later 101 documentation, the canonical developer-facing
+names are fixed as:
+
+- `OrganizationControllerSdk`
+- `DigitalTwinSdk`
+
+Do not use `DigitalTwinControllerSdk` in closeout, justification, or future 101
+material.
+
+Responsibility split:
+
+- `OrganizationControllerSdk`
+  - formalize the inter-tenant agreement
+  - submit or countersign the contract VC
+  - grant provider-side and consumer-side authorization rules
+  - manage later disable/revoke lifecycle
+- `DigitalTwinSdk`
+  - request the SMART access token with the VP carrying the contract VC
+  - search digital twins
+  - open/read IPS bundles
+  - download one or more IPS results
+
+Important scope note for the closeout narrative:
+
+- the current GW repository proves the backend behavior and route contract
+- the current didactic integration test already simulates both facades
+- the real public `sdk-node` and `sdk-front` façade convergence remains a
+  follow-up packaging task, not a backend gap
+
+## 8.3 101 Teaching Sequence for New Developers
+
+The high-level 101 flow that a developer should learn is now closed as
+follows:
+
+1. `OrganizationControllerSdk`
+   - register or resolve provider tenant `acme`
+   - register or resolve consumer tenant `lab`
+2. `OrganizationControllerSdk`
+   - formalize one inter-tenant contract VC
+   - or at minimum obtain the already signed contract VC to be presented later
+3. `OrganizationControllerSdk`
+   - ensure provider-side permit rules exist for the target digital twins
+   - optionally ensure consumer-side member delegation rules exist
+4. `DigitalTwinSdk`
+   - build one VP carrying the contract VC
+   - request one SMART access token from the provider tenant
+5. `DigitalTwinSdk`
+   - search `digitaltwin/.../Composition/_search` by text and section
+6. `DigitalTwinSdk`
+   - inspect one result and open the IPS
+   - or select several results and download multiple IPS bundles
+
+The canonical teaching example proven in the GW integration suite is:
+
+- provider tenant `acme-id`
+- consumer tenant `lab-id`
+- provider subjects:
+  - `Doraemon` with one IPS imported
+  - `Novita` with medication-only demo bundles
+- research searches:
+  - `ibuprofen`
+  - `paracetamol`
+
+Expected observable behavior:
+
+- searching `ibuprofen` returns exactly one digital twin
+- searching `paracetamol` returns exactly one digital twin
+- both matches resolve to the `Novita` subject
+- the prior IPS import for `Doraemon` remains available and independently
+  searchable/readable
+
+## 8.4 What the 101 Must Make Explicit
+
+To avoid newbie confusion, the future 101 material in `gdc-sdk-node-ts` and
+`gdc-sdk-front-ts` must make explicit:
+
+- which data is collected in frontend forms
+- which VC/VP material is built client-side versus backend-side
+- which GW path each SDK method ultimately targets
+- that smart-contract, queue, and storage plumbing remains inside GW CORE
+- that `did:web` is used for public identity resolution, while the persisted
+  authorization/ledger model uses canonical organization/member URNs
+
+This closes the justification narrative without claiming that the final public
+SDK façade packaging is already published.
+
 ## 9. Digital Twin Search and IPS Retrieval Lifecycle
 
 | Step | Actor | Class / helper | Main method |
 | --- | --- | --- | --- |
-| Search twin / composition | professional | `ProfessionalSdk` | `searchClinicalBundle(...)` |
-| Read latest IPS | professional | `ProfessionalSdk` | `getLatestIps(...)` |
+| Search twin / composition | professional / research consumer | `DigitalTwinSdk` (future public façade) or current `ProfessionalSdk` runtime | `searchClinicalBundle(...)` |
+| Read latest IPS | professional / research consumer | `DigitalTwinSdk` (future public façade) or current `ProfessionalSdk` runtime | `getLatestIps(...)` |
 | Read latest IPS from individual side | individual controller | `IndividualControllerSdk` | `getLatestIps(...)` |
 
 Expected use:
@@ -182,6 +313,14 @@ Expected use:
 - search one `Composition` or twin projection first when the UI needs section-aware discovery
 - request IPS-style bundle after identifying the subject and allowed sections
 - allow one or more sections depending on granted scopes and route input
+
+Closeout naming rule:
+
+- for research-access 101 material, teach this capability under `DigitalTwinSdk`
+- `ProfessionalSdk` remains the current runtime/actor implementation already
+  available today
+- this avoids leaking backend actor-specific naming into the end-user research
+  search narrative
 
 ## 10. Reproducible Local Stack
 

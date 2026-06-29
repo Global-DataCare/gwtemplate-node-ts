@@ -3,6 +3,10 @@ import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schem
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
+import {
+  buildOrganizationAuthorizationUrn,
+  normalizeOrganizationAuthorizationUrn,
+} from 'gdc-common-utils-ts/utils/organization-authorization-urn';
 
 export function tryGetJwkThumbprint(jwk?: PublicJwk): string | undefined {
   if (!jwk) return undefined;
@@ -26,7 +30,10 @@ export function hashLedgerString(input: string): string {
 }
 
 export function buildLedgerOrganizationId(identifierType: string, identifierValue: string): string {
-  return `${identifierType}|${identifierValue}`;
+  return buildOrganizationAuthorizationUrn({
+    identifierType,
+    identifierValue,
+  });
 }
 
 /**
@@ -34,11 +41,11 @@ export function buildLedgerOrganizationId(identifierType: string, identifierValu
  * claims used across GW onboarding.
  *
  * Format:
- * - `identifier.additionalType|identifier.value`
+ * - `urn:org:<identifier.additionalType-lowercase>:<identifier.value>`
  *
  * Examples for the current EU-focused code/tests:
- * - `TAX|VATES-<local-id>`
- * - `TAX|<local-tax-id>`
+ * - `urn:org:tax:VATES-<local-id>`
+ * - `urn:org:tax:<local-tax-id>`
  *
  * Jurisdiction remains a separate concern carried by claims/VC fields such as
  * `Organization.address.addressCountry` and, when a jurisdiction needs it,
@@ -50,6 +57,6 @@ export function resolveLedgerOrganizationId(claims?: ClaimsRecord, fallbackOrgId
   if (identifierType && identifierValue) {
     return buildLedgerOrganizationId(identifierType, identifierValue);
   }
-  if (fallbackOrgId) return fallbackOrgId;
+  if (fallbackOrgId) return normalizeOrganizationAuthorizationUrn(fallbackOrgId);
   throw new Error('Organization ledger identifier requires identifier.additionalType and identifier.value');
 }

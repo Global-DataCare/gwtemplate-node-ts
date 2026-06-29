@@ -17,6 +17,7 @@ import { getIndividualSectionId } from '../utils/individual-sections';
 import { IClearingHouseService } from '../services/ClearingHouseService';
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/consent';
+import { getMatchingInterTenantAccessContractFromVpToken } from 'gdc-common-utils-ts/utils/inter-tenant-access-contract';
 
 type TokenRequestBody = {
   scope?: string;
@@ -88,6 +89,11 @@ export class OpenIdAuthManager implements IJobProcessor {
     const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
     const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
     if (!tenantExists) throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
+    const issuerDidDoc = await this.tenantsCacheManager.getDidDocument(tenantVaultId);
+    const issuerDid = issuerDidDoc?.id || job.content?.aud;
+    if (!issuerDid) {
+      throw new ManagerError('Could not resolve token issuer DID.', IssueType.Exception);
+    }
 
     // --- Consent Rule Check (MVP) ---
     // This is a minimal permission gate to support unit/integration tests.
@@ -97,6 +103,33 @@ export class OpenIdAuthManager implements IJobProcessor {
     // - apply deny-overrides and purpose logic.
     const actor = parseActorFromSub(sub);
     const purpose = body.purpose?.trim();
+    const requestedCapabilities = this.extractRequestedCapabilities(scope);
+
+    // Inter-tenant contract gate:
+    // - issuerDid = tenant that is about to issue the SMART token
+    // - actor.organization = organization of the requesting professional/researcher
+    // - if both differ, this is no longer an intra-tenant access request
+    // - in that case the VP must carry one contract VC proving:
+    //   1. provider organization = issuer tenant (`acme`)
+    //   2. consumer organization = foreign requester tenant (`lab`)
+    //   3. capability allows the requested scope
+    //      example: `organization/Composition.rs`
+    //   4. purpose allows the requested business reason
+    //      example: `RESEARCH`
+    if (actor.organization && actor.organization !== issuerDid) {
+      const matchingContract = getMatchingInterTenantAccessContractFromVpToken(vpToken, {
+        providerOrganizationDid: issuerDid,
+        consumerOrganizationDid: actor.organization,
+        requiredCapabilities: requestedCapabilities,
+        purpose,
+      });
+      if (!matchingContract) {
+        throw new ManagerError(
+          `No active inter-tenant access contract found for consumer '${actor.organization}'.`,
+          IssueType.Forbidden,
+        );
+      }
+    }
     const rules = await this.vaultRepository.getContainersInSection<any>(tenantVaultId, getIndividualSectionId(subject, 'rules'));
     const evaluation = this.evaluateRequestedConsent({
       rules,
@@ -125,11 +158,6 @@ export class OpenIdAuthManager implements IJobProcessor {
     const tokenType = body.token_type || 'Bearer';
 
     const issuerVaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector, job.tenantId);
-    const issuerDidDoc = await this.tenantsCacheManager.getDidDocument(issuerVaultId);
-    const issuerDid = issuerDidDoc?.id || job.content?.aud;
-    if (!issuerDid) {
-      throw new ManagerError('Could not resolve token issuer DID.', IssueType.Exception);
-    }
 
     const legacyEnabled = process.env.SMART_TOKEN_LEGACY !== 'false';
     const legacyAlgCandidate = (process.env.LEGACY_SIGN_ALG === 'ES256' || process.env.LEGACY_SIGN_ALG === 'ES384')
@@ -248,6 +276,18 @@ export class OpenIdAuthManager implements IJobProcessor {
       if (resourceType) resourceTypes.add(resourceType);
     }
     return Array.from(resourceTypes);
+  }
+
+  private extractRequestedCapabilities(scope: string): string[] {
+    return Array.from(new Set(
+      scope
+        .split(/\s+/)
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => value.split('?', 1)[0]?.trim())
+        .filter((value): value is string => Boolean(value))
+        .filter((value) => value.toLowerCase().startsWith('organization/')),
+    ));
   }
 
   private evaluateRequestedConsent(input: {

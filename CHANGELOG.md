@@ -1,5 +1,40 @@
 ## [Unreleased]
 
+## [1.19.1] - 2026-06-29
+
+### Changed
+- Tightened SMART inter-tenant authorization so a foreign organization actor
+  can obtain a token from a tenant only when the presented `vp_token`
+  contains one active inter-tenant access contract VC whose FHIR `Contract`
+  subject matches:
+  - provider organization DID = token-issuing tenant
+  - consumer organization DID = requesting actor organization
+  - requested capability scope(s)
+  - requested purpose when the contract declares one
+  Files:
+  - `src/managers/OpenIdAuthManager.ts`
+  - `src/__tests__/managers/OpenIdAuthManager.test.ts`
+  - `src/__tests__/integration/identity/smart-token.test.ts`
+- Added one didactic inter-tenant research-access integration flow that
+  packages the current GW behavior as the future high-level
+  `OrganizationControllerSdk` + `DigitalTwinSdk` choreography:
+  - provider tenant `acme-id`
+  - consumer tenant `lab-id`
+  - subject `Doraemon` with one IPS import
+  - subject `Novita` with demo `ibuprofen` and `paracetamol` medication flows
+  - SMART token issuance from contract VC proof
+  - `digitaltwin/.../Composition/_search` returning one digital twin for
+    `ibuprofen` and one for `paracetamol`
+  Files:
+  - `src/__tests__/integration/helpers/research-access-sdk.ts`
+  - `src/__tests__/integration/identity/research-access.conversation.test.ts`
+- Closed the internal closeout naming/documentation rule so research-access 101
+  material consistently uses `OrganizationControllerSdk` + `DigitalTwinSdk`
+  rather than `DigitalTwinControllerSdk`, and explicitly documents that GW
+  retains smart-contract, queue, and storage plumbing:
+  - `docs-internal/05-project-closure-use-cases-and-lifecycles-summary.md`
+  - `docs-internal/06-project-closure-executive-summary.md`
+
 ## [1.19.0] - 2026-06-29
 
 ### Added
