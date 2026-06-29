@@ -177,7 +177,20 @@ describe('Host activation Offer/Order route story', () => {
     }
   });
 
-  it('submit _activate, poll Offer, submit Order, and poll commercial confirmation', async () => {
+  /**
+   * Contract guard for the legacy activation flow.
+   *
+   * This test must fail if `_activate-response` returns `201` but does not
+   * include the canonical Offer identifier in
+   * `meta.claims['org.schema.Offer.identifier']`.
+   *
+   * Reason:
+   * - `Order/_batch` must reuse that exact Offer id in
+   *   `Order.acceptedOffer.identifier`
+   * - validating only the final Order success is not enough, because a BFF/SDK
+   *   can only continue if activation exposes the claim explicitly
+   */
+  it('legacy _activate-response exposes the canonical Offer identifier in meta.claims and Order reuses that exact value', async () => {
     const activationPayload = buildActivationPayload();
     const activationUrl = '/host/cds-es/v1/test/registry/org.schema/Organization/_activate';
 
@@ -205,9 +218,13 @@ describe('Host activation Offer/Order route story', () => {
 
     const activationResult = JSON.parse(activationPoll.text) as { data: Array<Record<string, any>> };
     const activationEntry = activationResult.data[0];
-    const offerId = String(activationEntry.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
+    const canonicalOfferId = activationEntry.meta?.claims?.[ClaimsOfferSchemaorg.identifier];
+    const offerId = String(canonicalOfferId || '');
 
     expect(activationEntry.response.status).toBe('201');
+    expect(activationEntry.type).toBe('Organization-activation-response-v1.0');
+    expect(canonicalOfferId).toBeDefined();
+    expect(typeof canonicalOfferId).toBe('string');
     expect(offerId).toContain(':Offer:');
 
     const orderPayload = structuredClone(ORGANIZATION_ORDER_REQUEST) as any;

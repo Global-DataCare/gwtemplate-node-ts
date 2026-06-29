@@ -4,7 +4,7 @@
     "title": "Gateway API - CORE",
     "version": "1.0.3",
     "description": "CORE API documentation for the secure gateway canonical flow.",
-    "x-profile-generated-at": "2026-06-28T10:31:05.719Z",
+    "x-profile-generated-at": "2026-06-29T13:56:44.346Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -182,7 +182,7 @@
     "examples": {
       "OrganizationRegistrationPlaintextMessage": {
         "summary": "Plaintext Message for Organization Registration",
-        "description": "A DIDComm-like message wrapper containing the registration claims. This is the format for `application/didcomm-plain+json`.",
+        "description": "Transport-wrapper example for `application/didcomm-plain+json`. It shows the outer compatibility envelope accepted by GW CORE on the wire; app-facing onboarding docs should teach actor SDK flows first, not this wrapper.",
         "value": {
           "jti": "org-registration-request-<test-id>",
           "thid": "org-registration-thread-<test-id>",
@@ -401,7 +401,7 @@
       },
       "OrganizationVerificationTransactionPlaintextMessage": {
         "summary": "Plaintext Message for Organization Verification Transaction",
-        "description": "A DIDComm-like message wrapper for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This is the canonical legal-organization onboarding route and does not require `_activate` as a follow-up step.",
+        "description": "Transport-wrapper example for host `Organization/_transaction`. GW CORE forwards the signed PDF evidence, controller business binding key, optional organization credential-signing key, and legal-representative payload to ICA `_verify`. This is the canonical legal-organization onboarding route and does not require `_activate` as a follow-up step.",
         "value": {
           "jti": "organization-verification-transaction-request-<test-id>",
           "thid": "organization-verification-transaction-thread-<test-id>",
@@ -758,7 +758,7 @@
       },
       "OrganizationOrderPlaintextMessage": {
         "summary": "Plaintext Message for Organization Order",
-        "description": "A DIDComm-like message wrapper accepting an Offer via an Order. Order.acceptedOffer.identifier is required and must match the full Offer identifier URN returned by the Organization registration _batch-response (use {{offerId}} placeholder in Swagger UI).",
+        "description": "Transport-wrapper example accepting an Offer via an Order. Order.acceptedOffer.identifier is required and must match the full Offer identifier URN returned by the Organization registration _batch-response (use {{offerId}} placeholder in Swagger UI).",
         "value": {
           "jti": "org-order-request-<test-id>",
           "thid": "org-order-thread-<test-id>",
@@ -1138,7 +1138,7 @@
       },
       "FamilyRegistrationPlaintextMessage": {
         "summary": "Plaintext Message for Family Registration with online PDF link",
-        "description": "A DIDComm-like message wrapper containing the family organization claims. Default examples use contextualized `org.schema` claim keys such as `Organization.identifier.value` and `Service.category` because the gateway default claim-storage mode accepts omitted `org.schema.` prefixes when `@context` is `org.schema`. If the service is configured with `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, the same logical claims may also be sent fully qualified as `org.schema.*`. For signed-PDF onboarding, `Organization.owner.identifier.value` is expected to come from the signer certificate `serialNumber` (for example `IDCES-...`), not from the controller email. The signed individual PDF attachment accepts either `attachments[].data.links[0]` (preferred online URL form) or `attachments[].data.base64` (embedded legacy form). `Service.termsOfService` accepts either an HTTPS URL or an embedded `data:application/pdf;base64,...` payload; Swagger shows the URL form by default.",
+        "description": "Transport-wrapper example containing the family organization claims. Default examples use contextualized `org.schema` claim keys such as `Organization.identifier.value` and `Service.category` because the gateway default claim-storage mode accepts omitted `org.schema.` prefixes when `@context` is `org.schema`. If the service is configured with `CLAIMS_IDENTITY_STORAGE_MODE=canonical`, the same logical claims may also be sent fully qualified as `org.schema.*`. For signed-PDF onboarding, `Organization.owner.identifier.value` is expected to come from the signer certificate `serialNumber` (for example `IDCES-...`), not from the controller email. The signed individual PDF attachment accepts either `attachments[].data.links[0]` (preferred online URL form) or `attachments[].data.base64` (embedded legacy form). `Service.termsOfService` accepts either an HTTPS URL or an embedded `data:application/pdf;base64,...` payload; Swagger shows the URL form by default.",
         "value": {
           "jti": "family-registration-request-<test-id>",
           "thid": "family-registration-thread-<test-id>",
@@ -1491,7 +1491,7 @@
       },
       "ResearchCompositionIngestionPlaintextMessage": {
         "summary": "Plaintext Message for Research Digital Twin Composition Ingestion",
-        "description": "A DIDComm-like message wrapper containing a `body.data[]` array of Composition resource objects generated by a pre-conversion adapter.",
+        "description": "Transport-wrapper example containing a `body.data[]` array of Composition resource objects generated by a pre-conversion adapter.",
         "value": {
           "jti": "research-composition-request-<test-id>",
           "thid": "research-composition-thread-<test-id>",

@@ -4,11 +4,14 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import path from 'path';
 
 import {
+  buildX5cChain,
   bufferToPem,
   createCertificate,
   deriveKeyPair,
   generateMSPID,
   saveJwkDidAndCredential,
+  writeArtifactManifest,
+  writeX509ChainArtifacts,
 } from '../src/utils/pki';
 import { loadOrganizationIdentity } from '../src/utils/organization-json';
 import { confirmOverwrite, getArgValue, getEnvName, loadKdfConfig, promptSeed } from './utils/pki-script-utils';
@@ -97,8 +100,22 @@ async function main() {
   writeFileSync(path.join(outDir, 'ica-cert.der'), icaCert);
   writeFileSync(path.join(outDir, 'private-jwk.json'), JSON.stringify(icaKeyPair.jwk, null, 2));
   writeFileSync(path.join(outDir, 'ca-cert.der'), caCertDer);
+  writeX509ChainArtifacts(outDir, [icaCert, caCertDer]);
   const { d: _priv, ...pubJwk } = icaKeyPair.jwk;
-  await saveJwkDidAndCredential(icaAuthority, pubJwk, icaKeyPair.kid, outDir);
+  await saveJwkDidAndCredential(icaAuthority, pubJwk, icaKeyPair.kid, outDir, {
+    x5c: buildX5cChain([icaCert, caCertDer]),
+    x5u: `https://${icaAuthority.domain}/.well-known/x509.der`,
+  });
+  writeArtifactManifest(outDir, icaAuthority, {
+    role: 'ICA',
+    did: `did:web:${icaAuthority.domain}`,
+    didFile: `did-${icaAuthority.domain}.json`,
+    jwksFile: `jwks-${icaAuthority.domain}.json`,
+    credentialFile: `LegalParticipantCredential-${icaAuthority.domain}.jsonld`,
+    x509DerFile: 'x509.der',
+    x509ChainDerFile: 'x509-chain.der',
+    extraFiles: ['ica-cert.der', 'ica-cert.pem', 'ca-cert.der'],
+  });
 }
 
 main().catch((error) => {

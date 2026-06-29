@@ -9,17 +9,39 @@ import { AdapterCryptoSdkNode } from '../../../gdc-backend-utils-node/adapters/n
 import { mockKmsService } from '../../mocks/kms.mock';
 import { HostingManager } from '../../../managers/HostingManager';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
-import { generateTenantCollectionNameFromClaims } from '../../../utils/tenant';
+import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../../utils/tenant';
 import { testClaimsHostInitialization } from '../../data/end-to-end.data';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
 import { testDefaultTenantServiceTypeClaim, testTenant1TenantId } from '../../data/organization.data';
+import { ORGANIZATION_ORDER_JOB, ORGANIZATION_REGISTRATION_JOB } from '../../data/example-jobs';
+import {
+  ClaimsOfferSchemaorg,
+  ClaimsOrderSchemaorg,
+  ClaimsOrganizationSchemaorg,
+  ClaimsServiceSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
+import { AppAuthorizationManager } from '../../../managers/AppAuthorizationManager';
+import { composeHostDidWebId } from '../../../utils/did-backend';
+import { getClaimsInFirstDataEntry } from 'gdc-common-utils-ts/utils/bundle-reader';
 
+/**
+ * Business-matching regression for owner multi-email lists.
+ *
+ * Case under test:
+ * 1. two family organizations share one overlapping owner email
+ * 2. they differ by alternateName and by the second email in the owner list
+ * 3. `_search` must recover the correct organization when the caller provides
+ *    the distinguishing email plus the family nickname
+ */
 describe('FamilyManager multi-email integration (web/app)', () => {
   const mockQueueAdapter = { addJob: jest.fn() };
   const mockStorageAdapter: jest.Mocked<IStorageAdapter> = { upload: jest.fn() };
   const mockLogger: jest.Mocked<ILogger> = { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
+  const mockAppAuthManager = {
+    verifyBearerToken: jest.fn(async () => ({ payload: { sub: 'test-user', tenant_id: testTenant1TenantId } })),
+  } as unknown as AppAuthorizationManager;
 
   let app: express.Express;
   let vaultRepository: VaultMemRepository;
@@ -68,10 +90,37 @@ describe('FamilyManager multi-email integration (web/app)', () => {
       mockStorageAdapter,
       mockLogger,
       config,
+      { hostCollectionName, hostDid: composeHostDidWebId(config.apiBaseUrl, config.hostExternalDomain) } as any,
     );
 
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await tenantsCacheManager.loadHost();
+
+    const regJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    regJob.sector = Sector.HEALTH_CARE;
+    regJob.content = {
+      ...regJob.content,
+      body: {
+        ...regJob.content!.body,
+        data: regJob.content!.body!.data.map((entry: any) => ({
+          ...entry,
+          meta: {
+            ...entry.meta,
+            claims: {
+              ...entry.meta.claims,
+              [ClaimsServiceSchemaorg.category]: Sector.HEALTH_CARE,
+            },
+          },
+        })),
+      },
+    } as any;
+    const offerPayload = await hostingManager.process(regJob);
+    const offerId = getClaimsInFirstDataEntry(offerPayload.body)[ClaimsOfferSchemaorg.identifier] as string;
+    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    orderJob.sector = Sector.HEALTH_CARE;
+    orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    await hostingManager.process(orderJob);
+    await tenantsCacheManager.refreshTenant(getTenantVaultId(Sector.HEALTH_CARE, testTenant1TenantId));
 
     const asyncResponseStore = new AsyncResponseStoreMem();
     const crypto = new CryptographyService(new AdapterCryptoSdkNode());
@@ -83,12 +132,19 @@ describe('FamilyManager multi-email integration (web/app)', () => {
       vaultRepository,
       crypto,
       'http://host.example.com',
+      mockAppAuthManager,
     );
 
     app = express();
     app.use('/', apiRouter);
   });
 
+  /**
+   * Step 1: create family org #1 with owner emails `mailA,mailB`.
+   * Step 2: create family org #2 with owner emails `mailA,mailC`.
+   * Step 3: search using `mailC + alternateName`.
+   * Step 4: assert GW returns org #2, not org #1.
+   */
   it('should create two organizations with same owner (multi-email) and recover one by apodo and email', async () => {
     const tenantId = testTenant1TenantId;
     const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_batch`;
@@ -99,21 +155,25 @@ describe('FamilyManager multi-email integration (web/app)', () => {
     const org2Emails = 'parent1@example.com,parent3@example.com';
     const individualNickname1 = 'FAMILIA-UNO';
     const individualNickname2 = 'FAMILIA-DOS';
+    const ownerTelephone = '+34600000001';
+    const ownerIdentifierValue = 'parent1@example.com';
+    const providerDid = 'did:web:provider.example.com';
+    const addressCountry = 'ES';
 
     const baseClaims = {
-      'org.schema.Organization.owner.telephone': '+34600000001',
-      'org.schema.Organization.owner.email': org1Emails,
-      'org.schema.Organization.owner.identifier.value': 'parent1@example.com',
-      'org.schema.Organization.alternateName': individualNickname1,
-      'org.schema.Service.identifier': 'did:web:provider.example.com',
-      'org.schema.Service.serviceType': testDefaultTenantServiceTypeClaim,
-      'org.schema.Service.category': 'health-care',
-      'org.schema.Organization.addressCountry': 'ES',
+      [ClaimsOrganizationSchemaorg.ownerTelephone]: ownerTelephone,
+      [ClaimsOrganizationSchemaorg.ownerEmail]: org1Emails,
+      [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: ownerIdentifierValue,
+      [ClaimsOrganizationSchemaorg.alternateName]: individualNickname1,
+      [ClaimsServiceSchemaorg.identifier]: providerDid,
+      [ClaimsServiceSchemaorg.serviceType]: testDefaultTenantServiceTypeClaim,
+      [ClaimsServiceSchemaorg.category]: Sector.HEALTH_CARE,
+      [ClaimsOrganizationSchemaorg.addressCountry]: addressCountry,
     };
     const baseClaims2 = {
       ...baseClaims,
-      'org.schema.Organization.owner.email': org2Emails,
-      'org.schema.Organization.alternateName': individualNickname2,
+      [ClaimsOrganizationSchemaorg.ownerEmail]: org2Emails,
+      [ClaimsOrganizationSchemaorg.alternateName]: individualNickname2,
     };
 
     // Create org1
@@ -188,18 +248,18 @@ describe('FamilyManager multi-email integration (web/app)', () => {
           data: [{
             type: 'Family-registration-form-v1.0',
             meta: { claims: {
-              'org.schema.Organization.owner.email': 'parent3@example.com',
-              'org.schema.Organization.alternateName': individualNickname2,
-              'org.schema.Service.category': 'health-care',
+              [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent3@example.com',
+              [ClaimsOrganizationSchemaorg.alternateName]: individualNickname2,
+              [ClaimsServiceSchemaorg.category]: Sector.HEALTH_CARE,
             } },
           }],
         },
       },
     };
     const searchResult = await hostingManager.process(searchJob);
-    const found = searchResult.body.data[0];
-    expect(found.meta.claims['org.schema.Organization.alternateName']).toBe(individualNickname2);
-    expect(found.meta.claims['org.schema.Organization.owner.email']).toContain('parent3@example.com');
-    expect(found.meta.claims['org.schema.FamilyRegistration.status']).toBe('already_exists');
+    const foundClaims = getClaimsInFirstDataEntry(searchResult.body);
+    expect(foundClaims[ClaimsOrganizationSchemaorg.alternateName]).toBe(individualNickname2);
+    expect(String(foundClaims[ClaimsOrganizationSchemaorg.ownerEmail] || '')).toContain('parent3@example.com');
+    expect(foundClaims['org.schema.FamilyRegistration.status']).toBe('already_exists');
   });
 });

@@ -17,6 +17,10 @@ import { getTenantVaultId } from '../utils/tenant';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { DeviceLicense, DeviceInfo } from 'gdc-common-utils-ts/models/device-license';
 import { getEnvSectionId } from '../utils/section-env';
+import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
+import { DidDocument, VerificationMethod } from '../gdc-backend-utils-node/models/did';
+import { registerSubjectKeysOnLedger, revokeSubjectKeysOnLedger } from '../utils/ledger-device-registration';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -111,6 +115,14 @@ export class DeviceRegistrationManager implements IJobProcessor {
       }
 
       const vaultId = getTenantVaultId(sector as any, tenantId);
+      const licenseDoc = await this.resolveLicenseByActivationCode(code as string, vaultId);
+      const deviceIdentityContext = await this.prepareEmployeeDeviceIdentityContext({
+        job,
+        vaultId,
+        registrationRequest,
+        licenseDoc,
+        clientId,
+      });
       const deviceProfile = {
         type: 'DeviceProfile',
         clientId,
@@ -123,6 +135,8 @@ export class DeviceRegistrationManager implements IJobProcessor {
         jwks: registrationRequest.jwks,
         ext_device_info: registrationRequest.ext_device_info,
         softwareClaims,
+        subjectId: deviceIdentityContext?.subjectId,
+        verificationMethodIds: deviceIdentityContext?.newVerificationMethods.map((method) => method.id),
         createdAt: new Date().toISOString(),
       };
 
@@ -140,7 +154,6 @@ export class DeviceRegistrationManager implements IJobProcessor {
       await this.vaultRepository.put(vaultId, [protectedDeviceProfile], getEnvSectionId('device-profiles'));
 
       // Bind the activated license seat to this client_id and capture a minimal device fingerprint.
-      const licenseDoc = await this.resolveLicenseByActivationCode(code as string, vaultId);
       if (licenseDoc) {
         const license = licenseDoc.content as DeviceLicense & Record<string, any>;
         const fingerprint: DeviceInfo = {
@@ -157,6 +170,15 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
         licenseDoc.sequence = (licenseDoc.sequence || 0) + 1;
         await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+      }
+
+      if (deviceIdentityContext) {
+        await this.finalizeEmployeeDeviceIdentityContext({
+          job,
+          vaultId,
+          clientId,
+          context: deviceIdentityContext,
+        });
       }
 
       // --- Response Formatting Step ---
@@ -278,6 +300,268 @@ export class DeviceRegistrationManager implements IJobProcessor {
       throw new ManagerError('Multiple licenses found for the same activation code.', IssueType.Exception);
     }
     return licenseDocs[0];
+  }
+
+  private async prepareEmployeeDeviceIdentityContext(params: {
+    job: JobRequest;
+    vaultId: string;
+    registrationRequest: DcrRegistrationRequest;
+    licenseDoc?: ConfidentialStorageDoc;
+    clientId: string;
+  }): Promise<{
+    subjectId: string;
+    employeeDoc: ConfidentialStorageDoc;
+    employeeContent: EntityConfig;
+    previousDeviceId?: string;
+    previousDeviceProfileDoc?: ConfidentialStorageDoc;
+    previousVerificationMethods: VerificationMethod[];
+    newVerificationMethods: VerificationMethod[];
+  } | undefined> {
+    const subjectId = String((params.licenseDoc?.content as any)?.subjectId || '').trim();
+    if (!subjectId) return undefined;
+
+    const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(
+      params.vaultId,
+      subjectId,
+      getEnvSectionId('employees'),
+    );
+    if (!employeeDoc) return undefined;
+
+    const employeeContent = this.kmsService
+      ? await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, params.vaultId)
+      : (employeeDoc.content as EntityConfig);
+    if (!employeeContent?.didDocument?.id) return undefined;
+
+    const previousDeviceId = String((params.licenseDoc?.content as any)?.deviceId || '').trim() || undefined;
+    const previousDeviceProfileDoc = previousDeviceId
+      ? await this.vaultRepository.get<ConfidentialStorageDoc>(
+        params.vaultId,
+        previousDeviceId,
+        getEnvSectionId('device-profiles'),
+      )
+      : undefined;
+    const previousDeviceProfileContent = previousDeviceProfileDoc
+      ? (this.kmsService
+        ? await this.kmsService.unprotectConfidentialData<any>(previousDeviceProfileDoc, params.vaultId)
+        : (previousDeviceProfileDoc.content as any))
+      : undefined;
+
+    return {
+      subjectId,
+      employeeDoc,
+      employeeContent,
+      previousDeviceId,
+      previousDeviceProfileDoc,
+      previousVerificationMethods: this.extractVerificationMethodsFromProfile(
+        employeeContent.didDocument,
+        previousDeviceProfileContent,
+      ),
+      newVerificationMethods: this.buildVerificationMethodsForDid(
+        employeeContent.didDocument.id,
+        params.registrationRequest.jwks,
+      ),
+    };
+  }
+
+  private async finalizeEmployeeDeviceIdentityContext(params: {
+    job: JobRequest;
+    vaultId: string;
+    clientId: string;
+    context: {
+      subjectId: string;
+      employeeDoc: ConfidentialStorageDoc;
+      employeeContent: EntityConfig;
+      previousDeviceId?: string;
+      previousDeviceProfileDoc?: ConfidentialStorageDoc;
+      previousVerificationMethods: VerificationMethod[];
+      newVerificationMethods: VerificationMethod[];
+    };
+  }): Promise<void> {
+    const {
+      employeeDoc,
+      employeeContent,
+      previousDeviceId,
+      previousDeviceProfileDoc,
+      previousVerificationMethods,
+      newVerificationMethods,
+      subjectId,
+    } = params.context;
+
+    const updatedDidDocument = this.mergeDeviceVerificationMethods(
+      employeeContent.didDocument as DidDocument,
+      previousVerificationMethods.map((method) => method.id),
+      newVerificationMethods,
+    );
+
+    const updatedEmployeeContent: EntityConfig = {
+      ...employeeContent,
+      didDocument: updatedDidDocument,
+      meta: {
+        ...(employeeContent.meta || {}),
+        lastUpdated: new Date().toISOString(),
+      },
+    };
+
+    const updatedEmployeeDoc: ConfidentialStorageDoc = {
+      ...employeeDoc,
+      status: updatedEmployeeContent.status,
+      sequence: (employeeDoc.sequence || 0) + 1,
+      content: updatedEmployeeContent,
+    };
+    const protectedEmployeeDoc = this.kmsService
+      ? await this.kmsService.protectConfidentialData(updatedEmployeeDoc, params.vaultId)
+      : updatedEmployeeDoc;
+    await this.vaultRepository.put(params.vaultId, [protectedEmployeeDoc], getEnvSectionId('employees'));
+
+    const organizationId = String(params.job.tenantId || '').trim() || params.vaultId;
+    if (previousVerificationMethods.length > 0) {
+      await revokeSubjectKeysOnLedger({
+        jurisdiction: params.job.jurisdiction,
+        organizationId,
+        subjectType: 'employee',
+        subjectId: updatedDidDocument.id,
+        verificationMethods: previousVerificationMethods,
+        deviceId: previousDeviceId,
+      });
+    }
+    if (newVerificationMethods.length > 0) {
+      await registerSubjectKeysOnLedger({
+        jurisdiction: params.job.jurisdiction,
+        organizationId,
+        subjectType: 'employee',
+        subjectId: updatedDidDocument.id,
+        verificationMethods: newVerificationMethods,
+        deviceId: params.clientId,
+      });
+    }
+
+    if (previousDeviceProfileDoc && previousDeviceId && previousDeviceId !== params.clientId) {
+      const previousContent = this.kmsService
+        ? await this.kmsService.unprotectConfidentialData<any>(previousDeviceProfileDoc, params.vaultId)
+        : (previousDeviceProfileDoc.content as any);
+      const revokedDeviceProfileDoc: ConfidentialStorageDoc = {
+        ...previousDeviceProfileDoc,
+        status: 'revoked',
+        sequence: (previousDeviceProfileDoc.sequence || 0) + 1,
+        content: {
+          ...(previousContent || {}),
+          status: 'revoked',
+          revokedAt: new Date().toISOString(),
+          replacedByClientId: params.clientId,
+          subjectId,
+        },
+      };
+      const protectedRevokedProfile = this.kmsService
+        ? await this.kmsService.protectConfidentialData(revokedDeviceProfileDoc, params.vaultId)
+        : revokedDeviceProfileDoc;
+      await this.vaultRepository.put(
+        params.vaultId,
+        [protectedRevokedProfile],
+        getEnvSectionId('device-profiles'),
+      );
+    }
+  }
+
+  private buildVerificationMethodsForDid(subjectDid: string, jwks?: any): VerificationMethod[] {
+    const keys = Array.isArray(jwks?.keys) ? jwks.keys : [];
+    const methods: VerificationMethod[] = [];
+
+    keys.forEach((rawKey: PublicJwk, index: number) => {
+      const key = rawKey as PublicJwk & { key_ops?: string[]; use?: string; alg?: string; crv?: string };
+      const keyIdFragment = String(key.kid || `device-key-${index + 1}`).trim();
+      const verificationMethodId = `${subjectDid}#${keyIdFragment}`;
+      const method: VerificationMethod = {
+        id: verificationMethodId,
+        type: 'JsonWebKey2020',
+        controller: subjectDid,
+        publicKeyJwk: key,
+      };
+
+      const isSignatureKey = key.use === 'sig'
+        || Boolean(key.key_ops?.includes('sign'))
+        || String(key.alg || '').toUpperCase().startsWith('ML-DSA')
+        || String(key.alg || '').toUpperCase().startsWith('ES');
+      const isEncryptionKey = key.use === 'enc'
+        || Boolean(key.key_ops?.includes('encrypt'))
+        || String(key.alg || '').toUpperCase().startsWith('ECDH')
+        || String(key.crv || '').toUpperCase().startsWith('ML-KEM');
+
+      if (isSignatureKey || isEncryptionKey) {
+        methods.push(method);
+      }
+    });
+
+    return methods;
+  }
+
+  private extractVerificationMethodsFromProfile(didDocument: DidDocument, profileContent: any): VerificationMethod[] {
+    if (!didDocument?.verificationMethod?.length) return [];
+
+    const profileMethodIds = Array.isArray(profileContent?.verificationMethodIds)
+      ? profileContent.verificationMethodIds.map((value: unknown) => String(value || '').trim()).filter(Boolean)
+      : [];
+    if (profileMethodIds.length > 0) {
+      const methodIdSet = new Set(profileMethodIds);
+      return didDocument.verificationMethod.filter((method) => methodIdSet.has(String(method.id || '').trim()));
+    }
+
+    const subjectDid = String(didDocument.id || '').trim();
+    const fallbackMethods = this.buildVerificationMethodsForDid(subjectDid, profileContent?.jwks);
+    const fallbackIds = new Set(fallbackMethods.map((method) => method.id));
+    return didDocument.verificationMethod.filter((method) => fallbackIds.has(String(method.id || '').trim()));
+  }
+
+  private mergeDeviceVerificationMethods(
+    didDocument: DidDocument,
+    previousMethodIds: string[],
+    newVerificationMethods: VerificationMethod[],
+  ): DidDocument {
+    const removalSet = new Set(previousMethodIds.map((id) => String(id || '').trim()).filter(Boolean));
+    const verificationMethods = Array.isArray(didDocument.verificationMethod) ? [...didDocument.verificationMethod] : [];
+    const authentication = Array.isArray(didDocument.authentication) ? [...didDocument.authentication] : [];
+    const assertionMethod = Array.isArray(didDocument.assertionMethod) ? [...didDocument.assertionMethod] : [];
+    const keyAgreement = Array.isArray(didDocument.keyAgreement) ? [...didDocument.keyAgreement] : [];
+
+    const nextVerificationMethods = verificationMethods.filter((method) => !removalSet.has(String(method.id || '').trim()));
+    const filterReferences = (entries: Array<string | VerificationMethod>) => entries.filter((entry) => {
+      const id = typeof entry === 'string' ? entry : String(entry?.id || '').trim();
+      return !removalSet.has(id);
+    });
+
+    const nextAuthentication = filterReferences(authentication);
+    const nextAssertionMethod = filterReferences(assertionMethod);
+    const nextKeyAgreement = filterReferences(keyAgreement);
+    const existingIds = new Set(nextVerificationMethods.map((method) => String(method.id || '').trim()));
+
+    newVerificationMethods.forEach((method) => {
+      const methodId = String(method.id || '').trim();
+      if (!methodId || existingIds.has(methodId)) return;
+
+      nextVerificationMethods.push(method);
+      existingIds.add(methodId);
+
+      const use = String((method.publicKeyJwk as any)?.use || '').trim().toLowerCase();
+      const alg = String((method.publicKeyJwk as any)?.alg || '').trim().toUpperCase();
+      const crv = String((method.publicKeyJwk as any)?.crv || '').trim().toUpperCase();
+      const isSignatureKey = use === 'sig' || alg.startsWith('ML-DSA') || alg.startsWith('ES');
+      const isEncryptionKey = use === 'enc' || alg.startsWith('ECDH') || crv.startsWith('ML-KEM');
+
+      if (isSignatureKey) {
+        nextAuthentication.push(methodId);
+        nextAssertionMethod.push(methodId);
+      }
+      if (isEncryptionKey) {
+        nextKeyAgreement.push(methodId);
+      }
+    });
+
+    return {
+      ...didDocument,
+      verificationMethod: nextVerificationMethods,
+      authentication: Array.from(new Set(nextAuthentication.map((entry) => typeof entry === 'string' ? entry : String(entry.id || '').trim()))),
+      assertionMethod: Array.from(new Set(nextAssertionMethod.map((entry) => typeof entry === 'string' ? entry : String(entry.id || '').trim()))),
+      keyAgreement: Array.from(new Set(nextKeyAgreement.map((entry) => typeof entry === 'string' ? entry : String(entry.id || '').trim()))),
+    };
   }
 
   private async handleSearch(job: JobRequest): Promise<IDecodedDidcommPayload> {

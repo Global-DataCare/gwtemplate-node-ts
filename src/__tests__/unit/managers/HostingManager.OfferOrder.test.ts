@@ -62,7 +62,9 @@ import * as tenantUtils from '../../../utils/tenant';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { testTenant1LegalName } from '../../data/organization.data';
 import { HostingManager } from '../../../managers/HostingManager';
+import { HOST_ORDER_REQUIRED_INPUT_DISPLAY_CLAIMS } from '../../../managers/hosting/hosting-claim-contracts';
 import { generateLicenseOffer } from '../../../utils/offer';
+import { buildOfferOrderIndexedAttributes } from '../../../utils/offer-order-read-model';
 
 
 export const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
@@ -120,6 +122,7 @@ describe('HostingManager - Offer/Order Flow', () => {
         idType: 'test-id',
         idValue: '12345',
       },
+      maxHeaderSize: 16384,
       mongo: { dbName: 'test' },
       firebase: {},
     };
@@ -131,6 +134,7 @@ describe('HostingManager - Offer/Order Flow', () => {
       mockStorageAdapter,
       mockLogger,
       mockConfig,
+      { hostCollectionName, hostDid: 'did:web:testhost.com' },
     );
 
     mockKmsService.getPublicJwks.mockResolvedValue({
@@ -163,7 +167,7 @@ describe('HostingManager - Offer/Order Flow', () => {
 
 
   it('should create a PROVISIONAL tenant record and return an Offer', async () => {
-    const job = { ...ORGANIZATION_REGISTRATION_JOB };
+    const job = structuredClone(ORGANIZATION_REGISTRATION_JOB);
     const responsePayload = await hostingManager.process(job);
     const entry = responsePayload.body.data[0];
     expect(entry.response.status).toBe('201');
@@ -195,7 +199,7 @@ describe('HostingManager - Offer/Order Flow', () => {
 
   it('should process an Order to finalize a registration', async () => {
     // Step 1: Create the provisional registration to get an Offer ID
-    const registrationJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    const registrationJob = structuredClone(ORGANIZATION_REGISTRATION_JOB);
     const offerResponse = await hostingManager.process(registrationJob);
     const offerId = offerResponse.body.data[0].meta.claims[
       ClaimsOfferSchemaorg.identifier
@@ -203,7 +207,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     expect(offerId).toBeDefined();
 
     // Step 2: Create and process the Order
-    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
     orderJob.content!.body!.data[0]!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = offerId;
@@ -269,13 +273,13 @@ describe('HostingManager - Offer/Order Flow', () => {
     process.env.PAYMENT_ORCHESTRATION_MODE = 'portal-bff';
     process.env.PAYMENT_VERIFICATION_MODE = 'mock';
 
-    const registrationJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    const registrationJob = structuredClone(ORGANIZATION_REGISTRATION_JOB);
     const offerResponse = await hostingManager.process(registrationJob);
     const registrationOfferId = offerResponse.body.data[0].meta.claims[
       ClaimsOfferSchemaorg.identifier
     ] as string;
 
-    const registrationOrder = { ...ORGANIZATION_ORDER_JOB };
+    const registrationOrder = structuredClone(ORGANIZATION_ORDER_JOB);
     registrationOrder.content!.body!.data[0]!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = registrationOfferId;
@@ -303,6 +307,11 @@ describe('HostingManager - Offer/Order Flow', () => {
       id: String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]),
       status: 'active',
       sequence: 0,
+      meta: { claims: extraOfferClaims },
+      indexed: {
+        attributes: buildOfferOrderIndexedAttributes(extraOfferClaims as Record<string, unknown>),
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
       content: { claims: extraOfferClaims },
     } as ConfidentialStorageDoc, 'host');
     await vaultRepository.put(hostCollectionName, [secureOfferDoc], getEnvSectionId('communications'));
@@ -312,7 +321,7 @@ describe('HostingManager - Offer/Order Flow', () => {
       getEnvSectionId('device-licenses'),
     );
 
-    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
     orderJob.content!.body!.data[0]!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]);
@@ -345,7 +354,7 @@ describe('HostingManager - Offer/Order Flow', () => {
   });
 
   it('should return a 404 Not Found for an Order with an invalid offerId', async () => {
-    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
     orderJob.content!.body!.data[0]!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = EXAMPLE_LICENSE_INVALID_OFFER_ID;
@@ -359,21 +368,87 @@ describe('HostingManager - Offer/Order Flow', () => {
     );
   });
 
+  /**
+   * Consumer contract guard for `Order/_batch`.
+   *
+   * This test must fail if Order processing ever starts accepting a payload
+   * that omits `Order.acceptedOffer.identifier`, because that would hide a
+   * broken producer (`_activate` or `_transaction`) instead of surfacing it.
+   */
+  it('should return a 400 Bad Request for an Order without acceptedOffer.identifier', async () => {
+    // Step 1: remove both accepted-offer representations so the manager cannot
+    // recover through alias resolution and must fail the consumer contract.
+    const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
+    delete orderJob.content!.body!.data[0]!.meta!.claims.Order?.acceptedOffer;
+    delete orderJob.content!.body!.data[0]!.meta!.claims[HOST_ORDER_REQUIRED_INPUT_DISPLAY_CLAIMS[0]];
+    delete orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier];
+
+    const responsePayload = await hostingManager.process(orderJob);
+
+    // Step 2: assert the external public claim label, not an internal storage
+    // key, because that is the contract integrators actually see.
+    const errorEntry = responsePayload.body.data[0];
+    expect(errorEntry.response.status).toBe('400');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain(
+      `Missing required claim in Order: '${HOST_ORDER_REQUIRED_INPUT_DISPLAY_CLAIMS[0]}'`,
+    );
+  });
+
   it('should reopen hosted Offer and Order records through _search for portal-style read models', async () => {
-    const registrationJob = { ...ORGANIZATION_REGISTRATION_JOB };
-    const offerResponse = await hostingManager.process(registrationJob);
-    const offerId = offerResponse.body.data[0].meta.claims[
+    process.env.PAYMENT_ORCHESTRATION_MODE = 'portal-bff';
+    process.env.PAYMENT_VERIFICATION_MODE = 'mock';
+
+    const registrationJob = structuredClone(ORGANIZATION_REGISTRATION_JOB);
+    const registrationOfferResponse = await hostingManager.process(registrationJob);
+    const registrationOfferId = registrationOfferResponse.body.data[0].meta.claims[
       ClaimsOfferSchemaorg.identifier
     ] as string;
 
-    const orderJob = { ...ORGANIZATION_ORDER_JOB };
-    orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
-    await hostingManager.process(orderJob);
+    const registrationOrder = structuredClone(ORGANIZATION_ORDER_JOB);
+    registrationOrder.content!.body!.data[0]!.meta!.claims[
+      ClaimsOrderSchemaorg.acceptedOfferIdentifier
+    ] = registrationOfferId;
+    await hostingManager.process(registrationOrder);
 
     const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;
     const tenantAlternateName =
       regClaims[ClaimsOrganizationSchemaorg.alternateName]
       || regClaims[ClaimsOrganizationSchemaorg.identifierValue];
+
+    const extraOfferClaims = generateLicenseOffer(
+      2,
+      'did:web:testhost.com',
+      'us',
+      Sector.HEALTH_CARE,
+      ['Stripe'],
+    );
+    extraOfferClaims[ClaimsOrganizationSchemaorg.alternateName] = tenantAlternateName;
+    const offerId = String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]);
+
+    const secureOfferDoc = await mockKmsService.protectConfidentialData({
+      id: offerId,
+      status: 'active',
+      sequence: 0,
+      meta: { claims: extraOfferClaims },
+      indexed: {
+        attributes: buildOfferOrderIndexedAttributes(extraOfferClaims as Record<string, unknown>),
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
+      content: { claims: extraOfferClaims },
+    } as ConfidentialStorageDoc, 'host');
+    await vaultRepository.put(hostCollectionName, [secureOfferDoc], getEnvSectionId('communications'));
+
+    const commercialOrder = structuredClone(ORGANIZATION_ORDER_JOB);
+    commercialOrder.content!.body!.data[0]!.meta!.claims[
+      ClaimsOrderSchemaorg.acceptedOfferIdentifier
+    ] = offerId;
+    commercialOrder.content!.body!.data[0]!.meta!.claims[
+      ClaimsOrderSchemaorg.paymentMethod
+    ] = 'Stripe';
+    commercialOrder.content!.body!.data[0]!.meta!.claims[
+      ClaimsOrderSchemaorg.partOfInvoice
+    ] = 'in_test_search_001';
+    await hostingManager.process(commercialOrder);
 
     const offerSearch = await hostingManager.process({
       id: 'job-host-offer-search-1',

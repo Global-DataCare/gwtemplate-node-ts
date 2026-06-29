@@ -19,6 +19,7 @@ import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
+import { formatMissingRequiredClaimDiagnostic, toExternalClaimLabel } from '../utils/claim-contract';
 import {
   buildOfferOrderIndexedAttributes,
   buildOfferOrderSearchRow,
@@ -520,9 +521,15 @@ export class FamilyManager {
       throw new ManagerError('Malformed order entry: missing meta.claims', IssueType.Required);
     }
 
-    const offerId = getClaimValue<string>(claims, 'Order.acceptedOffer.identifier');
+    const offerId = getClaimValue<string>(claims, ClaimsOrderSchemaorg.acceptedOfferIdentifier);
     if (!offerId) {
-      throw new ManagerError(`Missing required claim in Order: 'Order.acceptedOffer.identifier'`, IssueType.Required);
+      throw new ManagerError(
+        formatMissingRequiredClaimDiagnostic(ClaimsOrderSchemaorg.acceptedOfferIdentifier, {
+          context: 'in Order',
+          displayLabel: toExternalClaimLabel(ClaimsOrderSchemaorg.acceptedOfferIdentifier),
+        }),
+        IssueType.Required,
+      );
     }
 
     const tenantId = job.tenantId;

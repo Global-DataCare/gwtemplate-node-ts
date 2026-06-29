@@ -35,6 +35,8 @@ FHIR-like `Communication` vs internal `CommMsgExtended`, read first:
 - Environment-variable reference: [docs-v2/22-environment-variables-reference.md](docs-v2/22-environment-variables-reference.md)
 - Testing and live E2E operations: [TESTING.md](TESTING.md)
 - Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)
+- Shared controller/device lifecycle note:
+  [gdc-sdk-core-ts/docs/ARCHITECTURE_CONTROLLER_DEVICE_LIFECYCLES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/ARCHITECTURE_CONTROLLER_DEVICE_LIFECYCLES.md)
 - Main docs index: [docs/README.md](docs/README.md)
 - Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
 - Employee bundle/lifecycle contract reference: [gdc-sdk-core-ts/docs/101-EMPLOYEES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-EMPLOYEES.md)
@@ -702,6 +704,16 @@ Leaf certificates are named with:
 ## Fabric Devnet (Optional)
 
 ## Security Modes
+
+Transport note:
+
+- This section documents inbound HTTP compatibility and envelope handling for
+  GW CORE operators.
+- It is not the recommended app-integration teaching surface for onboarding,
+  controller recovery, or device lifecycle.
+- Product integrations should follow the actor-scoped SDK lifecycles in
+  `gdc-sdk-node-ts` / `gdc-sdk-front-ts`; these flags only explain what the GW
+  host accepts on the wire.
 
 `SECURITY_MODE` and `NETWORK_MODE` are independent controls:
 - `SECURITY_MODE`: inbound content/auth policy (`strict|compat|demo`).

@@ -4,10 +4,13 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import path from 'path';
 
 import {
+  buildX5cChain,
   bufferToPem,
   createCertificate,
   deriveKeyPair,
   saveJwkDidAndCredential,
+  writeArtifactManifest,
+  writeX509ChainArtifacts,
 } from '../src/utils/pki';
 import { loadOrganizationIdentity } from '../src/utils/organization-json';
 import { confirmOverwrite, getArgValue, getEnvName, loadKdfConfig, promptSeed } from './utils/pki-script-utils';
@@ -73,9 +76,23 @@ async function main() {
 
   writeFileSync(path.join(outDir, 'root-cert.pem'), bufferToPem(cert, 'CERTIFICATE'));
   writeFileSync(path.join(outDir, 'root-cert.der'), cert);
+  writeX509ChainArtifacts(outDir, [cert]);
   writeFileSync(path.join(outDir, 'private-jwk.json'), JSON.stringify(keyPair.jwk, null, 2));
   const { d: _priv, ...pubJwk } = keyPair.jwk;
-  await saveJwkDidAndCredential(authority, pubJwk, keyPair.kid, outDir);
+  await saveJwkDidAndCredential(authority, pubJwk, keyPair.kid, outDir, {
+    x5c: buildX5cChain([cert]),
+    x5u: `https://${authority.domain}/.well-known/x509.der`,
+  });
+  writeArtifactManifest(outDir, authority, {
+    role: 'CA',
+    did: `did:web:${authority.domain}`,
+    didFile: `did-${authority.domain}.json`,
+    jwksFile: `jwks-${authority.domain}.json`,
+    credentialFile: `LegalParticipantCredential-${authority.domain}.jsonld`,
+    x509DerFile: 'x509.der',
+    x509ChainDerFile: 'x509-chain.der',
+    extraFiles: ['root-cert.der', 'root-cert.pem'],
+  });
 }
 
 main().catch((error) => {

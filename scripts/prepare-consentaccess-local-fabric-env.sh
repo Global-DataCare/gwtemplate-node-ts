@@ -60,18 +60,22 @@ cat >> "${OUT_ENV}" <<EOF
 # remain the final effective values.
 #
 # Important local rule:
-# - host bootstrap on the generic organization ledger stays disabled here
-# - consent-access writes still go to Fabric because the dedicated write-path
-#   adapter is activated by CONSENT_ACCESS_LEDGER_CHAINCODE and the provider map
-# LEDGER_ENABLED=false avoids crashing local startup in HostingManager while the
-# consent-access-specific Fabric adapter remains active.
+# - local-network now exercises both the identity ledger and consent ledger
+# - host/tenant onboarding writes go to identity-local
+# - consent lifecycle writes go to health-care-local
 NETWORK_MODE=${NETWORK_MODE_VALUE}
-LEDGER_ENABLED=false
+LEDGER_ENABLED=true
 LEDGER_PROVIDER_DEFAULT=mem
 LEDGER_PROVIDER_MAP=test=mem,local-network=fabric,test-network=fabric,network=fabric
 LEDGER_MSP_ID=${LEDGER_MSP_ID_VALUE}
 LEDGER_FABRIC_MSP_ID=${LEDGER_MSP_ID_VALUE}
 LEDGER_FABRIC_ITEM_TYPE=credential
+LEDGER_ORG_CHAINCODE=organization-sc
+LEDGER_CRYPTOGRAPHIC_KEY_CHAINCODE=cryptographickey-sc
+LEDGER_SUBJECT_KEY_BINDING_CHAINCODE=subjectkeybinding-sc
+LEDGER_ARTIFACT_CHAINCODE=artifact-sc
+LEDGER_ARTIFACT_EVENT_CHAINCODE=artifactevent-sc
+LEDGER_EVIDENCE_CHAINCODE=evidence-sc
 LEDGER_IDENTITY_CHANNEL_DEFAULT=${IDENTITY_CHANNEL_NAME}
 AS_LOCAL_HOST=true
 HLF_DATA_CHANNEL_NAME=${CHANNEL_NAME}

@@ -31,6 +31,30 @@ Relevant source anchors:
 - `src/adapters/CredentialLedgerAdapterFabric.ts`
 - `src/managers/ConsentManager.ts`
 
+Boundary note:
+
+- the local baseline consumes `../fabric-multicloud/devnet/fabric-v3` as a
+  deterministic Docker devnet
+- it must not be described as the same thing as staging or multi-cloud
+  infrastructure
+- `local-network` must stay documented as its own local environment contract
+
+### Current packaging reality
+
+Today the local Fabric runtime is split like this:
+
+- `gwtemplate-node-ts`
+  - local wrappers and orchestrators
+  - GW env preparation
+  - local chaincode deploy wrappers
+- `../fabric-multicloud/devnet/fabric-v3`
+  - Docker devnet
+  - channel bootstrap scripts
+  - generated backend Fabric connection material
+
+So the local devnet is reproducible, but it is not yet fully vendored inside
+`gwtemplate-node-ts`.
+
 ### Current local channel reality
 
 Do not document a local `research` channel as if it already existed.
@@ -188,6 +212,11 @@ Optional local smoke for the existing on-chain path:
 bash ./scripts/smoke-consentaccess-local-network.sh
 bash ./scripts/smoke-consentaccess-lifecycle-local-network.sh
 ```
+
+Do not document `npm i` in `fabric-multicloud` root for this path unless a
+specific subdirectory actually requires it. The current local bootstrap only
+depends on the devnet shell scripts and Docker assets under
+`devnet/fabric-v3`.
 
 ### Decision record
 

@@ -106,6 +106,17 @@ async function main() {
   });
 
   if (config.deployChaincode) {
+    await runStep('fabric-deploy-identity-chaincodes', {
+      cwd: fabricDevnetRoot,
+      command: 'bash',
+      args: ['./scripts/05-deploy-identity-chaincodes.sh'],
+      env: {
+        GWTEMPLATE_DIR: repoRoot,
+        CHANNEL_NAME: config.identityChannel,
+        HLF_IDENTITY_CHANNEL_NAME: config.identityChannel,
+      },
+    });
+
     await runStep('fabric-deploy-consentaccess-chaincode', {
       cwd: repoRoot,
       command: 'bash',
@@ -117,7 +128,7 @@ async function main() {
     });
   }
 
-  if (config.restartGw && isPidAlive(readPidFile())) {
+  if (config.restartGw) {
     await runStep('gw-stop-existing', {
       cwd: repoRoot,
       command: 'npm',
@@ -205,8 +216,8 @@ function printHelp() {
   console.log(`Usage: node scripts/bootstrap-local-fabric-stack.mjs [options]
 
 Bootstraps the local Fabric devnet, prepares GW local-fabric env, deploys the
-local consent-access chaincode, starts GW CORE in background, and bootstraps
-tenant acme-id by default.
+local identity and consent-access chaincodes, starts GW CORE in background, and
+bootstraps tenant acme-id by default.
 
 Options:
   --tenant-id <id>           Tenant to bootstrap. Default: acme-id

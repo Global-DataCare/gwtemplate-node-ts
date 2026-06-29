@@ -14,12 +14,21 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { generateTenantCollectionNameFromClaims } from '../../../utils/tenant';
 import { testClaimsHostInitialization } from '../../data/end-to-end.data';
 import { ORGANIZATION_ORDER_JOB, ORGANIZATION_REGISTRATION_JOB } from '../../data/example-jobs';
-import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import {
+  ClaimsOfferSchemaorg,
+  ClaimsOrderSchemaorg,
+  ClaimsOrganizationSchemaorg,
+  ClaimsServiceSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
+import { getClaimsInFirstDataEntry } from 'gdc-common-utils-ts/utils/bundle-reader';
 import { FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
 import { testTenant1TenantId } from '../../data/organization.data';
+import { AppAuthorizationManager } from '../../../managers/AppAuthorizationManager';
+import { getTenantVaultId } from '../../../utils/tenant';
+import { composeHostDidWebId } from '../../../utils/did-backend';
 
 async function invokeExpress(
   handler: any,
@@ -102,10 +111,22 @@ async function invokeExpress(
   return { status: statusCode, headers, text: responseText };
 }
 
+/**
+ * Step-by-step route coverage for current individual/family compatibility endpoints.
+ *
+ * Why this suite exists:
+ * 1. prove the route validator accepts the current individual organization paths
+ * 2. prove submit returns async `202 + Location`
+ * 3. avoid mixing this route smoke suite with the richer business matching
+ *    semantics covered in `family.multiphone` and `family.multimail`
+ */
 describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbox-safe)', () => {
   const mockQueueAdapter = { addJob: jest.fn() };
   const mockStorageAdapter: jest.Mocked<IStorageAdapter> = { upload: jest.fn() };
   const mockLogger: jest.Mocked<ILogger> = { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
+  const mockAppAuthManager = {
+    verifyBearerToken: jest.fn(async () => ({ payload: { sub: 'test-user', tenant_id: testTenant1TenantId } })),
+  } as unknown as AppAuthorizationManager;
 
   let app: express.Express;
   let vaultRepository: VaultMemRepository;
@@ -154,6 +175,7 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
       mockStorageAdapter,
       mockLogger,
       config,
+      { hostCollectionName, hostDid: composeHostDidWebId(config.apiBaseUrl, config.hostExternalDomain) } as any,
     );
 
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
@@ -161,11 +183,30 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
 
     // Create and finalize the provider tenant so the API path validator allows `individual/org.schema/Organization`.
     const regJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    regJob.sector = Sector.HEALTH_CARE;
+    regJob.content = {
+      ...regJob.content,
+      body: {
+        ...regJob.content!.body,
+        data: regJob.content!.body!.data.map((entry: any) => ({
+          ...entry,
+          meta: {
+            ...entry.meta,
+            claims: {
+              ...entry.meta.claims,
+              [ClaimsServiceSchemaorg.category]: Sector.HEALTH_CARE,
+            },
+          },
+        })),
+      },
+    } as any;
     const offerPayload = await hostingManager.process(regJob);
-    const offerId = offerPayload.body.data[0].meta.claims[ClaimsOfferSchemaorg.identifier] as string;
+    const offerId = getClaimsInFirstDataEntry(offerPayload.body)[ClaimsOfferSchemaorg.identifier] as string;
     const orderJob = { ...ORGANIZATION_ORDER_JOB };
-    orderJob.content!.body!.data[0]!.meta!.claims['Order.acceptedOffer.identifier'] = offerId;
+    orderJob.sector = Sector.HEALTH_CARE;
+    orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
     await hostingManager.process(orderJob);
+    await tenantsCacheManager.refreshTenant(getTenantVaultId(Sector.HEALTH_CARE, testTenant1TenantId));
 
     const asyncResponseStore = new AsyncResponseStoreMem();
     const crypto = new CryptographyService(new AdapterCryptoSdkNode());
@@ -177,12 +218,18 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
       vaultRepository,
       crypto,
       'http://host.example.com',
+      mockAppAuthManager,
     );
 
     app = express();
     app.use('/', apiRouter);
   });
 
+  /**
+   * Step 1: submit the legacy compatibility `_batch` path.
+   * Step 2: assert the router accepts it and enqueues one async job.
+   * Step 3: assert the poll location points to `_batch-response`.
+   */
   it('should return 202 Accepted for a valid family registration request', async () => {
     const tenantId = testTenant1TenantId;
     const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_batch`;
@@ -220,6 +267,11 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
     expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * Step 1: submit the current `_transaction` alias for the same family input.
+   * Step 2: assert the alias is accepted by the same route validator.
+   * Step 3: assert polling continues through `_transaction-response`.
+   */
   it('should return 202 Accepted for the _transaction alias on family registration', async () => {
     const tenantId = testTenant1TenantId;
     const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_transaction`;
@@ -257,6 +309,11 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
     expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * Step 1: submit the explicit individual purge route.
+   * Step 2: carry the minimum locator claims required by current GW matching.
+   * Step 3: assert the router exposes the async `_purge-response` poll path.
+   */
   it('should return 202 Accepted for the _purge action on individual organization', async () => {
     const tenantId = testTenant1TenantId;
     const url = `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_purge`;
@@ -279,10 +336,10 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
             type: 'Family-purge-request-v1.0',
             meta: {
               claims: {
-                'org.schema.Organization.owner.telephone': '+34600000001',
-                'org.schema.Organization.owner.email': 'parent@example.com',
-                'org.schema.Organization.alternateName': 'Ana',
-                'org.schema.Service.category': Sector.HEALTH_CARE,
+                [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
+                [ClaimsOrganizationSchemaorg.ownerEmail]: 'parent@example.com',
+                [ClaimsOrganizationSchemaorg.alternateName]: 'Ana',
+                [ClaimsServiceSchemaorg.category]: Sector.HEALTH_CARE,
               },
             },
           }],

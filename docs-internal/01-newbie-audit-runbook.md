@@ -18,6 +18,25 @@ Starting from a fresh workspace, prove that:
 This is the current packaged local audit baseline. It is the recommended first
 run before attempting broader SDK dialogue or ICA-hosted lifecycle suites.
 
+## Trust Material First
+
+If the local proof must include reproducible CA -> ICA -> host or tenant trust
+material, generate it from this repo before starting the runtime stack:
+
+```bash
+npm run pki:bundle -- --config scripts/examples/trust-bundle.local.example.json
+```
+
+That produces:
+
+- `did.json`
+- `jwks.json`
+- `x509.der`
+- `manifest.json`
+
+for the generated entities. The config file is a template and may need local
+path adjustments for sibling repos.
+
 ## Repositories
 
 Clone these sibling repositories under the same workspace directory:
@@ -36,6 +55,17 @@ required immediately:
 The other two are needed for broader cross-repo lifecycle demonstrations and
 follow-up evidence.
 
+Important scope note:
+
+- `../fabric-multicloud/devnet/fabric-v3` is the current local deterministic
+  Fabric devnet consumed by this repo
+- do not present that local devnet as equivalent to any staging or multi-cloud
+  infrastructure topology
+- keep the local audited flow documented as a separate environment with its own
+  channels, bootstrap commands, and runtime expectations
+- staging, test-network, and production/multicloud topologies must stay
+  documented separately
+
 ## Prerequisites
 
 - Node.js 20+
@@ -49,25 +79,26 @@ follow-up evidence.
 Run `npm i` in each repo you cloned:
 
 ```bash
-cd /Users/fernando/GITS/gdc-workspace/fabric-multicloud
+cd "$HOME/GITS/gdc-workspace/gwtemplate-node-ts"
 npm i
 
-cd /Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts
+cd "$HOME/GITS/gdc-workspace/gdc-sdk-node-ts"
 npm i
 
-cd /Users/fernando/GITS/gdc-workspace/gdc-sdk-node-ts
-npm i
-
-cd /Users/fernando/GITS/gdc-workspace/dataspace-ica-ts
+cd "$HOME/GITS/gdc-workspace/dataspace-ica-ts"
 npm i
 ```
+
+Do not run `npm i` in `fabric-multicloud` root as part of this baseline. The
+current local flow only requires the shell scripts under
+`../fabric-multicloud/devnet/fabric-v3`.
 
 ## Fastest Current Proof
 
 From `gwtemplate-node-ts`:
 
 ```bash
-cd /Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts
+cd "$HOME/GITS/gdc-workspace/gwtemplate-node-ts"
 npm run project:audit:demo
 ```
 
@@ -144,6 +175,8 @@ Important:
 - those broader SDK runs are not yet folded into `npm run project:audit:demo`
 - treat them as follow-up evidence, not as already-packaged one-command proof in
   this repo
+- the infrastructure anchor stays in `gwtemplate-node-ts`; `gdc-sdk-node-ts`
+  is the consumer-side validation layer, not the owner of local Fabric bootstrap
 
 ## Current Limits
 

@@ -6,12 +6,15 @@ import { Crypto } from '@peculiar/webcrypto';
 import * as pkijs from 'pkijs';
 import {
   AuthorityConfig,
+  buildX5cChain,
   bufferToPem,
   createCertificate,
   deriveKeyPair,
   generateMSPID,
   resolveOutputDir,
   saveJwkDidAndCredential,
+  writeArtifactManifest,
+  writeX509ChainArtifacts,
 } from './pki';
 
 type PkiChainOptions = {
@@ -177,8 +180,22 @@ export async function generatePkiChainFromEnv(options?: PkiChainOptions): Promis
   const rootOut = resolveOutputDir('full-pki-chain-root-ca');
   writeFileSync(`${rootOut}/root-cert.pem`, bufferToPem(rootCert, 'CERTIFICATE'));
   writeFileSync(`${rootOut}/root-cert.der`, rootCert);
+  writeX509ChainArtifacts(rootOut, [rootCert]);
   const { d: _rootPriv, ...rootPubJwk } = rootKeyPair.jwk;
-  await saveJwkDidAndCredential(rootCA, rootPubJwk, rootKeyPair.kid, rootOut);
+  await saveJwkDidAndCredential(rootCA, rootPubJwk, rootKeyPair.kid, rootOut, {
+    x5c: buildX5cChain([rootCert]),
+    x5u: `https://${rootCA.domain}/.well-known/x509.der`,
+  });
+  writeArtifactManifest(rootOut, rootCA, {
+    role: 'CA',
+    did: `did:web:${rootCA.domain}`,
+    didFile: `did-${rootCA.domain}.json`,
+    jwksFile: `jwks-${rootCA.domain}.json`,
+    credentialFile: `LegalParticipantCredential-${rootCA.domain}.jsonld`,
+    x509DerFile: 'x509.der',
+    x509ChainDerFile: 'x509-chain.der',
+    extraFiles: ['root-cert.der', 'root-cert.pem'],
+  });
   writeFileSync(`${rootOut}/private-jwk.json`, JSON.stringify(rootKeyPair.jwk, null, 2));
 
   // ICA
@@ -193,8 +210,22 @@ export async function generatePkiChainFromEnv(options?: PkiChainOptions): Promis
   const icaOut = resolveOutputDir('full-pki-chain-ica');
   writeFileSync(`${icaOut}/ica-cert.pem`, bufferToPem(icaCert, 'CERTIFICATE'));
   writeFileSync(`${icaOut}/ica-cert.der`, icaCert);
+  writeX509ChainArtifacts(icaOut, [icaCert, rootCert]);
   const { d: _icaPriv, ...icaPubJwk } = icaKeyPair.jwk;
-  await saveJwkDidAndCredential(ica, icaPubJwk, icaKeyPair.kid, icaOut);
+  await saveJwkDidAndCredential(ica, icaPubJwk, icaKeyPair.kid, icaOut, {
+    x5c: buildX5cChain([icaCert, rootCert]),
+    x5u: `https://${ica.domain}/.well-known/x509.der`,
+  });
+  writeArtifactManifest(icaOut, ica, {
+    role: 'ICA',
+    did: `did:web:${ica.domain}`,
+    didFile: `did-${ica.domain}.json`,
+    jwksFile: `jwks-${ica.domain}.json`,
+    credentialFile: `LegalParticipantCredential-${ica.domain}.jsonld`,
+    x509DerFile: 'x509.der',
+    x509ChainDerFile: 'x509-chain.der',
+    extraFiles: ['ica-cert.der', 'ica-cert.pem'],
+  });
   writeFileSync(`${icaOut}/private-jwk.json`, JSON.stringify(icaKeyPair.jwk, null, 2));
 
   // Host / MSP
@@ -214,7 +245,20 @@ export async function generatePkiChainFromEnv(options?: PkiChainOptions): Promis
   writeFileSync(`${hostOut}/signcerts/cert.der`, hostCertBuffer);
   writeFileSync(`${hostOut}/cacerts/root-cert.pem`, bufferToPem(rootCert, 'CERTIFICATE'));
   writeFileSync(`${hostOut}/intermediatecerts/ica-cert.pem`, bufferToPem(icaCert, 'CERTIFICATE'));
-  writeFileSync(`${hostOut}/x509-chain.der`, Buffer.concat([hostCertBuffer, icaCert, rootCert]));
+  writeX509ChainArtifacts(hostOut, [hostCertBuffer, icaCert, rootCert]);
   const { d: _hostPriv, ...hostPubJwk } = hostKeyPair.jwk;
-  await saveJwkDidAndCredential(hostCert, hostPubJwk, hostKeyPair.kid, hostOut);
+  await saveJwkDidAndCredential(hostCert, hostPubJwk, hostKeyPair.kid, hostOut, {
+    x5c: buildX5cChain([hostCertBuffer, icaCert, rootCert]),
+    x5u: `https://${hostCert.domain}/.well-known/x509.der`,
+  });
+  writeArtifactManifest(hostOut, hostCert, {
+    role: 'HOST',
+    did: `did:web:${hostCert.domain}`,
+    didFile: `did-${hostCert.domain}.json`,
+    jwksFile: `jwks-${hostCert.domain}.json`,
+    credentialFile: `LegalParticipantCredential-${hostCert.domain}.jsonld`,
+    x509DerFile: 'x509.der',
+    x509ChainDerFile: 'x509-chain.der',
+    extraFiles: ['signcerts/cert.der', 'signcerts/cert.pem', 'cacerts/root-cert.pem', 'intermediatecerts/ica-cert.pem'],
+  });
 }

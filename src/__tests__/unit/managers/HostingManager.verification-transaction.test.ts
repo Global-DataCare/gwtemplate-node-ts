@@ -17,6 +17,7 @@ import type { IVaultRepository } from '../../../database/repositories/vault/vaul
 import type { IHostRuntime } from '../../../managers/IHostRuntime';
 import { ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST } from '../../data/example-payloads';
 import { testClaimsRegisterTenantExpanded } from '../../data/organization.data';
+import { HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS } from '../../../managers/hosting/hosting-claim-contracts';
 
 const { HostingManager } = await import('../../../managers/HostingManager');
 const EXAMPLE_SECTOR = Sector.HEALTH_CARE;
@@ -73,6 +74,7 @@ function buildConfig(): IServerConfig {
     demoAllowInsecureBearer: true,
     nodeEnv: 'test',
     port: 3000,
+    maxHeaderSize: 16384,
     apiHostname: 'testhost',
     hostExternalDomain: 'host.example.org',
     apiBaseUrl: 'https://host.example.org',
@@ -434,6 +436,32 @@ describe('HostingManager legal organization verification transaction', () => {
     expect(errorEntry?.response?.outcome?.issue?.[0]?.diagnostics).toContain('ICA jurisdiction could not be resolved');
   });
 
+  it('returns OperationOutcome 400 when _transaction omits Service.category', async () => {
+    const manager = new HostingManager(
+      mockVaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      buildConfig(),
+      mockHostRuntime,
+    );
+
+    const job = buildTransactionJob();
+    delete (job.content as any).body.data[0].meta.claims[ClaimsServiceSchemaorg.category];
+
+    const response = await manager.process(job, 'test', false);
+    const errorEntry = response.body.data[0];
+
+    // Step 1: the manager must reject the request before ICA forwarding or
+    // Offer creation because the sector claim is the minimum host input
+    // contract for `_transaction`.
+    expect(errorEntry?.response?.status).toBe('400');
+    expect(errorEntry?.response?.outcome?.issue?.[0]?.diagnostics).toContain(
+      `Missing required claim: '${HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS[1]}'`,
+    );
+  });
+
   it('reissues verification for an existing tenant without creating a new offer and returns one controller activation code', async () => {
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
     const icaVerifyResponse = buildIcaVerifyResponse();
@@ -499,7 +527,14 @@ describe('HostingManager legal organization verification transaction', () => {
     expect(fetchCalls[0]?.url).toBe(
       `${EXAMPLE_ICA_BASE_URL}/ica/cds-ES/v1/${EXAMPLE_SECTOR}/terms/pdf/${EXAMPLE_VERIFY_RESOURCE_TYPE}/_verify`,
     );
+    // Step 1: existing-tenant `_issue` is a controller/key/email reissue path,
+    // not a new commercial onboarding. It must therefore not create a new
+    // `org.schema.Offer.identifier`.
     expect(claims[ClaimsOfferSchemaorg.identifier]).toBeUndefined();
+    // Step 2: no Offer means no workflow hint for `Order/_batch` either.
+    expect((responseEntry as any)?.resource?.next).toBeUndefined();
+    // Step 3: the response must instead carry the reissued controller
+    // activation material on the existing seat.
     expect(claims['org.schema.IndividualProduct.serialNumber']).toEqual(expect.any(String));
     expect(claims['org.schema.IndividualProduct.category']).toBe('professional');
     expect(mockVaultRepository.put).toHaveBeenCalledWith(
@@ -710,6 +745,59 @@ describe('HostingManager legal organization verification transaction', () => {
         }),
       })],
       getEnvSectionId('device-licenses'),
+    );
+  });
+
+  it('returns the canonical Offer identifier only for first-time legal _transaction onboarding', async () => {
+    const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+    const icaVerifyResponse = buildIcaVerifyResponse();
+    (mockVaultRepository.vaultExists as any).mockImplementation(async () => false);
+    (mockVaultRepository.getContainersInSection as any).mockResolvedValue([]);
+    global.fetch = jest.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const normalizedUrl = typeof url === 'string' ? url : String(url);
+      fetchCalls.push({ url: normalizedUrl, init });
+      if (fetchCalls.length === 1) {
+        return {
+          ok: false,
+          status: EXAMPLE_RESPONSE_STATUS_ACCEPTED,
+          headers: {
+            get: (name: string) => name.toLowerCase() === 'location' ? EXAMPLE_ICA_POLL_URL : null,
+          },
+        } as any;
+      }
+      return {
+        ok: true,
+        status: Number(EXAMPLE_RESPONSE_STATUS_OK),
+        headers: {
+          get: (name: string) => name.toLowerCase() === 'content-type' ? EXAMPLE_ICA_RESPONSE_CONTENT_TYPE : null,
+        },
+        json: async () => icaVerifyResponse,
+      } as any;
+    }) as any;
+
+    const manager = new HostingManager(
+      mockVaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      buildConfig(),
+      mockHostRuntime,
+    );
+
+    const response = await manager.process(buildTransactionJob(), 'test', false);
+    const responseEntry = response.body.data[0];
+    const claims = responseEntry?.meta?.claims || {};
+    const offerId = String(claims[ClaimsOfferSchemaorg.identifier] || '');
+
+    // Step 1: first-time legal `_transaction` must create the canonical Offer.
+    expect(responseEntry?.response?.status).toBe(EXAMPLE_RESPONSE_STATUS_OK);
+    expect(offerId).toContain(':Offer:');
+    // Step 2: the workflow hint may mirror it, but the claim path remains the
+    // source of truth for `Order/_batch`.
+    expect((responseEntry as any)?.resource?.next?.acceptedOffer?.identifier).toBe(offerId);
+    expect((responseEntry as any)?.resource?.next?.acceptedOffer?.identifierClaim).toBe(
+      ClaimsOrderSchemaorg.acceptedOfferIdentifier,
     );
   });
 });

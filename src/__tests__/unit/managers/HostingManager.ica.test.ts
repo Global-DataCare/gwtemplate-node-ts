@@ -4,6 +4,7 @@ import type { IVaultRepository } from '../../../database/repositories/vault/vaul
 import type { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import type { ILogger } from '../../../loggers/ILogger';
 import type { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
+import type { IHostRuntime } from '../../../managers/IHostRuntime';
 
 describe('HostingManager ICA demo flow', () => {
   it('stores ICA result as messaging entry after polling', async () => {
@@ -14,8 +15,9 @@ describe('HostingManager ICA demo flow', () => {
       protectConfidentialData: jest.fn(async (doc: any) => doc),
     } as unknown as IKmsService;
     const mockTenants = {} as TenantsCacheManager;
-  const mockStorage = {} as IStorageAdapter;
-  const mockLogger = { warn: jest.fn() } as unknown as ILogger;
+    const mockStorage = {} as IStorageAdapter;
+    const mockLogger = { warn: jest.fn() } as unknown as ILogger;
+    const mockHostRuntime = { hostCollectionName: 'host' } as IHostRuntime;
 
     const manager = new HostingManager(
       mockVaultRepository,
@@ -24,6 +26,7 @@ describe('HostingManager ICA demo flow', () => {
       mockStorage,
       mockLogger,
       { nodeEnv: 'demo', apiBaseUrl: 'http://localhost:3000', hostExternalDomain: '', namespace: 'antifraud', sectorsAllowed: [], allowedPaymentMethods: [], dbProvider: 'mem', storageProvider: 'mem', queueProvider: 'mem', host: {}, mongo: { dbName: 'default' }, firebase: {} } as any,
+      mockHostRuntime,
     );
 
     process.env.ICA_EXTERNAL_DOMAIN = 'test-eur-ica.unid.online';

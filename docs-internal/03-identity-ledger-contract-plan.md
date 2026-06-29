@@ -238,6 +238,182 @@ Allowed `relationship` examples:
 - the controller public key should **not** be globally revoked if the same
   controller still controls other individuals
 
+## Closed Inter-Tenant Contract Model
+
+This closeout now fixes the canonical semantic model for inter-tenant access
+contracts between two hosted tenants such as `acme-id` and `lab-id`.
+
+### Primary Verifiable Object
+
+The primary business object is:
+
+- one VC representing the inter-tenant agreement
+
+That VC contains:
+
+- `credentialSubject = FHIR Contract`
+- one or more `proof[]` entries, typically one per signing controller
+- VC metadata such as issuer, validity window, and presentation use
+
+Important rule:
+
+- the FHIR `Contract` is the canonical interoperable agreement payload
+- the VC is the canonical cryptographic/legal transport container
+- `Provenance` is a derived FHIR audit projection, not the primary signature
+  container
+
+### FHIR `Contract` Semantics
+
+For the current implemented branch, the contract claims-first model is:
+
+- `Contract.identifier`
+- `Contract.status`
+- `Contract.issued`
+- `Contract.applies-start`
+- `Contract.applies-end`
+- `Contract.provider-organization`
+- `Contract.consumer-organization`
+- `Contract.provider-controller`
+- `Contract.consumer-controller`
+- `Contract.security-label`
+- `Contract.term-type`
+- `Contract.instantiates-uri`
+
+Meaning:
+
+- provider organization = tenant exposing or controlling the data
+- consumer organization = foreign tenant requesting access
+- security label = allowed capability, for example
+  `organization/Composition.rs`
+- term type = allowed purpose, for example `RESEARCH`
+- `instantiates-uri` = the signed agreement PDF/CID or direct contractual
+  annexes
+
+Explicit non-goal for the minimum model:
+
+- invoice/payment timing is not mandatory in the first canonical contract
+  object, because invoicing may happen before, during, or after signature
+
+### Supporting Documents
+
+If commercial or supporting documents are needed, the semantic split is:
+
+- `Contract.instantiatesUri`
+  - primary signed agreement PDF/CID
+- `Contract.supportingInfo`
+  - optional supporting documents such as invoice, annexes, or
+    `DocumentReference`
+
+So the invoice is not modeled as the core meaning of `instantiatesUri`.
+
+### VC Proofs, `Provenance`, and Ledger History
+
+The cryptographic source of truth is:
+
+- VC `proof[]`
+- plus the corresponding ledger artifact/event records
+
+FHIR audit projection may be derived as:
+
+- one `Provenance` per VC `proof`
+- or one `Provenance` per lifecycle event where that is more useful for audit
+
+Recommended interpretation:
+
+- `VC.proof[]` = actual controller signatures
+- `Contract.relevantHistory` = references to derived `Provenance` or other
+  audit/history resources
+- ledger events = append-only operational trace of declaration, countersign,
+  suspension, revocation, expiry, or supersession
+
+So `relevantHistory` must not be treated as a comma-separated storage of raw
+proof ids. It is the FHIR history view, not the native cryptographic payload.
+
+### Ledger Projection
+
+For closeout purposes, the recommended ledger split is:
+
+- `artifact-sc`
+  - artifact record for the agreement PDF/CID
+  - optional artifact record for the VC itself when the VC hash must be
+    anchored independently
+- `artifactevent-sc`
+  - declaration event
+  - countersignature event
+  - suspension event
+  - revocation event
+  - expiry event
+  - supersession event
+- `credential-sc`
+  - VC status when the credential lifecycle must be tracked separately from
+    the artifact
+
+### SMART Authorization Gate
+
+The currently implemented GW rule is:
+
+- if the requesting actor belongs to the same organization as the token issuer,
+  no inter-tenant contract VC is required
+- if the requesting actor belongs to a different organization, the presenter
+  must carry a VP containing one active matching inter-tenant contract VC
+
+The match is evaluated against:
+
+- provider organization DID
+- consumer organization DID
+- required capability/scope
+- required purpose
+
+Current intentional scope limitation:
+
+- this is modeled today for two tenants, potentially on the same host
+- it does not claim host-side aggregate publication of `system/ResearchSubject`
+  or cross-host digital twin publication
+
+### Reuse Of `consentaccess-sc` For Consumer-Org Delegation
+
+The current preferred design is to reuse the existing consent-access pattern
+almost completely for the consumer-organization side delegation:
+
+- issuer/owner of the rule = consumer organization controller
+- delegated actor = employee/researcher of that consumer organization
+- protected subject = consumer organization DID
+- action = allowed capability, for example `organization/ResearchSubject.rs`
+  or `organization/Composition.rs`
+- purpose = allowed business reason such as `RESEARCH`
+- `Consent.source-reference` = blockchain-safe reference of the contract VC
+
+So the same atomic-rule export pattern can be kept:
+
+- `Consent`-style rule stored off-chain for query/evaluation
+- `buildConsentRulePrimaryDocument(...)` projection to one atomic blockchain
+  asset per rule
+- `assetId = CIDv1(SHA3-384(canonicalRuleId))`
+
+The additional contract-specific rule is:
+
+- the reused consent rule must point to the inter-tenant contract VC through
+  `Consent.source-reference`
+
+Canonical persisted identifiers for these rules should no longer use domain or
+`did:web` values as the primary ledger key. The canonical stable format is:
+
+- organization: `urn:org:<id-type-lowercase>:<id-value>`
+- member: `urn:org:<id-type-lowercase>:<id-value>:member:<member-id>`
+
+Role is still relevant, but it must be carried separately in rule/credential
+claims such as `Consent.actor-role`, not embedded into the canonical member id.
+
+Legacy short inputs such as `TAX|VATES-B12345678` are only accepted as manager
+input and must be normalized to the canonical URN before persistence, hashing,
+or blockchain registration.
+
+That lets the verifier answer both questions deterministically:
+
+1. does a valid provider-consumer contract VC exist?
+2. did the consumer organization delegate this specific employee to use that
+   contract for this capability/purpose?
+
 ### When a key is compromised
 
 - `cryptographickey-sc`: key status -> `revoked`
