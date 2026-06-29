@@ -1,6 +1,112 @@
+## [Unreleased]
+
+## [1.19.0] - 2026-06-29
+
+### Added
+- Added a focused route-level regression for professional device replacement so
+  `Device/_dcr` keeps the current seat-reuse and identity-ledger expectations
+  executable through the public GW API:
+  - `src/__tests__/integration/device.dcr-replacement.api.test.ts`
+- Added a dedicated unit slice for the extracted individual/family onboarding
+  flow helper:
+  - `src/__tests__/unit/managers/hosting/process-individual-organization.test.ts`
+- Added internal closeout summaries for the current project state and the
+  consolidated use-case/lifecycle narrative:
+  - `docs-internal/05-project-closure-use-cases-and-lifecycles-summary.md`
+  - `docs-internal/06-project-closure-executive-summary.md`
+
+### Changed
+- Completed the current `HostingManager` modularization pass so the host
+  onboarding/commercial lifecycle no longer depends on one monolithic manager
+  file for verification, activation, DID registration, order processing, host
+  config persistence, controller identity recovery, and service/resource
+  extraction:
+  - `src/managers/hosting/activation-helpers.ts`
+  - `src/managers/hosting/controller-entity-config.ts`
+  - `src/managers/hosting/create-pending-tenant-registration.ts`
+  - `src/managers/hosting/ensure-authority-tenant.ts`
+  - `src/managers/hosting/finalize-tenant-config.ts`
+  - `src/managers/hosting/hosting-claim-contracts.ts`
+  - `src/managers/hosting/ica-did-registration.ts`
+  - `src/managers/hosting/ica-enrollment.ts`
+  - `src/managers/hosting/ica-verification.ts`
+  - `src/managers/hosting/organization-issue-controller-identity.ts`
+  - `src/managers/hosting/persist-host-config.ts`
+  - `src/managers/hosting/process-individual-organization.ts`
+  - `src/managers/hosting/process-offer-order-search.ts`
+  - `src/managers/hosting/process-order-entry.ts`
+  - `src/managers/hosting/process-organization-activation.ts`
+  - `src/managers/hosting/process-organization-verification.ts`
+  - `src/managers/hosting/process-registration-entry.ts`
+  - `src/managers/hosting/process-tenant-did-document-binding.ts`
+  - `src/managers/hosting/reconcile-host-runtime-config.ts`
+  - `src/managers/hosting/registration-keys.ts`
+  - `src/managers/hosting/resource-extraction.ts`
+  - `src/managers/hosting/service-attachment.ts`
+  - `src/managers/HostingManager.ts`
+- Hardened the host commercial onboarding contract so `_transaction`,
+  `_activate`, `Offer/_search`, and `Order/_batch` coverage now fails fast when
+  canonical commercial claims or required service-category/order-acceptance
+  claims disappear:
+  - `src/__tests__/integration/host.transaction-offer-order.api.test.ts`
+  - `src/__tests__/integration/host.activate-offer-order.api.test.ts`
+  - `src/__tests__/unit/managers/HostingManager.OfferOrder.test.ts`
+  - `src/__tests__/unit/managers/HostingManager.verification-transaction.test.ts`
+  - `src/__tests__/unit/managers/HostingManager.activation.test.ts`
+  - `src/__tests__/unit/managers/HostingManager.ica.test.ts`
+- Aligned the individual/family compatibility flows with the real commercial
+  host bootstrap order so multi-phone and multi-email owner matching is tested
+  only after the tenant has gone through registration plus `Order/_batch`, and
+  all readback now uses shared bundle-claim readers instead of ad hoc
+  `body.data[0]` drilling:
+  - `src/__tests__/integration/individual/family.test.ts`
+  - `src/__tests__/integration/individual/family.multiphone.test.ts`
+  - `src/__tests__/integration/individual/family.multimail.test.ts`
+  - `src/__tests__/unit/examples/shared-flow-examples.test.ts`
+  - `src/managers/FamilyManager.ts`
+- Tightened device-registration behavior and coverage so professional device
+  replacement keeps the seat/license continuity and local ledger write path
+  consistent with the current controller recovery lifecycle:
+  - `src/managers/DeviceRegistrationManager.ts`
+  - `src/__tests__/managers/DeviceRegistrationManager.test.ts`
+- Linked the new shared SDK lifecycle note for controller/device recovery from
+  GW CORE documentation entry points:
+  - `README.md`
+  - `docs/README.md`
+- The canonical cross-repository reference for:
+  - legal organization controller recovery via `_issue`
+  - professional device replacement via `_exchange` + `Device/_dcr`
+  - individual controller recovery
+  now lives in `gdc-sdk-core-ts/docs/ARCHITECTURE_CONTROLLER_DEVICE_LIFECYCLES.md`.
+- Updated the shared dependency target to `gdc-common-utils-ts@^2.0.17` so GW
+  tests and manager flows consume the published bundle-claim readers instead of
+  hand-parsing first-entry claim payloads.
+- Refreshed the generated OpenAPI profile documents and swagger wiring so the
+  published API examples stay aligned with the current host onboarding and
+  lifecycle behavior:
+  - `docs/openapi-profiles/openapi-compat.json`
+  - `docs/openapi-profiles/openapi-core.json`
+  - `docs/openapi-profiles/openapi-extension.json`
+  - `swagger.config.cjs`
+
+### Validation
+- `npm install`
+- `gdc-common-utils-ts@2.0.17`, `gdc-sdk-core-ts@2.0.10`, `gdc-sdk-node-ts@2.0.11` published and consumed locally
+- `npm run build`
+
 ## [1.18.0] - 2026-06-28
 
 ### Added
+- Added employee device-replacement lifecycle handling to `Device/_dcr` so a
+  reissued activation code can reuse the same professional license seat while:
+  - revoking the previous local device profile bound to that seat
+  - replacing the employee `didDocument` verification methods with the newly
+    registered device keys
+  - syncing employee device keys and subject-key bindings to the identity
+    ledger when Fabric/local-network identity writes are enabled
+- Added manager coverage for the employee device replacement flow, including
+  local identity-ledger revocation/registration calls:
+  - `src/__tests__/managers/DeviceRegistrationManager.test.ts`
 - Added `docs-v2/24-local-audit-fabric-runtime.md` to define the current
   local ICA + GW CORE + Fabric baseline for auditors/integrators, including:
   - the supported deterministic local Fabric devnet path
@@ -514,35 +620,6 @@
 - `npm run type-check`
 - `npm run api:local-demo` + `HOST_ID_VALUE=... npm run test:e2e:live-gw`
 - `npm run api:local-firestore-demo` + `HOST_ID_VALUE=... npm run test:e2e:live-gw`
-
-## [Unreleased]
-
-### Changed
-- Moved `Composition`/`Bundle` search request parsing out of
-  `src/managers/CompositionManager.ts` into `src/utils/search-request.ts` so
-  subject, section, exclusion, type, bundle-type, `DocumentReference`, and
-  `Communication` filter extraction no longer lives as manager-private logic.
-- Kept the public `Composition/_search` and `Subject/$summary` contracts
-  unchanged while reducing `CompositionManager` coupling to FHIR search-body
-  shapes and adding dedicated parser coverage in
-  `src/__tests__/unit/utils/search-request.test.ts`.
-- Moved indexed-claim FHIR resource rehydration out of
-  `src/managers/CompositionManager.ts` into
-  `src/utils/fhir-resource-rehydration.ts`, replacing ad hoc string-literal
-  resource branching with shared `ResourceTypesFhirR4` constants and explicit
-  resource-family maps for subject/patient and effective-date semantics.
-- Completed the research twin sharing flow so `digitaltwin/.../Composition/_search`
-  discovers matching twin indexes by IPS section plus textual resource claims,
-  and selected twins can now be materialized through
-  `digitaltwin/<format>/Communication/_batch` targeting
-  `ResearchSubject/$summary`:
-  - `org.hl7.fhir.r4` returns a document-style `Bundle`
-  - `org.hl7.fhir.api` returns claims-first resources with canonical
-    `meta.claims`
-- Published digital twin runtime capabilities for `Communication/_batch` and
-  `ResearchSubject/$summary`, and normalized claims-first summary output so
-  contextualized FHIR claim keys are emitted canonically, for example
-  `MedicationStatement.subject` instead of `org.hl7.fhir.r4.MedicationStatement.subject`.
 
 ## [1.14.3] - 2026-06-18
 

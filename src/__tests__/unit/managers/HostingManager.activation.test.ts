@@ -479,11 +479,23 @@ describe('HostingManager activation flow', () => {
     );
   });
 
-  it('should return an Offer from _activate and accept the follow-up Order', async () => {
+  /**
+   * Producer + consumer contract guard for legacy `_activate`.
+   *
+   * This test exists to stop a false-green path where activation still returns
+   * `201` but the code silently drops `org.schema.Offer.identifier`.
+   * If that happens, the follow-up Order contract is already broken even before
+   * the caller reaches `Order/_batch`.
+   */
+  it('should expose the canonical org.schema.Offer.identifier in _activate and require that exact value for the follow-up Order', async () => {
     const activationResponse = await hostingManager.process(buildActivationJob());
     const activationClaims = activationResponse.body.data[0].meta?.claims as Record<string, unknown>;
-    const offerId = String(activationClaims[ClaimsOfferSchemaorg.identifier] || '');
+    const canonicalOfferId = activationClaims[ClaimsOfferSchemaorg.identifier];
+    const offerId = String(canonicalOfferId || '');
 
+    expect(activationResponse.body.data[0].type).toBe('Organization-activation-response-v1.0');
+    expect(canonicalOfferId).toBeDefined();
+    expect(typeof canonicalOfferId).toBe('string');
     expect(offerId).toContain(':Offer:');
 
     const orderJob: JobRequest = {
