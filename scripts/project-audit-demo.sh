@@ -18,7 +18,9 @@ IDENTITY_CHANNEL="${IDENTITY_CHANNEL:-identity-local}"
 BOOTSTRAP_INDIVIDUAL=true
 RESTART_GW=true
 SKIP_STACK=false
+SKIP_CONSENT_ASSETS=false
 SKIP_LIFECYCLE=false
+SKIP_SMART_ACCESS=false
 
 print_help() {
   cat <<'EOF'
@@ -28,6 +30,7 @@ Runs the current audited local demo path for GW CORE:
 1. bootstrap local Fabric + GW CORE
 2. create the canonical demo individual baseline
 3. execute the consent lifecycle smoke against health-care-local
+4. execute the SMART access smoke for both individual and digitaltwin flows
 
 Options:
   --mode <demo>              Execution mode. Only demo is packaged here today.
@@ -42,7 +45,9 @@ Options:
   --no-bootstrap-individual  Skip the canonical demo individual creation
   --no-restart-gw            Do not force-stop any previous GW listener
   --skip-stack               Do not run local:fabric:stack
+  --skip-consent-assets      Do not run the canonical consent asset smoke
   --skip-lifecycle           Do not run the consent lifecycle smoke
+  --skip-smart-access        Do not run the SMART access smoke
   --help, -h                 Show this help
 
 Artifacts:
@@ -106,8 +111,16 @@ while [[ $# -gt 0 ]]; do
       SKIP_STACK=true
       shift
       ;;
+    --skip-consent-assets)
+      SKIP_CONSENT_ASSETS=true
+      shift
+      ;;
     --skip-lifecycle)
       SKIP_LIFECYCLE=true
+      shift
+      ;;
+    --skip-smart-access)
+      SKIP_SMART_ACCESS=true
       shift
       ;;
     --help|-h)
@@ -150,6 +163,18 @@ if [[ "${SKIP_STACK}" != "true" ]]; then
   run_logged bootstrap-stack npm "${stack_args[@]}"
 fi
 
+if [[ "${SKIP_CONSENT_ASSETS}" != "true" ]]; then
+  run_logged consent-assets env \
+    BASE_URL="${BASE_URL}" \
+    TENANT_ID="${TENANT_ID}" \
+    JURISDICTION="${JURISDICTION}" \
+    SECTOR="${SECTOR}" \
+    AUTH_BEARER="${AUTH_BEARER}" \
+    CHANNEL_NAME="${DATA_CHANNEL}" \
+    CREATE_INDIVIDUAL_BY_DEFAULT=false \
+    bash "${ROOT_DIR}/scripts/smoke-consentaccess-local-network.sh"
+fi
+
 if [[ "${SKIP_LIFECYCLE}" != "true" ]]; then
   run_logged consent-lifecycle env \
     BASE_URL="${BASE_URL}" \
@@ -160,6 +185,18 @@ if [[ "${SKIP_LIFECYCLE}" != "true" ]]; then
     CHANNEL_NAME="${DATA_CHANNEL}" \
     CREATE_INDIVIDUAL_BY_DEFAULT=false \
     bash "${ROOT_DIR}/scripts/smoke-consentaccess-lifecycle-local-network.sh"
+fi
+
+if [[ "${SKIP_SMART_ACCESS}" != "true" ]]; then
+  run_logged smart-access env \
+    BASE_URL="${BASE_URL}" \
+    TENANT_ID="${TENANT_ID}" \
+    JURISDICTION="${JURISDICTION}" \
+    SECTOR="${SECTOR}" \
+    AUTH_BEARER="${AUTH_BEARER}" \
+    CHANNEL_NAME="${DATA_CHANNEL}" \
+    BOOTSTRAP_INDIVIDUAL_AND_DATA=true \
+    bash "${ROOT_DIR}/scripts/smoke-smart-access-local-network.sh"
 fi
 
 echo "[project-audit-demo] success"

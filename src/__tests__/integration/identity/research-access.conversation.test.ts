@@ -3,6 +3,7 @@ import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
 } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import {
+  RESEARCH_ACCESS_REQUESTER_MATRIX,
   RESEARCH_ACCESS_DEMO_MEDICATION_CASES,
   RESEARCH_ACCESS_SEARCH_FIXTURE,
   RESEARCH_ACCESS_TEST_IDS,
@@ -124,6 +125,36 @@ describe('Research access conversation (integration)', () => {
           || onlyMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'],
         ).toBe(RESEARCH_ACCESS_TEST_IDS.novitaSubjectDid);
       }
+
+      await organizationControllerSdk.grantResearchPermitByRoleForSubjects([
+        RESEARCH_ACCESS_TEST_IDS.doraemonSubjectDid,
+      ]);
+      const roleAllowedPayload = await digitalTwinSdk.requestResearchSmartAccessTokenForRequester({
+        subjectDid: RESEARCH_ACCESS_TEST_IDS.doraemonSubjectDid,
+        ...RESEARCH_ACCESS_REQUESTER_MATRIX.allowByRole,
+      });
+      expect(roleAllowedPayload?.access_token).toBeDefined();
+
+      const roleDeniedPayload = await digitalTwinSdk.requestResearchSmartAccessTokenForRequester({
+        subjectDid: RESEARCH_ACCESS_TEST_IDS.doraemonSubjectDid,
+        ...RESEARCH_ACCESS_REQUESTER_MATRIX.denyByRole,
+      });
+      expect(roleDeniedPayload?.access_token).toBeUndefined();
+
+      await organizationControllerSdk.grantResearchPermitByDirectEmailForSubjects([
+        RESEARCH_ACCESS_TEST_IDS.emailOnlyPermitSubjectDid,
+      ]);
+      const emailAllowedPayload = await digitalTwinSdk.requestResearchSmartAccessTokenForRequester({
+        subjectDid: RESEARCH_ACCESS_TEST_IDS.emailOnlyPermitSubjectDid,
+        ...RESEARCH_ACCESS_REQUESTER_MATRIX.allowByEmail,
+      });
+      expect(emailAllowedPayload?.access_token).toBeDefined();
+
+      const emailDeniedPayload = await digitalTwinSdk.requestResearchSmartAccessTokenForRequester({
+        subjectDid: RESEARCH_ACCESS_TEST_IDS.emailOnlyPermitSubjectDid,
+        ...RESEARCH_ACCESS_REQUESTER_MATRIX.denyByEmail,
+      });
+      expect(emailDeniedPayload?.access_token).toBeUndefined();
     } finally {
       gateway.queueAdapter.stop();
     }

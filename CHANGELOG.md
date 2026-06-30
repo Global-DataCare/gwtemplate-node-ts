@@ -7,6 +7,28 @@
   layers:
   - `src/__tests__/managers/OpenIdAuthManager.test.ts`
   - `src/__tests__/integration/identity/smart-token.test.ts`
+- Extended the local Fabric/local-network audit chain so the canonical demo
+  now exercises live consent-to-SMART-token flows for both:
+  - clinical `individual` access rooted at `organization/Composition.rs`
+  - research `digitaltwin` access rooted at `organization/ResearchSubject.rs`
+  The new smoke proves:
+  - one individual-professional SMART token can read the IPS bundle through
+    `individual/.../Bundle/_search`
+  - one research permit anchored from consent rules can issue a SMART token
+    that reads `digitaltwin/.../Composition/_search`
+  - research employees are allowed or denied both by matching role and by
+    direct-email targeting
+  - `scripts/project-audit-demo.sh` now chains the SMART access smoke together
+    with the existing consent-asset and consent-lifecycle live checks
+  Files:
+  - `scripts/smoke-smart-access-local-network.sh`
+  - `scripts/project-audit-demo.sh`
+  - `scripts/payload-helpers.sh`
+  - `scripts/render-demo-smart-access-payload.mts`
+  - `src/__tests__/data/demo-smart-access-local-network.data.ts`
+  - `src/__tests__/unit/data/demo-smart-access-local-network.data.test.ts`
+  - `src/__tests__/integration/helpers/research-access-sdk.ts`
+  - `src/__tests__/integration/identity/research-access.conversation.test.ts`
 
 ## [1.19.2] - 2026-06-30
 
