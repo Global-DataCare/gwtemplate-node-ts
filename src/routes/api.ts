@@ -25,6 +25,7 @@ import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/r
 import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
 import { ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE } from '../constants/domain';
 import { getTenantAuthorizationStatus as readTenantAuthorizationStatusFromConfig } from '../utils/tenant-lifecycle';
+import { enforceSmartScopeRouteCompatibility } from '../utils/smart-scope-route-authorization';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -2551,13 +2552,23 @@ export function createApiRouter(
    *       SMART token includes the matching `acr` and SHOULD include `amr` entries like `openid4vp`, `vc`, and
    *       `device_bound`.
    *
-   *       VP requirement: the SMART authorization request MUST include a verifiable presentation (VP) inside
-   *       the JAR (request object) or the DIDComm payload (demo flow). This VP is validated via the Gaia-X
-   *       Clearing House to enforce non-revocation before issuing the token.
+   *       Client authentication: the gateway accepts one signed client-authentication JWT in
+   *       `body.client_assertion`. The canonical request shape uses the standard parameter names
+   *       `client_assertion` + `client_assertion_type`; for compatibility, `client_assertion_type`
+   *       may carry either the full JWT-bearer URN or the shorter `private_key_jwt` label.
+   *
+   *       Proof requirement: the SMART authorization request normally carries one verifiable presentation (VP)
+   *       inside the JAR (request object) or the DIDComm payload (demo flow). That VP is validated via the
+   *       Gaia-X Clearing House to enforce non-revocation before issuing the token.
+   *
+   *       Research-access exception: for the inter-tenant `RESEARCH` use case only, the current gateway also
+   *       accepts one already-validated external `Bearer data access token` instead of `body.vp_token`, as long
+   *       as the trusted issuer, provider tenant, consumer organization, purpose, and requested capability match.
    *
    *       Demo payload note: in this endpoint the DIDComm `body` represents the JAR (authorize request object),
    *       including PKCE parameters (`code_challenge`, `code_challenge_method`), `client_id`, `redirect_uri`,
-   *       `vp_token`, optional `presentation_submission`, and `acr_values`.
+   *       `client_assertion`, `client_assertion_type`, `vp_token`, optional `presentation_submission`, and
+   *       `acr_values`.
    *
    *       The worker will validate the target subject exists and that at least one consent rule matches the actor.
    *     parameters:
@@ -3239,6 +3250,21 @@ export function createApiRouter(
           `Tenant authorization is ${authorizationStatus}.`,
         );
       }
+    }
+
+    try {
+      enforceSmartScopeRouteCompatibility({
+        section,
+        bearerPayload: verifiedBearerPayload,
+      });
+    } catch (error: any) {
+      return sendDidcommEarlyError(
+        req,
+        res,
+        403,
+        IssueType.Forbidden,
+        error?.message || 'SMART scope is not compatible with the requested endpoint.',
+      );
     }
 
     // --- 4. Replay Protection (best-effort) ---

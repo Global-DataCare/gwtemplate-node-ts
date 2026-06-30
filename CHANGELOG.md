@@ -1,5 +1,93 @@
 ## [Unreleased]
 
+## [1.19.2] - 2026-06-30
+
+### Changed
+- Completed the current SMART token hardening pass for both clinical
+  `Composition` access and research `ResearchSubject` access:
+  - canonical behavior still accepts `body.vp_token` plus Clearing House
+    verification
+  - the gateway also accepts one signed `client_assertion` plus
+    `client_assertion_type` on `identity/openid/smart/token`
+  - compatibility labels accepted for `client_assertion_type` include the
+    standard JWT-bearer URN, `private_key_jwt`, and `client_assertion`
+  - inter-tenant `RESEARCH` flows may also use one already-validated external
+    `Bearer data access token` instead of `body.vp_token` when:
+    - `purpose=RESEARCH`
+    - requester organization is foreign to the issuer tenant
+    - external issuer is listed in `EXTERNAL_RESEARCH_TOKEN_TRUSTED_ISSUERS`
+    - provider tenant, consumer organization, purpose, and requested
+      capability match
+  Files:
+  - `src/managers/OpenIdAuthManager.ts`
+  - `src/routes/api.ts`
+  - `docs/90.A-API_INTEGRATORS_GUIDE.md`
+  - `docs/openapi-examples/core-flow-examples.json`
+  - `docs/openapi-profiles/openapi-core.json`
+  - `docs/openapi-profiles/openapi-compat.json`
+  - `docs/openapi-profiles/openapi-extension.json`
+- Extended consent-rule evaluation for SMART token issuance so stored
+  `Consent.action` values may be interpreted as either:
+  - legacy section-only clinical actions such as
+    `LOINC|48765-2,LOINC|10160-0`
+  - canonical stored capability expressions such as
+    `Composition.rs?section=...` and `ResearchSubject.rs`
+  This preserves backward compatibility for current clinical rules while
+  adding canonical rule matching for digital-twin research access.
+  Files:
+  - `src/managers/OpenIdAuthManager.ts`
+- Tightened SMART root capability and endpoint compatibility enforcement so:
+  - token issuance accepts only `organization/Composition...` and
+    `organization/ResearchSubject...` root capabilities
+  - `patient/Composition...` and `patient/ResearchSubject...` are rejected at
+    token issuance time
+  - `individual` endpoints require one `organization/Composition...` root scope
+  - `digitaltwin` endpoints require one
+    `organization/ResearchSubject...` root scope
+  Files:
+  - `src/managers/OpenIdAuthManager.ts`
+  - `src/routes/api.ts`
+  - `src/utils/smart-scope-route-authorization.ts`
+
+### Tests
+- Expanded unit coverage for `OpenIdAuthManager` so the manager now proves:
+  - canonical stored `Composition.rs?section=...` rules match one clinical
+    `organization/Composition...` request
+  - `patient/Composition...` and `patient/ResearchSubject...` root scopes are
+    rejected
+  - inter-tenant research access can be authorized from one trusted external
+    bearer
+  - canonical stored `ResearchSubject.rs` rules match one research
+    `organization/ResearchSubject...` request
+  - research employees can be included or excluded by:
+    - matching role
+    - mismatching role
+    - direct email target
+    - direct email target for another employee
+  - professional SMART requests with `vp_token` plus `client_assertion`
+    continue to issue tokens
+  Files:
+  - `src/__tests__/managers/OpenIdAuthManager.test.ts`
+- Expanded integration coverage for `identity/openid/smart/token` so the route
+  now proves:
+  - clinical `Composition` token issuance still works
+  - foreign-tenant research token issuance still works from one matching
+    inter-tenant contract VC
+  - research token issuance also works from one trusted external bearer
+  - research token issuance also works when the stored action is canonical
+    `ResearchSubject.rs`
+  Files:
+  - `src/__tests__/integration/identity/smart-token.test.ts`
+- Added dedicated scope-route authorization tests so the project now proves:
+  - unit-level route compatibility for `individual` vs `digitaltwin`
+  - integration-level route rejection when a `ResearchSubject` token is used on
+    `individual`
+  - integration-level route rejection when a `Composition` token is used on
+    `digitaltwin`
+  Files:
+  - `src/__tests__/unit/utils/smart-scope-route-authorization.test.ts`
+  - `src/__tests__/integration/identity/smart-scope-route-gates.test.ts`
+
 ## [1.19.1] - 2026-06-29
 
 ### Changed
@@ -89,6 +177,10 @@
   - `src/__tests__/unit/managers/HostingManager.verification-transaction.test.ts`
   - `src/__tests__/unit/managers/HostingManager.activation.test.ts`
   - `src/__tests__/unit/managers/HostingManager.ica.test.ts`
+  - `src/__tests__/integration/host.activate-offer-order.api.test.ts` now also
+    proves that host `Order/_batch` rejects `health-care`-style tenant business
+    sectors in the path with `404`; host onboarding must use the registry
+    network selector (`test`, `test-network`, `network`) instead.
 - Aligned the individual/family compatibility flows with the real commercial
   host bootstrap order so multi-phone and multi-email owner matching is tested
   only after the tenant has gone through registration plus `Order/_batch`, and

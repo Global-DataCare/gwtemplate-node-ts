@@ -4,7 +4,7 @@
     "title": "Gateway API - CORE",
     "version": "1.0.3",
     "description": "CORE API documentation for the secure gateway canonical flow.",
-    "x-profile-generated-at": "2026-06-29T13:56:44.346Z",
+    "x-profile-generated-at": "2026-06-30T18:21:34.266Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -1047,6 +1047,8 @@
             "redirect_uri": "https://app.acme.org/callback",
             "code_challenge": "b2MtY2hhbGxlbmdlLWJhc2U2NA",
             "code_challenge_method": "S256",
+            "client_assertion": "<client-auth-jwt>",
+            "client_assertion_type": "private_key_jwt",
             "acr_values": "urn:antifraud:acr:openid4vp:employee",
             "vp_token": "<vp-jws-or-jsonld>",
             "presentation_submission": {
@@ -1109,6 +1111,15 @@
                     "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
                     "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
                     "org.schema.Person.email": "receptionist1@acme.org"
+                  }
+                },
+                "resource": {
+                  "meta": {
+                    "claims": {
+                      "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
+                      "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
+                      "org.schema.Person.email": "receptionist1@acme.org"
+                    }
                   }
                 }
               }
@@ -1176,6 +1187,26 @@
                     "Service.identifier": "did:web:api-provider.example.com",
                     "Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
                     "Service.termsOfService": "https://provider.example.com/terms.pdf"
+                  }
+                },
+                "resource": {
+                  "meta": {
+                    "claims": {
+                      "@context": "org.schema",
+                      "@type": "template",
+                      "Organization.address.addressCountry": "ES",
+                      "Organization.identifier.additionalType": "UUID",
+                      "Organization.identifier.value": "<UUID>",
+                      "Organization.owner.email": "adult1@example.com",
+                      "Organization.owner.identifier.value": "<cert-serialnumber>",
+                      "Person.email": "child1@example.com",
+                      "Person.identifier.additionalType": "UUID",
+                      "Person.identifier.value": "<child1-ID>",
+                      "Service.category": "health-care",
+                      "Service.identifier": "did:web:api-provider.example.com",
+                      "Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
+                      "Service.termsOfService": "https://provider.example.com/terms.pdf"
+                    }
                   }
                 }
               }
@@ -2206,6 +2237,15 @@
                     "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
                     "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
                     "org.schema.Person.email": "receptionist1@acme.org"
+                  }
+                },
+                "resource": {
+                  "meta": {
+                    "claims": {
+                      "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
+                      "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
+                      "org.schema.Person.email": "receptionist1@acme.org"
+                    }
                   }
                 }
               }
@@ -3734,7 +3774,7 @@
           "Core Flow (SDK E2E Use Cases)"
         ],
         "summary": "[Step 6.1] Request a SMART access_token (async)",
-        "description": "[Step 6.1]\n\nRequests a SMART access token. The request MUST include the gateway context-pinning scope item:\n`organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=*|<code>[,<code>...]]`.\nOmitting `section` is allowed and means the backend's default permitted set for that subject.\n\nOpenID4VP binding: the request MUST include `acr_values` from the prior verification event, using\none of: `urn:antifraud:acr:openid4vp:employee` or `urn:antifraud:acr:openid4vp:individual`. The issued\nSMART token includes the matching `acr` and SHOULD include `amr` entries like `openid4vp`, `vc`, and\n`device_bound`.\n\nVP requirement: the SMART authorization request MUST include a verifiable presentation (VP) inside\nthe JAR (request object) or the DIDComm payload (demo flow). This VP is validated via the Gaia-X\nClearing House to enforce non-revocation before issuing the token.\n\nDemo payload note: in this endpoint the DIDComm `body` represents the JAR (authorize request object),\nincluding PKCE parameters (`code_challenge`, `code_challenge_method`), `client_id`, `redirect_uri`,\n`vp_token`, optional `presentation_submission`, and `acr_values`.\n\nThe worker will validate the target subject exists and that at least one consent rule matches the actor.",
+        "description": "[Step 6.1]\n\nRequests a SMART access token. The request MUST include the gateway context-pinning scope item:\n`organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=*|<code>[,<code>...]]`.\nOmitting `section` is allowed and means the backend's default permitted set for that subject.\n\nOpenID4VP binding: the request MUST include `acr_values` from the prior verification event, using\none of: `urn:antifraud:acr:openid4vp:employee` or `urn:antifraud:acr:openid4vp:individual`. The issued\nSMART token includes the matching `acr` and SHOULD include `amr` entries like `openid4vp`, `vc`, and\n`device_bound`.\n\nClient authentication: the gateway accepts one signed client-authentication JWT in\n`body.client_assertion`. The canonical request shape uses the standard parameter names\n`client_assertion` + `client_assertion_type`; for compatibility, `client_assertion_type`\nmay carry either the full JWT-bearer URN or the shorter `private_key_jwt` label.\n\nProof requirement: the SMART authorization request normally carries one verifiable presentation (VP)\ninside the JAR (request object) or the DIDComm payload (demo flow). That VP is validated via the\nGaia-X Clearing House to enforce non-revocation before issuing the token.\n\nResearch-access exception: for the inter-tenant `RESEARCH` use case only, the current gateway also\naccepts one already-validated external `Bearer data access token` instead of `body.vp_token`, as long\nas the trusted issuer, provider tenant, consumer organization, purpose, and requested capability match.\n\nDemo payload note: in this endpoint the DIDComm `body` represents the JAR (authorize request object),\nincluding PKCE parameters (`code_challenge`, `code_challenge_method`), `client_id`, `redirect_uri`,\n`client_assertion`, `client_assertion_type`, `vp_token`, optional `presentation_submission`, and\n`acr_values`.\n\nThe worker will validate the target subject exists and that at least one consent rule matches the actor.",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
