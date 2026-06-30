@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
-import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
+import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
@@ -10,6 +10,12 @@ import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL,
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
 } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import {
+  buildDemoResearchPermitByEmailConsent,
+  buildDemoResearchPermitByRoleConsent,
+  buildDemoResearchRequesterMatrix,
+  buildDemoResearchSmartTokenRequest,
+} from '../../data/demo-smart-access-local-network.data';
 import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
 import { initializeTenantServicesConfig } from '../../../utils/services';
 import { getIndividualSectionId } from '../../../utils/individual-sections';
@@ -41,6 +47,7 @@ export const RESEARCH_ACCESS_TEST_IDS = Object.freeze({
   deviceDid: 'did:web:device.lab.example',
   doraemonSubjectDid: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid,
   novitaSubjectDid: 'did:web:api.acme.org:individual:novita',
+  emailOnlyPermitSubjectDid: 'did:web:api.acme.org:individual:email-only',
 });
 
 /**
@@ -70,6 +77,8 @@ export const RESEARCH_ACCESS_DEMO_MEDICATION_CASES = Object.freeze({
     searchText: 'paracetamol',
   }),
 });
+
+export const RESEARCH_ACCESS_REQUESTER_MATRIX = Object.freeze(buildDemoResearchRequesterMatrix());
 
 /**
  * Minimal runtime dependencies from `startServer()` that the high-level test
@@ -236,10 +245,54 @@ export class TestResearchOrgControllerSdk {
           [ClaimConsent.subject]: subjectDid,
           [ClaimConsent.actorIdentifier]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
           [ClaimConsent.actorRole]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.actorRole,
-          [ClaimConsent.decision]: 'permit',
+          [ClaimConsent.decision]: ConsentDecisions.Permit,
           [ClaimConsent.purpose]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
           [ClaimConsent.action]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.requestedSection,
           [ClaimConsent.date]: '2026-06-29',
+        }],
+        getIndividualSectionId(subjectDid, 'rules'),
+      );
+    }));
+  }
+
+  /**
+   * Seeds provider-side permit rules whose role constraint is evaluated against
+   * the requester employee.
+   */
+  public async grantResearchPermitByRoleForSubjects(subjectDids: readonly string[]): Promise<void> {
+    const providerVaultId = getTenantVaultId(
+      String(Sector.HEALTH_CARE),
+      EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerTenantId,
+    );
+    await Promise.all(subjectDids.map(async (subjectDid, index) => {
+      await this.deps.vaultRepository.put(
+        providerVaultId,
+        [{
+          ...buildDemoResearchPermitByRoleConsent({ subjectDid }),
+          id: `${RESEARCH_ACCESS_TEST_IDS.subjectPermitRule}-role-${index + 1}`,
+          [ClaimConsent.identifier]: `urn:uuid:${RESEARCH_ACCESS_TEST_IDS.subjectPermitRule}-role-${index + 1}`,
+        }],
+        getIndividualSectionId(subjectDid, 'rules'),
+      );
+    }));
+  }
+
+  /**
+   * Seeds provider-side permit rules that directly target one allowed research
+   * employee email.
+   */
+  public async grantResearchPermitByDirectEmailForSubjects(subjectDids: readonly string[]): Promise<void> {
+    const providerVaultId = getTenantVaultId(
+      String(Sector.HEALTH_CARE),
+      EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerTenantId,
+    );
+    await Promise.all(subjectDids.map(async (subjectDid, index) => {
+      await this.deps.vaultRepository.put(
+        providerVaultId,
+        [{
+          ...buildDemoResearchPermitByEmailConsent({ subjectDid }),
+          id: `${RESEARCH_ACCESS_TEST_IDS.subjectPermitRule}-email-${index + 1}`,
+          [ClaimConsent.identifier]: `urn:uuid:${RESEARCH_ACCESS_TEST_IDS.subjectPermitRule}-email-${index + 1}`,
         }],
         getIndividualSectionId(subjectDid, 'rules'),
       );
@@ -438,6 +491,46 @@ export class TestResearchDigitalTwinSdk {
       app: this.deps.app,
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/_batch-response`,
       thid: RESEARCH_ACCESS_TEST_IDS.smartTokenThreadId,
+    });
+  }
+
+  /**
+   * Requests one SMART token for the selected research employee variant using
+   * the shared request builder.
+   */
+  public async requestResearchSmartAccessTokenForRequester(input: {
+    subjectDid: string;
+    actorDid: string;
+    actorEmail: string;
+    actorRole: string;
+    clientSuffix: string;
+    thid: string;
+  }): Promise<any> {
+    const requestPayload = await buildDemoResearchSmartTokenRequest({
+      tenantId: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerTenantId,
+      subjectDid: input.subjectDid,
+      actorDid: input.actorDid,
+      actorEmail: input.actorEmail,
+      actorRole: input.actorRole,
+      clientSuffix: input.clientSuffix,
+      thid: input.thid,
+    });
+
+    const submitResp = await invokeExpress(this.deps.app, {
+      method: 'POST',
+      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`,
+      headers: { 'content-type': 'application/json', authorization: 'Bearer mock' },
+      body: requestPayload,
+    });
+
+    if (submitResp.status !== 202) {
+      return undefined;
+    }
+
+    return pollAcceptedGatewayOperation({
+      app: this.deps.app,
+      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/_batch-response`,
+      thid: input.thid,
     });
   }
 

@@ -27,7 +27,12 @@ import type { Server } from 'http';
 import type { QueueAdapterMem } from '../../adapters/queue-mem';
 import { startServer, resetServerConfig } from '../../server';
 import { invokeExpress } from './helpers/invokeExpress';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import {
+  ClaimsOfferSchemaorg,
+  ClaimsOrderSchemaorg,
+  ClaimsOrganizationSchemaorg,
+  ClaimsServiceSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
 import { testClaimsTenant1Registration } from '../data/end-to-end.data';
 import { ORGANIZATION_ORDER_REQUEST } from '../data/example-payloads';
 
@@ -191,7 +196,7 @@ describe('Host activation Offer/Order route story', () => {
    *   can only continue if activation exposes the claim explicitly
    */
   it('legacy _activate-response exposes the canonical Offer identifier in meta.claims and Order reuses that exact value', async () => {
-    const activationPayload = buildActivationPayload();
+    const activationPayload = buildActivationPayload() as any;
     const activationUrl = '/host/cds-es/v1/test/registry/org.schema/Organization/_activate';
 
     const activationSubmit = await invokeExpress(app, {
@@ -269,5 +274,73 @@ describe('Host activation Offer/Order route story', () => {
 
     expect(orderEntry.response.status).toBe('201');
     expect(orderEntry.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+  });
+
+  /**
+   * Consumer contract guard for host registry path construction.
+   *
+   * Host onboarding routes use the host registry network selector in the path
+   * (`test`, `test-network`, `network`), not the tenant business sector
+   * (`health-care`, etc.). A caller that reuses the Offer business sector in
+   * the host Order URL must fail with 404 so the mismatch is explicit.
+   */
+  it('returns 404 when host Order/_batch uses the tenant business sector instead of the host registry network selector', async () => {
+    const activationPayload = buildActivationPayload() as any;
+    const uniqueTaxId = 'VATES-B00998877';
+    const uniqueAlternateName = 'acme-wrong-sector';
+    activationPayload.body.organizationCredential.credentialSubject.taxID = uniqueTaxId;
+    activationPayload.body.representativeCredential.credentialSubject.memberOf.taxID = uniqueTaxId;
+    activationPayload.body.data[0].resource.meta.claims[ClaimsOrganizationSchemaorg.identifierValue] = uniqueTaxId;
+    activationPayload.body.data[0].resource.meta.claims[ClaimsOrganizationSchemaorg.taxId] = uniqueTaxId;
+    activationPayload.body.data[0].resource.meta.claims[ClaimsOrganizationSchemaorg.alternateName] = uniqueAlternateName;
+
+    const activationSubmit = await invokeExpress(app, {
+      method: 'POST',
+      url: '/host/cds-es/v1/test/registry/org.schema/Organization/_activate',
+      headers: { 'content-type': 'application/json' },
+      body: activationPayload,
+    });
+
+    expect(activationSubmit.status).toBe(202);
+    await queueAdapter.waitForEmptyQueue();
+
+    const activationPollPath = new URL(activationSubmit.headers.location, 'http://localhost').pathname;
+    const activationPoll = await invokeExpress(app, {
+      method: 'POST',
+      url: activationPollPath,
+      headers: { 'content-type': 'application/json' },
+      body: { thid: activationPayload.thid },
+    });
+
+    expect(activationPoll.status).toBe(200);
+
+    const activationResult = JSON.parse(activationPoll.text) as { data: Array<Record<string, any>> };
+    const offerId = String(
+      activationResult.data[0]?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '',
+    );
+    expect(offerId).toContain(':Offer:');
+
+    const orderPayload = structuredClone(ORGANIZATION_ORDER_REQUEST) as any;
+    orderPayload.thid = 'activation-route-wrong-sector-order-thid';
+    orderPayload.jti = 'activation-route-wrong-sector-order-jti';
+    orderPayload.body.data[0].resource = {
+      meta: {
+        claims: {
+          [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
+          [ClaimsOrderSchemaorg.paymentMethod]: 'Stripe',
+          [ClaimsOrderSchemaorg.partOfInvoice]: 'in_activation_wrong_sector_story',
+        },
+      },
+    };
+    orderPayload.body.data[0].meta = {};
+
+    const wrongPathSubmit = await invokeExpress(app, {
+      method: 'POST',
+      url: '/host/cds-es/v1/health-care/registry/org.schema/Order/_batch',
+      headers: { 'content-type': 'application/json' },
+      body: orderPayload,
+    });
+
+    expect(wrongPathSubmit.status).toBe(404);
   });
 });

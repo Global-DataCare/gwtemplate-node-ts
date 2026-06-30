@@ -370,6 +370,23 @@ Current intentional scope limitation:
 - it does not claim host-side aggregate publication of `system/ResearchSubject`
   or cross-host digital twin publication
 
+Current verification status:
+
+- manager and integration tests prove the in-memory SMART gate for:
+  - `organization/Composition.rs` on `individual`
+  - `organization/ResearchSubject.rs` on `digitaltwin`
+  - employee inclusion/exclusion by role
+  - employee inclusion/exclusion by direct email target
+- the `local-network` audit chain now also proves the deployed GW/Fabric path
+  for:
+  - consent rule anchoring
+  - SMART token issuance
+  - `individual/.../Bundle/_search`
+  - `digitaltwin/.../Composition/_search`
+
+The still-open gap is broader external-bearer interoperability and cross-host
+publication claims, not the core internal GW/Fabric authorization loop.
+
 ### Reuse Of `consentaccess-sc` For Consumer-Org Delegation
 
 The current preferred design is to reuse the existing consent-access pattern

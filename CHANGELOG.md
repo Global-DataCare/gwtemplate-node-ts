@@ -7,6 +7,83 @@
   layers:
   - `src/__tests__/managers/OpenIdAuthManager.test.ts`
   - `src/__tests__/integration/identity/smart-token.test.ts`
+- Extended the local Fabric/local-network audit chain so the canonical demo
+  now exercises live consent-to-SMART-token flows for both:
+  - clinical `individual` access rooted at `organization/Composition.rs`
+  - research `digitaltwin` access rooted at `organization/ResearchSubject.rs`
+  The new smoke proves:
+  - one individual-professional SMART token can read the IPS bundle through
+    `individual/.../Bundle/_search`
+  - one research permit anchored from consent rules can issue a SMART token
+    that reads `digitaltwin/.../Composition/_search`
+  - research employees are allowed or denied both by matching role and by
+    direct-email targeting
+  - `scripts/project-audit-demo.sh` now chains the SMART access smoke together
+    with the existing consent-asset and consent-lifecycle live checks
+  Files:
+  - `scripts/smoke-smart-access-local-network.sh`
+  - `scripts/project-audit-demo.sh`
+  - `scripts/payload-helpers.sh`
+  - `scripts/render-demo-smart-access-payload.mts`
+  - `src/__tests__/data/demo-smart-access-local-network.data.ts`
+  - `src/__tests__/unit/data/demo-smart-access-local-network.data.test.ts`
+  - `src/__tests__/integration/helpers/research-access-sdk.ts`
+  - `src/__tests__/integration/identity/research-access.conversation.test.ts`
+- Aligned the architecture and closeout/docs-v2 narrative with the now-proven
+  SMART split and local-network audit chain:
+  - clarified that Node/Jest TDD and live shell/Fabric smokes are complementary
+    layers, not replacements for each other
+  - documented that `digitaltwin/.../Composition/_search` is gated by
+    `organization/ResearchSubject.rs...`, while `individual` remains gated by
+    `organization/Composition.rs...`
+  - recorded the current executable proof status for employee allow/deny by
+    role and by direct email
+  Files:
+  - `ARCHITECTURE.md`
+  - `docs-v2/23-digital-twin-composition-search-contract.md`
+  - `docs-end/03-identity-ledger-contract-plan.md`
+  - `docs-end/05-project-closure-use-cases-and-lifecycles-summary.md`
+- Repackaged the closeout document set under `docs-end/` and added index files
+  for both closeout and `docs-v2` so the repository now exposes one explicit
+  reading order instead of the previous `docs-internal/` ad-hoc set.
+  Files:
+  - `docs-end/README.md`
+  - `docs-end/01-newbie-audit-runbook.md`
+  - `docs-end/02-current-state-traceability.md`
+  - `docs-end/03-identity-ledger-contract-plan.md`
+  - `docs-end/04-trust-bundle-operator-roles.md`
+  - `docs-end/05-project-closure-use-cases-and-lifecycles-summary.md`
+  - `docs-end/06-project-closure-executive-summary.md`
+  - `docs-v2/README.md`
+  - removed `docs-internal/*`
+- Refreshed the chaincode/deep-dive/docs-v2 references so public docs no longer
+  depend on workstation-local absolute paths and now point to stable GitHub or
+  workspace-relative references.
+  Files:
+  - `chaincode/docs/101-CONSENTACCESS-SC-CCAAS.md`
+  - `docs-v2/21-research-digital-twin-technical-backlog.md`
+  - `docs/04-DEEP-DIVES/04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md`
+  - `docs/04-DEEP-DIVES/04.L-TEST-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md`
+  - `docs/04-DEEP-DIVES/04.M-CONSENTACCESS-UNID-TEST-NETWORK-DEPLOY.md`
+- Expanded gateway-facing example payload fixtures to show the canonical SMART
+  proof layering and to mirror claims into `resource.meta.claims` where shared
+  readers now expect canonical bundle payloads.
+  Files:
+  - `src/__tests__/data/example-payloads.ts`
+- Added host onboarding route coverage proving that host `Order/_batch` must
+  use the host registry network selector in the URL path rather than the tenant
+  business sector, returning `404` when the wrong path shape is used.
+  Files:
+  - `src/__tests__/integration/host.activate-offer-order.api.test.ts`
+- Updated the portal/BFF/GW mapping reference and regenerated OpenAPI profile
+  timestamps so the route table, examples, and generated profile metadata stay
+  synchronized with the current branch content.
+  Files:
+  - `v1.5-tabla-portal-api-gw.md`
+  - `docs/openapi-profiles/openapi-core.json`
+  - `docs/openapi-profiles/openapi-compat.json`
+  - `docs/openapi-profiles/openapi-extension.json`
+  - `CONTRIBUTING.md`
 
 ## [1.19.2] - 2026-06-30
 

@@ -615,6 +615,13 @@ export const INITIAL_ACCESS_TOKEN_EXCHANGE_RESPONSE = {
 /**
  * @see API_INTEGRATORS_GUIDE.md section 7.2
  * A request for a scoped SMART access token.
+ *
+ * Proof layers in this example:
+ * - `client_assertion`: proves possession of the registered device private key
+ * - `vp_token`: proves the prior OpenID4VP verification event used to bind
+ *   the SMART request to `acr_values`
+ * - bearer / external research token is a separate alternative used only in
+ *   the inter-tenant research profile, not in this baseline professional flow
  */
 export const SMART_TOKEN_REQUEST = {
   "jti": "smart-token-request-<test-id>",
@@ -630,6 +637,8 @@ export const SMART_TOKEN_REQUEST = {
     "redirect_uri": "https://app.acme.org/callback",
     "code_challenge": "b2MtY2hhbGxlbmdlLWJhc2U2NA",
     "code_challenge_method": "S256",
+    "client_assertion": "<client-auth-jwt>",
+    "client_assertion_type": "private_key_jwt",
     "acr_values": "urn:antifraud:acr:openid4vp:employee",
     "vp_token": "<vp-jws-or-jsonld>",
     "presentation_submission": {
@@ -780,6 +789,17 @@ export const EMPLOYEE_REGISTRATION_REQUEST = {
           "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
           "org.schema.Person.email": "receptionist1@acme.org"
         }
+      },
+      // Mirror canonical claims in `resource.meta.claims` because shared bundle
+      // readers no longer inspect legacy `entry.meta.claims` directly.
+      "resource": {
+        "meta": {
+          "claims": {
+            "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
+            "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
+            "org.schema.Person.email": "receptionist1@acme.org"
+          }
+        }
       }
     }]
   },
@@ -811,7 +831,21 @@ export const FAMILY_REGISTRATION_REQUEST = {
           "@context": "org.schema",
           "@type": "template",
           ...testFamilyRegisterExpanded,
+          "Organization.owner.email": "adult1@example.com",
           "Service.termsOfService": "https://provider.example.com/terms.pdf",
+        }
+      },
+      // Mirror canonical claims in `resource.meta.claims` because shared bundle
+      // readers and example conformance tests read the canonical bundle view.
+      "resource": {
+        "meta": {
+          "claims": {
+            "@context": "org.schema",
+            "@type": "template",
+            ...testFamilyRegisterExpanded,
+            "Organization.owner.email": "adult1@example.com",
+            "Service.termsOfService": "https://provider.example.com/terms.pdf",
+          }
         }
       }
     }]

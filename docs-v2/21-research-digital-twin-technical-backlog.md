@@ -45,12 +45,12 @@ Architectural target to keep explicit while implementing:
 
 Primary code anchors:
 
-- [src/managers/CommunicationManager.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/managers/CommunicationManager.ts:203)
-- [src/managers/CommunicationManager.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/managers/CommunicationManager.ts:875)
-- [src/managers/CompositionManager.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/managers/CompositionManager.ts:192)
-- [src/managers/MedicationStatementManager.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/managers/MedicationStatementManager.ts:61)
-- [src/config/server-config.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/config/server-config.ts:139)
-- [src/routes/api.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/routes/api.ts:1577)
+- [src/managers/CommunicationManager.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/managers/CommunicationManager.ts#L203)
+- [src/managers/CommunicationManager.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/managers/CommunicationManager.ts#L875)
+- [src/managers/CompositionManager.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/managers/CompositionManager.ts#L192)
+- [src/managers/MedicationStatementManager.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/managers/MedicationStatementManager.ts#L61)
+- [src/config/server-config.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/config/server-config.ts#L139)
+- [src/routes/api.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/routes/api.ts#L1577)
 - [docs-v2/23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)
 
 ## Backlog Principles
@@ -75,9 +75,9 @@ Goal:
 
 Target files:
 
-- [src/config/server-config.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/config/server-config.ts:1)
-- [src/config.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/config.ts:1)
-- [src/__tests__/unit/config/server-config.test.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/__tests__/unit/config/server-config.test.ts:1)
+- [src/config/server-config.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/config/server-config.ts#L1)
+- [src/config.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/config.ts#L1)
+- [src/__tests__/unit/config/server-config.test.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/__tests__/unit/config/server-config.test.ts#L1)
 
 Backlog items:
 
@@ -135,9 +135,9 @@ Why:
 Target files:
 
 - new `src/adapters` or `src/database/repositories/research-store/*`
-- [src/database/repositories/vault/vault.repository.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/database/repositories/vault/vault.repository.ts:1)
-- [src/managers/CommunicationManager.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/managers/CommunicationManager.ts:875)
-- [src/managers/MedicationStatementManager.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/managers/MedicationStatementManager.ts:117)
+- [src/database/repositories/vault/vault.repository.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/database/repositories/vault/vault.repository.ts#L1)
+- [src/managers/CommunicationManager.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/managers/CommunicationManager.ts#L875)
+- [src/managers/MedicationStatementManager.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/managers/MedicationStatementManager.ts#L117)
 
 Recommended interface split:
 
@@ -218,12 +218,12 @@ Current truth:
 
 Target files:
 
-- [src/routes/api.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/routes/api.ts:1577)
-- [src/managers/MedicationStatementManager.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/managers/MedicationStatementManager.ts:199)
-- [src/utils/swagger-spec.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/utils/swagger-spec.ts:1)
+- [src/routes/api.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/routes/api.ts#L1577)
+- [src/managers/MedicationStatementManager.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/managers/MedicationStatementManager.ts#L199)
+- [src/utils/swagger-spec.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/utils/swagger-spec.ts#L1)
 - `docs/openapi-profiles/*`
-- [src/__tests__/unit/utils/swagger-spec.test.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/__tests__/unit/utils/swagger-spec.test.ts:1)
-- [src/__tests__/integration/medication-statement.api.test.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/__tests__/integration/medication-statement.api.test.ts:733)
+- [src/__tests__/unit/utils/swagger-spec.test.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/__tests__/unit/utils/swagger-spec.test.ts#L1)
+- [src/__tests__/integration/medication-statement.api.test.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/__tests__/integration/medication-statement.api.test.ts#L733)
 
 Recommended contract progression:
 

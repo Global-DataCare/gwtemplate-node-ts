@@ -156,6 +156,20 @@ indexación y la posterior búsqueda de proyecciones clínicas, incluyendo:
 - recuperación selectiva por secciones
 - alimentación de gemelo digital a partir de datos del sujeto
 
+Además, durante el cierre ha quedado mejor fijado y explicable el flujo entre
+frontend, BFF, `profile/wallet`, gateway y gemelo digital:
+
+- el frontend construye el `Bundle` del usuario gestionado mediante editores
+  compartidos
+- el BFF prepara la `Communication` adecuada según rol y caso de uso
+- el backend de `profile/wallet` recibe el payload del usuario autenticado y
+  lo encapsula como mensaje seguro DIDComm
+- el GW recibe, procesa y responde
+- la respuesta vuelve al frontend como `Bundle` reutilizable por la capa común
+  de readers
+- a partir de ahí, la búsqueda y lectura de gemelo digital e IPS quedan
+  conectadas con la misma narrativa funcional
+
 ## 5. Seguridad y Modelo de Confianza
 
 La seguridad del sistema se apoya en varias piezas complementarias.
@@ -207,8 +221,12 @@ de cierre:
 
 - si el actor pertenece al mismo tenant que emite el token, aplica el flujo
   habitual de consentimiento/autorización
-- si el actor pertenece a otro tenant, el gateway exige además una VP que
-  transporte una VC de contrato inter-tenant activa
+- si el actor pertenece a otro tenant, el gateway exige además una prueba de
+  acceso inter-tenant válida en ese caso de uso concreto de `research access`
+  - en el perfil interno actual, esa prueba es una VP que transporta una VC de
+    contrato inter-tenant activa
+  - en un perfil externo de investigación, esa misma función puede quedar
+    sustituida por un `Bearer data access token` externo ya validado
 
 Esa VC contiene como `credentialSubject` un recurso FHIR `Contract`, mientras
 que las firmas de los controllers viven en `proof[]`. De esta forma, la
@@ -238,7 +256,9 @@ junior:
 
 1. una organización proveedora como `acme` publica y gobierna sus datos
 2. una organización consumidora como `lab` firma el acuerdo inter-tenant
-3. el investigador presenta una VP con la VC del contrato
+3. el investigador presenta la prueba de acceso exigida por el perfil activo
+   - VP con VC de contrato en el perfil interno actual
+   - o token externo validado en un perfil de investigación integrado
 4. el gateway emite el SMART token si contrato, purpose, capability y políticas
    coinciden
 5. con ese token, `DigitalTwinSdk` busca composiciones/gemelos digitales y
@@ -254,11 +274,20 @@ La validación de cierre ya deja probado, además, un caso didáctico concreto:
 Por tanto, la justificación puede afirmar con precisión que:
 
 - el backend GW y su contrato de rutas para research access quedan cerrados
-- el flujo funcional de contrato VC -> SMART token -> búsqueda de twin queda
-  probado
+- el flujo funcional de prueba inter-tenant -> SMART token -> búsqueda de twin
+  queda probado en su perfil interno actual
 - la futura convergencia pública en `sdk-node` y `sdk-front` es principalmente
   una tarea de empaquetado documental y de fachada, no un vacío del modelo
   backend ya validado
+
+En este punto conviene distinguir entre:
+
+- el perfil interno ya probado, donde la prueba de acceso viaja como `vp_token`
+  con la VC de contrato inter-tenant
+- y un perfil externo de investigación, por ejemplo con `data access token`
+  validado desde Pontus-X, cuyo encaje debe tratarse como una variante acotada
+  al endpoint `identity/openid/smart/token` del caso de uso `research access`,
+  no como una regla general del resto de usos de `OpenIdAuthManager`
 
 ### 5.4 Soporte para criptografía moderna y evolución post-quantum
 
@@ -318,6 +347,18 @@ Esto permite explicar y soportar escenarios como:
 Con ello, el sistema puede adaptarse a distintos escenarios de interoperación
 sin confundir el contrato funcional con el formato de red.
 
+En términos más cercanos a integradores y equipos de portal/BFF, esto significa
+que:
+
+- una cosa es el payload funcional que el usuario o el profesional quiere
+  enviar o leer
+- otra es la `Communication` FHIR que hace de shell interoperable
+- y otra distinta es el envelope DIDComm que protege el transporte entre capas
+
+Esta separación también deja preparado el camino para evolución de
+criptografía moderna y mecanismos post-quantum sin reescribir la lógica de
+negocio.
+
 ## 7. Descubrimiento en el Espacio de Datos
 
 El proyecto contempla explícitamente el descubrimiento como capacidad
@@ -330,6 +371,9 @@ Esto incluye:
 - resolución de DIDs de host, tenant, empleado e individuo
 - separación entre identidad pública y rutas internas del backend
 - soporte para autodiscovery y para flujos guiados por portal/BFF
+- posibilidad de extender la confianza a emisores externos de tokens o
+  contratos de servicio, resolviendo sus claves públicas desde DID/JWKS
+  configurables por entorno
 
 Esta parte es clave para un espacio de datos real, porque permite desacoplar
 la identidad pública de la topología interna de despliegue.
@@ -419,8 +463,8 @@ de integradores, auditores y clientes.
 Se recomienda como documenatación complementaria:
 
 1. el anexo técnico detallado:
-   [05-project-closure-use-cases-and-lifecycles-summary.md](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/docs-internal/05-project-closure-use-cases-and-lifecycles-summary.md)
-2. la tabla funcional BFF `v1.5` / `v1.6`
+   [05-project-closure-use-cases-and-lifecycles-summary.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs-internal/05-project-closure-use-cases-and-lifecycles-summary.md)
+2. la tabla funcional BFF `v1.5`
 3. los runbooks de trust bundle y local Fabric
 4. los scripts y referencias de pruebas live
 5. los logs o evidencias de ejecución de los principales casos de uso

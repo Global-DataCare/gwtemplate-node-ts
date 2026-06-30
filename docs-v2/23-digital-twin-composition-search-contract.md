@@ -251,9 +251,9 @@ The tested flow is:
 
 Concrete test anchors:
 
-- [src/__tests__/unit/managers/CommunicationManager.unit.test.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/__tests__/unit/managers/CommunicationManager.unit.test.ts:1)
-- [src/__tests__/unit/managers/CompositionManager.test.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/__tests__/unit/managers/CompositionManager.test.ts:1)
-- [src/__tests__/integration/composition.bundle-search.api.test.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/src/__tests__/integration/composition.bundle-search.api.test.ts:1)
+- [src/__tests__/unit/managers/CommunicationManager.unit.test.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/__tests__/unit/managers/CommunicationManager.unit.test.ts#L1)
+- [src/__tests__/unit/managers/CompositionManager.test.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/__tests__/unit/managers/CompositionManager.test.ts#L1)
+- [src/__tests__/integration/composition.bundle-search.api.test.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/src/__tests__/integration/composition.bundle-search.api.test.ts#L1)
 
 ## Relationship to legacy/MVP routes
 
@@ -271,3 +271,48 @@ The target public contract is now:
 - `digitaltwin/.../Composition/_search`
 - section-first
 - twin-document-first in the response
+
+## SMART Authorization Compatibility
+
+For the current GW profile, this public search contract is intentionally tied
+to one research-oriented SMART root capability:
+
+- token issuance for the `digitaltwin` search plane accepts
+  `organization/ResearchSubject.rs...`
+- `patient/ResearchSubject...` is rejected
+- route-level enforcement rejects `Composition`-rooted clinical SMART tokens on
+  `digitaltwin` endpoints
+
+The corresponding clinical plane remains separate:
+
+- `individual` access uses `organization/Composition.rs...`
+- route-level enforcement rejects `ResearchSubject`-rooted tokens on
+  `individual` endpoints
+
+This keeps the runtime split explicit:
+
+- `Composition` = clinical/index access plane
+- `ResearchSubject` = research/digital-twin access plane
+
+## Executable Proof
+
+The current repository proves this contract at three levels:
+
+1. manager/unit and route/integration tests for SMART token issuance and route
+   compatibility
+2. didactic in-memory research conversation proving:
+   - inter-tenant contract VC presentation
+   - `allow` and `deny` by employee role
+   - `allow` and `deny` by direct employee email targeting
+3. live `local-network` smoke proving:
+   - consent rule anchoring on Fabric
+   - SMART token issuance for `organization/ResearchSubject.rs`
+   - `digitaltwin/.../Composition/_search` execution with the emitted token
+
+Primary anchors:
+
+- `src/__tests__/integration/identity/research-access.conversation.test.ts`
+- `src/__tests__/integration/identity/smart-token.test.ts`
+- `src/__tests__/integration/identity/smart-scope-route-gates.test.ts`
+- `scripts/smoke-smart-access-local-network.sh`
+- `scripts/project-audit-demo.sh`

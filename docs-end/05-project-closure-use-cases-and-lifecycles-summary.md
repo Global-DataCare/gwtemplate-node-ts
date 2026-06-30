@@ -1,14 +1,12 @@
 # Project Closure Summary: Use Cases, Lifecycles, SDK Classes, and Local Reproducibility
 
-Status: working closeout note for project justification and Word export.
-
 ## 1. Clarification About ICA VC Readers
 
 Short answer: yes, there were already useful readers in `ica-client-sdk-ts`, but they were not the full shared answer for the GW `_transaction` / `_transaction-response` shape.
 
 What already existed:
 
-- [controllerBinding.ts](</Users/fernando/GITS/gdc-workspace/ica-client-sdk-ts/src/controllerBinding.ts>)
+- [controllerBinding.ts](https://github.com/Global-DataCare/ica-client-sdk-ts/blob/main/src/controllerBinding.ts)
   - `findLegalRepresentativeCredentialEntry(...)`
   - `getLegalRepresentativeCredentialSubject(...)`
   - `extractRepresentativeBindingProjection(...)`
@@ -32,8 +30,8 @@ What they did not solve cleanly for the whole stack:
 
 That is why the new shared readers were added in:
 
-- [legal-organization-verification-result.ts](</Users/fernando/GITS/gdc-workspace/gdc-common-utils-ts/src/utils/legal-organization-verification-result.ts>)
-- [bundle-reader.ts](</Users/fernando/GITS/gdc-workspace/gdc-common-utils-ts/src/utils/bundle-reader.ts>)
+- [legal-organization-verification-result.ts](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/utils/legal-organization-verification-result.ts)
+- [bundle-reader.ts](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/utils/bundle-reader.ts)
 
 So the correct conclusion is:
 
@@ -189,10 +187,13 @@ Sequence:
 2. subject-level permission/consent rules exist as usual
 3. provider and consumer controllers sign one inter-tenant contract VC whose
    `credentialSubject` contains a FHIR `Contract`
-4. the consumer professional presents that contract VC inside a VP
+4. the consumer professional presents the required access proof
+   - in the current internal profile, this is one VP carrying the contract VC
+   - in one external research profile, this may instead be one validated
+     `Bearer data access token` from a platform such as Pontus-X
 5. GW issues the SMART token only if:
    - the actor belongs to the consumer organization declared in the contract
-   - the contract is active
+   - the contract or external access proof is active/valid
    - the contract provider matches the token issuer tenant
    - the requested capability matches the allowed scope
    - the requested purpose matches the allowed purpose
@@ -200,9 +201,40 @@ Sequence:
 
 Important modeling rule:
 
-- the contract VC is an additional inter-tenant authorization gate
+- the contract VC is the current internal inter-tenant authorization gate
+- one external research token profile may replace that proof with a validated
+  external `Bearer data access token`
 - it does not replace subject consent
 - it does not claim host-side aggregate digital twin publication
+
+Coverage note for closeout:
+
+- the executable GW integration flow currently proves the internal profile
+  where the proof travels as one VP carrying the contract VC
+- the external research-token profile is documented as an alternative
+  integration shape, but it still requires dedicated TDD before it can be
+  counted as code-proven behavior
+- the minimum TDD slice for that external profile should include:
+  - issuer/DID/JWKS trust resolution
+  - token signature verification
+  - alternative/exclusive proof selection versus `vp_token`
+
+Additional closeout status update:
+
+- the repository now also carries one explicit `local-network` audit chain for
+  both SMART access planes:
+  - `individual` clinical access via `organization/Composition.rs`
+  - `digitaltwin` research access via `organization/ResearchSubject.rs`
+- the research audit path now proves both:
+  - employee inclusion/exclusion by role
+  - employee inclusion/exclusion by direct email target
+- the canonical live entrypoint is:
+  - `scripts/project-audit-demo.sh`
+  which chains:
+  - `scripts/smoke-consentaccess-local-network.sh`
+  - `scripts/smoke-consentaccess-lifecycle-local-network.sh`
+  - `scripts/smoke-smart-access-local-network.sh`
+  - allow/deny integration tests for `smart/token`
 
 Contract semantics fixed for closeout:
 
@@ -231,7 +263,8 @@ Responsibility split:
   - grant provider-side and consumer-side authorization rules
   - manage later disable/revoke lifecycle
 - `DigitalTwinSdk`
-  - request the SMART access token with the VP carrying the contract VC
+  - request the SMART access token with the current internal VP/carried
+    contract VC or with the validated external research token profile
   - search digital twins
   - open/read IPS bundles
   - download one or more IPS results
@@ -258,7 +291,8 @@ follows:
    - ensure provider-side permit rules exist for the target digital twins
    - optionally ensure consumer-side member delegation rules exist
 4. `DigitalTwinSdk`
-   - build one VP carrying the contract VC
+   - build one VP carrying the contract VC, or obtain one validated external
+     research token when that integration profile is used
    - request one SMART access token from the provider tenant
 5. `DigitalTwinSdk`
    - search `digitaltwin/.../Composition/_search` by text and section
@@ -287,7 +321,7 @@ Expected observable behavior:
 
 ## 8.4 What the 101 Must Make Explicit
 
-To avoid newbie confusion, the future 101 material in `gdc-sdk-node-ts` and
+To avoid newbie confusion, the 101 material in `gdc-sdk-node-ts` and
 `gdc-sdk-front-ts` must make explicit:
 
 - which data is collected in frontend forms
@@ -296,16 +330,42 @@ To avoid newbie confusion, the future 101 material in `gdc-sdk-node-ts` and
 - that smart-contract, queue, and storage plumbing remains inside GW CORE
 - that `did:web` is used for public identity resolution, while the persisted
   authorization/ledger model uses canonical organization/member URNs
+- that external research-token integrations should validate trusted issuers via
+  configured DID/JWKS URLs instead of hardcoding one local public key
 
-This closes the justification narrative without claiming that the final public
-SDK façade packaging is already published.
+This closes the justification narrative without forcing frontend readers to
+learn internal actor-specific runtime names first.
+
+## 8.5 Frontend, BFF, Profile/Wallet, and GW Dialogue
+
+For closeout, the high-level operational story should also be explained in the
+same simple order used by frontend and BFF developers:
+
+1. frontend forms and shared editors build the managed-user `Bundle`
+2. depending on the role and use case, the BFF/runtime shapes the
+   `Communication` that transports that bundle
+3. the `profile/wallet` backend receives the authenticated managed-user payload
+   and wraps it as a secure DIDComm message
+4. the GW receives that message, verifies it, decodes it, processes it, and
+   returns the response
+5. the reverse path gives the frontend one response `Bundle`
+6. the frontend reads that response with the shared bundle-reader layer
+
+Important documentation rule for closeout:
+
+- keep the business payload, the FHIR `Communication` shell, and the DIDComm
+  transport envelope explained as three related but distinct layers
+- do not collapse frontend, BFF/runtime, wallet, and GW responsibilities into
+  one vague backend step
+- keep `DigitalTwinSdk` visible as the developer-facing surface for the later
+  research read/search flow after token issuance
 
 ## 9. Digital Twin Search and IPS Retrieval Lifecycle
 
 | Step | Actor | Class / helper | Main method |
 | --- | --- | --- | --- |
-| Search twin / composition | professional / research consumer | `DigitalTwinSdk` (future public façade) or current `ProfessionalSdk` runtime | `searchClinicalBundle(...)` |
-| Read latest IPS | professional / research consumer | `DigitalTwinSdk` (future public façade) or current `ProfessionalSdk` runtime | `getLatestIps(...)` |
+| Search twin / composition | professional / research consumer | `DigitalTwinSdk` as the documented 101 surface, backed by the current runtime implementation | `searchClinicalBundle(...)` |
+| Read latest IPS | professional / research consumer | `DigitalTwinSdk` as the documented 101 surface, backed by the current runtime implementation | `getLatestIps(...)` |
 | Read latest IPS from individual side | individual controller | `IndividualControllerSdk` | `getLatestIps(...)` |
 
 Expected use:
@@ -313,12 +373,13 @@ Expected use:
 - search one `Composition` or twin projection first when the UI needs section-aware discovery
 - request IPS-style bundle after identifying the subject and allowed sections
 - allow one or more sections depending on granted scopes and route input
+- once the GW response comes back to the BFF/frontend path, reuse the same
+  shared reader/editor surfaces instead of duplicating parsing logic per screen
 
 Closeout naming rule:
 
 - for research-access 101 material, teach this capability under `DigitalTwinSdk`
-- `ProfessionalSdk` remains the current runtime/actor implementation already
-  available today
+- current runtime code may still route through actor-specific SDK surfaces
 - this avoids leaking backend actor-specific naming into the end-user research
   search narrative
 
@@ -349,7 +410,7 @@ git clone <fabric-multicloud-repo-url>
 
 Operational anchor:
 
-- [25-trust-bundle-and-local-network-runbook.md](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/docs-v2/25-trust-bundle-and-local-network-runbook.md)
+- [25-trust-bundle-and-local-network-runbook.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs-v2/25-trust-bundle-and-local-network-runbook.md)
 
 Main commands:
 
@@ -369,8 +430,8 @@ npm run pki:member
 
 Main scripts behind them:
 
-- [generate-ica.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/generate-ica.ts)
-- [generate-host.ts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/generate-host.ts)
+- [generate-ica.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/generate-ica.ts)
+- [generate-host.ts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/generate-host.ts)
 
 Generated/public artifacts to audit:
 
@@ -388,7 +449,7 @@ Generated/public artifacts to audit:
 
 Operational references:
 
-- [24-local-audit-fabric-runtime.md](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/docs-v2/24-local-audit-fabric-runtime.md)
+- [24-local-audit-fabric-runtime.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs-v2/24-local-audit-fabric-runtime.md)
 - `../fabric-multicloud/devnet/fabric-v3`
 
 Canonical local command:
@@ -497,7 +558,7 @@ If the project closeout must be billable and defensible, the final handover shou
 ## 13. Recommended Attachments for the Formal Closeout
 
 1. This markdown exported to Word/PDF.
-2. The BFF API table `v1.5` / `v1.6`.
+2. The BFF API table `v1.5`.
 3. The local trust bundle and Fabric runbooks.
 4. The live `101` E2E scripts and their logs.
 5. One appendix with:
