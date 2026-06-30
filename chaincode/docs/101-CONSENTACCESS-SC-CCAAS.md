@@ -10,7 +10,7 @@ It is intentionally written for developers who do not know the previous chaincod
 
 The smart contract package lives in:
 
-- [consentaccess-sc-javascript](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript)
+- [consentaccess-sc-javascript](https://github.com/Global-DataCare/gwtemplate-node-ts/tree/main/chaincode/consentaccess-sc-javascript)
 
 ## What This Smart Contract Stores
 
@@ -49,10 +49,10 @@ That means:
 
 The package was prepared with these files:
 
-- [package.json](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript/package.json)
-- [metadata.json](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript/metadata.json)
-- [Dockerfile](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript/Dockerfile)
-- [docker/docker-entrypoint.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript/docker/docker-entrypoint.sh)
+- [package.json](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/chaincode/consentaccess-sc-javascript/package.json)
+- [metadata.json](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/chaincode/consentaccess-sc-javascript/metadata.json)
+- [Dockerfile](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/chaincode/consentaccess-sc-javascript/Dockerfile)
+- [docker/docker-entrypoint.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/chaincode/consentaccess-sc-javascript/docker/docker-entrypoint.sh)
 
 ## How The Package Was Generated
 
@@ -101,7 +101,7 @@ This file is useful for inspection, packaging and operational documentation.
 
 ### 4. Add A Docker Image For External Service Runtime
 
-The package now contains a multi-stage [Dockerfile](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript/Dockerfile).
+The package now contains a multi-stage [Dockerfile](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/chaincode/consentaccess-sc-javascript/Dockerfile).
 
 It has these stages:
 
@@ -114,7 +114,7 @@ The important runtime stage for local Fabric CCAAS testing is `ccaas`.
 
 ### 5. Add A Runtime Entrypoint
 
-The file [docker/docker-entrypoint.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript/docker/docker-entrypoint.sh) decides how the chaincode starts:
+The file [docker/docker-entrypoint.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/chaincode/consentaccess-sc-javascript/docker/docker-entrypoint.sh) decides how the chaincode starts:
 
 - debug mode if `DEBUG=true`
 - in-process peer mode if `CHAINCODE_SERVER_ADDRESS` is missing
@@ -322,8 +322,8 @@ already exist in `gdc-common-utils-ts`.
 
 Scripts:
 
-- [render-demo-consentaccess-payload.mts](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/render-demo-consentaccess-payload.mts)
-- [smoke-consentaccess-local-network.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/smoke-consentaccess-local-network.sh)
+- [render-demo-consentaccess-payload.mts](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/render-demo-consentaccess-payload.mts)
+- [smoke-consentaccess-local-network.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/smoke-consentaccess-local-network.sh)
 
 The renderer reuses:
 
@@ -376,13 +376,13 @@ for the consent smoke. Reuse the existing documented flow:
 1. Deploy the chaincode and prepare `.env.local-fabric`.
 2. Start GW CORE with that environment.
 3. Bootstrap the tenant with:
-   - [bootstrap-single-tenant.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/bootstrap-single-tenant.sh)
+   - [bootstrap-single-tenant.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/bootstrap-single-tenant.sh)
    - canonical local overrides:
      - `TENANT_ID=acme-id`
      - `JURISDICTION=ES`
      - `SECTOR=health-care`
 4. Create the individual baseline first with:
-   - [demo-create-individual-organization.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/demo-create-individual-organization.sh)
+   - [demo-create-individual-organization.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/demo-create-individual-organization.sh)
    - canonical local overrides:
      - `TENANT_ID=acme-id`
      - `JURISDICTION=ES`
@@ -392,7 +392,7 @@ for the consent smoke. Reuse the existing documented flow:
    - note:
      - `individual/org.schema/Person` is only a legacy compatibility alias
 5. Create the baseline medication resources with:
-   - [demo-communication-medications-ips.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/demo-communication-medications-ips.sh)
+   - [demo-communication-medications-ips.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/demo-communication-medications-ips.sh)
    - canonical local overrides:
      - `TENANT_ID=acme-id`
      - `JURISDICTION=ES`
@@ -460,7 +460,7 @@ This means:
 
 Local lifecycle smoke:
 
-- [smoke-consentaccess-lifecycle-local-network.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/smoke-consentaccess-lifecycle-local-network.sh)
+- [smoke-consentaccess-lifecycle-local-network.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/smoke-consentaccess-lifecycle-local-network.sh)
 - prints timing metrics for:
   - activate
   - revoke
@@ -482,9 +482,9 @@ For local Fabric devnet:
 
 This is now derived automatically by the scripts:
 
-- [bootstrap-single-tenant.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/bootstrap-single-tenant.sh)
-- [bootstrap-alice-bob-discovery.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/bootstrap-alice-bob-discovery.sh)
-- [smoke-alice-bob-autodiscovery.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/smoke-alice-bob-autodiscovery.sh)
+- [bootstrap-single-tenant.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/bootstrap-single-tenant.sh)
+- [bootstrap-alice-bob-discovery.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/bootstrap-alice-bob-discovery.sh)
+- [smoke-alice-bob-autodiscovery.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/smoke-alice-bob-autodiscovery.sh)
 
 So if `.env.local-fabric` exports `NETWORK_MODE=local-network`, those
 scripts no longer need manual overrides just to hit the correct host onboarding
@@ -499,7 +499,7 @@ That means:
 
 - prefer shared identifiers, actor roles, subject DIDs and reference examples
   from:
-  - [gdc-common-utils-ts/src/examples/shared.ts](/Users/fernando/GITS/gdc-workspace/gdc-common-utils-ts/src/examples/shared.ts)
+  - [gdc-common-utils-ts/src/examples/shared.ts](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/examples/shared.ts)
 - do not create new ad hoc literals for the same semantic values unless the test
   is explicitly about a different value
 - keep local smoke scripts aligned with the same canonical sample data that the
@@ -515,7 +515,7 @@ This is important because it reduces drift between:
 
 This repository already includes a deterministic local Fabric v3 devnet under:
 
-- [fabric-multicloud/devnet/fabric-v3](/Users/fernando/GITS/gdc-workspace/fabric-multicloud/devnet/fabric-v3)
+- `../fabric-multicloud/devnet/fabric-v3`
 
 Use that sibling workspace path as the source of truth.
 
@@ -528,13 +528,13 @@ Do not use these legacy reference folders for this flow:
 
 The fastest local path is the dedicated script:
 
-- [consentaccess-local-devnet.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/scripts/consentaccess-local-devnet.sh)
-- [prepare-consentaccess-local-fabric-env.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/prepare-consentaccess-local-fabric-env.sh)
+- [consentaccess-local-devnet.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/chaincode/scripts/consentaccess-local-devnet.sh)
+- [prepare-consentaccess-local-fabric-env.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/prepare-consentaccess-local-fabric-env.sh)
 
 Run it like this:
 
 ```bash
-cd /Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts
+cd $HOME/GITS/gdc-workspace/gwtemplate-node-ts
 bash ./chaincode/scripts/consentaccess-local-devnet.sh
 bash ./scripts/prepare-consentaccess-local-fabric-env.sh
 npm run api:local-fabric
@@ -555,7 +555,7 @@ What the first script now does in practice:
 The second script expects this exact generated file:
 
 ```text
-/Users/fernando/GITS/gdc-workspace/fabric-multicloud/devnet/fabric-v3/.env.fabric-devnet
+$HOME/GITS/gdc-workspace/fabric-multicloud/devnet/fabric-v3/.env.fabric-devnet
 ```
 
 It does not look for `.env.fabric-devnet` in the root of `fabric-multicloud`.
@@ -563,7 +563,7 @@ It does not look for `.env.fabric-devnet` in the root of `fabric-multicloud`.
 If that file does not exist yet, the scripts now generate it automatically by
 calling:
 
-- [ensure-fabric-devnet-env.sh](/Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/scripts/ensure-fabric-devnet-env.sh)
+- [ensure-fabric-devnet-env.sh](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/ensure-fabric-devnet-env.sh)
 
 You do not need to call that helper manually because:
 
@@ -633,7 +633,7 @@ For this smart contract:
 From:
 
 ```bash
-cd /Users/fernando/GITS/gdc-workspace/fabric-multicloud/devnet/fabric-v3
+cd $HOME/GITS/gdc-workspace/fabric-multicloud/devnet/fabric-v3
 ```
 
 Run:
@@ -651,7 +651,7 @@ export HLF_CHANNEL_NAME=health-care-eu
 From:
 
 ```bash
-cd /Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript
+cd $HOME/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript
 ```
 
 Choose the service address that the peer will use inside the Docker network:
@@ -681,8 +681,8 @@ Use the Fabric tools container directly instead.
 Copy the archive into the devnet workspace:
 
 ```bash
-cp /Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript/consentaccess-sc-caas.tgz \
-   /Users/fernando/GITS/gdc-workspace/fabric-multicloud/devnet/fabric-v3/channel-artifacts/
+cp $HOME/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript/consentaccess-sc-caas.tgz \
+   $HOME/GITS/gdc-workspace/fabric-multicloud/devnet/fabric-v3/channel-artifacts/
 ```
 
 Then install it:
@@ -730,7 +730,7 @@ docker run -d \
 If the image does not exist yet, build it first:
 
 ```bash
-cd /Users/fernando/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript
+cd $HOME/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript
 docker build --target ccaas -f ./Dockerfile -t consentaccess-sc:latest .
 ```
 

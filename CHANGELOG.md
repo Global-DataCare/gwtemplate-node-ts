@@ -43,6 +43,47 @@
   - `docs-v2/23-digital-twin-composition-search-contract.md`
   - `docs-end/03-identity-ledger-contract-plan.md`
   - `docs-end/05-project-closure-use-cases-and-lifecycles-summary.md`
+- Repackaged the closeout document set under `docs-end/` and added index files
+  for both closeout and `docs-v2` so the repository now exposes one explicit
+  reading order instead of the previous `docs-internal/` ad-hoc set.
+  Files:
+  - `docs-end/README.md`
+  - `docs-end/01-newbie-audit-runbook.md`
+  - `docs-end/02-current-state-traceability.md`
+  - `docs-end/03-identity-ledger-contract-plan.md`
+  - `docs-end/04-trust-bundle-operator-roles.md`
+  - `docs-end/05-project-closure-use-cases-and-lifecycles-summary.md`
+  - `docs-end/06-project-closure-executive-summary.md`
+  - `docs-v2/README.md`
+  - removed `docs-internal/*`
+- Refreshed the chaincode/deep-dive/docs-v2 references so public docs no longer
+  depend on workstation-local absolute paths and now point to stable GitHub or
+  workspace-relative references.
+  Files:
+  - `chaincode/docs/101-CONSENTACCESS-SC-CCAAS.md`
+  - `docs-v2/21-research-digital-twin-technical-backlog.md`
+  - `docs/04-DEEP-DIVES/04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md`
+  - `docs/04-DEEP-DIVES/04.L-TEST-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md`
+  - `docs/04-DEEP-DIVES/04.M-CONSENTACCESS-UNID-TEST-NETWORK-DEPLOY.md`
+- Expanded gateway-facing example payload fixtures to show the canonical SMART
+  proof layering and to mirror claims into `resource.meta.claims` where shared
+  readers now expect canonical bundle payloads.
+  Files:
+  - `src/__tests__/data/example-payloads.ts`
+- Added host onboarding route coverage proving that host `Order/_batch` must
+  use the host registry network selector in the URL path rather than the tenant
+  business sector, returning `404` when the wrong path shape is used.
+  Files:
+  - `src/__tests__/integration/host.activate-offer-order.api.test.ts`
+- Updated the portal/BFF/GW mapping reference and regenerated OpenAPI profile
+  timestamps so the route table, examples, and generated profile metadata stay
+  synchronized with the current branch content.
+  Files:
+  - `v1.5-tabla-portal-api-gw.md`
+  - `docs/openapi-profiles/openapi-core.json`
+  - `docs/openapi-profiles/openapi-compat.json`
+  - `docs/openapi-profiles/openapi-extension.json`
+  - `CONTRIBUTING.md`
 
 ## [1.19.2] - 2026-06-30
 
