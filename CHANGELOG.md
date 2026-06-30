@@ -29,6 +29,20 @@
   - `src/__tests__/unit/data/demo-smart-access-local-network.data.test.ts`
   - `src/__tests__/integration/helpers/research-access-sdk.ts`
   - `src/__tests__/integration/identity/research-access.conversation.test.ts`
+- Aligned the architecture and closeout/docs-v2 narrative with the now-proven
+  SMART split and local-network audit chain:
+  - clarified that Node/Jest TDD and live shell/Fabric smokes are complementary
+    layers, not replacements for each other
+  - documented that `digitaltwin/.../Composition/_search` is gated by
+    `organization/ResearchSubject.rs...`, while `individual` remains gated by
+    `organization/Composition.rs...`
+  - recorded the current executable proof status for employee allow/deny by
+    role and by direct email
+  Files:
+  - `ARCHITECTURE.md`
+  - `docs-v2/23-digital-twin-composition-search-contract.md`
+  - `docs-end/03-identity-ledger-contract-plan.md`
+  - `docs-end/05-project-closure-use-cases-and-lifecycles-summary.md`
 
 ## [1.19.2] - 2026-06-30
 
