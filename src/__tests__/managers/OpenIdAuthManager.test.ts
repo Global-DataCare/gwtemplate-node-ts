@@ -18,8 +18,8 @@ import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL,
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
 } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import { buildClientAssertionJwt } from 'gdc-common-utils-ts/utils/client-assertion';
 import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
-import { createClientAssertion } from '../utils/client-assertion-fixtures';
 
 describe('OpenIdAuthManager', () => {
   it('should issue a signed access_token for a tenant (org did rule)', async () => {
@@ -1213,7 +1213,7 @@ describe('OpenIdAuthManager', () => {
     // - client_assertion still authenticates the registered researcher client
     process.env.EXTERNAL_RESEARCH_TOKEN_TRUSTED_ISSUERS = 'https://pontus-x.example';
     const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-002';
-    const clientAssertion = await createClientAssertion({
+    const clientAssertion = await buildClientAssertionJwt({
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -1331,7 +1331,7 @@ describe('OpenIdAuthManager', () => {
     process.env.EXTERNAL_RESEARCH_TOKEN_TRUSTED_ISSUERS = 'https://pontus-x.example';
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-rs-001';
-    const clientAssertion = await createClientAssertion({
+    const clientAssertion = await buildClientAssertionJwt({
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -1449,7 +1449,7 @@ describe('OpenIdAuthManager', () => {
     process.env.EXTERNAL_RESEARCH_TOKEN_TRUSTED_ISSUERS = 'https://pontus-x.example';
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-role-allow';
-    const clientAssertion = await createClientAssertion({
+    const clientAssertion = await buildClientAssertionJwt({
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -1568,7 +1568,7 @@ describe('OpenIdAuthManager', () => {
     process.env.EXTERNAL_RESEARCH_TOKEN_TRUSTED_ISSUERS = 'https://pontus-x.example';
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher2@lab.org:device:client-role-deny';
-    const clientAssertion = await createClientAssertion({
+    const clientAssertion = await buildClientAssertionJwt({
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -1685,7 +1685,7 @@ describe('OpenIdAuthManager', () => {
     process.env.EXTERNAL_RESEARCH_TOKEN_TRUSTED_ISSUERS = 'https://pontus-x.example';
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-email-allow';
-    const clientAssertion = await createClientAssertion({
+    const clientAssertion = await buildClientAssertionJwt({
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -1804,7 +1804,7 @@ describe('OpenIdAuthManager', () => {
     process.env.EXTERNAL_RESEARCH_TOKEN_TRUSTED_ISSUERS = 'https://pontus-x.example';
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher2@lab.org:device:client-email-deny';
-    const clientAssertion = await createClientAssertion({
+    const clientAssertion = await buildClientAssertionJwt({
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -1922,7 +1922,7 @@ describe('OpenIdAuthManager', () => {
     // - `client_assertion` proves possession of the device private key
     // - `vp_token` remains the authorization/holder-proof input for OIDC4VP
     const clientId = 'did:web:api.acme.org:employee:doctor1@acme.org:device:client-001';
-    const clientAssertion = await createClientAssertion({
+    const clientAssertion = await buildClientAssertionJwt({
       clientId,
       audience: 'did:web:api.acme.org',
     });

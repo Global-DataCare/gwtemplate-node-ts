@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### Changed
+- Replaced the repository-local SMART `client_assertion` test fixture with the
+  published shared helper from `gdc-common-utils-ts` so GW manager/integration
+  coverage now exercises the same JWT construction path consumed by the SDK
+  layers:
+  - `src/__tests__/managers/OpenIdAuthManager.test.ts`
+  - `src/__tests__/integration/identity/smart-token.test.ts`
+
 ## [1.19.2] - 2026-06-30
 
 ### Changed

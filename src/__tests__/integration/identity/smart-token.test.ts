@@ -18,8 +18,8 @@ import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL,
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
 } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import { buildClientAssertionJwt } from 'gdc-common-utils-ts/utils/client-assertion';
 import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
-import { createClientAssertion } from '../../utils/client-assertion-fixtures';
 
 describe('SMART token issuance (integration)', () => {
   it('should issue token when subject exists and rules match', async () => {
@@ -88,7 +88,7 @@ describe('SMART token issuance (integration)', () => {
       // - `client_assertion` authenticates the registered device/client
       // - `vp_token` carries the prior OpenID4VP holder proof used for `acr`
       const clientId = 'did:web:api.acme.org:employee:doctor1@acme.org:device:client-001';
-      const clientAssertion = await createClientAssertion({
+      const clientAssertion = await buildClientAssertionJwt({
         clientId,
         audience: 'did:web:api.acme.org',
       });
@@ -207,7 +207,7 @@ describe('SMART token issuance (integration)', () => {
       });
       addVC(vpPayload, EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL);
       const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-002';
-      const clientAssertion = await createClientAssertion({
+      const clientAssertion = await buildClientAssertionJwt({
         clientId,
         audience: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerOrganizationDid,
       });
@@ -330,7 +330,7 @@ describe('SMART token issuance (integration)', () => {
         scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
       };
       const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-003';
-      const clientAssertion = await createClientAssertion({
+      const clientAssertion = await buildClientAssertionJwt({
         clientId,
         audience: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerOrganizationDid,
       });
@@ -457,7 +457,7 @@ describe('SMART token issuance (integration)', () => {
         scope: researchSubjectScope,
       };
       const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-004';
-      const clientAssertion = await createClientAssertion({
+      const clientAssertion = await buildClientAssertionJwt({
         clientId,
         audience: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerOrganizationDid,
       });
