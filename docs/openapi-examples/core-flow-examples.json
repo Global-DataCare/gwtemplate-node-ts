@@ -459,6 +459,8 @@
       "redirect_uri": "https://app.acme.org/callback",
       "code_challenge": "b2MtY2hhbGxlbmdlLWJhc2U2NA",
       "code_challenge_method": "S256",
+      "client_assertion": "<client-auth-jwt>",
+      "client_assertion_type": "private_key_jwt",
       "acr_values": "urn:antifraud:acr:openid4vp:employee",
       "vp_token": "<vp-jws-or-jsonld>",
       "presentation_submission": {

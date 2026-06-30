@@ -18,8 +18,13 @@ import { IClearingHouseService } from '../services/ClearingHouseService';
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/consent';
 import { getMatchingInterTenantAccessContractFromVpToken } from 'gdc-common-utils-ts/utils/inter-tenant-access-contract';
+import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
+import { getEnvSectionId } from '../utils/section-env';
 
 type TokenRequestBody = {
+  client_id?: string;
+  client_assertion?: string;
+  client_assertion_type?: string;
   scope?: string;
   sub?: string;
   expires_in?: number;
@@ -28,6 +33,21 @@ type TokenRequestBody = {
   vp_token?: string;
   presentation_submission?: any;
   acr_values?: string | string[];
+};
+
+type AccessProofResult = {
+  mode: 'vp_token' | 'external_research_bearer';
+  acr: string;
+  amr: string[];
+  vpHash?: string;
+  ledgerVerified: boolean;
+};
+
+type ParsedPermission = {
+  raw: string;
+  capability: string;
+  resourceType: string;
+  filters: Record<string, string[]>;
 };
 
 export class OpenIdAuthManager implements IJobProcessor {
@@ -51,6 +71,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     }
 
     const body = (job.content?.body || {}) as TokenRequestBody;
+    const clientId = body.client_id?.trim();
     const scope = body.scope?.trim();
     if (!scope) {
       throw new ManagerError("Missing 'scope' in token request body.", IssueType.Required);
@@ -61,31 +82,17 @@ export class OpenIdAuthManager implements IJobProcessor {
       throw new ManagerError("Missing 'sub' in token request body.", IssueType.Required);
     }
 
-    const vpToken = body.vp_token?.trim();
-    if (!vpToken) {
-      throw new ManagerError("Missing 'vp_token' in token request body.", IssueType.Required);
-    }
-
     const acrValues = this.normalizeAcrValues(body.acr_values);
     if (acrValues.length === 0) {
       throw new ManagerError("Missing 'acr_values' in token request body.", IssueType.Required);
-    }
-
-    const clearingResult = await this.clearingHouseService.verifyVpToken({
-      vpToken,
-      presentationSubmission: body.presentation_submission,
-      acrValues,
-    });
-
-    if (!acrValues.includes(clearingResult.acr)) {
-      throw new ManagerError('Clearing House returned an unexpected acr value.', IssueType.Forbidden);
     }
 
     // --- Gateway SMART Scope Extension: Context Pinning ---
     // Require a root scope item of the form:
     //   organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=*|<code>[,<code>...]]
     // An omitted section means the backend's default permitted set for that subject.
-    const { subject, sections } = this.extractPinnedSubjectAndSections(scope);
+    const requestedPermissions = this.parseRequestedScopePermissions(scope);
+    const { subject } = this.extractPinnedSubjectAndSections(scope);
     const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
     const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
     if (!tenantExists) throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
@@ -94,6 +101,14 @@ export class OpenIdAuthManager implements IJobProcessor {
     if (!issuerDid) {
       throw new ManagerError('Could not resolve token issuer DID.', IssueType.Exception);
     }
+
+    await this.validateClientAssertion({
+      body,
+      clientId,
+      issuerDid,
+      tenantVaultId,
+      requestIssuerDid: String(job.content?.iss || '').trim() || undefined,
+    });
 
     // --- Consent Rule Check (MVP) ---
     // This is a minimal permission gate to support unit/integration tests.
@@ -104,6 +119,17 @@ export class OpenIdAuthManager implements IJobProcessor {
     const actor = parseActorFromSub(sub);
     const purpose = body.purpose?.trim();
     const requestedCapabilities = this.extractRequestedCapabilities(scope);
+    const vpToken = body.vp_token?.trim();
+    const accessProof = await this.resolveAccessProof({
+      acrValues,
+      actorOrganizationDid: actor.organization,
+      issuerDid,
+      purpose,
+      requestedCapabilities,
+      vpToken,
+      presentationSubmission: body.presentation_submission,
+      bearerPayload: (job.content as any)?.meta?.bearer?.jwt?.payload,
+    });
 
     // Inter-tenant contract gate:
     // - issuerDid = tenant that is about to issue the SMART token
@@ -117,17 +143,19 @@ export class OpenIdAuthManager implements IJobProcessor {
     //   4. purpose allows the requested business reason
     //      example: `RESEARCH`
     if (actor.organization && actor.organization !== issuerDid) {
-      const matchingContract = getMatchingInterTenantAccessContractFromVpToken(vpToken, {
-        providerOrganizationDid: issuerDid,
-        consumerOrganizationDid: actor.organization,
-        requiredCapabilities: requestedCapabilities,
-        purpose,
-      });
-      if (!matchingContract) {
-        throw new ManagerError(
-          `No active inter-tenant access contract found for consumer '${actor.organization}'.`,
-          IssueType.Forbidden,
-        );
+      if (accessProof.mode === 'vp_token') {
+        const matchingContract = getMatchingInterTenantAccessContractFromVpToken(vpToken!, {
+          providerOrganizationDid: issuerDid,
+          consumerOrganizationDid: actor.organization,
+          requiredCapabilities: requestedCapabilities,
+          purpose,
+        });
+        if (!matchingContract) {
+          throw new ManagerError(
+            `No active inter-tenant access contract found for consumer '${actor.organization}'.`,
+            IssueType.Forbidden,
+          );
+        }
       }
     }
     const rules = await this.vaultRepository.getContainersInSection<any>(tenantVaultId, getIndividualSectionId(subject, 'rules'));
@@ -136,7 +164,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       subject,
       actor,
       purpose,
-      sections,
+      requestedPermissions,
       jurisdiction: job.jurisdiction,
     });
 
@@ -185,10 +213,10 @@ export class OpenIdAuthManager implements IJobProcessor {
       iat: now,
       nbf: now,
       exp: now + lifetimeSeconds,
-      acr: clearingResult.acr,
-      amr: clearingResult.amr,
-      vp_hash: clearingResult.vpHash,
-      ledger_verified: clearingResult.ledgerVerified,
+      acr: accessProof.acr,
+      amr: accessProof.amr,
+      vp_hash: accessProof.vpHash,
+      ledger_verified: accessProof.ledgerVerified,
     };
 
     const encodedHeader = Content.stringToBase64Url(JSON.stringify(jwtHeader));
@@ -215,16 +243,331 @@ export class OpenIdAuthManager implements IJobProcessor {
         expires_in: lifetimeSeconds,
         scope,
         subject,
-        ledger_verified: clearingResult.ledgerVerified,
+        ledger_verified: accessProof.ledgerVerified,
       },
     };
   }
 
+  private async resolveAccessProof(params: {
+    acrValues: string[];
+    actorOrganizationDid?: string;
+    issuerDid: string;
+    purpose?: string;
+    requestedCapabilities: string[];
+    vpToken?: string;
+    presentationSubmission?: any;
+    bearerPayload?: Record<string, any>;
+  }): Promise<AccessProofResult> {
+    if (params.vpToken) {
+      const clearingResult = await this.clearingHouseService.verifyVpToken({
+        vpToken: params.vpToken,
+        presentationSubmission: params.presentationSubmission,
+        acrValues: params.acrValues,
+      });
+
+      if (!params.acrValues.includes(clearingResult.acr)) {
+        throw new ManagerError('Clearing House returned an unexpected acr value.', IssueType.Forbidden);
+      }
+
+      return {
+        mode: 'vp_token',
+        acr: clearingResult.acr,
+        amr: Array.isArray(clearingResult.amr) ? clearingResult.amr : [],
+        vpHash: clearingResult.vpHash,
+        ledgerVerified: clearingResult.ledgerVerified,
+      };
+    }
+
+    return this.resolveExternalResearchBearerProof(params);
+  }
+
+  private async validateClientAssertion(params: {
+    body: TokenRequestBody;
+    clientId?: string;
+    issuerDid: string;
+    tenantVaultId: string;
+    requestIssuerDid?: string;
+  }): Promise<void> {
+    const clientAssertion = params.body.client_assertion?.trim();
+    const clientAssertionType = params.body.client_assertion_type?.trim();
+    if (!clientAssertion && !clientAssertionType) {
+      return;
+    }
+
+    if (!clientAssertion) {
+      throw new ManagerError("Missing 'client_assertion' in token request body.", IssueType.Required);
+    }
+    if (!clientAssertionType) {
+      throw new ManagerError("Missing 'client_assertion_type' in token request body.", IssueType.Required);
+    }
+    if (!this.isSupportedClientAssertionType(clientAssertionType)) {
+      throw new ManagerError(`Unsupported client_assertion_type '${clientAssertionType}'.`, IssueType.NotSupported);
+    }
+
+    const payload = await this.verifyClientAssertionSignature(clientAssertion, params.clientId, params.tenantVaultId);
+    const assertionClientId = String(payload?.iss || '').trim();
+    if (!assertionClientId) {
+      throw new ManagerError('client_assertion must include iss.', IssueType.Required);
+    }
+    if (params.clientId && assertionClientId !== params.clientId) {
+      throw new ManagerError('client_assertion iss must match body.client_id.', IssueType.Forbidden);
+    }
+
+    const assertionSub = String(payload?.sub || '').trim();
+    if (assertionSub && assertionSub !== assertionClientId) {
+      throw new ManagerError('client_assertion sub must match client identity.', IssueType.Forbidden);
+    }
+
+    if (params.requestIssuerDid && assertionClientId !== params.requestIssuerDid) {
+      throw new ManagerError('client_assertion client identity must match request issuer.', IssueType.Forbidden);
+    }
+
+    const audience = this.readAudienceString(payload?.aud);
+    if (!audience) {
+      throw new ManagerError('client_assertion must include aud.', IssueType.Required);
+    }
+    if (audience !== params.issuerDid && !audience.includes('/identity/openid/smart/token')) {
+      throw new ManagerError('client_assertion aud does not target this SMART token endpoint.', IssueType.Forbidden);
+    }
+  }
+
+  private isSupportedClientAssertionType(value: string): boolean {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+      || normalized === 'private_key_jwt'
+      || normalized === 'client_assertion';
+  }
+
+  private async verifyClientAssertionSignature(
+    compact: string,
+    clientId: string | undefined,
+    tenantVaultId: string,
+  ): Promise<Record<string, any>> {
+    const header = decodeProtectedHeader(compact);
+    const alg = String(header.alg || '').trim();
+    if (!alg || alg.toLowerCase() === 'none') {
+      throw new ManagerError('client_assertion must be signed with a supported algorithm.', IssueType.Security);
+    }
+
+    const jwks = await this.resolveClientAssertionJwks(compact, header, clientId, tenantVaultId, alg);
+    let lastError = '';
+    for (const jwk of jwks) {
+      try {
+        const keyLike = await importJWK(jwk as JWK, alg);
+        const { payload } = await compactVerify(compact, keyLike);
+        return JSON.parse(Content.bytesToStringUTF8(payload));
+      } catch (error: any) {
+        lastError = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    throw new ManagerError(
+      `Invalid client_assertion signature${lastError ? `: ${lastError}` : ''}`,
+      IssueType.Security,
+    );
+  }
+
+  private async resolveClientAssertionJwks(
+    compact: string,
+    header: Record<string, any>,
+    clientId: string | undefined,
+    tenantVaultId: string,
+    alg: string,
+  ): Promise<Record<string, any>[]> {
+    const resolved: Record<string, any>[] = [];
+    const embedded = header.jwk;
+    if (embedded && typeof embedded === 'object') {
+      resolved.push(embedded as Record<string, any>);
+    }
+
+    if (clientId) {
+      const deviceProfileDoc = await this.vaultRepository.get<any>(
+        tenantVaultId,
+        clientId,
+        getEnvSectionId('device-profiles'),
+      );
+      if (deviceProfileDoc) {
+        const profile = this.kmsService.unprotectConfidentialData
+          ? await this.kmsService.unprotectConfidentialData<any>(deviceProfileDoc, tenantVaultId).catch(() => undefined)
+          : deviceProfileDoc?.content;
+        const keys = Array.isArray(profile?.jwks?.keys) ? profile.jwks.keys : [];
+        const kid = String(header.kid || '').trim();
+        for (const key of keys) {
+          if (!key || typeof key !== 'object') continue;
+          if (kid && String((key as any).kid || '').trim() && String((key as any).kid).trim() !== kid) continue;
+          if (String((key as any).alg || '').trim() && String((key as any).alg).trim() !== alg) continue;
+          resolved.push(key as Record<string, any>);
+        }
+      }
+    }
+
+    if (resolved.length === 0) {
+      throw new ManagerError(
+        `Could not resolve verification key material for client_assertion${clientId ? ` client_id='${clientId}'` : ''}.`,
+        IssueType.NotFound,
+      );
+    }
+    return resolved;
+  }
+
+  private resolveExternalResearchBearerProof(params: {
+    acrValues: string[];
+    actorOrganizationDid?: string;
+    issuerDid: string;
+    purpose?: string;
+    requestedCapabilities: string[];
+    bearerPayload?: Record<string, any>;
+  }): AccessProofResult {
+    const purpose = String(params.purpose || '').trim().toUpperCase();
+    if (purpose !== 'RESEARCH') {
+      throw new ManagerError("Missing 'vp_token' in token request body.", IssueType.Required);
+    }
+
+    if (!params.actorOrganizationDid || params.actorOrganizationDid === params.issuerDid) {
+      throw new ManagerError("Missing 'vp_token' in token request body.", IssueType.Required);
+    }
+
+    const payload = params.bearerPayload;
+    if (!payload || typeof payload !== 'object') {
+      throw new ManagerError(
+        'Missing validated external research Bearer token metadata for SMART token request.',
+        IssueType.Required,
+      );
+    }
+
+    const trustedIssuers = this.readTrustedExternalResearchIssuers();
+    const externalIssuer = this.readFirstString(payload, ['iss', 'issuer']);
+    if (!externalIssuer || !trustedIssuers.has(externalIssuer)) {
+      throw new ManagerError('External research Bearer token issuer is not trusted.', IssueType.Forbidden);
+    }
+
+    const consumerOrganizationDid = this.readFirstString(payload, [
+      'consumer_organization',
+      'consumerOrganizationDid',
+      'organization',
+      'organizationDid',
+      'org',
+    ]);
+    if (!consumerOrganizationDid || consumerOrganizationDid !== params.actorOrganizationDid) {
+      throw new ManagerError('External research Bearer token consumer organization does not match requester.', IssueType.Forbidden);
+    }
+
+    const providerOrganizationDid = this.readFirstString(payload, [
+      'provider_organization',
+      'providerOrganizationDid',
+    ]) || this.readAudienceString(payload.aud);
+    if (!providerOrganizationDid || providerOrganizationDid !== params.issuerDid) {
+      throw new ManagerError('External research Bearer token provider does not match issuer tenant.', IssueType.Forbidden);
+    }
+
+    const purposes = this.readStringValues(payload, ['purpose', 'purposes']);
+    if (!purposes.some((value) => value.toUpperCase() === purpose)) {
+      throw new ManagerError('External research Bearer token purpose does not match request.', IssueType.Forbidden);
+    }
+
+    const grantedCapabilities = this.readGrantedCapabilities(payload);
+    if (!params.requestedCapabilities.every((capability) => grantedCapabilities.includes(capability))) {
+      throw new ManagerError('External research Bearer token capabilities do not cover requested scope.', IssueType.Forbidden);
+    }
+
+    const externalAcr = this.readFirstString(payload, ['acr']);
+    const acr = externalAcr && params.acrValues.includes(externalAcr)
+      ? externalAcr
+      : params.acrValues[0];
+
+    return {
+      mode: 'external_research_bearer',
+      acr,
+      amr: this.readStringValues(payload, ['amr']).length
+        ? this.readStringValues(payload, ['amr'])
+        : ['external_bearer', 'data_access_token'],
+      ledgerVerified: typeof payload.ledger_verified === 'boolean'
+        ? payload.ledger_verified
+        : true,
+    };
+  }
+
+  private readTrustedExternalResearchIssuers(): Set<string> {
+    const configured = String(process.env.EXTERNAL_RESEARCH_TOKEN_TRUSTED_ISSUERS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    return new Set(configured);
+  }
+
+  private readFirstString(source: Record<string, any>, keys: string[]): string | undefined {
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return undefined;
+  }
+
+  private readAudienceString(value: unknown): string | undefined {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (Array.isArray(value)) {
+      const first = value.find((item) => typeof item === 'string' && item.trim());
+      if (typeof first === 'string') return first.trim();
+    }
+    return undefined;
+  }
+
+  private readStringValues(source: Record<string, any>, keys: string[]): string[] {
+    const values: string[] = [];
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'string') {
+        values.push(
+          ...value.split(/\s+/).map((entry) => entry.trim()).filter(Boolean),
+        );
+        continue;
+      }
+      if (Array.isArray(value)) {
+        values.push(
+          ...value
+            .filter((entry) => typeof entry === 'string')
+            .map((entry) => String(entry).trim())
+            .filter(Boolean),
+        );
+      }
+    }
+    return Array.from(new Set(values));
+  }
+
+  private readGrantedCapabilities(source: Record<string, any>): string[] {
+    const rawValues = this.readStringValues(source, ['scope', 'scopes', 'capability', 'capabilities']);
+    const expanded = new Set<string>();
+    for (const value of rawValues) {
+      expanded.add(value);
+      const queryIndex = value.indexOf('?');
+      if (queryIndex > 0) {
+        expanded.add(value.slice(0, queryIndex));
+      }
+    }
+    return Array.from(expanded);
+  }
+
   private extractPinnedSubjectAndSections(scope: string): { subject: string; sections: string[] } {
     const scopes = scope.split(/\s+/).map((s) => s.trim()).filter(Boolean);
-    const rootScopes = scopes.filter((s) => s.toLowerCase().startsWith('organization/composition.'));
+    const forbiddenPatientScopes = scopes.filter((s) => {
+      const normalized = s.toLowerCase();
+      return normalized.startsWith('patient/composition.')
+        || normalized.startsWith('patient/researchsubject.');
+    });
+    if (forbiddenPatientScopes.length > 0) {
+      throw new ManagerError(
+        'SMART token requests must use organization-scoped root capabilities. patient/* scopes are not accepted.',
+        IssueType.NotSupported,
+      );
+    }
+
+    const rootScopes = scopes.filter((s) => {
+      const normalized = s.toLowerCase();
+      return normalized.startsWith('organization/composition.')
+        || normalized.startsWith('organization/researchsubject.');
+    });
     if (rootScopes.length === 0) {
-      throw new ManagerError('Missing required root scope: organization/Composition.<cruds>?subject=...', IssueType.Required);
+      throw new ManagerError('Missing required root scope: organization/Composition.<cruds>?subject=... or organization/ResearchSubject.<cruds>?subject=...', IssueType.Required);
     }
 
     const parsed = rootScopes.map((root) => {
@@ -254,6 +597,18 @@ export class OpenIdAuthManager implements IJobProcessor {
 
     const mergedSections = Array.from(new Set(parsed.flatMap((p) => p.sections)));
     return { subject, sections: mergedSections };
+  }
+
+  private parseRequestedScopePermissions(scope: string): ParsedPermission[] {
+    const requested: ParsedPermission[] = [];
+    for (const token of scope.split(/\s+/).map((value) => value.trim()).filter(Boolean)) {
+      if (!token.toLowerCase().startsWith('organization/') && !token.toLowerCase().startsWith('patient/')) continue;
+      const parsed = this.parsePermissionExpression(token, { allowLegacySectionList: false });
+      const subject = parsed.filters.subject;
+      if (subject) delete parsed.filters.subject;
+      requested.push(parsed);
+    }
+    return requested;
   }
 
   private normalizeAcrValues(acrValues?: string | string[]): string[] {
@@ -295,7 +650,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     subject: string;
     actor: ReturnType<typeof parseActorFromSub>;
     purpose?: string;
-    sections: string[];
+    requestedPermissions: ParsedPermission[];
     jurisdiction: string;
   }): {
     allowed: boolean;
@@ -312,14 +667,17 @@ export class OpenIdAuthManager implements IJobProcessor {
       ? input.actor.identifier.toLowerCase()
       : undefined;
 
-    for (const section of input.sections.length > 0 ? input.sections : ['*']) {
-      const normalizedSection = section === '*' ? '*' : normalizeCodeSystemAndValue(section);
+    const requestedPermissions = input.requestedPermissions.length > 0
+      ? input.requestedPermissions
+      : [this.parsePermissionExpression('organization/Composition.rs?section=*', { allowLegacySectionList: false })];
+
+    for (const requestedPermission of requestedPermissions) {
       const candidates = (input.rules || [])
         .filter((rule) => String(getClaimValue<string>(rule, 'Consent.subject') || '').trim() === input.subject)
         .filter((rule) => this.isRuleTimeActive(rule))
         .filter((rule) => this.matchesRulePurpose(rule, input.purpose))
         .filter((rule) => this.matchesRuleRole(rule, normalizedActorRole, actorEmail))
-        .filter((rule) => this.matchesRuleSection(rule, normalizedSection))
+        .filter((rule) => this.matchesRulePermission(rule, requestedPermission))
         .map((rule) => {
           const match = this.resolveRuleMatchKind(rule, input.actor, actorEmail, normalizedJurisdiction);
           if (!match) return undefined;
@@ -333,7 +691,12 @@ export class OpenIdAuthManager implements IJobProcessor {
 
       const winner = candidates[0];
       if (!winner || String(getClaimValue<string>(winner.rule, 'Consent.decision') || '').trim() !== 'permit') {
-        if (normalizedSection !== '*') missingSections.push(normalizedSection);
+        const requestedSections = requestedPermission.filters.section || [];
+        if (requestedPermission.resourceType === 'Composition' && requestedSections.length > 0 && !requestedSections.includes('*')) {
+          missingSections.push(...requestedSections);
+        } else {
+          missingResourceTypes.push(requestedPermission.resourceType);
+        }
       }
     }
 
@@ -368,13 +731,99 @@ export class OpenIdAuthManager implements IJobProcessor {
     return normalizedRuleRoles.includes(normalizedActorRole);
   }
 
-  private matchesRuleSection(rule: any, normalizedSection: string): boolean {
-    if (!normalizedSection || normalizedSection === '*') return true;
-    const actions = String(getClaimValue<string>(rule, 'Consent.action') || '')
-      .split(',')
-      .map((value) => normalizeCodeSystemAndValue(value.trim()))
-      .filter(Boolean);
-    return actions.includes('*') || actions.includes(normalizedSection);
+  private matchesRulePermission(rule: any, requestedPermission: ParsedPermission): boolean {
+    const rawAction = String(getClaimValue<string>(rule, 'Consent.action') || '').trim();
+    const parsedRulePermissions = this.parseStoredRulePermissions(rawAction);
+    if (parsedRulePermissions.length === 0) {
+      return requestedPermission.resourceType === 'Composition'
+        && (!requestedPermission.filters.section || requestedPermission.filters.section.includes('*'));
+    }
+
+    return parsedRulePermissions.some((rulePermission) => this.rulePermissionCoversRequest(rulePermission, requestedPermission));
+  }
+
+  private parseStoredRulePermissions(rawAction: string): ParsedPermission[] {
+    const value = rawAction.trim();
+    if (!value) return [];
+
+    const tokens = this.isCanonicalPermissionExpression(value)
+      ? value.split(/\s+/).map((part) => part.trim()).filter(Boolean)
+      : [value];
+
+    return tokens.map((token) => this.parsePermissionExpression(token, { allowLegacySectionList: true }));
+  }
+
+  private isCanonicalPermissionExpression(value: string): boolean {
+    return /^(?:organization\/|patient\/)?[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z]+)(?:\?|$)/.test(value);
+  }
+
+  private parsePermissionExpression(
+    value: string,
+    options: Readonly<{ allowLegacySectionList: boolean }>,
+  ): ParsedPermission {
+    const raw = String(value || '').trim();
+    if (!raw) {
+      return {
+        raw,
+        capability: 'Composition.rs',
+        resourceType: 'Composition',
+        filters: {},
+      };
+    }
+
+    if (options.allowLegacySectionList && !this.isCanonicalPermissionExpression(raw)) {
+      const sections = raw
+        .split(',')
+        .map((item) => normalizeCodeSystemAndValue(item.trim()))
+        .filter(Boolean);
+      return {
+        raw,
+        capability: 'Composition.rs',
+        resourceType: 'Composition',
+        filters: sections.length > 0 ? { section: sections } : {},
+      };
+    }
+
+    const withoutPrefix = raw.replace(/^(organization|patient)\//i, '');
+    const [head, queryString = ''] = withoutPrefix.split('?', 2);
+    const capability = head.trim();
+    const resourceType = capability.split('.', 1)[0]?.trim() || capability;
+    const params = new URLSearchParams(queryString);
+    const filters: Record<string, string[]> = {};
+    for (const [key, rawValue] of params.entries()) {
+      const values = String(rawValue || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .map((item) => key === 'section' ? normalizeCodeSystemAndValue(item) : item);
+      if (values.length > 0) filters[key] = values;
+    }
+
+    return {
+      raw,
+      capability,
+      resourceType,
+      filters,
+    };
+  }
+
+  private rulePermissionCoversRequest(rulePermission: ParsedPermission, requestedPermission: ParsedPermission): boolean {
+    if (rulePermission.resourceType !== requestedPermission.resourceType) return false;
+
+    const requestedFilterKeys = Object.keys(requestedPermission.filters);
+    for (const key of requestedFilterKeys) {
+      const requestedValues = requestedPermission.filters[key] || [];
+      if (requestedValues.length === 0) continue;
+      if (requestedValues.includes('*')) continue;
+
+      const normalizedRequestedValues = requestedValues.map((value) => key === 'section' ? normalizeCodeSystemAndValue(value) : value);
+      const ruleValues = (rulePermission.filters[key] || []).map((value) => key === 'section' ? normalizeCodeSystemAndValue(value) : value);
+      if (ruleValues.length === 0) return false;
+      if (ruleValues.includes('*')) continue;
+      if (!normalizedRequestedValues.every((value) => ruleValues.includes(value))) return false;
+    }
+
+    return true;
   }
 
   private resolveRuleMatchKind(
