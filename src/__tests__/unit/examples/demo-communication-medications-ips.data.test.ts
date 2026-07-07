@@ -1,4 +1,5 @@
 import {
+  buildDemoCommunicationBatchSubmitRequest,
   buildDemoCommunicationDidcommRequest,
   buildDemoDocumentBundle,
   buildDemoMedicationSearchRequest,
@@ -13,7 +14,7 @@ describe('demo communication medications IPS fixtures', () => {
     expect(demoCommunicationMedicationIpsDefaults.demoMedicationCases[1]?.demoMedicationText).toBe('Paracetamol 600 mg');
   });
 
-  it('renders the first communication/document bundle using the first medication case', () => {
+  it('renders the first document bundle using the first medication case', () => {
     const bundle = buildDemoDocumentBundle({
       ...demoCommunicationMedicationIpsDefaults,
       thidComm: 'comm-1',
@@ -22,14 +23,16 @@ describe('demo communication medications IPS fixtures', () => {
       medicationCaseIndex: 0,
     });
 
+    expect(bundle.type).toBe('document');
+    expect(bundle.entry?.[0]?.resource?.resourceType).toBe('Composition');
     const medication = bundle.entry?.[1]?.resource as any;
     expect(medication?.id).toBe('medication-ibuprofen-001');
     expect(medication?.medicationCodeableConcept?.text).toBe('Ibuprofen 400 mg');
     expect(medication?.meta?.claims?.['org.hl7.fhir.api.MedicationStatement.dose-quantity-value']).toBe(400);
   });
 
-  it('renders the second communication/document bundle using the second medication case', () => {
-    const request = buildDemoCommunicationDidcommRequest({
+  it('renders the communication submission with the attached document bundle for the second medication case', () => {
+    const request = buildDemoCommunicationBatchSubmitRequest({
       ...demoCommunicationMedicationIpsDefaults,
       thidComm: 'comm-2',
       thidMedSearch: 'med-search-2',
@@ -40,6 +43,28 @@ describe('demo communication medications IPS fixtures', () => {
     const attachmentData = request.body.entry?.[0]?.resource?.payload?.[0]?.contentAttachment?.data;
     expect(typeof attachmentData).toBe('string');
     expect(attachmentData?.length).toBeGreaterThan(20);
+    const attachmentBundle = JSON.parse(Buffer.from(String(attachmentData), 'base64').toString('utf8'));
+    expect(attachmentBundle.type).toBe('document');
+    expect(attachmentBundle.entry?.[0]?.resource?.resourceType).toBe('Composition');
+  });
+
+  it('keeps the deprecated didcomm-named alias mapped to the same GW submit payload', () => {
+    const nextRequest = buildDemoCommunicationBatchSubmitRequest({
+      ...demoCommunicationMedicationIpsDefaults,
+      thidComm: 'comm-3',
+      thidMedSearch: 'med-search-3',
+      thidIpsSearch: 'ips-search-3',
+      medicationCaseIndex: 0,
+    });
+    const legacyAliasRequest = buildDemoCommunicationDidcommRequest({
+      ...demoCommunicationMedicationIpsDefaults,
+      thidComm: 'comm-3',
+      thidMedSearch: 'med-search-3',
+      thidIpsSearch: 'ips-search-3',
+      medicationCaseIndex: 0,
+    });
+
+    expect(legacyAliasRequest).toEqual(nextRequest);
   });
 
   it('keeps subject-scoped medication and IPS searches anchored to the same subject and IPS document type', () => {

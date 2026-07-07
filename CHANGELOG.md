@@ -1,12 +1,43 @@
 ## [Unreleased]
 
 ### Changed
+- Added explicit `docs-v2` terminology so GW docs no longer mix:
+  - `ProfileRuntime` as the unlocked end-user profile runtime
+  - `TenantServiceRuntime` as the technical service/tenant wallet/runtime
+  - `ChannelBackendPort` as the product/channel API above those runtimes
+  in:
+  - `docs-v2/101-README.md`
+  - `docs-v2/09-api-integrators-guide.md`
+  - `docs-v2/19-key-custody-and-audit-readiness.md`
+- Added one centralized integration map so
+  front/BFF/backend contributors now have one high-level entry point for:
+  - inter-tenant research access choreography
+  - `digitaltwin` SMART scope and `Composition/_search` semantics
+  - DCR vs human-profile identity boundaries
+  - current-vs-deferred status for researcher overlays, `urn:twin`, and
+    reusable wallet/profile modules
 - Replaced the repository-local SMART `client_assertion` test fixture with the
   published shared helper from `gdc-common-utils-ts` so GW manager/integration
   coverage now exercises the same JWT construction path consumed by the SDK
   layers:
   - `src/__tests__/managers/OpenIdAuthManager.test.ts`
   - `src/__tests__/integration/identity/smart-token.test.ts`
+- Extended `digitaltwin/.../Composition/_search` so one request can match
+  directly against researcher-branch `Composition` records stored in the
+  digital-twin composition collection, instead of only fanning out through
+  leaf resource families first. The first direct `Composition.*` capability
+  now covered is `Composition.meta-tag`, matched as a tokenized
+  `system|code` filter against stored `meta.tag[]` / `tag[]` values.
+  TDD coverage now proves:
+  - one unit-level digital twin `Composition` branch tagged with
+    `urn:research:tag:score|10` is returned by
+    `Composition/_search(section + Composition.meta-tag)`
+  - one integration-level `digitaltwin` search returns a branch composition
+    persisted in the tenant vault with the same `meta.tag[]` payload
+  Files:
+  - `src/managers/TwinCompositionManager.ts`
+  - `src/__tests__/unit/managers/CompositionManager.test.ts`
+  - `src/__tests__/integration/composition.bundle-search.api.test.ts`
 - Extended the local Fabric/local-network audit chain so the canonical demo
   now exercises live consent-to-SMART-token flows for both:
   - clinical `individual` access rooted at `organization/Composition.rs`
@@ -64,7 +95,7 @@
   - `docs-v2/21-research-digital-twin-technical-backlog.md`
   - `docs/04-DEEP-DIVES/04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md`
   - `docs/04-DEEP-DIVES/04.L-TEST-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md`
-  - `docs/04-DEEP-DIVES/04.M-CONSENTACCESS-UNID-TEST-NETWORK-DEPLOY.md`
+  - `docs/04-DEEP-DIVES/04.M-CONSENTACCESS-NETWORK-DEPLOY.md`
 - Expanded gateway-facing example payload fixtures to show the canonical SMART
   proof layering and to mirror claims into `resource.meta.claims` where shared
   readers now expect canonical bundle payloads.

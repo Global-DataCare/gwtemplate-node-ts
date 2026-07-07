@@ -816,4 +816,56 @@ describe('CompositionManager', () => {
     expect(data[0].resource.total).toBe(1);
     expect(data[0].resource.data[0].id).toBe('comp-obs-combo-1');
   });
+
+  it('supports digitaltwin Composition/_search by section plus Composition.meta-tag for one researcher branch composition', async () => {
+    const subjectDid = 'did:web:api.lab.org:research-subject:branch-tag-001';
+    const compositionSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
+    const branchCompositionId =
+      'urn:twin:researchsubject-branch-tag-001:branch:employee-001:version:01JZ4CV2G1X2M5Y8Y3V4W6Q7R8';
+    const branchTag = {
+      id: 'Composition.meta.tag[0]',
+      system: 'urn:research:tag:score',
+      code: '10',
+    };
+
+    mockVaultRepository.getAllSections.mockResolvedValue([
+      compositionSectionId,
+    ] as any);
+    mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
+      if (sectionId === compositionSectionId) {
+        return [
+          {
+            id: branchCompositionId,
+            'Composition.subject': subjectDid,
+            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            meta: { tag: [branchTag] },
+            tag: [branchTag],
+          },
+        ] as any;
+      }
+      return [] as any;
+    });
+
+    const response = await manager.process(createJob({
+      action: '_search',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [
+            { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
+            { name: 'Composition.meta-tag', valueCoding: { system: 'urn:research:tag:score', code: '10' } },
+          ],
+        } as any,
+      } as any,
+    }));
+
+    const data = (response.body as any).data;
+    expect(data[0].type).toBe('Composition-search-response-v1.0');
+    expect(data[0].resource.total).toBe(1);
+    expect(data[0].resource.data[0].id).toBe(branchCompositionId);
+    expect(data[0].resource.data[0].meta?.tag?.[0]?.system).toBe('urn:research:tag:score');
+    expect(data[0].resource.data[0].meta?.tag?.[0]?.code).toBe('10');
+  });
 });

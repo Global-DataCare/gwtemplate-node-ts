@@ -7,6 +7,11 @@ Purpose:
   duplicated,
 - make numbering and intent explicit.
 
+For 101 narration, use [01-narrative-contract.md](./01-narrative-contract.md)
+as the repository-local version of the root
+[NARRATIVE-ALIGNMENT.md](../NARRATIVE-ALIGNMENT.md) contract before reading
+any individual flow file.
+
 ## Reading order
 
 1. [00-quickstart.md](./00-quickstart.md)

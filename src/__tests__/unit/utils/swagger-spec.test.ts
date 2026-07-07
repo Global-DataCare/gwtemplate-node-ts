@@ -206,5 +206,14 @@ describe('Swagger Spec Generation', () => {
     expect(familyClaims['org.schema.Organization.identifier.value']).toBeUndefined();
     expect(familyClaims['Organization.owner.identifier.value']).toBe('<cert-serialnumber>');
     expect(familyClaims['Organization.owner.identifier.value']).not.toBe('adult1@example.com');
+
+    const communicationAttachment =
+      spec.components.examples.CommunicationCreationPlaintextMessage?.value?.body?.entry?.[0]?.resource?.payload?.[0]?.contentAttachment;
+    const communicationBundle = communicationAttachment
+      ? JSON.parse(Buffer.from(communicationAttachment.data, 'base64').toString('utf8'))
+      : undefined;
+    expect(communicationBundle?.resourceType).toBe('Bundle');
+    expect(communicationBundle?.type).toBe('document');
+    expect(communicationBundle?.entry?.[0]?.resource?.resourceType).toBe('Composition');
   });
 });

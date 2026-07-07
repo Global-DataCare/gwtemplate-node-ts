@@ -1,5 +1,8 @@
 # 12 Communication Batch Index Data
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - define the canonical v2 exchange model for individual index data,

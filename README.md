@@ -8,6 +8,9 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 
 ## Non-Negotiable Conventions
 
+For the cross-repo 101 story order and security narrative, read
+[NARRATIVE-ALIGNMENT.md](NARRATIVE-ALIGNMENT.md).
+
 - FHIR SearchParameter names are canonical FHIR names only: lowercase and `-` where applicable.
 - No invented camelCase for FHIR claims/search keys (example: use `Communication.part-of`, never `Communication.partOf`).
 - Custom parameter names are allowed only when FHIR has no defined parameter.
@@ -15,10 +18,13 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 - `resource.meta.claims` is not part of base FHIR. It is a claims-first extension used by GW/SDK contracts on top of FHIR-like resources.
 - Those claims are often contextualized with `@context` such as `org.schema` or `org.hl7.fhir.api`, but may also use less-contextualized keys when the active `@context` already disambiguates them.
 
-If you are new and confused by DIDComm envelope vs batch body vs entry type vs
-FHIR-like `Communication` vs internal `CommMsgExtended`, read first:
+If you are new and confused by the front-story vs GW boundary, read first:
 
+- [`gdc-common-utils-ts/docs/101-BFF_AND_CHANNEL_MESSAGE_FLOW.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-BFF_AND_CHANNEL_MESSAGE_FLOW.md)
 - [`gdc-common-utils-ts/docs/101-COMMUNICATION_LAYERING.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
+- [NARRATIVE-ALIGNMENT.md](NARRATIVE-ALIGNMENT.md)
+
+GW starts after upstream profile/runtime unlock and document/Communication authoring.
 
 ## Repository Navigation
 
@@ -243,6 +249,13 @@ If you already ran `./docker_build_local.sh`, prefer the `SKIP_BUILD=true` varia
 ## 6) Ingest medications via Communication and retrieve IPS search views (Terminal 2)
 
 The shell script only orchestrates the flow. The synthetic demo payloads now live in TypeScript render helpers so the `.sh` does not duplicate FHIR/Communication contract JSON.
+The canonical newbie story for document cases is:
+
+- author a `Bundle` with `type=document`
+- put `Composition` first in the bundle
+- submit that document through `Communication` over DIDComm/plain
+- read the attached document bundle back through `Communication`
+- teach backend search separately with FHIR params such as `Composition.section`
 
 Default mode (`didcomm`):
 
@@ -287,6 +300,8 @@ Canonical payload examples are not maintained separately in Swagger, markdown, a
 - Swagger/OpenAPI generation: [`src/utils/swagger-spec.ts`](src/utils/swagger-spec.ts) and [`scripts/generate-swagger-spec.mts`](scripts/generate-swagger-spec.mts)
 - Script payload rendering from the same fixtures: [`scripts/render-example-payload.mts`](scripts/render-example-payload.mts)
 - GW markdown conformance test: [`src/__tests__/unit/examples/markdown-examples.test.ts`](src/__tests__/unit/examples/markdown-examples.test.ts)
+- Canonical document-bundle story check: [`src/__tests__/unit/api-examples/communication.examples.test.ts`](src/__tests__/unit/api-examples/communication.examples.test.ts)
+- Canonical backend search check: [`src/__tests__/integration/composition.bundle-search.api.test.ts`](src/__tests__/integration/composition.bundle-search.api.test.ts)
 - GW to shared `gdc-common-utils-ts` conformance test: [`src/__tests__/unit/examples/shared-flow-examples.test.ts`](src/__tests__/unit/examples/shared-flow-examples.test.ts)
 - GW shared bundle editor surface contract: [`src/__tests__/unit/examples/shared-bundle-entry-editors.test.ts`](src/__tests__/unit/examples/shared-bundle-entry-editors.test.ts)
 - Shared lifecycle source of truth: [`gdc-common-utils-ts/src/examples/lifecycle.ts`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/examples/lifecycle.ts)

@@ -73,6 +73,10 @@ function buildConfidentialDoc(options?: {
 
 describe('confidential-storage-persistence', () => {
   it('keeps small JWE payloads inline when they are below both thresholds', async () => {
+    // Teaching goal:
+    // - prove that persistence policy is about the encrypted payload shape
+    // - keep the document id and lifecycle locator out of the size/externalize
+    //   decision so the storage contract stays independent from the public id
     const blobStore = new InMemoryConfidentialBlobStore();
     const document = buildConfidentialDoc();
     const persisted = await externalizeConfidentialStorageDocForPersistence(
@@ -92,6 +96,8 @@ describe('confidential-storage-persistence', () => {
   });
 
   it('externalizes JWE payloads above the global inline threshold and records blob metadata', async () => {
+    // Step 1.
+    // Make the encrypted payload large enough to require blob externalization.
     const blobStore = new InMemoryConfidentialBlobStore();
     const document = buildConfidentialDoc({ ciphertextLength: LARGE_CIPHERTEXT_LENGTH });
     const persisted = await externalizeConfidentialStorageDocForPersistence(
@@ -119,6 +125,9 @@ describe('confidential-storage-persistence', () => {
   });
 
   it('externalizes when the persisted document size exceeds the Firestore-style guardrail', async () => {
+    // Step 1.
+    // Keep the JWE small but grow the indexed metadata so the record itself
+    // crosses the persistence guardrail.
     const blobStore = new InMemoryConfidentialBlobStore();
     const document = buildConfidentialDoc({
       ciphertextLength: SMALL_CIPHERTEXT_LENGTH,

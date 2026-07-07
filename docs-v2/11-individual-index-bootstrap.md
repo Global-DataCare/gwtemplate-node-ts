@@ -1,5 +1,8 @@
 # 11 Individual Index Bootstrap
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - create the tenant-side indexed individual context,

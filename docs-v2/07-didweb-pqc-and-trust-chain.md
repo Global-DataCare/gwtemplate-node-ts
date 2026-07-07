@@ -1,5 +1,8 @@
 # 07 did:web, PQC, and Trust Chain
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 ## did:web role
 
 `did:web` is used as practical decentralized identifier binding for service actors and tenants:

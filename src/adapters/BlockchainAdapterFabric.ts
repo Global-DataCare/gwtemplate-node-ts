@@ -2,6 +2,7 @@
 // Copyright 2026 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { ManageAssetConsentAccess } from '../blockchain/fabric/v3/manageAssetConsentAccess';
+import { ManageAssetArtifact } from '../blockchain/fabric/v3/manageAssetArtifact';
 import type { IBlockchainAdapter } from './IBlockchainAdapter';
 
 type FabricBlockchainConfig = {
@@ -56,5 +57,26 @@ export class BlockchainAdapterFabric implements IBlockchainAdapter {
     return {
       accepted: Array.isArray(params.payload?.data) ? params.payload.data.length : 0,
     };
+  }
+
+  public async registerArtifactBundle(params: {
+    assetId: string;
+    payload: Record<string, unknown>;
+    channel: string;
+    chaincode: string;
+  }): Promise<{ accepted: number; txId?: string }> {
+    const config = loadFabricBlockchainConfig();
+    const manager = new ManageAssetArtifact({
+      chaincodeName: params.chaincode,
+      channelName: params.channel,
+    });
+
+    await manager.upsertArtifact(
+      config.mspId,
+      params.assetId,
+      params.payload,
+    );
+
+    return { accepted: 1 };
   }
 }

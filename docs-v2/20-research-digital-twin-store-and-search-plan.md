@@ -1,5 +1,8 @@
 # 20 Research Digital Twin Store and Search Plan
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - define the missing plan for a separate research/digital twin data store,

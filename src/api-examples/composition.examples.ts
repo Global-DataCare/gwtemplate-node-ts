@@ -39,3 +39,23 @@ export const COMPOSITION_SEARCH_PARAMETERS_EXAMPLE = {
   ],
 } as const;
 
+export const DIGITAL_TWIN_COMPOSITION_SEARCH_MESSAGE_EXAMPLE = {
+  jti: 'digitaltwin-composition-search-001',
+  thid: 'digitaltwin-composition-search-001',
+  iss: 'did:web:research-client.example.org',
+  aud: 'did:web:gateway.acme.org',
+  type: 'application/fhir+json; fhirVersion=4.0',
+  body: {
+    resourceType: 'Parameters',
+    parameter: [
+      {
+        name: 'section',
+        valueString: 'LOINC|10160-0',
+      },
+      {
+        name: 'MedicationStatement.code-display',
+        valueString: 'amoxicillin',
+      },
+    ],
+  },
+} as const;

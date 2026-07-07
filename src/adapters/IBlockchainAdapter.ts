@@ -37,6 +37,19 @@ export interface IBlockchainAdapter {
   ): Promise<{ accepted: number; txId?: string }>;
 
   /**
+   * Optional write path for registering one content-addressed artifact payload
+   * on-chain.
+   */
+  registerArtifactBundle?(
+    params: {
+      assetId: string;
+      payload: Record<string, unknown>;
+      channel: string;
+      chaincode: string;
+    },
+  ): Promise<{ accepted: number; txId?: string }>;
+
+  /**
    * Optional write path for registering one sanitized consent-access rule on-chain.
    *
    * The payload still uses the shared JSON:API-style primary-document contract

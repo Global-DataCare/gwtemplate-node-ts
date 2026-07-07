@@ -4,10 +4,10 @@ Explicit endpoint classification used by profile generation.
 
 ## Core
 
-- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
-- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
 - `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction`
 - `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response`
+- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
+- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
 - `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`
 - `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response`
 - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch`
@@ -23,6 +23,12 @@ Explicit endpoint classification used by profile generation.
 - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch-response`
 - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch`
 - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch-response`
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch`
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch-response`
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_search`
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch`
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`
+- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_search`
 - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token`
 - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response`
 
@@ -33,7 +39,6 @@ Explicit endpoint classification used by profile generation.
 
 ## Extension
 
-- `/digitaltwin/*`
 - `/{tenantId}/.../individual/org.hl7.fhir.api/Observation/*`
 - `/{tenantId}/.../individual/org.hl7.fhir.api/Subject/*`
 - Any appointment-specific vertical surfaces (kept out of current core profile).

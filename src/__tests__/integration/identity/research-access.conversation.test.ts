@@ -20,8 +20,9 @@ import {
  * 3. the provider ingests two medication-only fixtures for Novita
  * 3. the controller facade materializes the contract VC presentation
  * 4. a digital-twin facade asks GW for a SMART token with that proof
- * 5. the same digital-twin facade performs `Composition/_search` over both
- *    Doraemon and Novita and consumes the bundle-response payloads
+ * 5. the same digital-twin facade performs `Composition/_search` over the
+ *    indexed document bundles for Doraemon and Novita and consumes the
+ *    bundle-response payloads
  *
  * Internal smart-contract, queue, and policy plumbing stay inside GW.
  */

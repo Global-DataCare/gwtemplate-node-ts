@@ -1,5 +1,10 @@
 # Newbie Audit Runbook
 
+> 101 note
+> - This file is part of the packaged closeout/audit path in `docs-end`, not the main current integrator/runtime onboarding path.
+> - For the active GW reading order, start in [../docs-v2/101-README.md](../docs-v2/101-README.md).
+> - Use this runbook when the goal is reproducible local audit evidence.
+
 Status date: 2026-06-28  
 Audience: junior contributors, examiners, and auditors who need the shortest
 reproducible local path.

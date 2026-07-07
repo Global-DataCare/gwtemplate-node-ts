@@ -1,5 +1,8 @@
 # 21 Research Digital Twin Technical Backlog
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - convert the research/digital twin plan into implementation slices tied to

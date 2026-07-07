@@ -1,5 +1,8 @@
 # 06 Security Model and Why
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 ## Why this stack exists
 
 The platform is designed for high-assurance health/document exchange where:

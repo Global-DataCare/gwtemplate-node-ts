@@ -176,6 +176,16 @@ export class TwinCompositionManager {
     }
 
     const requestedResourceType = Array.from(requestedResourceTypes)[0]!;
+    if (requestedResourceType === ResourceTypesFhirR4.Composition) {
+      return this.searchCompositionRecordsByDirectFilters({
+        tenantVaultId: params.tenantVaultId,
+        requiredSections: params.requiredSections,
+        excludedSections: params.excludedSections,
+        filters,
+        filterMatchesBySectionsAndTypes: params.filterMatchesBySectionsAndTypes,
+      });
+    }
+
     const allSections = await this.vaultRepository.getAllSections(params.tenantVaultId);
     const matchedSubjects = new Set<string>();
 
@@ -222,6 +232,54 @@ export class TwinCompositionManager {
     }
 
     return compositionMatches;
+  }
+
+  private async searchCompositionRecordsByDirectFilters(params: {
+    tenantVaultId: string;
+    requiredSections: string[];
+    excludedSections: string[];
+    filters: SearchFilters;
+    filterMatchesBySectionsAndTypes: (matches: any[], requiredSections: string[], excludedSections: string[], requiredTypes: string[]) => any[];
+  }): Promise<any[]> {
+    const allSections = await this.vaultRepository.getAllSections(params.tenantVaultId);
+    const compositionSectionPrefix = getEnvSectionId(`${SUBJECT_SECTION_DIGITAL_TWIN}_${DataCollectionIds.composition}_`);
+    const candidateSectionIds = allSections.filter((sectionId) =>
+      String(sectionId || '').startsWith(compositionSectionPrefix),
+    );
+
+    const compositionMatches: any[] = [];
+    for (const candidateSectionId of candidateSectionIds) {
+      const records = await this.vaultRepository.listContainersInSection<any>(params.tenantVaultId, candidateSectionId);
+      const sectionMatches = params.filterMatchesBySectionsAndTypes(
+        records,
+        params.requiredSections,
+        params.excludedSections,
+        [],
+      );
+      compositionMatches.push(
+        ...sectionMatches.filter((record) => this.matchesCompositionFilters(record, params.filters)),
+      );
+    }
+
+    return compositionMatches;
+  }
+
+  private matchesCompositionFilters(record: Record<string, any>, filters: SearchFilters): boolean {
+    const relevantEntries = Object.entries(filters).filter(([key, values]) =>
+      String(key || '').startsWith(`${ResourceTypesFhirR4.Composition}.`) && Array.isArray(values) && values.length > 0,
+    );
+    if (relevantEntries.length === 0) return false;
+
+    return relevantEntries.every(([claimName, values]) => {
+      const normalizedClaimName = stripKnownFhirClaimContextPrefix(String(claimName || '').trim()).toLowerCase();
+      if (normalizedClaimName === 'composition.meta-tag' || normalizedClaimName === 'composition.meta.tag') {
+        return values.every((expectedValue) => this.matchesCompositionMetaTag(record, expectedValue));
+      }
+
+      const actualValue = this.readClaimValue(record, claimName);
+      if (!actualValue) return false;
+      return values.every((expectedValue) => this.matchesClaimValue(claimName, actualValue, expectedValue));
+    });
   }
 
   private matchesResourceFilters(
@@ -282,6 +340,40 @@ export class TwinCompositionManager {
     }
 
     return normalizedActual === normalizedExpected;
+  }
+
+  private matchesCompositionMetaTag(record: Record<string, any>, expectedValue: string): boolean {
+    const normalizedExpected = String(expectedValue || '').trim();
+    if (!normalizedExpected) return false;
+
+    const [expectedSystem, expectedCode] = normalizedExpected.includes('|')
+      ? normalizedExpected.split('|', 2).map((value) => String(value || '').trim())
+      : ['', normalizedExpected];
+    if (!expectedCode) return false;
+
+    return this.collectResearchTags(record).some((tag) => {
+      const actualSystem = String(tag?.system || '').trim();
+      const actualCode = String(tag?.code || '').trim();
+      if (!actualCode) return false;
+      if (expectedSystem) {
+        return actualSystem === expectedSystem && actualCode === expectedCode;
+      }
+      return actualCode === expectedCode;
+    });
+  }
+
+  private collectResearchTags(record: Record<string, any>): Array<{ system?: string; code?: string }> {
+    const directTags = Array.isArray(record?.tag) ? record.tag : [];
+    const metaTags = Array.isArray(record?.meta?.tag) ? record.meta.tag : [];
+    const uniqueTags = new Map<string, { system?: string; code?: string }>();
+    for (const rawTag of [...directTags, ...metaTags]) {
+      if (!rawTag || typeof rawTag !== 'object') continue;
+      const system = String((rawTag as any).system || '').trim();
+      const code = String((rawTag as any).code || '').trim();
+      if (!system && !code) continue;
+      uniqueTags.set(`${system}|${code}`, { system, code });
+    }
+    return Array.from(uniqueTags.values());
   }
 
   private normalizeReference(value: string | undefined): string {

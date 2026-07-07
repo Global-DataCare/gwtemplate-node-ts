@@ -1,5 +1,8 @@
 # 13 Subject Summary Operation
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - define the target v2 summary semantics,

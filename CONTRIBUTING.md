@@ -3,6 +3,9 @@
 Read [ARCHITECTURE.md](./ARCHITECTURE.md) before changing managers, routes,
 queue adapters, storage adapters, or gateway-facing examples.
 
+For 101 material, also read [NARRATIVE-ALIGNMENT.md](./NARRATIVE-ALIGNMENT.md)
+and [docs-v2/01-narrative-contract.md](./docs-v2/01-narrative-contract.md).
+
 ## Main Rule
 
 `gwtemplate-node-ts` owns actual GW backend behavior.
@@ -47,6 +50,9 @@ When a flow spans app/frontend, BFF/runtime, and GW:
 
 GW tests and docs should state that split explicitly instead of collapsing all
 responsibilities into one vague "communication manager" narrative.
+
+For 101 docs, tests, and snippets, the explanation must still start from the
+upstream profile/runtime story even when the local example mocks it.
 
 ## TDD Rule
 

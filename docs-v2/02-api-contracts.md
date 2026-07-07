@@ -1,5 +1,8 @@
 # 02 API Contracts
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Canonical write/read model:
 
 - Write: `Communication/_batch` or the resource-specific canonical `_batch` route.

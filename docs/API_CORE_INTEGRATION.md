@@ -156,6 +156,13 @@ exchanging the email-proof `id_token` for the `initial_access_token` required by
 `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr` (+ poll),
 binding wallet public key(s) to that license serial number and controller email before creating additional employees.
 - SDK method chain: `activateEmployeeDeviceWithActivationCode(...)`
+- Identity-layer rule:
+  - onboarding / order confirms the human controller identity and business
+    lifecycle
+  - `Token/_exchange` + `Device/_dcr` registers the technical client/device/BFF
+    identity that will operate afterwards
+  - controller binding material such as `credentialSubject.hasCredential.material`
+    does not replace DCR
 - DCR semantics in CORE:
   - registers the technical client/device/app identity
   - does not by itself publish or replace the human controller/professional DID document

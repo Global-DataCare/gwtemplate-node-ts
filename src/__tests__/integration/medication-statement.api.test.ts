@@ -3,7 +3,7 @@ import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 import {
-  buildDemoCommunicationDidcommRequest,
+  buildDemoCommunicationBatchSubmitRequest,
   demoCommunicationMedicationIpsDefaults,
 } from '../data/demo-communication-medications-ips.data';
 import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
@@ -339,7 +339,7 @@ describe('MedicationStatement API (integration)', () => {
     }
   });
 
-  it('ingests medications via Communication and retrieves them via MedicationStatement/_search and Bundle/_search', async () => {
+  it('ingests medications via Communication carrying a document bundle and retrieves them via MedicationStatement/_search and Bundle/_search', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -1213,7 +1213,7 @@ describe('MedicationStatement API (integration)', () => {
       }
       expect(baseBatchPayload?.data?.[0]?.response?.status).toBe('200');
 
-      const firstMedicationRequest = buildDemoCommunicationDidcommRequest({
+      const firstMedicationRequest = buildDemoCommunicationBatchSubmitRequest({
         ...demoCommunicationMedicationIpsDefaults,
         subjectId: subjectDid,
         thidComm: 'communication-extra-medication-001',
@@ -1249,7 +1249,7 @@ describe('MedicationStatement API (integration)', () => {
       }
       expect(firstMedicationBatchPayload?.data?.[0]?.response?.status).toBe('200');
 
-      const secondMedicationRequest = buildDemoCommunicationDidcommRequest({
+      const secondMedicationRequest = buildDemoCommunicationBatchSubmitRequest({
         ...demoCommunicationMedicationIpsDefaults,
         subjectId: subjectDid,
         thidComm: 'communication-extra-medication-002',

@@ -54,7 +54,7 @@ describe('Composition Bundle _search API (integration)', () => {
     resetServerConfig();
   });
 
-  it('supports Bundle/_search with composition.subject and composition.section', async () => {
+  it('supports Bundle/_search over document bundles with composition.subject and composition.section', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -771,6 +771,123 @@ describe('Composition Bundle _search API (integration)', () => {
           || firstMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'],
         ).toBe(subjectDid);
       }
+    } finally {
+      queueAdapter.stop();
+    }
+  });
+
+  it('stores one researcher branch Composition in digitaltwin and finds it by Composition.meta-tag', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.DB_PROVIDER = 'mem';
+    process.env.STORAGE_PROVIDER = 'mem';
+    process.env.QUEUE_PROVIDER = 'mem';
+    process.env.SECTORS_ALLOWED = 'health-care';
+    process.env.ORG_HOST_LEGAL_NAME = 'Gateway Host Services';
+    process.env.ORG_HOST_JURISDICTION = 'ES';
+    process.env.ORG_HOST_ID_TYPE = 'TAX';
+    process.env.ORG_HOST_ID_VALUE = 'A0011223344';
+    process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
+    process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
+    process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.JSON_LEGACY = 'true';
+    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+
+    resetServerConfig();
+
+    const { app, queueAdapter, tenantManager, vaultRepository, kmsService } = await startServer({ listen: false });
+    try {
+      const hostBootstrapClaims = {
+        [ClaimsOrganizationSchemaorg.addressCountry]: process.env.ORG_HOST_JURISDICTION,
+        [ClaimsOrganizationSchemaorg.identifierType]: process.env.ORG_HOST_ID_TYPE,
+        [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
+        [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
+      };
+      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
+
+      const tenantConfig = {
+        claims: tenantClaims,
+        didConfig: { service: initializeTenantServicesConfig(Sector.HEALTH_CARE) },
+        didDocument: { id: 'did:web:api.acme.org', '@context': 'https://www.w3.org/ns/did/v1' },
+      };
+
+      await kmsService.provisionKeys(tenantVaultId);
+      const secureTenantRecord = await kmsService.protectConfidentialData(
+        { id: tenantVaultId, sequence: 0, content: tenantConfig } as any,
+        'host',
+      );
+      await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
+      await tenantManager.getTenant(tenantVaultId);
+
+      const subjectDid = 'did:web:api.lab.org:research-subject:branch-composition-001';
+      const branchCompositionId =
+        'urn:twin:researchsubject-branch-composition-001:branch:employee-001:version:01JZ4CV2G1X2M5Y8Y3V4W6Q7R8';
+      const branchTag = {
+        id: 'Composition.meta.tag[0]',
+        system: 'urn:research:tag:score',
+        code: '10',
+      };
+
+      const digitalTwinCompositionSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
+      await vaultRepository.put(
+        tenantVaultId,
+        [
+          {
+            id: branchCompositionId,
+            '@context': 'org.hl7.fhir.api',
+            'Composition.identifier': branchCompositionId,
+            'Composition.subject': subjectDid,
+            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            'Composition.author': 'did:web:api.lab.org:employee:researcher1@lab.org:ISCO-08|2211',
+            'Composition.date': '2026-07-01T10:00:00Z',
+            meta: { tag: [branchTag] },
+            tag: [branchTag],
+          },
+        ],
+        digitalTwinCompositionSection,
+      );
+
+      const searchResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'researcher-branch-composition-search-001',
+          body: {
+            resourceType: 'Parameters',
+            parameter: [
+              { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
+              { name: 'Composition.meta-tag', valueCoding: { system: 'urn:research:tag:score', code: '10' } },
+            ],
+          },
+        },
+      });
+      expect(searchResp.status).toBe(202);
+
+      let searchPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'researcher-branch-composition-search-001' },
+        });
+        if (pollResp.status === 200) {
+          searchPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(searchPayload?.resourceType).toBe('Bundle');
+      expect(searchPayload?.data?.[0]?.type).toBe('Composition-search-response-v1.0');
+      expect(searchPayload?.data?.[0]?.resource?.total).toBe(1);
+      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.id).toBe(branchCompositionId);
+      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.tag?.[0]?.system).toBe('urn:research:tag:score');
+      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.tag?.[0]?.code).toBe('10');
     } finally {
       queueAdapter.stop();
     }

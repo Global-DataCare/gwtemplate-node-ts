@@ -1,5 +1,10 @@
 # Docs End Index
 
+> 101 note
+> - `docs-end` is the packaged closeout/audit narrative, not the main current integrator/runtime onboarding path.
+> - For the active GW reading order, start in [../docs-v2/101-README.md](../docs-v2/101-README.md).
+> - Use this folder after the current runtime/integrator path is already clear.
+
 Purpose:
 
 - keep the closeout package grouped in one place,
@@ -33,4 +38,3 @@ Rule:
 - `docs-end` is the packaged closeout narrative,
 - `v1.5-tabla-portal-api-gw.md` is the canonical operation/mapping table,
 - do not keep a second divergent copy of that table inside `docs-end`.
-

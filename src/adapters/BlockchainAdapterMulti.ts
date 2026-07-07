@@ -59,4 +59,19 @@ export class BlockchainAdapterMulti implements IBlockchainAdapter {
     }
     return { accepted: 0 };
   }
+
+  public async registerArtifactBundle(params: {
+    assetId: string;
+    payload: Record<string, unknown>;
+    channel: string;
+    chaincode: string;
+  }): Promise<{ accepted: number; txId?: string }> {
+    if (this.writeAdapter?.registerArtifactBundle) {
+      return this.writeAdapter.registerArtifactBundle(params);
+    }
+    if (this.discoveryAdapter.registerArtifactBundle) {
+      return this.discoveryAdapter.registerArtifactBundle(params);
+    }
+    return { accepted: 0 };
+  }
 }

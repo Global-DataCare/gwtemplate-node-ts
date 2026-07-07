@@ -3,7 +3,11 @@ import { generateUrnHash } from '../../utils/urn-hash';
 import { testExamplesIndividualUrn } from '../data/identity.data';
 
 describe('generateUrnHash', () => {
-  // This test's primary goal is to log the generated hashes for documentation.
+  // Teaching goal:
+  // - show that the hash is about the canonical URN string, not the public
+  //   business identifier stored elsewhere in the payload
+  // - this helper is used for stable technical locators, routing keys, or
+  //   traceability references, not as a substitute for `resource.identifier`
   it('should generate deterministic, multibase-encoded hashes for all example URNs', () => {
     // console.log('--- URN Multibase Hash Generation ---');
 
@@ -24,15 +28,16 @@ describe('generateUrnHash', () => {
   });
 
   it('should produce the same hash for URNs that only differ in schema-part casing', () => {
-    // This URN has uppercase schema parts ('URN', 'NETWORK', 'IDENTIFIER', 'NNES').
-    // The value parts ('global', '12345678Z') remain as is.
+    // Step 1.
+    // Build two URNs that differ only in casing for the schema prefixes.
     const urnWithUppercaseSchema = 'URN:NETWORK:global:IDENTIFIER:NNES:12345678Z';
-    
-    // This is the reference URN from the data file.
-    const referenceUrn = testExamplesIndividualUrn.nnes; // 'urn:network:global:identifier:NNES:12345678Z'
 
-    // Both URNs should canonicalize to the same string, producing the same hash.
-    // Canonical form: 'urn:network:global:identifier:nnes:12345678Z'
+    // Step 2.
+    // Use the shared canonical example as the reference input.
+    const referenceUrn = testExamplesIndividualUrn.nnes;
+
+    // Step 3.
+    // The canonical locator string should hash the same regardless of schema casing.
     const expectedHash = generateUrnHash(referenceUrn);
     const actualHash = generateUrnHash(urnWithUppercaseSchema);
 
@@ -40,13 +45,16 @@ describe('generateUrnHash', () => {
   });
 
   it('should produce a different hash if a value-part casing differs', () => {
-    // This URN has an uppercase value part ('GLOBAL').
+    // Step 1.
+    // Change the value part casing, which should alter the canonicalized input.
     const urnWithUppercaseValue = 'urn:network:GLOBAL:identifier:NNES:12345678Z';
-    
-    // This is the reference URN from the data file, which has a lowercase 'global'.
+
+    // Step 2.
+    // Reuse the shared canonical example so the only difference is the value part.
     const referenceUrn = testExamplesIndividualUrn.nnes;
 
-    // Because the case of the value part 'GLOBAL' is preserved, the hashes will be different.
+    // Step 3.
+    // Value-part changes must produce a different locator hash.
     const expectedHash = generateUrnHash(referenceUrn);
     const actualHash = generateUrnHash(urnWithUppercaseValue);
 
@@ -54,10 +62,6 @@ describe('generateUrnHash', () => {
   });
 });
 
-/**
- * A helper function for logging purposes only to show what the canonicalized URN looks like.
- * This duplicates the logic from the main function for verification in the test output.
- */
 function canonicalizeForTest(urn: string): string {
   const parts = urn.split(':');
   const canonicalParts = parts.map((part, index) => {

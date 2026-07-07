@@ -1,5 +1,8 @@
 # 23 Digital Twin Composition Search Contract
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - define the public search contract that is now actually implemented for
@@ -47,6 +50,11 @@ Polling behavior:
 
 The accepted public request shape is a FHIR `Parameters` resource carried in
 the DIDComm/plain JSON body.
+
+Teach the search contract from public request params first:
+
+- `section`
+- `Composition.section` / `composition.section`
 
 Required parameters:
 

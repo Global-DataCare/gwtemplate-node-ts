@@ -29,6 +29,7 @@ describe('shared bundle entry editor surface in GW', () => {
   });
 
   it('uses the generic entry editor for AllergyIntolerance, MedicationStatement, and Condition bundle claims today', () => {
+    // This is helper-level editing under the canonical document-bundle story, not the primary newbie path.
     const bundle = new BundleEditor()
       .setBundleOperation(EmployeeBundleOperations.create)
       .setAllowedResourceType(ResourceTypesFhirR4.AllergyIntolerance)

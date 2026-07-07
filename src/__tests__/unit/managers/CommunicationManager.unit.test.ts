@@ -685,7 +685,7 @@ describe('CommunicationManager Unit Tests', () => {
       );
     });
 
-    it('projects IPS resources when Communication attachment contains a DocumentReference with a document bundle attachment', async () => {
+    it('keeps DocumentReference attachments working as a compatibility wrapper around a document bundle', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
 

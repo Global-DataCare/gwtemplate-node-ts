@@ -1,5 +1,8 @@
 # 15 Related Person Index Data
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - model caregiver/family relationship data as individual index data,

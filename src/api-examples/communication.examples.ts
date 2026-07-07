@@ -22,23 +22,6 @@ const IPS_BUNDLE_LIGHT_EXAMPLE = {
   ],
 } as const;
 
-const IPS_DOCUMENT_REFERENCE_EXAMPLE = {
-  resourceType: 'DocumentReference',
-  subject: { reference: 'did:web:api.acme.org:individual:123' },
-  date: '2026-05-16T00:00:00.000Z',
-  description: 'IPS Document Bundle',
-  identifier: [{ value: 'urn:uuid:ips-document-reference-001' }],
-  content: [
-    {
-      attachment: {
-        contentType: 'application/fhir+json',
-        title: 'ips-light.json',
-        data: Buffer.from(JSON.stringify(IPS_BUNDLE_LIGHT_EXAMPLE), 'utf8').toString('base64'),
-      },
-    },
-  ],
-} as const;
-
 export const COMMUNICATION_INGESTION_ENTRY_EXAMPLE = {
   type: 'Communication-ingestion-request-v1.0',
   resource: {
@@ -55,8 +38,8 @@ export const COMMUNICATION_INGESTION_ENTRY_EXAMPLE = {
       {
         contentAttachment: {
           contentType: 'application/fhir+json',
-          title: 'IPS DocumentReference',
-          data: Buffer.from(JSON.stringify(IPS_DOCUMENT_REFERENCE_EXAMPLE), 'utf8').toString('base64'),
+          title: 'IPS document bundle',
+          data: Buffer.from(JSON.stringify(IPS_BUNDLE_LIGHT_EXAMPLE), 'utf8').toString('base64'),
         },
       },
     ],
