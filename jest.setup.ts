@@ -1,16 +1,13 @@
 // jest.setup.ts
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const setupDir = process.cwd();
 
 // Load environment variables based on the test script being run.
 // `npm run test:e2e` will set `process.env.TEST_ENV` to `e2e`.
 if (process.env.TEST_ENV === 'e2e') {
   const envFile = process.env.JEST_ENV_FILE || '.env.local-demo';
-  const envPath = path.resolve(__dirname, envFile);
+  const envPath = path.resolve(setupDir, envFile);
   const result = dotenv.config({ path: envPath, override: true });
   
   if (result.error) {
@@ -20,7 +17,7 @@ if (process.env.TEST_ENV === 'e2e') {
   }
 } else {
   // For all other tests, optionally load the canonical local demo profile if it exists.
-  dotenv.config({ path: path.resolve(__dirname, '.env.local-demo') });
+  dotenv.config({ path: path.resolve(setupDir, '.env.local-demo') });
 }
 
 /* eslint-disable no-undef */

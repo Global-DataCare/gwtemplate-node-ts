@@ -69,6 +69,25 @@ Include:
 - at least one negative/validation path
 - compatibility behavior when aliases or legacy inputs are still accepted
 
+Use the same header block at the top of every test file, immediately below the
+copyright line, so the test intent is visible before the imports:
+
+- `101 note` or `Teaching goal` comment block
+- one-sentence contract summary
+- reused shared fixtures/examples
+- positive path and at least one negative/validation path
+- compatibility path when legacy aliases or fallback behavior exist
+- no ad hoc literals when shared fixtures exist
+- helper functions stay in dedicated helper modules, not beside the class
+
+TDD sequence for new routes/managers:
+
+1. write the failing unit test first
+2. add the failing integration test when the route contract changes
+3. implement the minimum change to pass
+4. add the compatibility case if the route accepts legacy inputs
+5. refactor without changing behavior
+
 ## Naming Rule
 
 - keep the common concept first and the specialization last

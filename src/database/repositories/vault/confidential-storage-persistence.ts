@@ -19,7 +19,7 @@ const textEncoder = new TextEncoder();
  * Why this exists:
  * - keep small operational records inline in PostgreSQL/Firestore
  * - avoid unnecessary round-trips to external blob storage for lightweight
- *   reminder/voice/runtime data
+ *   data
  * - still externalize large encrypted payloads such as clinical bundles or
  *   attachment-heavy records
  */

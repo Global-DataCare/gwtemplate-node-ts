@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+## [1.20.0] - 2026-07-14
+
+### Changed
+- Made Jest environment-file resolution use the process working directory so
+  unit, integration and E2E runners consistently load their selected local
+  environment file.
+- Clarified confidential-storage persistence documentation so it describes
+  generic operational data rather than a channel-specific payload type.
+- Expanded contributor guidance for the required TDD and executable-101 test
+  structure.
+
+### Testing
+- Replaced the obsolete Firestore vault repository E2E specification with the
+  current vault blood-pressure daily-batch integration coverage.
+
 ### Changed
 - Added explicit `docs-v2` terminology so GW docs no longer mix:
   - `ProfileRuntime` as the unlocked end-user profile runtime
