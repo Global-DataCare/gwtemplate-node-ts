@@ -1643,6 +1643,8 @@ export function createApiRouter(
    *       content:
    *         application/didcomm-plain+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/ResearchCompositionSearchPlaintextMessage' }
    *         application/json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *         application/x-www-form-urlencoded:
@@ -1688,6 +1690,8 @@ export function createApiRouter(
    *       content:
    *         application/didcomm-plain+json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *           examples:
+   *             message: { $ref: '#/components/examples/ResearchCompositionSearchPlaintextMessage' }
    *         application/json:
    *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
    *         application/x-www-form-urlencoded:

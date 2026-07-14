@@ -82,6 +82,8 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
     examples.COMPOSITION_UPDATE_MESSAGE;
   swaggerDefinition.components.examples.ResearchCompositionIngestionPlaintextMessage.value =
     examples.RESEARCH_COMPOSITION_INGESTION_MESSAGE;
+  swaggerDefinition.components.examples.ResearchCompositionSearchPlaintextMessage.value =
+    apiExamples.DIGITAL_TWIN_COMPOSITION_SEARCH_MESSAGE_EXAMPLE;
   swaggerDefinition.components.examples.PersonalObservationPlaintextMessage.value =
     examples.PERSONAL_OBSERVATION_MESSAGE;
   swaggerDefinition.components.examples.FamilyMemberRelationshipPlaintextMessage.value =

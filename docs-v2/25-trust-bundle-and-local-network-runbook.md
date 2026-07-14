@@ -1,5 +1,8 @@
 ## Trust Bundle and Local Network Runbook
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Status: Current reproducible PKI/bootstrap contract for local operators.
 
 ### Goal

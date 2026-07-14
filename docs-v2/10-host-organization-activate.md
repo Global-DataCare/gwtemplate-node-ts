@@ -1,5 +1,8 @@
 # 10 Host Organization Activate
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - provide the legacy compatibility host activation route for callers that already start from ICA-backed proof,

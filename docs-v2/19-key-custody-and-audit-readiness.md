@@ -1,5 +1,8 @@
 # 19 Key Custody and Audit Readiness
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - document the current GW key-custody model,
@@ -14,6 +17,17 @@ Terminology rule:
 - this document uses `HashiCorp Transit`, not just `Vault`,
 - because GW already uses the word `vault` for persisted confidential storage,
 - and mixing both concepts produces design and audit confusion.
+- this document talks about the technical service/tenant custody layer, not
+  the end-user `ProfileRuntime` that unlocks one user-owned profile in the
+  SDK runtimes.
+
+Runtime naming rule:
+
+- `ProfileRuntime`
+  unlocked end-user profile runtime
+- `TenantServiceRuntime`
+  technical wallet/runtime for tenant/BFF/service signing, encryption,
+  DIDComm/plain wrapping, and confidential storage tasks
 
 ## Current State
 

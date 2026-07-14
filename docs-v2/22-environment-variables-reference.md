@@ -1,5 +1,8 @@
 # 22 Environment Variables Reference
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - explain what each environment-variable block is for,

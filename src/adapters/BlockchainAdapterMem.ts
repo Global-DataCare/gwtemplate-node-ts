@@ -64,6 +64,20 @@ export class BlockchainAdapterMem implements IBlockchainAdapter {
     };
   }
 
+  public async registerArtifactBundle(params: {
+    assetId: string;
+    payload: Record<string, unknown>;
+    channel: string;
+    chaincode: string;
+  }): Promise<{ accepted: number; txId?: string }> {
+    this.consentAccessBundles.set(params.assetId, params.payload);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    return {
+      accepted: 1,
+      txId: `mem-artifact-${Date.now()}`,
+    };
+  }
+
   // Helper method for tests to populate the ledger
   public addMapping(hash: string, did: string) {
     this.ledger.set(hash, did);

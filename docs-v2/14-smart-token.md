@@ -1,5 +1,8 @@
 # 14 SMART Token
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - request subject-scoped access after the right identity and authorization steps exist,

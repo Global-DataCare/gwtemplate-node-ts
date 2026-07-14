@@ -1,5 +1,8 @@
 # 17 Clinical Bundle Readers
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Purpose:
 
 - define the GW consumption boundary for section-aware clinical bundle readers,

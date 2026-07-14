@@ -42,12 +42,18 @@ docs/
 - **Portal API to GW CORE**: [PORTAL_API_TO_GW_CORE.md](PORTAL_API_TO_GW_CORE.md) is the canonical functional reference for portal/BFF endpoint design over GW CORE, including the separation between `employees`, `related persons`, `members`, and `consents`.
 - **Communication layering source of truth**:
   - [101-COMMUNICATION_LAYERING.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
+- **BFF/channel front-story source of truth**:
+  - [101-BFF_AND_CHANNEL_MESSAGE_FLOW.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-BFF_AND_CHANNEL_MESSAGE_FLOW.md)
 - **IPS communication outbox source of truth**:
   - [101-IPS_COMMUNICATION_OUTBOX.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-IPS_COMMUNICATION_OUTBOX.md)
 - **Consent access status**: [90.E-TODO_SMART_EHR_COMPAT.md](90.E-TODO_SMART_EHR_COMPAT.md) also records the current live SMART consent-evaluation behavior, including deny precedence and permission-request lookup identifiers.
 - **Tenant identifier migration note**: [90.K-TODO_TENANT_IDENTIFIER_V2.md](90.K-TODO_TENANT_IDENTIFIER_V2.md) tracks the deferred `v2.0` redesign away from `alternateName`-based hosted compatibility.
-- **GW lifecycle 101**: [101-01.I-LIFECYCLE.md](01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md) explains the local GW CORE lifecycle model, including `status`, `audit`, and `/_purge`.
-- **GW shared bundle editor note**: [101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md](01-OVERVIEW-AND-GUIDES/101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md) explains which `BundleEntryEditor` clinical `asX()` helpers are actually published in the currently installed `gdc-common-utils-ts` version and which resource families still use generic claims editing in GW.
+- **Current GW 101 path**: [../docs-v2/101-README.md](../docs-v2/101-README.md) is the current ordered reading path for active integrator/runtime guidance.
+- **Current GW lifecycle contract**: [../docs-v2/16-deactivation-and-purge-lifecycle.md](../docs-v2/16-deactivation-and-purge-lifecycle.md) is the current lifecycle contract for integrators/auditors.
+- **Current GW integrators guide**: [../docs-v2/09-api-integrators-guide.md](../docs-v2/09-api-integrators-guide.md) is the clean onboarding path without legacy route drift.
+- **Bridge-only local 101 lifecycle note**: [101-01.I-LIFECYCLE.md](01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md) remains as a local bridge note.
+- **Bridge-only local shared bundle editor note**: [101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md](01-OVERVIEW-AND-GUIDES/101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md) remains as a local bridge note.
+- **Bridge-only local tutorial boundary note**: [101-01.K-HIGH_LEVEL_TUTORIAL_BOUNDARIES.md](01-OVERVIEW-AND-GUIDES/101-01.K-HIGH_LEVEL_TUTORIAL_BOUNDARIES.md) remains as a local bridge note.
 - **GW clinical bundle reader v2**: [../docs-v2/17-clinical-bundle-readers.md](../docs-v2/17-clinical-bundle-readers.md) is the canonical integrator-facing contract for section-aware read/filter/count/pagination semantics.
 - **GW deactivation/purge lifecycle**: [../docs-v2/16-deactivation-and-purge-lifecycle.md](../docs-v2/16-deactivation-and-purge-lifecycle.md) explains the disable/purge hierarchy for individual, tenant, and host, including blob deletion and discovery unpublication.
 - **GW lifecycle current vs target**: [90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md) separates what is already implemented from the target normalized `PATCH`-based contract for SDK alignment.
@@ -89,6 +95,8 @@ If you are new to GW CORE, read these before editing examples or OpenAPI descrip
 
 - Communication layering 101:
   - [101-COMMUNICATION_LAYERING.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
+- BFF/channel front-story 101:
+  - [101-BFF_AND_CHANNEL_MESSAGE_FLOW.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-BFF_AND_CHANNEL_MESSAGE_FLOW.md)
 - Resource claims 101:
   - [101-RESOURCE_CLAIMS.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-RESOURCE_CLAIMS.md)
 - IPS Communication outbox 101:
@@ -122,6 +130,7 @@ Memory aid:
 *   **[01.H-DEPLOYMENT-GUIDE.md](01-OVERVIEW-AND-GUIDES/01.H-DEPLOYMENT-GUIDE.md)**: Step-by-step instructions for deploying the application to Google Cloud Run.
 *   **[101-01.I-LIFECYCLE.md](01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md)**: Local lifecycle semantics for GW CORE, including `status` vs `audit`, `PATCH` target semantics, and `/_purge`.
 *   **[101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md](01-OVERVIEW-AND-GUIDES/101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md)**: Current GW note on `BundleEditor`/`BundleReader` usage and which typed clinical `asX()` entry editors are really available from the installed shared package.
+*   **[101-01.K-HIGH_LEVEL_TUTORIAL_BOUNDARIES.md](01-OVERVIEW-AND-GUIDES/101-01.K-HIGH_LEVEL_TUTORIAL_BOUNDARIES.md)**: Rule set for distinguishing true high-level `101` material from transport, claims, and internal plumbing examples.
 *   **[docs-v2/16-deactivation-and-purge-lifecycle.md](../docs-v2/16-deactivation-and-purge-lifecycle.md)**: Auditor/integrator contract for deactivation semantics across individual, tenant, and host, including what gets unpublished and what gets physically deleted.
 
 ### 📂 02-API-AND-ENDPOINTS

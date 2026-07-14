@@ -1,5 +1,10 @@
 # 18 Organization Controller Lifecycle
 
+> 101 note
+> - This is the current narrow GW lifecycle `101` in `docs-v2`.
+> - Start the self-managed user story upstream with `login -> loadProfile -> actor facade`, then use this file for the GW route/lifecycle contract.
+> - Read [101-README.md](./101-README.md) for the ordered current path.
+
 Purpose:
 
 - describe the narrow GW lifecycle for the **organization controller**,
@@ -8,6 +13,12 @@ Purpose:
 
 This document is intentionally narrower than the broader onboarding and
 integrator guides.
+
+Current user-story boundary:
+
+- controller profile load/session bootstrap lives upstream in
+  `gdc-sdk-node-ts`
+- this file begins after that point and focuses only on GW lifecycle semantics
 
 It covers only:
 

@@ -49,6 +49,16 @@ Do **not** model:
 - tenant purge = all historical keys deleted
 - individual disable = controller key revoked everywhere
 
+Identity contract note:
+
+- the canonical technical lifecycle id is the internal entry/resource id, not
+  the public business identifier
+- the public identifier stays in the business payload and can be used to build
+  transport locators/URNs, but it is not the storage or lifecycle primary key
+- version/CID belongs to the canonicalized content, not to the public locator
+- if a resource is only user-authored claims, the canonicalized claims become
+  the content fingerprint source until a materialized FHIR resource exists
+
 That would be wrong because one public key may legitimately be referenced by
 more than one subject, especially:
 

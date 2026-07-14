@@ -1,4 +1,7 @@
-# 05 Release Playbook
+# 08 Release Playbook
+
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
 
 1. Update docs-v2 first (quick path).
 2. Run focused tests + E2E gate.

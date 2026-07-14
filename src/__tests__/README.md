@@ -1,5 +1,8 @@
 # API and Testing Strategy Overview
 #
+This test guide follows the shared narrative contract in
+[docs-v2/01-narrative-contract.md](../../docs-v2/01-narrative-contract.md).
+
 ## Sectors: Network vs Business (Important!)
 
 There are two distinct sector concepts in this platform:
@@ -21,6 +24,10 @@ There are two distinct sector concepts in this platform:
 See comments in scripts and tests for more details and examples.
 
 This document outlines the complete architecture and testing strategy for the API, focusing on its asynchronous FAPI-compliant nature, data models, and multi-tenant design. It also includes information about the specific tests for organization registration.
+
+When a test is used as a 101 teaching artifact, it must still explain the
+upstream story: `login -> loadProfile(...) -> loaded-profile workspace ->
+security mode decision -> GW behavior`, even if the upstream steps are mocked.
 
 ## 1. Overall Architecture & FAPI Flow
 

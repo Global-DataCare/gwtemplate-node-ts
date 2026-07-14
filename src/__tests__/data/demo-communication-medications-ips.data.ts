@@ -145,6 +145,7 @@ export function buildDemoDocumentBundle(config: DemoConfig) {
   };
 }
 
+// Compatibility helper for older attachment-wrapper assertions.
 export function buildDemoDocumentReference(config: DemoConfig) {
   const medicationCase = getDemoMedicationCase(config);
   const documentBundle = buildDemoDocumentBundle(config);
@@ -167,8 +168,20 @@ export function buildDemoDocumentReference(config: DemoConfig) {
   };
 }
 
-export function buildDemoCommunicationDidcommRequest(config: DemoConfig) {
-  const documentReference = buildDemoDocumentReference(config);
+/**
+ * Renders the GW async submit payload used by local demo/integration tests.
+ *
+ * Important boundary:
+ * - this is not a full DIDComm plaintext message
+ * - it is the GW submit contract: `thid + body`
+ * - `body` carries a batch `Bundle` whose first entry is a `Communication`
+ * - the `Communication` attachment carries the document bundle directly
+ *
+ * Real DIDComm wrapping and wallet pack/unpack live upstream in
+ * `gdc-common-utils-ts` transport helpers and tests.
+ */
+export function buildDemoCommunicationBatchSubmitRequest(config: DemoConfig) {
+  const documentBundle = buildDemoDocumentBundle(config);
   return {
     thid: config.thidComm,
     body: {
@@ -194,8 +207,8 @@ export function buildDemoCommunicationDidcommRequest(config: DemoConfig) {
               {
                 contentAttachment: {
                   contentType: config.attachmentFhirJson,
-                  title: config.demoDocumentReferenceAttachmentTitle,
-                  data: encodeBase64(JSON.stringify(documentReference)),
+                  title: config.demoCompositionTitle,
+                  data: encodeBase64(JSON.stringify(documentBundle)),
                 },
               },
             ],
@@ -206,13 +219,23 @@ export function buildDemoCommunicationDidcommRequest(config: DemoConfig) {
   };
 }
 
+/**
+ * Deprecated compatibility alias.
+ *
+ * Kept temporarily so existing local tests can move in small patches, but new
+ * docs/tests should use `buildDemoCommunicationBatchSubmitRequest`.
+ */
+export function buildDemoCommunicationDidcommRequest(config: DemoConfig) {
+  return buildDemoCommunicationBatchSubmitRequest(config);
+}
+
 export function buildDemoCommunicationLegacyFhirRequest(config: DemoConfig) {
-  const didcomm = buildDemoCommunicationDidcommRequest(config);
+  const submitRequest = buildDemoCommunicationBatchSubmitRequest(config);
   return {
     thid: config.thidComm,
-    resourceType: didcomm.body.resourceType,
-    type: didcomm.body.type,
-    entry: didcomm.body.entry,
+    resourceType: submitRequest.body.resourceType,
+    type: submitRequest.body.type,
+    entry: submitRequest.body.entry,
   };
 }
 

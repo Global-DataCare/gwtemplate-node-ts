@@ -1,5 +1,15 @@
 # 09 API Integrators Guide
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md), plus repository
+governance in [ARCHITECTURE.md](../ARCHITECTURE.md) and
+[CONTRIBUTING.md](../CONTRIBUTING.md).
+
+> 101 note
+> - This is the current integrator-facing GW `101` in `docs-v2`.
+> - Start the self-managed user story upstream with `login -> loadProfile -> actor facade`, then use this guide for GW route/contract semantics.
+> - Read [101-README.md](./101-README.md) for the ordered current path.
+
 Purpose:
 
 - give new integrators one canonical mental model for GW CORE,
@@ -11,8 +21,47 @@ This is the v2 guide.
 
 Use `docs/90.A-API_INTEGRATORS_GUIDE.md` only as v1/transitional reference.
 
+Current user-story boundary:
+
+- the first profile/runtime/login step is owned by `gdc-sdk-node-ts` or
+  `gdc-sdk-front-ts`
+- payload authoring is taught in `gdc-common-utils-ts`; runtime-neutral
+  contracts and reusable example fixtures stay in the shared GDC layers,
+  especially `gdc-common-utils-ts` and `gdc-sdk-core-ts`
+- GW starts after that, when one already-authenticated actor submits/polls
+  routes
+- do not teach GW as the first user-session entrypoint in this guide
+
+Do not mix these runtime concepts:
+
+- `ProfileRuntime`
+  unlocked end-user profile runtime from `gdc-sdk-node-ts` or
+  `gdc-sdk-front-ts`
+- `TenantServiceRuntime`
+  technical wallet/runtime owned by the service, tenant, or BFF for signing,
+  encryption, DIDComm/plain wrapping, and confidential storage operations
+- `ChannelBackendPort`
+  product/channel-facing backend API above those runtimes, as used in channel
+  apps such as `uhc-unid-chat-node`
+
+Strict-mode note:
+
+- when the client is running in strict FAPI/JWE mode, the loaded profile owns
+  the wallet/key material used to build the outbound signed/encrypted envelope
+  before it reaches GW
+- that profile-owned envelope may use PQC-capable signing/encryption keys when
+  the profile exposes them; GW does not synthesize or replace those keys
+- this repository's GW tests validate the accepted envelope, async queueing,
+  and route contracts; the upstream `loadProfile(...)` + wallet assembly belongs
+  in `gdc-sdk-node-ts` or `gdc-sdk-front-ts` tests
+- compatibility modes may still accept plaintext projections like
+  `application/didcomm-plain+json` or `application/fhir+json` when the route
+  allows them, but strict mode should be documented and tested as the security
+  default
+
 ## Read First
 
+- [101-BFF_AND_CHANNEL_MESSAGE_FLOW.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-BFF_AND_CHANNEL_MESSAGE_FLOW.md)
 - [101-COMMUNICATION_LAYERING.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
 - [101-RESOURCE_CLAIMS.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-RESOURCE_CLAIMS.md)
 - [101-IPS_COMMUNICATION_OUTBOX.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-IPS_COMMUNICATION_OUTBOX.md)
@@ -146,10 +195,11 @@ capability.
 For the current public search contract after those projections exist:
 
 - use `digitaltwin/.../Composition/_search`,
-- send the IPS `section` token first,
-- then send resource-scoped textual filters such as
-  `MedicationStatement.code-display`, `MedicationStatement.code-text`,
-  `Observation.code-display`, or `Observation.code-text`,
+- send the public IPS `section` token first,
+- then send resource-scoped search filters such as
+  `Composition.section`, `MedicationStatement.code-display`,
+  `MedicationStatement.code-text`, `Observation.code-display`, or
+  `Observation.code-text`,
 - expect matched `Composition` results, not leaf clinical resources.
 
 - [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)

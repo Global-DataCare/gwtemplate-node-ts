@@ -24,7 +24,7 @@ import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../
 import { invokeExpress } from './invokeExpress';
 import { testPayloadCreateTenant1 } from '../../data/end-to-end.data';
 import {
-  buildDemoCommunicationDidcommRequest,
+  buildDemoCommunicationBatchSubmitRequest,
   demoCommunicationMedicationIpsDefaults,
 } from '../../data/demo-communication-medications-ips.data';
 import { testTenant1AlternateName } from '../../data/organization.data';
@@ -378,7 +378,7 @@ export class TestResearchOrgControllerSdk {
     thidIpsSearch: string;
     medicationCaseIndex: number;
   }): Promise<any> {
-    const request = buildDemoCommunicationDidcommRequest({
+    const request = buildDemoCommunicationBatchSubmitRequest({
       ...demoCommunicationMedicationIpsDefaults,
       subjectId: RESEARCH_ACCESS_TEST_IDS.novitaSubjectDid as typeof demoCommunicationMedicationIpsDefaults.subjectId,
       ...input,

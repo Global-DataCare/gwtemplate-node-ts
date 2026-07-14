@@ -1,5 +1,8 @@
 ## Local Audit Runtime with Fabric
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Status: Proposed local baseline for auditors, integrators, and junior contributors.
 
 ### Goal

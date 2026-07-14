@@ -1,4 +1,7 @@
-# 08 Use-Case Flow Explanations
+# 05 Use-Case Flow Explanations
+
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
 
 This section explains the intent behind the core operational flow shape.
 

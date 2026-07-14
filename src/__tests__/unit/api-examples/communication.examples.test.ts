@@ -18,10 +18,11 @@ describe('api-examples communication', () => {
     expect(claims['Communication.note-text']).toBe('IPS ingestion request');
   });
 
-  it('embeds a DocumentReference whose attachment carries the IPS bundle', () => {
+  it('embeds the IPS document bundle directly in the communication attachment', () => {
     const attachment: any = COMMUNICATION_INGESTION_ENTRY_EXAMPLE.resource.payload[0].contentAttachment;
-    const documentReference = JSON.parse(Buffer.from(attachment.data, 'base64').toString('utf8'));
-    expect(documentReference.resourceType).toBe('DocumentReference');
-    expect(documentReference.content[0].attachment.contentType).toBe('application/fhir+json');
+    const documentBundle = JSON.parse(Buffer.from(attachment.data, 'base64').toString('utf8'));
+    expect(documentBundle.resourceType).toBe('Bundle');
+    expect(documentBundle.type).toBe('document');
+    expect(documentBundle.entry[0]?.resource?.resourceType).toBe('Composition');
   });
 });

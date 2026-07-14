@@ -27,7 +27,6 @@ function classifyPath(p) {
 
   // Extension-oriented or non-core verticals.
   if (
-    p.includes('/digitaltwin/') ||
     p.includes('/Observation/') ||
     p.includes('/Subject/_batch') ||
     p.includes('/Appointment') ||
@@ -40,6 +39,8 @@ function classifyPath(p) {
 
 const CORE_FLOW_PATHS = [
   '/host/ping',
+  '/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction',
+  '/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response',
   '/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate',
   '/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response',
   '/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch',
@@ -62,6 +63,12 @@ const CORE_FLOW_PATHS = [
   '/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch-response',
   '/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch',
   '/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch-response',
+  '/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch',
+  '/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch-response',
+  '/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_search',
+  '/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch',
+  '/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response',
+  '/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_search',
 ];
 
 const CORE_FLOW_STEP_BY_PATH = {

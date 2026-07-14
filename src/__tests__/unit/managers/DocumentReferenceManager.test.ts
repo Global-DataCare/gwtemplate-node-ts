@@ -13,7 +13,12 @@ describe('DocumentReferenceManager', () => {
     put: jest.fn(),
   } as unknown as jest.Mocked<IVaultRepository>;
 
-  const manager = new DocumentReferenceManager(mockVaultRepository);
+  const mockBlockchainAdapter = {
+    registerCidVersionMappings: jest.fn(),
+    registerArtifactBundle: jest.fn(),
+  } as any;
+
+  const manager = new DocumentReferenceManager(mockVaultRepository, mockBlockchainAdapter);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -86,5 +91,37 @@ describe('DocumentReferenceManager', () => {
     expect(data[0].response.status).toBe('400');
     expect(data[0].response.outcome.issue[0].diagnostics).toContain('DocumentReference.subject');
     expect(mockVaultRepository.put).not.toHaveBeenCalled();
+  });
+
+  // This test proves the backend contract for attachment/document writes:
+  // the vault write remains local, while the CID-backed artifact is also
+  // published through the blockchain adapter with the business identifier kept
+  // separate from the content hash.
+  it('registers content-addressed CID mappings on the blockchain adapter', async () => {
+    const subject = 'did:web:api.acme.org:individual:321';
+    const job = createJob({
+      '@context': 'org.hl7.fhir.r4',
+      'DocumentReference.subject': subject,
+      'DocumentReference.identifier': 'urn:uuid:docref-002',
+      'DocumentReference.contenttype': 'application/pdf',
+      'DocumentReference.contentdata': Buffer.from('%PDF-1.4', 'utf8').toString('base64'),
+    });
+
+    await manager.process(job);
+
+    expect(mockBlockchainAdapter.registerCidVersionMappings).toHaveBeenCalledTimes(1);
+    expect(mockBlockchainAdapter.registerArtifactBundle).toHaveBeenCalledTimes(1);
+    const [mappings, channel, chaincode] = mockBlockchainAdapter.registerCidVersionMappings.mock.calls[0];
+    expect(channel).toBe('health-care-es');
+    expect(chaincode).toBe('fhir-versioning');
+    expect(mappings[0].resourceType).toBe('DocumentReference');
+    expect(mappings[0].versionId.startsWith('z')).toBe(true);
+    expect(mappings[0].cid).toBe(mappings[0].versionId);
+    expect(mappings[0].resourceId).toBeDefined();
+
+    const [artifactParams] = mockBlockchainAdapter.registerArtifactBundle.mock.calls[0];
+    expect(artifactParams.assetId).toBe(mappings[0].cid);
+    expect(artifactParams.payload.resourceType).toBe('DocumentReference');
+    expect(artifactParams.payload.subject).toBe(subject);
   });
 });

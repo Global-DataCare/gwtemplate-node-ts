@@ -25,6 +25,7 @@ import type { ITenantsManager } from './ITenantsManager';
 
 type FhirBundleEntryLike = {
   type?: string;
+  fullUrl?: string;
   meta?: { claims?: Record<string, any> };
   resource?: any;
   request?: any;
@@ -125,6 +126,22 @@ export class DocumentReferenceManager implements IJobProcessor {
         }
         await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
         if (versioning.mapping) cidMappings.push(versioning.mapping);
+
+        if (this.blockchainAdapter?.registerArtifactBundle && versioning.mapping) {
+          await this.blockchainAdapter.registerArtifactBundle({
+            assetId: versioning.mapping.cid,
+            payload: {
+              resourceType: 'DocumentReference',
+              resourceId: id,
+              fullUrl: entry?.fullUrl,
+              subject,
+              claims,
+              resource: entry?.resource,
+            },
+            channel: `${job.sector}-${jurisdiction.toLowerCase()}`,
+            chaincode: process.env.FHIR_ARTIFACT_LEDGER_CHAINCODE || 'artifact-sc',
+          });
+        }
 
         const responseAction = `${normalizedAction}-response`;
         responseEntries.push({

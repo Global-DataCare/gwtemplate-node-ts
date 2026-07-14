@@ -6,12 +6,63 @@
 policy enforcement, storage orchestration, and the final runtime contract
 actually exposed by the gateway.
 
+For any 101-facing docs, snippets, or tests, also follow:
+
+- [NARRATIVE-ALIGNMENT.md](./NARRATIVE-ALIGNMENT.md)
+- [docs-v2/01-narrative-contract.md](./docs-v2/01-narrative-contract.md)
+
 This repository is the source of truth for:
 
 - manager behavior
 - route/endpoint behavior
 - runtime policy enforcement
 - integration and E2E verification of actual gateway behavior
+
+## Identity, Content, And Routing Contract
+
+When GW docs or tests mention identifiers, keep these roles separate:
+
+- `resource.identifier` is the public/business locator
+- `resource.id` and `Bundle.entry.id` are the technical lifecycle ids used for
+  readback, disable, purge, and manager correlation
+- `Bundle.entry.fullUrl` is a transport/reference locator, not the canonical
+  business identifier
+- `resource.meta.versionId` is the content CID/hash for the canonicalized
+  payload, not the public identifier
+- `ConfidentialStorageDoc.id` is the storage record key used by the vault layer
+
+For routing and traceability, derive the URL/URN locator from the technical id
+plus routing metadata such as dataspace, sector, and blockchain region. Do not
+derive the canonical lifecycle id from the public identifier.
+
+Canonical content fingerprint rules:
+
+- FHIR JSON resource -> hash/CID of the canonicalized JSON
+- PDF or binary artifact -> hash/CID of the raw bytes
+- user-authored clinical resource without a materialized FHIR resource ->
+  hash/CID of the canonicalized claims
+
+Clinical artifact anchoring rule:
+
+- document-oriented clinical bundles that arrive through `Communication`
+  should be eligible for on-chain CID/hash anchoring when policy requires it
+- the same pattern can later be reused by employee and consent managers for
+  their own bundle-style writes
+- this is not a blanket rule for every confidential-storage write
+- the artifact payload keeps the CID/hash separate from the business id
+- `DocumentReferenceManager` is the current reference implementation for the
+  attachment/document ingestion path
+- route context should be resolved from provider origin metadata first
+- if provider origin resolution cannot derive sector/jurisdiction from
+  `countryAddress` and `makesOffer.category`, fall back to the provider/index
+  sector and jurisdiction already available in the individual-index runtime
+- backend adapters must treat the blockchain channel as a routing outcome, not
+  as a claim field
+
+When this repository references the cross-repo route/domain split, align it
+with the GW template portal contract:
+
+- [gwtemplate-node-ts/docs/PORTAL_API_TO_GW_CORE.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs/PORTAL_API_TO_GW_CORE.md)
 
 This repository is not the place for:
 
@@ -23,6 +74,10 @@ This repository is not the place for:
 GW CORE may consume shared neutral semantics from:
 
 - `gdc-common-utils-ts`
+
+The common-utils layer owns the base front-story for profile/runtime unlock,
+channel/BFF flow, and Communication authoring. GW must not redefine those
+steps locally.
 
 GW CORE may align with contracts shaped by:
 
@@ -40,13 +95,14 @@ But the dependency of truth flows the other way for backend behavior:
 Use the repositories in this order:
 
 1. `gdc-common-utils-ts`
-   - shared neutral semantics
+   - shared neutral semantics and the base front-story
 2. `gdc-sdk-core-ts`
    - neutral domain facades
 3. `gdc-sdk-node-ts` / `gdc-sdk-front-ts`
    - actor-aware runtime orchestration
 4. `gwtemplate-node-ts`
-   - actual backend contract and execution behavior
+   - actual backend contract and execution behavior after the upstream
+     profile/runtime and Communication authoring steps already happened
 
 That does not mean GW is downstream from SDKs in authority. It means reusable
 SDK semantics should be shaped cleanly before being specialized, while GW
@@ -96,6 +152,10 @@ Avoid inverted names such as:
 ## Test And Contract Policy
 
 GW tests must prove actual backend behavior, not aspirational SDK layering.
+
+When a test is written as a 101 teaching artifact, it must also carry the
+upstream story in comments: `login -> loadProfile(...) -> loaded-profile
+workspace -> security mode -> GW behavior`.
 
 Preferred anchors:
 

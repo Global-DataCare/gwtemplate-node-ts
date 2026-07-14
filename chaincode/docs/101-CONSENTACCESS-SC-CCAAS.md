@@ -808,3 +808,7 @@ Then check:
 - `ConsentManager` invokes `registerConsentAccessBundle(...)`
 - the service container `consentaccess-sc` stays healthy
 - `readConsentAccess(<assetId>)` returns the sanitized bundle with `data[]`
+> 101 note
+> - Teach here: the chaincode-side consent-access logic only after the caller already came through an SDK/app profile runtime and GW route.
+> - Do not present chaincode docs as the first user/login/profile entrypoint.
+> - Read [../../docs/01-OVERVIEW-AND-GUIDES/101-README.md](../../docs/01-OVERVIEW-AND-GUIDES/101-README.md) for the ordered path and upstream runtime entrypoints.

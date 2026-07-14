@@ -1,5 +1,8 @@
 # Deactivation And Purge Lifecycle
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Status: Canonical operational contract for auditors and integrators.
 
 This document explains the lifecycle at the three hosted levels currently modeled by GW CORE:

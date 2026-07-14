@@ -1,5 +1,8 @@
 # 04 Claims and FHIR Rules
 
+This file follows the shared narrative contract in
+[01-narrative-contract.md](./01-narrative-contract.md).
+
 Claims model:
 
 - Claims map to interoperable ids such as `Resource.param-name`.
