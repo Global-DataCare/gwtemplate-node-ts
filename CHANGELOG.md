@@ -1,5 +1,28 @@
 ## [Unreleased]
 
+### Fixed
+- Individual Offer generation now reads the jurisdiction/network from the
+  preserved `cds-<jurisdiction>` route context instead of treating the
+  individual's optional `Organization.addressCountry` as that network.
+- Offer generation still fails before persistence when `hostDid`, route
+  jurisdiction, or sector is missing, preventing identifiers such as
+  `urn:cds:undefined:v1:...` from entering the Order lifecycle.
+- Preserved Family Offer claims when an accepted Order moves the registration
+  from pending to active, so subsequent Offer/Order searches remain auditable.
+- Made contextual claim lookup work in both `contextualized` and `canonical`
+  identity storage modes; fully-qualified Order constants no longer disappear
+  when `CLAIMS_IDENTITY_STORAGE_MODE=canonical`.
+- Prevented claims-first FHIR resources with the same sparse resource shell
+  from collapsing into one projection by deriving their version/deduplication
+  CID from the complete clinical claims.
+
+### Testing
+- Replaced shallow mutable lifecycle fixtures with isolated clones and added
+  assertions for Offer creation, Order confirmation, tenant activation, async
+  polling, PDF persistence, bearer verification, and multi-contact lookup.
+- Added integration coverage proving that three distinct Consent permissions
+  survive Communication ingestion and remain independently readable.
+
 ## [1.20.0] - 2026-07-14
 
 ### Changed

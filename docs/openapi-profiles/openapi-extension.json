@@ -4,7 +4,7 @@
     "title": "Gateway API - EXTENSIONS",
     "version": "1.0.3",
     "description": "Extension profile including non-core and vertical-specific capabilities on top of core and compat.",
-    "x-profile-generated-at": "2026-07-06T16:30:13.566Z",
+    "x-profile-generated-at": "2026-07-16T22:35:09.728Z",
     "x-profile-name": "extension"
   },
   "servers": [],
@@ -859,7 +859,7 @@
                 "meta": {
                   "claims": {
                     "@context": "org.schema",
-                    "Order.acceptedOffer.identifier": "{{offerId}}"
+                    "org.schema.Order.acceptedOffer.identifier": "{{offerId}}"
                   }
                 }
               }
@@ -1349,7 +1349,7 @@
                 "meta": {
                   "claims": {
                     "@context": "org.schema",
-                    "Order.acceptedOffer.identifier": "{{offerId}}"
+                    "org.schema.Order.acceptedOffer.identifier": "{{offerId}}"
                   }
                 }
               }

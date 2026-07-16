@@ -4,7 +4,7 @@
     "title": "Gateway API - CORE",
     "version": "1.0.3",
     "description": "CORE API documentation for the secure gateway canonical flow.",
-    "x-profile-generated-at": "2026-07-06T16:30:13.537Z",
+    "x-profile-generated-at": "2026-07-16T22:35:09.708Z",
     "x-profile-name": "core"
   },
   "servers": [],
@@ -775,7 +775,7 @@
                 "meta": {
                   "claims": {
                     "@context": "org.schema",
-                    "Order.acceptedOffer.identifier": "{{offerId}}"
+                    "org.schema.Order.acceptedOffer.identifier": "{{offerId}}"
                   }
                 }
               }
@@ -1265,7 +1265,7 @@
                 "meta": {
                   "claims": {
                     "@context": "org.schema",
-                    "Order.acceptedOffer.identifier": "{{offerId}}"
+                    "org.schema.Order.acceptedOffer.identifier": "{{offerId}}"
                   }
                 }
               }

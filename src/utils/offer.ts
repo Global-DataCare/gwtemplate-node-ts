@@ -34,6 +34,13 @@ export function generateLicenseOffer(
   allowedPaymentMethods: string[],
   eligibleCustomerType: typeof LICENSE_USER_CLASS_EMPLOYEE | typeof LICENSE_USER_CLASS_INDIVIDUAL = LICENSE_USER_CLASS_EMPLOYEE,
 ): Record<string, any> {
+  const normalizedHostDid = String(hostDid || '').trim();
+  const normalizedJurisdiction = String(jurisdiction || '').trim().toUpperCase();
+  const normalizedSector = String(sector || '').trim();
+  if (!normalizedHostDid) throw new Error('generateLicenseOffer requires hostDid.');
+  if (!normalizedJurisdiction) throw new Error('generateLicenseOffer requires jurisdiction.');
+  if (!normalizedSector) throw new Error('generateLicenseOffer requires sector.');
+
   const tier = determineLicenseTier(employeeCount);
   const offerId = uuidv4();
 
@@ -42,14 +49,14 @@ export function generateLicenseOffer(
 
   const offerClaims: Record<string, any> = {
     [ClaimsOfferSchemaorg.acceptedPaymentMethod]: allowedPaymentMethods.join(','),
-    [ClaimsOfferSchemaorg.category]: sector,
+    [ClaimsOfferSchemaorg.category]: normalizedSector,
     [ClaimsOfferSchemaorg.checkoutPageURLTemplate]: '<payment-url>', // Placeholder to be replaced by the order process
     [ClaimsOfferSchemaorg.eligibleCustomerType]: eligibleCustomerType,
     [ClaimsOfferSchemaorg.eligibleQuantityValue]: employeeCount,
-    [ClaimsOfferSchemaorg.identifier]: `urn:cds:${jurisdiction}:v1:${sector}:product:org.schema:Offer:${offerId}`,
+    [ClaimsOfferSchemaorg.identifier]: `urn:cds:${normalizedJurisdiction}:v1:${normalizedSector}:product:org.schema:Offer:${offerId}`,
     [ClaimsOfferSchemaorg.itemOfferedName]: tier.name,
     [ClaimsOfferSchemaorg.itemOfferedSku]: 'web-or-app-identifier',
-    [ClaimsOfferSchemaorg.offeredBy]: hostDid,
+    [ClaimsOfferSchemaorg.offeredBy]: normalizedHostDid,
     [ClaimsOfferSchemaorg.price]: tier.price,
     [ClaimsOfferSchemaorg.priceCurrency]: 'EUR', // Assuming EUR for now
     [ClaimsOfferSchemaorg.serialNumber]: serialNumbers,

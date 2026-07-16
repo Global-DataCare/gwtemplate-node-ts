@@ -3,17 +3,18 @@
 
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
-import { DemoKmsService } from '../../../services/DemoKmsService';
 import { KmsService } from '../../../services/KmsService';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import { AdapterCryptoSdkNode } from '../../../gdc-backend-utils-node/adapters/node/crypto';
 import { testConfigTenant1, testTenant1IdentifierUrn, testHostDidWeb } from '../../data/organization.data';
-import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { EntityConfig } from '../../../gdc-backend-utils-node/models/entity';
+import { getEnvSectionId } from '../../../utils/section-env';
 
 describe('TenantsCacheManager - tenant urls', () => {
   let tenantsCacheManager: TenantsCacheManager;
   let realKmsService: KmsService;
+  let vaultRepository: VaultMemRepository;
 
   const hostConfig: EntityConfig = {
     id: 'host-id',
@@ -28,12 +29,17 @@ describe('TenantsCacheManager - tenant urls', () => {
     claims: {
       ...testConfigTenant1.claims,
       [ClaimsOrganizationSchemaorg.url]: 'acme.example.com',
+      [ClaimsServiceSchemaorg.category]: 'health-care',
     }
   } as any;
 
   const tenantConfigWithoutUrl: EntityConfig = { 
     ...testConfigTenant1,
     didDocument: { ...testConfigTenant1.didDocument, id: testTenant1IdentifierUrn },
+    claims: {
+      ...testConfigTenant1.claims,
+      [ClaimsServiceSchemaorg.category]: 'health-care',
+    },
   } as any;
   delete (tenantConfigWithoutUrl.claims as any)[ClaimsOrganizationSchemaorg.url];
 
@@ -45,14 +51,27 @@ describe('TenantsCacheManager - tenant urls', () => {
     },
   } as any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     const cryptoService = new CryptographyService(new AdapterCryptoSdkNode());
-    const vaultRepository = new VaultMemRepository();
+    vaultRepository = new VaultMemRepository();
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => realKmsService, 'test-host-collection');
     realKmsService = new KmsService(cryptoService, tenantsCacheManager);
-    const demoKmsService = new DemoKmsService(realKmsService);
-    // Even though we instantiate demoKmsService, the tenantsCacheManager holds a reference to the real one.
-    // This is correct as its internal operations (like decryption) should use the real KMS.
+
+    // Exercise the public storage-backed cache boundary. Older versions of this
+    // test reached into a renamed private Map, so they could pass without proving
+    // that a tenant registration was loadable through the real manager path.
+    jest.spyOn(realKmsService, 'unprotectConfidentialData').mockImplementation(
+      async (record: any) => record.content,
+    );
+    await vaultRepository.put(
+      'test-host-collection',
+      [
+        { id: 'health-care_acme_with_url', status: 'active', content: tenantConfigWithUrl },
+        { id: 'health-care_acme_no_url', status: 'active', content: tenantConfigWithoutUrl },
+        { id: 'health-care_acme_with_operational_url', status: 'active', content: tenantConfigWithOperationalUrl },
+      ] as any,
+      getEnvSectionId('tenants'),
+    );
 
     // Spy on getDidDocument and mock its implementation
     jest.spyOn(tenantsCacheManager, 'getDidDocument').mockImplementation(async (vaultId: string) => {
@@ -63,11 +82,6 @@ describe('TenantsCacheManager - tenant urls', () => {
       return undefined;
     });
 
-    // Manually set up the internal cache for the tests.
-    (tenantsCacheManager as any).tenantCacheByVaultId.set('host', hostConfig);
-    (tenantsCacheManager as any).tenantCacheByVaultId.set('health-care_acme_with_url', tenantConfigWithUrl);
-    (tenantsCacheManager as any).tenantCacheByVaultId.set('health-care_acme_no_url', tenantConfigWithoutUrl);
-    (tenantsCacheManager as any).tenantCacheByVaultId.set('health-care_acme_with_operational_url', tenantConfigWithOperationalUrl);
   });
 
   afterEach(() => {

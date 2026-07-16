@@ -342,7 +342,14 @@ export class FamilyManager {
     }
 
     // Offer generation: default to 2 (representative + subject).
-    const jurisdiction = claims[ClaimsOrganizationSchemaorg.addressCountry] as string;
+    // This jurisdiction is the data-space/blockchain network selected by the
+    // `cds-<jurisdiction>` route. It is not the individual's country and must
+    // therefore come from the preserved HTTP route context, not from optional
+    // Organization address claims.
+    const jurisdiction = String(job.jurisdiction || '').trim();
+    if (!jurisdiction) {
+      throw new ManagerError('Job is missing route jurisdiction for the individual Offer network.', IssueType.Required);
+    }
     const offeredBy = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
     if (!offeredBy) {
       throw new ManagerError(`Tenant DID not found for '${tenantVaultId}'`, IssueType.NotFound);
@@ -568,10 +575,16 @@ export class FamilyManager {
       status: EntityLifecycleStatus.Active,
     };
 
-    const updatedDoc: ConfidentialStorageDoc = {
+    const updatedDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
       id: secureDoc.id,
       status: finalizedContent.status,
       sequence: (secureDoc.sequence || 0) + 1,
+      // Offer/Order searches intentionally use non-hydrated projections. Keep
+      // the auditable public claims when transitioning pending -> active;
+      // dropping this field made a successfully confirmed Offer disappear
+      // from `_search` while its encrypted content still existed.
+      meta: (secureDoc as ConfidentialStorageDoc & { meta?: Record<string, unknown> }).meta
+        || { claims: finalizedContent.claims },
       indexed: secureDoc.indexed,
       content: finalizedContent,
     };

@@ -315,7 +315,7 @@ describe('IndividualManager', () => {
       const tenantVaultId = 'health-care_acme';
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
       mockVaultRepository.vaultExists.mockResolvedValue(true);
-      mockVaultRepository.getContainersInSection.mockResolvedValue([
+      mockVaultRepository.listContainersInSection.mockResolvedValue([
         {
           id: 'consent-1',
           'Consent.subject': subjectDid,
@@ -365,7 +365,7 @@ describe('IndividualManager', () => {
       const response = await individualManager.process(job);
       const responseEntry = response.body.data[0] as any;
 
-      expect(mockVaultRepository.getContainersInSection).toHaveBeenCalledWith(
+      expect(mockVaultRepository.listContainersInSection).toHaveBeenCalledWith(
         tenantVaultId,
         getSubjectScopedSectionId(subjectDid, 'individual', 'consents'),
       );

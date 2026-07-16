@@ -11,6 +11,7 @@ import {
   HealthcareConsentPurposes,
 } from 'gdc-common-utils-ts/constants/index';
 import {
+  ClaimsOrderSchemaorg,
   ClaimsOrganizationSchemaorg,
   ClaimsPersonSchemaorg,
   ClaimsServiceSchemaorg,
@@ -269,7 +270,7 @@ export const ORGANIZATION_ORDER_REQUEST = {
       "meta": {
         "claims": {
           "@context": "org.schema",
-          "Order.acceptedOffer.identifier": "{{offerId}}",
+          [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: "{{offerId}}",
         }
       }
     }]
@@ -893,7 +894,7 @@ export const FAMILY_ORDER_REQUEST = {
       "meta": {
         "claims": {
           "@context": "org.schema",
-          "Order.acceptedOffer.identifier": "{{offerId}}"
+          [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: "{{offerId}}"
         }
       }
     }]

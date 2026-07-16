@@ -133,6 +133,8 @@ describe('normalizeContextualizedClaims', () => {
       'Organization.identifier.value': 'A12345678',
       'Service.category': 'health-care',
     });
+    expect(getClaimValue(claims, 'org.schema.Organization.identifier.value')).toBe('A12345678');
+    expect(getClaimValue(claims, 'org.schema.Service.category')).toBe('health-care');
   });
 });
 

@@ -239,6 +239,10 @@ describe('Ping API Endpoint', () => {
   describe('POST /host/.../_batch (Legacy JSON Ping)', () => {
     it('should reject plain JSON when JSON legacy mode is not enabled', async () => {
       // --- Arrange ---
+      const originalSecurityMode = process.env.SECURITY_MODE;
+      const originalJsonLegacy = process.env.JSON_LEGACY;
+      process.env.SECURITY_MODE = 'compat';
+      process.env.JSON_LEGACY = 'false';
       const asyncResponseStore = new AsyncResponseStoreMem();
       const { app, tenantsCacheManager } = setupApp(asyncResponseStore);
   
@@ -249,16 +253,23 @@ describe('Ping API Endpoint', () => {
       const expectedPollingUrl = `http://testhost.com${pingUrl.replace('/_batch', '/_batch-response')}`;
   
       // --- Act ---
-      const response = await invokeExpress(app, {
-        method: 'POST',
-        url: pingUrl,
-        headers: { 'content-type': 'application/json' },
-        body: decodedPingMessage,
-      });
-        
-      // --- Assert ---
-      expect(response.status).toBe(415);
-      expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
+      try {
+        const response = await invokeExpress(app, {
+          method: 'POST',
+          url: pingUrl,
+          headers: { 'content-type': 'application/json' },
+          body: decodedPingMessage,
+        });
+
+        // --- Assert ---
+        expect(response.status).toBe(415);
+        expect(mockQueueAdapter.addJob).not.toHaveBeenCalled();
+      } finally {
+        if (originalSecurityMode === undefined) delete process.env.SECURITY_MODE;
+        else process.env.SECURITY_MODE = originalSecurityMode;
+        if (originalJsonLegacy === undefined) delete process.env.JSON_LEGACY;
+        else process.env.JSON_LEGACY = originalJsonLegacy;
+      }
     });
   });
 

@@ -47,6 +47,9 @@ import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
   addJob: jest.fn(),
 };
+const mockAppAuthManager = {
+  verifyBearerToken: jest.fn(async () => ({ payload: { sub: 'person-api-test' } })),
+} as any;
 
 const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   const app = express();
@@ -65,6 +68,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
     vaultRepository,
     cryptographyService,
     'http://localhost:3001',
+    mockAppAuthManager,
   );
   app.use('/', apiRouter);
 
@@ -114,7 +118,7 @@ describe('Person Onboarding API', () => {
     const response = await invokeExpress(app, {
       method: 'POST',
       url: registrationUrl,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: 'Bearer test-id-token' },
       body: { request: testEncryptedJwe1 },
     });
 

@@ -32,7 +32,7 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { MlkemPrivateJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { createHash } from 'crypto';
 import { Content } from 'gdc-common-utils-ts/utils/content';
-import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { JWK } from 'gdc-common-utils-ts/models/jwk';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { HostingManager } from '../../managers/HostingManager';
@@ -40,6 +40,7 @@ import type { IHostRuntime } from '../../managers/IHostRuntime';
 import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getEnvSectionId } from '../../utils/section-env';
+import { AppAuthorizationManager } from '../../managers/AppAuthorizationManager';
 
 type InMemoryResponse = {
   status: number;
@@ -157,6 +158,10 @@ const mockLogger: jest.Mocked<ILogger> = {
   debug: jest.fn(),
 };
 
+const mockAppAuthManager = {
+  verifyBearerToken: jest.fn(async () => ({ payload: { sub: 'organization-api-test' } })),
+} as unknown as AppAuthorizationManager;
+
 const setupApp = (
   asyncResponseStore: IAsyncResponseStore,
   tenantsCacheManager: TenantsCacheManager,
@@ -171,7 +176,8 @@ const setupApp = (
     asyncResponseStore,
     vaultRepository,
     cryptographyService,
-    'http://host.example.com'
+    'http://host.example.com',
+    mockAppAuthManager,
   );
   const app = express();
   app.use('/', apiRouter);
@@ -224,6 +230,7 @@ describe('Organization Registration API', () => {
       demoAllowInsecureBearer: true,
       nodeEnv: 'test',
       port: 3000,
+      maxHeaderSize: 16 * 1024,
       apiHostname: 'host',
       hostExternalDomain: 'host.example.com',
       apiBaseUrl: 'http://host.example.com',
@@ -933,7 +940,7 @@ describe('Organization Registration API', () => {
 
       // --- ACT (Phase 2: Submit Order) ---
       const orderPayload = { ...ORGANIZATION_ORDER_REQUEST };
-      orderPayload.body.data[0].meta.claims['Order.acceptedOffer.identifier'] = offerId;
+      orderPayload.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
       const { thid: orderThid } = orderPayload;
       
       const decodedOrderJob: JobRequest = {

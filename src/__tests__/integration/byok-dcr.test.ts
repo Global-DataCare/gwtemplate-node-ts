@@ -28,7 +28,7 @@ import { testPayloadCreateTenant1, testTenant1Data } from '../data/end-to-end.da
 import { testClaimsTenant1Receptionist1, testTenant1Receptionist1DidExternal, testTenant1Receptionist1Urn } from '../data/employee.data';
 import { testTenant1AlternateName, testTenant1VaultId } from '../data/organization.data';
 import { testIndividualOnboardingBatchEntries } from '../data/customer-onboarding.data';
-import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { generateUrnHash } from '../../utils/urn-hash';
 import { createHash } from 'crypto';
 import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
@@ -165,7 +165,12 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const response = await invokeExpress(app, {
       method: 'POST',
       url: registrationUrl,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      // DemoTokenVerifier still requires a structurally valid JWT. The signature is
+      // intentionally empty in demo mode, but an arbitrary bearer string is rejected.
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        authorization: 'Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJieW9rLWRjci10ZXN0In0.',
+      },
       body: { request: compactJwe },
     });
 
@@ -223,7 +228,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
         data: [
           {
             type: 'Organization-order-request-v1.0',
-            meta: { claims: { 'Order.acceptedOffer.identifier': offerId } },
+            meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } },
           },
         ],
       },
@@ -264,7 +269,10 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const orderPostResponse = await invokeExpress(app, {
       method: 'POST',
       url: orderUrl,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        authorization: 'Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJieW9rLWRjci10ZXN0In0.',
+      },
       body: { request: orderCompactJwe },
     });
     expect(orderPostResponse.status).toBe(202);
@@ -295,7 +303,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const { decryptedBytes: orderDecryptedBytes } = await cryptoService.decryptJwe(encryptedOrderFinalResponse, externalEncrypter);
     const orderFinalResponse = JSON.parse(Content.bytesToStringUTF8(orderDecryptedBytes)) as IDecodedDidcommPayload;
     expect(orderFinalResponse.thid).toBe(orderThid);
-    expect(['201', '404']).toContain(orderFinalResponse.body?.data?.[0]?.response?.status);
+    expect(orderFinalResponse.body?.data?.[0]).toMatchObject({ response: { status: '201' } });
 
     // Reload host + tenant caches after finalization to make subsequent tests deterministic.
     await tenantManager.loadHost();
