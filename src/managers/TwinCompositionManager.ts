@@ -55,9 +55,6 @@ Record<string, readonly TwinCompositionProjectionConfig[]>
   [HealthcareSummarySections.PlanOfCare.attributeValue]: Object.freeze([
     { collectionIds: [DataCollectionIds.carePlans], resourceType: ResourceTypesFhirR4.CarePlan },
   ]),
-  [HealthcareSummarySections.PlanOfTreatment.attributeValue]: Object.freeze([
-    { collectionIds: [DataCollectionIds.carePlans], resourceType: ResourceTypesFhirR4.CarePlan },
-  ]),
   [HealthcareSummarySections.SocialHistory.attributeValue]: Object.freeze([
     { collectionIds: [DataCollectionIds.observations], resourceType: ResourceTypesFhirR4.Observation },
   ]),

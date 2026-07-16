@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [1.20.1] - 2026-07-17
+
+### Changed
+- Removed the duplicate `PlanOfTreatment` digital-twin projection entry; the
+  canonical `PlanOfCare` LOINC section maps once to the care-plan collection.
+- Updated the shared dependency to `gdc-common-utils-ts@^2.3.1`, including the
+  canonical colon-delimited hosted-provider DID correction.
+
 ### Fixed
 - Individual Offer generation now reads the jurisdiction/network from the
   preserved `cds-<jurisdiction>` route context instead of treating the
