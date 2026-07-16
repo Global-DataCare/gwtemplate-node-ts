@@ -65,4 +65,19 @@ describe('generateLicenseOffer', () => {
     expect(() => generateLicenseOffer(2, hostDid, undefined as unknown as string, sector, allowedPaymentMethods))
       .toThrow('generateLicenseOffer requires jurisdiction.');
   });
+
+  it.each([
+    ['hostDid', '', jurisdiction, sector, 'generateLicenseOffer requires hostDid.'],
+    ['sector', hostDid, jurisdiction, '   ', 'generateLicenseOffer requires sector.'],
+  ])('rejects a missing %s before an Offer can be persisted', (_field, nextHostDid, nextJurisdiction, nextSector, message) => {
+    expect(() => generateLicenseOffer(2, nextHostDid, nextJurisdiction, nextSector, allowedPaymentMethods))
+      .toThrow(message);
+  });
+
+  it('normalizes the route network and trims identity inputs in the Offer projection', () => {
+    const claims = generateLicenseOffer(2, `  ${hostDid}  `, ' es ', ` ${sector} `, allowedPaymentMethods);
+    expect(claims[ClaimsOfferSchemaorg.identifier]).toMatch(/^urn:cds:ES:v1:health-care:product:/);
+    expect(claims[ClaimsOfferSchemaorg.offeredBy]).toBe(hostDid);
+    expect(claims[ClaimsOfferSchemaorg.category]).toBe(sector);
+  });
 });

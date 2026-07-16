@@ -964,15 +964,19 @@ export class CommunicationManager implements IJobProcessor {
           this.getFirstClaimValue(claims, config.identifierClaimKeys)
           || `urn:uuid:${uuidv4()}`;
         const fallbackId = determineResourceId(identifier, process.env.NODE_ENV);
-        const versioning = applyFhirCidVersioningToEntry({
+        const claimsVersionId = claimsToContentCid(claims).cid;
+        applyFhirCidVersioningToEntry({
           entry: { resource },
           claims,
           resourceType,
           resourceId: fallbackId,
         });
-        const versionId = this.getFirstClaimValue(claims, [
-          `${resourceType}.meta.versionId`,
-        ]);
+        // Claims-first resources can have identical sparse FHIR shells while
+        // carrying different clinical meaning in meta.claims. Deduplicate by
+        // the canonical claims CID, not by the bare resource shell CID.
+        claims[`${resourceType}.meta.versionId`] = claimsVersionId;
+        claims[`org.hl7.fhir.r4.${resourceType}.meta.versionId`] = claimsVersionId;
+        const versionId = claimsVersionId;
 
         const sectionId = getSubjectScopedSectionId(subjectRef, SUBJECT_SECTION_INDIVIDUAL, config.collectionId);
         if (versionId) {
@@ -982,7 +986,7 @@ export class CommunicationManager implements IJobProcessor {
           if (alreadyIndexed) continue;
         }
 
-        const recordId = String(resource?.id || versioning.versionId || fallbackId);
+        const recordId = String(resource?.id || versionId || fallbackId);
         const record: Record<string, any> = {
           id: recordId,
           ...claims,

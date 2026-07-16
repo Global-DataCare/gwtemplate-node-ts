@@ -575,10 +575,16 @@ export class FamilyManager {
       status: EntityLifecycleStatus.Active,
     };
 
-    const updatedDoc: ConfidentialStorageDoc = {
+    const updatedDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
       id: secureDoc.id,
       status: finalizedContent.status,
       sequence: (secureDoc.sequence || 0) + 1,
+      // Offer/Order searches intentionally use non-hydrated projections. Keep
+      // the auditable public claims when transitioning pending -> active;
+      // dropping this field made a successfully confirmed Offer disappear
+      // from `_search` while its encrypted content still existed.
+      meta: (secureDoc as ConfidentialStorageDoc & { meta?: Record<string, unknown> }).meta
+        || { claims: finalizedContent.claims },
       indexed: secureDoc.indexed,
       content: finalizedContent,
     };

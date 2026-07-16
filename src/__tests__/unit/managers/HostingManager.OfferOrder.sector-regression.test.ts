@@ -30,6 +30,7 @@ beforeEach(async () => {
     demoAllowInsecureBearer: true,
     nodeEnv: 'test',
     port: 3000,
+    maxHeaderSize: 16 * 1024,
     apiHostname: 'testhost',
     hostExternalDomain: 'testhost.com',
     apiBaseUrl: 'http://testhost:3000',

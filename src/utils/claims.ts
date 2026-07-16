@@ -73,8 +73,17 @@ export function getClaimValue<T = any>(claims: Record<string, any>, key: string)
 
   const context = claims['@context'];
   if (typeof context === 'string' && context.length > 0) {
-    const prefixedKey = context.endsWith('.') ? `${context}${key}` : `${context}.${key}`;
-    if (claims[prefixedKey] !== undefined) return claims[prefixedKey] as T;
+    const prefix = context.endsWith('.') ? context : `${context}.`;
+    // Identity claims may be stored either contextualized (`org.schema.Order...`)
+    // or canonical (`Order...`). Callers use the exported fully-qualified claim
+    // constants, so lookup must work in both configured storage modes.
+    if (key.startsWith(prefix)) {
+      const canonicalKey = key.slice(prefix.length);
+      if (claims[canonicalKey] !== undefined) return claims[canonicalKey] as T;
+    } else {
+      const prefixedKey = `${prefix}${key}`;
+      if (claims[prefixedKey] !== undefined) return claims[prefixedKey] as T;
+    }
   }
 
   return undefined;

@@ -180,7 +180,7 @@
           "meta": {
             "claims": {
               "@context": "org.schema",
-              "Order.acceptedOffer.identifier": "{{offerId}}"
+              "org.schema.Order.acceptedOffer.identifier": "{{offerId}}"
             }
           }
         }

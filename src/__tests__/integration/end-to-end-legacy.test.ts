@@ -53,7 +53,7 @@ import { IServerConfig } from '../../config';
 import { IAuthorizationManager } from '../../managers/auth/IAuthorizationManager';
 import { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import { IAccessTokenClaims } from 'gdc-common-utils-ts/models/auth';
-import { ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
@@ -120,7 +120,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
       jsonLegacy: true,
       didcommPlainEnabled: true,
       demoAllowInsecureBearer: true,
-      nodeEnv: 'test', port: 3000, apiHostname: 'testhost', hostExternalDomain: 'testhost.com',
+      nodeEnv: 'test', port: 3000, maxHeaderSize: 16 * 1024, apiHostname: 'testhost', hostExternalDomain: 'testhost.com',
       apiBaseUrl: 'http://testhost:3000', namespace: 'test-namespace', sectorsAllowed: [Sector.HEALTH_CARE, Sector.TEST],
       allowedPaymentMethods: ['Stripe'],
       dbProvider: 'mem', queueProvider: 'mem', storageProvider: 'mem',
@@ -129,7 +129,15 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     };
     const hostRuntime = { hostCollectionName, hostDid: 'did:web:testhost.com' };
     
-    const hostingManager = new HostingManager(vaultRepository, kmsService, tenantManager, new StorageMemAdapter(), logger, mockConfig);
+    const hostingManager = new HostingManager(
+      vaultRepository,
+      kmsService,
+      tenantManager,
+      new StorageMemAdapter(),
+      logger,
+      mockConfig,
+      hostRuntime,
+    );
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await tenantManager.loadHost();
     
@@ -204,8 +212,11 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     const claims = orgCreationPayloadWithPdf.body.data[0].meta.claims;
     claims[ClaimsServiceSchemaorg.termsOfService] = pdfBase64;
     // Ensure the Service resource can be materialized into a stored document.
-    claims['org.schema.Service.identifier'] = 'urn:uuid:service-001';
-    claims['org.schema.Organization.alternateName'] = 'acme-with-pdf';
+    claims[ClaimsServiceSchemaorg.identifier] = 'urn:uuid:service-001';
+    claims[ClaimsOrganizationSchemaorg.alternateName] = 'acme-with-pdf';
+    // Tenant identity is keyed by the legal identifier value, not by the display
+    // alias. Reusing `acme-id` would exercise idempotency and never process this PDF.
+    claims[ClaimsOrganizationSchemaorg.identifierValue] = 'acme-with-pdf';
     const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
 
     const response = await invokeExpress(app, {
@@ -223,10 +234,21 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
 
     await queueAdapter.waitForEmptyQueue();
 
-    // Registration step creates a provisional tenant record stored in the HOST vault.
-    const vaultId = getTenantVaultId(claims[ClaimsServiceSchemaorg.category], claims['org.schema.Organization.alternateName']);
-    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const pollingResponse = await invokeExpress(app, {
+      method: 'POST',
+      url: new URL(response.headers.location).pathname,
+      headers: { 'content-type': 'application/json' },
+      body: { thid: orgCreationPayloadWithPdf.thid },
+    });
+    expect(pollingResponse.status).toBe(200);
+    expect(JSON.parse(pollingResponse.text).data[0]).toMatchObject({ response: { status: '201' } });
 
+    // Registration step creates a provisional tenant record stored in the HOST vault.
+    const vaultId = getTenantVaultId(
+      claims[ClaimsServiceSchemaorg.category],
+      claims[ClaimsOrganizationSchemaorg.identifierValue],
+    );
+    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
     const secureTenantRecord = await vaultRepository.get<any>(hostCollectionName, vaultId, getEnvSectionId('tenants'));
     expect(secureTenantRecord).toBeDefined();
 

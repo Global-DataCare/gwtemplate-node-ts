@@ -83,10 +83,22 @@ describe('Service Initialization Utilities', () => {
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
           (s as any).selector?.format === 'org.hl7.fhir.api' &&
+          s.serviceEndpoint === 'Communication' &&
           s.actions?.includes('_batch'),
       );
       expect(digitalTwinService).toBeDefined();
-      expect(digitalTwinService!.serviceEndpoint).toContain('Composition');
+      expect(digitalTwinService!.serviceEndpoint).toBe('Communication');
+
+      // Communication is the converged auditable ingestion envelope. Composition
+      // remains the searchable clinical-document projection after indexing.
+      const digitalTwinCompositionSearch = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.api' &&
+          s.serviceEndpoint === 'Composition' &&
+          s.actions?.includes('_search'),
+      );
+      expect(digitalTwinCompositionSearch).toBeDefined();
 
       const digitalTwinR4Service = services.find(
         (s: DidService) =>
@@ -249,22 +261,42 @@ describe('Service Initialization Utilities', () => {
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
           (s as any).selector?.format === 'org.hl7.fhir.api' &&
+          s.serviceEndpoint === 'Communication' &&
           s.actions?.includes('_batch'),
       );
 
       expect(digitalTwinService).toBeDefined();
-      expect(digitalTwinService!.serviceEndpoint).toContain('Composition');
+      expect(digitalTwinService!.serviceEndpoint).toBe('Communication');
       expect(digitalTwinService!.actions).toEqual(['_batch']);
+
+      const legacyCompositionBatch = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.api' &&
+          s.serviceEndpoint === 'Composition' &&
+          s.actions?.includes('_batch'),
+      );
+      expect(legacyCompositionBatch).toBeDefined();
 
       const digitalTwinR4Service = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
           (s as any).selector?.format === 'org.hl7.fhir.r4' &&
+          s.serviceEndpoint === 'Communication' &&
           s.actions?.includes('_batch'),
       );
       expect(digitalTwinR4Service).toBeDefined();
-      expect(digitalTwinR4Service!.serviceEndpoint).toContain('Composition');
+      expect(digitalTwinR4Service!.serviceEndpoint).toBe('Communication');
       expect(digitalTwinR4Service!.actions).toEqual(['_batch']);
+
+      const legacyCompositionR4Batch = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.r4' &&
+          s.serviceEndpoint === 'Composition' &&
+          s.actions?.includes('_batch'),
+      );
+      expect(legacyCompositionR4Batch).toBeDefined();
 
       const digitalTwinMedicationSearchService = services.find(
         (s: DidService) =>

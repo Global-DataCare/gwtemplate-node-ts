@@ -119,5 +119,63 @@ describe('Family transaction Offer/Order route story', () => {
     const orderEntry = orderPoll.body.data[0];
     expect(orderEntry.response.status).toBe('201');
     expect(orderEntry.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+
+    // A confirmed registration remains discoverable through its original
+    // Offer projection. This catches pending -> active rewrites that preserve
+    // encrypted content but accidentally drop non-hydrated `meta.claims`.
+    const offerSearchPayload = {
+      thid: 'family-offer-search-story-thid',
+      jti: 'family-offer-search-story-jti',
+      iss: 'did:web:controller.example.com',
+      aud: 'did:web:api.acme.org',
+      type: 'application/json',
+      body: {
+        data: [{
+          type: 'Offer-search-request-v1.0',
+          meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } },
+          resource: { meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } } },
+        }],
+      },
+    };
+    const offerSearchSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Offer/_search`,
+      headers: { 'content-type': 'application/json' },
+      body: offerSearchPayload,
+    });
+    expect(offerSearchSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+    const offerSearchPoll = await pollJsonBody(
+      harness.app,
+      offerSearchSubmit.headers.location,
+      offerSearchPayload.thid,
+    );
+    expect(offerSearchPoll.status).toBe(200);
+    expect(offerSearchPoll.body.data[0].response.status).toBe('200');
+    expect(offerSearchPoll.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
+
+    // Re-starting the same individual is a read/idempotency outcome, not a new
+    // pending Order. Channels use this status to avoid reconfirming an active
+    // Offer and triggering the historical "not in pending state" conflict.
+    const repeatedRegistrationPayload = structuredClone(registrationPayload);
+    repeatedRegistrationPayload.thid = 'family-transaction-repeat-story-thid';
+    repeatedRegistrationPayload.jti = 'family-transaction-repeat-story-jti';
+    const repeatedSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_transaction`,
+      headers: { 'content-type': 'application/json' },
+      body: repeatedRegistrationPayload,
+    });
+    expect(repeatedSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+    const repeatedPoll = await pollJsonBody(
+      harness.app,
+      repeatedSubmit.headers.location,
+      repeatedRegistrationPayload.thid,
+    );
+    expect(repeatedPoll.status).toBe(200);
+    expect(repeatedPoll.body.data[0].response.status).toBe('200');
+    expect(repeatedPoll.body.data[0].meta.claims['org.schema.FamilyRegistration.status']).toBe('already_exists');
+    expect(repeatedPoll.body.data[0].meta.claims[ClaimsOfferSchemaorg.identifier]).toBe(offerId);
   });
 });

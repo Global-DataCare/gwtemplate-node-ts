@@ -20,7 +20,7 @@ import {
   ClaimsOrganizationSchemaorg,
   ClaimsServiceSchemaorg,
 } from 'gdc-common-utils-ts/constants/schemaorg';
-import { getClaimsInFirstDataEntry } from 'gdc-common-utils-ts/utils/bundle-reader';
+import { getClaimValue } from '../../../utils/claims';
 import { FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
@@ -182,8 +182,11 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
     await tenantsCacheManager.loadHost();
 
     // Create and finalize the provider tenant so the API path validator allows `individual/org.schema/Organization`.
-    const regJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    // These canonical fixtures contain nested mutable claims. A shallow copy leaks
+    // accepted offer identifiers across tests and can make tenant activation order-dependent.
+    const regJob = structuredClone(ORGANIZATION_REGISTRATION_JOB);
     regJob.sector = Sector.HEALTH_CARE;
+    regJob.jurisdiction = 'es';
     regJob.content = {
       ...regJob.content,
       body: {
@@ -201,11 +204,18 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
       },
     } as any;
     const offerPayload = await hostingManager.process(regJob);
-    const offerId = getClaimsInFirstDataEntry(offerPayload.body)[ClaimsOfferSchemaorg.identifier] as string;
-    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    expect(offerPayload.body.data[0]).toMatchObject({ response: { status: '201' } });
+    const offerId = getClaimValue<string>(
+      offerPayload.body.data[0].meta?.claims || {},
+      ClaimsOfferSchemaorg.identifier,
+    );
+    expect(offerId).toBeDefined();
+    const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
     orderJob.sector = Sector.HEALTH_CARE;
+    orderJob.jurisdiction = 'es';
     orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
-    await hostingManager.process(orderJob);
+    const orderPayload = await hostingManager.process(orderJob);
+    expect(orderPayload.body.data[0]).toMatchObject({ response: { status: '201' } });
     await tenantsCacheManager.refreshTenant(getTenantVaultId(Sector.HEALTH_CARE, testTenant1TenantId));
 
     const asyncResponseStore = new AsyncResponseStoreMem();

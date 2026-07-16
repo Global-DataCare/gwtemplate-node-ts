@@ -19,16 +19,27 @@ import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
 import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
-import { ORGANIZATION_ORDER_JOB, ORGANIZATION_REGISTRATION_JOB } from '../../data/example-jobs';
 import { FAMILY_ORDER_REQUEST, FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
 import * as tenantUtils from '../../../utils/tenant';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import {
+  ClaimsOfferSchemaorg,
+  ClaimsOrderSchemaorg,
+  ClaimsOrganizationSchemaorg,
+  ClaimsServiceSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { getEnvSectionId } from '../../../utils/section-env';
-import { HostingManager } from '../../../managers/HostingManager';
 import { FamilyManager } from '../../../managers/FamilyManager';
-import { testDefaultTenantServiceTypeClaim, testTenant1TenantId } from '../../data/organization.data';
+import {
+  testConfigTenant1,
+  testTenant1DidWebExternal,
+  testTenant1TenantId,
+} from '../../data/organization.data';
+import { testClaimsHostInitialization } from '../../data/end-to-end.data';
 import { generateLicenseOffer } from '../../../utils/offer';
+import { buildOfferOrderIndexedAttributes } from '../../../utils/offer-order-read-model';
+import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/enums';
+import { EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME } from 'gdc-common-utils-ts/examples/shared';
 
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
@@ -67,14 +78,24 @@ const mockKmsService: jest.Mocked<IKmsService> = {
 describe('FamilyManager - Offer/Order Flow', () => {
   let vaultRepository: VaultMemRepository;
   let tenantsCacheManager: TenantsCacheManager;
-  let hostingManager: InstanceType<typeof HostingManager>;
   let familyManager: InstanceType<typeof FamilyManager>;
   let hostCollectionName: string;
   let config: IServerConfig;
 
-  function buildFamilyRegistrationRequestWithoutPdfAttachment() {
+  function buildFamilyRegistrationRequestWithoutPdfAttachment(addressCountry?: string) {
     const payload = structuredClone(FAMILY_REGISTRATION_REQUEST) as any;
     delete payload.attachments;
+    for (const entry of payload.body.data) {
+      const claimBlocks = [entry.meta?.claims, entry.resource?.meta?.claims].filter(Boolean);
+      for (const claims of claimBlocks) {
+        claims[ClaimsOrganizationSchemaorg.alternateName] = EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME;
+        if (addressCountry) {
+          claims[ClaimsOrganizationSchemaorg.addressCountry] = addressCountry;
+        } else {
+          delete claims[ClaimsOrganizationSchemaorg.addressCountry];
+        }
+      }
+    }
     return payload;
   }
 
@@ -83,22 +104,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
 
     vaultRepository = new VaultMemRepository();
 
-    const hostClaims = {
-      'org.schema.Organization.alternateName': 'host',
-      'org.schema.Organization.legalName': 'Hosting Organization',
-      'org.schema.Organization.identifier.additionalType': 'TAX',
-      'org.schema.Organization.identifier.value': 'A12345678',
-      'org.schema.Organization.identifier': 'did:web:host.example.com',
-      'org.schema.Organization.address.addressCountry': 'ES',
-      'org.schema.Person.identifier': 'urn:uuid:a1b2c3d4-e5f6-7890-1234-567890abcdef',
-      'org.schema.Person.hasOccupation': 'ISCO-08|1120',
-      'org.schema.Person.email': 'admin1@host.example.com',
-      'org.schema.Service.category': 'system',
-      'org.schema.Service.identifier': 'urn:web:<manufacturer>',
-      'org.schema.Service.serviceType': testDefaultTenantServiceTypeClaim,
-      'org.schema.Service.termsOfService': 'https://github.com/<manufacturer>/<software>/terms',
-    };
-    hostCollectionName = tenantUtils.generateTenantCollectionNameFromClaims(hostClaims as any);
+    hostCollectionName = tenantUtils.generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
 
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
 
@@ -135,28 +141,34 @@ describe('FamilyManager - Offer/Order Flow', () => {
       keys: [{ kid: 'sig-key-1', use: 'sig', alg: 'ML-DSA-44' } as any],
     });
 
-    hostingManager = new HostingManager(
-      vaultRepository,
-      mockKmsService,
-      tenantsCacheManager,
-      mockStorageAdapter,
-      mockLogger,
-      config,
+    // FamilyManager is the unit under test. Seed one verified active tenant
+    // directly from the shared organization fixture; HostingManager's own
+    // activation/Order lifecycle is covered by route integration tests.
+    const expectedTenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, testTenant1TenantId);
+    const tenantConfig = structuredClone(testConfigTenant1) as any;
+    tenantConfig.claims[ClaimsServiceSchemaorg.category] = Sector.HEALTH_CARE;
+    tenantConfig.didDocument = {
+      ...(tenantConfig.didDocument || {}),
+      id: testTenant1DidWebExternal,
+    };
+    const secureTenantRecord = await mockKmsService.protectConfidentialData({
+      id: expectedTenantVaultId,
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      content: tenantConfig,
+    } as ConfidentialStorageDoc, 'host');
+    await vaultRepository.put(
+      hostCollectionName,
+      [secureTenantRecord],
+      getEnvSectionId('tenants'),
     );
-
-    // Bootstrap host and register the provider tenant (acme) so FamilyManager can resolve it via TenantsCacheManager.
-    // Use network sector for host onboarding
-    await hostingManager.bootstrapHost(hostClaims as any);
-    await tenantsCacheManager.loadHost();
-
-    const registrationJob = { ...ORGANIZATION_REGISTRATION_JOB };
-    const offerResponse = await hostingManager.process(registrationJob);
-    // BUSINESS sector is used for vaultId (never network sector)
-    const offerId = offerResponse.body.data[0].meta.claims[ClaimsOfferSchemaorg.identifier] as string;
-
-    const orderJob = { ...ORGANIZATION_ORDER_JOB };
-    orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
-    await hostingManager.process(orderJob);
+    const tenantRecords = await vaultRepository.getContainersInSection(hostCollectionName, getEnvSectionId('tenants'));
+    expect(tenantRecords.map((record) => record.id)).toContain(expectedTenantVaultId);
+    const cachedTenant = await tenantsCacheManager.refreshTenant(expectedTenantVaultId);
+    expect(cachedTenant?.didDocument?.id).toBe(testTenant1DidWebExternal);
+    expect(await tenantsCacheManager.getCollectionName(expectedTenantVaultId)).toBe(
+      tenantUtils.generateTenantCollectionNameFromClaims(tenantConfig.claims),
+    );
 
     familyManager = new FamilyManager(
       vaultRepository,
@@ -188,11 +200,12 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const responsePayload = await familyManager.process(familyRegistrationJob);
     const entry = responsePayload.body.data[0];
 
-    expect(['201', '400']).toContain(entry.response.status);
-    if (entry.response.status === '201') {
-      expect(entry.type).toBe('Family-registration-offer-v1.0');
-      expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
-    }
+    expect(entry.response.status).toBe('201');
+    expect(entry.type).toBe('Family-registration-offer-v1.0');
+    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toMatch(
+      /^urn:cds:ES:v1:health-care:product:org\.schema:Offer:/,
+    );
+    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).not.toContain('undefined');
   });
 
   it('should process a family Order and finalize the family registration', async () => {
@@ -214,10 +227,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
 
     const offerPayload = await familyManager.process(familyRegistrationJob);
     const firstEntry = offerPayload.body.data[0];
-    if (firstEntry.response.status !== '201') {
-      expect(firstEntry.response.status).toBe('400');
-      return;
-    }
+    expect(firstEntry.response.status).toBe('201');
     const offerId = firstEntry.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
 
     const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
@@ -239,11 +249,9 @@ describe('FamilyManager - Offer/Order Flow', () => {
 
     const finalPayload = await familyManager.process(familyOrderJob);
     const entry = finalPayload.body.data[0];
-    expect(['201', '400']).toContain(entry.response.status);
-    if (entry.response.status === '201') {
-      expect(entry.type).toBe('Family-order-response-v1.0');
-      expect(entry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
-    }
+    expect(entry.response.status).toBe('201');
+    expect(entry.type).toBe('Family-order-response-v1.0');
+    expect(entry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
 
     const tenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, tenantId);
     const tenantCollectionName = await tenantsCacheManager.getCollectionName(tenantVaultId);
@@ -252,9 +260,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       tenantCollectionName!,
       getEnvSectionId('communications'),
     );
-    if (entry.response.status === '201') {
-      expect(communications.length).toBeGreaterThan(0);
-    }
+    expect(communications.length).toBeGreaterThan(0);
   });
 
   it('should reopen family Offer and Order records through _search for portal-style read models', async () => {
@@ -265,6 +271,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       sequence: 0,
       createdAtTimestamp: Date.now(),
       tenantId,
+      jurisdiction: 'ES',
       sector: Sector.HEALTH_CARE,
       section: 'individual',
       format: 'org.schema',
@@ -275,10 +282,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
 
     const offerPayload = await familyManager.process(familyRegistrationJob);
     const firstEntry = offerPayload.body.data[0];
-    if (firstEntry.response.status !== '201') {
-      expect(firstEntry.response.status).toBe('400');
-      return;
-    }
+    expect(firstEntry.response.status).toBe('201');
     const offerId = firstEntry.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
 
     const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
@@ -348,6 +352,48 @@ describe('FamilyManager - Offer/Order Flow', () => {
     expect(orderSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
   });
 
+  it('uses the route network even when an individual address country conflicts', async () => {
+    const response = await familyManager.process({
+      id: 'job-family-route-network-wins',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId: testTenant1TenantId,
+      jurisdiction: 'es',
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: 'Organization',
+      content: buildFamilyRegistrationRequestWithoutPdfAttachment('ZZ'),
+    });
+
+    const entry = response.body.data[0];
+    expect(entry.response.status).toBe('201');
+    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toMatch(/^urn:cds:ES:v1:health-care:/);
+    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ZZ');
+  });
+
+  it('rejects an individual Offer when the route network is absent even if addressCountry exists', async () => {
+    const response = await familyManager.process({
+      id: 'job-family-missing-route-network',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId: testTenant1TenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: 'Organization',
+      content: buildFamilyRegistrationRequestWithoutPdfAttachment('ES'),
+    });
+
+    const entry = response.body.data[0];
+    expect(entry.response.status).toBe('400');
+    expect(entry.response.outcome.issue[0].diagnostics).toContain('route jurisdiction');
+  });
+
   it('should accept one portal-managed commercial family Order and emit extra individual seats', async () => {
     process.env.PAYMENT_ORCHESTRATION_MODE = 'portal-bff';
     process.env.PAYMENT_VERIFICATION_MODE = 'mock';
@@ -370,6 +416,11 @@ describe('FamilyManager - Offer/Order Flow', () => {
       id: String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]),
       status: 'active',
       sequence: 0,
+      meta: { claims: extraOfferClaims },
+      indexed: {
+        attributes: buildOfferOrderIndexedAttributes(extraOfferClaims),
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
       content: { claims: extraOfferClaims },
     } as ConfidentialStorageDoc, tenantVaultId);
     await vaultRepository.put(tenantCollectionName!, [secureOfferDoc], getEnvSectionId('communications'));

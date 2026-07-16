@@ -19,7 +19,7 @@ import {
   ClaimsOrganizationSchemaorg,
   ClaimsServiceSchemaorg,
 } from 'gdc-common-utils-ts/constants/schemaorg';
-import { getClaimsInFirstDataEntry } from 'gdc-common-utils-ts/utils/bundle-reader';
+import { getClaimValue } from '../../../utils/claims';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
@@ -179,8 +179,9 @@ describe('FamilyManager multi-phone integration', () => {
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await tenantsCacheManager.loadHost();
 
-    const regJob = { ...ORGANIZATION_REGISTRATION_JOB };
+    const regJob = structuredClone(ORGANIZATION_REGISTRATION_JOB);
     regJob.sector = Sector.HEALTH_CARE;
+    regJob.jurisdiction = 'es';
     regJob.content = {
       ...regJob.content,
       body: {
@@ -198,11 +199,18 @@ describe('FamilyManager multi-phone integration', () => {
       },
     } as any;
     const offerPayload = await hostingManager.process(regJob);
-    const offerId = getClaimsInFirstDataEntry(offerPayload.body)[ClaimsOfferSchemaorg.identifier] as string;
-    const orderJob = { ...ORGANIZATION_ORDER_JOB };
+    expect(offerPayload.body.data[0]).toMatchObject({ response: { status: '201' } });
+    const offerId = getClaimValue<string>(
+      offerPayload.body.data[0].meta?.claims || {},
+      ClaimsOfferSchemaorg.identifier,
+    );
+    expect(offerId).toBeDefined();
+    const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
     orderJob.sector = Sector.HEALTH_CARE;
+    orderJob.jurisdiction = 'es';
     orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
-    await hostingManager.process(orderJob);
+    const orderPayload = await hostingManager.process(orderJob);
+    expect(orderPayload.body.data[0]).toMatchObject({ response: { status: '201' } });
     await tenantsCacheManager.refreshTenant(getTenantVaultId(Sector.HEALTH_CARE, testTenant1TenantId));
 
     const asyncResponseStore = new AsyncResponseStoreMem();
@@ -265,6 +273,7 @@ describe('FamilyManager multi-phone integration', () => {
       sequence: 0,
       createdAtTimestamp: Date.now(),
       tenantId,
+      jurisdiction: 'es',
       sector: Sector.HEALTH_CARE,
       section: 'individual',
       format: 'org.schema',
@@ -284,7 +293,8 @@ describe('FamilyManager multi-phone integration', () => {
         },
       },
     };
-    await hostingManager.process(job1);
+    const createResult1 = await hostingManager.process(job1);
+    expect(getClaimValue(createResult1.body.data[0].meta?.claims || {}, 'org.schema.FamilyRegistration.status')).toBe('new_created');
 
     // Create org2
     const job2: JobRequest = {
@@ -305,7 +315,8 @@ describe('FamilyManager multi-phone integration', () => {
         },
       },
     };
-    await hostingManager.process(job2);
+    const createResult2 = await hostingManager.process(job2);
+    expect(getClaimValue(createResult2.body.data[0].meta?.claims || {}, 'org.schema.FamilyRegistration.status')).toBe('new_created');
 
     // Buscar org2 por owner.telephone y alternateName
     const searchJob: JobRequest = {
@@ -338,9 +349,11 @@ describe('FamilyManager multi-phone integration', () => {
       },
     };
     const searchResult = await hostingManager.process(searchJob);
-    const foundClaims = getClaimsInFirstDataEntry(searchResult.body);
-    expect(foundClaims[ClaimsOrganizationSchemaorg.alternateName]).toBe(individualNickname2);
-    expect(String(foundClaims[ClaimsOrganizationSchemaorg.ownerTelephone] || '')).toContain('+34600000003');
-    expect(foundClaims['org.schema.FamilyRegistration.status']).toBe('already_exists');
+    const foundClaims = searchResult.body.data[0].meta?.claims || {};
+    expect(getClaimValue(foundClaims, ClaimsOrganizationSchemaorg.alternateName)).toBe(individualNickname2);
+    expect(String(getClaimValue(foundClaims, ClaimsOrganizationSchemaorg.ownerTelephone) || '')).toContain('+34600000003');
+    // This test exercises the legacy immediate-active HostingManager path.
+    // Pending/resume semantics are covered by the FamilyManager Offer/Order tests.
+    expect(getClaimValue(foundClaims, 'org.schema.FamilyRegistration.status')).toBe('already_exists');
   });
 });

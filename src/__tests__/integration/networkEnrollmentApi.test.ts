@@ -23,6 +23,9 @@ import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
   addJob: jest.fn((jobName: string, jobData: JobRequest) => Promise.resolve()),
 };
+const mockAppAuthManager = {
+  verifyBearerToken: jest.fn(async () => ({ payload: { sub: 'network-controller-test' } })),
+} as any;
 
 const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
   const app = express();
@@ -47,6 +50,7 @@ const setupApp = (asyncResponseStore: IAsyncResponseStore) => {
     vaultRepository,
     cryptographyService,
     'http://localhost:3001',
+    mockAppAuthManager,
   );
   app.use('/', apiRouter);
 
@@ -124,7 +128,7 @@ describe('Network Enrollment API', () => {
       const response = await invokeExpress(app, {
         method: 'POST',
         url: enrollmentUrl,
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: 'Bearer test-id-token' },
         body: { request: testEncryptedJwe1 },
       });
 
@@ -177,7 +181,7 @@ describe('Network Enrollment API', () => {
       const response = await invokeExpress(app, {
         method: 'POST',
         url: enrollmentUrl,
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: 'Bearer test-id-token' },
         body: { request: testEncryptedJwe1 },
       });
 
@@ -282,7 +286,7 @@ describe('Network Enrollment API', () => {
       const response = await invokeExpress(app, {
         method: 'POST',
         url: enrollmentUrl,
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: 'Bearer test-id-token' },
         body: { request: testEncryptedJwe1 },
       });
 
