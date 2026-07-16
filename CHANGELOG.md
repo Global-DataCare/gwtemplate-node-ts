@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+### Fixed
+- Made Offer generation fail before persistence when `hostDid`, jurisdiction,
+  or sector is missing, preventing identifiers such as
+  `urn:cds:undefined:v1:...` from entering the individual Order lifecycle.
+
 ## [1.20.0] - 2026-07-14
 
 ### Changed

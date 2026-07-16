@@ -60,4 +60,9 @@ describe('generateLicenseOffer', () => {
     expect(offerClaims[ClaimsOfferSchemaorg.priceCurrency]).toBeDefined();
     expect(offerClaims[ClaimsOfferSchemaorg.serialNumber]).toBeDefined();
   });
+
+  it('rejects a missing jurisdiction instead of persisting an undefined Offer URN', () => {
+    expect(() => generateLicenseOffer(2, hostDid, undefined as unknown as string, sector, allowedPaymentMethods))
+      .toThrow('generateLicenseOffer requires jurisdiction.');
+  });
 });

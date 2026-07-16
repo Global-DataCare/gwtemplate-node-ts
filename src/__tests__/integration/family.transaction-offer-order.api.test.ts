@@ -71,7 +71,11 @@ describe('Family transaction Offer/Order route story', () => {
     const offerId = String(registrationEntry.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
 
     expect(registrationEntry.response.status).toBe('201');
-    expect(offerId).toContain(':Offer:');
+    // The Offer builder is claim-driven: the jurisdiction carried in the
+    // individual bootstrap claims must survive into the canonical URN. This
+    // guards the live SDK/GW regression that produced `urn:cds:undefined`.
+    expect(offerId).toMatch(/^urn:cds:ES:v1:health-care:product:org\.schema:Offer:/);
+    expect(offerId).not.toContain('undefined');
 
     const orderPayload = structuredClone(FAMILY_ORDER_REQUEST) as any;
     orderPayload.thid = 'family-order-story-thid';
