@@ -45,6 +45,9 @@ describe('Family transaction Offer/Order route story', () => {
       [ClaimsOrganizationSchemaorg.ownerEmail]: 'adult1@example.com',
       [ClaimsServiceSchemaorg.category]: 'health-care',
     };
+    // An individual has no required country. The Offer jurisdiction/network
+    // must be taken from `/cds-es/`, even when this claim is absent.
+    delete familyClaims[ClaimsOrganizationSchemaorg.addressCountry];
     registrationPayload.body.data[0].resource = registrationPayload.body.data[0].resource || {};
     registrationPayload.body.data[0].resource.meta = {
       claims: familyClaims,
@@ -71,9 +74,8 @@ describe('Family transaction Offer/Order route story', () => {
     const offerId = String(registrationEntry.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
 
     expect(registrationEntry.response.status).toBe('201');
-    // The Offer builder is claim-driven: the jurisdiction carried in the
-    // individual bootstrap claims must survive into the canonical URN. This
-    // guards the live SDK/GW regression that produced `urn:cds:undefined`.
+    // The route, not an individual address claim, selects the Offer network.
+    // This guards the live SDK/GW regression that produced `urn:cds:undefined`.
     expect(offerId).toMatch(/^urn:cds:ES:v1:health-care:product:org\.schema:Offer:/);
     expect(offerId).not.toContain('undefined');
 

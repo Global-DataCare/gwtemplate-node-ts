@@ -18,7 +18,7 @@ describe('generateLicenseOffer', () => {
     expect(offerClaims[ClaimsOfferSchemaorg.itemOfferedName]).toBe('License Tier XS');
     expect(offerClaims[ClaimsOfferSchemaorg.price]).toBe('0.00');
     expect(offerClaims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(5);
-    expect(offerClaims[ClaimsOfferSchemaorg.identifier]).toContain('urn:cds:es:v1:health-care:product:org.schema:Offer:');
+    expect(offerClaims[ClaimsOfferSchemaorg.identifier]).toContain('urn:cds:ES:v1:health-care:product:org.schema:Offer:');
     expect(offerClaims[ClaimsOfferSchemaorg.serialNumber].split(',')).toHaveLength(5);
   });
 
