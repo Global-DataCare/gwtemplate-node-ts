@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
+import { buildGaiaXLegalPersonCredentialDraft } from 'gdc-common-utils-ts/convert/schemaorg-to-gaia-x';
 
 export interface GaiaXLegalParticipantCredentialOptions {
   webDomain: string;              // e.g. "https://example.com"
@@ -13,7 +14,14 @@ export interface GaiaXLegalParticipantCredentialOptions {
   termsAndConditionsUrl: string;  // public URL
   termsAndConditionsHashHex: string; // hex string of the T&C file hash
   termsAndConditionsHashAlg?: "SHA-256" | "SHA-384" | "SHA-512";
+  /** Resolvable ICA/GXDCH registration credential. GDC deployments may point to ICA evidence until GXDCH replacement. */
+  legalRegistrationNumberCredentialId?: string;
 }
+/**
+ * @deprecated Compatibility name. The returned ICAM 25.11 credential is a
+ * Gaia-X `LegalPerson`, meaning the participating legal organization, never
+ * the natural-person LegalRepresentative.
+ */
 export function createGaiaXLegalParticipantCredential(options: GaiaXLegalParticipantCredentialOptions) {
   const {
     webDomain,
@@ -27,45 +35,21 @@ export function createGaiaXLegalParticipantCredential(options: GaiaXLegalPartici
     termsAndConditionsHashAlg = "SHA-384",
   } = options;
 
-  const credentialId = `urn:uuid:${uuidv4()}`;
-
-  return {
-    "@context": [
-      "https://www.w3.org/ns/credentials/v2",
-      "https://w3id.org/gaia-x/context/v2206"
-    ],
-    "id": credentialId,
-    "type": ["VerifiableCredential", "gx:LegalParticipant"],
-    "issuer": issuerDid,
-    "validFrom": new Date().toISOString(),
-    "credentialSubject": {
-      "id": did,
-      "type": "gx:LegalParticipant",
-      "gx:legalName": officialName,
-      "gx:legalRegistrationNumber": {
-        "type": "gx:RegistrationNumber",
-        "gx:vatID": vatId
-      },
-      "gx:headquarterAddress": {
-        "type": "gx:Address",
-        "gx:countryCode": countryCode
-      },
-      "gx:legalAddress": {
-        "type": "gx:Address",
-        "gx:countryCode": countryCode
-      },
-      "gx:website": webDomain,
-      "gx:termsAndConditions": {
-        "type": "gx:TermsAndConditions",
-        "gx:content": termsAndConditionsUrl,
-        "gx:hash": {
-          "gx:algorithm": termsAndConditionsHashAlg,
-          "gx:value": termsAndConditionsHashHex
-        }
-      }
-    }
-    // Note: add the "proof" property after signing with a compatible tool.
+  const claims: ClaimsRecord = {
+    [ClaimsOrganizationSchemaorg.legalName]: officialName,
+    [ClaimsOrganizationSchemaorg.identifierValue]: vatId,
+    [ClaimsOrganizationSchemaorg.addressCountry]: countryCode,
+    [ClaimsOrganizationSchemaorg.url]: webDomain,
   };
+  return buildGaiaXLegalPersonCredentialDraft({
+    claims,
+    credentialId: `urn:uuid:${uuidv4()}`,
+    subjectId: did,
+    issuerId: issuerDid,
+    legalRegistrationNumberCredentialId:
+      options.legalRegistrationNumberCredentialId || `${did}#ica-legal-registration-evidence`,
+    validFrom: new Date().toISOString(),
+  });
 }
 
 export function buildGaiaXLegalParticipantOptionsFromClaims(params: {

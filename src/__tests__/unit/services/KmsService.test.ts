@@ -164,6 +164,35 @@ describe('KmsService', () => {
       expect(jws.signatures[0].signature).toBe(mockJwsParts.signature);
     });
   });
+
+  describe('createCompactJws', () => {
+    it('signs caller-provided VC media headers while retaining KMS-owned alg and kid', async () => {
+      const mockJwsParts = { protected: 'protected', payload: 'payload', signature: 'sig' };
+      mockCryptoService.signDataJws.mockResolvedValue(mockJwsParts);
+      await kmsService.init();
+      await kmsService.provisionKeys('tenant-123');
+
+      const compact = await kmsService.createCompactJws(
+        { type: ['VerifiableCredential'] },
+        mockMldsaPublicKey.kid,
+        'tenant-123',
+        'vc_sign',
+        { typ: 'vc+ld+json+jwt', cty: 'vc+ld+json', alg: 'forbidden', kid: 'forbidden' },
+      );
+
+      expect(mockCryptoService.signDataJws).toHaveBeenCalledWith(
+        { type: ['VerifiableCredential'] },
+        {
+          typ: 'vc+ld+json+jwt',
+          cty: 'vc+ld+json',
+          alg: mockMldsaPublicKey.alg,
+          kid: mockMldsaPublicKey.kid,
+        },
+        mockMldsaSecretKey,
+      );
+      expect(compact).toBe('protected.payload.sig');
+    });
+  });
   
   describe('encodeResponse', () => {
     it('should use encryptJweToCompact for a single recipient', async () => {
@@ -248,6 +277,26 @@ describe('KmsService', () => {
 
       const publicKey = await restartedKmsService.getPublicEncryptionKey('tenant-123');
       expect(publicKey).toEqual(expect.objectContaining({ kid: mockMlkemPublicKey.kid }));
+    });
+
+    it('spends five unwraps once per atomic tenant-key cache fill, not once per operation purpose', async () => {
+      await kmsService.provisionKeys('tenant-budget');
+      const delegate = new InMemoryEnvelopeAdapter();
+      const unwrapKeyMaterial = jest.fn(delegate.unwrapKeyMaterial.bind(delegate));
+      const restartedKmsService = new KmsService(mockCryptoService, mockTenantsCacheManager, {
+        wrappedKeyRepository,
+        envelopeAdapter: {
+          wrapKeyMaterial: delegate.wrapKeyMaterial.bind(delegate),
+          unwrapKeyMaterial,
+        },
+      });
+      await restartedKmsService.init();
+      unwrapKeyMaterial.mockClear();
+
+      await restartedKmsService.getPublicEncryptionKey('tenant-budget');
+      await restartedKmsService.getPublicJwks('tenant-budget');
+
+      expect(unwrapKeyMaterial).toHaveBeenCalledTimes(5);
     });
 
     it('reloads a tenant private encryption key by recipient kid when decoding after restart', async () => {

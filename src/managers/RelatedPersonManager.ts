@@ -22,6 +22,7 @@ import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMa
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { ACTION_PURGE, SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
+import { InteroperableLifecycleStatuses } from 'gdc-common-utils-ts/utils/interoperable-resource-operation';
 import type { ITenantsManager } from './ITenantsManager';
 
 type FhirBundleEntryLike = {
@@ -166,7 +167,7 @@ export class RelatedPersonManager implements IJobProcessor {
           }
           const updatedRecord: Record<string, any> = {
             ...existingRecord,
-            status: EntityLifecycleStatus.Inactive,
+            status: InteroperableLifecycleStatuses.Purged,
             meta: {
               ...(existingRecord.meta || {}),
               lifecycleDisposition: 'purged',

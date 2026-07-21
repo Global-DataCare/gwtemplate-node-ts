@@ -6,6 +6,15 @@ Roadmap references:
 - `docs/UC_CAPABILITY_MATRIX_SEDIA.md`
 
 ## NOW
+0. Support the additive MVP Bundle-change/readback contract documented in
+   `../gdc-sdk-core-ts/docs/MVP_BUNDLE_CHANGE_RECONCILIATION_PLAN.md`:
+   - response entries remain correlatable to submitted new/modified resources
+     by stable identifier
+   - Composition, Consent, RelatedPerson and supported resource `_search`
+     results remain subject-scoped and authoritative
+   - submit/poll acknowledgement is not documented as persistence confirmation
+   - add partial-failure and ambiguous-submit readback integration coverage
+     without changing current MVP routes
 1. Keep Communication->DocumentReference indexing/retrieval contract stable (`identifier` logical, `contenthash` retrieval hash).
 2. Keep `Bundle/_search` behavior documented and tested for composition/docref search variants.
 3. Keep API integrator docs aligned with implemented claim names.

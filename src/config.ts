@@ -119,6 +119,8 @@ export interface IServerConfig {
   kekSecret?: string;
   gcpKms?: {
     keyName?: string;
+    runtimeKekCiphertext?: string;
+    runtimeKekId?: string;
   };
   hashicorpTransit?: {
     baseUrl?: string;

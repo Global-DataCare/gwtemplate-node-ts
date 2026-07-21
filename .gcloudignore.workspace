@@ -1,0 +1,8 @@
+**
+!gdc-common-utils-ts/**
+!gwtemplate-node-ts/**
+gwtemplate-node-ts/node_modules/**
+gwtemplate-node-ts/build/**
+gdc-common-utils-ts/node_modules/**
+gdc-common-utils-ts/build/**
+.git/**

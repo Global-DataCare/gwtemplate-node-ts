@@ -22,6 +22,7 @@ const mockVaultRepository: jest.Mocked<IVaultRepository> = {
   sectionExists: jest.fn(),
   getContainersListInSection: jest.fn(),
   getContainersInSection: jest.fn(),
+  listContainersInSection: jest.fn(),
   put: jest.fn(),
   get: jest.fn(),
   getHistory: jest.fn(),

@@ -1,5 +1,27 @@
 ## [Unreleased]
 
+## [1.20.2] - 2026-07-21
+
+### Changed
+- Replaced the legacy Gaia-X `v2206` LegalParticipant projection with the
+  shared ICAM 25.11 LegalPerson contract. LegalPerson is the participating
+  legal organization; the natural LegalRepresentative remains a separate VC.
+- Service-offering well-known artifacts are now independently signed Gaia-X
+  ServiceOffering Enveloped VCs using VC-JWT and reference the provider's
+  LegalPerson credential and service terms.
+- Compact-JWS signing accepts protected `typ`/`cty` headers while retaining
+  KMS-owned `alg` and `kid` values.
+
+### Security
+- Production now rejects in-memory and raw `KEK_SECRET` envelope custody,
+  validates a rotatable Cloud KMS CryptoKey and unwraps one encrypted service
+  runtime KEK per pod/process during `buildInfrastructure()`.
+- Tenant key records now use the runtime KEK locally with AES-GCM context AAD;
+  provisioning, rehydration and business operations no longer call Cloud KMS.
+- Added runtime-KEK provisioning and executable one-KMS-decrypt bootstrap tests.
+- Added the KMS/ML-KEM responsibility and audit-evidence matrix. ImagingStudy,
+  profile PIN custody and product marketplaces remain outside GW Core.
+
 ## [1.20.1] - 2026-07-17
 
 ### Changed
