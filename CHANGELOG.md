@@ -1,21 +1,21 @@
 ## [Unreleased]
 
 ### Documentation
-- Separate signed host authorization, per-tenant operation authorization and
-  Fabric ledger identity in the V2 audit contract.
-- Record that the final operator target uses only
-  `LEDGER_GENESIS_VERIFICATION`, while runtime `1.20.5` still requires manual
-  channel fingerprints and chaincode allowlists until a signed governance
-  manifest resolver is implemented.
+- Keep the host PDF free of Fabric channels, permissions, block-zero hashes and
+  chaincode policy. Root governance configures channel read/write membership
+  separately and Fabric provisioning injects technical fingerprints.
 
 ### Fixed
+- Let new `staging/test-network/scoped-v2` MVP deployments start without
+  genesis hashes or a per-host chaincode allowlist. `prod` or `network` still
+  require live block-zero verification.
 - Make scoped-v2 startup verify all live Fabric genesis fingerprints before
   infrastructure bootstrap, validate every persisted binding before one
   combined binding write, and initialize host KMS keys only after ledger
   protection succeeds.
-- Enforce an exact channel and per-channel chaincode allowlist for every
-  scoped-v2 Fabric contract access; request-derived channels can no longer
-  bypass the startup bindings.
+- When genesis verification is enabled, enforce its bound host channel ceiling
+  without introducing a per-host chaincode allowlist. MVP chaincode operations
+  remain governed by GW licensing/actor policy and Fabric policy.
 
 ## [1.20.4] - 2026-07-21
 
