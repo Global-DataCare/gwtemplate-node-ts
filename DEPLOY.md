@@ -100,17 +100,23 @@ Frontera de persistencia y Fabric:
   `DEPLOYMENT_ENV`, `NETWORK_MODE` y `HOST_STORAGE_SCOPE`.
 - El prefijo fisico resultante sigue
   `<deployment>_<network-mode>_<host>_...`.
-- `LEDGER_CHANNEL_GENESIS_SHA256` declara una huella SHA-256 del bloque cero
-  por canal. El GW consulta el peer y falla cerrado si alguna no coincide.
-- `LEDGER_CHANNEL_CHAINCODE_ALLOWLIST` declara exactamente esos mismos canales
-  y los chaincodes permitidos en cada uno, con el formato
-  `identity=credential-sc|organization-sc;health-care-eu=artifact-sc`.
-  Cualquier otro canal o chaincode falla antes del acceso contractual a Fabric.
+- En `staging/test-network`, el MVP puede usar
+  `LEDGER_GENESIS_VERIFICATION=false`: no requiere huellas ni allowlist de
+  chaincodes. En `prod` o `network`, la verificacion es obligatoria.
+- Con verificacion activa, `LEDGER_CHANNEL_GENESIS_SHA256` declara una huella
+  SHA-256 del bloque cero por canal. El GW consulta el peer y falla cerrado si
+  alguna no coincide.
+- Los mismos bindings técnicos forman el techo de canales del host. El MVP no
+  mantiene una allowlist de chaincodes por host: GW autoriza cada operación por
+  tenant, licencia/rol y acción, y Fabric aplica sus propias políticas.
 - Todos los bloques genesis reales se comprueban antes de construir la
   infraestructura persistente. Después se validan todos los bindings guardados,
   se persisten juntos los ausentes y solo entonces se inicializa el KMS.
 - Dos canales con el mismo nombre en test y produccion no son el mismo ledger;
   la vinculacion se demuestra mediante su bloque genesis.
+- El PDF del host no contiene canales, permisos, huellas ni chaincodes. Un
+  controller de gobernanza configura después la membresía y lectura/escritura;
+  el aprovisionamiento Fabric calcula e inyecta las huellas automáticamente.
 
 Regla de custodia:
 

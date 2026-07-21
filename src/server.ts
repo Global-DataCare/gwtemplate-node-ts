@@ -45,15 +45,12 @@ import { createGlobalErrorHandler } from './middlewares/global-error-handler';
 import * as path from 'path';
 import { generateTenantCollectionNameFromClaims } from './utils/tenant';
 import { resolveStorageScope } from './config/storage-layout';
+import { assertLedgerGenesisVerificationMode } from './blockchain/fabric/v3/fabric-target-policy';
 import {
   parseExpectedChannelBindings,
   verifyLedgerChannelGenesis,
   initializeRuntimeAfterLedgerProtection,
 } from './services/ledger-channel-binding';
-import {
-  assertFabricTargetPolicyCoversBindings,
-  parseFabricTargetPolicy,
-} from './blockchain/fabric/v3/fabric-target-policy';
 import * as swaggerUi from 'swagger-ui-express';
 import { LicenseManager } from './managers/LicenseManager';
 import { TokenManager } from './managers/TokenManager';
@@ -193,15 +190,18 @@ async function startServer(options?: StartServerOptions) {
   const storageScope = resolveStorageScope();
   let observedLedgerBindings;
   if (storageScope.layout === 'scoped-v2') {
-    if (String(process.env.LEDGER_GENESIS_VERIFICATION || '').trim().toLowerCase() !== 'true') {
-      throw new Error('scoped-v2 requires LEDGER_GENESIS_VERIFICATION=true.');
+    const verifyGenesis = String(process.env.LEDGER_GENESIS_VERIFICATION || '')
+      .trim()
+      .toLowerCase() === 'true';
+    const deploymentEnv = String(process.env.DEPLOYMENT_ENV || '').trim().toLowerCase();
+    const networkMode = String(process.env.NETWORK_MODE || '').trim().toLowerCase();
+    assertLedgerGenesisVerificationMode({ deploymentEnv, networkMode, enabled: verifyGenesis });
+    if (verifyGenesis) {
+      const ledgerMspId = String(process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_ORG1 || '').trim();
+      if (!ledgerMspId) throw new Error('genesis verification requires LEDGER_MSP_ID.');
+      const expected = parseExpectedChannelBindings(process.env.LEDGER_CHANNEL_GENESIS_SHA256);
+      observedLedgerBindings = await verifyLedgerChannelGenesis({ mspId: ledgerMspId, expected });
     }
-    const ledgerMspId = String(process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_ORG1 || '').trim();
-    if (!ledgerMspId) throw new Error('scoped-v2 requires LEDGER_MSP_ID.');
-    const expected = parseExpectedChannelBindings(process.env.LEDGER_CHANNEL_GENESIS_SHA256);
-    const targetPolicy = parseFabricTargetPolicy(process.env.LEDGER_CHANNEL_CHAINCODE_ALLOWLIST);
-    assertFabricTargetPolicyCoversBindings(expected, targetPolicy);
-    observedLedgerBindings = await verifyLedgerChannelGenesis({ mspId: ledgerMspId, expected });
   }
 
   const {

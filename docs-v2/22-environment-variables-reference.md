@@ -321,22 +321,24 @@ Legacy note:
   - `test-network` keeps the existing jurisdiction-derived fallback unless an explicit override is set.
 
 `LEDGER_GENESIS_VERIFICATION`
-- Enables live block-zero verification. Use `false` only for local/unit-test
-  profiles and `true` for persistent staging and production.
+- Enables live block-zero verification. It may be `false` for the
+  `staging/test-network` MVP. It is mandatory for `prod` or `network`.
 - This switch identifies the ledger; it does not authorize hosts, tenants,
-  channels, chaincodes or write operations.
+  channels or write operations.
 
 `LEDGER_CHANNEL_GENESIS_SHA256`
-- Current `scoped-v2` bootstrap map of `channel=sha256(block-zero)` entries.
-- It is still required manually by runtime `1.20.5` when genesis verification
-  is enabled. The target design resolves it from an authenticated, signed
-  governance manifest instead of asking a human controller to copy hashes.
+- Internal generated map of `channel=sha256(block-zero)` entries passed from
+  Fabric provisioning to the current runtime.
+- It is not required when verification is disabled in `staging/test-network`.
+- It is not maintained by a human controller, stored in the host PDF or used
+  as business authorization.
+- Its channel names form the technical host channel ceiling. Tenant,
+  organization, license/role, action, sector and jurisdiction still determine
+  whether an operation may read or write.
 
-`LEDGER_CHANNEL_CHAINCODE_ALLOWLIST`
-- Current exact `channel=chaincode-a|chaincode-b;...` runtime boundary.
-- It is a host-level technical ceiling, not sufficient tenant authorization.
-  Every request still needs tenant, organization, action, sector, jurisdiction
-  and read/write authorization.
+There is no per-host chaincode allowlist in the MVP. GW business authorization
+and Fabric policies control operations against chaincodes available in an
+authorized channel.
 
 Audit and migration details:
 [27-fabric-authorization-and-ledger-binding.md](./27-fabric-authorization-and-ledger-binding.md).

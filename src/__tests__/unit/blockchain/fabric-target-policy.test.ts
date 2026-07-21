@@ -1,41 +1,24 @@
 import {
   assertFabricChannelAllowed,
   assertFabricTargetAllowed,
-  assertFabricTargetPolicyCoversBindings,
-  parseFabricTargetPolicy,
+  assertLedgerGenesisVerificationMode,
+  fabricChannelPolicyFromBindings,
 } from '../../../blockchain/fabric/v3/fabric-target-policy';
 import { ManageAsset } from '../../../blockchain/fabric/v3/manageAsset';
 
-describe('scoped Fabric target policy', () => {
-  const policy = parseFabricTargetPolicy(
-    'identity=credential-sc|organization-sc;health-care-eu=consentaccess-sc|artifact-sc',
-  );
+describe('scoped Fabric channel policy', () => {
+  const policy = fabricChannelPolicyFromBindings([
+    { channel: 'identity', genesisSha256: 'a'.repeat(64) },
+    { channel: 'health-care-eu', genesisSha256: 'b'.repeat(64) },
+  ]);
 
-  test('parses a channel and chaincode allowlist', () => {
-    expect([...policy.get('identity')!]).toEqual(['credential-sc', 'organization-sc']);
-    expect([...policy.get('health-care-eu')!]).toEqual(['consentaccess-sc', 'artifact-sc']);
+  test('derives the exact channel ceiling from verified genesis bindings', () => {
+    expect([...policy]).toEqual(['identity', 'health-care-eu']);
   });
 
-  test('rejects malformed and duplicate targets', () => {
-    expect(() => parseFabricTargetPolicy(undefined)).toThrow(/at least one/);
-    expect(() => parseFabricTargetPolicy('identity=')).toThrow(/Invalid/);
-    expect(() => parseFabricTargetPolicy('identity=a;identity=b')).toThrow(/Duplicate/);
-  });
-
-  test('requires an exact channel match with genesis bindings', () => {
-    expect(() => assertFabricTargetPolicyCoversBindings([
-      { channel: 'identity', genesisSha256: 'a'.repeat(64) },
-    ], policy)).toThrow(/unbound channel health-care-eu/);
-
-    expect(() => assertFabricTargetPolicyCoversBindings([
-      { channel: 'identity', genesisSha256: 'a'.repeat(64) },
-      { channel: 'animal-pet-eu', genesisSha256: 'b'.repeat(64) },
-    ], policy)).toThrow(/Missing Fabric chaincode allowlist/);
-  });
-
-  test('fails closed for channels and chaincodes outside the policy', () => {
+  test('fails closed outside bound channels but does not restrict chaincodes per host', () => {
     expect(() => assertFabricChannelAllowed('animal-pet-eu', policy)).toThrow(/not allowed/);
-    expect(() => assertFabricTargetAllowed('identity', 'artifact-sc', policy)).toThrow(/not allowed/);
+    expect(() => assertFabricTargetAllowed('identity', 'artifact-sc', policy)).not.toThrow();
     expect(() => assertFabricTargetAllowed('identity', 'credential-sc', policy)).not.toThrow();
   });
 
@@ -45,13 +28,15 @@ describe('scoped Fabric target policy', () => {
       deploymentEnv: process.env.DEPLOYMENT_ENV,
       networkMode: process.env.NETWORK_MODE,
       hostStorageScope: process.env.HOST_STORAGE_SCOPE,
-      allowlist: process.env.LEDGER_CHANNEL_CHAINCODE_ALLOWLIST,
+      genesisVerification: process.env.LEDGER_GENESIS_VERIFICATION,
+      bindings: process.env.LEDGER_CHANNEL_GENESIS_SHA256,
     };
     process.env.STORAGE_LAYOUT = 'scoped-v2';
     process.env.DEPLOYMENT_ENV = 'staging';
     process.env.NETWORK_MODE = 'test-network';
-    process.env.HOST_STORAGE_SCOPE = 'accuro';
-    process.env.LEDGER_CHANNEL_CHAINCODE_ALLOWLIST = 'identity=credential-sc';
+    process.env.HOST_STORAGE_SCOPE = 'host-a';
+    process.env.LEDGER_GENESIS_VERIFICATION = 'true';
+    process.env.LEDGER_CHANNEL_GENESIS_SHA256 = `identity=${'a'.repeat(64)}`;
     try {
       const manager = new ManageAsset('credential', {
         channelName: 'production-identity',
@@ -64,11 +49,53 @@ describe('scoped Fabric target policy', () => {
         DEPLOYMENT_ENV: previous.deploymentEnv,
         NETWORK_MODE: previous.networkMode,
         HOST_STORAGE_SCOPE: previous.hostStorageScope,
-        LEDGER_CHANNEL_CHAINCODE_ALLOWLIST: previous.allowlist,
+        LEDGER_GENESIS_VERIFICATION: previous.genesisVerification,
+        LEDGER_CHANNEL_GENESIS_SHA256: previous.bindings,
       })) {
         if (value === undefined) delete process.env[key];
         else process.env[key] = value;
       }
     }
+  });
+
+  test('staging test-network scoped-v2 needs neither genesis hashes nor a chaincode allowlist', () => {
+    const previous = {
+      storageLayout: process.env.STORAGE_LAYOUT,
+      deploymentEnv: process.env.DEPLOYMENT_ENV,
+      networkMode: process.env.NETWORK_MODE,
+      hostStorageScope: process.env.HOST_STORAGE_SCOPE,
+      genesisVerification: process.env.LEDGER_GENESIS_VERIFICATION,
+      bindings: process.env.LEDGER_CHANNEL_GENESIS_SHA256,
+    };
+    process.env.STORAGE_LAYOUT = 'scoped-v2';
+    process.env.DEPLOYMENT_ENV = 'staging';
+    process.env.NETWORK_MODE = 'test-network';
+    process.env.HOST_STORAGE_SCOPE = 'host-a';
+    process.env.LEDGER_GENESIS_VERIFICATION = 'false';
+    delete process.env.LEDGER_CHANNEL_GENESIS_SHA256;
+    try {
+      expect(() => assertFabricTargetAllowed('animal-pet-eu', 'any-approved-chaincode')).not.toThrow();
+    } finally {
+      for (const [key, value] of Object.entries({
+        STORAGE_LAYOUT: previous.storageLayout,
+        DEPLOYMENT_ENV: previous.deploymentEnv,
+        NETWORK_MODE: previous.networkMode,
+        HOST_STORAGE_SCOPE: previous.hostStorageScope,
+        LEDGER_GENESIS_VERIFICATION: previous.genesisVerification,
+        LEDGER_CHANNEL_GENESIS_SHA256: previous.bindings,
+      })) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
+  test('requires genesis verification only at the production ledger boundary', () => {
+    expect(() => assertLedgerGenesisVerificationMode({
+      deploymentEnv: 'staging', networkMode: 'test-network', enabled: false,
+    })).not.toThrow();
+    expect(() => assertLedgerGenesisVerificationMode({
+      deploymentEnv: 'prod', networkMode: 'network', enabled: false,
+    })).toThrow(/requires LEDGER_GENESIS_VERIFICATION=true/);
   });
 });
