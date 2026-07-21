@@ -4,6 +4,7 @@
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import { scopePhysicalCollectionName } from '../config/storage-layout';
 
 /**
  * Generates the deterministic, physical collection name for a tenant's vault in Firestore.
@@ -11,7 +12,9 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
  * source of truth for collection naming and is used by the `TenantsCacheManager` to populate
  * its cache.
  *
- * The pattern is: `[countryCode]_[idType]_[idValue]_[sector]`
+ * `legacy-v1` preserves `[countryCode]_[idType]_[idValue]_[sector]` exactly.
+ * `scoped-v2` prefixes that physical collection with the explicit deployment,
+ * ledger-mode and host storage scope.
  *
  * @param claims The claims object from the tenant's `EntityConfig`. Must contain the required schema.org properties.
  * @returns The physical collection name for the tenant's vault.
@@ -36,7 +39,7 @@ export function generateTenantCollectionNameFromClaims(claims: ClaimsRecord): st
   const cleanIdValue = String(idValue).replace(/[^a-zA-Z0-9]/g, '').trim(); // Remove special chars
   const cleanSector = String(sector).toLowerCase().trim();
   
-  return `${cleanCountry}_${cleanIdType}_${cleanIdValue}_${cleanSector}`;
+  return scopePhysicalCollectionName(`${cleanCountry}_${cleanIdType}_${cleanIdValue}_${cleanSector}`);
 }
 
   /**

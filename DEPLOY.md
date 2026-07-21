@@ -92,6 +92,19 @@ Ejemplos:
 - `ENVELOPE_PROVIDER`
 - `HOST_PUBLIC_URL`
 
+Frontera de persistencia y Fabric:
+
+- Los despliegues existentes mantienen `STORAGE_LAYOUT=legacy-v1`; no se
+  renombran colecciones ni secciones de forma implicita.
+- Los despliegues nuevos usan `STORAGE_LAYOUT=scoped-v2` junto con
+  `DEPLOYMENT_ENV`, `NETWORK_MODE` y `HOST_STORAGE_SCOPE`.
+- El prefijo fisico resultante sigue
+  `<deployment>_<network-mode>_<host>_...`.
+- `LEDGER_CHANNEL_GENESIS_SHA256` declara una huella SHA-256 del bloque cero
+  por canal. El GW consulta el peer y falla cerrado si alguna no coincide.
+- Dos canales con el mismo nombre en test y produccion no son el mismo ledger;
+  la vinculacion se demuestra mediante su bloque genesis.
+
 Regla de custodia:
 
 - `ENVELOPE_PROVIDER=memory` solo para dev/test

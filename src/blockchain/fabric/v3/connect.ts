@@ -73,6 +73,9 @@ export async function newConnectOptions(
     commitStatusOptions: () => {
       return { deadline: Date.now() + 60000 }; // 1 minute
     },
+    blockEventsOptions: () => {
+      return { deadline: Date.now() + 15000 };
+    },
   };
   return Promise.resolve(connectOptions);
 }

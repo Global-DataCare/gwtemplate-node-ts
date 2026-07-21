@@ -1,5 +1,23 @@
 ## [Unreleased]
 
+## [1.20.4] - 2026-07-21
+
+### Added
+- Add the explicit `legacy-v1` and `scoped-v2` persistence layouts. Existing
+  deployments keep their physical collection and section paths unchanged;
+  new scoped deployments use the typed
+  `<deployment>_<network-mode>_<host>` prefix.
+- Verify and persist the SHA-256 fingerprint of Fabric block zero for every
+  configured channel before enabling a scoped GW. Startup fails closed when
+  the peer, configured fingerprint or stored binding disagree.
+
+### Changed
+- Add finite Fabric block-event deadlines so genesis verification cannot leave
+  startup waiting indefinitely.
+- Remove stale ESLint and Prettier scripts, which referenced unconfigured and
+  undeclared tools. TypeScript checking and tests remain the executable source
+  gates.
+
 ## [1.20.3] - 2026-07-21
 
 ### Fixed
