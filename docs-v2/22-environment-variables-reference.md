@@ -320,6 +320,27 @@ Legacy note:
   - `local-network` -> `identity-local`
   - `test-network` keeps the existing jurisdiction-derived fallback unless an explicit override is set.
 
+`LEDGER_GENESIS_VERIFICATION`
+- Enables live block-zero verification. Use `false` only for local/unit-test
+  profiles and `true` for persistent staging and production.
+- This switch identifies the ledger; it does not authorize hosts, tenants,
+  channels, chaincodes or write operations.
+
+`LEDGER_CHANNEL_GENESIS_SHA256`
+- Current `scoped-v2` bootstrap map of `channel=sha256(block-zero)` entries.
+- It is still required manually by runtime `1.20.5` when genesis verification
+  is enabled. The target design resolves it from an authenticated, signed
+  governance manifest instead of asking a human controller to copy hashes.
+
+`LEDGER_CHANNEL_CHAINCODE_ALLOWLIST`
+- Current exact `channel=chaincode-a|chaincode-b;...` runtime boundary.
+- It is a host-level technical ceiling, not sufficient tenant authorization.
+  Every request still needs tenant, organization, action, sector, jurisdiction
+  and read/write authorization.
+
+Audit and migration details:
+[27-fabric-authorization-and-ledger-binding.md](./27-fabric-authorization-and-ledger-binding.md).
+
 ## 13. Local Authority Artifact Overrides
 
 `LOCAL_CA_ARTIFACTS_DIR`

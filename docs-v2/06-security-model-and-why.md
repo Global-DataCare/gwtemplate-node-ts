@@ -56,6 +56,18 @@ Controls are distributed across:
 - cryptographic verification paths,
 - auditable async submit/poll model.
 
+## Fabric authorization is not ledger identification
+
+Keep host authorization, per-tenant read/write authorization and live-ledger
+identity as three independent controls. A block-zero SHA-256 fingerprint proves
+which ledger a named channel belongs to; it does not grant channel membership
+or permission to write. Conversely, simulated authorization tests do not prove
+that a deployed GW reached the intended live ledger.
+
+See [27-fabric-authorization-and-ledger-binding.md](./27-fabric-authorization-and-ledger-binding.md)
+for the current manual bootstrap limitation and the signed-governance-manifest
+target.
+
 ## Key custody boundary
 
 For the current operational custody model and the explicit audit caveat around

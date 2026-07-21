@@ -40,7 +40,8 @@ any individual flow file.
 24. [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)
 25. [24-local-audit-fabric-runtime.md](./24-local-audit-fabric-runtime.md)
 26. [25-trust-bundle-and-local-network-runbook.md](./25-trust-bundle-and-local-network-runbook.md)
-27. [99-migration-map-from-docs.md](./99-migration-map-from-docs.md)
+27. [27-fabric-authorization-and-ledger-binding.md](./27-fabric-authorization-and-ledger-binding.md)
+28. [99-migration-map-from-docs.md](./99-migration-map-from-docs.md)
 
 ## Research / Digital Twin Map
 
@@ -62,4 +63,3 @@ Practical rule:
 - `23` = current public route contract
 
 So the numbering is fine as-is; the files cover different layers.
-

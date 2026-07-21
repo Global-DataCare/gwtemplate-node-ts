@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### Documentation
+- Separate signed host authorization, per-tenant operation authorization and
+  Fabric ledger identity in the V2 audit contract.
+- Record that the final operator target uses only
+  `LEDGER_GENESIS_VERIFICATION`, while runtime `1.20.5` still requires manual
+  channel fingerprints and chaincode allowlists until a signed governance
+  manifest resolver is implemented.
+
 ### Fixed
 - Make scoped-v2 startup verify all live Fabric genesis fingerprints before
   infrastructure bootstrap, validate every persisted binding before one
