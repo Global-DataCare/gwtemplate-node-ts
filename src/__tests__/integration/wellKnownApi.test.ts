@@ -201,10 +201,18 @@ describe('Well-Known Tenant Artifacts API', () => {
     const expectedVc = { '@context': ['https://www.w3.org/2018/credentials/v1'], type: ['VerifiableCredential'], issuer: 'did:web:host' };
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
     mockTenantsCacheManager.getTenant.mockResolvedValue({ governanceVc: expectedVc } as any);
+    mockKmsService.getPublicJwks.mockResolvedValue({ keys: [{ kid: 'tenant-vc-sign', use: 'sig', purpose: 'vc_sign' }] } as any);
+    mockKmsService.createCompactJws.mockResolvedValue('header.payload.signature');
 
     const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
     expect(response.status).toBe(200);
-    expect(JSON.parse(response.text)).toEqual(expectedVc);
+    expect(JSON.parse(response.text)).toEqual({
+      ...expectedVc,
+      proof: {
+        type: 'EnvelopedVerifiableCredential',
+        id: 'data:application/vc+jwt,header.payload.signature',
+      },
+    });
     expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith(testTenant1VaultId);
   });
 
@@ -244,6 +252,8 @@ describe('Well-Known Tenant Artifacts API', () => {
     const expectedUrl = `/${tenantId}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/service-offering-index.json`;
 
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
+    mockKmsService.getPublicJwks.mockResolvedValue({ keys: [{ kid: 'tenant-vc-sign', use: 'sig', purpose: 'vc_sign' }] } as any);
+    mockKmsService.createCompactJws.mockResolvedValue('header.payload.signature');
     mockTenantsCacheManager.getTenant.mockResolvedValue({
       didDocument: { id: testTenant1IdentifierUrn },
       claims: {
@@ -260,6 +270,8 @@ describe('Well-Known Tenant Artifacts API', () => {
           ServiceCapability.IndexProvider,
           ServiceCapability.IndexReader,
         ]),
+        [ClaimsServiceSchemaorg.termsOfService]: 'https://provider.example/terms',
+        [`${ClaimsServiceSchemaorg.termsOfService}#hash`]: 'zTermsContentMultihash',
       },
     } as any);
 
@@ -267,14 +279,25 @@ describe('Well-Known Tenant Artifacts API', () => {
     const parsed = JSON.parse(response.text);
 
     expect(response.status).toBe(200);
-    expect(parsed['@type']).toBe('dcat:DataService');
-    expect(parsed['dcat:endpointURL']).toBe(buildExampleHostedTenantBaseUrl({
+    expect(parsed.type).toEqual(['VerifiableCredential', 'ServiceOffering']);
+    expect(parsed.credentialSubject.type).toBe('gx:ServiceOffering');
+    expect(parsed.credentialSubject['gx:endpoint']).toEqual([{ 'gx:endpointURL': buildExampleHostedTenantBaseUrl({
       alternateName: tenantId,
       jurisdiction: urnParts.jurisdiction,
       version: urnParts.version,
       sector: urnParts.sector,
-    }));
-    expect(parsed['dcat:keyword']).toEqual([ServiceCapability.IndexProvider]);
+    }) }]);
+    expect(parsed.proof).toEqual({
+      type: 'EnvelopedVerifiableCredential',
+      id: 'data:application/vc+jwt,header.payload.signature',
+    });
+    expect(mockKmsService.createCompactJws).toHaveBeenCalledWith(
+      expect.objectContaining({ type: ['VerifiableCredential', 'ServiceOffering'] }),
+      'tenant-vc-sign',
+      testTenant1VaultId,
+      'vc_sign',
+      { typ: 'vc+ld+json+jwt', cty: 'vc+ld+json' },
+    );
   });
 
   it('should return 404 for the research service offering artifact when digital twin is not enabled', async () => {
@@ -348,7 +371,13 @@ describe('Well-Known Legal Participant VC API', () => {
 
     expect(response.status).toBe(200);
     const parsed = JSON.parse(response.text);
-    expect(parsed).toEqual(hostEntityConfig.governanceVc);
+    expect(parsed).toEqual({
+      ...hostEntityConfig.governanceVc,
+      proof: {
+        type: 'EnvelopedVerifiableCredential',
+        id: 'data:application/vc+jwt,header.payload.signature',
+      },
+    });
     expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith('host');
   });
 });

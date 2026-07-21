@@ -3,7 +3,7 @@ import { ConsentRule, ClaimConsent } from 'gdc-common-utils-ts/models/consent-ru
 import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { getClaimValue } from './claims';
-import { buildConsentRuleKey, hashConsentRuleId } from './consent';
+import { buildConsentRuleStorageKey, hashConsentRuleId } from './consent';
 import { getIndividualSectionId } from './individual-sections';
 
 export const requiredConsentClaims = [
@@ -76,7 +76,7 @@ export async function persistConsentRuleAndAttachment(
     getIndividualSectionId(subjectId, 'attachments'),
   );
 
-  const ruleKey = buildConsentRuleKey({
+  const ruleKey = buildConsentRuleStorageKey({
     subjectId,
     sector,
     target: actorIdentifier,

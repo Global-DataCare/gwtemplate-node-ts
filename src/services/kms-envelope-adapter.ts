@@ -6,6 +6,52 @@ export interface KmsEnvelopeAdapter {
   unwrapKeyMaterial(wrapped: string, context: { entityVaultId: string; purpose: string }): Promise<Uint8Array>;
 }
 
+const RUNTIME_KEK_PREFIX = 'rkek1.';
+
+/**
+ * Per-process envelope boundary backed by a 32-byte service KEK.
+ *
+ * The key is supplied by the composition root after one external KMS unwrap.
+ * Tenant operations use AES-256-GCM locally and therefore never call KMS.
+ */
+export class RuntimeKekEnvelopeAdapter implements KmsEnvelopeAdapter {
+  private readonly kek: Buffer;
+
+  constructor(runtimeKek: Uint8Array, private readonly legacyRootAdapter?: KmsEnvelopeAdapter) {
+    if (runtimeKek.byteLength !== 32) throw new Error('Runtime service KEK must contain exactly 32 bytes.');
+    this.kek = Buffer.from(runtimeKek);
+  }
+
+  async wrapKeyMaterial(plaintext: Uint8Array, context: { entityVaultId: string; purpose: string }): Promise<string> {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.kek, iv);
+    cipher.setAAD(Buffer.from(JSON.stringify(context), 'utf8'));
+    const ciphertext = Buffer.concat([cipher.update(Buffer.from(plaintext)), cipher.final()]);
+    return `${RUNTIME_KEK_PREFIX}${Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString('base64url')}`;
+  }
+
+  async unwrapKeyMaterial(wrapped: string, context: { entityVaultId: string; purpose: string }): Promise<Uint8Array> {
+    if (!wrapped.startsWith(RUNTIME_KEK_PREFIX)) {
+      if (this.legacyRootAdapter) return this.legacyRootAdapter.unwrapKeyMaterial(wrapped, context);
+      throw new Error('Wrapped key material is not a runtime-KEK v1 envelope.');
+    }
+    const bytes = Buffer.from(wrapped.slice(RUNTIME_KEK_PREFIX.length), 'base64url');
+    if (bytes.length < 28) throw new Error('Wrapped key material is invalid or truncated.');
+    const decipher = createDecipheriv('aes-256-gcm', this.kek, bytes.subarray(0, 12));
+    decipher.setAAD(Buffer.from(JSON.stringify(context), 'utf8'));
+    decipher.setAuthTag(bytes.subarray(12, 28));
+    return new Uint8Array(Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]));
+  }
+
+  destroy(): void {
+    this.kek.fill(0);
+  }
+}
+
+export function isRuntimeKekEnvelope(value: string): boolean {
+  return value.startsWith(RUNTIME_KEK_PREFIX);
+}
+
 type FetchLike = typeof fetch;
 
 /**

@@ -7,6 +7,7 @@ import { IVaultRepository } from '../../../database/repositories/vault/vault.rep
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
 import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/enums';
+import { InteroperableLifecycleStatuses } from 'gdc-common-utils-ts/utils/interoperable-resource-operation';
 
 describe('RelatedPersonManager', () => {
   const mockVaultRepository = {
@@ -167,7 +168,8 @@ describe('RelatedPersonManager', () => {
     const response = await manager.process(job);
     expect((response.body as any).data[0].response.status).toBe('200');
     const stored = (mockVaultRepository.put as any).mock.calls[0][1][0];
-    expect(stored.status).toBe(EntityLifecycleStatus.Inactive);
+    expect(stored.status).toBe(InteroperableLifecycleStatuses.Purged);
+    expect(stored['RelatedPerson.lifecycle-disposition']).toBeUndefined();
     expect(stored.meta.lifecycleDisposition).toBe('purged');
   });
 });

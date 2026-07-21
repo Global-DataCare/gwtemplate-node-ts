@@ -17,6 +17,13 @@ Primary references:
 3. OpenAPI/examples/tests must describe actual behavior, not aspirational behavior.
 
 ## Hard Rules
+0. In production each Kubernetes pod/process must unwrap the encrypted service
+runtime KEK exactly once through KMS during bootstrap. Inject that process-owned
+resource from `buildInfrastructure`; tenant operations use it locally and must
+not call KMS. Do not add a singleton/global registry or shared plaintext key.
+Google KMS is the current production root; preserve an adapter boundary for
+future AWS KMS/multi-root support. `KEK_SECRET` remains local/demo custody and
+must not be represented as the audited production profile.
 1. Manager logic is deterministic and claim-driven.
 2. Search semantics must be explicit:
 - accepted query params

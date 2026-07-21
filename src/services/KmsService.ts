@@ -22,8 +22,8 @@ import { InMemoryKeyMaterialProvider } from './in-memory-key-material-provider';
 import type { KeyMaterialProvider, KeyMaterialPurpose } from './key-material-provider';
 import { TenantKeyCache } from './tenant-key-cache';
 import type { KmsEnvelopeAdapter } from './kms-envelope-adapter';
-import { InMemoryEnvelopeAdapter } from './kms-envelope-adapter';
-import type { WrappedKeyPurpose, WrappedKeyRepository } from './wrapped-key-repository';
+import { InMemoryEnvelopeAdapter, RuntimeKekEnvelopeAdapter, isRuntimeKekEnvelope } from './kms-envelope-adapter';
+import type { WrappedKeyPurpose, WrappedKeyRecord, WrappedKeyRepository } from './wrapped-key-repository';
 
 import { TenantsCacheManager } from '../managers/TenantsCacheManager';
 
@@ -478,6 +478,7 @@ export class KmsService implements IKmsService {
     signerKid: string,
     signerVaultId: string,
     purpose: SigningPurpose = 'vc_sign',
+    protectedHeader?: Readonly<Record<string, string>>,
   ): Promise<string> {
     this.checkInitialized();
     const keyPairSet = await this.getEntityKeys(signerVaultId, purpose);
@@ -485,7 +486,11 @@ export class KmsService implements IKmsService {
     if (!signingKey) {
       throw new Error(`Signing key '${signerKid}' not found for entity: ${signerVaultId}`);
     }
-    const jwsParts = await this.signJwsObject(payload, signingKey);
+    const jwsParts = await this.signJwsObject(payload, signingKey, {
+      ...protectedHeader,
+      alg: signingKey.publicJwk.alg,
+      kid: signingKey.publicJwk.kid,
+    });
     return `${jwsParts.protected}.${jwsParts.payload}.${jwsParts.signature}`;
   }
 
@@ -564,7 +569,7 @@ export class KmsService implements IKmsService {
   private async signJwsObject(
     payload: object,
     signingKey: { publicJwk: JWK & { kid: string }; secretKeyBytes: Uint8Array; },
-    protectedHeader?: { alg?: string; kid?: string },
+    protectedHeader?: { alg?: string; kid?: string; [key: string]: string | undefined },
   ) {
     const resolvedHeader = protectedHeader || { alg: signingKey.publicJwk.alg, kid: signingKey.publicJwk.kid };
     if (resolvedHeader.alg && resolvedHeader.alg.startsWith('ES')) {
@@ -573,7 +578,7 @@ export class KmsService implements IKmsService {
     return await this.crypto.signDataJws(payload, resolvedHeader, signingKey.secretKeyBytes);
   }
 
-  private async signJwsWithEcdsa(payload: object, protectedHeader: { alg?: string; kid?: string }, secretKeyBytes: Uint8Array) {
+  private async signJwsWithEcdsa(payload: object, protectedHeader: { alg?: string; kid?: string; [key: string]: string | undefined }, secretKeyBytes: Uint8Array) {
     const protectedHeaderB64Url = Content.objectToRawBase64UrlSafe(protectedHeader);
     const payloadB64Url = Content.objectToRawBase64UrlSafe(payload);
     const signingInput = `${protectedHeaderB64Url}.${payloadB64Url}`;
@@ -741,19 +746,24 @@ export class KmsService implements IKmsService {
         const keyMaterial = this._managedKeys.get(entityVaultId);
         if (keyMaterial) {
           const keyVersion = String(this.keyVersions.get(entityVaultId) || 0);
+          // Provisioning hands the fresh keyset to the bounded provider once.
+          // Keeping a second unbounded copy would defeat cache TTL/eviction.
+          this._managedKeys.delete(entityVaultId);
           return { keyMaterial, keyVersion };
         }
 
         const rehydrated = await this.loadWrappedKeys(entityVaultId);
-        this._managedKeys.set(entityVaultId, rehydrated.keyMaterial);
         this.keyVersions.set(entityVaultId, Number(rehydrated.keyVersion));
         return rehydrated;
       },
     });
   }
 
-  private async getEntityKeys(entityVaultId: string, purpose: KeyMaterialPurpose): Promise<EntityKeysSet> {
-    const record = await this.keyMaterialProvider.get(entityVaultId, purpose);
+  private async getEntityKeys(entityVaultId: string, _purpose: KeyMaterialPurpose): Promise<EntityKeysSet> {
+    // EntityKeysSet is persisted as five independently wrapped purposes but is
+    // loaded atomically. Cache one bounded `all` entry so changing operations
+    // does not trigger five KMS decrypts per purpose.
+    const record = await this.keyMaterialProvider.get(entityVaultId, 'all');
     return record.keyMaterial;
   }
 
@@ -867,11 +877,15 @@ export class KmsService implements IKmsService {
     };
   }
 
-  private async unwrapRecordPayload(entityVaultId: string, record: { purpose: WrappedKeyPurpose; wrappedKeyMaterial: string }): Promise<any> {
+  private async unwrapRecordPayload(entityVaultId: string, record: WrappedKeyRecord): Promise<any> {
     const plaintext = await this.envelopeAdapter.unwrapKeyMaterial(record.wrappedKeyMaterial, {
       entityVaultId,
       purpose: record.purpose,
     });
+    if (this.envelopeAdapter instanceof RuntimeKekEnvelopeAdapter && !isRuntimeKekEnvelope(record.wrappedKeyMaterial) && this.wrappedKeyRepository) {
+      const migrated = await this.envelopeAdapter.wrapKeyMaterial(plaintext, { entityVaultId, purpose: record.purpose });
+      await this.wrappedKeyRepository.put({ ...record, wrappedKeyMaterial: migrated, updatedAt: new Date().toISOString() });
+    }
     return JSON.parse(Content.bytesToStringUTF8(plaintext));
   }
 

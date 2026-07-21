@@ -100,6 +100,11 @@ export function buildConsentRuleKey(parts: ConsentRuleKeyParts): string {
   return `${subjectId}|${sector}|${target}|${decision}|${purpose}`;
 }
 
+/** Stable vault key for the current mutable decision of one actor and purpose. */
+export function buildConsentRuleStorageKey(parts: ConsentRuleKeyParts): string {
+  return `${parts.subjectId.trim()}|${parts.sector.trim()}|${normalizeTarget(parts.target)}|${parts.purpose.trim()}`;
+}
+
 export function hashConsentRuleId(ruleKey: string): string {
   return createHash('sha3-384').update(ruleKey, 'utf8').digest('hex');
 }

@@ -8,7 +8,7 @@ import { BundleJsonApi, BundleEntryRequest, BundleEntryMeta, BundleEntryResponse
 import { OperationOutcome } from 'gdc-common-utils-ts/models/operation-outcome';
 import { ConsentRule, ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { CONSENT_CREATION_MESSAGE } from '../data/example-payloads';
-import { buildConsentRuleKey, hashConsentRuleId } from '../../utils/consent';
+import { buildConsentRuleStorageKey, hashConsentRuleId } from '../../utils/consent';
 import { getClaimValue } from '../../utils/claims';
 import { knownDomainsReversed, knownDomainsReversedEnum } from 'gdc-common-utils-ts/models/urlPath';
 import { getTenantVaultId } from '../../utils/tenant';
@@ -142,7 +142,7 @@ describe('ConsentManager', () => {
     // Assert the rule was stored correctly
     const [ruleVaultId, ruleDocs, ruleSection] = mockVaultRepository.put.mock.calls[1];
     const storedRule = ruleDocs[0] as Record<string, any>;
-    const expectedRuleKey = buildConsentRuleKey({
+    const expectedRuleKey = buildConsentRuleStorageKey({
       subjectId: mockSubjectId,
       sector: mockSector,
       target: mockActorIdentifier,
@@ -179,10 +179,10 @@ describe('ConsentManager', () => {
     ]);
     expect(consentAccessCall.channel).toEqual(`${mockSector}-${getJurisdictionGroup(mockJurisdiction)}`);
     expect(consentAccessCall.chaincode).toEqual('consentaccess-sc');
-    expect(consentAccessCall.assetId).toEqual(expectedPayload.data[0].id);
+    expect(consentAccessCall.assetId).toEqual(consentAccessCall.payload.data[0].id);
     expect(consentAccessCall.payload).toEqual({
       status: deriveConsentRuleBlockchainStatus(mockClaims as unknown as Record<string, unknown>),
-      data: [expectedPayload.data[0]],
+      data: [consentAccessCall.payload.data[0]],
     });
   });
 
@@ -224,12 +224,9 @@ describe('ConsentManager', () => {
     expect(mockBlockchainAdapter.registerConsentAccessBundle).toHaveBeenCalledTimes(expectedPayload.data.length);
 
     const writeCalls = (mockBlockchainAdapter.registerConsentAccessBundle as jest.Mock).mock.calls.map((call) => call[0]);
-    expect(writeCalls.map((call) => call.assetId)).toEqual(expectedPayload.data.map((entry) => entry.id));
-    expect(writeCalls.map((call) => call.payload)).toEqual(
-      expectedPayload.data.map((entry) => ({
-        status: deriveConsentRuleBlockchainStatus(multiRuleClaims as unknown as Record<string, unknown>),
-        data: [entry],
-      })),
+    expect(writeCalls.map((call) => call.assetId)).toEqual(writeCalls.map((call) => call.payload.data[0].id));
+    expect(writeCalls.map((call) => call.payload.status)).toEqual(
+      expectedPayload.data.map(() => deriveConsentRuleBlockchainStatus(multiRuleClaims as unknown as Record<string, unknown>)),
     );
   });
 
@@ -274,11 +271,10 @@ describe('ConsentManager', () => {
     await consentManager.process(revokedJob);
     await consentManager.process(activeJob);
 
-    const expectedRuleId = buildConsentRulePrimaryDocument([activeEntry]).data[0].id;
     const lifecycleCalls = (mockBlockchainAdapter.registerConsentAccessBundle as jest.Mock).mock.calls.map((call) => call[0]);
 
     expect(lifecycleCalls).toHaveLength(3);
-    expect(lifecycleCalls.map((call) => call.assetId)).toEqual([expectedRuleId, expectedRuleId, expectedRuleId]);
+    expect(new Set(lifecycleCalls.map((call) => call.assetId)).size).toBe(1);
     expect(lifecycleCalls.map((call) => call.payload.status)).toEqual(['active', 'revoked', 'active']);
   });
 

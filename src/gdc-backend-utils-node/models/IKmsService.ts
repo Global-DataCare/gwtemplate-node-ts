@@ -142,7 +142,13 @@ export interface IKmsService {
    * @param signerVaultId The vault ID of the entity that owns the key.
    * @returns A promise that resolves to the compact JWS string.
    */
-  createCompactJws(payload: object, signerKid: string, signerVaultId: string, purpose?: SigningPurpose): Promise<string>;
+  createCompactJws(
+    payload: object,
+    signerKid: string,
+    signerVaultId: string,
+    purpose?: SigningPurpose,
+    protectedHeader?: Readonly<Record<string, string>>,
+  ): Promise<string>;
 
   // --- Outbound Encryption ---
 

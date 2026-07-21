@@ -34,6 +34,7 @@ import { getBaseUrlFromDidWeb } from '../utils/did-backend';
 import { isFhirSector, isResearchSector } from '../utils/sector';
 import { hasProviderServiceCapabilityClaim } from '../utils/services';
 import { getTenantServiceCapabilityClaim } from '../utils/service-capability-claims';
+import { buildGaiaXServiceOfferingCredentialDraft } from 'gdc-common-utils-ts/convert/schemaorg-to-gaia-x';
 
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ILogger } from '../loggers/ILogger';
@@ -69,6 +70,8 @@ export function createDiscoveryRouter(
     sector?: string;
     jurisdiction?: string;
     serviceTypeClaim?: string;
+    termsOfService?: string;
+    termsOfServiceHash?: string;
   };
 
   type ServiceOfferingKind = 'index' | 'research';
@@ -220,6 +223,8 @@ export function createDiscoveryRouter(
       sector,
       jurisdiction,
       serviceTypeClaim,
+      termsOfService: getTenantServiceClaim(tenantConfig, ClaimsServiceSchemaorg.termsOfService),
+      termsOfServiceHash: getTenantServiceClaim(tenantConfig, `${ClaimsServiceSchemaorg.termsOfService}#hash`),
     };
   };
 
@@ -464,12 +469,44 @@ export function createDiscoveryRouter(
   ) => {
     const offering = buildServiceOfferings(dataset, publicOrigin).find((candidate) => candidate.kind === kind);
     if (!offering) return undefined;
+    // A Gaia-X terms hash attests the referenced document bytes. Hashing the
+    // URL text would be a different statement, so omit the VC until the real
+    // content hash produced by service attachment ingestion is available.
+    if (!dataset.termsOfService || !dataset.termsOfServiceHash) return undefined;
+    const claims = {
+      [ClaimsServiceSchemaorg.name]: offering.title,
+      [ClaimsServiceSchemaorg.url]: offering.endpointUrl,
+      [ClaimsServiceSchemaorg.serviceType]: offering.serviceTypes.join(','),
+      [ClaimsServiceSchemaorg.category]: offering.sector,
+    };
+    return buildGaiaXServiceOfferingCredentialDraft({
+      claims,
+      credentialId: `${offering.id}.vc`,
+      subjectId: offering.id,
+      issuerId: offering.publisherDid,
+      providedByCredentialId: `${dataset.baseUrl}/.well-known/legal-participant.vc.json`,
+      termsAndConditionsUrl: dataset.termsOfService,
+      termsAndConditionsHash: dataset.termsOfServiceHash,
+      validFrom: new Date().toISOString(),
+    });
+  };
+
+  /** Signs a Gaia-X VC draft as the VC-JWT enveloped credential required by ICAM 25.11. */
+  const signGaiaXEnvelopedCredential = async (credential: Record<string, unknown>, vaultId: string) => {
+    const jwks = await kmsService.getPublicJwks(vaultId);
+    const signer = jwks.keys.find((key: any) => key.use === 'sig' && key.purpose === 'vc_sign')
+      || jwks.keys.find((key: any) => key.use === 'sig');
+    if (!signer?.kid) throw new Error(`No VC signing key found for '${vaultId}'.`);
+    const jwt = await kmsService.createCompactJws(credential, signer.kid, vaultId, 'vc_sign', {
+      typ: 'vc+ld+json+jwt',
+      cty: 'vc+ld+json',
+    });
     return {
-      '@context': {
-        dcat: 'https://www.w3.org/ns/dcat#',
-        dcterms: 'http://purl.org/dc/terms/',
+      ...credential,
+      proof: {
+        type: 'EnvelopedVerifiableCredential',
+        id: `data:application/vc+jwt,${jwt}`,
       },
-      ...toServiceOfferingNode(offering),
     };
   };
 
@@ -858,7 +895,7 @@ export function createDiscoveryRouter(
     const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     const vc = entityConfig?.governanceVc;
     if (!vc) return res.status(404).type('text').send('Not Found');
-    res.json(vc);
+    res.json(await signGaiaXEnvelopedCredential(vc, res.locals.vaultId));
   });
 
   router.get(`${tenantWellKnownPrefix}/service-offering-index.json`, resolveTenant, async (req, res) => {
@@ -866,7 +903,7 @@ export function createDiscoveryRouter(
     const dataset = tenantConfig ? toProviderDataset(tenantConfig) : null;
     const artifact = dataset ? buildServiceOfferingArtifact(dataset, 'index', `${req.protocol}://${req.get('host')}`) : undefined;
     if (!artifact) return res.status(404).type('text').send('Not Found');
-    res.json(artifact);
+    res.json(await signGaiaXEnvelopedCredential(artifact, res.locals.vaultId));
   });
 
   router.get(`${tenantWellKnownPrefix}/service-offering-research.json`, resolveTenant, async (req, res) => {
@@ -874,7 +911,7 @@ export function createDiscoveryRouter(
     const dataset = tenantConfig ? toProviderDataset(tenantConfig) : null;
     const artifact = dataset ? buildServiceOfferingArtifact(dataset, 'research', `${req.protocol}://${req.get('host')}`) : undefined;
     if (!artifact) return res.status(404).type('text').send('Not Found');
-    res.json(artifact);
+    res.json(await signGaiaXEnvelopedCredential(artifact, res.locals.vaultId));
   });
 
   router.get([`${hostScopedWellKnownPrefix}/openid-configuration`, `${tenantWellKnownPrefix}/openid-configuration`], resolveTenant, (req, res) => {

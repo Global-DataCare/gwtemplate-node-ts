@@ -366,6 +366,8 @@ export function getConfig(): IServerConfig {
       kekSecret: process.env.KEK_SECRET,
       gcpKms: {
         keyName: process.env.GCP_KMS_KEY_NAME,
+        runtimeKekCiphertext: process.env.GCP_KMS_RUNTIME_KEK_CIPHERTEXT,
+        runtimeKekId: process.env.GCP_KMS_RUNTIME_KEK_ID,
       },
       hashicorpTransit: {
         baseUrl: process.env.HASHICORP_TRANSIT_BASE_URL,

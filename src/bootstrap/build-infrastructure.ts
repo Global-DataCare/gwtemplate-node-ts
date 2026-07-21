@@ -102,7 +102,7 @@ export async function buildInfrastructure(options: {
   let kmsService: IKmsService;
   const tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, hostCollectionName);
   const wrappedKeyRepository = new VaultWrappedKeyRepository(vaultRepository, hostCollectionName);
-  const { adapter: envelopeAdapter, provider: envelopeProvider } = createEnvelopeAdapter(config);
+  const { adapter: envelopeAdapter, provider: envelopeProvider } = await createEnvelopeAdapter(config);
   if (envelopeProvider === 'memory') {
     console.warn('[GW-API] Envelope provider is memory. Use this only for dev/test.');
   }
