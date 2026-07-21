@@ -26,6 +26,8 @@ import { VaultWrappedKeyRepository } from '../services/wrapped-key-repository';
 export async function buildInfrastructure(options: {
   config: IServerConfig;
   hostCollectionName: string;
+  /** Server bootstrap defers this until Fabric ledger protection is verified. */
+  initializeKms?: boolean;
 }): Promise<{
   vaultRepository: IVaultRepository;
   storageAdapter: IStorageAdapter;
@@ -121,7 +123,9 @@ export async function buildInfrastructure(options: {
     });
     console.log('[GW-API] Using KmsService.');
   }
-  await kmsService.init();
+  if (options.initializeKms !== false) {
+    await kmsService.init();
+  }
 
   return { vaultRepository, storageAdapter, cryptographyService, logger, tenantManager, kmsService };
 }

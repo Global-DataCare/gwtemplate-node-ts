@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+### Fixed
+- Make scoped-v2 startup verify all live Fabric genesis fingerprints before
+  infrastructure bootstrap, validate every persisted binding before one
+  combined binding write, and initialize host KMS keys only after ledger
+  protection succeeds.
+- Enforce an exact channel and per-channel chaincode allowlist for every
+  scoped-v2 Fabric contract access; request-derived channels can no longer
+  bypass the startup bindings.
+
 ## [1.20.4] - 2026-07-21
 
 ### Added

@@ -47,8 +47,13 @@ import { generateTenantCollectionNameFromClaims } from './utils/tenant';
 import { resolveStorageScope } from './config/storage-layout';
 import {
   parseExpectedChannelBindings,
-  verifyAndPersistLedgerChannelBindings,
+  verifyLedgerChannelGenesis,
+  initializeRuntimeAfterLedgerProtection,
 } from './services/ledger-channel-binding';
+import {
+  assertFabricTargetPolicyCoversBindings,
+  parseFabricTargetPolicy,
+} from './blockchain/fabric/v3/fabric-target-policy';
 import * as swaggerUi from 'swagger-ui-express';
 import { LicenseManager } from './managers/LicenseManager';
 import { TokenManager } from './managers/TokenManager';
@@ -185,6 +190,20 @@ async function startServer(options?: StartServerOptions) {
   const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
   
   // --- DEPENDENCY INJECTION ---
+  const storageScope = resolveStorageScope();
+  let observedLedgerBindings;
+  if (storageScope.layout === 'scoped-v2') {
+    if (String(process.env.LEDGER_GENESIS_VERIFICATION || '').trim().toLowerCase() !== 'true') {
+      throw new Error('scoped-v2 requires LEDGER_GENESIS_VERIFICATION=true.');
+    }
+    const ledgerMspId = String(process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_ORG1 || '').trim();
+    if (!ledgerMspId) throw new Error('scoped-v2 requires LEDGER_MSP_ID.');
+    const expected = parseExpectedChannelBindings(process.env.LEDGER_CHANNEL_GENESIS_SHA256);
+    const targetPolicy = parseFabricTargetPolicy(process.env.LEDGER_CHANNEL_CHAINCODE_ALLOWLIST);
+    assertFabricTargetPolicyCoversBindings(expected, targetPolicy);
+    observedLedgerBindings = await verifyLedgerChannelGenesis({ mspId: ledgerMspId, expected });
+  }
+
   const {
     vaultRepository,
     storageAdapter,
@@ -192,21 +211,17 @@ async function startServer(options?: StartServerOptions) {
     logger,
     tenantManager,
     kmsService,
-  } = await buildInfrastructure({ config, hostCollectionName });
+  } = await buildInfrastructure({ config, hostCollectionName, initializeKms: false });
 
-  const storageScope = resolveStorageScope();
-  if (storageScope.layout === 'scoped-v2') {
-    if (String(process.env.LEDGER_GENESIS_VERIFICATION || '').trim().toLowerCase() !== 'true') {
-      throw new Error('scoped-v2 requires LEDGER_GENESIS_VERIFICATION=true.');
-    }
-    const ledgerMspId = String(process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_ORG1 || '').trim();
-    if (!ledgerMspId) throw new Error('scoped-v2 requires LEDGER_MSP_ID.');
-    await verifyAndPersistLedgerChannelBindings({
+  if (observedLedgerBindings) {
+    await initializeRuntimeAfterLedgerProtection({
       vaultRepository,
       hostCollectionName,
-      mspId: ledgerMspId,
-      expected: parseExpectedChannelBindings(process.env.LEDGER_CHANNEL_GENESIS_SHA256),
+      observed: observedLedgerBindings,
+      initializeRuntime: () => kmsService.init(),
     });
+  } else {
+    await kmsService.init();
   }
   const {
     hostingManager,

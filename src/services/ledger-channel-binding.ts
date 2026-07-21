@@ -9,6 +9,21 @@ export type LedgerChannelBinding = Readonly<{
 
 export type FetchGenesisSha256 = (mspId: string, channel: string) => Promise<string>;
 
+export async function verifyLedgerChannelGenesis(params: {
+  mspId: string;
+  expected: LedgerChannelBinding[];
+  fetchGenesisSha256?: FetchGenesisSha256;
+}): Promise<LedgerChannelBinding[]> {
+  const fetchGenesis = params.fetchGenesisSha256 || fetchChannelGenesisSha256;
+  return Promise.all(params.expected.map(async (expected) => {
+    const observed = (await fetchGenesis(params.mspId, expected.channel)).toLowerCase();
+    if (observed !== expected.genesisSha256) {
+      throw new Error(`Fabric genesis mismatch for channel ${expected.channel}.`);
+    }
+    return { channel: expected.channel, genesisSha256: observed };
+  }));
+}
+
 export function parseExpectedChannelBindings(value: string | undefined): LedgerChannelBinding[] {
   const entries = String(value || '').split(',').map((entry) => entry.trim()).filter(Boolean);
   if (entries.length === 0) {
@@ -43,34 +58,65 @@ export async function verifyAndPersistLedgerChannelBindings(params: {
   expected: LedgerChannelBinding[];
   fetchGenesisSha256?: FetchGenesisSha256;
 }): Promise<void> {
-  const fetchGenesis = params.fetchGenesisSha256 || fetchChannelGenesisSha256;
-  const sectionId = getEnvSectionId('ledger-channel-bindings');
-  for (const expected of params.expected) {
-    const observed = (await fetchGenesis(params.mspId, expected.channel)).toLowerCase();
-    if (observed !== expected.genesisSha256) {
-      throw new Error(`Fabric genesis mismatch for channel ${expected.channel}.`);
-    }
+  const observed = await verifyLedgerChannelGenesis(params);
+  await verifyAndPersistObservedLedgerChannelBindings({
+    vaultRepository: params.vaultRepository,
+    hostCollectionName: params.hostCollectionName,
+    observed,
+  });
+}
 
-    const existing = await params.vaultRepository.get<any>(
+/**
+ * Checks all persisted bindings before performing one repository write for all
+ * missing records. This prevents a later channel mismatch leaving a partially
+ * accepted binding set behind.
+ */
+export async function verifyAndPersistObservedLedgerChannelBindings(params: {
+  vaultRepository: IVaultRepository;
+  hostCollectionName: string;
+  observed: LedgerChannelBinding[];
+}): Promise<void> {
+  const sectionId = getEnvSectionId('ledger-channel-bindings');
+  const existingBindings = await Promise.all(params.observed.map(async (binding) => ({
+    binding,
+    existing: await params.vaultRepository.get<any>(
       params.hostCollectionName,
-      expected.channel,
+      binding.channel,
       sectionId,
-    );
+    ),
+  })));
+
+  const missing: any[] = [];
+  for (const { binding, existing } of existingBindings) {
     const persistedHash = String(existing?.content?.genesisSha256 || '').toLowerCase();
-    if (persistedHash && persistedHash !== observed) {
-      throw new Error(`Persisted Fabric genesis mismatch for channel ${expected.channel}.`);
+    if (persistedHash && persistedHash !== binding.genesisSha256) {
+      throw new Error(`Persisted Fabric genesis mismatch for channel ${binding.channel}.`);
     }
     if (!persistedHash) {
-      await params.vaultRepository.put(params.hostCollectionName, [{
-        id: expected.channel,
+      missing.push({
+        id: binding.channel,
         status: 'active',
         sequence: 0,
         content: {
-          channel: expected.channel,
-          genesisSha256: observed,
+          channel: binding.channel,
+          genesisSha256: binding.genesisSha256,
           verifiedAt: new Date().toISOString(),
         },
-      } as any], sectionId);
+      });
     }
   }
+  if (missing.length > 0) {
+    await params.vaultRepository.put(params.hostCollectionName, missing, sectionId);
+  }
+}
+
+/** Initializes runtime state only after every stored ledger binding is safe. */
+export async function initializeRuntimeAfterLedgerProtection(params: {
+  vaultRepository: IVaultRepository;
+  hostCollectionName: string;
+  observed: LedgerChannelBinding[];
+  initializeRuntime: () => Promise<void>;
+}): Promise<void> {
+  await verifyAndPersistObservedLedgerChannelBindings(params);
+  await params.initializeRuntime();
 }

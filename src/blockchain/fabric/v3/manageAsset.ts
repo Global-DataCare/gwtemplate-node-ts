@@ -5,6 +5,7 @@ import type { Contract, Gateway } from '@hyperledger/fabric-gateway';
 import type * as grpc from '@grpc/grpc-js';
 import { newGatewayConnection, newGrpcConnection } from './connect';
 import { resolveIdentityChannel } from '../../../utils/ledger';
+import { assertFabricTargetAllowed } from './fabric-target-policy';
 
 type ContractSession = {
   contract: Contract;
@@ -38,12 +39,14 @@ export class ManageAsset {
   }
 
   protected async withContract(mspId: string, handler: (session: ContractSession) => Promise<Uint8Array>): Promise<Uint8Array> {
+    const channelName = this.channel || resolveIdentityChannel(process.env.HOST_JURISDICTION || process.env.JURISDICTION);
+    const chaincodeName = this.getContractName();
+    assertFabricTargetAllowed(channelName, chaincodeName);
     const client = await newGrpcConnection(mspId);
     const gateway = await newGatewayConnection(client, mspId);
     try {
-      const channelName = this.channel || resolveIdentityChannel(process.env.HOST_JURISDICTION || process.env.JURISDICTION);
       const network = await gateway.getNetwork(channelName);
-      const contract = network.getContract(this.getContractName());
+      const contract = network.getContract(chaincodeName);
       return await handler({ contract, gateway, client });
     } finally {
       gateway.close();

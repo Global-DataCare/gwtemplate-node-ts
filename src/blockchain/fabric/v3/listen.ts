@@ -17,6 +17,7 @@ import * as path from 'path';
 import { TextDecoder } from 'util';
 import { Block, parseBlock, Transaction } from './blockParser';
 import { ExpectedError } from './expectedError';
+import { assertFabricChannelAllowed } from './fabric-target-policy';
 
 const checkpointFile = path.resolve(
   process.env.CHECKPOINT_FILE ?? 'checkpoint.json'
@@ -89,6 +90,7 @@ const applyWritesToOffChainStore: Store = async (data) => {
 };
 
 export async function main(clientMspId: string): Promise<void> {
+  assertFabricChannelAllowed(channelName);
   const client = await newGrpcConnection(clientMspId);
   const connectOptions = await newConnectOptions(client, clientMspId);
   const gateway = connect(connectOptions);

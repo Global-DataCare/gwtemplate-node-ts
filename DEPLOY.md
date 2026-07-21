@@ -102,6 +102,13 @@ Frontera de persistencia y Fabric:
   `<deployment>_<network-mode>_<host>_...`.
 - `LEDGER_CHANNEL_GENESIS_SHA256` declara una huella SHA-256 del bloque cero
   por canal. El GW consulta el peer y falla cerrado si alguna no coincide.
+- `LEDGER_CHANNEL_CHAINCODE_ALLOWLIST` declara exactamente esos mismos canales
+  y los chaincodes permitidos en cada uno, con el formato
+  `identity=credential-sc|organization-sc;health-care-eu=artifact-sc`.
+  Cualquier otro canal o chaincode falla antes del acceso contractual a Fabric.
+- Todos los bloques genesis reales se comprueban antes de construir la
+  infraestructura persistente. Después se validan todos los bindings guardados,
+  se persisten juntos los ausentes y solo entonces se inicializa el KMS.
 - Dos canales con el mismo nombre en test y produccion no son el mismo ledger;
   la vinculacion se demuestra mediante su bloque genesis.
 
