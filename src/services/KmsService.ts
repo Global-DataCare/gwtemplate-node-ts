@@ -90,6 +90,8 @@ export class KmsService implements IKmsService {
   private tenantsCacheManager: TenantsCacheManager;
   /** In-memory key storage. Key: entityId, Value: KeyPairSet. */
   private _managedKeys: Map<string, EntityKeysSet>;
+  /** Public kid-to-owner index; contains no private key material. */
+  private encryptionKeyOwners: Map<string, string>;
   private keyVersions: Map<string, number>;
   private keyMaterialProvider: KeyMaterialProvider<EntityKeysSet>;
   private wrappedKeyRepository?: WrappedKeyRepository;
@@ -108,6 +110,7 @@ export class KmsService implements IKmsService {
     this.crypto = cryptographyService;
     this.tenantsCacheManager = tenantsCacheManager;
     this._managedKeys = new Map();
+    this.encryptionKeyOwners = new Map();
     this.keyVersions = new Map();
     this.wrappedKeyRepository = options?.wrappedKeyRepository;
     this.envelopeAdapter = options?.envelopeAdapter || new InMemoryEnvelopeAdapter();
@@ -764,6 +767,7 @@ export class KmsService implements IKmsService {
     // loaded atomically. Cache one bounded `all` entry so changing operations
     // does not trigger five KMS decrypts per purpose.
     const record = await this.keyMaterialProvider.get(entityVaultId, 'all');
+    this.encryptionKeyOwners.set(record.keyMaterial.encryptionKeyPair.publicJWKey.kid, entityVaultId);
     return record.keyMaterial;
   }
 
@@ -890,6 +894,17 @@ export class KmsService implements IKmsService {
   }
 
   private async findManagedPrivateEncryptionKeyByRecipientKids(recipientKids: string[]): Promise<MlkemPrivateJwk | undefined> {
+    for (const kid of recipientKids) {
+      const entityVaultId = this.encryptionKeyOwners.get(kid);
+      if (!entityVaultId) continue;
+      const keySet = await this.getEntityKeys(entityVaultId, 'encryption');
+      if (keySet.encryptionKeyPair.publicJWKey.kid === kid) {
+        return {
+          ...keySet.encryptionKeyPair.publicJWKey,
+          dBytes: keySet.encryptionKeyPair.secretKeyBytes,
+        };
+      }
+    }
     if (!this.wrappedKeyRepository) {
       return undefined;
     }

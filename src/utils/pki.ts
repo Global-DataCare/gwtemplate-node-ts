@@ -190,8 +190,6 @@ export async function saveJwkDidAndCredential(
     ],
   };
   
-  const termsAndConditionsHash = Buffer.from(sha256(Buffer.from('dummy terms content for test', 'utf8'))).toString('hex');
-
   const credential = createGaiaXLegalParticipantCredential({
     webDomain: `https://${entity.domain}`,
     officialName: entity.officialName,
@@ -199,8 +197,6 @@ export async function saveJwkDidAndCredential(
     issuerDid: didID, // Current local trust bootstrap keeps this credential self-issued; the X.509 chain carries the CA-backed trust.
     vatId: entity.legalRegistrationNumber,
     countryCode: entity.countryCode,
-    termsAndConditionsUrl: `https://${entity.domain}/terms`,
-    termsAndConditionsHashHex: termsAndConditionsHash,
   });
 
   fs.mkdirSync(outputDir, { recursive: true });

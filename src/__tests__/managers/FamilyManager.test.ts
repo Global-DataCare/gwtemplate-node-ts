@@ -123,6 +123,7 @@ function makeBatchJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
     sequence: 0,
     createdAtTimestamp: Date.now(),
     tenantId: TENANT_ID,
+    jurisdiction: 'ES',
     sector: SECTOR,
     section: 'individual',
     format: 'org.schema',
@@ -470,7 +471,7 @@ describe('FamilyManager', () => {
   let mockVaultRepository: MockProxy<IVaultRepository>;
   let mockStorageAdapter: MockProxy<IStorageAdapter>;
   let mockLogger: MockProxy<ILogger>;
-  let mockTenantsCacheManager: jest.Mocked<Pick<TenantsCacheManager, 'getCollectionName' | 'getTenantDid'>>;
+  let mockTenantsCacheManager: jest.Mocked<Pick<TenantsCacheManager, 'getCollectionName' | 'getTenantDid' | 'isTenantOperational'>>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -482,6 +483,7 @@ describe('FamilyManager', () => {
     mockTenantsCacheManager = {
       getCollectionName: jest.fn().mockResolvedValue(COLLECTION_NAME),
       getTenantDid: jest.fn().mockResolvedValue(TENANT_DID),
+      isTenantOperational: jest.fn().mockResolvedValue(true),
     };
 
     manager = new FamilyManager(

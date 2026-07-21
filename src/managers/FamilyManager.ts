@@ -1260,9 +1260,11 @@ export class FamilyManager {
         const pdfBytes = Buffer.from(termsOfService, 'base64');
         const uploadResult = await this.storageAdapter.upload(pdfBytes, 'application/pdf');
         if (!uploadResult) throw new Error('Storage adapter returned undefined result.');
-        const { publicUrl, encodedMultiHash } = uploadResult;
+        const { publicUrl } = uploadResult;
         service.meta.claims[ClaimsServiceSchemaorg.termsOfService] = publicUrl;
-        (service.meta.claims as any)[`${ClaimsServiceSchemaorg.termsOfService}#hash`] = encodedMultiHash;
+        (service.meta.claims as any)[`${ClaimsServiceSchemaorg.termsOfService}#hash`] = createHash('sha256')
+          .update(pdfBytes)
+          .digest('hex');
       } catch (e: any) {
         throw new ManagerError(`Error processing service attachment: ${e.message}`, IssueType.Invalid);
       }
