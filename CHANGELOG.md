@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [1.20.3] - 2026-07-21
+
+### Fixed
+- Store the Gaia-X ServiceOffering terms evidence as the SHA-256 hexadecimal
+  digest of the uploaded document bytes. LegalPerson no longer depends on
+  terms or synthesizes a hash from a URL.
+- Keep a public encryption-kid owner index so bounded key-cache eviction does
+  not prevent legacy polling from decrypting host- or tenant-addressed JWE
+  responses.
+- Align family lifecycle and gateway crypto tests with route jurisdiction,
+  operational-tenant checks and the current per-recipient CEK-wrap profile.
+- Consume `gdc-common-utils-ts` 2.3.3 for ISO 3166-1 Gaia-X addresses and
+  strict ServiceOffering terms evidence.
+
 ## [1.20.2] - 2026-07-21
 
 ### Changed

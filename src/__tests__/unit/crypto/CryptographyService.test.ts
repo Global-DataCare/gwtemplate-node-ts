@@ -145,7 +145,9 @@ describe('CryptographyService', () => {
       const jweObject = await cryptoService.encryptJwe(payload, protectedHeader, senderKeyPair, recipients);
 
       // --- 3. Assert ---
-      expect(aesEncryptSpy).toHaveBeenCalledTimes(1);
+      // One AES-GCM operation encrypts the payload and another wraps its
+      // random CEK for the recipient under the confidential-pqc-v1 profile.
+      expect(aesEncryptSpy).toHaveBeenCalledTimes(2);
       expect(encapsulateSpy).toHaveBeenCalledTimes(1);
       expect(encapsulateSpy).toHaveBeenCalledWith(expect.any(Uint8Array), senderKeyPair.dBytes, Content.base64ToBytes(recipients[0].x));
       // expect(encapsulateSpy).toHaveBeenCalledWith(expect.any(Uint8Array), senderKeyPair.dBytes, Content.base64ToBytes(recipients[1].x));
@@ -154,7 +156,13 @@ describe('CryptographyService', () => {
       expect(jweObject.ciphertext).toBe(mockEncryptedComponents.ciphertext);
       expect(jweObject.recipients).toHaveLength(1);
       expect(jweObject.recipients[0].header.kid).toBe('recipient-1');
-      expect(jweObject.recipients[0].encrypted_key).toBe(Content.bytesToRawBase64UrlSafe(mockEncapsulation.encapsulatedCekBytes));
+      expect(Content.base64UrlSafeToJSON(jweObject.recipients[0].encrypted_key!)).toMatchObject({
+        v: 'gdc-mlkem-cek-wrap-v1',
+        kem: 'ML-KEM-768',
+        kdf: 'HKDF-SHA-256',
+        wrap: 'A256GCM',
+        kemCiphertext: Content.bytesToRawBase64UrlSafe(mockEncapsulation.encapsulatedCekBytes),
+      });
     });
   });
 
@@ -212,7 +220,7 @@ describe('CryptographyService', () => {
       const mockDecryptedBytes = Content.stringToBytesUTF8(mockDecryptedPayloadString);
       const mockProtectedHeader = { enc: 'A256GCM' };
 
-      const decapsulateSpy = jest.spyOn(cryptoService, 'decapsulate').mockResolvedValue(mockCek);
+      const unwrapRecipientCekSpy = jest.spyOn(cryptoService as any, 'unwrapRecipientCek').mockResolvedValue(mockCek);
       const decryptSpy = jest.spyOn(cryptoService, 'decrypt').mockResolvedValue(mockDecryptedPayloadString);
       jest.spyOn(Content, 'base64UrlSafeToJSON').mockReturnValue(mockProtectedHeader);
 
@@ -220,8 +228,8 @@ describe('CryptographyService', () => {
       const { decryptedBytes, protectedHeader } = await cryptoService.decryptJwe(mockJwe, recipient2PrivKey);
 
       // --- 3. Assert ---
-      expect(decapsulateSpy).toHaveBeenCalledTimes(1);
-      expect(decapsulateSpy).toHaveBeenCalledWith(Content.base64ToBytes('encrypted-key-2-b64'), recipient2PrivKey.dBytes);
+      expect(unwrapRecipientCekSpy).toHaveBeenCalledTimes(1);
+      expect(unwrapRecipientCekSpy).toHaveBeenCalledWith('encrypted-key-2-b64', recipient2PrivKey, mockJwe.protected);
       expect(decryptSpy).toHaveBeenCalledTimes(1);
       expect(decryptSpy).toHaveBeenCalledWith(
         { ciphertext: mockJwe.ciphertext, iv: mockJwe.iv, tag: mockJwe.tag }, mockCek, mockJwe.protected

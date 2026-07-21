@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import type { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
@@ -59,9 +60,11 @@ export async function handleServiceAttachment(
       serviceMeta.verification = { ...verification, evidence: evidenceList };
       const uploadResult = await deps.storageAdapter.upload(pdfBytes, 'application/pdf');
       if (!uploadResult) throw new Error('Storage adapter returned undefined result.');
-      const { publicUrl, encodedMultiHash } = uploadResult;
+      const { publicUrl } = uploadResult;
       service.meta!.claims[ClaimsServiceSchemaorg.termsOfService] = publicUrl;
-      (service.meta!.claims as any)[`${ClaimsServiceSchemaorg.termsOfService}#hash`] = encodedMultiHash;
+      (service.meta!.claims as any)[`${ClaimsServiceSchemaorg.termsOfService}#hash`] = createHash('sha256')
+        .update(pdfBytes)
+        .digest('hex');
     } catch (error) {
       throw new ManagerError(`Error processing service attachment: ${(error as Error).message}`, IssueType.Invalid);
     }

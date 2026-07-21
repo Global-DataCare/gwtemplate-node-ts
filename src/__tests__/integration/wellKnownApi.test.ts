@@ -271,7 +271,7 @@ describe('Well-Known Tenant Artifacts API', () => {
           ServiceCapability.IndexReader,
         ]),
         [ClaimsServiceSchemaorg.termsOfService]: 'https://provider.example/terms',
-        [`${ClaimsServiceSchemaorg.termsOfService}#hash`]: 'zTermsContentMultihash',
+        [`${ClaimsServiceSchemaorg.termsOfService}#hash`]: 'a'.repeat(64),
       },
     } as any);
 
