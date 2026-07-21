@@ -1,6 +1,47 @@
 // File: src/__tests__/unit/utils/tenant.test.ts
 
-import { isValidTenantAlternateName } from '../../../utils/tenant';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { generateTenantCollectionNameFromClaims, isValidTenantAlternateName } from '../../../utils/tenant';
+
+const originalStorageEnv = {
+  STORAGE_LAYOUT: process.env.STORAGE_LAYOUT,
+  DEPLOYMENT_ENV: process.env.DEPLOYMENT_ENV,
+  NETWORK_MODE: process.env.NETWORK_MODE,
+  HOST_STORAGE_SCOPE: process.env.HOST_STORAGE_SCOPE,
+};
+
+afterEach(() => {
+  for (const [key, value] of Object.entries(originalStorageEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
+const exampleClaims = {
+  [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+  [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+  [ClaimsOrganizationSchemaorg.identifierValue]: 'B87.617.981',
+  [ClaimsServiceSchemaorg.category]: 'system',
+};
+
+describe('generateTenantCollectionNameFromClaims', () => {
+  test('keeps the historical collection name when no persistence namespace is configured', () => {
+    process.env.STORAGE_LAYOUT = 'legacy-v1';
+
+    expect(generateTenantCollectionNameFromClaims(exampleClaims)).toBe('ES_TAX_B87617981_system');
+  });
+
+  test('isolates scoped-v2 collections by deployment, ledger mode and anonymous host', () => {
+    process.env.STORAGE_LAYOUT = 'scoped-v2';
+    process.env.DEPLOYMENT_ENV = 'staging';
+    process.env.NETWORK_MODE = 'test-network';
+    process.env.HOST_STORAGE_SCOPE = 'host-a';
+
+    expect(generateTenantCollectionNameFromClaims(exampleClaims)).toBe(
+      'staging_test-network_host-a__ES_TAX_B87617981_system',
+    );
+  });
+});
 
 describe('isValidTenantAlternateName', () => {
 

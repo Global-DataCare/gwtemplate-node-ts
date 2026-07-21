@@ -44,6 +44,11 @@ import { createFhirRouter } from './routes/fhir';
 import { createGlobalErrorHandler } from './middlewares/global-error-handler';
 import * as path from 'path';
 import { generateTenantCollectionNameFromClaims } from './utils/tenant';
+import { resolveStorageScope } from './config/storage-layout';
+import {
+  parseExpectedChannelBindings,
+  verifyAndPersistLedgerChannelBindings,
+} from './services/ledger-channel-binding';
 import * as swaggerUi from 'swagger-ui-express';
 import { LicenseManager } from './managers/LicenseManager';
 import { TokenManager } from './managers/TokenManager';
@@ -188,6 +193,21 @@ async function startServer(options?: StartServerOptions) {
     tenantManager,
     kmsService,
   } = await buildInfrastructure({ config, hostCollectionName });
+
+  const storageScope = resolveStorageScope();
+  if (storageScope.layout === 'scoped-v2') {
+    if (String(process.env.LEDGER_GENESIS_VERIFICATION || '').trim().toLowerCase() !== 'true') {
+      throw new Error('scoped-v2 requires LEDGER_GENESIS_VERIFICATION=true.');
+    }
+    const ledgerMspId = String(process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_ORG1 || '').trim();
+    if (!ledgerMspId) throw new Error('scoped-v2 requires LEDGER_MSP_ID.');
+    await verifyAndPersistLedgerChannelBindings({
+      vaultRepository,
+      hostCollectionName,
+      mspId: ledgerMspId,
+      expected: parseExpectedChannelBindings(process.env.LEDGER_CHANNEL_GENESIS_SHA256),
+    });
+  }
   const {
     hostingManager,
     icaManager,
