@@ -1,5 +1,25 @@
 ## [Unreleased]
 
+## [1.20.8] - 2026-07-22
+
+### Added
+- Add typed region-final Fabric channel construction for the six approved
+  regions and make `identity-global` the non-regional human identity default.
+- Add the normative GDC Human Health versus VetChain Pets network/channel and
+  resource-chaincode matrix, with PETD explicitly marked as a target contract.
+
+### Documentation
+- Define the identity-ledger bootstrap order: governance-executor organization
+  first, then its Root CA controller employee/person and canonical
+  `hasCredential.material` commitment.
+- Document the implemented GW role of `subjectkeybinding-sc`: write-only
+  derived audit/lifecycle state today, with reverse lookup and authorization
+  enforcement explicitly not implemented.
+- Add the chaincode README with transactions, identity/sector channel
+  boundaries, credential-plane separation and current limitations.
+- Separate the GDC human-health funding/product boundary from the commercial
+  VetChain Pets reuse boundary, including independent staging Fabric networks.
+
 ## [1.20.7] - 2026-07-22
 
 ### Documentation

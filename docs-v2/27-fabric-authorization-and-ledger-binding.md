@@ -31,7 +31,36 @@ jurisdiction, then routes only to a channel granted by the current governance
 configuration. This prevents a non-provider tenant or an actor without the
 required professional, research or responder capability from writing.
 
-## Root controller identity is anchored in `identity`
+## Root controller identity is anchored in `identity-global`
+
+`identity-global` is exclusively the global human/governance identity plane.
+It is not regional and must not contain animal identities, animal ownership,
+clinical records or professional employment records. The bootstrap order is:
+
+1. register the legal organization designated by the rulebook to execute the
+   committee's decisions;
+2. register the Root CA controller employee/person as a member of that
+   organization;
+3. persist the controller subject's canonical operation-signing commitment;
+4. derive optional operational key and subject-key indexes.
+
+The global human plane contains natural persons, human individual
+organizations, their controllers/members and their personal user/device keys.
+Professional provider and employee records belong to their sector-region
+channel and reference the global person UUID.
+
+Sector-region channels use a region suffix:
+
+- `health-care-<region>`: human clinical certification and permissions in
+  the selected provider index for that region;
+- `animal-pet-<region>`: animal/animal-individual-organization identity,
+  one or more ownership relationships, animal clinical certification and
+  permissions in the selected provider index for that region.
+
+The initial region catalog is `eu`, `na`, `asia`, `africa`, `pacific`
+and `latam`. Here `asia` includes the Middle East and India;
+`pacific` includes China, Japan, Korea, Australia and the rest of the Pacific;
+and `latam` includes Latin America and the Caribbean.
 
 The Root CA controller's authoritative operation-signing key binding belongs to
 the controller employee/person identity itself:
@@ -45,9 +74,21 @@ employee/person UUID to the public JWK. It is also the canonical model for a
 controller or member of an individual organization.
 
 Do not make `subjectkeybinding-sc` a second authority for this relationship.
-That contract may index device or rotating keys and their lifecycle, while
-`cryptographickey-sc` may store normalized key metadata/status, but those
-records are derived and must agree with `hasCredential.material`.
+The GW currently writes that contract during organization DID-key registration
+and employee device-key registration or revocation. Its current resolver sends
+those writes to one identity channel without applying the required
+human-versus-sector-region ownership rule. That routing is a known gap and must
+be fixed before treating these records as authoritative.
+
+The GW does not read the contract in an authorization path. The contract
+exposes reads and history by
+`bindingId`; although it writes composite subject/key indexes, it currently
+exposes no reverse-query transaction. Its implemented role is therefore
+derived lifecycle/audit state, not authorization enforcement.
+
+`cryptographickey-sc` may store normalized key metadata/status, but both
+records are derived and must agree with `hasCredential.material` when they
+represent the same canonical operation-signing key.
 
 Fabric chaincode lifecycle does not initialize world state. After the identity
 contracts are committed, a protected controller client must derive the key pair

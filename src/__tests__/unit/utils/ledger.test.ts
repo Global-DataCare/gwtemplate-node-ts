@@ -32,10 +32,11 @@ describe('resolveIdentityChannel', () => {
     expect(resolveIdentityChannel('ES')).toBe('identity-local');
   });
 
-  it('keeps the jurisdiction-derived identity channel outside local-network', () => {
+  it('uses global human identity outside local-network regardless of jurisdiction', () => {
     process.env.NETWORK_MODE = 'test-network';
     delete process.env.LEDGER_IDENTITY_CHANNEL_DEFAULT;
 
-    expect(resolveIdentityChannel('ES')).toBe('es-identity');
+    expect(resolveIdentityChannel('ES')).toBe('identity-global');
+    expect(resolveIdentityChannel('US')).toBe('identity-global');
   });
 });

@@ -60,17 +60,21 @@ explicitly incomplete until that contract gap is resolved.
 
 The required bootstrap sequence is:
 
-1. In the protected controller runtime, accept or generate the seed and derive
+1. Register the legal governance-executor organization in `identity-global`,
+   the human/governance identity plane. This organization is a
+   deployment/rulebook input, not a hard-coded product organization.
+2. In the protected controller runtime, accept or generate the seed and derive
    the post-quantum operation-signing key pair. Never send the seed or private
    key to Fabric, DID/JWKS, logs or Kubernetes configuration.
-2. Compute the public JWK's RFC 7638 thumbprint and RFC 9278 URN.
-3. After the identity contracts are committed, submit one explicit,
+3. Compute the public JWK's RFC 7638 thumbprint and RFC 9278 URN.
+4. After the identity contracts are committed, submit one explicit,
    idempotent bootstrap transaction that creates the Root CA controller
-   employee/person and stores the URN in `hasCredential.material`.
-4. Reject a second root-controller initialization and retain the Fabric
+   employee/person under that registered organization and stores the URN in
+   `hasCredential.material`.
+5. Reject a second root-controller initialization and retain the Fabric
    transaction identity, block history and canonical public bootstrap payload
    as audit evidence.
-5. Require later key rotation to be an authorized ledger transaction preserving
+6. Require later key rotation to be an authorized ledger transaction preserving
    the previous claim/history and proving continuity with the currently active
    controller key.
 
