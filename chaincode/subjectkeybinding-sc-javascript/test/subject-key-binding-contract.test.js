@@ -4,6 +4,13 @@
 
 "use strict";
 
+/**
+ * Flow contract: a subject-key binding is a derived relationship that keeps
+ * only a keyId reference and relationship lifecycle. The canonical JWK and key
+ * lifecycle remain in cryptographickey-sc, and unrelated key fields must never
+ * be copied into this asset.
+ */
+
 const chai = require("chai");
 const chaiAsPromised = require("chai-as-promised");
 
@@ -145,6 +152,29 @@ describe("SubjectKeyBindingContract", () => {
 
     const history = await contract.getSubjectKeyBindingHistory(ctx, BINDING_ID);
     expect(history[0].timestamp).to.equal(77);
+  });
+
+  it("stores a key reference without duplicating cryptographic-key state", async () => {
+    const ctx = createContractContext({ txSeconds: 10, txId: "TX-REFERENCE-ONLY" });
+    const created = await contract.CreateSubjectKeyBinding(
+      ctx,
+      BINDING_ID,
+      JSON.stringify(buildPayload({
+        publicKeyJwk: { kty: "AKP", alg: "ML-DSA-44", pub: "must-not-be-copied" },
+        thumbprint: "urn:jwk:must-not-be-copied",
+        alg: "ML-DSA-44",
+        use: "sig",
+        keyStatus: "revoked",
+      })),
+    );
+
+    expect(created.keyId).to.equal("key1");
+    expect(created).not.to.have.property("publicKeyJwk");
+    expect(created).not.to.have.property("thumbprint");
+    expect(created).not.to.have.property("alg");
+    expect(created).not.to.have.property("use");
+    expect(created).not.to.have.property("keyStatus");
+    expect(created.status).to.equal("active");
   });
 
   it("rejects duplicates, malformed payloads and invalid status operations", async () => {

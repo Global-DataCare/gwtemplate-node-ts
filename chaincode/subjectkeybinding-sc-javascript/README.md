@@ -5,6 +5,43 @@ and a cryptographic key. It is an audit/index contract. It is not the canonical
 identity record, a channel authorization mechanism, or a replacement for the
 credentialSubject.hasCredential.material claim.
 
+## Why this is not part of cryptographickey-sc
+
+`cryptographickey-sc` owns one record per public key and its intrinsic
+lifecycle: algorithm, use, thumbprint, owner organization, status and expiry.
+It answers questions about the key itself, such as whether it is active or
+revoked.
+
+`subjectkeybinding-sc` owns the many-to-many relationships that use that key.
+It answers a different question: which subject uses this key, in which
+operational relationship, and whether that particular relationship is active?
+
+Keeping those records separate prevents the key asset from becoming an
+unbounded array that must be rewritten every time a device, role or subject is
+added or removed. It also allows one key to have several independently audited
+relationships and lets one subject rotate from one key to another without
+rewriting either key's immutable identity.
+
+Example:
+
+    cryptographickey-sc
+      key-2026-01 -> { thumbprint, alg, status: "active" }
+
+    subjectkeybinding-sc
+      employee-456__device-a-signing-key -> professional-signing, active
+      employee-456__device-b-signing-key -> professional-signing, suspended
+      controller-789__personal-device-key -> controller-signing, revoked
+
+The binding only stores `keyId`; it must not duplicate the JWK, thumbprint,
+algorithm or key lifecycle. Consumers resolve those fields from
+`cryptographickey-sc` in the same channel and must require both the key and the
+specific binding to be active. A binding cannot reactivate or alter a revoked
+key.
+
+This separation is deliberately not authorization by itself. The applicable
+credential, employee/member relationship, licence, consent and channel policy
+still decide whether an operation is permitted.
+
 ## Channel ownership boundary
 
 Deploy the contract in each channel that owns subjects with operational keys;
@@ -12,12 +49,18 @@ do not build one cross-sector key registry.
 
 - identity-global owns natural persons, human individual organizations, their
   controllers/members and personal user/device keys.
+- identity-REGION owns jurisdictional professional identity, employment,
+  licences and professional device/key bindings that must be referenced across
+  several sector or animal-species channels. Registration there grants no
+  sector/species write by itself.
 - health-care-REGION owns professional provider/employee relationships, their
   professional keys, human clinical certification and provider-index
   permissions for that region.
 - animal-pet-REGION owns animal/animal-individual-organization identity,
-  multiple ownership relationships, veterinary provider/employee professional
-  keys, animal clinical certification and provider-index permissions.
+  multiple ownership relationships, animal clinical certification and
+  provider-index permissions. It references the multi-species veterinary
+  professional registered once in identity-REGION and applies the employing
+  organization's ICA VC plus host grant.
 
 REGION is one of eu, na, asia, africa, pacific or latam. A professional employee
 record references the person's global UUID without copying the global human

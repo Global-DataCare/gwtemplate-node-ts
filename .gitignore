@@ -88,6 +88,11 @@ Env
 
 # Compiled TypeScript files
 lib
+
+# JavaScript Fabric chaincodes keep their authored runtime sources under lib/.
+# They are not generated build output and must exist in a clean checkout.
+!chaincode/subjectkeybinding-sc-javascript/lib/
+!chaincode/subjectkeybinding-sc-javascript/lib/**
 build
 
 # Ignore all .json files in the root, like service account keys
