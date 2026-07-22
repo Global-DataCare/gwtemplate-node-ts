@@ -31,6 +31,40 @@ jurisdiction, then routes only to a channel granted by the current governance
 configuration. This prevents a non-provider tenant or an actor without the
 required professional, research or responder capability from writing.
 
+## Root controller identity is anchored in `identity`
+
+The Root CA controller's authoritative operation-signing key binding belongs to
+the controller employee/person identity itself:
+
+```text
+credentialSubject.hasCredential.material = urn:jwk:<RFC-7638-thumbprint>
+```
+
+The RFC 7638 thumbprint is encoded using RFC 9278. This claim binds the stable
+employee/person UUID to the public JWK. It is also the canonical model for a
+controller or member of an individual organization.
+
+Do not make `subjectkeybinding-sc` a second authority for this relationship.
+That contract may index device or rotating keys and their lifecycle, while
+`cryptographickey-sc` may store normalized key metadata/status, but those
+records are derived and must agree with `hasCredential.material`.
+
+Fabric chaincode lifecycle does not initialize world state. After the identity
+contracts are committed, a protected controller client must derive the key pair
+outside Fabric and submit one explicit, idempotent bootstrap transaction. Only
+the public thumbprint URN enters the employee identity; the seed and private key
+never enter a proposal, block, DID document, JWKS, log or Kubernetes secret.
+
+The current `employee-sc` does not yet persist this claim and exposes no
+one-time bootstrap function. This is a production TODO, not an implemented
+guarantee. Until it is implemented and tested, the online governance UI must
+not claim that ledger anchoring protects its controller key.
+
+The Fabric-CA X.509 admin/client identity used to submit the internal Fabric
+transaction is separate from the post-quantum controller JWK used to sign the
+public governance request. Audit records must retain both identities without
+equating or reusing their private keys.
+
 ## MVP chaincode rule
 
 The MVP does not maintain a per-host chaincode allowlist. Once a host is a
