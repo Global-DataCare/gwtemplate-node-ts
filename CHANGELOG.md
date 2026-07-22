@@ -1,9 +1,16 @@
 ## [Unreleased]
 
+## [1.20.7] - 2026-07-22
+
 ### Documentation
 - Keep the host PDF free of Fabric channels, permissions, block-zero hashes and
   chaincode policy. Root governance configures channel read/write membership
   separately and Fabric provisioning injects technical fingerprints.
+- Correct the Root CA controller trust chain: the employee/person
+  `hasCredential.material` RFC 9278 URN is the canonical subject-to-key binding;
+  auxiliary subject-key/key registries are derived lifecycle indexes. Document
+  the missing one-time Fabric bootstrap transaction and keep Fabric-CA X.509
+  credentials separate from the controller's public post-quantum JWK.
 
 ### Fixed
 - Let new `staging/test-network/scoped-v2` MVP deployments start without
