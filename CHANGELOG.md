@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [1.20.10] - 2026-07-22
+
+### Fixed
+- Keep the sector first in research channel families:
+  `health-research-<jurisdiction>` and
+  `animal-research-<jurisdiction>`.
+
 ## [1.20.9] - 2026-07-22
 
 ### Documentation

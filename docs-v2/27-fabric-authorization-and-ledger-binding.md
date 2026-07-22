@@ -71,7 +71,7 @@ Sector-region channels use a region suffix:
 
 Institutional channel families are separately governed:
 
-- `research-health-<region>` and `research-animal-<region>` register research
+- `health-research-<region>` and `animal-research-<region>` register research
   institutions, researchers and research-governance evidence. One Health read
   grants in the two networks are independent and confer no clinical writes;
 - `health-it-<region>` and `animal-it-<region>` register software/device

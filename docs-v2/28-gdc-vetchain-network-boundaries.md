@@ -139,8 +139,8 @@ their distinct peer visibility or endorsement boundary is needed:
 
 | Family | Records owned | Explicit non-grant |
 | --- | --- | --- |
-| `research-health-<jurisdiction>` | human-health research institutions, researchers, employment and research-governance evidence | no human clinical writes |
-| `research-animal-<jurisdiction>` | animal/One Health institutions, researchers, employment and research-governance evidence | no animal clinical writes |
+| `health-research-<jurisdiction>` | human-health research institutions, researchers, employment and research-governance evidence | no human clinical writes |
+| `animal-research-<jurisdiction>` | animal/One Health institutions, researchers, employment and research-governance evidence | no animal clinical writes |
 | `health-it-<jurisdiction>` | health software/device organizations, employees and product/service attestations | no provider status |
 | `animal-it-<jurisdiction>` | animal software/device organizations, employees and product/service attestations | no veterinary-provider status |
 | `health-gov-<jurisdiction>` | municipal, regional or national health/emergency institutions and responders | no automatic provider status |
@@ -175,7 +175,7 @@ ledger read access.
 ## One Health research boundary
 
 A One Health institution can be admitted independently to
-`research-health-<jurisdiction>` and `research-animal-<jurisdiction>`. Its
+`health-research-<jurisdiction>` and `animal-research-<jurisdiction>`. Its
 researchers may receive separately governed reads from both trust domains, but
 research status alone never permits writes to provider-certified human or
 animal records.
