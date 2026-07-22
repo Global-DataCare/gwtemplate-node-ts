@@ -25,11 +25,17 @@ read/write role in the selected channels. The operation is authenticated with
 the controller identity and signature and is audited independently from the
 host PDF.
 
-GW must not accept a request-supplied channel as authority. It resolves the
-authenticated tenant, organization, license/role, action, sector and
-jurisdiction, then routes only to a channel granted by the current governance
-configuration. This prevents a non-provider tenant or an actor without the
-required professional, research or responder capability from writing.
+GW must not accept a request-supplied channel as authority. It first verifies
+the ICA-issued organization VC and current host grant, then resolves the
+authenticated tenant, active employment/membership, licence, internal role,
+key binding, action, sector and jurisdiction. This prevents a professional in
+an unapproved organization, or an approved organization with an unauthorized
+actor, from writing.
+
+The organization is the external permission boundary. The individual's role
+is the internal action boundary. A veterinarian, doctor, researcher,
+responder, insurer employee or crew member receives no channel permission from
+the job title alone. Read and write are independent grants.
 
 ## Root controller identity is anchored in `identity-global`
 
@@ -46,8 +52,14 @@ clinical records or professional employment records. The bootstrap order is:
 
 The global human plane contains natural persons, human individual
 organizations, their controllers/members and their personal user/device keys.
-Professional provider and employee records belong to their sector-region
-channel and reference the global person UUID.
+Professional provider and employee records belong to the channel family that
+governs their accredited organization and reference the global person UUID.
+A veterinarian is multi-species, not multi-sector: register the professional
+once under the veterinary organization in `identity-<region>`, then grant that
+organization only the species channel families established by its VC and host
+policy. This jurisdictional identity registry owns employment, licence and
+professional device/key lifecycle; it grants no species-channel write by
+itself.
 
 Sector-region channels use a region suffix:
 
@@ -56,6 +68,28 @@ Sector-region channels use a region suffix:
 - `animal-pet-<region>`: animal/animal-individual-organization identity,
   one or more ownership relationships, animal clinical certification and
   permissions in the selected provider index for that region.
+
+Institutional channel families are separately governed:
+
+- `research-health-<region>` and `research-animal-<region>` register research
+  institutions, researchers and research-governance evidence. One Health read
+  grants in the two networks are independent and confer no clinical writes;
+- `health-it-<region>` and `animal-it-<region>` register software/device
+  organizations and their product or service attestations without provider
+  status;
+- `health-gov-<region>` and `animal-gov-<region>` register public institutions
+  and responders where they are not governed as an integrated regulated
+  healthcare provider;
+- `health-travel-global` and `animal-travel-global` register global carriers
+  and crew credentials, while emergency reads remain explicit GW
+  consent/break-glass operations;
+- insurance receives a dedicated regional channel only when separate peer
+  visibility or endorsement requires it; otherwise it remains an exact GW
+  policy grant.
+
+These names are target routing vocabulary, not mandatory MVP provisioning.
+Create a channel only for a distinct membership, confidentiality, residency or
+endorsement boundary.
 
 The initial region catalog is `eu`, `na`, `asia`, `africa`, `pacific`
 and `latam`. Here `asia` includes the Middle East and India;

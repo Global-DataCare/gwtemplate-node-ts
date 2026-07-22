@@ -1,7 +1,7 @@
 {
   "name": "subjectkeybinding-sc",
-  "version": "1.0.0",
-  "description": "Smart contract for subject-to-key binding assets",
+  "version": "1.0.1",
+  "description": "Derived subject-to-key relationship index referencing cryptographickey-sc assets",
   "main": "index.js",
   "engines": {
     "node": ">=18"
@@ -26,6 +26,7 @@
   "nyc": {
     "exclude": [
       "coverage/**",
+      "eslint.config.js",
       "test/**"
     ],
     "reporter": [

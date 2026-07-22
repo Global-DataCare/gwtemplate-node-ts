@@ -1,5 +1,30 @@
 ## [Unreleased]
 
+## [1.20.9] - 2026-07-22
+
+### Documentation
+- Correct Fabric authorization so channel grants belong to an ICA-accredited
+  organization accepted by host governance, while professional role/licence
+  is a second internal action boundary. Define multi-species veterinary,
+  emergency, One Health research, IT, government, insurance and global travel
+  channel families with a minimal staging subset instead of requiring every
+  target channel for the MVP.
+- Define `subjectkeybinding-sc` as a derived many-to-many relationship index:
+  `cryptographickey-sc` owns public-key material and lifecycle, while bindings
+  own subject/device/role relationships and their independent lifecycle.
+- Document that bindings store only `keyId`, cannot override key status and are
+  not identity, proof of possession, licensing, consent or authorization.
+- Track the authored `subjectkeybinding-sc` runtime sources that were
+  accidentally hidden by the repository-wide `lib` ignore rule, so a clean
+  checkout contains the contract imported by its entrypoint.
+
+### Tests
+- Prove that subject-key binding projection discards JWK, thumbprint,
+  algorithm, use and key-status fields instead of duplicating canonical
+  `cryptographickey-sc` state.
+- Add a package-local ESLint 9 flat configuration so the declared lint gate is
+  executable in a clean checkout.
+
 ## [1.20.8] - 2026-07-22
 
 ### Added
