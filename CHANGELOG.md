@@ -6,6 +6,9 @@
   section filters; query-string summary parameters remain compatible.
 
 ### Documentation
+- Teach the immutable `FhirDocumentFacade` section/type/clinical-date-range
+  chain in the GW lifecycle 101 instead of exposing raw Bundle-query filter
+  fields or separate FHIR date/Period setters.
 - Complete the GW 101 lifecycle with the canonical Communication
   `Subject/$summary` read path and concrete section, count, entry and
   section/type/date resource-consumption examples.
