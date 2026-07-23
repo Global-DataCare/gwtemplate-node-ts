@@ -1,6 +1,13 @@
 ## [Unreleased]
 
+### Added
+- Accept the canonical FHIR `Parameters` attachment on Communications that
+  request `Subject/$summary`, including subject, document-type and repeated
+  section filters; query-string summary parameters remain compatible.
+
 ### Documentation
+- Document the read-only `$summary` lifecycle and the ownership split between
+  BundleReader, FhirDocumentFacade, SDK actor facades and UHC format extensions.
 - Expand the cross-portal subject-binding environment contract with
   deny-by-default behavior, reciprocal receiving-GW configuration and explicit
   issuer DID boundaries.

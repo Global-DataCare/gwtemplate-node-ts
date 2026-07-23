@@ -459,7 +459,7 @@ export class CommunicationManager implements IJobProcessor {
         format,
         resourceType: summaryResourceType,
         action: '$summary',
-        body: this.buildSummaryParametersBody(query),
+        body: this.buildSummaryParametersBody(query, fhirResource),
       };
     }
 
@@ -494,7 +494,34 @@ export class CommunicationManager implements IJobProcessor {
     };
   }
 
-  private buildSummaryParametersBody(query: string): Record<string, unknown> {
+  /**
+   * Resolves the FHIR `Parameters` body for an embedded `$summary` read.
+   *
+   * Canonical contract:
+   * - `Communication.contentReference` selects `Subject/$summary`
+   * - `Communication.payload.contentAttachment.data` carries the serialized
+   *   FHIR `Parameters` resource
+   *
+   * Query-string conversion remains a compatibility path for older clients.
+   */
+  private buildSummaryParametersBody(
+    query: string,
+    fhirResource: FhirCommunication,
+  ): Record<string, unknown> {
+    const payloads = Array.isArray((fhirResource as any)?.payload)
+      ? (fhirResource as any).payload
+      : [];
+    for (const payload of payloads) {
+      const attachment =
+        this.resolveCommunicationPayloadAttachment(payload)?.documentAttachment;
+      if (!attachment) continue;
+      const parsed = this.parseAttachmentJson(attachment);
+      if (parsed?.resourceType === FHIR_PARAMETERS_RESOURCE_TYPE
+        && Array.isArray(parsed.parameter)) {
+        return parsed as Record<string, unknown>;
+      }
+    }
+
     const params = new URLSearchParams(query);
     const parameter: Array<Record<string, unknown>> = [];
     const parameterNameByQueryKey: Record<string, string> = {
