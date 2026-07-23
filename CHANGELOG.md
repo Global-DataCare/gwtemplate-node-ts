@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [1.20.12] - 2026-07-23
+
+### Fixed
+- Preserve an explicit public `organization.did` across the canonical legal
+  organization `_transaction` and `Order/_batch` flow so the final tenant DID
+  Document does not fall back to the operator IP or a hostname-only DID.
+- Preserve `did:` and `urn:` values in DID binding `alsoKnownAs` updates while
+  continuing to normalize domain and HTTP aliases to HTTPS.
+
+### Documentation
+- Document stable operator DNS configuration such as
+  `HOST_EXTERNAL_DOMAIN=host-accuro.globaldatacare.es` and the current
+  SDK/portal responsibility for supplying the public organization DID.
+
 ## [1.20.11] - 2026-07-23
 
 ### Fixed
