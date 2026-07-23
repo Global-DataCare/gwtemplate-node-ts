@@ -20,6 +20,7 @@ import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/con
 import { getMatchingInterTenantAccessContractFromVpToken } from 'gdc-common-utils-ts/utils/inter-tenant-access-contract';
 import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
 import { getEnvSectionId } from '../utils/section-env';
+import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 
 type TokenRequestBody = {
   client_id?: string;
@@ -119,6 +120,10 @@ export class OpenIdAuthManager implements IJobProcessor {
     const actor = parseActorFromSub(sub);
     const purpose = body.purpose?.trim();
     const requestedCapabilities = this.extractRequestedCapabilities(scope);
+    const isInterTenantResearchAccess = requestedCapabilities.some((capability) =>
+      capability === ServiceCapability.DigitalTwinReader
+      || capability === ServiceCapability.DigitalTwinProvider
+    );
     const vpToken = body.vp_token?.trim();
     const accessProof = await this.resolveAccessProof({
       acrValues,
@@ -131,18 +136,21 @@ export class OpenIdAuthManager implements IJobProcessor {
       bearerPayload: (job.content as any)?.meta?.bearer?.jwt?.payload,
     });
 
-    // Inter-tenant contract gate:
+    // Inter-tenant research contract gate:
     // - issuerDid = tenant that is about to issue the SMART token
     // - actor.organization = organization of the requesting professional/researcher
-    // - if both differ, this is no longer an intra-tenant access request
-    // - in that case the VP must carry one contract VC proving:
+    // - only DigitalTwin/ResearchSubject capabilities represent the research
+    //   contract boundary; individual Composition self-read remains governed
+    //   by its subject-scoped consent rules
+    // - when research actor and issuer differ, the VP must carry one contract
+    //   VC proving:
     //   1. provider organization = issuer tenant (`acme`)
     //   2. consumer organization = foreign requester tenant (`lab`)
     //   3. capability allows the requested scope
-    //      example: `organization/Composition.rs`
+    //      example: `organization/ResearchSubject.rs`
     //   4. purpose allows the requested business reason
     //      example: `RESEARCH`
-    if (actor.organization && actor.organization !== issuerDid) {
+    if (isInterTenantResearchAccess && actor.organization && actor.organization !== issuerDid) {
       if (accessProof.mode === 'vp_token') {
         const matchingContract = getMatchingInterTenantAccessContractFromVpToken(vpToken!, {
           providerOrganizationDid: issuerDid,

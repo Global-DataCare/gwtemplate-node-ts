@@ -20,6 +20,37 @@ import {
 } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import { buildClientAssertionJwt } from 'gdc-common-utils-ts/utils/client-assertion';
 import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
+import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
+import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
+import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
+import {
+  EXAMPLE_HOSTING_OPERATOR_DID,
+  EXAMPLE_SUBJECT_DID,
+} from 'gdc-common-utils-ts/examples/shared';
+
+const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_SCOPE =
+  `${ServiceCapability.DigitalTwinReader}?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
+
+/**
+ * Reuses the shared research contract while specializing its capability for
+ * the DigitalTwin/ResearchSubject boundary enforced by this manager.
+ */
+function buildExampleInterTenantDigitalTwinContractCredential(): Record<string, unknown> {
+  const credential = EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL as any;
+  return {
+    ...credential,
+    credentialSubject: {
+      ...(credential.credentialSubject || {}),
+      term: (credential.credentialSubject?.term || []).map((term: any) => ({
+        ...term,
+        offer: {
+          ...(term.offer || {}),
+          securityLabel: [{ text: ServiceCapability.DigitalTwinReader }],
+        },
+      })),
+    },
+  };
+}
 
 describe('OpenIdAuthManager', () => {
   it('should issue a signed access_token for a tenant (org did rule)', async () => {
@@ -1051,6 +1082,7 @@ describe('OpenIdAuthManager', () => {
           ...testConsentRulePermitOrgDid,
           'Consent.actor-identifier': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
           'Consent.purpose': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
+          'Consent.action': `${ServiceCapability.DigitalTwinReader}?subject=*`,
         },
       ] as any),
       put: jest.fn(),
@@ -1074,7 +1106,7 @@ describe('OpenIdAuthManager', () => {
       iss: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
       sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
     });
-    addVC(vpPayload, EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL);
+    addVC(vpPayload, buildExampleInterTenantDigitalTwinContractCredential());
 
     const manager = new OpenIdAuthManager(
       mockKmsService,
@@ -1101,7 +1133,7 @@ describe('OpenIdAuthManager', () => {
         aud: 'did:web:api.acme.org',
         body: {
           sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
-          scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+          scope: EXAMPLE_INTER_TENANT_DIGITAL_TWIN_SCOPE,
           purpose: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
           vp_token: JSON.stringify(vpPayload),
           acr_values: 'urn:antifraud:acr:openid4vp:employee',
@@ -1110,6 +1142,104 @@ describe('OpenIdAuthManager', () => {
     } as JobRequest);
 
     expect(response.body.access_token).toBeDefined();
+  });
+
+  it('should issue an individual self-read token without requiring an inter-tenant research contract', async () => {
+    const mockKmsService: jest.Mocked<IKmsService> = {
+      init: jest.fn(),
+      provisionKeys: jest.fn(),
+      getPublicJwks: jest.fn(),
+      getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' } as any),
+      getPublicEncryptionKey: jest.fn(),
+      getHostPublicJwkSet: jest.fn(),
+      decodeRequest: jest.fn(),
+      signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
+      signWithReconstructedKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+      createCompactJws: jest.fn(),
+      encodeResponse: jest.fn(),
+      protectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getHmacBase64Url: jest.fn(),
+      protectAttributesNameAndValue: jest.fn(),
+    };
+
+    const mockTenantsCacheManager: jest.Mocked<TenantsCacheManager> = {
+      getDidDocument: jest.fn().mockResolvedValue({ id: EXAMPLE_HOSTING_OPERATOR_DID } as any),
+      tenantExists: jest.fn().mockResolvedValue(true),
+    } as any;
+
+    const mockVaultRepository: jest.Mocked<IVaultRepository> = {
+      createNewVault: jest.fn(),
+      vaultExists: jest.fn().mockResolvedValue(true),
+      getVaultConfig: jest.fn().mockResolvedValue({ id: 'vault' } as any),
+      createNewSection: jest.fn(),
+      updateSection: jest.fn(),
+      getAllSections: jest.fn(),
+      sectionExists: jest.fn(),
+      getContainersListInSection: jest.fn(),
+      listContainersInSection: jest.fn(),
+      getContainersInSection: jest.fn().mockResolvedValue([{
+        '@context': 'org.hl7.fhir.api',
+        [ClaimConsent.subject]: EXAMPLE_SUBJECT_DID,
+        [ClaimConsent.identifier]: 'urn:uuid:individual-self-read',
+        [ClaimConsent.decision]: ConsentDecisions.Permit,
+        [ClaimConsent.actorIdentifier]: EXAMPLE_SUBJECT_DID,
+        [ClaimConsent.action]: `${ServiceCapability.IndexReader}?section=*`,
+        [ClaimConsent.purpose]: HealthcareConsentPurposes.Treatment,
+      }] as any),
+      put: jest.fn(),
+      get: jest.fn(),
+      getHistory: jest.fn(),
+      query: jest.fn(),
+      delete: jest.fn(),
+      purge: jest.fn(),
+    };
+
+    const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
+      verifyVpToken: jest.fn().mockResolvedValue({
+        acr: 'urn:antifraud:acr:openid4vp:individual',
+        amr: ['openid4vp', 'vc'],
+        vpHash: 'hash',
+        ledgerVerified: true,
+      }),
+    };
+
+    const manager = new OpenIdAuthManager(
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockVaultRepository,
+      mockClearingHouse,
+    );
+
+    const response = await manager.process({
+      tenantId: 'acme',
+      jurisdiction: 'ES',
+      sector: 'health-care',
+      section: 'identity',
+      format: 'openid',
+      resourceType: 'smart',
+      action: 'token',
+      id: '',
+      sequence: 0,
+      status: 'DRAFT' as any,
+      createdAtTimestamp: Date.now(),
+      content: {
+        thid: 'individual-self-read',
+        iss: `${EXAMPLE_SUBJECT_DID}:device:client`,
+        aud: EXAMPLE_HOSTING_OPERATOR_DID,
+        body: {
+          sub: EXAMPLE_SUBJECT_DID,
+          scope: `${ServiceCapability.IndexReader}?subject=${EXAMPLE_SUBJECT_DID}&section=*`,
+          purpose: HealthcareConsentPurposes.Treatment,
+          vp_token: JSON.stringify(createVP({ iss: EXAMPLE_SUBJECT_DID, sub: EXAMPLE_SUBJECT_DID })),
+          acr_values: 'urn:antifraud:acr:openid4vp:individual',
+        },
+      } as any,
+    } as JobRequest);
+
+    expect(response.body.access_token).toBeDefined();
+    expect(response.body.subject).toBe(EXAMPLE_SUBJECT_DID);
   });
 
   it('should deny a foreign organization actor when no matching inter-tenant contract is presented', async () => {
@@ -1152,6 +1282,7 @@ describe('OpenIdAuthManager', () => {
           ...testConsentRulePermitOrgDid,
           'Consent.actor-identifier': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
           'Consent.purpose': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
+          'Consent.action': `${ServiceCapability.DigitalTwinReader}?subject=*`,
         },
       ] as any),
       put: jest.fn(),
@@ -1196,7 +1327,7 @@ describe('OpenIdAuthManager', () => {
         aud: 'did:web:api.acme.org',
         body: {
           sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
-          scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+          scope: EXAMPLE_INTER_TENANT_DIGITAL_TWIN_SCOPE,
           purpose: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
           vp_token: JSON.stringify(createVP({
             iss: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,

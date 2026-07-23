@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [1.20.11] - 2026-07-23
+
+### Fixed
+- Keep the SMART inter-tenant `Contract` VC gate on
+  `organization/ResearchSubject.*` digital-twin access. Individual
+  `organization/Composition.*` self-read continues through its VP and
+  subject-scoped FHIR `Consent` rules without being misclassified as a
+  research consumer when its public DID root differs from the operator DID.
+
 ## [1.20.10] - 2026-07-22
 
 ### Fixed

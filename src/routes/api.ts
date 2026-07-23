@@ -2569,6 +2569,13 @@ export function createApiRouter(
    *       accepts one already-validated external `Bearer data access token` instead of `body.vp_token`, as long
    *       as the trusted issuer, provider tenant, consumer organization, purpose, and requested capability match.
    *
+   *       Contract boundary: the inter-tenant FHIR `Contract` VC gate applies
+   *       to `organization/ResearchSubject.*` digital-twin capabilities.
+   *       Individual `organization/Composition.*` self-read still requires
+   *       one verified VP and matching FHIR `Consent`, but not a research
+   *       contract solely because its public DID root differs from the
+   *       operator DID serving the endpoint.
+   *
    *       Demo payload note: in this endpoint the DIDComm `body` represents the JAR (authorize request object),
    *       including PKCE parameters (`code_challenge`, `code_challenge_method`), `client_id`, `redirect_uri`,
    *       `client_assertion`, `client_assertion_type`, `vp_token`, optional `presentation_submission`, and
