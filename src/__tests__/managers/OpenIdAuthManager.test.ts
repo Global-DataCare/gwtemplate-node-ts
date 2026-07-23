@@ -14,16 +14,22 @@ import {
 import { IClearingHouseService } from '../../services/ClearingHouseService';
 import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CLAIMS,
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
-  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_ID,
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_VALID_FROM,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_VALID_UNTIL,
 } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import { ClaimInterTenantAccessContract } from 'gdc-common-utils-ts/models/inter-tenant-access-contract';
+import { buildInterTenantAccessContractCredential } from 'gdc-common-utils-ts/utils/inter-tenant-access-contract';
 import { buildClientAssertionJwt } from 'gdc-common-utils-ts/utils/client-assertion';
 import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import {
+  EXAMPLE_CONTROLLER_DID,
   EXAMPLE_HOSTING_OPERATOR_DID,
   EXAMPLE_SUBJECT_DID,
 } from 'gdc-common-utils-ts/examples/shared';
@@ -31,26 +37,17 @@ import {
 const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_SCOPE =
   `${ServiceCapability.DigitalTwinReader}?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
 
-/**
- * Reuses the shared research contract while specializing its capability for
- * the DigitalTwin/ResearchSubject boundary enforced by this manager.
- */
-function buildExampleInterTenantDigitalTwinContractCredential(): Record<string, unknown> {
-  const credential = EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL as any;
-  return {
-    ...credential,
-    credentialSubject: {
-      ...(credential.credentialSubject || {}),
-      term: (credential.credentialSubject?.term || []).map((term: any) => ({
-        ...term,
-        offer: {
-          ...(term.offer || {}),
-          securityLabel: [{ text: ServiceCapability.DigitalTwinReader }],
-        },
-      })),
+const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_CONTRACT_CREDENTIAL =
+  buildInterTenantAccessContractCredential({
+    claims: {
+      ...EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CLAIMS,
+      [ClaimInterTenantAccessContract.capability]: ServiceCapability.DigitalTwinReader,
     },
-  };
-}
+    issuer: EXAMPLE_CONTROLLER_DID,
+    validFrom: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_VALID_FROM,
+    validUntil: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_VALID_UNTIL,
+    additionalCredential: { id: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_ID },
+  }) as unknown as Record<string, unknown>;
 
 describe('OpenIdAuthManager', () => {
   it('should issue a signed access_token for a tenant (org did rule)', async () => {
@@ -1106,7 +1103,7 @@ describe('OpenIdAuthManager', () => {
       iss: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
       sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
     });
-    addVC(vpPayload, buildExampleInterTenantDigitalTwinContractCredential());
+    addVC(vpPayload, EXAMPLE_INTER_TENANT_DIGITAL_TWIN_CONTRACT_CREDENTIAL);
 
     const manager = new OpenIdAuthManager(
       mockKmsService,
