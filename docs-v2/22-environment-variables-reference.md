@@ -164,9 +164,18 @@ Legacy note:
 `HOST_EXTERNAL_DOMAIN`
 - Highest-priority public domain for the host.
 - Used when the runtime needs to publish its external base URL.
+- Use an externally routable DNS name, without scheme or path.
+- A Kubernetes `ClusterIP` is internal-only and must not be advertised here.
 
 `HOST_EXTERNAL_PORT`
 - Optional public port paired with the external host/domain.
+
+`HOST_PUBLIC_URL`
+- Externally routable origin, including the `https://` scheme.
+- In Kubernetes this must point to an Ingress or `LoadBalancer`, never to the
+  service `CLUSTER-IP` or the GKE control-plane endpoint.
+- Operational checks are `${HOST_PUBLIC_URL}/host/ping` and
+  `${HOST_PUBLIC_URL}/api-docs`.
 
 `ICA_EXTERNAL_DOMAIN`
 - Optional public authority domain for authority publication or well-known
@@ -288,10 +297,15 @@ Legacy note:
 `SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS`
 - Comma-separated `did:web` issuer allowlist for
   `SubjectIdentityBindingCredential`.
+- Configure the credential authority DID, not a GW URL, employee DID,
+  individual DID, physical support/card DID, controller DID or `alsoKnownAs`.
 - Applied only after the enclosing VP proof is verified.
-- Allows exact equivalence between individual DIDs in the routed sector.
+- Also requires exact subject DID matching, the routed sector and active
+  credential status.
 - Does not trust arbitrary DID Document aliases and does not authorize physical
   support/card DIDs.
+- Each receiving GW has its own allowlist. Configure both sides only when
+  cross-portal access must be bidirectional.
 - Leave empty to reject all cross-portal individual DID bindings.
 
 `LEGACY_X509_DER_BASE64`

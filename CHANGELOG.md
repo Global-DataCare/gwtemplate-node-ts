@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### Documentation
+- Expand the cross-portal subject-binding environment contract with
+  deny-by-default behavior, reciprocal receiving-GW configuration and explicit
+  issuer DID boundaries.
+- Clarify that `HOST_PUBLIC_URL` must resolve to an externally routable
+  Ingress, Cloud Run service or `LoadBalancer`, never a Kubernetes `ClusterIP`
+  or GKE control-plane endpoint.
+
 ## [1.20.13] - 2026-07-23
 
 ### Added
