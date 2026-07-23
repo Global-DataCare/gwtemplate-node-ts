@@ -29,9 +29,14 @@ import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabil
 import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import {
+  EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
+  EXAMPLE_PORTAL_INDIVIDUAL_DID,
+  EXAMPLE_SUBJECT_IDENTITY_BINDING_CREDENTIAL,
+  EXAMPLE_TRUSTED_HEALTH_PORTAL_DID,
+} from 'gdc-common-utils-ts/examples/subject-identity-binding';
+import {
   EXAMPLE_CONTROLLER_DID,
   EXAMPLE_HOSTING_OPERATOR_DID,
-  EXAMPLE_SUBJECT_DID,
 } from 'gdc-common-utils-ts/examples/shared';
 
 const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_SCOPE =
@@ -50,7 +55,7 @@ const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_CONTRACT_CREDENTIAL =
   }) as unknown as Record<string, unknown>;
 
 describe('SMART token issuance (integration)', () => {
-  it('should issue an individual self-read token when the subject DID uses a public provider root', async () => {
+  it('should issue individual self-read through a trusted cross-portal DID binding', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -68,6 +73,7 @@ describe('SMART token issuance (integration)', () => {
     process.env.SECURITY_MODE = 'demo';
     process.env.JSON_LEGACY = 'true';
     process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+    process.env.SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS = EXAMPLE_TRUSTED_HEALTH_PORTAL_DID;
 
     resetServerConfig();
 
@@ -105,7 +111,8 @@ describe('SMART token issuance (integration)', () => {
       await tenantManager.getTenant(tenantVaultId);
 
       // Create the individual's physical vault and rules
-      const subject = EXAMPLE_SUBJECT_DID;
+      const subject = EXAMPLE_PORTAL_INDIVIDUAL_DID;
+      const actorDid = EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID;
       const individualRulesSectionId = getIndividualSectionId(subject, 'rules');
       await vaultRepository.put(tenantVaultId, [{
         id: 'individual-self-read-integration',
@@ -118,7 +125,13 @@ describe('SMART token issuance (integration)', () => {
         [ClaimConsent.purpose]: HealthcareConsentPurposes.Treatment,
       } as any], individualRulesSectionId);
 
-      const clientId = `${subject}:device:client-001`;
+      // Exercise the real HTTP/queue/manager path with the production shared
+      // binding credential shape; no test bridge pre-authorizes the aliases.
+      const vp = addVC(
+        createVP({ iss: actorDid, sub: actorDid }),
+        EXAMPLE_SUBJECT_IDENTITY_BINDING_CREDENTIAL,
+      );
+      const clientId = `${actorDid}:device:client-001`;
       const clientAssertion = await buildClientAssertionJwt({
         clientId,
         audience: EXAMPLE_HOSTING_OPERATOR_DID,
@@ -136,11 +149,11 @@ describe('SMART token issuance (integration)', () => {
           client_id: clientId,
           client_assertion: clientAssertion,
           client_assertion_type: 'private_key_jwt',
-          sub: subject,
+          sub: actorDid,
           purpose: HealthcareConsentPurposes.Treatment,
           scope: `${ServiceCapability.IndexReader}?subject=${subject}&section=*`,
           expires_in: 60,
-          vp_token: '---VP---',
+          vp_token: JSON.stringify(vp),
           acr_values: 'urn:antifraud:acr:openid4vp:individual',
         },
       },
@@ -168,6 +181,7 @@ describe('SMART token issuance (integration)', () => {
       expect(finalPayload?.subject).toBe(subject);
     } finally {
       queueAdapter.stop();
+      delete process.env.SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS;
     }
   });
 

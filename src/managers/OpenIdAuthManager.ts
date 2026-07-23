@@ -18,6 +18,7 @@ import { IClearingHouseService } from '../services/ClearingHouseService';
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/consent';
 import { getMatchingInterTenantAccessContractFromVpToken } from 'gdc-common-utils-ts/utils/inter-tenant-access-contract';
+import { getMatchingSubjectIdentityBindingFromVpToken } from 'gdc-common-utils-ts/utils/subject-identity-binding';
 import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
 import { getEnvSectionId } from '../utils/section-env';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
@@ -166,6 +167,26 @@ export class OpenIdAuthManager implements IJobProcessor {
         }
       }
     }
+    const actorSubjectAliases = new Set<string>([actor.sub]);
+    const isIndividualAccessProof = String(accessProof.acr || '').toLowerCase().includes('individual');
+    if (!isInterTenantResearchAccess && isIndividualAccessProof && actor.sub !== subject) {
+      const trustedIssuerDids = this.readTrustedSubjectIdentityBindingIssuers();
+      const binding = accessProof.mode === 'vp_token'
+        ? getMatchingSubjectIdentityBindingFromVpToken(vpToken!, {
+            trustedIssuerDids,
+            requiredSubjectDids: [actor.sub, subject],
+            sector: job.sector,
+          })
+        : undefined;
+      if (!binding) {
+        throw new ManagerError(
+          `No trusted subject identity binding found between actor '${actor.sub}' and subject '${subject}'.`,
+          IssueType.Forbidden,
+        );
+      }
+      actorSubjectAliases.add(binding.subjectDid);
+      binding.aliasDids.forEach((did) => actorSubjectAliases.add(did));
+    }
     const rules = await this.vaultRepository.getContainersInSection<any>(tenantVaultId, getIndividualSectionId(subject, 'rules'));
     const evaluation = this.evaluateRequestedConsent({
       rules,
@@ -174,6 +195,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       purpose,
       requestedPermissions,
       jurisdiction: job.jurisdiction,
+      actorSubjectAliases,
     });
 
     if (!evaluation.allowed) {
@@ -503,6 +525,23 @@ export class OpenIdAuthManager implements IJobProcessor {
     return new Set(configured);
   }
 
+  /**
+   * Reads the fail-closed allowlist of authorities that may bind two public
+   * DIDs belonging to the same individual.
+   *
+   * This is an issuer policy after VP/VC proof verification. It never turns a
+   * DID Document `alsoKnownAs` value or a physical support DID into an
+   * authorization identity.
+   */
+  private readTrustedSubjectIdentityBindingIssuers(): string[] {
+    return Array.from(new Set(
+      String(process.env.SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value.startsWith('did:web:')),
+    ));
+  }
+
   private readFirstString(source: Record<string, any>, keys: string[]): string | undefined {
     for (const key of keys) {
       const value = source[key];
@@ -660,6 +699,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     purpose?: string;
     requestedPermissions: ParsedPermission[];
     jurisdiction: string;
+    actorSubjectAliases?: ReadonlySet<string>;
   }): {
     allowed: boolean;
     missingSections: string[];
@@ -687,7 +727,13 @@ export class OpenIdAuthManager implements IJobProcessor {
         .filter((rule) => this.matchesRuleRole(rule, normalizedActorRole, actorEmail))
         .filter((rule) => this.matchesRulePermission(rule, requestedPermission))
         .map((rule) => {
-          const match = this.resolveRuleMatchKind(rule, input.actor, actorEmail, normalizedJurisdiction);
+          const match = this.resolveRuleMatchKind(
+            rule,
+            input.actor,
+            actorEmail,
+            normalizedJurisdiction,
+            input.actorSubjectAliases,
+          );
           if (!match) return undefined;
           return {
             rule,
@@ -839,12 +885,14 @@ export class OpenIdAuthManager implements IJobProcessor {
     actor: ReturnType<typeof parseActorFromSub>,
     actorEmail: string | undefined,
     jurisdiction: string,
+    actorSubjectAliases?: ReadonlySet<string>,
   ): 'direct' | 'organization' | 'jurisdiction' | undefined {
     const ruleActor = String(getClaimValue<string>(rule, 'Consent.actor-identifier') || '').trim();
     if (!ruleActor) return undefined;
 
     if (actorEmail && ruleActor.toLowerCase() === actorEmail) return 'direct';
     if (ruleActor === actor.sub) return 'direct';
+    if (actorSubjectAliases?.has(ruleActor)) return 'direct';
 
     if (ruleActor.startsWith('did:web:')) {
       if (actor.organization && (ruleActor === actor.organization || ruleActor.startsWith(`${actor.organization}:`))) {

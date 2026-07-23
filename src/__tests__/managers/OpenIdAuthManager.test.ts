@@ -29,6 +29,12 @@ import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabil
 import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import {
+  EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
+  EXAMPLE_PORTAL_INDIVIDUAL_DID,
+  EXAMPLE_SUBJECT_IDENTITY_BINDING_CREDENTIAL,
+  EXAMPLE_TRUSTED_HEALTH_PORTAL_DID,
+} from 'gdc-common-utils-ts/examples/subject-identity-binding';
+import {
   EXAMPLE_CONTROLLER_DID,
   EXAMPLE_HOSTING_OPERATOR_DID,
   EXAMPLE_SUBJECT_DID,
@@ -48,6 +54,70 @@ const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_CONTRACT_CREDENTIAL =
     validUntil: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_VALID_UNTIL,
     additionalCredential: { id: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_ID },
   }) as unknown as Record<string, unknown>;
+
+function buildAliasedIndividualSelfReadManager(): OpenIdAuthManager {
+  // Test setup only: dependencies are mocked, but the real OpenIdAuthManager
+  // executes VP extraction, trusted-issuer matching and Consent evaluation.
+  const kmsService = {
+    getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' }),
+    signWithManagedKey: jest.fn().mockResolvedValue({
+      payload: '',
+      signatures: [{ protected: 'p', signature: 'sig' }],
+    }),
+  } as unknown as jest.Mocked<IKmsService>;
+  const tenants = {
+    getDidDocument: jest.fn().mockResolvedValue({ id: EXAMPLE_HOSTING_OPERATOR_DID }),
+    tenantExists: jest.fn().mockResolvedValue(true),
+  } as unknown as jest.Mocked<TenantsCacheManager>;
+  const vault = {
+    getContainersInSection: jest.fn().mockResolvedValue([{
+      '@context': 'org.hl7.fhir.api',
+      [ClaimConsent.subject]: EXAMPLE_PORTAL_INDIVIDUAL_DID,
+      [ClaimConsent.identifier]: 'urn:uuid:aliased-individual-self-read',
+      [ClaimConsent.decision]: ConsentDecisions.Permit,
+      [ClaimConsent.actorIdentifier]: EXAMPLE_PORTAL_INDIVIDUAL_DID,
+      [ClaimConsent.action]: `${ServiceCapability.IndexReader}?section=*`,
+      [ClaimConsent.purpose]: HealthcareConsentPurposes.Treatment,
+    }]),
+  } as unknown as jest.Mocked<IVaultRepository>;
+  const clearingHouse = {
+    verifyVpToken: jest.fn().mockResolvedValue({
+      acr: 'urn:antifraud:acr:openid4vp:individual',
+      amr: ['openid4vp', 'vc'],
+      vpHash: 'hash',
+      ledgerVerified: true,
+    }),
+  } as unknown as jest.Mocked<IClearingHouseService>;
+  return new OpenIdAuthManager(kmsService, tenants, vault, clearingHouse);
+}
+
+function buildAliasedIndividualSelfReadJob(vpToken: string): JobRequest {
+  return {
+    tenantId: 'acme',
+    jurisdiction: 'ES',
+    sector: 'health-care',
+    section: 'identity',
+    format: 'openid',
+    resourceType: 'smart',
+    action: 'token',
+    id: '',
+    sequence: 0,
+    status: 'DRAFT' as any,
+    createdAtTimestamp: Date.now(),
+    content: {
+      thid: 'aliased-individual-self-read',
+      iss: `${EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID}:device:client`,
+      aud: EXAMPLE_HOSTING_OPERATOR_DID,
+      body: {
+        sub: EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
+        scope: `${ServiceCapability.IndexReader}?subject=${EXAMPLE_PORTAL_INDIVIDUAL_DID}&section=*`,
+        purpose: HealthcareConsentPurposes.Treatment,
+        vp_token: vpToken,
+        acr_values: 'urn:antifraud:acr:openid4vp:individual',
+      },
+    } as any,
+  } as JobRequest;
+}
 
 describe('OpenIdAuthManager', () => {
   it('should issue a signed access_token for a tenant (org did rule)', async () => {
@@ -1237,6 +1307,47 @@ describe('OpenIdAuthManager', () => {
 
     expect(response.body.access_token).toBeDefined();
     expect(response.body.subject).toBe(EXAMPLE_SUBJECT_DID);
+  });
+
+  it('should accept a trusted verified binding between two individual portal DIDs', async () => {
+    // The card/support DID is deliberately absent. A client must resolve the
+    // support document `subject` before requesting SMART authorization.
+    process.env.SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS = EXAMPLE_TRUSTED_HEALTH_PORTAL_DID;
+    const vp = addVC(
+      createVP({
+        iss: EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
+        sub: EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
+      }),
+      EXAMPLE_SUBJECT_IDENTITY_BINDING_CREDENTIAL,
+    );
+
+    try {
+      const response = await buildAliasedIndividualSelfReadManager().process(
+        buildAliasedIndividualSelfReadJob(JSON.stringify(vp)),
+      );
+      expect(response.body.access_token).toBeDefined();
+      expect(response.body.subject).toBe(EXAMPLE_PORTAL_INDIVIDUAL_DID);
+    } finally {
+      delete process.env.SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS;
+    }
+  });
+
+  it('should reject an individual DID binding whose issuer is not configured as trusted', async () => {
+    // The exact same VP must fail closed when deployment policy does not trust
+    // the credential issuer.
+    const vp = addVC(
+      createVP({
+        iss: EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
+        sub: EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
+      }),
+      EXAMPLE_SUBJECT_IDENTITY_BINDING_CREDENTIAL,
+    );
+
+    await expect(
+      buildAliasedIndividualSelfReadManager().process(
+        buildAliasedIndividualSelfReadJob(JSON.stringify(vp)),
+      ),
+    ).rejects.toThrow('No trusted subject identity binding found');
   });
 
   it('should deny a foreign organization actor when no matching inter-tenant contract is presented', async () => {
