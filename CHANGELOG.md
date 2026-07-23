@@ -6,6 +6,8 @@
   section filters; query-string summary parameters remain compatible.
 
 ### Documentation
+- Distinguish total Bundle entries, top-level UI-visible resources and
+  section/type/date-filtered resources in the clinical summary lifecycle.
 - Teach the immutable `FhirDocumentFacade` section/type/clinical-date-range
   chain in the GW lifecycle 101 instead of exposing raw Bundle-query filter
   fields or separate FHIR date/Period setters.
