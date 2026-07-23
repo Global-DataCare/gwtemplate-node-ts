@@ -76,6 +76,7 @@ type VerificationDeps = Readonly<{
     environment?: string;
     jobMeta?: DidCommDecodedMetadata;
     fallbackAlternateName?: string;
+    primaryDid?: string;
   }) => Promise<ClaimsRecord>;
   createOrganizationIssueClaimsFromClaims: (input: {
     claims: ClaimsRecord;
@@ -128,11 +129,18 @@ export async function processOrganizationVerificationTransaction(
     resourceType,
   });
   const vc = deps.extractCredentialResourcesFromIcaPayload(icaResponse);
+  const requestedPrimaryDid = typeof resource.organization?.did === 'string'
+    ? resource.organization.did.trim()
+    : '';
+  if (requestedPrimaryDid && !/^did:[a-z0-9]+:.+$/i.test(requestedPrimaryDid)) {
+    throw new ManagerError('Organization verification organization.did must be a valid DID.', IssueType.Value);
+  }
   const processedClaims = await deps.createPendingTenantRegistrationFromClaims({
     claims,
     environment: resourceType,
     jobMeta: deps.job.content?.meta,
     fallbackAlternateName: deps.job.tenantId,
+    primaryDid: requestedPrimaryDid || undefined,
   });
 
   return {

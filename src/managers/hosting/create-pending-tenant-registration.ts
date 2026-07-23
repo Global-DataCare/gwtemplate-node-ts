@@ -28,6 +28,7 @@ type CreatePendingTenantRegistrationDeps = Readonly<{
   environment?: string;
   jobMeta?: DidCommDecodedMetadata;
   fallbackAlternateName?: string;
+  primaryDid?: string;
   config: IServerConfig;
   vaultRepository: IVaultRepository;
   kmsService: IKmsService;
@@ -141,6 +142,7 @@ export async function createPendingTenantRegistration(
       status: EntityLifecycleStatus.Pending,
       claims: processedClaims,
       contained: [person, processedService].filter(Boolean),
+      ...(deps.primaryDid ? { primaryDid: deps.primaryDid } : {}),
       ...(registrationKeys.signerJwk || registrationKeys.encrypterJwk ? { registrationKeys } : {}),
     },
   };

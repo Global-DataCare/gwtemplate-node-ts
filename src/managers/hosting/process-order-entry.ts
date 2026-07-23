@@ -45,7 +45,14 @@ type ProcessHostOrderEntryDeps = Readonly<{
   offerOrderService: HostingOfferOrderService;
   extractResources: (claims: ClaimsRecord, environment?: string) => { organization: any; person?: any; service: any };
   extractContainedService: (contained: any) => any;
-  finalizeTenantConfig: (organization: any, alternateName: string, processedClaims: ClaimsRecord, sector: Sector, vaultId: string) => Promise<any>;
+  finalizeTenantConfig: (
+    organization: any,
+    alternateName: string,
+    processedClaims: ClaimsRecord,
+    sector: Sector,
+    vaultId: string,
+    options?: { primaryDid?: string },
+  ) => Promise<any>;
   isLedgerRegistrationEnabled: () => boolean;
   extractServiceEvidence: (service: any) => any;
   buildControllerEntityConfig: (
@@ -143,6 +150,11 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
     processedClaims,
     sector,
     vaultId,
+    {
+      primaryDid: typeof (decryptedContent as any).primaryDid === 'string'
+        ? (decryptedContent as any).primaryDid
+        : undefined,
+    },
   );
 
   const attributes = AllowedIndexableClaims.organizationRegistry

@@ -1,6 +1,6 @@
 {
   "name": "gwtemplate-node-ts",
-  "version": "1.20.11",
+  "version": "1.20.12",
   "license": "Apache-2.0",
   "main": "src/server.ts",
   "type": "module",

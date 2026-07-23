@@ -3,12 +3,16 @@ import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
+import { normalizeTenantPublicUrl } from './activation-helpers';
 
 export function normalizeBindingAliasList(value: unknown): string[] {
   const rawItems = Array.isArray(value) ? value : [value];
   const aliases = rawItems
     .map((item) => typeof item === 'string' ? item.trim() : '')
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((item) => item.startsWith('did:') || item.startsWith('urn:')
+      ? item
+      : normalizeTenantPublicUrl(item) || item);
   return Array.from(new Set(aliases));
 }
 

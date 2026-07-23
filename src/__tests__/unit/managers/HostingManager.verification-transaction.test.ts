@@ -275,6 +275,9 @@ describe('HostingManager legal organization verification transaction', () => {
       },
     });
     expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+    expect((mockVaultRepository.put as any).mock.calls[0]?.[1]?.[0]?.content?.primaryDid).toBe(
+      ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST.body.data[0]?.resource?.organization?.did,
+    );
   });
 
   it('resolves ICA jurisdiction from the trusted ICA did:web instead of the host route jurisdiction', async () => {
@@ -460,6 +463,34 @@ describe('HostingManager legal organization verification transaction', () => {
     expect(errorEntry?.response?.outcome?.issue?.[0]?.diagnostics).toContain(
       `Missing required claim: '${HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS[1]}'`,
     );
+  });
+
+  it('rejects an organization.did that is not a DID before persisting onboarding state', async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      status: Number(EXAMPLE_RESPONSE_STATUS_OK),
+      headers: {
+        get: (name: string) => name.toLowerCase() === 'content-type' ? EXAMPLE_ICA_RESPONSE_CONTENT_TYPE : null,
+      },
+      json: async () => buildIcaVerifyResponse(),
+    })) as any;
+    const manager = new HostingManager(
+      mockVaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      buildConfig(),
+      mockHostRuntime,
+    );
+    const job = buildTransactionJob();
+    (job.content!.body.data[0].resource as any).organization.did = 'https://globaldatacare.es/not-a-did';
+
+    const response = await manager.process(job, 'test', false);
+
+    expect(response.body.data[0]?.response?.status).toBe('400');
+    expect(JSON.stringify(response.body.data[0])).toContain('organization.did must be a valid DID');
+    expect(mockVaultRepository.put).not.toHaveBeenCalled();
   });
 
   it('reissues verification for an existing tenant without creating a new offer and returns one controller activation code', async () => {

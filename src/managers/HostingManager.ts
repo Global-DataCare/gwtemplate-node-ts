@@ -702,8 +702,7 @@ export class HostingManager {
   }
 
   private normalizeBindingAliasList(value: unknown): string[] {
-    return normalizeBindingAliasListExternal(value)
-      .map((item) => this.normalizeTenantPublicUrl(item) || item);
+    return normalizeBindingAliasListExternal(value);
   }
 
   private extractRegistrationKeys(jobMeta?: DidCommDecodedMetadata) {
@@ -947,12 +946,14 @@ export class HostingManager {
     environment?: string;
     jobMeta?: DidCommDecodedMetadata;
     fallbackAlternateName?: string;
+    primaryDid?: string;
   }): Promise<ClaimsRecord> {
     return createPendingTenantRegistration({
       claims: input.claims,
       environment: input.environment,
       jobMeta: input.jobMeta,
       fallbackAlternateName: input.fallbackAlternateName,
+      primaryDid: input.primaryDid,
       config: this.config,
       vaultRepository: this.vaultRepository,
       kmsService: this.kmsService,
