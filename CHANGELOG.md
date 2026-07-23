@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+## [1.20.13] - 2026-07-23
+
+### Added
+- Accept a verified subject identity binding VC for individual self-read when
+  the authenticated actor DID and requested individual DID are different.
+- Require the binding issuer to be configured in
+  `SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS` and the binding sector to match the
+  routed sector.
+
+### Security
+- Keep physical support/card DIDs outside SMART authorization and continue to
+  require the enclosing VP proof plus subject-scoped FHIR Consent evaluation.
+
 ## [1.20.12] - 2026-07-23
 
 ### Fixed

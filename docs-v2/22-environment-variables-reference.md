@@ -285,6 +285,15 @@ Legacy note:
 `SMART_TOKEN_LEGACY`
 - Enables legacy smart-token compatibility mode.
 
+`SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS`
+- Comma-separated `did:web` issuer allowlist for
+  `SubjectIdentityBindingCredential`.
+- Applied only after the enclosing VP proof is verified.
+- Allows exact equivalence between individual DIDs in the routed sector.
+- Does not trust arbitrary DID Document aliases and does not authorize physical
+  support/card DIDs.
+- Leave empty to reject all cross-portal individual DID bindings.
+
 `LEGACY_X509_DER_BASE64`
 - Base64 DER certificate payload for legacy exposure paths.
 
