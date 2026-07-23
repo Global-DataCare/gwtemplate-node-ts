@@ -6,6 +6,9 @@
   section filters; query-string summary parameters remain compatible.
 
 ### Documentation
+- Complete the GW 101 lifecycle with the canonical Communication
+  `Subject/$summary` read path and concrete section, count, entry and
+  section/type/date resource-consumption examples.
 - Document the read-only `$summary` lifecycle and the ownership split between
   BundleReader, FhirDocumentFacade, SDK actor facades and UHC format extensions.
 - Expand the cross-portal subject-binding environment contract with
