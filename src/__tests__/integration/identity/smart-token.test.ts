@@ -20,9 +20,40 @@ import {
 } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import { buildClientAssertionJwt } from 'gdc-common-utils-ts/utils/client-assertion';
 import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
+import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
+import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
+import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
+import {
+  EXAMPLE_HOSTING_OPERATOR_DID,
+  EXAMPLE_SUBJECT_DID,
+} from 'gdc-common-utils-ts/examples/shared';
+
+const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_SCOPE =
+  `${ServiceCapability.DigitalTwinReader}?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
+
+/**
+ * Reuses the shared research contract while specializing its capability for
+ * the DigitalTwin/ResearchSubject boundary enforced by the live route.
+ */
+function buildExampleInterTenantDigitalTwinContractCredential(): Record<string, unknown> {
+  const credential = EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL as any;
+  return {
+    ...credential,
+    credentialSubject: {
+      ...(credential.credentialSubject || {}),
+      term: (credential.credentialSubject?.term || []).map((term: any) => ({
+        ...term,
+        offer: {
+          ...(term.offer || {}),
+          securityLabel: [{ text: ServiceCapability.DigitalTwinReader }],
+        },
+      })),
+    },
+  };
+}
 
 describe('SMART token issuance (integration)', () => {
-  it('should issue token when subject exists and rules match', async () => {
+  it('should issue an individual self-read token when the subject DID uses a public provider root', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -63,7 +94,7 @@ describe('SMART token issuance (integration)', () => {
       const tenantConfig = {
         claims: tenantClaims,
         didConfig: { service: initializeTenantServicesConfig(Sector.HEALTH_CARE) },
-        didDocument: { id: 'did:web:api.acme.org', '@context': 'https://www.w3.org/ns/did/v1' },
+        didDocument: { id: EXAMPLE_HOSTING_OPERATOR_DID, '@context': 'https://www.w3.org/ns/did/v1' },
       };
 
       // Ensure the tenant has signing keys available for token issuance.
@@ -77,20 +108,23 @@ describe('SMART token issuance (integration)', () => {
       await tenantManager.getTenant(tenantVaultId);
 
       // Create the individual's physical vault and rules
-      const subject = EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid;
+      const subject = EXAMPLE_SUBJECT_DID;
       const individualRulesSectionId = getIndividualSectionId(subject, 'rules');
       await vaultRepository.put(tenantVaultId, [{
-        ...testConsentRulePermitOrgDid,
+        id: 'individual-self-read-integration',
+        '@context': 'org.hl7.fhir.api',
+        [ClaimConsent.subject]: subject,
+        [ClaimConsent.identifier]: 'urn:uuid:individual-self-read-integration',
+        [ClaimConsent.decision]: ConsentDecisions.Permit,
+        [ClaimConsent.actorIdentifier]: subject,
+        [ClaimConsent.action]: `${ServiceCapability.IndexReader}?section=*`,
+        [ClaimConsent.purpose]: HealthcareConsentPurposes.Treatment,
       } as any], individualRulesSectionId);
 
-      // Submit token request (legacy/plaintext)
-      // Professional SMART baseline:
-      // - `client_assertion` authenticates the registered device/client
-      // - `vp_token` carries the prior OpenID4VP holder proof used for `acr`
-      const clientId = 'did:web:api.acme.org:employee:doctor1@acme.org:device:client-001';
+      const clientId = `${subject}:device:client-001`;
       const clientAssertion = await buildClientAssertionJwt({
         clientId,
-        audience: 'did:web:api.acme.org',
+        audience: EXAMPLE_HOSTING_OPERATOR_DID,
       });
       const tokenUrl = `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`;
       const submitResp = await invokeExpress(app, {
@@ -100,17 +134,17 @@ describe('SMART token issuance (integration)', () => {
         body: {
           thid: 'smart-token-thread-id',
           iss: clientId,
-          aud: 'did:web:api.acme.org',
+          aud: EXAMPLE_HOSTING_OPERATOR_DID,
         body: {
           client_id: clientId,
           client_assertion: clientAssertion,
           client_assertion_type: 'private_key_jwt',
-          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
-          purpose: 'TREAT',
-          scope: `organization/Composition.rs?subject=${subject}&section=LOINC|48765-2`,
+          sub: subject,
+          purpose: HealthcareConsentPurposes.Treatment,
+          scope: `${ServiceCapability.IndexReader}?subject=${subject}&section=*`,
           expires_in: 60,
           vp_token: '---VP---',
-          acr_values: 'urn:antifraud:acr:openid4vp:employee',
+          acr_values: 'urn:antifraud:acr:openid4vp:individual',
         },
       },
     });
@@ -196,6 +230,7 @@ describe('SMART token issuance (integration)', () => {
         ...testConsentRulePermitOrgDid,
         'Consent.actor-identifier': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
         'Consent.purpose': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
+        'Consent.action': `${ServiceCapability.DigitalTwinReader}?subject=*`,
       } as any], individualRulesSectionId);
 
       // Research internal profile:
@@ -205,7 +240,7 @@ describe('SMART token issuance (integration)', () => {
         iss: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
         sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
       });
-      addVC(vpPayload, EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL);
+      addVC(vpPayload, buildExampleInterTenantDigitalTwinContractCredential());
       const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-002';
       const clientAssertion = await buildClientAssertionJwt({
         clientId,
@@ -227,7 +262,7 @@ describe('SMART token issuance (integration)', () => {
             client_assertion_type: 'client_assertion',
             sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
             purpose: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
-            scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+            scope: EXAMPLE_INTER_TENANT_DIGITAL_TWIN_SCOPE,
             expires_in: 60,
             vp_token: JSON.stringify(vpPayload),
             acr_values: 'urn:antifraud:acr:openid4vp:employee',
