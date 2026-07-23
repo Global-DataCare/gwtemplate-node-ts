@@ -1121,7 +1121,20 @@ describe('Composition Bundle _search API (integration)', () => {
                   payload: [
                     {
                       contentReference: {
-                        reference: `digitaltwin/org.hl7.fhir.api/ResearchSubject/$summary?subject=${encodeURIComponent(subjectDid)}`,
+                        reference: 'digitaltwin/org.hl7.fhir.api/ResearchSubject/$summary',
+                      },
+                      contentAttachment: {
+                        contentType: 'application/fhir+json',
+                        data: Buffer.from(JSON.stringify({
+                          resourceType: 'Parameters',
+                          parameter: [
+                            { name: 'subject', valueString: subjectDid },
+                            {
+                              name: 'section',
+                              valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+                            },
+                          ],
+                        }), 'utf8').toString('base64'),
                       },
                     },
                   ],

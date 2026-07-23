@@ -1492,6 +1492,94 @@ describe('CommunicationManager Unit Tests', () => {
       ]);
     });
 
+    it('uses the attached FHIR Parameters as the canonical Subject/$summary request body', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+      mockCompositionManager.process.mockImplementation(async (forwardedJobInput: unknown) => {
+        const forwardedJob = forwardedJobInput as JobRequest;
+        return ({
+        jti: randomUUID(),
+        iss: testServerDid,
+        aud: 'did:web:sender.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        thid: 'thread-subject-summary-parameters-001',
+        type: 'transaction-response',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch-response',
+          data: [{
+            type: 'Bundle-summary-response-v1.0',
+            response: { status: '200' },
+            resource: {
+              resourceType: 'Bundle',
+              type: 'document',
+              meta: { forwardedBody: (forwardedJob.content as any)?.body },
+            },
+          }],
+        },
+        }) as any;
+      });
+
+      const parameters = {
+        resourceType: 'Parameters',
+        parameter: [
+          { name: 'subject', valueString: subjectDid },
+          { name: 'document-type', valueString: 'http://loinc.org|60591-5' },
+          { name: 'section', valueString: 'LOINC|48765-2' },
+        ],
+      };
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'thread-subject-summary-parameters-001',
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.api.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [{
+            type: 'Communication',
+            resource: {
+              resourceType: 'Communication',
+              status: 'completed',
+              subject: { reference: subjectDid },
+              payload: [{
+                contentReference: {
+                  reference: 'individual/org.hl7.fhir.api/Subject/$summary',
+                },
+                contentAttachment: {
+                  contentType: 'application/fhir+json',
+                  data: Buffer.from(JSON.stringify(parameters), 'utf8').toString('base64'),
+                },
+              }],
+            },
+          }],
+        } as any,
+      };
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.api' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      await communicationManager.process(job);
+
+      const forwardedJob = mockCompositionManager.process.mock.calls[0][0] as JobRequest;
+      expect(forwardedJob.resourceType).toBe('Subject');
+      expect(forwardedJob.action).toBe('$summary');
+      expect((forwardedJob.content as any)?.body).toEqual(parameters);
+    });
+
     it('treats Patient/$summary as an alias of Subject/$summary', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);

@@ -21,7 +21,28 @@ Compatibility alias:
 - `Subject/$summary` is the canonical cross-sector name.
 - `Patient/$summary` is a healthcare-facing alias.
 - new docs must not teach legacy `_search` as the primary summary model.
-- when transported through `Communication`, the canonical semantics still live in `resource.meta.claims`.
+- when transported through `Communication`,
+  `Communication.content-reference` selects `Subject/$summary` and
+  `Communication.content-attachment-data` carries the base64-encoded FHIR
+  `Parameters` resource.
+- the FHIR `Parameters.parameter[]` array carries `subject`, `document-type`
+  and zero or more `section` filters.
+- query parameters on `content-reference` remain compatibility input only.
+- this is a read operation. SDKs must expose it as
+  `requestClinicalSummary(...)`, never as ingestion or index update.
+- a successful operation returns `Bundle-summary-response-v1.0` containing one
+  FHIR `Bundle` of type `document`.
+
+## Reader Ownership
+
+- `gdc-common-utils-ts` `BundleReader` owns section enumeration, reference
+  counts and resource-entry resolution.
+- `gdc-sdk-core-ts` `FhirDocumentFacade` owns resource retrieval and combined
+  section/type/date filters.
+- `LifecycleResultReader` owns operation statuses/issues, not document content.
+- GDC Node and Front actor facades expose the same summary result.
+- UHC Node/Front extensions reuse those readers and only add product formats
+  such as FHIR R5.
 
 ## Payload Source Of Truth
 
@@ -36,6 +57,7 @@ Compatibility alias:
 - `gdc-common-utils-ts/__tests__/utils-communication-bundle-document-request.test.ts`
 - `gwtemplate-node-ts/src/__tests__/unit/managers/CommunicationManager.unit.test.ts`
 - `gwtemplate-node-ts/src/__tests__/unit/managers/CompositionManager.test.ts`
+- `gwtemplate-node-ts/src/__tests__/integration/composition.bundle-search.api.test.ts`
 
 ## Out Of Scope
 
