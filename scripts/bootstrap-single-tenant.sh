@@ -136,6 +136,7 @@ if [[ -z "$org_err" ]]; then
     order_payload_overrides="$(jq -n --arg thid "$thid_order" --arg offer "$offer_id" --arg iss "$ADMIN_EMAIL" '{
       "/thid": $thid,
       "/iss": $iss,
+      "/body/data/0/meta/claims/org.schema.Order.acceptedOffer.identifier": $offer,
       "/body/data/0/meta/claims/Order.acceptedOffer.identifier": $offer
     }')"
     order_payload="$(render_example_payload ORGANIZATION_ORDER_REQUEST "$order_payload_overrides")"

@@ -210,9 +210,7 @@ export class CommunicationManager implements IJobProcessor {
 
     for (const entry of entries) {
       try {
-        const fhirResource: FhirCommunication | undefined = (entry as any).resource
-          ? (entry as any).resource
-          : this.buildFhirCommunicationFromClaims((entry as any)?.meta?.claims);
+        const fhirResource = this.hydrateFhirCommunicationEntry(entry);
 
         if (!fhirResource) {
           throw new Error('Malformed entry: missing resource and missing meta.claims');
@@ -1436,6 +1434,10 @@ export class CommunicationManager implements IJobProcessor {
     const recipient = claims[CommunicationClaim.Recipient];
     const sender = claims[CommunicationClaim.Sender];
     const text = claims[CommunicationClaim.Text];
+    const contentReference = claims[CommunicationClaim.ContentReference];
+    const attachmentData = claims[CommunicationClaim.ContentAttachmentData];
+    const attachmentType = claims[CommunicationClaim.ContentAttachmentType];
+    const attachmentTitle = claims[CommunicationClaim.ContentAttachmentTitle];
 
     const toRefs = typeof recipient === 'string'
       ? recipient.split(',').map((r: string) => r.trim()).filter(Boolean).map((reference: string) => ({ reference }))
@@ -1449,6 +1451,25 @@ export class CommunicationManager implements IJobProcessor {
         : sender && typeof sender === 'object' && typeof sender.reference === 'string'
           ? sender
           : undefined;
+    const payload: Array<Record<string, unknown>> = [];
+    if (typeof contentReference === 'string' && contentReference.trim()) {
+      payload.push({
+        contentReference: { reference: contentReference.trim() },
+      });
+    }
+    if (
+      (typeof attachmentData === 'string' && attachmentData.trim())
+      || (typeof attachmentType === 'string' && attachmentType.trim())
+      || (typeof attachmentTitle === 'string' && attachmentTitle.trim())
+    ) {
+      payload.push({
+        contentAttachment: {
+          data: typeof attachmentData === 'string' ? attachmentData : undefined,
+          contentType: typeof attachmentType === 'string' ? attachmentType : undefined,
+          title: typeof attachmentTitle === 'string' ? attachmentTitle : undefined,
+        },
+      });
+    }
 
     return {
       resourceType: 'Communication',
@@ -1458,7 +1479,35 @@ export class CommunicationManager implements IJobProcessor {
       recipient: toRefs,
       sender: senderRef,
       note: typeof text === 'string' ? [{ text }] : undefined,
+      payload: payload.length > 0 ? payload : undefined,
     } as unknown as FhirCommunication;
+  }
+
+  /**
+   * Hydrates the claims-only `org.hl7.fhir.api` Communication shell emitted by
+   * the SDK while preserving any native R4 fields already present.
+   *
+   * In particular, `$summary` needs its operation reference and attached FHIR
+   * Parameters restored as two payload elements, and section updates need
+   * their attached batch/collection restored before projection.
+   */
+  private hydrateFhirCommunicationEntry(entry: any): FhirCommunication | undefined {
+    const resource = entry?.resource as FhirCommunication | undefined;
+    const claims = resource?.meta?.claims || entry?.meta?.claims;
+    const fromClaims = this.buildFhirCommunicationFromClaims(claims);
+    if (!resource) return fromClaims;
+    if (!fromClaims) return resource;
+    return {
+      ...fromClaims,
+      ...resource,
+      status: resource.status || fromClaims.status,
+      sent: resource.sent || fromClaims.sent,
+      subject: resource.subject || fromClaims.subject,
+      recipient: resource.recipient || fromClaims.recipient,
+      sender: resource.sender || fromClaims.sender,
+      note: resource.note || fromClaims.note,
+      payload: resource.payload || fromClaims.payload,
+    };
   }
 
   private resolveCommunicationIdentifier(entry: any, fhirResource: FhirCommunication): string | undefined {

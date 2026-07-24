@@ -712,6 +712,7 @@ describe('Composition Bundle _search API (integration)', () => {
       )).toBe(true);
 
       const allergiesSection = 'LOINC|48765-2';
+      const sectionSubjectDid = 'did:web:api.acme.org:individual:section-only-allergy-001';
       const allergySectionBundle = {
         resourceType: 'Bundle',
         type: 'batch',
@@ -723,8 +724,11 @@ describe('Composition Bundle _search API (integration)', () => {
             meta: { claims: {
               '@context': 'org.hl7.fhir.api',
               'AllergyIntolerance.identifier': 'urn:uuid:allergy-section-update-integration-001',
-              'AllergyIntolerance.subject': subjectDid,
+              'AllergyIntolerance.subject': sectionSubjectDid,
               'AllergyIntolerance.category': allergiesSection,
+              'AllergyIntolerance.criticality': 'high',
+              'AllergyIntolerance.clinical-status': 'active',
+              'AllergyIntolerance.onset-datetime': '2026-07-24T09:30:00Z',
             } },
           },
         }],
@@ -744,13 +748,13 @@ describe('Composition Bundle _search API (integration)', () => {
               request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
               meta: { claims: {
                 '@context': 'org.hl7.fhir.r4',
-                'Communication.subject': subjectDid,
+                'Communication.subject': sectionSubjectDid,
                 'Composition.section': allergiesSection,
               } },
               resource: {
                 resourceType: 'Communication',
                 status: 'completed',
-                subject: { reference: subjectDid },
+                subject: { reference: sectionSubjectDid },
                 payload: [{
                   contentAttachment: {
                     contentType: 'application/fhir+json',
@@ -784,11 +788,11 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(sectionUpdatePayload?.data?.[0]?.response?.status).toBe('200');
       const allergyRecords = await vaultRepository.getContainersInSection<any>(
         tenantVaultId,
-        getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'allergies'),
+        getSubjectScopedSectionId(sectionSubjectDid, 'digitaltwin', 'allergies'),
       );
       const updatedCompositionRecords = await vaultRepository.getContainersInSection<any>(
         tenantVaultId,
-        digitalTwinCompositionSection,
+        getSubjectScopedSectionId(sectionSubjectDid, 'digitaltwin', 'composition'),
       );
       expect(allergyRecords.some((record: any) =>
         record['AllergyIntolerance.identifier'] === 'urn:uuid:allergy-section-update-integration-001'
@@ -798,6 +802,73 @@ describe('Composition Bundle _search API (integration)', () => {
         record['Composition.section'] === allergiesSection
         || record['org.hl7.fhir.r4.Composition.section'] === allergiesSection,
       )).toBe(true);
+
+      // Step 3: read the section-only update through the canonical summary
+      // contract and prove the claims-first AllergyIntolerance is returned.
+      const summaryResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'allergy-section-summary-integration-001',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [{
+              request: { method: 'POST', url: 'individual/org.hl7.fhir.api/Communication' },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: sectionSubjectDid },
+                sender: { reference: 'did:web:provider.example.org' },
+                payload: [{
+                  contentReference: {
+                    reference: 'individual/org.hl7.fhir.api/Subject/$summary',
+                  },
+                  contentAttachment: {
+                    contentType: 'application/fhir+json',
+                    data: Buffer.from(JSON.stringify({
+                      resourceType: 'Parameters',
+                      parameter: [
+                        { name: 'subject', valueString: sectionSubjectDid },
+                        { name: 'section', valueString: allergiesSection },
+                      ],
+                    }), 'utf8').toString('base64'),
+                  },
+                }],
+              },
+            }],
+          },
+        },
+      });
+      expect(summaryResp.status).toBe(202);
+
+      let summaryPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'allergy-section-summary-integration-001' },
+        });
+        if (pollResp.status === 200) {
+          summaryPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      expect(summaryPayload?.data?.[0]?.type).toBe('Bundle-summary-response-v1.0');
+      expect(summaryPayload?.data?.[0]?.resource?.type).toBe('document');
+      const allergySummaryEntry = summaryPayload?.data?.[0]?.resource?.entry
+        ?.find((entry: any) => entry?.resource?.resourceType === 'AllergyIntolerance');
+      expect(allergySummaryEntry?.resource?.meta?.claims).toMatchObject({
+        'AllergyIntolerance.identifier': 'urn:uuid:allergy-section-update-integration-001',
+        'AllergyIntolerance.subject': sectionSubjectDid,
+        'AllergyIntolerance.criticality': 'high',
+        'AllergyIntolerance.clinical-status': 'active',
+        'AllergyIntolerance.onset-datetime': '2026-07-24T09:30:00Z',
+      });
 
       const searchCases = [
         {
@@ -818,6 +889,7 @@ describe('Composition Bundle _search API (integration)', () => {
         },
         {
           thid: 'allergy-section-update-search-001',
+          expectedSubject: sectionSubjectDid,
           parameters: [
             { name: 'section', valueString: allergiesSection },
             {
@@ -867,7 +939,7 @@ describe('Composition Bundle _search API (integration)', () => {
           || firstMatch?.['org.hl7.fhir.r4.Composition.subject']
           || firstMatch?.meta?.claims?.['Composition.subject']
           || firstMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'],
-        ).toBe(subjectDid);
+        ).toBe(searchCase.expectedSubject || subjectDid);
       }
     } finally {
       queueAdapter.stop();
@@ -1262,6 +1334,8 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(apiPayload?.data?.[0]?.type).toBe('Bundle-summary-response-v1.0');
       expect(apiPayload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
       expect(apiPayload?.data?.[0]?.resource?.entry?.[0]?.fullUrl).toMatch(/^urn:uuid:/);
+      expect(apiPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.section?.[0]?.entry?.length)
+        .toBeGreaterThan(0);
       const apiMedicationEntry = apiPayload?.data?.[0]?.resource?.entry
         ?.find((entry: any) => entry?.resource?.resourceType === 'MedicationStatement');
       expect(Object.keys(apiMedicationEntry.resource).sort()).toEqual(['id', 'meta', 'resourceType']);

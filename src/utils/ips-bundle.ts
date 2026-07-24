@@ -188,6 +188,7 @@ export function projectSummaryBundleByFormat(
         const claims = resource?.meta?.claims && typeof resource.meta.claims === 'object'
           ? canonicalizeFhirClaims(resource.meta.claims as Record<string, any>)
           : {};
+        const isComposition = resource?.resourceType === ResourceTypesFhirR4.Composition;
         return {
           fullUrl: String(entry?.fullUrl || '').trim() || `urn:uuid:${String(resource?.id || randomUUID())}`,
           resource: {
@@ -196,6 +197,18 @@ export function projectSummaryBundleByFormat(
             meta: {
               claims,
             },
+            // The API projection remains claims-first for clinical entries,
+            // but a document Composition must retain its native graph so the
+            // SDK can resolve section references without a second query.
+            ...(isComposition ? {
+              status: resource.status,
+              type: resource.type,
+              subject: resource.subject,
+              date: resource.date,
+              title: resource.title,
+              section: resource.section,
+              author: resource.author,
+            } : {}),
           },
         };
       })

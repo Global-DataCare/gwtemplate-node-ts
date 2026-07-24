@@ -1704,17 +1704,17 @@ describe('CommunicationManager Unit Tests', () => {
             type: 'Communication',
             resource: {
               resourceType: 'Communication',
-              status: 'completed',
-              subject: { reference: subjectDid },
-              payload: [{
-                contentReference: {
-                  reference: 'individual/org.hl7.fhir.api/Subject/$summary',
+              meta: {
+                claims: {
+                  '@context': 'org.hl7.fhir.api',
+                  'Communication.status': 'completed',
+                  'Communication.subject': subjectDid,
+                  'Communication.content-reference': 'individual/org.hl7.fhir.api/Subject/$summary',
+                  'Communication.content-attachment-type': 'application/fhir+json',
+                  'Communication.content-attachment-data':
+                    Buffer.from(JSON.stringify(parameters), 'utf8').toString('base64'),
                 },
-                contentAttachment: {
-                  contentType: 'application/fhir+json',
-                  data: Buffer.from(JSON.stringify(parameters), 'utf8').toString('base64'),
-                },
-              }],
+              },
             },
           }],
         } as any,
