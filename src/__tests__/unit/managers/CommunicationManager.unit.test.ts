@@ -480,7 +480,7 @@ describe('CommunicationManager Unit Tests', () => {
   describe('process (FHIR Bundle resource projections)', () => {
     const subjectDid = 'did:web:api.acme.org:individual:bundle-subject-001';
 
-    it('projects one section-scoped batch and never invents a medication section', async () => {
+    it('normalizes a native EHR section update without meta.claims and never invents a medication section', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
 
@@ -493,12 +493,13 @@ describe('CommunicationManager Unit Tests', () => {
           resource: {
             resourceType: 'AllergyIntolerance',
             id: 'allergy-section-update-001',
-            meta: { claims: {
-              '@context': 'org.hl7.fhir.api',
-              'AllergyIntolerance.identifier': 'urn:uuid:allergy-section-update-001',
-              'AllergyIntolerance.subject': subjectDid,
-              'AllergyIntolerance.category': section,
-            } },
+            identifier: [{ value: 'urn:uuid:allergy-section-update-001' }],
+            patient: { reference: subjectDid },
+            code: { coding: [{ system: 'http://snomed.info/sct', code: '91935009' }] },
+            clinicalStatus: { coding: [{ code: 'active' }] },
+            category: ['food'],
+            criticality: 'high',
+            onsetDateTime: '2026-07-24T10:00:00Z',
           },
         }],
       };
@@ -514,21 +515,23 @@ describe('CommunicationManager Unit Tests', () => {
           type: 'batch',
           data: [{
             type: 'Communication',
-            meta: { claims: {
-              '@context': 'org.hl7.fhir.r4',
-              'Communication.subject': subjectDid,
-              'Composition.section': section,
-            } },
             resource: {
               resourceType: 'Communication',
               status: 'completed',
               subject: { reference: subjectDid },
-              payload: [{
+              payload: [
+                {
+                  contentCodeableConcept: {
+                    coding: [{ system: 'http://loinc.org', code: '48765-2' }],
+                  },
+                },
+                {
                 contentAttachment: {
                   contentType: 'application/fhir+json',
                   data: Buffer.from(JSON.stringify(sectionBatch), 'utf8').toString('base64'),
                 },
-              }],
+                },
+              ],
             },
           }],
         } as any,
@@ -556,6 +559,27 @@ describe('CommunicationManager Unit Tests', () => {
         (args) => args[0] === tenantVaultId && args[2] === allergySectionId,
       );
       expect(allergyPut).toBeDefined();
+      const allergyRecord = (allergyPut?.[1] as any[])[0];
+      expect(
+        allergyRecord['AllergyIntolerance.identifier']
+        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.identifier']
+        || allergyRecord['org.hl7.fhir.r4.AllergyIntolerance.identifier'],
+      ).toBe('urn:uuid:allergy-section-update-001');
+      expect(
+        allergyRecord['AllergyIntolerance.subject']
+        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.subject']
+        || allergyRecord['org.hl7.fhir.r4.AllergyIntolerance.subject'],
+      ).toBe(subjectDid);
+      expect(
+        allergyRecord['AllergyIntolerance.code']
+        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.code']
+        || allergyRecord['org.hl7.fhir.r4.AllergyIntolerance.code'],
+      ).toBe('http://snomed.info/sct|91935009');
+      expect(
+        allergyRecord['AllergyIntolerance.clinical-status']
+        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.clinical-status']
+        || allergyRecord['org.hl7.fhir.r4.AllergyIntolerance.clinical-status'],
+      ).toBe('active');
       const compositionRecords = mockVaultRepository.put.mock.calls
         .filter((args) => args[0] === tenantVaultId && args[2] === getSubjectScopedSectionId(subjectDid, 'individual', 'composition'))
         .flatMap((args) => args[1] as any[]);
@@ -1654,7 +1678,7 @@ describe('CommunicationManager Unit Tests', () => {
       ]);
     });
 
-    it('uses the attached FHIR Parameters as the canonical Subject/$summary request body', async () => {
+    it('uses claims-first FHIR Parameters directly without manufacturing a native payload', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
       mockCompositionManager.process.mockImplementation(async (forwardedJobInput: unknown) => {
@@ -1734,6 +1758,7 @@ describe('CommunicationManager Unit Tests', () => {
         content: decoded,
       };
 
+      expect((decoded.body as any).data[0].resource.payload).toBeUndefined();
       await communicationManager.process(job);
 
       const forwardedJob = mockCompositionManager.process.mock.calls[0][0] as JobRequest;

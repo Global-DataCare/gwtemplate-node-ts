@@ -814,20 +814,20 @@ describe('Composition Bundle _search API (integration)', () => {
           body: {
             resourceType: 'Bundle',
             type: 'batch',
-            entry: [{
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.api/Communication' },
+            data: [{
+              type: 'Communication',
               resource: {
                 resourceType: 'Communication',
-                status: 'completed',
-                subject: { reference: sectionSubjectDid },
-                sender: { reference: 'did:web:provider.example.org' },
-                payload: [{
-                  contentReference: {
-                    reference: 'individual/org.hl7.fhir.api/Subject/$summary',
-                  },
-                  contentAttachment: {
-                    contentType: 'application/fhir+json',
-                    data: Buffer.from(JSON.stringify({
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.api',
+                    'Communication.status': 'completed',
+                    'Communication.subject': sectionSubjectDid,
+                    'Communication.sender': 'did:web:provider.example.org',
+                    'Communication.content-reference':
+                      'individual/org.hl7.fhir.api/Subject/$summary',
+                    'Communication.content-attachment-type': 'application/fhir+json',
+                    'Communication.content-attachment-data': Buffer.from(JSON.stringify({
                       resourceType: 'Parameters',
                       parameter: [
                         { name: 'subject', valueString: sectionSubjectDid },
@@ -835,7 +835,7 @@ describe('Composition Bundle _search API (integration)', () => {
                       ],
                     }), 'utf8').toString('base64'),
                   },
-                }],
+                },
               },
             }],
           },

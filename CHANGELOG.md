@@ -1,5 +1,25 @@
 ## [Unreleased]
 
+## [1.20.16] - 2026-07-24
+
+### Fixed
+- Process canonical Communication operation references and attachments directly
+  from `resource.meta.claims`; manager execution no longer manufactures a
+  native FHIR `payload[]` before running `Subject/$summary`, subject search or
+  attached clinical projection.
+- Keep native FHIR Communication payloads as a compatible input projection
+  without making API claims-first jobs depend on R4 field materialization.
+- Normalize native EHR FHIR resources through the shared
+  `normalizeClaimsFromFhirResource(...)` boundary before indexed persistence;
+  existing `resource.meta.claims` remain authoritative when present.
+
+### Tests
+- Replace the section-summary integration request assembled as native FHIR with
+  the claims-first API shape emitted by the public SDK, and assert at unit level
+  that attached Parameters execute while `resource.payload` remains absent.
+- Retain native FHIR Communication unit coverage alongside the claims-first
+  flow so neither interoperability direction can silently replace the other.
+
 ## [1.20.15] - 2026-07-24
 
 ### Fixed
