@@ -43,10 +43,11 @@ describe('server-config sector resolution', () => {
   });
 
   it('should accept synthetic sectors in deprecated SECTORS_ALLOWED', () => {
-    expect(parseAndValidateSectors('animal-care,animal-index,animal-tech')).toEqual([
+    expect(parseAndValidateSectors('animal-care,animal-index,animal-tech,animal-insurance')).toEqual([
       'animal-care',
       'animal-index',
       'animal-tech',
+      'animal-insurance',
     ]);
   });
 
@@ -58,11 +59,12 @@ describe('server-config sector resolution', () => {
   });
 
   it('should validate SUBSECTORSALLOWED values', () => {
-    expect(parseAndValidateSubsectors('research,care,index,tech')).toEqual([
+    expect(parseAndValidateSubsectors('research,care,index,tech,insurance')).toEqual([
       'research',
       'care',
       'index',
       'tech',
+      'insurance',
     ]);
     expect(() => parseAndValidateSubsectors('care,unknown')).toThrow(
       /Invalid SUBSECTORSALLOWED/
@@ -70,8 +72,9 @@ describe('server-config sector resolution', () => {
   });
 
   it('should build sectors consistently from main and subsectors', () => {
-    expect(buildSectorsFromMainAndSubsectors('animal', ['care'])).toEqual([
+    expect(buildSectorsFromMainAndSubsectors('animal', ['care', 'insurance'])).toEqual([
       'animal-care',
+      'animal-insurance',
     ]);
   });
 

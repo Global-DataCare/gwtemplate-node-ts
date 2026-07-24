@@ -5,7 +5,7 @@ let configInstance: IServerConfig;
 const DEFAULT_MAX_HEADER_SIZE_BYTES = 128 * 1024;
 
 const MAIN_SECTORS = ['animal', 'health'] as const;
-const SUBSECTORS = ['research', 'care', 'index', 'tech'] as const;
+const SUBSECTORS = ['research', 'care', 'index', 'tech', 'insurance'] as const;
 
 export type NetworkMode = 'test' | 'local-network' | 'test-network' | 'network';
 export type ResearchStoreProvider = 'postgres' | 'supabase' | 'firestore';
@@ -140,7 +140,7 @@ export function parseAndValidateSectors(csv: string | undefined): Sector[] {
   if (!csv) return [];
   const legacySectors = new Set(Object.values(Sector) as string[]);
   const requestedSectors = csv.split(',').map((s) => s.trim());
-  const syntheticSectorPattern = /^(animal|health)-(research|care|index|tech)$/;
+  const syntheticSectorPattern = /^(animal|health)-(research|care|index|tech|insurance)$/;
   for (const sector of requestedSectors) {
     if (sector === Sector.SYSTEM) {
       throw new Error(`Config Error: The '${Sector.SYSTEM}' sector is reserved and cannot be set in SECTORS_ALLOWED.`);
@@ -148,7 +148,7 @@ export function parseAndValidateSectors(csv: string | undefined): Sector[] {
     if (!legacySectors.has(sector) && !syntheticSectorPattern.test(sector)) {
       throw new Error(
           `Config Error: Invalid sector '${sector}'. Allowed legacy sectors (${Array.from(legacySectors).join(', ')}) ` +
-          "or synthetic sectors '<animal|health>-<research|care|index|tech>'."
+          "or synthetic sectors '<animal|health>-<research|care|index|tech|insurance>'."
       );
     }
   }

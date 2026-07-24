@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+### Changed
+- Accept `insurance` in the synthetic sector taxonomy and configure the GDC
+  staging profile for the eight combinations of `animal|health` with
+  `care|tech|research|insurance`.
+
 ## [1.20.16] - 2026-07-24
 
 ### Fixed

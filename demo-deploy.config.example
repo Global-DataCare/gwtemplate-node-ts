@@ -50,7 +50,7 @@ export CLEARING_HOUSE_MODE="${CLEARING_HOUSE_MODE:-stub}"
 export ICA_MODE="${ICA_MODE:-}"
 
 # Normalize sectors for the server config helper.
-export SECTORS_ALLOWED="${SECTORS_ALLOWED:-health-care,test}"
+export SECTORS_ALLOWED="${SECTORS_ALLOWED:-animal-care,animal-tech,animal-research,animal-insurance,health-care,health-tech,health-research,health-insurance}"
 
 # GCS bucket is optional in demo/mem mode but the template still accepts it.
 export GCS_BUCKET_NAME="${GCS_BUCKET_NAME:-}"
