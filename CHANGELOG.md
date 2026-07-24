@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+## [1.20.14] - 2026-07-24
+
+- Raise `gdc-common-utils-ts` to `^2.3.6` for the staging image.
 - Accept both OpenID DCR `application_type=web` and `native`, aligning the GW
   template with browser and native protected-profile enrollment.
 
