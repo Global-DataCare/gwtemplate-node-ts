@@ -47,10 +47,10 @@ describe('DeviceRegistrationManager', () => {
   });
 
   describe('process', () => {
-    it('should process a valid DCR job and return a success response with a client_id', async () => {
+    it('should process a valid web DCR job and return a success response with a client_id', async () => {
       // Arrange
       const job = cloneDeep(DCR_REGISTRATION_JOB);
-      (job.content?.body as any).application_type = 'native';
+      (job.content?.body as any).application_type = 'web';
       const activationCode = (job.content?.body as any)?.code as string;
       const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
       const license: DeviceLicense = {
