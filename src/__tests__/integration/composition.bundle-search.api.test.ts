@@ -711,6 +711,94 @@ describe('Composition Bundle _search API (integration)', () => {
         || record['org.hl7.fhir.r4.Composition.section'] === HealthcareBasicSections.VitalSigns.attributeValue,
       )).toBe(true);
 
+      const allergiesSection = 'LOINC|48765-2';
+      const allergySectionBundle = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        data: [{
+          type: 'AllergyIntolerance-edit-request-v1.0',
+          resource: {
+            resourceType: 'AllergyIntolerance',
+            id: 'allergy-section-update-integration-001',
+            meta: { claims: {
+              '@context': 'org.hl7.fhir.api',
+              'AllergyIntolerance.identifier': 'urn:uuid:allergy-section-update-integration-001',
+              'AllergyIntolerance.subject': subjectDid,
+              'AllergyIntolerance.category': allergiesSection,
+            } },
+          },
+        }],
+      };
+
+      // Step 1: update exactly one clinical section using the explicit section contract.
+      const sectionUpdateResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'allergy-section-update-integration-001',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [{
+              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              meta: { claims: {
+                '@context': 'org.hl7.fhir.r4',
+                'Communication.subject': subjectDid,
+                'Composition.section': allergiesSection,
+              } },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [{
+                  contentAttachment: {
+                    contentType: 'application/fhir+json',
+                    title: 'allergies-section.json',
+                    data: Buffer.from(JSON.stringify(allergySectionBundle), 'utf8').toString('base64'),
+                  },
+                }],
+              },
+            }],
+          },
+        },
+      });
+      expect(sectionUpdateResp.status).toBe(202);
+
+      let sectionUpdatePayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'allergy-section-update-integration-001' },
+        });
+        if (pollResp.status === 200) {
+          sectionUpdatePayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      // Step 2: verify the section resource and Composition projection exist under the exact code.
+      expect(sectionUpdatePayload?.data?.[0]?.response?.status).toBe('200');
+      const allergyRecords = await vaultRepository.getContainersInSection<any>(
+        tenantVaultId,
+        getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'allergies'),
+      );
+      const updatedCompositionRecords = await vaultRepository.getContainersInSection<any>(
+        tenantVaultId,
+        digitalTwinCompositionSection,
+      );
+      expect(allergyRecords.some((record: any) =>
+        record['AllergyIntolerance.identifier'] === 'urn:uuid:allergy-section-update-integration-001'
+        || record['org.hl7.fhir.api.AllergyIntolerance.identifier'] === 'urn:uuid:allergy-section-update-integration-001',
+      )).toBe(true);
+      expect(updatedCompositionRecords.some((record: any) =>
+        record['Composition.section'] === allergiesSection
+        || record['org.hl7.fhir.r4.Composition.section'] === allergiesSection,
+      )).toBe(true);
+
       const searchCases = [
         {
           thid: 'ips-all-sections-med-search-001',
@@ -726,6 +814,16 @@ describe('Composition Bundle _search API (integration)', () => {
             { name: 'section', valueString: HealthcareBasicSections.VitalSigns.attributeValue },
             { name: 'Observation.code-display', valueString: 'pressure' },
             { name: 'Observation.code-text', valueString: 'pressure' },
+          ],
+        },
+        {
+          thid: 'allergy-section-update-search-001',
+          parameters: [
+            { name: 'section', valueString: allergiesSection },
+            {
+              name: 'AllergyIntolerance.identifier',
+              valueString: 'urn:uuid:allergy-section-update-integration-001',
+            },
           ],
         },
       ];

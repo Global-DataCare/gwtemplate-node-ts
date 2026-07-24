@@ -619,11 +619,11 @@ export class CommunicationManager implements IJobProcessor {
     const payloadSection = payloadSections[0];
     const payloadType = this.extractCompositionTypeFromCommunicationPayload(fhirResource);
     const sectionCodes = Array.from(new Set([
-      claimsSection,
+      ...claimsSection.split(','),
       ...payloadSections,
       payloadSection,
-      HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
     ].map((value) => String(value || '').trim()).filter(Boolean)));
+    if (sectionCodes.length === 0) return;
     const typeCode = claimsType || payloadType || HealthcareBasicSections.PatientSummaryDocument.attributeValue;
 
     const sent = String(
@@ -974,10 +974,18 @@ export class CommunicationManager implements IJobProcessor {
     if (!tenantExists) return;
 
     const communicationSubject = this.resolveCommunicationSubject(entry, fhirResource);
+    const explicitSection = String(
+      (entry?.meta?.claims?.['Composition.section'] as string | undefined)
+      || (entry?.resource?.meta?.claims?.['Composition.section'] as string | undefined)
+      || '',
+    ).trim();
     const payloads = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload : [];
     for (const payload of payloads) {
       const attachment = this.resolveCommunicationPayloadAttachment(payload)?.documentAttachment;
-      const resources = this.extractProjectedFhirResourcesFromAttachment(attachment);
+      const resources = this.extractProjectedFhirResourcesFromAttachment(
+        attachment,
+        Boolean(explicitSection),
+      );
       for (const resource of resources) {
         const resourceType = this.getSupportedProjectedResourceType(resource?.resourceType);
         if (!resource || !resourceType) continue;
@@ -1573,7 +1581,10 @@ export class CommunicationManager implements IJobProcessor {
     }
   }
 
-  private extractProjectedFhirResourcesFromAttachment(attachment: Record<string, any> | undefined): Array<Record<string, any>> {
+  private extractProjectedFhirResourcesFromAttachment(
+    attachment: Record<string, any> | undefined,
+    sectionScoped = false,
+  ): Array<Record<string, any>> {
     if (!attachment || typeof attachment !== 'object') return [];
     const parsed = this.parseAttachmentJson(attachment);
     if (!parsed || typeof parsed !== 'object') return [];
@@ -1583,6 +1594,25 @@ export class CommunicationManager implements IJobProcessor {
       return documentBundle.entry
         .map((bundleEntry: any) => bundleEntry?.resource as Record<string, any> | undefined)
         .filter((resource: Record<string, any> | undefined): resource is Record<string, any> => Boolean(resource?.resourceType));
+    }
+
+    const bundleType = String((parsed as any).type || '').toLowerCase();
+    if ((parsed as any).resourceType === 'Bundle' && ['batch', 'collection'].includes(bundleType)) {
+      const entries = Array.isArray((parsed as any).data)
+        ? (parsed as any).data
+        : Array.isArray((parsed as any).entry) ? (parsed as any).entry : [];
+      const resources = entries
+        .map((bundleEntry: any) => bundleEntry?.resource as Record<string, any> | undefined)
+        .filter((resource: Record<string, any> | undefined): resource is Record<string, any> => Boolean(resource?.resourceType));
+      if (!sectionScoped && resources.some(
+        (resource: Record<string, any>) => this.getSupportedProjectedResourceType(resource.resourceType),
+      )) {
+        throw new Error(
+          'Clinical Bundle.type batch/collection requires one explicit Composition.section claim; '
+          + 'use updateClinicalSection, or send Bundle.type document with Composition first via updateClinicalSummary.',
+        );
+      }
+      return sectionScoped ? resources : [];
     }
 
     if (this.getSupportedProjectedResourceType((parsed as any).resourceType)) {

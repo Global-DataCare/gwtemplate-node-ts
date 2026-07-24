@@ -480,6 +480,168 @@ describe('CommunicationManager Unit Tests', () => {
   describe('process (FHIR Bundle resource projections)', () => {
     const subjectDid = 'did:web:api.acme.org:individual:bundle-subject-001';
 
+    it('projects one section-scoped batch and never invents a medication section', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+
+      const section = 'LOINC|48765-2';
+      const sectionBatch = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        data: [{
+          type: 'AllergyIntolerance-edit-request-v1.0',
+          resource: {
+            resourceType: 'AllergyIntolerance',
+            id: 'allergy-section-update-001',
+            meta: { claims: {
+              '@context': 'org.hl7.fhir.api',
+              'AllergyIntolerance.identifier': 'urn:uuid:allergy-section-update-001',
+              'AllergyIntolerance.subject': subjectDid,
+              'AllergyIntolerance.category': section,
+            } },
+          },
+        }],
+      };
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'thread-allergy-section-update-001',
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [{
+            type: 'Communication',
+            meta: { claims: {
+              '@context': 'org.hl7.fhir.r4',
+              'Communication.subject': subjectDid,
+              'Composition.section': section,
+            } },
+            resource: {
+              resourceType: 'Communication',
+              status: 'completed',
+              subject: { reference: subjectDid },
+              payload: [{
+                contentAttachment: {
+                  contentType: 'application/fhir+json',
+                  data: Buffer.from(JSON.stringify(sectionBatch), 'utf8').toString('base64'),
+                },
+              }],
+            },
+          }],
+        } as any,
+      };
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      await communicationManager.process(job);
+
+      const tenantVaultId = 'health-care_acme';
+      const allergySectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'allergies');
+      const allergyPut = mockVaultRepository.put.mock.calls.find(
+        (args) => args[0] === tenantVaultId && args[2] === allergySectionId,
+      );
+      expect(allergyPut).toBeDefined();
+      const compositionRecords = mockVaultRepository.put.mock.calls
+        .filter((args) => args[0] === tenantVaultId && args[2] === getSubjectScopedSectionId(subjectDid, 'individual', 'composition'))
+        .flatMap((args) => args[1] as any[]);
+      const projectedSections = compositionRecords.map((record) =>
+        record['Composition.section'] || record['org.hl7.fhir.r4.Composition.section']);
+      expect(projectedSections).toEqual([section]);
+      expect(projectedSections).not.toContain('LOINC|10160-0');
+    });
+
+    it('rejects an unscoped clinical batch instead of accepting an update that reads back empty', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+
+      const unscopedBatch = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        data: [{
+          type: 'AllergyIntolerance-edit-request-v1.0',
+          resource: {
+            resourceType: 'AllergyIntolerance',
+            id: 'allergy-unscoped-001',
+            meta: { claims: {
+              '@context': 'org.hl7.fhir.api',
+              'AllergyIntolerance.identifier': 'urn:uuid:allergy-unscoped-001',
+              'AllergyIntolerance.subject': subjectDid,
+            } },
+          },
+        }],
+      };
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(),
+        thid: 'thread-allergy-unscoped-001',
+        iss: 'did:web:sender.example',
+        aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: 'Bundle',
+          type: 'batch',
+          data: [{
+            type: 'Communication',
+            meta: { claims: {
+              '@context': 'org.hl7.fhir.r4',
+              'Communication.subject': subjectDid,
+            } },
+            resource: {
+              resourceType: 'Communication',
+              status: 'completed',
+              subject: { reference: subjectDid },
+              payload: [{
+                contentAttachment: {
+                  contentType: 'application/fhir+json',
+                  data: Buffer.from(JSON.stringify(unscopedBatch), 'utf8').toString('base64'),
+                },
+              }],
+            },
+          }],
+        } as any,
+      };
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: decoded,
+      };
+
+      // Step 1: process the same generic Communication path that used to return a false success.
+      const result = await communicationManager.process(job);
+
+      // Step 2: expose the contract error in the batch response and persist no clinical projection.
+      expect((result.body as any).data[0].response.status).toBe('500');
+      expect((result.body as any).data[0].response.outcome.issue[0].details.text)
+        .toContain('requires one explicit Composition.section');
+      expect(mockVaultRepository.put.mock.calls.some(
+        (args) => args[2] === getSubjectScopedSectionId(subjectDid, 'individual', 'allergies'),
+      )).toBe(false);
+    });
+
     it('projects IPS resources from an attached document bundle with indexed claims', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);

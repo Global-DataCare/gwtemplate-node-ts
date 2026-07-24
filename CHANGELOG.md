@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [1.20.14] - 2026-07-24
+
+- Raise `gdc-common-utils-ts` to `^2.3.6` for the staging image.
+- Accept both OpenID DCR `application_type=web` and `native`, aligning the GW
+  template with browser and native protected-profile enrollment.
+
+- Communication clinical projection now processes section-scoped
+  `Bundle.type=batch|collection` attachments when the outer Communication
+  carries one `Composition.section`, and no longer invents the medication
+  section when neither a document nor an explicit section was supplied.
+  Unscoped clinical batches now return an explicit processing error instead
+  of a successful ingestion followed by empty clinical readback.
 ### Added
 - Accept the canonical FHIR `Parameters` attachment on Communications that
   request `Subject/$summary`, including subject, document-type and repeated

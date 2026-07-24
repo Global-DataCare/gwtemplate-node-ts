@@ -240,8 +240,13 @@ export class DeviceRegistrationManager implements IJobProcessor {
     if ((!request.jwks || !request.jwks.keys || request.jwks.keys.length === 0) && !request.jwks_uri) {
       throw new ManagerError('Either `jwks` or `jwks_uri` is a required field.', IssueType.Value);
     }
-    if (request.application_type && request.application_type !== 'native') {
-        throw new ManagerError(`Unsupported application_type: '${request.application_type}'. Only 'native' is supported.`, IssueType.Value);
+    if (request.application_type
+      && request.application_type !== 'native'
+      && request.application_type !== 'web') {
+      throw new ManagerError(
+        `Unsupported application_type: '${request.application_type}'. Expected 'native' or 'web'.`,
+        IssueType.Value,
+      );
     }
   }
 
