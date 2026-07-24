@@ -1,5 +1,22 @@
 ## [Unreleased]
 
+## [1.20.15] - 2026-07-24
+
+### Fixed
+- Hydrate claims-first `org.hl7.fhir.api` Communication shells before
+  processing them, restoring the SDK-rendered operation reference and attached
+  FHIR Parameters for `Subject/$summary` and the attached batch/collection for
+  `updateClinicalSection(...)`.
+- Preserve the native Composition section graph in API summary responses so
+  `BundleReader` and `FhirDocumentFacade` resolve section resources and their
+  claims without a second index query.
+- Make the single-tenant demo bootstrap replace both accepted-offer claim
+  aliases, preventing a false success with an uncreated tenant.
+
+### Tests
+- Cover the published-SDK flow `updateClinicalSection(r4)` ->
+  `requestClinicalSummary(api)` for a section-only AllergyIntolerance update.
+
 ## [1.20.14] - 2026-07-24
 
 - Raise `gdc-common-utils-ts` to `^2.3.6` for the staging image.
