@@ -18,6 +18,7 @@ import {
   parseCommunicationParticipantSearchCriteria,
 } from 'gdc-common-utils-ts/utils/communication-participant-search';
 import { SearchBundleTypes } from 'gdc-common-utils-ts/utils/fhir-search';
+import { normalizeClaimsFromFhirResource } from 'gdc-common-utils-ts/utils/interoperable-resource-operation';
 import { GatewayLocalFhirResourceTypes } from '../shared/fhir-constants';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
@@ -210,7 +211,7 @@ export class CommunicationManager implements IJobProcessor {
 
     for (const entry of entries) {
       try {
-        const fhirResource = this.hydrateFhirCommunicationEntry(entry);
+        const fhirResource = this.resolveCommunicationResource(entry);
 
         if (!fhirResource) {
           throw new Error('Malformed entry: missing resource and missing meta.claims');
@@ -225,13 +226,22 @@ export class CommunicationManager implements IJobProcessor {
         if (!serverDid) {
             throw new Error(`Could not determine server DID for tenant '${job.tenantId}'.`);
         }
-        const commMsg = this.convertFhirToCommMsg(job.content.thid, serverDid, fhirResource);
+        const commMsg = this.convertCommunicationEntryToCommMsg(
+          job.content.thid,
+          serverDid,
+          entry,
+          fhirResource,
+        );
         await this.persistCommunicationChannelRecord(job, entry as any, fhirResource, commMsg);
         await this.persistCompositionProjectionFromCommunication(job, entry as any, fhirResource, serverDid);
         await this.persistDocumentReferenceProjectionFromCommunication(job, entry as any, fhirResource);
         await this.persistProjectedResourcesFromCommunication(job, entry as any, fhirResource);
 
-        const embeddedSearchResponseEntries = await this.executeEmbeddedSearchRequest(job, fhirResource);
+        const embeddedSearchResponseEntries = await this.executeEmbeddedSearchRequest(
+          job,
+          entry,
+          fhirResource,
+        );
         if (embeddedSearchResponseEntries && embeddedSearchResponseEntries.length > 0) {
           bundleEntries.push(...embeddedSearchResponseEntries);
           continue;
@@ -345,15 +355,16 @@ export class CommunicationManager implements IJobProcessor {
 
   private async executeEmbeddedSearchRequest(
     job: JobRequest,
+    entry: any,
     fhirResource: FhirCommunication,
   ): Promise<Array<BundleEntryResponse | ErrorEntry> | undefined> {
-    const references = this.buildCommunicationContentReferences(job, undefined, fhirResource)
+    const references = this.buildCommunicationContentReferences(job, entry, fhirResource)
       .filter((reference) => this.isEmbeddedSearchReference(reference));
     if (references.length === 0) return undefined;
 
     const responseEntries: Array<BundleEntryResponse | ErrorEntry> = [];
     for (const reference of references) {
-      const parsed = this.parseEmbeddedSearchReference(reference, job, fhirResource);
+      const parsed = this.parseEmbeddedSearchReference(reference, job, entry, fhirResource);
       if (!parsed) continue;
       const targetManager = parsed.resourceType === 'Subject' && parsed.action === '_search'
         ? this.individualManager
@@ -413,6 +424,7 @@ export class CommunicationManager implements IJobProcessor {
   private parseEmbeddedSearchReference(
     reference: string,
     fallbackJob: JobRequest,
+    entry: any,
     fhirResource: FhirCommunication,
   ): { section: string; format: string; resourceType: string; action: string; body: Record<string, unknown> } | undefined {
     const normalized = String(reference || '').trim();
@@ -457,7 +469,7 @@ export class CommunicationManager implements IJobProcessor {
         format,
         resourceType: summaryResourceType,
         action: '$summary',
-        body: this.buildSummaryParametersBody(query, fhirResource),
+        body: this.buildSummaryParametersBody(query, entry, fhirResource),
       };
     }
 
@@ -467,7 +479,7 @@ export class CommunicationManager implements IJobProcessor {
         format,
         resourceType: 'Subject',
         action: '_search',
-        body: this.buildSubjectSearchBody(query, fhirResource),
+        body: this.buildSubjectSearchBody(query, entry, fhirResource),
       };
     }
 
@@ -495,24 +507,20 @@ export class CommunicationManager implements IJobProcessor {
   /**
    * Resolves the FHIR `Parameters` body for an embedded `$summary` read.
    *
-   * Canonical contract:
-   * - `Communication.contentReference` selects `Subject/$summary`
-   * - `Communication.payload.contentAttachment.data` carries the serialized
-   *   FHIR `Parameters` resource
+   * The canonical claims-first Communication stores both the operation
+   * reference and serialized Parameters attachment in `resource.meta.claims`.
+   * Native FHIR payloads remain a supported input projection, but manager
+   * execution never requires claims to be converted into `payload[]`.
    *
    * Query-string conversion remains a compatibility path for older clients.
    */
   private buildSummaryParametersBody(
     query: string,
+    entry: any,
     fhirResource: FhirCommunication,
   ): Record<string, unknown> {
-    const payloads = Array.isArray((fhirResource as any)?.payload)
-      ? (fhirResource as any).payload
-      : [];
-    for (const payload of payloads) {
-      const attachment =
-        this.resolveCommunicationPayloadAttachment(payload)?.documentAttachment;
-      if (!attachment) continue;
+    for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
+      const attachment = resolved.documentAttachment;
       const parsed = this.parseAttachmentJson(attachment);
       if (parsed?.resourceType === FHIR_PARAMETERS_RESOURCE_TYPE
         && Array.isArray(parsed.parameter)) {
@@ -551,15 +559,15 @@ export class CommunicationManager implements IJobProcessor {
     };
   }
 
-  private buildSubjectSearchBody(query: string, fhirResource: FhirCommunication): Record<string, unknown> {
-    const payload = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload[0] : undefined;
-    const attachment = payload?.contentAttachment;
-    const dataBase64 = String(attachment?.data || '').trim();
-    if (dataBase64) {
-      try {
-        return JSON.parse(Buffer.from(dataBase64, 'base64').toString('utf8'));
-      } catch {
-        // Fall through to query-string conversion.
+  private buildSubjectSearchBody(
+    query: string,
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): Record<string, unknown> {
+    for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
+      const parsed = this.parseAttachmentJson(resolved.documentAttachment);
+      if (parsed?.resourceType === FHIR_PARAMETERS_RESOURCE_TYPE) {
+        return parsed as Record<string, unknown>;
       }
     }
 
@@ -609,13 +617,13 @@ export class CommunicationManager implements IJobProcessor {
       || (entry?.resource?.meta?.claims?.['Composition.type'] as string | undefined)
       || '',
     ).trim();
-    const payloadComposition = this.extractCompositionResourceFromCommunicationPayload(fhirResource);
+    const payloadComposition = this.extractCompositionResourceFromCommunication(entry, fhirResource);
     const embeddedClaims = payloadComposition?.meta?.claims && typeof payloadComposition.meta.claims === 'object'
       ? normalizeContextualizedClaims(payloadComposition.meta.claims as Record<string, any>)
       : undefined;
-    const payloadSections = this.extractCompositionSectionsFromCommunicationPayload(fhirResource);
+    const payloadSections = this.extractCompositionSectionsFromCommunication(entry, fhirResource);
     const payloadSection = payloadSections[0];
-    const payloadType = this.extractCompositionTypeFromCommunicationPayload(fhirResource);
+    const payloadType = this.extractCompositionTypeFromCommunication(entry, fhirResource);
     const sectionCodes = Array.from(new Set([
       ...claimsSection.split(','),
       ...payloadSections,
@@ -711,14 +719,8 @@ export class CommunicationManager implements IJobProcessor {
       || (commMsg.created_time ? new Date(commMsg.created_time * 1000).toISOString() : undefined)
       || new Date().toISOString();
 
-    const noteText = Array.isArray(fhirResource.note)
-      ? fhirResource.note
-        .map((note) => String(note?.text || '').trim())
-        .filter(Boolean)
-        .join('\n')
-      : '';
-    const payloads = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload : [];
-    const attachmentCount = payloads.filter((payload: any) => payload?.contentAttachment && typeof payload.contentAttachment === 'object').length;
+    const noteText = this.resolveCommunicationNoteTexts(entry, fhirResource).join('\n');
+    const attachmentCount = this.resolveCommunicationAttachments(entry, fhirResource).length;
     const contentReferences = this.buildCommunicationContentReferences(job, entry, fhirResource);
 
     const record: Record<string, any> = {
@@ -751,7 +753,9 @@ export class CommunicationManager implements IJobProcessor {
       [CommunicationClaim.Sent]: sent,
       [CommunicationClaim.NoteText]: noteText || undefined,
       meta: {
-        payloadCount: payloads.length,
+        payloadCount: attachmentCount + contentReferences.filter(
+          (reference) => !reference.startsWith('DocumentReference/'),
+        ).length,
         documentReferenceCount: attachmentCount,
       },
     };
@@ -763,60 +767,60 @@ export class CommunicationManager implements IJobProcessor {
     await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
   }
 
-  private extractCompositionSectionsFromCommunicationPayload(fhirResource: FhirCommunication): string[] {
+  private extractCompositionSectionsFromCommunication(
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): string[] {
     const payload = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload[0] : undefined;
     const fromCodeableConcept = payload?.contentCodeableConcept?.coding?.[0];
     if (fromCodeableConcept?.system && fromCodeableConcept?.code) {
       return [this.toCanonicalCodingToken(fromCodeableConcept.system, fromCodeableConcept.code)];
     }
 
-    const resolvedAttachment = this.resolveCommunicationPayloadAttachment(payload);
-    const contentType = String(resolvedAttachment?.documentAttachment?.contentType || '').toLowerCase();
-    const encodedData = String(resolvedAttachment?.documentAttachment?.data || '').trim();
-    if (!encodedData || !contentType.includes('json')) return [];
-
-    try {
-      const decoded = Buffer.from(encodedData, 'base64').toString('utf8');
-      const parsed = this.parseDocumentBundle(decoded);
-      if (!parsed) return [];
-      const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
-      const sectionCodes = Array.isArray(compositionEntry?.resource?.section)
-        ? compositionEntry.resource.section
-          .map((section: any) => {
-            const sectionCoding = section?.code?.coding?.[0];
-            return sectionCoding?.system && sectionCoding?.code
-              ? this.toCanonicalCodingToken(sectionCoding.system, sectionCoding.code)
-              : '';
-          })
-          .filter(Boolean)
-        : [];
-      if (sectionCodes.length > 0) return sectionCodes;
-    } catch {
-      return [];
+    for (const resolvedAttachment of this.resolveCommunicationAttachments(entry, fhirResource)) {
+      try {
+        const parsed = this.asDocumentBundle(
+          this.parseAttachmentJson(resolvedAttachment.documentAttachment),
+        );
+        if (!parsed) continue;
+        const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
+        const sectionCodes = Array.isArray(compositionEntry?.resource?.section)
+          ? compositionEntry.resource.section
+            .map((section: any) => {
+              const sectionCoding = section?.code?.coding?.[0];
+              return sectionCoding?.system && sectionCoding?.code
+                ? this.toCanonicalCodingToken(sectionCoding.system, sectionCoding.code)
+                : '';
+            })
+            .filter(Boolean)
+          : [];
+        if (sectionCodes.length > 0) return sectionCodes;
+      } catch {
+        continue;
+      }
     }
     return [];
   }
 
-  private extractCompositionTypeFromCommunicationPayload(fhirResource: FhirCommunication): string | undefined {
-    const payload = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload[0] : undefined;
-    const resolvedAttachment = this.resolveCommunicationPayloadAttachment(payload);
-    const contentType = String(resolvedAttachment?.documentAttachment?.contentType || '').toLowerCase();
-    const encodedData = String(resolvedAttachment?.documentAttachment?.data || '').trim();
-    if (!encodedData || !contentType.includes('json')) return undefined;
-
-    try {
-      const decoded = Buffer.from(encodedData, 'base64').toString('utf8');
-      const parsed = this.parseDocumentBundle(decoded);
-      if (!parsed) return undefined;
-      const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
-      const coding = compositionEntry?.resource?.type?.coding?.[0];
-      if (coding?.system && coding?.code) {
-        return this.toCanonicalCodingToken(coding.system, coding.code);
+  private extractCompositionTypeFromCommunication(
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): string | undefined {
+    for (const resolvedAttachment of this.resolveCommunicationAttachments(entry, fhirResource)) {
+      try {
+        const parsed = this.asDocumentBundle(
+          this.parseAttachmentJson(resolvedAttachment.documentAttachment),
+        );
+        if (!parsed) continue;
+        const compositionEntry = parsed.entry.find((e: any) => e?.resource?.resourceType === 'Composition');
+        const coding = compositionEntry?.resource?.type?.coding?.[0];
+        if (coding?.system && coding?.code) {
+          return this.toCanonicalCodingToken(coding.system, coding.code);
+        }
+      } catch {
+        continue;
       }
-    } catch {
-      return undefined;
     }
-
     return undefined;
   }
 
@@ -844,9 +848,7 @@ export class CommunicationManager implements IJobProcessor {
     if (!subject) return;
     const communicationSent = this.resolveCommunicationSent(entry, fhirResource) || nowIso;
 
-    const payloads = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload : [];
-    for (const payload of payloads) {
-      const resolvedAttachment = this.resolveCommunicationPayloadAttachment(payload);
+    for (const resolvedAttachment of this.resolveCommunicationAttachments(entry, fhirResource)) {
       const attachment = resolvedAttachment?.documentAttachment;
       if (!attachment) continue;
 
@@ -975,11 +977,11 @@ export class CommunicationManager implements IJobProcessor {
     const explicitSection = String(
       (entry?.meta?.claims?.['Composition.section'] as string | undefined)
       || (entry?.resource?.meta?.claims?.['Composition.section'] as string | undefined)
+      || this.extractCompositionSectionsFromCommunication(entry, fhirResource)[0]
       || '',
     ).trim();
-    const payloads = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload : [];
-    for (const payload of payloads) {
-      const attachment = this.resolveCommunicationPayloadAttachment(payload)?.documentAttachment;
+    for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
+      const attachment = resolved.documentAttachment;
       const resources = this.extractProjectedFhirResourcesFromAttachment(
         attachment,
         Boolean(explicitSection),
@@ -1085,14 +1087,12 @@ export class CommunicationManager implements IJobProcessor {
     communicationSubject: string | undefined,
     fhirResource: FhirCommunication,
   ): Record<string, any> {
-    const rawMetaClaims = resource?.meta?.claims;
-    if (rawMetaClaims && typeof rawMetaClaims === 'object' && !Array.isArray(rawMetaClaims)) {
-      return normalizeContextualizedClaims(rawMetaClaims as Record<string, any>);
-    }
-
-    const baseClaims: Record<string, any> = {
-      '@context': 'org.hl7.fhir.api',
-    };
+    const baseClaims = normalizeContextualizedClaims(
+      normalizeClaimsFromFhirResource(resource as any, {
+        identifierClaimKey: `${resourceType}.identifier`,
+      }) as Record<string, any>,
+    );
+    baseClaims['@context'] = baseClaims['@context'] || 'org.hl7.fhir.api';
 
     const resourceSubjectRef = String(
       resource?.subject?.reference
@@ -1107,12 +1107,6 @@ export class CommunicationManager implements IJobProcessor {
       }
     }
 
-    const identifierValue = String(resource?.identifier?.[0]?.value || '').trim();
-    if (identifierValue) baseClaims[`${resourceType}.identifier`] = identifierValue;
-
-    const statusValue = String(resource?.status || '').trim();
-    if (statusValue) baseClaims[`${resourceType}.status`] = statusValue;
-
     const language = String(resource?.language || (fhirResource as any)?.language || '').trim();
     if (language) baseClaims[`${resourceType}.language`] = language;
 
@@ -1123,11 +1117,6 @@ export class CommunicationManager implements IJobProcessor {
       || resource?.category?.[0]?.text
       || '',
     ).trim();
-    if (codeableText) {
-      const claimName = resourceType === 'MedicationStatement' ? 'medication-text' : 'code-text';
-      baseClaims[`${resourceType}.${claimName}`] = codeableText;
-    }
-
     const codeCoding = resource?.code?.coding?.[0]
       || resource?.medicationCodeableConcept?.coding?.[0]
       || resource?.vaccineCode?.coding?.[0]
@@ -1139,37 +1128,9 @@ export class CommunicationManager implements IJobProcessor {
     if (codeableText) {
       baseClaims[`${resourceType}.CodeTextLocal`] = codeableText;
     }
-    const codeSystem = String(codeCoding?.system || '').trim();
-    const codeValue = String(codeCoding?.code || '').trim();
-    if (codeValue) {
-      baseClaims[`${resourceType}.code`] = codeSystem ? `${codeSystem}|${codeValue}` : codeValue;
-    }
     const userSelectedRaw = codeCoding?.userSelected;
     if (typeof userSelectedRaw === 'boolean') {
       baseClaims[`${resourceType}.user-selected`] = String(userSelectedRaw);
-    }
-
-    const noteText = String(resource?.note?.[0]?.text || '').trim();
-    if (noteText) baseClaims[`${resourceType}.note`] = noteText;
-
-    const effectiveDateTime = String(
-      resource?.effectiveDateTime
-      || resource?.onsetDateTime
-      || resource?.occurrenceDateTime
-      || resource?.occurrencePeriod?.start
-      || resource?.performedDateTime
-      || resource?.issued
-      || resource?.recordedDate
-      || resource?.authoredOn
-      || resource?.start
-      || '',
-    ).trim();
-    if (effectiveDateTime) {
-      const claimName =
-        resourceType === 'MedicationStatement' ? 'effective' :
-        resourceType === 'Observation' ? 'effectiveDateTime' :
-        'date';
-      baseClaims[`${resourceType}.${claimName}`] = effectiveDateTime;
     }
 
     if (resourceType === 'MedicationStatement') {
@@ -1338,7 +1299,7 @@ export class CommunicationManager implements IJobProcessor {
    * (The rest of the method remains the same)
    */
    // ... [rest of the convertFhirToCommMsg method] ...
-   public convertFhirToCommMsg(thid: string, fromDid: string, fhirResource: FhirCommunication): CommMsgExtended {
+  public convertFhirToCommMsg(thid: string, fromDid: string, fhirResource: FhirCommunication): CommMsgExtended {
     const bodyData: DataEntry[] = [];
     const noteTexts = this.extractCommunicationNoteTexts(fhirResource);
 
@@ -1426,88 +1387,152 @@ export class CommunicationManager implements IJobProcessor {
     };
   }
 
-  private buildFhirCommunicationFromClaims(claims: Record<string, any> | undefined): FhirCommunication | undefined {
-    if (!claims || typeof claims !== 'object') return undefined;
-
-    const sent = claims[CommunicationClaim.Sent];
-    const subject = claims[CommunicationClaim.Subject];
-    const recipient = claims[CommunicationClaim.Recipient];
-    const sender = claims[CommunicationClaim.Sender];
-    const text = claims[CommunicationClaim.Text];
-    const contentReference = claims[CommunicationClaim.ContentReference];
-    const attachmentData = claims[CommunicationClaim.ContentAttachmentData];
-    const attachmentType = claims[CommunicationClaim.ContentAttachmentType];
-    const attachmentTitle = claims[CommunicationClaim.ContentAttachmentTitle];
-
-    const toRefs = typeof recipient === 'string'
-      ? recipient.split(',').map((r: string) => r.trim()).filter(Boolean).map((reference: string) => ({ reference }))
-      : Array.isArray(recipient)
-        ? recipient.map((r) => (typeof r === 'string' ? ({ reference: r }) : r)).filter(Boolean)
-        : undefined;
-
-    const senderRef =
-      typeof sender === 'string'
-        ? { reference: sender }
-        : sender && typeof sender === 'object' && typeof sender.reference === 'string'
-          ? sender
-          : undefined;
-    const payload: Array<Record<string, unknown>> = [];
-    if (typeof contentReference === 'string' && contentReference.trim()) {
-      payload.push({
-        contentReference: { reference: contentReference.trim() },
-      });
-    }
-    if (
-      (typeof attachmentData === 'string' && attachmentData.trim())
-      || (typeof attachmentType === 'string' && attachmentType.trim())
-      || (typeof attachmentTitle === 'string' && attachmentTitle.trim())
-    ) {
-      payload.push({
-        contentAttachment: {
-          data: typeof attachmentData === 'string' ? attachmentData : undefined,
-          contentType: typeof attachmentType === 'string' ? attachmentType : undefined,
-          title: typeof attachmentTitle === 'string' ? attachmentTitle : undefined,
-        },
-      });
+  /**
+   * Converts one canonical claims-first Communication entry into the internal
+   * message model without manufacturing a native FHIR `payload[]`.
+   *
+   * Native R4 payloads are still consumed by `convertFhirToCommMsg`; claims
+   * add only the operation reference, attachment or annotation that is absent
+   * from that transport projection.
+   */
+  private convertCommunicationEntryToCommMsg(
+    thid: string,
+    fromDid: string,
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): CommMsgExtended {
+    const commMsg = this.convertFhirToCommMsg(thid, fromDid, fhirResource);
+    const bodyData = commMsg.body?.data || [];
+    const claims = this.resolveCommunicationClaims(entry, fhirResource);
+    const reference = this.normalizeOptionalString(claims[CommunicationClaim.ContentReference]);
+    if (reference && !bodyData.some((item) =>
+      item.type === 'Reference'
+      && this.normalizeOptionalString((item.resource as any)?.reference) === reference)) {
+      bodyData.push(this.buildAtomicDataEntry('Reference', { reference }));
     }
 
-    return {
-      resourceType: 'Communication',
-      status: 'completed',
-      sent: typeof sent === 'string' ? sent : undefined,
-      subject: typeof subject === 'string' ? { reference: subject } : undefined,
-      recipient: toRefs,
-      sender: senderRef,
-      note: typeof text === 'string' ? [{ text }] : undefined,
-      payload: payload.length > 0 ? payload : undefined,
-    } as unknown as FhirCommunication;
+    const claimsAttachment = this.resolveClaimsAttachment(entry, fhirResource);
+    if (claimsAttachment) {
+      const attachment = claimsAttachment.documentAttachment;
+      const duplicate = bodyData.some((item) =>
+        item.type === 'Attachment'
+        && this.normalizeOptionalString((item.resource as any)?.data)
+          === this.normalizeOptionalString(attachment.data)
+        && this.normalizeOptionalString((item.resource as any)?.contentType)
+          === this.normalizeOptionalString(attachment.contentType));
+      if (!duplicate) {
+        bodyData.push(this.buildAtomicDataEntry('Attachment', {
+          contentType: attachment.contentType,
+          data: attachment.data,
+          title: attachment.title,
+        }));
+      }
+    }
+
+    const claimText = this.normalizeOptionalString(
+      claims[CommunicationClaim.NoteText] || claims[CommunicationClaim.Text],
+    );
+    if (claimText && bodyData.length === 0) {
+      bodyData.push(this.buildAtomicDataEntry('Annotation', { text: claimText }, claimText));
+    }
+    commMsg.body = { ...commMsg.body, data: bodyData };
+    return commMsg;
   }
 
   /**
-   * Hydrates the claims-only `org.hl7.fhir.api` Communication shell emitted by
-   * the SDK while preserving any native R4 fields already present.
+   * Resolves the Communication shell without projecting canonical claims into
+   * native FHIR fields.
    *
-   * In particular, `$summary` needs its operation reference and attached FHIR
-   * Parameters restored as two payload elements, and section updates need
-   * their attached batch/collection restored before projection.
+   * `resource.meta.claims` remains the source of truth for API jobs. A native
+   * FHIR Communication is accepted as a transport projection, but manager
+   * logic reads claims and native fields independently.
    */
-  private hydrateFhirCommunicationEntry(entry: any): FhirCommunication | undefined {
-    const resource = entry?.resource as FhirCommunication | undefined;
-    const claims = resource?.meta?.claims || entry?.meta?.claims;
-    const fromClaims = this.buildFhirCommunicationFromClaims(claims);
-    if (!resource) return fromClaims;
-    if (!fromClaims) return resource;
+  private resolveCommunicationResource(entry: any): FhirCommunication | undefined {
+    const resource = entry?.resource && typeof entry.resource === 'object'
+      ? entry.resource
+      : entry && typeof entry === 'object' ? entry : undefined;
+    if (resource?.resourceType === COMMUNICATION_RESOURCE_TYPE) {
+      return resource as FhirCommunication;
+    }
+    const claims = this.resolveCommunicationClaims(entry, resource);
+    if (Object.keys(claims).length === 0) return undefined;
     return {
-      ...fromClaims,
-      ...resource,
-      status: resource.status || fromClaims.status,
-      sent: resource.sent || fromClaims.sent,
-      subject: resource.subject || fromClaims.subject,
-      recipient: resource.recipient || fromClaims.recipient,
-      sender: resource.sender || fromClaims.sender,
-      note: resource.note || fromClaims.note,
-      payload: resource.payload || fromClaims.payload,
+      resourceType: COMMUNICATION_RESOURCE_TYPE,
+      status: 'completed',
+      meta: { claims },
+    } as unknown as FhirCommunication;
+  }
+
+  private resolveCommunicationClaims(
+    entry: any,
+    fhirResource: FhirCommunication | undefined,
+  ): Record<string, any> {
+    const entryClaims = entry?.meta?.claims;
+    const resourceClaims = (fhirResource as any)?.meta?.claims;
+    return {
+      ...(entryClaims && typeof entryClaims === 'object' && !Array.isArray(entryClaims)
+        ? entryClaims
+        : {}),
+      ...(resourceClaims && typeof resourceClaims === 'object' && !Array.isArray(resourceClaims)
+        ? resourceClaims
+        : {}),
     };
+  }
+
+  private resolveClaimsAttachment(
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): ResolvedCommunicationAttachment | undefined {
+    const claims = this.resolveCommunicationClaims(entry, fhirResource);
+    const data = this.normalizeOptionalString(claims[CommunicationClaim.ContentAttachmentData]);
+    const contentType = this.normalizeOptionalString(claims[CommunicationClaim.ContentAttachmentType]);
+    const title = this.normalizeOptionalString(claims[CommunicationClaim.ContentAttachmentTitle]);
+    if (!data && !contentType && !title) return undefined;
+    const attachment = { data, contentType, title };
+    return {
+      transportAttachment: attachment,
+      documentAttachment: attachment,
+    };
+  }
+
+  private resolveCommunicationAttachments(
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): ResolvedCommunicationAttachment[] {
+    const resolved: ResolvedCommunicationAttachment[] = [];
+    const claimsAttachment = this.resolveClaimsAttachment(entry, fhirResource);
+    if (claimsAttachment) resolved.push(claimsAttachment);
+
+    const payloads = Array.isArray((fhirResource as any)?.payload)
+      ? (fhirResource as any).payload
+      : [];
+    for (const payload of payloads) {
+      const nativeAttachment = this.resolveCommunicationPayloadAttachment(payload);
+      if (!nativeAttachment) continue;
+      const duplicate = resolved.some((candidate) =>
+        this.normalizeOptionalString(candidate.documentAttachment?.data)
+          === this.normalizeOptionalString(nativeAttachment.documentAttachment?.data)
+        && this.normalizeOptionalString(candidate.documentAttachment?.contentType)
+          === this.normalizeOptionalString(nativeAttachment.documentAttachment?.contentType)
+        && this.normalizeOptionalString(candidate.documentAttachment?.title)
+          === this.normalizeOptionalString(nativeAttachment.documentAttachment?.title));
+      if (!duplicate) resolved.push(nativeAttachment);
+    }
+    return resolved;
+  }
+
+  private resolveCommunicationNoteTexts(
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): string[] {
+    const claims = this.resolveCommunicationClaims(entry, fhirResource);
+    const claimText = this.normalizeOptionalString(
+      claims[CommunicationClaim.NoteText] || claims[CommunicationClaim.Text],
+    );
+    return Array.from(new Set([
+      ...(claimText ? [claimText] : []),
+      ...this.extractCommunicationNoteTexts(fhirResource),
+    ]));
   }
 
   private resolveCommunicationIdentifier(entry: any, fhirResource: FhirCommunication): string | undefined {
@@ -1557,20 +1582,26 @@ export class CommunicationManager implements IJobProcessor {
   }
 
   private buildCommunicationContentReferences(
-    job: JobRequest,
+    _job: JobRequest,
     entry: any,
     fhirResource: FhirCommunication,
   ): string[] {
     const references: string[] = [];
+    const claims = this.resolveCommunicationClaims(entry, fhirResource);
+    const claimsReference = this.normalizeOptionalString(
+      claims[CommunicationClaim.ContentReference],
+    );
+    if (claimsReference) references.push(claimsReference);
+
     const payloads = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload : [];
 
     for (const payload of payloads) {
       const contentReference = this.normalizeOptionalString(payload?.contentReference?.reference);
       if (contentReference) references.push(contentReference);
+    }
 
-      const attachment = this.resolveCommunicationPayloadAttachment(payload)?.documentAttachment;
-      if (!attachment) continue;
-
+    for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
+      const attachment = resolved.documentAttachment;
       const contentType = String(attachment.contentType || 'application/octet-stream').trim();
       const dataBase64 = typeof attachment.data === 'string' ? attachment.data.trim() : '';
       const url = typeof attachment.url === 'string' ? attachment.url.trim() : '';
@@ -1670,12 +1701,12 @@ export class CommunicationManager implements IJobProcessor {
     return [];
   }
 
-  private extractCompositionResourceFromCommunicationPayload(
+  private extractCompositionResourceFromCommunication(
+    entry: any,
     fhirResource: FhirCommunication,
   ): Record<string, any> | undefined {
-    const payloads = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload : [];
-    for (const payload of payloads) {
-      const attachment = this.resolveCommunicationPayloadAttachment(payload)?.documentAttachment;
+    for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
+      const attachment = resolved.documentAttachment;
       if (!attachment || typeof attachment !== 'object') continue;
       const parsed = this.parseAttachmentJson(attachment);
       const documentBundle = this.asDocumentBundle(parsed);
