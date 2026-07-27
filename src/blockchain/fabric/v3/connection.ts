@@ -8,12 +8,30 @@ export const EnvPublicPemPrefix = 'HLF_CERTIFICATE';
 export const EnvPrivatePemPrefix = 'HLF_PRIVATE_KEY';
 export const EnvPeerPrefix = 'HLF_CONNECTION_PEER';
 
+function getProcessOwnedOrMspValue(baseName: string, mspId: string): {
+  envVariableName: string;
+  value?: string;
+} {
+  const processOwnedValue = env.get(baseName).asString();
+  if (processOwnedValue) {
+    return { envVariableName: baseName, value: processOwnedValue };
+  }
+
+  const compatibilityName = `${baseName}_${mspId}`;
+  return {
+    envVariableName: compatibilityName,
+    value: env.get(compatibilityName).asString(),
+  };
+}
+
 export function getConnectionTlsCertPemByMspId(mspId: string): string {
-  const envVariableName = `${EnvConnectionPemPrefix}_${mspId}`;
+  const { envVariableName, value: resultString } = getProcessOwnedOrMspValue(
+    EnvConnectionPemPrefix,
+    mspId,
+  );
   console.log(
     `---> getConnectionTlsCertPemByMspId: mspId=${mspId}; envVariableName=${envVariableName}`
   );
-  const resultString = env.get(envVariableName).asString();
 
   if (!resultString || resultString === '') {
     throw new Error(
@@ -25,12 +43,14 @@ export function getConnectionTlsCertPemByMspId(mspId: string): string {
 }
 
 export function getConnectionPeerByMspId(mspId: string): string {
-  const envVariableName = `${EnvPeerPrefix}_${mspId}`;
+  const { envVariableName, value: resultString } = getProcessOwnedOrMspValue(
+    EnvPeerPrefix,
+    mspId,
+  );
   console.log(
     `---> getConnectionPeerByMspId: mspId=${mspId}; envVariableName=${envVariableName}`
   );
 
-  const resultString = env.get(envVariableName).asString();
   if (!resultString || resultString === '') {
     throw new Error(
       `!!! The peer connection "${envVariableName}" was not found for the mspId "${mspId}"`
@@ -41,11 +61,13 @@ export function getConnectionPeerByMspId(mspId: string): string {
 }
 
 export function getPublicCertByMspId(mspId: string): string {
-  const envVariableName = `${EnvPublicPemPrefix}_${mspId}`;
+  const { envVariableName, value: resultString } = getProcessOwnedOrMspValue(
+    EnvPublicPemPrefix,
+    mspId,
+  );
   console.log(
     `---> getPublicCertByMspId: mspId=${mspId}; envVariableName=${envVariableName}`
   );
-  const resultString = env.get(envVariableName).asString();
 
   if (!resultString || resultString === '') {
     throw new Error(
@@ -57,11 +79,13 @@ export function getPublicCertByMspId(mspId: string): string {
 }
 
 export function getPrivatePemKeyByMspId(mspId: string): string {
-  const envVariableName = `${EnvPrivatePemPrefix}_${mspId}`;
+  const { envVariableName, value: resultString } = getProcessOwnedOrMspValue(
+    EnvPrivatePemPrefix,
+    mspId,
+  );
   console.log(
     `---> getPrivatePemKeyByMspId: mspId=${mspId}; envVariableName=${envVariableName}`
   );
-  const resultString = env.get(envVariableName).asString();
 
   if (!resultString || resultString === '') {
     throw new Error(

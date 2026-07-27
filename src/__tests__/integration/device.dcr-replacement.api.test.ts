@@ -47,6 +47,9 @@ import type { EntityConfig } from '../../gdc-backend-utils-node/models/entity';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
+import { ManageAssetOrganization } from '../../blockchain/fabric/v3/manageAssetOrganization';
+import { ManageAssetArtifact } from '../../blockchain/fabric/v3/manageAssetArtifact';
+import { ManageAssetArtifactEvent } from '../../blockchain/fabric/v3/manageAssetArtifactEvent';
 import { ClearingHouseService } from '../../services/ClearingHouseService';
 
 describe('Device DCR replacement route story', () => {
@@ -67,6 +70,11 @@ describe('Device DCR replacement route story', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    jest.spyOn(ManageAssetOrganization.prototype, 'createOrganization').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetArtifactEvent.prototype, 'createArtifactEvent').mockResolvedValue({} as any);
 
     const logger = new ConsoleLogger();
     const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
@@ -191,6 +199,7 @@ describe('Device DCR replacement route story', () => {
         verifyInitialAccessToken: jest.fn(async () => ({ scope: 'dcr:register' })),
       } as any,
     ));
+    jest.clearAllMocks();
   });
 
   afterEach(() => {

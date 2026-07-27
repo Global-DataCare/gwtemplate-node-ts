@@ -43,6 +43,7 @@ import { VerificationMethod } from 'gdc-common-utils-ts/models/did';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
+import { shouldUseFabricLedger } from '../adapters/credential-ledger-resolver';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { buildGatewayInvoiceBundle } from '../utils/invoice-bundle';
 import { verifyOrderPaymentConfirmation } from '../utils/payment-confirmation';
@@ -1495,11 +1496,13 @@ export class HostingManager {
   }
 
   private isLedgerRegistrationEnabled(): boolean {
-    if (typeof this.config.ledger?.enabled === 'boolean') {
-      return this.config.ledger.enabled;
-    }
-    const env = String(this.config.nodeEnv || '').toLowerCase();
-    return env !== 'demo' && env !== 'test';
+    return shouldUseFabricLedger({
+      ...process.env,
+      NETWORK_MODE: this.config.networkMode,
+      LEDGER_ENABLED: typeof this.config.ledger?.enabled === 'boolean'
+        ? String(this.config.ledger.enabled)
+        : process.env.LEDGER_ENABLED,
+    });
   }
 
   private extractContainedService(

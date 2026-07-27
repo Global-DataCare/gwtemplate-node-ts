@@ -1,9 +1,21 @@
 ## [Unreleased]
 
+## [1.20.17] - 2026-07-27
+
 ### Changed
 - Accept `insurance` in the synthetic sector taxonomy and configure the GDC
   staging profile for the eight combinations of `animal|health` with
   `care|tech|research|insurance`.
+- Resolve Fabric enablement from the provider selected for the active
+  `NETWORK_MODE`; a `test=mem` runtime no longer acquires Fabric writes from
+  mappings for `test-network` or `network`.
+- Use process-owned `HLF_CONNECTION_PEER`, `HLF_CONNECTION_PEM`,
+  `HLF_CERTIFICATE`, and `HLF_PRIVATE_KEY` as the canonical Fabric connection
+  contract, retaining the MSP-suffixed names as compatibility fallbacks.
+
+### Tests
+- Cover active-network ledger selection and canonical/legacy Fabric connection
+  environment names.
 
 ## [1.20.16] - 2026-07-24
 
