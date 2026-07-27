@@ -3,6 +3,7 @@ import { VerificationMethod } from '../gdc-backend-utils-node/models/did';
 import { resolveIdentityChannel } from './ledger';
 import { ManageAssetCryptographicKey, type CryptographicKeyLedgerPayload } from '../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
+import { shouldUseFabricLedger } from '../adapters/credential-ledger-resolver';
 import {
   hashLedgerString,
   inferLedgerJwkUse,
@@ -10,14 +11,7 @@ import {
 } from './ledger-organization-registration-helpers';
 
 function shouldSyncIdentityLedger(): boolean {
-  const networkMode = String(process.env.NETWORK_MODE || '').trim().toLowerCase();
-  const ledgerEnabled = String(process.env.LEDGER_ENABLED || '').trim().toLowerCase() === 'true';
-  const defaultProvider = String(process.env.LEDGER_PROVIDER_DEFAULT || '').trim().toLowerCase();
-  const providerMap = String(process.env.LEDGER_PROVIDER_MAP || '').trim().toLowerCase();
-  return networkMode === 'local-network'
-    || ledgerEnabled
-    || defaultProvider === 'fabric'
-    || providerMap.includes('fabric');
+  return shouldUseFabricLedger();
 }
 
 function getLedgerMspId(): string | undefined {

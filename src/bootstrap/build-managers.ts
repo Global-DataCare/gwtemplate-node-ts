@@ -15,7 +15,11 @@ import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { CredentialLedgerAdapterMem } from '../adapters/CredentialLedgerAdapterMem';
 import { CredentialLedgerAdapterFabric } from '../adapters/CredentialLedgerAdapterFabric';
 import { CredentialLedgerAdapterMulti } from '../adapters/CredentialLedgerAdapterMulti';
-import { CredentialLedgerResolver, parseLedgerProviderMap } from '../adapters/credential-ledger-resolver';
+import {
+  CredentialLedgerResolver,
+  parseLedgerProviderMap,
+  shouldUseFabricLedger,
+} from '../adapters/credential-ledger-resolver';
 import type { ICredentialLedgerAdapter } from '../adapters/ICredentialLedgerAdapter';
 import { IndividualManager } from '../managers/IndividualManager';
 import { FamilyManager } from '../managers/FamilyManager';
@@ -110,7 +114,7 @@ export function buildManagers(options: {
     config.hostExternalDomain,
   );
   const blockchainAdapterMem = new BlockchainAdapterMem();
-  const blockchainAdapterFabric = shouldEnableFabricBlockchainWrites() ? new BlockchainAdapterFabric() : undefined;
+  const blockchainAdapterFabric = shouldUseFabricLedger() ? new BlockchainAdapterFabric() : undefined;
   const blockchainAdapter: IBlockchainAdapter = blockchainAdapterFabric
     ? new BlockchainAdapterMulti({ discoveryAdapter: blockchainAdapterMem, writeAdapter: blockchainAdapterFabric })
     : blockchainAdapterMem;
@@ -202,16 +206,4 @@ export function buildManagers(options: {
     discoveryService,
     clearingHouseService,
   };
-}
-
-function shouldEnableFabricBlockchainWrites(): boolean {
-  const ledgerEnabled = String(process.env.LEDGER_ENABLED || '').trim().toLowerCase() === 'true';
-  const defaultProvider = String(process.env.LEDGER_PROVIDER_DEFAULT || '').trim().toLowerCase();
-  const providerMap = String(process.env.LEDGER_PROVIDER_MAP || '').trim().toLowerCase();
-  const explicitConsentChaincode = String(process.env.CONSENT_ACCESS_LEDGER_CHAINCODE || '').trim();
-
-  return ledgerEnabled
-    || defaultProvider === 'fabric'
-    || providerMap.includes('fabric')
-    || explicitConsentChaincode.length > 0;
 }

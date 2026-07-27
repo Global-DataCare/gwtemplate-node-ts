@@ -19,12 +19,21 @@ import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAs
 import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 
 const TEST_API_BASE_URL = 'http://localhost:3001';
+const FABRIC_LEDGER_TEST_ENV = {
+  NETWORK_MODE: 'local-network',
+  LEDGER_ENABLED: 'true',
+  LEDGER_PROVIDER_DEFAULT: 'mem',
+  LEDGER_PROVIDER_MAP: 'local-network=fabric',
+  LEDGER_MSP_ID: 'Org1MSP',
+} as const;
 
 describe('DeviceRegistrationManager', () => {
   let manager: DeviceRegistrationManager;
   let vaultRepository: VaultMemRepository;
   const originalNetworkMode = process.env.NETWORK_MODE;
   const originalLedgerEnabled = process.env.LEDGER_ENABLED;
+  const originalLedgerProviderDefault = process.env.LEDGER_PROVIDER_DEFAULT;
+  const originalLedgerProviderMap = process.env.LEDGER_PROVIDER_MAP;
   const originalLedgerMspId = process.env.LEDGER_MSP_ID;
   
   beforeEach(() => {
@@ -33,12 +42,16 @@ describe('DeviceRegistrationManager', () => {
     manager = new DeviceRegistrationManager(TEST_API_BASE_URL, vaultRepository, mockKmsService);
     delete process.env.NETWORK_MODE;
     delete process.env.LEDGER_ENABLED;
+    delete process.env.LEDGER_PROVIDER_DEFAULT;
+    delete process.env.LEDGER_PROVIDER_MAP;
     delete process.env.LEDGER_MSP_ID;
   });
 
   afterAll(() => {
     process.env.NETWORK_MODE = originalNetworkMode;
     process.env.LEDGER_ENABLED = originalLedgerEnabled;
+    process.env.LEDGER_PROVIDER_DEFAULT = originalLedgerProviderDefault;
+    process.env.LEDGER_PROVIDER_MAP = originalLedgerProviderMap;
     process.env.LEDGER_MSP_ID = originalLedgerMspId;
   });
   
@@ -107,9 +120,7 @@ describe('DeviceRegistrationManager', () => {
     });
 
     it('should replace the previous device for the same employee license and sync employee identity', async () => {
-      process.env.NETWORK_MODE = 'local-network';
-      process.env.LEDGER_ENABLED = 'true';
-      process.env.LEDGER_MSP_ID = 'Org1MSP';
+      Object.assign(process.env, FABRIC_LEDGER_TEST_ENV);
 
       const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
       const keySubmitSpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'submit').mockResolvedValue({} as any);

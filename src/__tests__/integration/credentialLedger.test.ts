@@ -4,9 +4,43 @@
 import { invokeExpress } from './helpers/invokeExpress';
 import { CredentialLedgerAdapterMem } from '../../adapters/CredentialLedgerAdapterMem';
 import { CredentialLedgerResolver } from '../../adapters/credential-ledger-resolver';
+import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
 import { startServer, resetServerConfig } from '../../server';
 
 describe('Credential ledger endpoints (demo, mem)', () => {
+  it('keeps the active test runtime off Fabric when only higher modes map to Fabric', async () => {
+    const keys = [
+      'NETWORK_MODE',
+      'LEDGER_ENABLED',
+      'LEDGER_PROVIDER_DEFAULT',
+      'LEDGER_PROVIDER_MAP',
+      'CONSENT_ACCESS_LEDGER_CHAINCODE',
+    ] as const;
+    const originalValues = new Map(keys.map((key) => [key, process.env[key]]));
+
+    Object.assign(process.env, {
+      NETWORK_MODE: 'test',
+      LEDGER_ENABLED: 'true',
+      LEDGER_PROVIDER_DEFAULT: 'mem',
+      LEDGER_PROVIDER_MAP: 'test=mem,test-network=fabric,network=fabric',
+    });
+    delete process.env.CONSENT_ACCESS_LEDGER_CHAINCODE;
+    resetServerConfig();
+
+    const { blockchainAdapter, queueAdapter } = await startServer({ listen: false });
+    try {
+      expect(blockchainAdapter).toBeInstanceOf(BlockchainAdapterMem);
+    } finally {
+      queueAdapter.stop();
+      for (const key of keys) {
+        const value = originalValues.get(key);
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      resetServerConfig();
+    }
+  });
+
   it('should return sync and async status/history from the ledger', async () => {
     process.env.NODE_ENV = 'demo';
     process.env.DB_PROVIDER = 'mem';

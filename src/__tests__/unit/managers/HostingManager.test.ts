@@ -296,6 +296,7 @@ describe('HostingManager', () => {
   });
 
   it('[ledger] registers organization, keys, bindings and artifacts on identity-local', async () => {
+    mockConfig.networkMode = 'local-network';
     mockConfig.ledger = {
       enabled: true,
       mspId: 'Org1MSP',
@@ -447,6 +448,7 @@ describe('HostingManager', () => {
   });
 
   it('[ledger] falls back to verificationMethod id when a JWK thumbprint is unavailable', async () => {
+    mockConfig.networkMode = 'local-network';
     mockConfig.ledger = {
       enabled: true,
       mspId: 'Org1MSP',
