@@ -1,5 +1,36 @@
 ## [Unreleased]
 
+## [1.20.18] - 2026-07-28
+
+### Fixed
+
+- Accept the independently addressable historical `onehealth-research`
+  compatibility sector alongside the canonical health sector matrix.
+- Bind a newly consumed employee license to the employee email and canonical
+  role as well as its subject id, so the subsequent `License/_issue`,
+  `Token/_exchange` and DCR flow can reuse the seat and register the employee
+  device keys on `identity-eu`.
+
+### Changed
+
+- Split identity ledger routing: natural-person individuals remain on
+  `identity-global`, while EU organizations, employees/controllers, locations,
+  keys, identity evidence and identity events use `identity-eu`.
+
+### Documentation
+
+- Document the canonical professional identity boundary across employee/profile
+  records, Consent, VP and SMART, including one shared SHA3-256 multibase
+  payload for actor DID paths and credential `sameAs`, clinical-only scopes and
+  provider endpoint audience resolution.
+- Separate a controller's signed governance approval from the privileged,
+  auditable infrastructure reconciler that updates channel membership, joins
+  selected peers and activates committed chaincodes.
+
+### Dependencies
+
+- Raise `gdc-common-utils-ts` to `^2.3.8`.
+
 ## [1.20.17] - 2026-07-27
 
 ### Changed

@@ -7,7 +7,7 @@ import { OrganizationConfig } from '../gdc-backend-utils-node/models/entity';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { PdfSignatureEvidence } from './pdf-evidence';
 import { ILogger } from '../loggers/ILogger';
-import { resolveIdentityChannel } from './ledger';
+import { resolveOrganizationIdentityChannel } from './ledger';
 import { ManageAssetOrganization } from '../blockchain/fabric/v3/manageAssetOrganization';
 import { ManageAssetArtifact } from '../blockchain/fabric/v3/manageAssetArtifact';
 import { ManageAssetArtifactEvent } from '../blockchain/fabric/v3/manageAssetArtifactEvent';
@@ -50,7 +50,7 @@ export async function registerOrganizationOnLedger(params: {
 
   const chaincodeName = params.ledgerConfig?.chaincodeName || process.env.LEDGER_ORG_CHAINCODE;
   const channelName = params.ledgerConfig?.channelName
-    || resolveIdentityChannel(params.jurisdiction || params.hostJurisdiction);
+    || resolveOrganizationIdentityChannel(params.jurisdiction || params.hostJurisdiction);
   const manager = new ManageAssetOrganization({ chaincodeName, channelName });
   const organizationClaims = (params.organization?.meta as any)?.claims || (params.config as any)?.claims;
   const ledgerOrgId = resolveLedgerOrganizationId(organizationClaims, params.orgId);

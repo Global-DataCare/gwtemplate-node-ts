@@ -47,12 +47,12 @@ still decide whether an operation is permitted.
 Deploy the contract in each channel that owns subjects with operational keys;
 do not build one cross-sector key registry.
 
-- identity-global owns natural persons, human individual organizations, their
-  controllers/members and personal user/device keys.
-- identity-REGION owns jurisdictional professional identity, employment,
-  licences and professional device/key bindings that must be referenced across
-  several sector or animal-species channels. Registration there grants no
-  sector/species write by itself.
+- identity-global owns natural-person individual identities, their personal
+  user/device keys, identity evidence and identity events.
+- identity-REGION owns legal organizations, employees/controllers, locations,
+  keys, identity evidence/events, employment and licences that must be
+  referenced across several sector or animal-species channels. Registration
+  there grants no sector/species write by itself.
 - health-care-REGION owns professional provider/employee relationships, their
   professional keys, human clinical certification and provider-index
   permissions for that region.
@@ -71,9 +71,9 @@ identity into the sector channel.
 The governance bootstrap is ordered:
 
 1. Register the legal organization designated by the rulebook to execute the
-   data-space committee's decisions in organization-sc on identity-global.
+   data-space committee's decisions in organization-sc on identity-REGION.
 2. Register its initial Root CA controller as an employee/person belonging to
-   that organization in employee-sc on identity-global.
+   that organization in employee-sc on identity-REGION.
 3. Store the controller's canonical operation-signing commitment on that
    identity as:
 
@@ -99,10 +99,10 @@ The GW currently writes bindings in two flows:
   encryption JWK is linked to the subject, and the key and binding are marked
   revoked during revocation.
 
-Current limitation: the GW resolver sends these records to one identity channel
-and does not yet select identity-global versus the owning sector-region channel.
-That routing must be corrected before using a binding as authoritative audit
-state.
+The GW resolver keeps `person` bindings on identity-global and routes
+organization/employee bindings to identity-REGION. Deployments must provision
+the required regional channel and chaincodes before treating these bindings as
+authoritative audit state.
 
 Typical asset:
 

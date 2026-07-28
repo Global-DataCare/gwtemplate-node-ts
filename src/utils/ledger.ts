@@ -1,7 +1,11 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/utils/ledger.ts
 
-import { GLOBAL_HUMAN_IDENTITY_CHANNEL } from '../blockchain/fabric/v3/ledger-channel-name';
+import {
+  EU_ORGANIZATION_IDENTITY_CHANNEL,
+  GLOBAL_HUMAN_IDENTITY_CHANNEL,
+} from '../blockchain/fabric/v3/ledger-channel-name';
+import { getJurisdictionGroup } from './jurisdiction';
 
 export function resolveIdentityChannel(jurisdiction?: string): string {
   const explicitDefault = String(process.env.LEDGER_IDENTITY_CHANNEL_DEFAULT || '').trim();
@@ -14,4 +18,47 @@ export function resolveIdentityChannel(jurisdiction?: string): string {
   // hold credentials from several jurisdictions.
   void jurisdiction;
   return GLOBAL_HUMAN_IDENTITY_CHANNEL;
+}
+
+/**
+ * Resolves the legal-entity identity plane.
+ *
+ * Organizations, their employees/controllers, locations, keys, identity
+ * evidence and identity events share the organization's regional channel.
+ * Natural-person identities remain on `identity-global`.
+ */
+export function resolveOrganizationIdentityChannel(jurisdiction?: string): string {
+  const explicitDefault = String(
+    process.env.LEDGER_ORGANIZATION_IDENTITY_CHANNEL_DEFAULT || '',
+  ).trim();
+  if (explicitDefault) return explicitDefault;
+
+  const networkMode = String(process.env.NETWORK_MODE || '').trim().toLowerCase();
+  if (networkMode === 'local-network') return 'identity-local';
+
+  if (getJurisdictionGroup(String(jurisdiction || '').trim()) === 'eu') {
+    return EU_ORGANIZATION_IDENTITY_CHANNEL;
+  }
+
+  throw new Error(
+    'Organization identity channel is not configured for this jurisdiction. '
+    + 'Set LEDGER_ORGANIZATION_IDENTITY_CHANNEL_DEFAULT.',
+  );
+}
+
+/**
+ * Resolves an organization-scoped employee record or a global person.
+ *
+ * `employee` includes the employment/controller relationship and its
+ * operational keys. A natural-person or Root governance controller identity
+ * remains a `person` in `identity-global` and is referenced from the regional
+ * relationship instead of being duplicated there.
+ */
+export function resolveSubjectIdentityChannel(
+  subjectType: 'employee' | 'person',
+  jurisdiction?: string,
+): string {
+  return subjectType === 'employee'
+    ? resolveOrganizationIdentityChannel(jurisdiction)
+    : resolveIdentityChannel(jurisdiction);
 }

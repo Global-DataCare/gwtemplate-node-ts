@@ -45,7 +45,7 @@ orderer, per-channel block 0, MSP, peer ledger, CouchDB or chaincode lifecycle.
 A GW that supports both domains holds two explicit Fabric connections and may
 bridge authorized API operations; it never treats the networks as one ledger.
 
-`identity-global` is the authoritative natural-person/controller identity
+`identity-global` is the authoritative natural-person individual identity
 plane used by both domains. In the MVP it may be reached through the human
 identity connection by a dual-domain GW. That logical authority does not make
 the animal and human clinical ledgers one Fabric network. Moving it later to a
@@ -54,10 +54,10 @@ copy.
 
 ## People, professionals and animals
 
-`identity-global` contains human natural persons acting as `ONSELF`,
-controllers or members of human or animal individual organizations, plus
-their personal device/key lifecycle. It contains no animal identities,
-ownership records or clinical evidence.
+`identity-global` contains human natural-person individuals and their personal
+device/key lifecycle, identity evidence and identity events. It contains no
+legal organizations, organizational employees/controllers, locations, animal
+identities, ownership records or clinical evidence.
 
 A veterinarian is multi-species, not multi-sector. Register that professional
 once in `identity-<jurisdiction>` as an employee of an accredited veterinary
@@ -84,8 +84,9 @@ organization VC and host channel grant
 
 | Channel family | Region | Ownership |
 | --- | --- | --- |
-| `identity-global` | global | natural persons, controllers/members, personal keys and governance identity |
-| `health-care-<jurisdiction>` | regional | admitted providers, employees/licences, human-health permissions and evidence |
+| `identity-global` | global | natural-person individuals, personal keys, identity evidence and identity events |
+| `identity-<jurisdiction>` | regional | legal organizations, employees/controllers, locations, keys, identity evidence and identity events |
+| `health-care-<jurisdiction>` | regional | human-health permissions and clinical evidence |
 
 The initial routing catalog is `eu`, `na`, `asia`, `africa`, `pacific` and
 `latam`. Exact legal country/region remains in verified VC claims such as

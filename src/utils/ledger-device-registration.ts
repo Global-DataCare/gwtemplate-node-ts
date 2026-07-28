@@ -1,6 +1,6 @@
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { VerificationMethod } from '../gdc-backend-utils-node/models/did';
-import { resolveIdentityChannel } from './ledger';
+import { resolveSubjectIdentityChannel } from './ledger';
 import { ManageAssetCryptographicKey, type CryptographicKeyLedgerPayload } from '../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 import { shouldUseFabricLedger } from '../adapters/credential-ledger-resolver';
@@ -43,7 +43,7 @@ export async function registerSubjectKeysOnLedger(params: {
   const mspId = getLedgerMspId();
   if (!mspId) return;
 
-  const channelName = resolveIdentityChannel(params.jurisdiction);
+  const channelName = resolveSubjectIdentityChannel(params.subjectType, params.jurisdiction);
   const keyManager = new ManageAssetCryptographicKey({
     chaincodeName: process.env.LEDGER_CRYPTOGRAPHIC_KEY_CHAINCODE || 'cryptographickey-sc',
     channelName,
@@ -119,7 +119,7 @@ export async function revokeSubjectKeysOnLedger(params: {
   const mspId = getLedgerMspId();
   if (!mspId) return;
 
-  const channelName = resolveIdentityChannel(params.jurisdiction);
+  const channelName = resolveSubjectIdentityChannel(params.subjectType, params.jurisdiction);
   const revokedAt = String(params.revokedAtEpochSec || Math.floor(Date.now() / 1000));
   const keyManager = new ManageAssetCryptographicKey({
     chaincodeName: process.env.LEDGER_CRYPTOGRAPHIC_KEY_CHAINCODE || 'cryptographickey-sc',

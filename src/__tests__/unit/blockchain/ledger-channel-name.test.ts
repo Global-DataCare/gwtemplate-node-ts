@@ -3,6 +3,7 @@
  * product adapters remain responsible for selecting a permitted family.
  */
 import {
+  EU_ORGANIZATION_IDENTITY_CHANNEL,
   GLOBAL_HUMAN_IDENTITY_CHANNEL,
   LedgerRegions,
   buildRegionalLedgerChannel,
@@ -11,6 +12,7 @@ import {
 describe('ledger channel name', () => {
   it('keeps the global human identity channel non-regional', () => {
     expect(GLOBAL_HUMAN_IDENTITY_CHANNEL).toBe('identity-global');
+    expect(EU_ORGANIZATION_IDENTITY_CHANNEL).toBe('identity-eu');
   });
 
   it.each(Object.values(LedgerRegions))('places region %s last', (region) => {

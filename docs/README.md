@@ -151,6 +151,7 @@ Memory aid:
 *   **[03.G-LEGACY-AND-MANAGED-KEYS.md](03-IDENTITY-AND-TRUST/03.G-LEGACY-AND-MANAGED-KEYS.md)**: Discusses strategies for handling both externally managed and system-managed keys.
 *   **[03.H-ICA-CERTIFICATE-ISSUANCE.md](03-IDENTITY-AND-TRUST/03.H-ICA-CERTIFICATE-ISSUANCE.md)**: Documents the split between Fabric operational enrollment and dataspace ICA Host VC issuance, plus the boundary between host certificate bootstrap and host autodiscovery.
 *   **[03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md](03-IDENTITY-AND-TRUST/03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md)**: Audit reference for the hosting-operator bootstrap boundary, including `env -> vault -> Fabric bootstrap` resolution order and the separation between hosting validation, operational enrollment, and Host VC issuance.
+*   **[03.J-PROFESSIONAL-CONSENT-SMART.md](03-IDENTITY-AND-TRUST/03.J-PROFESSIONAL-CONSENT-SMART.md)**: Canonical professional DID reuse across employee/profile identity, Consent, VP and SMART, including endpoint audience resolution and hash-boundary semantics.
 
 ### 📂 04-DEEP-DIVES
 *   **[04.A-VC-ARCHITECTURE-DEEP-DIVE.md](04-DEEP-DIVES/04.A-VC-ARCHITECTURE-DEEP-DIVE.md)**: A deep dive into the Verifiable Credentials architecture.
