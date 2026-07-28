@@ -361,6 +361,8 @@ export class EmployeeManager {
       vaultId,
       tenantId,
       employeeId,
+      email,
+      role: roleCode,
       sector: sector || 'health-care',
       jurisdiction: jurisdiction || 'us',
     });
@@ -593,6 +595,8 @@ export class EmployeeManager {
     vaultId: string;
     tenantId: string;
     employeeId: string;
+    email: string;
+    role: string;
     sector: string;
     jurisdiction: string;
   }): Promise<BundleEntry | undefined> {
@@ -634,6 +638,8 @@ export class EmployeeManager {
       ...(availableDoc.content as DeviceLicense),
       status: LICENSE_STATUS_ISSUED,
       subjectId: params.employeeId,
+      issuedToEmail: params.email,
+      issuedToRole: params.role,
       issuedAt: nowSec,
     };
     await this.vaultRepository.put(

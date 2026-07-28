@@ -1,6 +1,11 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/EmployeeManager.test.ts
 
+/**
+ * Flow contract: employee onboarding consumes one organization-owned seat,
+ * binds it to the canonical employee identity and role, and only then permits
+ * later issue, token and device-registration operations.
+ */
 import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
@@ -209,6 +214,15 @@ describe('EmployeeManager', () => {
       const consumeCall = mockVaultRepository.put.mock.calls[0];
       expect(consumeCall[0]).toBe(TENANT_VAULT_ID);
       expect(consumeCall[2]).toBe(getEnvSectionId('device-licenses'));
+      const consumedLicense = (consumeCall[1] as ConfidentialStorageDoc[])[0]
+        .content as DeviceLicense;
+      expect(consumedLicense.subjectId).toBe(MOCKED_OCCUPATION_UUID);
+      expect(consumedLicense.issuedToEmail).toBe(
+        testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email],
+      );
+      expect(consumedLicense.issuedToRole).toBe(
+        testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.hasOccupation],
+      );
 
       expect(response.body.data[0].response.status).toBe('201');
     });

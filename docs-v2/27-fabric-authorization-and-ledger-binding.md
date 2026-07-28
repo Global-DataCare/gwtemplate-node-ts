@@ -37,21 +37,27 @@ is the internal action boundary. A veterinarian, doctor, researcher,
 responder, insurer employee or crew member receives no channel permission from
 the job title alone. Read and write are independent grants.
 
-## Root controller identity is anchored in `identity-global`
+## Individual and organizational identity planes
 
 `identity-global` is exclusively the global human/governance identity plane.
 It is not regional and must not contain animal identities, animal ownership,
-clinical records or professional employment records. The bootstrap order is:
+clinical records, legal organizations or professional employment records.
+Natural-person individual and Root governance-controller keys, identity
+evidence and identity events remain there. EU legal organizations, their
+employment/controller relationships, locations and organization-scoped
+operational keys are anchored in `identity-eu`. The bootstrap order is:
 
-1. register the legal organization designated by the rulebook to execute the
-   committee's decisions;
-2. register the Root CA controller employee/person as a member of that
-   organization;
-3. persist the controller subject's canonical operation-signing commitment;
+1. register the legal organization designated by the rulebook in its regional
+   identity channel;
+2. register the Root CA controller person and canonical operation-signing
+   commitment in `identity-global`;
+3. register the regional controller-membership relationship by referencing
+   that global person UUID from the legal organization;
 4. derive optional operational key and subject-key indexes.
 
-The global human plane contains natural persons, human individual
-organizations, their controllers/members and their personal user/device keys.
+The global human plane contains natural-person individuals and governance
+controllers, their identity evidence/events and their personal user/device
+keys.
 Professional provider and employee records belong to the channel family that
 governs their accredited organization and reference the global person UUID.
 A veterinarian is multi-species, not multi-sector: register the professional
@@ -90,6 +96,19 @@ Institutional channel families are separately governed:
 These names are target routing vocabulary, not mandatory MVP provisioning.
 Create a channel only for a distinct membership, confidentiality, residency or
 endorsement boundary.
+
+Creating `identity-eu`, `identity-na` or another regional channel does not add
+it silently to every peer. A controller may request or approve participation
+under data-space governance, but does not receive peer-admin material. A
+privileged declarative reconciler updates the channel configuration, adds only
+approved MSPs, joins the selected host peers, approves/commits the required
+chaincodes and reports auditable health with safe retries.
+
+A non-member host cannot read that channel ledger. A joined host can replicate
+it, but write authority remains independently constrained by channel ACL,
+endorsement policy and chaincode authorization. Hosts join only the regional
+planes they need; routine peer maintenance belongs to the platform
+operator/reconciler, not manual portal-controller work.
 
 The initial region catalog is `eu`, `na`, `asia`, `africa`, `pacific`
 and `latam`. Here `asia` includes the Middle East and India;

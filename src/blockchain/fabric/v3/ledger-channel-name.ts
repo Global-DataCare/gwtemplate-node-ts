@@ -16,6 +16,7 @@ export const LedgerRegions = Object.freeze({
 export type LedgerRegion = typeof LedgerRegions[keyof typeof LedgerRegions];
 
 export const GLOBAL_HUMAN_IDENTITY_CHANNEL = 'identity-global' as const;
+export const EU_ORGANIZATION_IDENTITY_CHANNEL = 'identity-eu' as const;
 
 const CHANNEL_FAMILY_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 

@@ -1,3 +1,8 @@
+/**
+ * Flow contract: deployment configuration accepts canonical sectors plus
+ * explicitly named signed-identity compatibility sectors and fails closed for
+ * every unrecognized value.
+ */
 import {
   buildSectorsFromMainAndSubsectors,
   determineApiBaseUrl,
@@ -48,6 +53,18 @@ describe('server-config sector resolution', () => {
       'animal-index',
       'animal-tech',
       'animal-insurance',
+    ]);
+  });
+
+  it('should preserve the independently addressable onehealth-research compatibility sector', () => {
+    expect(parseAndValidateSectors(
+      'health-care,health-research,health-tech,health-insurance,onehealth-research',
+    )).toEqual([
+      'health-care',
+      'health-research',
+      'health-tech',
+      'health-insurance',
+      'onehealth-research',
     ]);
   });
 
