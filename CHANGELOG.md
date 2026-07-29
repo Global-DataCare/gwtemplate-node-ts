@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+### Changed
+
+- Mark the gateway as a private npm project, add a failing `prepublishOnly`
+  guard, and document that releases are immutable container images deployed by
+  digest, never npm packages.
+
 ## [1.20.20] - 2026-07-30
 
 ### Dependencies
