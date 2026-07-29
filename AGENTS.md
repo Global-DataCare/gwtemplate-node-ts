@@ -80,5 +80,9 @@ Collect and preserve audit artifacts:
 3. `live-gw-uc5-debug-*.jsonl`
 
 ## Release Discipline
+- This repository is a deployable service, not an npm package. Keep
+  `package.json#private` set to `true` and preserve the failing
+  `prepublishOnly` guard; never run or document `npm publish`. Release
+  immutable container images to Artifact Registry and deploy them by digest.
 - Update `CHANGELOG.md` under `Unreleased` with explicit endpoint/manager effects.
 - Keep docs and API examples synchronized with test-proven behavior.
