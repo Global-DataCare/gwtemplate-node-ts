@@ -1111,7 +1111,9 @@ export class CommunicationManager implements IJobProcessor {
     if (language) baseClaims[`${resourceType}.language`] = language;
 
     const codeableText = String(
-      resource?.code?.text
+      baseClaims[`${resourceType}.code-text`]
+      || baseClaims[`${resourceType}.CodeTextLocal`]
+      || resource?.code?.text
       || resource?.medicationCodeableConcept?.text
       || resource?.vaccineCode?.text
       || resource?.category?.[0]?.text
@@ -1121,7 +1123,12 @@ export class CommunicationManager implements IJobProcessor {
       || resource?.medicationCodeableConcept?.coding?.[0]
       || resource?.vaccineCode?.coding?.[0]
       || resource?.category?.[0]?.coding?.[0];
-    const codeDisplay = String(codeCoding?.display || '').trim();
+    const codeDisplay = String(
+      baseClaims[`${resourceType}.code-display`]
+      || baseClaims[`${resourceType}.CodeDisplay`]
+      || codeCoding?.display
+      || '',
+    ).trim();
     if (codeDisplay) {
       baseClaims[`${resourceType}.CodeDisplay`] = codeDisplay;
     }

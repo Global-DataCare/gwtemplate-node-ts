@@ -120,7 +120,7 @@ export async function pollAcceptedGatewayOperation(input: {
  * references to the requested research subject DID.
  */
 export function loadResearchIpsAllSectionsFixture(subjectDid: string): any {
-  const fixturePath = path.join(process.cwd(), 'src', '__tests__', 'data', 'fhir-ips-bundle-all-sections.json');
+  const fixturePath = path.join(process.cwd(), 'node_modules', 'gdc-common-utils-ts', 'fixtures', 'fhir-ips-bundle-all-sections.json');
   const bundle = JSON.parse(readFileSync(fixturePath, 'utf8'));
   for (const entry of Array.isArray(bundle?.entry) ? bundle.entry : []) {
     const resource = entry?.resource;

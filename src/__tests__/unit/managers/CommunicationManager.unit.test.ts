@@ -495,7 +495,15 @@ describe('CommunicationManager Unit Tests', () => {
             id: 'allergy-section-update-001',
             identifier: [{ value: 'urn:uuid:allergy-section-update-001' }],
             patient: { reference: subjectDid },
-            code: { coding: [{ system: 'http://snomed.info/sct', code: '91935009' }] },
+            language: 'es',
+            code: {
+              text: 'http://snomed.info/sct|91935009',
+              coding: [{ system: 'http://snomed.info/sct', code: '91935009', display: 'Peanut' }],
+            },
+            meta: { claims: {
+              'AllergyIntolerance.code-text': 'Cacahuete',
+              'AllergyIntolerance.code-display': 'Peanut',
+            } },
             clinicalStatus: { coding: [{ code: 'active' }] },
             category: ['food'],
             criticality: 'high',
@@ -575,6 +583,25 @@ describe('CommunicationManager Unit Tests', () => {
         || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.code']
         || allergyRecord['org.hl7.fhir.r4.AllergyIntolerance.code'],
       ).toBe('http://snomed.info/sct|91935009');
+      expect(
+        allergyRecord['AllergyIntolerance.code-text']
+        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.code-text'],
+      ).toBe('Cacahuete');
+      expect(
+        allergyRecord['AllergyIntolerance.CodeTextLocal']
+        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.CodeTextLocal'],
+      ).toBe('Cacahuete');
+      expect(
+        allergyRecord['AllergyIntolerance.code-display']
+        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.code-display'],
+      ).toBe('Peanut');
+      expect(
+        allergyRecord['AllergyIntolerance.code-text']
+        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.code-text'],
+      ).not.toBe(
+        allergyRecord['AllergyIntolerance.code']
+        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.code'],
+      );
       expect(
         allergyRecord['AllergyIntolerance.clinical-status']
         || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.clinical-status']

@@ -56,4 +56,29 @@ describe('fhir-resource-rehydration utils', () => {
       },
     }]);
   });
+
+  it.each([
+    ResourceTypesFhirR4.AllergyIntolerance,
+    ResourceTypesFhirR4.Condition,
+  ])('keeps the manually authored local name when rehydrating %s', (resourceType) => {
+    const token = 'http://snomed.info/sct|373270004';
+    const resource = buildFhirResourceFromIndexedClaims(resourceType, {
+      [`${resourceType}.subject`]: 'Patient/p-1',
+      [`${resourceType}.code`]: token,
+      [`${resourceType}.code-text`]: 'Penicilina',
+      [`${resourceType}.code-display`]: 'Penicillin',
+      [`${resourceType}.language`]: 'es',
+    });
+
+    expect(resource.language).toBe('es');
+    expect(resource.code).toEqual({
+      text: 'Penicilina',
+      coding: [{
+        system: 'http://snomed.info/sct',
+        code: '373270004',
+        display: 'Penicillin',
+      }],
+    });
+    expect(resource.code.text).not.toBe(token);
+  });
 });

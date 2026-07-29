@@ -1,5 +1,23 @@
 ## [Unreleased]
 
+## [1.20.19] - 2026-07-29
+
+### Fixed
+
+- Preserve canonical `<ResourceType>.code-text`, `code-display` and `language`
+  claims when projecting native FHIR resources; compatibility aliases can no
+  longer replace manual text with `system|code`.
+- Rehydrate canonical `code-display` claims into `Coding.display`.
+
+### Changed
+
+- Consume the official all-sections IPS fixture from
+  `gdc-common-utils-ts/fixtures` instead of maintaining a gateway copy.
+
+### Dependencies
+
+- Raise `gdc-common-utils-ts` to `^2.3.9`.
+
 ## [1.20.18] - 2026-07-28
 
 ### Fixed
