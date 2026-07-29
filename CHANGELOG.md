@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [1.20.20] - 2026-07-30
+
+### Dependencies
+
+- Raise `gdc-common-utils-ts` to `^2.3.12` so deployed gateways consume the
+  complete IPS all-section claims, localized coded-name and fixture contract.
+
 ## [1.20.19] - 2026-07-29
 
 ### Fixed
