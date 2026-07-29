@@ -18,7 +18,7 @@ describe('Composition Bundle _search API (integration)', () => {
     // Official HL7 IPS fixture used to feed individual, mirror into digitaltwin,
     // and verify section-first `Composition/_search` behavior end to end:
     // https://build.fhir.org/ig/HL7/fhir-ips/en/Bundle-bundle-ips-all-sections.json.html
-    const fixturePath = path.join(process.cwd(), 'src', '__tests__', 'data', 'fhir-ips-bundle-all-sections.json');
+    const fixturePath = path.join(process.cwd(), 'node_modules', 'gdc-common-utils-ts', 'fixtures', 'fhir-ips-bundle-all-sections.json');
     const bundle = JSON.parse(readFileSync(fixturePath, 'utf8'));
     for (const entry of Array.isArray(bundle?.entry) ? bundle.entry : []) {
       const resource = entry?.resource;

@@ -60,7 +60,10 @@ export function buildFhirResourceFromIndexedClaims(
     || getClaimValue<string>(claims, `${resourceType}.date`),
   );
   const codeText = normalizeReference(getClaimValue<string>(claims, `${resourceType}.code-text`));
-  const codeDisplay = normalizeReference(getClaimValue<string>(claims, `${resourceType}.CodeDisplay`));
+  const codeDisplay = normalizeReference(
+    getClaimValue<string>(claims, `${resourceType}.code-display`)
+    || getClaimValue<string>(claims, `${resourceType}.CodeDisplay`),
+  );
   const codeTextLocal = normalizeReference(getClaimValue<string>(claims, `${resourceType}.CodeTextLocal`));
   const medicationText = normalizeReference(getClaimValue<string>(claims, `${ResourceTypesFhirR4.MedicationStatement}.medication-text`));
   const language = normalizeReference(getClaimValue<string>(claims, `${resourceType}.language`));
