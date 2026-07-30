@@ -26,7 +26,12 @@ import { buildInterTenantAccessContractCredential } from 'gdc-common-utils-ts/ut
 import { buildClientAssertionJwt } from 'gdc-common-utils-ts/utils/client-assertion';
 import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
-import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
+import {
+  HealthcareBasicSections,
+  HealthcareConsentPurposes,
+} from 'gdc-common-utils-ts/constants/healthcare';
+import { buildSmartCompositionReadScope } from 'gdc-common-utils-ts/utils/smart-scope';
+import { buildUnsignedIndividualMemberIdentityVpJwt } from 'gdc-common-utils-ts/utils/individual-smart';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import {
   EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
@@ -120,6 +125,66 @@ function buildAliasedIndividualSelfReadJob(vpToken: string): JobRequest {
 }
 
 describe('OpenIdAuthManager', () => {
+  it('issues only consented sections to an accepted individual member VP', async () => {
+    const subjectDid = 'did:web:api.acme.org:individual:patricia';
+    const actorId = 'firebase-member-001';
+    const memberPhone = '+34600111222';
+    const role = 'v3-RoleCode|RESPRSN';
+    const actorDid = `did:web:api.acme.org:family:${actorId}:${role}`;
+    const allergySection = HealthcareBasicSections.AllergiesAndIntolerances.attributeValue;
+    const vpToken = buildUnsignedIndividualMemberIdentityVpJwt({
+      clientId: actorDid, actorDid, subjectDid, relationship: role, telephone: memberPhone,
+    });
+    const vault = {
+      getContainersInSection: jest.fn()
+        .mockResolvedValueOnce([{ content: {
+          status: 'active', subjectId: actorId, authorizedSubjectDid: subjectDid,
+          issuedToRole: role, issuedToPhone: memberPhone,
+        } }])
+        .mockResolvedValueOnce([{
+          [ClaimConsent.subject]: subjectDid,
+          [ClaimConsent.decision]: ConsentDecisions.Permit,
+          [ClaimConsent.actorIdentifier]: `tel:${memberPhone}`,
+          [ClaimConsent.actorRole]: role,
+          [ClaimConsent.action]: allergySection,
+          [ClaimConsent.purpose]: HealthcareConsentPurposes.Treatment,
+        }]),
+    } as unknown as jest.Mocked<IVaultRepository>;
+    const manager = new OpenIdAuthManager(
+      {
+        getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' }),
+        signWithManagedKey: jest.fn().mockResolvedValue({
+          payload: '', signatures: [{ protected: 'p', signature: 'sig' }],
+        }),
+      } as unknown as jest.Mocked<IKmsService>,
+      {
+        getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' }),
+        tenantExists: jest.fn().mockResolvedValue(true),
+      } as unknown as jest.Mocked<TenantsCacheManager>,
+      vault,
+      { verifyVpToken: jest.fn().mockResolvedValue({
+        acr: 'urn:antifraud:acr:openid4vp:individual',
+        amr: ['openid4vp', 'vc'], vpHash: 'hash', ledgerVerified: true,
+      }) } as unknown as jest.Mocked<IClearingHouseService>,
+    );
+
+    const response = await manager.process({
+      tenantId: 'acme', jurisdiction: 'ES', sector: 'health-care',
+      section: 'identity', format: 'openid', resourceType: 'smart', action: 'token',
+      content: { thid: 'member-smart-token-test', iss: actorDid, aud: 'did:web:api.acme.org', body: {
+        sub: actorDid,
+        scope: buildSmartCompositionReadScope({ subjectDid, sections: '*' }),
+        purpose: HealthcareConsentPurposes.Treatment,
+        vp_token: vpToken,
+        acr_values: 'urn:antifraud:acr:openid4vp:individual',
+      } },
+    } as JobRequest);
+
+    expect(response.body.scope).toBe(buildSmartCompositionReadScope({
+      subjectDid, sections: allergySection,
+    }));
+  });
+
   it('should issue a signed access_token for a tenant (org did rule)', async () => {
     const mockKmsService: jest.Mocked<IKmsService> = {
       init: jest.fn(),
@@ -215,7 +280,11 @@ describe('OpenIdAuthManager', () => {
 
     const response = await manager.process(job);
     expect(response.body.access_token).toContain('.sig');
-    expect(response.body.scope).toContain('organization/Composition.rs');
+    expect(response.body.scope).toBe(buildSmartCompositionReadScope({
+      subjectDid: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid,
+      sections: HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
+    }));
+    expect(response.body.scope).not.toContain('section=*');
     expect(response.body.ledger_verified).toBe(true);
     expect(mockKmsService.signWithManagedKey).toHaveBeenCalled();
     expect(mockClearingHouse.verifyVpToken).toHaveBeenCalled();

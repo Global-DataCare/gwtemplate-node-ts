@@ -527,12 +527,10 @@ describe('CommunicationManager Unit Tests', () => {
               resourceType: 'Communication',
               status: 'completed',
               subject: { reference: subjectDid },
+              topic: {
+                coding: [{ system: 'http://loinc.org', code: '48765-2' }],
+              },
               payload: [
-                {
-                  contentCodeableConcept: {
-                    coding: [{ system: 'http://loinc.org', code: '48765-2' }],
-                  },
-                },
                 {
                 contentAttachment: {
                   contentType: 'application/fhir+json',

@@ -620,7 +620,11 @@ export class CommunicationManager implements IJobProcessor {
     if (!subject) return;
 
     const claimsSection = String(
-      (entry?.meta?.claims?.['Composition.section'] as string | undefined)
+      (entry?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
+      || (entry?.resource?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
+      // Compatibility read for commands produced before Communication.topic
+      // became the canonical section-scoped batch/collection claim.
+      || (entry?.meta?.claims?.['Composition.section'] as string | undefined)
       || (entry?.resource?.meta?.claims?.['Composition.section'] as string | undefined)
       || '',
     ).trim();
@@ -783,10 +787,9 @@ export class CommunicationManager implements IJobProcessor {
     entry: any,
     fhirResource: FhirCommunication,
   ): string[] {
-    const payload = Array.isArray((fhirResource as any)?.payload) ? (fhirResource as any).payload[0] : undefined;
-    const fromCodeableConcept = payload?.contentCodeableConcept?.coding?.[0];
-    if (fromCodeableConcept?.system && fromCodeableConcept?.code) {
-      return [this.toCanonicalCodingToken(fromCodeableConcept.system, fromCodeableConcept.code)];
+    const topicCoding = (fhirResource as any)?.topic?.coding?.[0];
+    if (topicCoding?.system && topicCoding?.code) {
+      return [this.toCanonicalCodingToken(topicCoding.system, topicCoding.code)];
     }
 
     for (const resolvedAttachment of this.resolveCommunicationAttachments(entry, fhirResource)) {
@@ -987,7 +990,9 @@ export class CommunicationManager implements IJobProcessor {
 
     const communicationSubject = this.resolveCommunicationSubject(entry, fhirResource);
     const explicitSection = String(
-      (entry?.meta?.claims?.['Composition.section'] as string | undefined)
+      (entry?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
+      || (entry?.resource?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
+      || (entry?.meta?.claims?.['Composition.section'] as string | undefined)
       || (entry?.resource?.meta?.claims?.['Composition.section'] as string | undefined)
       || this.extractCompositionSectionsFromCommunication(entry, fhirResource)[0]
       || '',

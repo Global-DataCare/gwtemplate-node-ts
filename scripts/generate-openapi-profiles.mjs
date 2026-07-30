@@ -175,7 +175,10 @@ function deriveSpec(spec, targetProfile) {
     clone.info.title = 'Gateway API - EXTENSIONS';
     clone.info.description = 'Extension profile including non-core and vertical-specific capabilities on top of core and compat.';
   }
-  clone.info['x-profile-generated-at'] = new Date().toISOString();
+  // Generated profiles are tracked release artifacts. Do not embed wall-clock
+  // metadata: the same source specification must produce byte-identical JSON
+  // so a clean release build does not dirty the worktree.
+  delete clone.info['x-profile-generated-at'];
   clone.info['x-profile-name'] = targetProfile;
   if (targetProfile === 'core') {
     clone.tags = [

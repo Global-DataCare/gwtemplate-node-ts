@@ -20,6 +20,7 @@ import {
   EXAMPLE_BUNDLE_TYPE_BATCH,
   EXAMPLE_CONTENT_TYPE_APPLICATION_JSON,
   EXAMPLE_EMAIL_CONTROLLER_ORG,
+  EXAMPLE_FORM_CONTROLLER_PHONE,
   EXAMPLE_HEALTHCARE_ACTOR_ROLE_GENERALIST_MEDICAL_PRACTITIONER,
   EXAMPLE_JOB_IDENTIFIER_LICENSE_SEARCH,
   EXAMPLE_JURISDICTION,
@@ -41,6 +42,7 @@ import {
   Format,
   JobAction,
   LicenseStatuses,
+  buildLicenseSearchEntry,
 } from 'gdc-common-utils-ts';
 
 const TEST_TENANT_ID = EXAMPLE_TENANT_IDENTIFIER;
@@ -131,6 +133,7 @@ function newDocumentsLicenseSearchFixture(): ConfidentialStorageDoc[] {
     exp: Math.floor(Date.now() / 1000) + 3600,
     subjectId: EXAMPLE_LICENSE_SUBJECT_ID_ACTIVE,
     issuedToEmail: EXAMPLE_EMAIL_CONTROLLER_ORG,
+    issuedToPhone: EXAMPLE_FORM_CONTROLLER_PHONE,
     issuedToRole: EXAMPLE_HEALTHCARE_ACTOR_ROLE_GENERALIST_MEDICAL_PRACTITIONER,
   };
 
@@ -229,5 +232,26 @@ describe('LicenseManager (_search)', () => {
         subjectId: EXAMPLE_LICENSE_SUBJECT_ID_AVAILABLE,
       }),
     }));
+  });
+
+  it('finds an active accepted member seat by the verified telephone claim', async () => {
+    // This is the browser readback immediately after License/_accept. A valid
+    // phone invitation must not disappear merely because the actor has no
+    // email claim.
+    const entry = buildLicenseSearchEntry({
+      userClass: DeviceUserClasses.Employee,
+      status: LicenseStatuses.Active,
+      additionalClaims: {
+        [ClaimsPersonSchemaorg.telephone]: EXAMPLE_FORM_CONTROLLER_PHONE,
+      },
+    });
+
+    const response = await manager.process(newJobSearchLicense(entry as unknown as Record<string, unknown>));
+    const firstEntry = (response.body as any).data[0];
+
+    expect(firstEntry.resource.total).toBe(1);
+    expect(firstEntry.resource.data[0].meta.claims).toMatchObject({
+      [ClaimsPersonSchemaorg.telephone]: EXAMPLE_FORM_CONTROLLER_PHONE,
+    });
   });
 });

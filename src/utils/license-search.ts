@@ -110,6 +110,10 @@ export async function searchLicenseDocuments(
         meta: {
           status: license.status,
           ...(license.subjectId ? { subjectId: license.subjectId } : {}),
+          ...(license.ownerOrganizationId ? { ownerOrganizationId: license.ownerOrganizationId } : {}),
+          ...(license.authorizedSubjectDid ? { authorizedSubjectDid: license.authorizedSubjectDid } : {}),
+          ...(license.relatedPersonId ? { relatedPersonId: license.relatedPersonId } : {}),
+          ...(license.invitationId ? { invitationId: license.invitationId } : {}),
           claims: buildLicenseSearchClaims(license),
         },
       };
@@ -135,6 +139,9 @@ export function buildLicenseSearchClaims(
   }
   if (license.issuedToEmail) {
     claims[ClaimsPersonSchemaorg.email] = license.issuedToEmail;
+  }
+  if (license.issuedToPhone) {
+    claims[ClaimsPersonSchemaorg.telephone] = license.issuedToPhone;
   }
   if (license.issuedToRole) {
     claims[ClaimsPersonSchemaorg.hasOccupationalRoleValue] = license.issuedToRole;
@@ -196,6 +203,9 @@ export function resolveLicenseFilterValues(
     case 'email':
     case ClaimsPersonSchemaorg.email:
       return toFilterValues(license.issuedToEmail);
+    case 'telephone':
+    case ClaimsPersonSchemaorg.telephone:
+      return toFilterValues(license.issuedToPhone);
     case 'role':
     case ClaimsPersonSchemaorg.hasOccupationalRoleValue:
     case ClaimsPersonSchemaorg.hasOccupation:

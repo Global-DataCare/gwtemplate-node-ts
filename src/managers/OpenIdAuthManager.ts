@@ -22,6 +22,10 @@ import { getMatchingSubjectIdentityBindingFromVpToken } from 'gdc-common-utils-t
 import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
 import { getEnvSectionId } from '../utils/section-env';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
+import { deriveGrantedSmartScopes } from 'gdc-common-utils-ts/utils/smart-scope';
+import type { ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
+import { getMatchingIndividualMemberCredentialFromVpToken } from 'gdc-common-utils-ts/utils/individual-smart';
+import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 
 type TokenRequestBody = {
   client_id?: string;
@@ -168,9 +172,18 @@ export class OpenIdAuthManager implements IJobProcessor {
       }
     }
     const actorSubjectAliases = new Set<string>([actor.sub]);
+    let memberCredential: ReturnType<typeof getMatchingIndividualMemberCredentialFromVpToken>;
+    let memberLicense: DeviceLicense | undefined;
     const isIndividualAccessProof = String(accessProof.acr || '').toLowerCase().includes('individual');
     if (!isInterTenantResearchAccess && isIndividualAccessProof && actor.sub !== subject) {
       const trustedIssuerDids = this.readTrustedSubjectIdentityBindingIssuers();
+      memberCredential = accessProof.mode === 'vp_token'
+        ? getMatchingIndividualMemberCredentialFromVpToken(vpToken!, {
+            actorDid: actor.sub,
+            subjectDid: subject,
+            relationship: actor.role,
+          })
+        : undefined;
       const binding = accessProof.mode === 'vp_token'
         ? getMatchingSubjectIdentityBindingFromVpToken(vpToken!, {
             trustedIssuerDids,
@@ -178,25 +191,67 @@ export class OpenIdAuthManager implements IJobProcessor {
             sector: job.sector,
           })
         : undefined;
-      if (!binding) {
+      if (!binding && !memberCredential) {
         throw new ManagerError(
           `No trusted subject identity binding found between actor '${actor.sub}' and subject '${subject}'.`,
           IssueType.Forbidden,
         );
       }
-      actorSubjectAliases.add(binding.subjectDid);
-      binding.aliasDids.forEach((did) => actorSubjectAliases.add(did));
+      if (memberCredential) {
+        memberLicense = await this.getActiveMemberLicense({
+          tenantVaultId,
+          subject,
+          actorIdentifier: actor.identifier,
+          actorRole: actor.role,
+        });
+        if (!memberLicense) {
+          throw new ManagerError('No active individual-member license binds this actor to the requested subject.', IssueType.Forbidden);
+        }
+      }
+      if (binding) {
+        actorSubjectAliases.add(binding.subjectDid);
+        binding.aliasDids.forEach((did) => actorSubjectAliases.add(did));
+      }
+      memberCredential?.sameAs.forEach((alias) => actorSubjectAliases.add(alias));
     }
     const rules = await this.vaultRepository.getContainersInSection<any>(tenantVaultId, getIndividualSectionId(subject, 'rules'));
-    const evaluation = this.evaluateRequestedConsent({
-      rules,
-      subject,
-      actor,
-      purpose,
-      requestedPermissions,
-      jurisdiction: job.jurisdiction,
-      actorSubjectAliases,
-    });
+    let grantedScope = scope;
+    const requestedScopeTokens = scope.split(/\s+/).map((value) => value.trim()).filter(Boolean);
+    const compositionReadOnlyRequest = requestedScopeTokens.length > 0
+      && requestedScopeTokens.every((value) =>
+        /^organization\/Composition\.(?:r|rs)\?/i.test(value));
+    const sharedProjection = compositionReadOnlyRequest
+      ? deriveGrantedSmartScopes(rules as ConsentRule[], {
+          requestedScopes: requestedScopeTokens,
+          actor: {
+            actorKind: actor.sub.includes(':family:') ? 'related-person' : 'professional',
+            did: actor.sub,
+            aliases: Array.from(actorSubjectAliases),
+            email: memberLicense?.issuedToEmail
+              || (actor.identifier?.includes('@') ? actor.identifier : undefined),
+            phone: memberLicense?.issuedToPhone,
+            organizationDid: actor.organization,
+            jurisdiction: job.jurisdiction,
+          },
+          actorRole: actor.role,
+          purpose,
+        })
+      : undefined;
+    const evaluation = sharedProjection
+      ? {
+          allowed: sharedProjection.grantedScopes.length > 0,
+          missingSections: sharedProjection.deniedSections,
+          missingResourceTypes: [] as string[],
+        }
+      : this.evaluateRequestedConsent({
+          rules,
+          subject,
+          actor,
+          purpose,
+          requestedPermissions,
+          jurisdiction: job.jurisdiction,
+          actorSubjectAliases,
+        });
 
     if (!evaluation.allowed) {
       const missingSections = evaluation.missingSections.map((value) => normalizeCodeSystemAndValue(value)).filter(Boolean);
@@ -210,6 +265,9 @@ export class OpenIdAuthManager implements IJobProcessor {
           : 'No matching consent rule found for requested scope.',
         IssueType.Forbidden,
       );
+    }
+    if (sharedProjection) {
+      grantedScope = sharedProjection.grantedScopes.join(' ');
     }
 
     const lifetimeSeconds = Math.max(1, Math.min(3600, body.expires_in || 300));
@@ -239,7 +297,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       iss: issuerDid,
       sub,
       aud: issuerDid,
-      scope,
+      scope: grantedScope,
       iat: now,
       nbf: now,
       exp: now + lifetimeSeconds,
@@ -271,7 +329,7 @@ export class OpenIdAuthManager implements IJobProcessor {
         access_token: accessToken,
         token_type: tokenType,
         expires_in: lifetimeSeconds,
-        scope,
+        scope: grantedScope,
         subject,
         ledger_verified: accessProof.ledgerVerified,
       },
@@ -309,6 +367,34 @@ export class OpenIdAuthManager implements IJobProcessor {
     }
 
     return this.resolveExternalResearchBearerProof(params);
+  }
+
+  /**
+   * Resolves the accepted member license that binds the authenticated Firebase
+   * actor, subject and relationship. Its verified email/telephone may then be
+   * used for Consent matching; the privacy-preserving VP aliases stay hashed.
+   */
+  private async getActiveMemberLicense(input: {
+    tenantVaultId: string;
+    subject: string;
+    actorIdentifier?: string;
+    actorRole?: string;
+  }): Promise<DeviceLicense | undefined> {
+    const actorIdentifier = String(input.actorIdentifier || '').trim();
+    const actorRole = String(input.actorRole || '').trim().toLowerCase();
+    if (!actorIdentifier || !actorRole) return undefined;
+    const documents = await this.vaultRepository.getContainersInSection<any>(
+      input.tenantVaultId,
+      getEnvSectionId('device-licenses'),
+    );
+    return (documents || []).map((document: any) =>
+      document?.content as DeviceLicense & Record<string, unknown> | undefined
+    ).find((license) => {
+      return license?.status === 'active'
+        && String(license.subjectId || '').replace(/^firebase:/, '') === actorIdentifier.replace(/^firebase:/, '')
+        && String(license.authorizedSubjectDid || '').trim() === input.subject
+        && String(license.issuedToRole || '').trim().toLowerCase() === actorRole;
+    });
   }
 
   private async validateClientAssertion(params: {

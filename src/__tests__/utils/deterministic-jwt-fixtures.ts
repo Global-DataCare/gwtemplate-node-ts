@@ -14,7 +14,7 @@ import {
   deriveDeterministicEcJwkPair,
   type DeterministicEcJwkAlgorithm as DeterministicJwtAlgorithm,
   type DeterministicEcJwkPair,
-} from '../../../../gdc-common-utils-ts/dist/utils/deterministic-jwk.js';
+} from 'gdc-common-utils-ts/utils/deterministic-jwk';
 import type { ITokenVerifier, VerificationResult } from '../../auth/ITokenVerifier';
 import { importJWK, jwtVerify, SignJWT, type JWK, type JWTPayload, type KeyLike } from 'jose';
 

@@ -20,6 +20,9 @@ process.env.HOST_ADMIN_EMAIL = 'host-admin@example.com';
 process.env.HOST_ADMIN_UID = 'host-admin';
 process.env.HOST_ADMIN_ROLE = 'RESPRSN';
 process.env.HOST_TERMS_URL = 'https://host.example.com/terms';
+// The story must configure its ICA boundary explicitly so a clean checkout
+// behaves exactly like a developer checkout that happens to have local env files.
+process.env.ICA_URL_EXTERNAL = 'https://ica.example.com/ica/cds-ES/v1';
 
 import type * as express from 'express';
 import type { Server } from 'http';
