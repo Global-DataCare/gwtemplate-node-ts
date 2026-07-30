@@ -1,5 +1,30 @@
 ## [Unreleased]
 
+## [1.20.22] - 2026-07-30
+
+### Fixed
+
+- Read the section of a native FHIR section-only batch from
+  `Communication.topic` instead of `payload.contentCodeableConcept`, while
+  retaining the old outer `Composition.section` claim only as a compatibility
+  read.
+- Narrow read-only Composition SMART requests to the exact active Consent
+  intersection before signing the access token.
+- Use the Stripe API version required by the locked Stripe 20.2 SDK in every
+  payment and webhook client so a clean build remains type-correct.
+- Make generated OpenAPI profiles reproducible by removing their wall-clock
+  generation timestamp, so a clean release build leaves no tracked diff.
+- Resolve Common Utils tests through the declared npm dependency instead of a
+  hard-coded sibling checkout, allowing clean clones and CI worktrees to run.
+- Preserve unambiguous legacy single-section IPS records that predate the
+  per-resource `Composition.section` membership claim.
+- Make the host transaction integration story declare its simulated ICA URL
+  instead of depending on an untracked developer environment file.
+
+### Dependencies
+
+- Raise `gdc-common-utils-ts` to `^2.3.15`.
+
 ## [1.20.21] - 2026-07-30
 
 ### Fixed

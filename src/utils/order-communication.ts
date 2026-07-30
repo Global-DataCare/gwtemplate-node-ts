@@ -71,7 +71,7 @@ async function createStripeCheckoutUrl(
   if (!amount || amount <= 0) return '';
 
   const stripeClient = new stripe.Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2026-02-25.clover',
+    apiVersion: '2025-12-15.clover',
   });
 
   const session = await stripeClient.checkout.sessions.create({
@@ -113,7 +113,7 @@ async function createStripeInvoice(
   }
 
   const stripeClient = new stripe.Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2026-02-25.clover',
+    apiVersion: '2025-12-15.clover',
   });
 
   const customer = await stripeClient.customers.create({

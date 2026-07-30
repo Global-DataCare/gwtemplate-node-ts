@@ -44,7 +44,11 @@ function matchesRequiredTypes(actualType: string, requiredTypes: string[]): bool
   return requiredTypes.some((requiredType) => extractTokenCode(requiredType) === actualCode);
 }
 
-function belongsToSection(record: Record<string, any>, sectionToken: string): boolean {
+function belongsToSection(
+  record: Record<string, any>,
+  sectionToken: string,
+  allowImplicitMembership: boolean,
+): boolean {
   const expected = extractTokenCode(sectionToken).toLowerCase();
   const memberships = String(
     getClaimValue<string>(record, 'Composition.section') || '',
@@ -52,6 +56,10 @@ function belongsToSection(record: Record<string, any>, sectionToken: string): bo
     .split(',')
     .map((value) => extractTokenCode(value).toLowerCase())
     .filter(Boolean);
+  // A legacy single-section ingestion stored the resource in the section's
+  // dedicated collection without repeating Composition.section. That is
+  // unambiguous only while reconstructing exactly one Composition section.
+  if (memberships.length === 0) return allowImplicitMembership;
   return memberships.includes(expected);
 }
 
@@ -89,6 +97,7 @@ export async function buildConsolidatedIpsBundleDocument(
     if (compositionDate) compositionDates.push(compositionDate);
   }
 
+  const allowImplicitSectionMembership = includedSectionTokens.size === 1;
   for (const sectionToken of includedSectionTokens) {
     const projectionConfigs = TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG[sectionToken] || [];
     for (const projectionConfig of projectionConfigs) {
@@ -99,7 +108,7 @@ export async function buildConsolidatedIpsBundleDocument(
           // Observation and Condition collections are shared by several IPS
           // sections. The resource's own Composition.section claim is the
           // authoritative membership authored during document ingestion.
-          if (!belongsToSection(resourceRecord, sectionToken)) continue;
+          if (!belongsToSection(resourceRecord, sectionToken, allowImplicitSectionMembership)) continue;
           const resource = buildFhirResourceFromIndexedClaims(projectionConfig.resourceType, resourceRecord);
           const entryKey = resolveBundleEntryKey(undefined, resource);
           if (!bundleEntries.has(entryKey)) {
