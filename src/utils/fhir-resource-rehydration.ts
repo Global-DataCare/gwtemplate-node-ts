@@ -141,6 +141,29 @@ export function buildFhirResourceFromIndexedClaims(
     }
   }
 
+  if (resourceType === ResourceTypesFhirR4.DeviceUseStatement) {
+    const deviceReference = normalizeReference(
+      getClaimValue<string>(claims, 'DeviceUseStatement.device'),
+    );
+    const deviceDisplay = normalizeReference(
+      getClaimValue<string>(claims, 'DeviceUseStatement.device-display'),
+    );
+    if (deviceReference || deviceDisplay) {
+      resource.device = {
+        ...(deviceReference ? { reference: deviceReference } : {}),
+        ...(deviceDisplay ? { display: deviceDisplay } : {}),
+      };
+    }
+    const recordedOn = normalizeReference(
+      getClaimValue<string>(claims, 'DeviceUseStatement.recordedon'),
+    );
+    const timingDateTime = normalizeReference(
+      getClaimValue<string>(claims, 'DeviceUseStatement.timing-datetime'),
+    );
+    if (recordedOn) resource.recordedOn = recordedOn;
+    if (timingDateTime) resource.timingDateTime = timingDateTime;
+  }
+
   if (resourceType === GatewayLocalFhirResourceTypes.OperationOutcome) {
     resource.issue = Array.isArray(record?.issue) ? record.issue : [];
   }

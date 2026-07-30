@@ -44,6 +44,8 @@ type SupportedProjectedResourceType =
   | 'Observation'
   | 'AllergyIntolerance'
   | 'Condition'
+  | 'DeviceUseStatement'
+  | 'Flag'
   | 'Procedure'
   | 'ImagingStudy'
   | 'Immunization'
@@ -86,6 +88,16 @@ const PROJECTED_RESOURCE_CONFIG: Record<SupportedProjectedResourceType, Projecti
     collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Condition],
     subjectClaimKeys: ['Condition.subject', 'Condition.patient'],
     identifierClaimKeys: ['Condition.identifier', 'Condition.identifier.value'],
+  },
+  DeviceUseStatement: {
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.DeviceUseStatement],
+    subjectClaimKeys: ['DeviceUseStatement.subject', 'DeviceUseStatement.patient'],
+    identifierClaimKeys: ['DeviceUseStatement.identifier', 'DeviceUseStatement.identifier.value'],
+  },
+  Flag: {
+    collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Flag],
+    subjectClaimKeys: ['Flag.subject', 'Flag.patient'],
+    identifierClaimKeys: ['Flag.identifier', 'Flag.identifier.value'],
   },
   Procedure: {
     collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Procedure],
@@ -992,6 +1004,9 @@ export class CommunicationManager implements IJobProcessor {
 
         const config = PROJECTED_RESOURCE_CONFIG[resourceType];
         const claims = this.extractProjectedResourceClaims(resourceType, resource, communicationSubject, fhirResource);
+        if (explicitSection && !getClaimValue<string>(claims, 'Composition.section')) {
+          claims['Composition.section'] = explicitSection;
+        }
         const subjectRef = this.resolveProjectedResourceSubject(claims, config.subjectClaimKeys);
         if (!subjectRef) continue;
 
@@ -1678,6 +1693,7 @@ export class CommunicationManager implements IJobProcessor {
 
     const documentBundle = this.asDocumentBundle(parsed);
     if (documentBundle) {
+      this.inferDocumentResourceSectionClaims(documentBundle);
       return documentBundle.entry
         .map((bundleEntry: any) => bundleEntry?.resource as Record<string, any> | undefined)
         .filter((resource: Record<string, any> | undefined): resource is Record<string, any> => Boolean(resource?.resourceType));
@@ -1706,6 +1722,62 @@ export class CommunicationManager implements IJobProcessor {
       return [parsed as Record<string, any>];
     }
     return [];
+  }
+
+  /**
+   * Native EHR documents are allowed to omit `meta.claims`. Preserve their
+   * Composition graph by deriving only the missing per-resource section claim
+   * from `Composition.section[].entry[]` before normal claims conversion.
+   */
+  private inferDocumentResourceSectionClaims(documentBundle: any): void {
+    const entries = Array.isArray(documentBundle?.entry) ? documentBundle.entry : [];
+    const composition = entries
+      .map((bundleEntry: any) => bundleEntry?.resource)
+      .find((resource: any) => resource?.resourceType === ResourceTypesFhirR4.Composition);
+    const sections = Array.isArray(composition?.section) ? composition.section : [];
+    const sectionTokensByReference = new Map<string, Set<string>>();
+
+    for (const section of sections) {
+      const coding = section?.code?.coding?.[0];
+      if (!coding?.code) continue;
+      const token = coding?.system
+        ? this.toCanonicalCodingToken(coding.system, coding.code)
+        : String(coding.code).trim();
+      for (const item of Array.isArray(section?.entry) ? section.entry : []) {
+        const reference = String(item?.reference || '').trim();
+        if (!reference) continue;
+        const tokens = sectionTokensByReference.get(reference) || new Set<string>();
+        tokens.add(token);
+        sectionTokensByReference.set(reference, tokens);
+      }
+    }
+
+    for (const bundleEntry of entries) {
+      const resource = bundleEntry?.resource;
+      if (!resource || resource.resourceType === ResourceTypesFhirR4.Composition) continue;
+      const resourceId = String(resource.id || '').trim();
+      const aliases = [
+        String(bundleEntry?.fullUrl || '').trim(),
+        resourceId,
+        resourceId ? `${resource.resourceType}/${resourceId}` : '',
+      ].filter(Boolean);
+      const tokens = new Set<string>();
+      for (const alias of aliases) {
+        for (const token of sectionTokensByReference.get(alias) || []) tokens.add(token);
+      }
+      if (tokens.size === 0) continue;
+      const existingClaims = resource?.meta?.claims && typeof resource.meta.claims === 'object'
+        ? resource.meta.claims
+        : {};
+      if (getClaimValue<string>(existingClaims, 'Composition.section')) continue;
+      resource.meta = {
+        ...(resource.meta || {}),
+        claims: {
+          ...existingClaims,
+          'Composition.section': Array.from(tokens).join(','),
+        },
+      };
+    }
   }
 
   private extractCompositionResourceFromCommunication(

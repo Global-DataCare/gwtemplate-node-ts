@@ -73,8 +73,15 @@ Record<string, readonly TwinCompositionProjectionConfig[]>
   [HealthcareSummarySections.GoalsAndPreferences.attributeValue]: Object.freeze([
     { collectionIds: [DataCollectionIds.consents], resourceType: ResourceTypesFhirR4.Consent },
   ]),
-  [HealthcareSummarySections.Alert.attributeValue]: Object.freeze([]),
-  [HealthcareSummarySections.MedicalDevices.attributeValue]: Object.freeze([]),
+  [HealthcareSummarySections.Alert.attributeValue]: Object.freeze([
+    { collectionIds: [DataCollectionIds.flags], resourceType: ResourceTypesFhirR4.Flag },
+  ]),
+  [HealthcareSummarySections.MedicalDevices.attributeValue]: Object.freeze([
+    {
+      collectionIds: [DataCollectionIds.deviceUseStatements],
+      resourceType: ResourceTypesFhirR4.DeviceUseStatement,
+    },
+  ]),
 });
 
 /**

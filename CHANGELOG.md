@@ -1,5 +1,22 @@
 ## [Unreleased]
 
+## [1.20.21] - 2026-07-30
+
+### Fixed
+
+- Reconstruct IPS Composition sections from each indexed resource's
+  `Composition.section` claim instead of copying every shared
+  Observation/Condition collection into every compatible section.
+- Persist and return the IPS alert (`Flag`) and medical-device
+  (`DeviceUseStatement`) sections during Communication import and
+  `Subject/$summary` readback.
+- Align the Stripe API version literal with the installed Stripe 20 SDK so the
+  gateway test/build gate remains type-correct.
+
+### Dependencies
+
+- Raise `gdc-common-utils-ts` to `^2.3.13`.
+
 ### Changed
 
 - Mark the gateway as a private npm project, add a failing `prepublishOnly`

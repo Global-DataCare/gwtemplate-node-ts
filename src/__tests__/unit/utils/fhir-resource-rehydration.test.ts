@@ -57,6 +57,30 @@ describe('fhir-resource-rehydration utils', () => {
     }]);
   });
 
+  it('rehydrates DeviceUseStatement with the persisted human device display', () => {
+    const resource = buildFhirResourceFromIndexedClaims(ResourceTypesFhirR4.DeviceUseStatement, {
+      id: 'device-use-1',
+      'DeviceUseStatement.subject': 'Patient/p-1',
+      'DeviceUseStatement.status': 'active',
+      'DeviceUseStatement.device': 'Device/hip-1',
+      'DeviceUseStatement.device-display': 'Hip prosthesis',
+      'DeviceUseStatement.recordedon': '2026-01-02T00:00:00Z',
+      'DeviceUseStatement.timing-datetime': '2026-01-01T00:00:00Z',
+    });
+
+    expect(resource).toMatchObject({
+      resourceType: ResourceTypesFhirR4.DeviceUseStatement,
+      subject: { reference: 'Patient/p-1' },
+      status: 'active',
+      device: {
+        reference: 'Device/hip-1',
+        display: 'Hip prosthesis',
+      },
+      recordedOn: '2026-01-02T00:00:00Z',
+      timingDateTime: '2026-01-01T00:00:00Z',
+    });
+  });
+
   it.each([
     ResourceTypesFhirR4.AllergyIntolerance,
     ResourceTypesFhirR4.Condition,

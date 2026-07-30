@@ -711,6 +711,98 @@ describe('Composition Bundle _search API (integration)', () => {
         || record['org.hl7.fhir.r4.Composition.section'] === HealthcareBasicSections.VitalSigns.attributeValue,
       )).toBe(true);
 
+      // Read the complete fixture back through the same authoritative
+      // Communication -> Subject/$summary contract used by BFF consumers.
+      // Exact Composition references prove that shared Observation/Condition
+      // collections do not bleed into unrelated IPS sections and that the
+      // Flag and DeviceUseStatement sections survive persistence.
+      const completeSummaryResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'ips-all-sections-summary-001',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [{
+              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [{
+                  contentReference: {
+                    reference: `individual/org.hl7.fhir.r4/Subject/$summary?subject=${encodeURIComponent(subjectDid)}`,
+                  },
+                }],
+              },
+            }],
+          },
+        },
+      });
+      expect(completeSummaryResp.status).toBe(202);
+
+      let completeSummaryPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'ips-all-sections-summary-001' },
+        });
+        if (pollResp.status === 200) {
+          completeSummaryPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      const completeSummary = completeSummaryPayload?.data?.[0]?.resource;
+      const completeComposition = completeSummary?.entry
+        ?.find((bundleEntry: any) => bundleEntry?.resource?.resourceType === 'Composition')
+        ?.resource;
+      const expectedSectionTypes: Record<string, string[]> = {
+        '11450-4': ['Condition', 'Condition'],
+        '48765-2': ['AllergyIntolerance'],
+        '10160-0': ['MedicationStatement', 'MedicationStatement', 'MedicationStatement'],
+        '11369-6': Array(8).fill('Immunization'),
+        '30954-2': Array(6).fill('Observation'),
+        '47519-4': ['Procedure'],
+        '46264-8': ['DeviceUseStatement'],
+        '8716-3': Array(3).fill('Observation'),
+        '29762-2': Array(2).fill('Observation'),
+        '104605-1': ['Flag'],
+        '81338-6': ['Consent'],
+        '42348-3': ['Consent'],
+        '47420-5': ['Condition'],
+        '11348-0': ['Condition'],
+        '10162-6': ['Observation'],
+        '18776-5': ['CarePlan'],
+      };
+      const resourceTypeByReference = new Map(
+        (completeSummary?.entry || []).flatMap((bundleEntry: any) => {
+          const resource = bundleEntry?.resource;
+          const aliases = [
+            bundleEntry?.fullUrl,
+            resource?.id,
+            resource?.resourceType && resource?.id
+              ? `${resource.resourceType}/${resource.id}`
+              : undefined,
+          ].filter(Boolean);
+          return aliases.map((alias: string) => [alias, resource?.resourceType]);
+        }),
+      );
+      expect(completeComposition?.section).toHaveLength(16);
+      for (const section of completeComposition.section) {
+        const code = section?.code?.coding?.[0]?.code;
+        const types = (section?.entry || [])
+          .map((item: any) => resourceTypeByReference.get(item?.reference))
+          .filter(Boolean)
+          .sort();
+        expect(types).toEqual([...(expectedSectionTypes[code] || [])].sort());
+      }
+
       const allergiesSection = 'LOINC|48765-2';
       const sectionSubjectDid = 'did:web:api.acme.org:individual:section-only-allergy-001';
       const allergySectionBundle = {
