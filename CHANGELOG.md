@@ -1,5 +1,22 @@
 ## [Unreleased]
 
+## [1.20.23] - 2026-07-30
+
+### Fixed
+
+- Removed the unused host ICA enrollment placeholder that sent `DEMO-CSR` and
+  `Bearer demo`; GW Core no longer pretends that a tenant/host Fabric
+  certificate was enrolled successfully.
+
+### Documentation
+
+- Bound host peer enrollment to a signed `HostingServiceCredential`, a
+  Root-controller governance decision and the privileged
+  `fabric-multicloud` reconciler.
+- Documented that MSP/TLS keys and CSRs are generated locally by the host and
+  separated Fabric certificates from tenant X.509 leaves and the dataspace ICA
+  `CA:FALSE` VC-signing identity.
+
 ## [1.20.22] - 2026-07-30
 
 ### Fixed
