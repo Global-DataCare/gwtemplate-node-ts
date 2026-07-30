@@ -80,11 +80,6 @@ import {
   persistTenantConfig as persistTenantConfigExternal,
 } from './hosting/persist-host-config';
 import {
-  pollIcaResult as pollIcaResultExternal,
-  requestIcaEnrollment as requestIcaEnrollmentExternal,
-  storeIcaMessage as storeIcaMessageExternal,
-} from './hosting/ica-enrollment';
-import {
   extractCredentialResourcesFromIcaPayload as extractCredentialResourcesFromIcaPayloadExternal,
   forwardOrganizationVerificationTransactionToIca as forwardOrganizationVerificationTransactionToIcaExternal,
 } from './hosting/ica-verification';
@@ -1469,29 +1464,6 @@ export class HostingManager {
       service,
       logger: this.logger,
       storageAdapter: this.storageAdapter,
-    });
-  }
-
-  private async requestIcaEnrollment(params: { organizationClaims: ClaimsRecord; evidence?: PdfSignatureEvidence[]; tenantVaultId: string }) {
-    return requestIcaEnrollmentExternal({
-      ...params,
-      config: this.config,
-      logger: this.logger,
-      vaultRepository: this.vaultRepository,
-      kmsService: this.kmsService,
-    });
-  }
-
-  private async pollIcaResult(url: string): Promise<any | undefined> {
-    return pollIcaResultExternal({ url });
-  }
-
-  private async storeIcaMessage(tenantVaultId: string, resultResource: any): Promise<void> {
-    return storeIcaMessageExternal({
-      tenantVaultId,
-      resultResource,
-      kmsService: this.kmsService,
-      vaultRepository: this.vaultRepository,
     });
   }
 
