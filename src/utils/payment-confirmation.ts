@@ -72,7 +72,7 @@ async function verifyStripePaymentLive(
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new ManagerError('Stripe live payment verification requires STRIPE_SECRET_KEY.', IssueType.Required);
   }
-  const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-12-15.clover' });
+  const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-02-25.clover' });
   const refs = extractStripeReference(invoiceId, paymentUrl);
   if (refs.invoiceId) {
     const invoice = await stripeClient.invoices.retrieve(refs.invoiceId);

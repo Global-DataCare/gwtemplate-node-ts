@@ -44,6 +44,17 @@ function matchesRequiredTypes(actualType: string, requiredTypes: string[]): bool
   return requiredTypes.some((requiredType) => extractTokenCode(requiredType) === actualCode);
 }
 
+function belongsToSection(record: Record<string, any>, sectionToken: string): boolean {
+  const expected = extractTokenCode(sectionToken).toLowerCase();
+  const memberships = String(
+    getClaimValue<string>(record, 'Composition.section') || '',
+  )
+    .split(',')
+    .map((value) => extractTokenCode(value).toLowerCase())
+    .filter(Boolean);
+  return memberships.includes(expected);
+}
+
 export async function buildConsolidatedIpsBundleDocument(
   params: BuildConsolidatedIpsBundleDocumentParams,
 ): Promise<Record<string, any>> {
@@ -85,6 +96,10 @@ export async function buildConsolidatedIpsBundleDocument(
         const resourceSectionId = getSubjectScopedSectionId(params.subject, params.scope, collectionIdSuffix);
         const resourceRecords = await params.vaultRepository.listContainersInSection(params.tenantVaultId, resourceSectionId);
         for (const resourceRecord of resourceRecords) {
+          // Observation and Condition collections are shared by several IPS
+          // sections. The resource's own Composition.section claim is the
+          // authoritative membership authored during document ingestion.
+          if (!belongsToSection(resourceRecord, sectionToken)) continue;
           const resource = buildFhirResourceFromIndexedClaims(projectionConfig.resourceType, resourceRecord);
           const entryKey = resolveBundleEntryKey(undefined, resource);
           if (!bundleEntries.has(entryKey)) {
