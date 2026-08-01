@@ -1024,8 +1024,14 @@ export class HostingManager {
   }
 
   private buildIcaVerifyUrl(jurisdiction: string, sector: string, resourceType: string): string {
-    const normalizedResourceType = String(resourceType || 'contract').trim();
-    return `${this.buildIcaSectorBaseUrl(jurisdiction, sector)}/terms/pdf/${normalizedResourceType}/_verify`;
+    return buildIcaVerifyUrlExternal({
+      jurisdiction,
+      sector,
+      resourceType,
+      config: this.config,
+      isDemoSecurityMode: this.isDemoSecurityMode.bind(this),
+      isDevelopmentOrDemoDiagnosticsEnabled: this.isDevelopmentOrDemoDiagnosticsEnabled.bind(this),
+    });
   }
 
   private async forwardOrganizationVerificationTransactionToIca(input: {
