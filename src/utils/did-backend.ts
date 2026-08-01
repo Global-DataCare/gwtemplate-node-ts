@@ -86,11 +86,51 @@ export function findSigningMethod(didDocument: DidDocument, alg?: string): strin
   if (!didDocument || !didDocument.verificationMethod) {
     return undefined;
   }
+  const assertionMethodIds = new Set((didDocument.assertionMethod || [])
+    .map((method) => typeof method === 'string' ? method : method.id)
+    .filter(Boolean));
+  const signingMethods = assertionMethodIds.size > 0
+    ? didDocument.verificationMethod.filter((method) => assertionMethodIds.has(method.id))
+    : didDocument.verificationMethod;
   if (!alg) {
-    return didDocument.verificationMethod[0]?.id;
+    return signingMethods[0]?.id;
   }
-  const vm = didDocument.verificationMethod.find((method) => (method.publicKeyJwk as any)?.alg === alg);
+  const vm = signingMethods.find((method) => (method.publicKeyJwk as any)?.alg === alg);
   return vm?.id;
+}
+
+/**
+ * Canonicalizes historical KMS-generated DID documents in memory. Earlier
+ * records exposed private `purpose` labels and placed every signature key in
+ * `assertionMethod`; the standard DID relationships carry that meaning now.
+ */
+export function normalizeDidDocumentKeyRelationships(didDocument: DidDocument): DidDocument {
+  const authentication = new Set((didDocument.authentication || [])
+    .map((method) => typeof method === 'string' ? method : method.id)
+    .filter(Boolean));
+  const assertionMethod = new Set((didDocument.assertionMethod || [])
+    .map((method) => typeof method === 'string' ? method : method.id)
+    .filter(Boolean));
+  const verificationMethod = (didDocument.verificationMethod || []).map((method) => {
+    const jwk = method.publicKeyJwk as any;
+    const purpose = jwk?.purpose;
+    if (purpose === 'comm_sig') {
+      assertionMethod.delete(method.id);
+      authentication.add(method.id);
+    } else if (purpose === 'vc_sign') {
+      authentication.delete(method.id);
+      assertionMethod.add(method.id);
+    }
+    const { purpose: _internalPurpose, ...publicKeyJwk } = jwk || {};
+    return { ...method, publicKeyJwk } as VerificationMethod;
+  });
+
+  return {
+    ...didDocument,
+    verificationMethod,
+    authentication: Array.from(authentication),
+    assertionMethod: Array.from(assertionMethod),
+  };
 }
 
 export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: JwkSet): DidDocument {
@@ -98,6 +138,7 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
         ...skeletonDidDoc,
         // Explicitly type the arrays to satisfy the DidDocument interface
         verificationMethod: [] as VerificationMethod[],
+        authentication: [] as (string | VerificationMethod)[],
         assertionMethod: [] as (string | VerificationMethod)[],
         keyAgreement: [] as (string | VerificationMethod)[],
     };
@@ -117,6 +158,8 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
     }
 
     for (const key of jwks.keys) {
+        const internalPurpose = (key as any).purpose;
+        const { purpose: _internalPurpose, ...publicKeyJwk } = key as any;
         for (const did of Array.from(didWebs)) {
             const keyIdFragment = key.kid || `key-${(newDidDoc.verificationMethod?.length || 0) + 1}`;
             const verificationMethodId = `${did}#${keyIdFragment}`;
@@ -125,7 +168,7 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
                 id: verificationMethodId,
                 controller: did,
                 type: 'JsonWebKey2020',
-                publicKeyJwk: key as PublicJwk,
+                publicKeyJwk: publicKeyJwk as PublicJwk,
             };
 
             // Determine key usage from 'alg' (for signing) or 'crv' (for encryption)
@@ -142,9 +185,15 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
 
             if (isSignatureKey) {
                 newDidDoc.verificationMethod!.push(vm);
-                // As per W3C DID Core spec, assertionMethod should contain a reference
-                // to the verification method, not the full embedded key.
-                newDidDoc.assertionMethod!.push(verificationMethodId);
+                // KMS purpose labels are private routing metadata, not registered
+                // JWK members or DID verification relationships. Publish the
+                // communication signer through authentication and credential
+                // signers through assertionMethod.
+                if (internalPurpose === 'comm_sig') {
+                    newDidDoc.authentication!.push(verificationMethodId);
+                } else {
+                    newDidDoc.assertionMethod!.push(verificationMethodId);
+                }
                 isAddedToVerificationMethods = true;
             }
             if (isEncryptionKey) {
@@ -159,6 +208,20 @@ export function populateDidDocumentFromJwks(skeletonDidDoc: DidDocument, jwks: J
         }
     }
     return newDidDoc;
+}
+
+/**
+ * Removes KMS-only routing metadata before a JWK Set crosses the public API.
+ * Standard JOSE `use` remains authoritative (`sig` or `enc`); DID verification
+ * relationships express whether a signature key authenticates or asserts.
+ */
+export function toPublicJwkSet(jwks: JwkSet): JwkSet {
+  return {
+    keys: (jwks?.keys || []).map((key) => {
+      const { purpose: _internalPurpose, ...publicKey } = key as any;
+      return publicKey as JwkSet['keys'][number];
+    }),
+  };
 }
 
 export function applyLegacyX509Metadata(

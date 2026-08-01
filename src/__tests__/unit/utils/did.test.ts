@@ -3,7 +3,7 @@
 
 import { DidDocument } from '../../../gdc-backend-utils-node/models/did';
 import { JwkSet } from '../../../gdc-backend-utils-node/models/jwk';
-import { createHostedDidWeb, getPrimaryDidWeb, findSigningMethod, populateDidDocumentFromJwks, getBaseUrlFromDidWeb } from '../../../utils/did-backend';
+import { createHostedDidWeb, getPrimaryDidWeb, findSigningMethod, populateDidDocumentFromJwks, getBaseUrlFromDidWeb, normalizeDidDocumentKeyRelationships, toPublicJwkSet } from '../../../utils/did-backend';
 
 // --- Test Data ---
 const HOST_DID = 'did:web:host.com';
@@ -33,7 +33,9 @@ const hostDidDoc: DidDocument = {
 
 const testJwks: JwkSet = {
   keys: [
-    { kid: 'sig-ml', use: 'sig', alg: 'ML-DSA-44', kty: 'AKP', pub: '...' },
+    { kid: 'comm-ml', use: 'sig', alg: 'ML-DSA-44', kty: 'AKP', pub: '...', purpose: 'comm_sig' } as any,
+    { kid: 'vc-ml', use: 'sig', alg: 'ML-DSA-44', kty: 'AKP', pub: '...', purpose: 'vc_sign' } as any,
+    { kid: 'vc-es384', use: 'sig', alg: 'ES384', kty: 'EC', crv: 'P-384', x: 'x', y: 'y' },
     { kid: 'enc-ml', use: 'enc', alg: 'ML-KEM-768', kty: 'OKP', crv: 'ML-KEM-768', x: '...' },
   ],
 };
@@ -65,12 +67,12 @@ describe('DID Utility Functions (Deterministic)', () => {
 
     it('should return the id of the first verification method if no algorithm is specified', () => {
       const result = findSigningMethod(populatedDoc);
-      expect(result).toBe(`${HOSTED_DID}#sig-ml`);
+      expect(result).toBe(`${HOSTED_DID}#vc-ml`);
     });
 
     it('should find the id for a specific algorithm', () => {
       const result = findSigningMethod(populatedDoc, 'ML-DSA-44');
-      expect(result).toBe(`${HOSTED_DID}#sig-ml`);
+      expect(result).toBe(`${HOSTED_DID}#vc-ml`);
     });
   });
 
@@ -85,16 +87,21 @@ describe('DID Utility Functions (Deterministic)', () => {
       const result = populateDidDocumentFromJwks(skeletonDoc, testJwks);
 
       // 1. Check that verificationMethod contains the full key objects
-      expect(result.verificationMethod).toHaveLength(2);
+      expect(result.verificationMethod).toHaveLength(4);
       expect(result.verificationMethod?.[0]).toHaveProperty('publicKeyJwk');
-      expect(result.verificationMethod?.[0].id).toBe('did:web:example.com#sig-ml');
+      expect(result.verificationMethod?.[0].id).toBe('did:web:example.com#comm-ml');
+      expect((result.verificationMethod?.[0].publicKeyJwk as any).purpose).toBeUndefined();
 
-      expect(result.verificationMethod?.[1]).toHaveProperty('publicKeyJwk');
-      expect(result.verificationMethod?.[1].id).toBe('did:web:example.com#enc-ml');
+      expect(result.verificationMethod?.[3]).toHaveProperty('publicKeyJwk');
+      expect(result.verificationMethod?.[3].id).toBe('did:web:example.com#enc-ml');
 
-      // 2. Check that assertionMethod and keyAgreement contain ONLY string references
-      expect(result.assertionMethod).toHaveLength(1);
-      expect(result.assertionMethod?.[0]).toBe('did:web:example.com#sig-ml');
+      // 2. Check that the standard DID relationships, rather than private JWK
+      // purpose labels, distinguish communication and credential signers.
+      expect(result.authentication).toEqual(['did:web:example.com#comm-ml']);
+      expect(result.assertionMethod).toEqual([
+        'did:web:example.com#vc-ml',
+        'did:web:example.com#vc-es384',
+      ]);
       // Verify it's a string, not an object
       expect(typeof result.assertionMethod?.[0]).toBe('string'); 
 
@@ -102,6 +109,45 @@ describe('DID Utility Functions (Deterministic)', () => {
       expect(result.keyAgreement?.[0]).toBe('did:web:example.com#enc-ml');
       // Verify it's a string, not an object
       expect(typeof result.keyAgreement?.[0]).toBe('string');
+    });
+  });
+
+  describe('toPublicJwkSet', () => {
+    it('removes internal purpose labels while retaining standard JOSE use', () => {
+      const result = toPublicJwkSet(testJwks);
+
+      expect(result.keys[0]).toMatchObject({ kid: 'comm-ml', use: 'sig' });
+      expect((result.keys[0] as any).purpose).toBeUndefined();
+      expect((result.keys[1] as any).purpose).toBeUndefined();
+      expect((testJwks.keys[0] as any).purpose).toBe('comm_sig');
+    });
+  });
+
+  describe('normalizeDidDocumentKeyRelationships', () => {
+    it('migrates historical purpose labels to DID relationships without exposing them', () => {
+      const legacy = {
+        '@context': 'https://www.w3.org/ns/did/v1',
+        id: 'did:web:example.com',
+        verificationMethod: [
+          { id: 'did:web:example.com#comm', controller: 'did:web:example.com', type: 'JsonWebKey2020', publicKeyJwk: { kid: 'comm', use: 'sig', purpose: 'comm_sig' } },
+          { id: 'did:web:example.com#vc', controller: 'did:web:example.com', type: 'JsonWebKey2020', publicKeyJwk: { kid: 'vc', use: 'sig', purpose: 'vc_sign' } },
+          { id: 'did:web:example.com#es384', controller: 'did:web:example.com', type: 'JsonWebKey2020', publicKeyJwk: { kid: 'es384', use: 'sig', alg: 'ES384' } },
+        ],
+        assertionMethod: [
+          'did:web:example.com#comm',
+          'did:web:example.com#vc',
+          'did:web:example.com#es384',
+        ],
+      } as any;
+
+      const result = normalizeDidDocumentKeyRelationships(legacy);
+
+      expect(result.authentication).toEqual(['did:web:example.com#comm']);
+      expect(result.assertionMethod).toEqual([
+        'did:web:example.com#vc',
+        'did:web:example.com#es384',
+      ]);
+      expect(result.verificationMethod?.every((method) => (method.publicKeyJwk as any).purpose === undefined)).toBe(true);
     });
   });
 

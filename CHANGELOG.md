@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Stop publishing the private KMS labels `comm_sig` and `vc_sign` as JWK
+  members. DID documents now place the communication ML-DSA key under
+  `authentication`, both ML-DSA/ES384 credential keys under `assertionMethod`,
+  and ML-KEM under `keyAgreement`.
 - Route host `Organization/_transaction` verification to the ICA path section
   selected by `NETWORK_MODE` (`local-network`, `test-network`, or `network`),
   while preserving `terms` as the compatibility alias for `test`.

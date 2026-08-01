@@ -8,7 +8,7 @@ import { DiscoveryService } from '../services/DiscoveryService';
 import { getTenantVaultId } from '../utils/tenant';
 import { pingHandler } from './handlers/discovery/ping.handler';
 import { signVerifiableCredential } from '../utils/vc-signer';
-import { findSigningMethod } from '../utils/did-backend';
+import { findSigningMethod, toPublicJwkSet } from '../utils/did-backend';
 import { buildStatusListCredential, buildStatusListEntry, createStatusListEncodedList } from '../utils/status-list';
 import { DataspaceWellKnownPaths } from 'gdc-common-utils-ts/constants/dataspace-protocol';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
@@ -762,7 +762,7 @@ export function createDiscoveryRouter(
   router.get([`${hostScopedWellKnownPrefix}/jwks.json`, `${tenantWellKnownPrefix}/jwks.json`], resolveTenant, async (req, res) => {
     try {
       const vaultId = res.locals.vaultId;
-      const jwks = await kmsService.getPublicJwks(vaultId);
+      const jwks = toPublicJwkSet(await kmsService.getPublicJwks(vaultId));
       const entityConfig = await tenantsCacheManager.getTenant(vaultId);
       const legacySignAlg = (entityConfig?.legacyX509DerBase64 || entityConfig?.legacyX509ChainBase64?.length)
         ? (entityConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG)
@@ -843,7 +843,11 @@ export function createDiscoveryRouter(
         ? (entityConfig?.legacySignAlg || process.env.LEGACY_SIGN_ALG)
         : undefined;
       const verificationMethodId = findSigningMethod(didDoc, legacySignAlg) || (didDoc.assertionMethod?.[0] as string);
-      const pqcSignMethod = didDoc.verificationMethod?.find((method: any) => (method.publicKeyJwk as any)?.alg?.startsWith('ML-DSA'))?.id as string | undefined;
+      const assertionMethodIds = new Set((didDoc.assertionMethod || [])
+        .map((method: any) => typeof method === 'string' ? method : method.id)
+        .filter(Boolean));
+      const pqcSignMethod = didDoc.verificationMethod?.find((method: any) =>
+        assertionMethodIds.has(method.id) && (method.publicKeyJwk as any)?.alg?.startsWith('ML-DSA'))?.id as string | undefined;
       const pqcSignAlg = pqcSignMethod
         ? (didDoc.verificationMethod?.find((method: any) => method.id === pqcSignMethod)?.publicKeyJwk as any)?.alg
         : undefined;
