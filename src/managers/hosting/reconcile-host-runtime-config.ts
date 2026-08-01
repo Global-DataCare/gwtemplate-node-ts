@@ -22,8 +22,9 @@ type ReconcilePersistedHostRuntimeConfigDeps = Readonly<{
 }>;
 
 /**
- * Refreshes the persisted host runtime service projection without mutating host
- * identity claims or re-running host bootstrap.
+ * Refreshes the persisted host runtime service projection and repairs the DID
+ * identifier when a previous bootstrap persisted a non-authoritative runtime
+ * hostname. Key material and legal identity claims are left untouched.
  */
 export async function reconcilePersistedHostRuntimeConfig(
   deps: ReconcilePersistedHostRuntimeConfigDeps,
@@ -52,7 +53,7 @@ export async function reconcilePersistedHostRuntimeConfig(
     deps.config.nodeEnv,
     deps.config.networkMode,
   );
-  const didId = String(hostConfig.didDocument?.id || composeHostDidWebId(deps.config.apiBaseUrl, deps.config.hostExternalDomain));
+  const didId = composeHostDidWebId(deps.config.apiBaseUrl, deps.config.hostExternalDomain);
   const didDocument = {
     '@context': hostConfig.didDocument?.['@context'] || 'https://www.w3.org/ns/did/v1',
     ...hostConfig.didDocument,
@@ -81,8 +82,11 @@ export async function reconcilePersistedHostRuntimeConfig(
   const expectedDidConfigServicesJson = JSON.stringify(expectedDidConfigServices);
   const previousDidDocumentServices = JSON.stringify(hostConfig.didDocument?.service || []);
   const expectedDidDocumentServicesJson = JSON.stringify(nextDidDocumentServices);
+  const previousDidId = String(hostConfig.didDocument?.id || '');
 
   if (
+    previousDidId === didId
+    &&
     previousDidConfigServices === expectedDidConfigServicesJson
     && previousDidDocumentServices === expectedDidDocumentServicesJson
   ) {
