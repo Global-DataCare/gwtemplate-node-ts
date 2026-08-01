@@ -137,6 +137,28 @@ describe('TenantsCacheManager', () => {
       const result = await tenantsCacheManager.getTenantDid('non-existent-id');
       expect(result).toBeUndefined();
     });
+
+    it('normalizes historical KMS key purposes before caching a DID document', async () => {
+      const legacyConfig = {
+        ...acmeConfig,
+        didDocument: {
+          ...acmeConfig.didDocument,
+          verificationMethod: [
+            { id: `${tenantUrn}#comm`, controller: tenantUrn, type: 'JsonWebKey2020', publicKeyJwk: { kid: 'comm', use: 'sig', purpose: 'comm_sig' } },
+            { id: `${tenantUrn}#vc`, controller: tenantUrn, type: 'JsonWebKey2020', publicKeyJwk: { kid: 'vc', use: 'sig', purpose: 'vc_sign' } },
+          ],
+          assertionMethod: [`${tenantUrn}#comm`, `${tenantUrn}#vc`],
+        },
+      } as any;
+      mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId } as any);
+      mockKmsService.unprotectConfidentialData.mockResolvedValue(legacyConfig);
+
+      const result = await tenantsCacheManager.getDidDocument(acmeVaultId);
+
+      expect(result?.authentication).toEqual([`${tenantUrn}#comm`]);
+      expect(result?.assertionMethod).toEqual([`${tenantUrn}#vc`]);
+      expect((result?.verificationMethod?.[0].publicKeyJwk as any).purpose).toBeUndefined();
+    });
   });
 
   describe('getDidServiceConfig', () => {

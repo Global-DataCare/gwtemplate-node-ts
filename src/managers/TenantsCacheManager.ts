@@ -14,7 +14,7 @@ import { getIdentifierUrnFromClaims, generateTenantCollectionNameFromClaims } fr
 import { DidDocument, DidService, VerificationMethod } from '../gdc-backend-utils-node/models/did';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
-import { getBaseUrlFromDidWeb } from '../utils/did-backend';
+import { getBaseUrlFromDidWeb, normalizeDidDocumentKeyRelationships } from '../utils/did-backend';
 import { parseTenantUrn } from '../utils/urn';
 import { getEnvSectionId } from '../utils/section-env';
 import { getTenantAuthorizationStatus, isTenantAuthorizationOperational, TenantAuthorizationLifecycleStatus } from '../utils/tenant-lifecycle';
@@ -139,6 +139,9 @@ export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRe
       }
 
       tenantConfig.collectionName = generateTenantCollectionNameFromClaims(tenantConfig.claims);
+      if (tenantConfig.didDocument) {
+        tenantConfig.didDocument = normalizeDidDocumentKeyRelationships(tenantConfig.didDocument);
+      }
       return tenantConfig;
     } catch (error) {
       console.error(`[TenantsCacheManager] Failed to decrypt tenant record for vaultId '${vaultId}'.`, error);
@@ -258,6 +261,7 @@ export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRe
       try {
         const config = await this.kmsService.unprotectConfidentialData<any>(record, 'host');
         if (!config?.claims || !config?.didDocument?.id) continue;
+        config.didDocument = normalizeDidDocumentKeyRelationships(config.didDocument);
         const collectionName = generateTenantCollectionNameFromClaims(config.claims);
         config.collectionName = collectionName;
         const vaultId = record.id;

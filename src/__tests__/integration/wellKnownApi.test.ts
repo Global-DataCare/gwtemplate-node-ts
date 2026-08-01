@@ -165,6 +165,27 @@ describe('Well-Known JWKS Discovery API', () => {
     expect(JSON.parse(response.text)).toEqual(expectedJwks);
     expect(mockKmsService.getPublicJwks).toHaveBeenCalledWith(testTenant1VaultId);
   });
+
+  it('does not expose private KMS purpose labels in the public JWK Set', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const expectedUrl = `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/jwks.json`;
+    mockKmsService.getPublicJwks.mockResolvedValue({
+      keys: [
+        { kid: 'comm-ml', kty: 'AKP', alg: 'ML-DSA-44', use: 'sig', purpose: 'comm_sig' },
+        { kid: 'vc-ml', kty: 'AKP', alg: 'ML-DSA-44', use: 'sig', purpose: 'vc_sign' },
+      ],
+    } as any);
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
+
+    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const parsed = JSON.parse(response.text);
+
+    expect(response.status).toBe(200);
+    expect(parsed.keys).toEqual([
+      { kid: 'comm-ml', kty: 'AKP', alg: 'ML-DSA-44', use: 'sig' },
+      { kid: 'vc-ml', kty: 'AKP', alg: 'ML-DSA-44', use: 'sig' },
+    ]);
+  });
 });
 
 describe('Well-Known Ping API', () => {
