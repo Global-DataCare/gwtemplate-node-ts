@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Reconcile a persisted host DID identifier against `HOST_EXTERNAL_DOMAIN` so
+  an earlier Kubernetes-internal `*.svc.cluster.local` bootstrap cannot remain
+  published through the public host-scoped `did.json` endpoint. Existing host
+  keys and legal claims are preserved.
 - Stop publishing the private KMS labels `comm_sig` and `vc_sign` as JWK
   members. DID documents now place the communication ML-DSA key under
   `authentication`, both ML-DSA/ES384 credential keys under `assertionMethod`,

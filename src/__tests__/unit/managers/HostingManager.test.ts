@@ -229,6 +229,7 @@ describe('HostingManager', () => {
         ? { ...service, actions: service.actions.filter((action: string) => action !== '_transaction') }
         : service
     ));
+    staleHostConfig.didDocument.id = 'did:web:gw.internal.svc.cluster.local';
     staleHostConfig.didDocument.service = [];
 
     const staleSecureDoc = await mockKmsService.protectConfidentialData({
@@ -249,6 +250,9 @@ describe('HostingManager', () => {
     );
 
     expect(refreshedServices).toEqual(expectedServices);
+    expect((await mockTenantsCacheManager.getDidDocument('host'))?.id).toBe(
+      composeHostDidWebId(mockConfig.apiBaseUrl, mockConfig.hostExternalDomain),
+    );
     expect(
       refreshedServices?.some((service: any) =>
         service?.selector?.section === 'registry'
