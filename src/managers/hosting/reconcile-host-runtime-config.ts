@@ -1,6 +1,7 @@
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { DidDocument } from 'gdc-common-utils-ts/models/did';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
+import type { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import type { OrganizationConfig } from '../../gdc-backend-utils-node/models/entity';
 import type { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
@@ -10,8 +11,9 @@ import type { IHostRuntime } from '../IHostRuntime';
 import type { IHostingTenantRegistry } from '../IHostingTenantRegistry';
 import { getEnvSectionId } from '../../utils/section-env';
 import { initializeHostServicesConfig } from '../../utils/services';
-import { composeHostDidWebId, applyLegacyX509Metadata } from '../../utils/did-backend';
+import { composeHostDidWebId, applyLegacyX509Metadata, populateDidDocumentFromJwks } from '../../utils/did-backend';
 import { populateDidDocumentServices } from '../../utils/did-document';
+import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipantCredential } from '../../utils/credential-generators';
 
 type ReconcilePersistedHostRuntimeConfigDeps = Readonly<{
   config: IServerConfig;
@@ -54,12 +56,20 @@ export async function reconcilePersistedHostRuntimeConfig(
     deps.config.networkMode,
   );
   const didId = composeHostDidWebId(deps.config.apiBaseUrl, deps.config.hostExternalDomain);
-  const didDocument = {
-    '@context': hostConfig.didDocument?.['@context'] || 'https://www.w3.org/ns/did/v1',
-    ...hostConfig.didDocument,
-    id: didId,
-    alsoKnownAs: Array.isArray(hostConfig.didDocument?.alsoKnownAs) ? hostConfig.didDocument?.alsoKnownAs : [],
-  } as DidDocument;
+  const previousDidId = String(hostConfig.didDocument?.id || '');
+  const publicKeys = previousDidId === didId ? undefined : await deps.kmsService.getPublicJwks('host');
+  const didDocument = publicKeys
+    ? populateDidDocumentFromJwks({
+      '@context': hostConfig.didDocument?.['@context'] || 'https://www.w3.org/ns/did/v1',
+      id: didId,
+      alsoKnownAs: Array.isArray(hostConfig.didDocument?.alsoKnownAs) ? hostConfig.didDocument.alsoKnownAs : [],
+    }, publicKeys)
+    : {
+      '@context': hostConfig.didDocument?.['@context'] || 'https://www.w3.org/ns/did/v1',
+      ...hostConfig.didDocument,
+      id: didId,
+      alsoKnownAs: Array.isArray(hostConfig.didDocument?.alsoKnownAs) ? hostConfig.didDocument?.alsoKnownAs : [],
+    } as DidDocument;
   const nextDidDocumentServices = populateDidDocumentServices(
     didId,
     deps.config.apiBaseUrl,
@@ -82,7 +92,6 @@ export async function reconcilePersistedHostRuntimeConfig(
   const expectedDidConfigServicesJson = JSON.stringify(expectedDidConfigServices);
   const previousDidDocumentServices = JSON.stringify(hostConfig.didDocument?.service || []);
   const expectedDidDocumentServicesJson = JSON.stringify(nextDidDocumentServices);
-  const previousDidId = String(hostConfig.didDocument?.id || '');
 
   if (
     previousDidId === didId
@@ -98,6 +107,35 @@ export async function reconcilePersistedHostRuntimeConfig(
   }
 
   didDocument.service = nextDidDocumentServices;
+  let governanceVc = hostConfig.governanceVc;
+  let selfDescriptionVc = hostConfig.selfDescriptionVc;
+  if (publicKeys) {
+    const hostSignerKid = publicKeys.keys.find((key: any) => key.use === 'sig' && key.purpose === 'vc_sign')?.kid
+      || publicKeys.keys.find((key: any) => key.use === 'sig')?.kid;
+    if (!hostSignerKid) {
+      throw new ManagerError('Host signing key not found, cannot reconcile host VCs.', IssueType.Exception);
+    }
+    const governancePayload = createGaiaXLegalParticipantCredential(
+      buildGaiaXLegalParticipantOptionsFromClaims({
+        claims: hostConfig.claims,
+        webDomain: deps.config.apiBaseUrl,
+        did: didId,
+        issuerDid: didId,
+      }),
+    ) as Omit<VerifiableCredentialV2, 'proof'>;
+    const buildCredential = async (payload: Omit<VerifiableCredentialV2, 'proof'>): Promise<VerifiableCredentialV2> => ({
+      ...payload,
+      proof: [{
+        type: 'JsonWebSignature2020',
+        created: new Date().toISOString(),
+        proofPurpose: 'assertionMethod',
+        verificationMethod: `${didId}#${hostSignerKid}`,
+        jws: await deps.kmsService.createDetachedJws(payload, hostSignerKid, 'host', 'vc_sign'),
+      }],
+    });
+    governanceVc = await buildCredential(governancePayload);
+    selfDescriptionVc = await buildCredential({ ...governancePayload, issuer: didId });
+  }
   const nextHostConfig: OrganizationConfig = {
     ...hostConfig,
     didConfig: {
@@ -105,6 +143,8 @@ export async function reconcilePersistedHostRuntimeConfig(
       service: expectedDidConfigServices,
     },
     didDocument,
+    governanceVc,
+    selfDescriptionVc,
     meta: {
       ...(hostConfig.meta || {}),
       lastUpdated: new Date().toISOString(),
@@ -118,6 +158,17 @@ export async function reconcilePersistedHostRuntimeConfig(
   };
   const protectedDoc = await deps.kmsService.protectConfidentialData(nextSecureDoc, 'host');
   await deps.vaultRepository.put(hostCollectionName, [protectedDoc], getEnvSectionId('tenants'));
+  if (publicKeys && governanceVc && selfDescriptionVc) {
+    const wellKnownDocs: ConfidentialStorageDoc[] = [
+      { id: 'legal-participant.vc.json', status: 'active', sequence: 0, content: governanceVc },
+      { id: 'vc.json', status: 'active', sequence: 0, content: governanceVc },
+      { id: 'self-description.json', status: 'active', sequence: 0, content: selfDescriptionVc },
+    ];
+    const protectedWellKnownDocs = await Promise.all(
+      wellKnownDocs.map(doc => deps.kmsService.protectConfidentialData(doc, 'host')),
+    );
+    await deps.vaultRepository.put(hostCollectionName, protectedWellKnownDocs, getEnvSectionId('.well-known'));
+  }
 
   const refreshTenant = (deps.tenantsCacheManager as any)?.refreshTenant;
   if (typeof refreshTenant === 'function') {

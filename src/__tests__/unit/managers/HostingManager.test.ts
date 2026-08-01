@@ -253,6 +253,16 @@ describe('HostingManager', () => {
     expect((await mockTenantsCacheManager.getDidDocument('host'))?.id).toBe(
       composeHostDidWebId(mockConfig.apiBaseUrl, mockConfig.hostExternalDomain),
     );
+    const refreshedHost = await mockTenantsCacheManager.getTenant('host');
+    expect(refreshedHost?.governanceVc?.issuer).toBe(
+      composeHostDidWebId(mockConfig.apiBaseUrl, mockConfig.hostExternalDomain),
+    );
+    expect(refreshedHost?.governanceVc?.proof?.[0]?.verificationMethod).toBe(
+      `${composeHostDidWebId(mockConfig.apiBaseUrl, mockConfig.hostExternalDomain)}#key-1`,
+    );
+    expect(refreshedHost?.didDocument?.verificationMethod?.every((method: any) =>
+      method.id.startsWith(`${composeHostDidWebId(mockConfig.apiBaseUrl, mockConfig.hostExternalDomain)}#`),
+    )).toBe(true);
     expect(
       refreshedServices?.some((service: any) =>
         service?.selector?.section === 'registry'
