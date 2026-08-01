@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+### Fixed
+
+- Route host `Organization/_transaction` verification to the ICA path section
+  selected by `NETWORK_MODE` (`local-network`, `test-network`, or `network`),
+  while preserving `terms` as the compatibility alias for `test`.
+
 ## [1.20.23] - 2026-07-30
 
 ### Fixed

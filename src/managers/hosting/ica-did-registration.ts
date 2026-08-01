@@ -118,7 +118,11 @@ export function buildIcaVerifyUrl(params: {
   isDevelopmentOrDemoDiagnosticsEnabled: () => boolean;
 }): string {
   const normalizedResourceType = String(params.resourceType || 'contract').trim();
-  return `${buildIcaSectorBaseUrl(params)}/terms/pdf/${normalizedResourceType}/_verify`;
+  const configuredNetworkKind = String(params.config.networkMode || '').trim().toLowerCase();
+  const networkKind = ['local-network', 'test-network', 'network'].includes(configuredNetworkKind)
+    ? configuredNetworkKind
+    : 'terms';
+  return `${buildIcaSectorBaseUrl(params)}/${networkKind}/pdf/${normalizedResourceType}/_verify`;
 }
 
 export function buildIcaDidCreateUrl(params: {
