@@ -32,6 +32,7 @@ import {
 } from 'gdc-common-utils-ts/constants/healthcare';
 import { buildSmartCompositionReadScope } from 'gdc-common-utils-ts/utils/smart-scope';
 import { buildUnsignedIndividualMemberIdentityVpJwt } from 'gdc-common-utils-ts/utils/individual-smart';
+import { buildUnsignedProfessionalIdentityVpJwt } from 'gdc-common-utils-ts/utils/professional-smart';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import {
   EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
@@ -290,7 +291,13 @@ describe('OpenIdAuthManager', () => {
     expect(mockClearingHouse.verifyVpToken).toHaveBeenCalled();
   });
 
-  it('should match section tokens regardless of LOINC system casing or URL form', async () => {
+  it('should match a provider-neutral member DID and normalized section token', async () => {
+    const actorDid = 'did:web:external.acme.org:member:zDoctorEmailHash:ISCO-08|2211';
+    const vpToken = buildUnsignedProfessionalIdentityVpJwt({
+      clientId: actorDid,
+      actorDid,
+      role: 'ISCO-08|2211',
+    });
     const mockKmsService: jest.Mocked<IKmsService> = {
       init: jest.fn(),
       provisionKeys: jest.fn(),
@@ -331,6 +338,7 @@ describe('OpenIdAuthManager', () => {
       getContainersInSection: jest.fn().mockResolvedValue([
         {
           ...testConsentRulePermitOrgDid,
+          'Consent.actor-identifier': 'did:web:api.acme.org:employee:zDoctorEmailHash:ISCO-08|2211',
           'Consent.action': 'loinc|48765-2',
         },
       ] as any),
@@ -375,10 +383,10 @@ describe('OpenIdAuthManager', () => {
         iss: 'did:web:device.example',
         aud: 'did:web:api.acme.org',
         body: {
-          sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
+          sub: actorDid,
           scope: 'organization/Composition.rs?subject=did:web:api.acme.org:individual:123&section=http://loinc.org|48765-2',
           purpose: 'TREAT',
-          vp_token: 'vp',
+          vp_token: vpToken,
           acr_values: 'urn:antifraud:acr:openid4vp:employee',
         },
       } as any,

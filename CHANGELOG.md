@@ -2,6 +2,13 @@
 
 ### Fixed
 
+- Match SMART Consent roles for provider-neutral organization and individual
+  member DIDs. The parser now reads the terminal identifier/role tuple instead
+  of requiring the literal `employee` or `family` path segment.
+- Treat hosted and external member DIDs with the same terminal identifier and
+  coded role as aliases only after the verified VP binds the exact requesting
+  actor; an unverified suffix alone never creates authorization.
+
 - Reconcile a persisted host DID identifier against `HOST_EXTERNAL_DOMAIN` so
   an earlier Kubernetes-internal `*.svc.cluster.local` bootstrap cannot remain
   published through the public host-scoped `did.json` endpoint. The migration
