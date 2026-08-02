@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.20.24] - 2026-08-02
+
 ### Fixed
 
 - Match SMART Consent roles for provider-neutral organization and individual
