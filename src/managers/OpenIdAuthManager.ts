@@ -26,6 +26,7 @@ import { deriveGrantedSmartScopes } from 'gdc-common-utils-ts/utils/smart-scope'
 import type { ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
 import { getMatchingIndividualMemberCredentialFromVpToken } from 'gdc-common-utils-ts/utils/individual-smart';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { getMatchingProfessionalCredentialFromVpToken } from 'gdc-common-utils-ts/utils/professional-smart';
 
 type TokenRequestBody = {
   client_id?: string;
@@ -215,6 +216,15 @@ export class OpenIdAuthManager implements IJobProcessor {
       memberCredential?.sameAs.forEach((alias) => actorSubjectAliases.add(alias));
     }
     const rules = await this.vaultRepository.getContainersInSection<any>(tenantVaultId, getIndividualSectionId(subject, 'rules'));
+    const professionalCredential = accessProof.mode === 'vp_token' && vpToken && actor.role
+      ? getMatchingProfessionalCredentialFromVpToken(vpToken, {
+          actorDid: actor.sub,
+          role: actor.role,
+        })
+      : undefined;
+    if (memberCredential || professionalCredential) {
+      this.addPortableMemberRuleAliases(rules, actor, actorSubjectAliases);
+    }
     let grantedScope = scope;
     const requestedScopeTokens = scope.split(/\s+/).map((value) => value.trim()).filter(Boolean);
     const compositionReadOnlyRequest = requestedScopeTokens.length > 0
@@ -224,7 +234,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       ? deriveGrantedSmartScopes(rules as ConsentRule[], {
           requestedScopes: requestedScopeTokens,
           actor: {
-            actorKind: actor.sub.includes(':family:') ? 'related-person' : 'professional',
+            actorKind: actor.memberKind === 'individual' ? 'related-person' : 'professional',
             did: actor.sub,
             aliases: Array.from(actorSubjectAliases),
             email: memberLicense?.issuedToEmail
@@ -794,7 +804,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     const missingSections: string[] = [];
     const missingResourceTypes: string[] = [];
     const normalizedActorRole = input.actor.role?.trim()
-      ? normalizeConsentActorRole(input.actor.role.trim(), input.actor.sub.includes(':family:') ? 'family' : 'professional')
+      ? normalizeConsentActorRole(input.actor.role.trim(), input.actor.memberKind === 'individual' ? 'family' : 'professional')
       : undefined;
     const normalizedJurisdiction = String(input.jurisdiction || '').trim().toUpperCase();
     const actorEmail = input.actor.identifier && input.actor.identifier.includes('@')
@@ -991,6 +1001,40 @@ export class OpenIdAuthManager implements IJobProcessor {
     if (normalizedRuleJurisdiction && normalizedRuleJurisdiction === jurisdiction) return 'jurisdiction';
 
     return undefined;
+  }
+
+  /**
+   * Adds hosted/external DID aliases only after a verified VP credential binds
+   * the exact requesting actor. Provider path vocabulary and DID host may vary;
+   * the portable member identity is the terminal identifier plus coded role.
+   */
+  private addPortableMemberRuleAliases(
+    rules: any[],
+    actor: ReturnType<typeof parseActorFromSub>,
+    aliases: Set<string>,
+  ): void {
+    if (!actor.identifier || !actor.role) return;
+    const normalizedRole = normalizeConsentActorRole(
+      actor.role,
+      actor.memberKind === 'individual' ? 'family' : 'professional',
+    );
+    for (const rule of rules || []) {
+      const ruleActors = String(getClaimValue<string>(rule, 'Consent.actor-identifier') || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value.startsWith('did:web:'));
+      for (const ruleActor of ruleActors) {
+        const parsedRuleActor = parseActorFromSub(ruleActor);
+        if (!parsedRuleActor.identifier || !parsedRuleActor.role) continue;
+        const normalizedRuleRole = normalizeConsentActorRole(
+          parsedRuleActor.role,
+          parsedRuleActor.memberKind === 'individual' ? 'family' : 'professional',
+        );
+        if (parsedRuleActor.identifier === actor.identifier && normalizedRuleRole === normalizedRole) {
+          aliases.add(ruleActor);
+        }
+      }
+    }
   }
 
   private normalizeJurisdictionRuleActor(ruleActor: string): string | undefined {
