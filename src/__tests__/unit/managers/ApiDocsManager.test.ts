@@ -1,6 +1,37 @@
 import { createApiDocsSetupOptions } from '../../../managers/ApiDocsManager';
 
+/**
+ * API-docs teaching-flow contract under test:
+ * the rendered page must explain identity bootstrap, the public actor/transport
+ * boundary, internal subject-index dispatch, compatibility routes and the
+ * submit/202/poll/readback lifecycle before developers reach the flat endpoint
+ * catalogue. CSS assertions retain responsive visual and dark-theme support.
+ */
 describe('ApiDocsManager Global Flow Context', () => {
+  it('renders the GW CORE contract map before the endpoint catalogue', () => {
+    const options = createApiDocsSetupOptions();
+    const script = String(options.customJsStr || '');
+    const css = String(options.customCss || '');
+
+    expect(script).toContain('gw-core-contract-map');
+    expect(script).toContain('BFF / actor facade');
+    expect(script).toContain('Communication/_batch');
+    expect(script).toContain('Subject/$summary');
+    expect(script).toContain('Internal operation');
+    expect(script).toContain('Compatibility only');
+    expect(script).toContain('Organization / License');
+    expect(script).toContain('Identity bootstrap');
+    expect(script).toContain('DCR registers the actor device');
+    expect(script).toContain('Submit + thid');
+    expect(script).toContain('202 Accepted');
+    expect(script).toContain('Poll response');
+    expect(script).toContain('Exact readback');
+    expect(css).toContain('.gw-core-contract-map');
+    expect(css).toContain('.gw-core-contract-arrow');
+    expect(css).toContain('.gw-core-contract-lifecycle');
+    expect(css).toContain('.gw-core-contract-map { padding-top: 58px; }');
+  });
+
   it('includes canonical tenant, individual, and physician helper fields', () => {
     const options = createApiDocsSetupOptions();
     const script = String(options.customJsStr || '');

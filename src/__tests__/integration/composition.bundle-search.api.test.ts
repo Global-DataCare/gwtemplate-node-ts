@@ -711,8 +711,10 @@ describe('Composition Bundle _search API (integration)', () => {
         || record['org.hl7.fhir.r4.Composition.section'] === HealthcareBasicSections.VitalSigns.attributeValue,
       )).toBe(true);
 
-      // Read the complete fixture back through the same authoritative
-      // Communication -> Subject/$summary contract used by BFF consumers.
+      // Step: read the complete fixture back through the authoritative public
+      // Communication endpoint. Subject/$summary is only the operation
+      // reference inside that request; this test deliberately performs no
+      // direct HTTP call to the summary route.
       // Exact Composition references prove that shared Observation/Condition
       // collections do not bleed into unrelated IPS sections and that the
       // Flag and DeviceUseStatement sections survive persistence.

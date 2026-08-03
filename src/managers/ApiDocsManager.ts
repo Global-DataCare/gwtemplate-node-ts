@@ -1,6 +1,20 @@
 // src/managers/ApiDocsManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
+/**
+ * Builds the Swagger UI adapter used by the running GW service.
+ *
+ * In addition to selecting generated OpenAPI profiles, the adapter renders an
+ * accessible contract map before the endpoint catalogue. The map teaches the
+ * ordered integration flow: establish the actor through DCR/SMART, call a
+ * semantic SDK facade, submit and poll the public GW transport, let GW resolve
+ * internal operation references, and perform authoritative readback. It also
+ * labels administrative aggregates and compatibility routes so HTTP
+ * reachability is not mistaken for the recommended application contract.
+ *
+ * Keep this explanation synchronized with
+ * `docs/01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md` and its unit test.
+ */
 export function createApiDocsSetupOptions(
   swaggerSpecUrl = '/swagger-spec.json',
   swaggerSpecUrls?: Array<{ url: string; name: string }>,
@@ -627,6 +641,49 @@ export function createApiDocsSetupOptions(
         syncGlobalContextPanelState();
       }
 
+      function upsertCoreContractMap() {
+        if (document.getElementById('gw-core-contract-map')) return;
+        const information = document.querySelector('.swagger-ui .information-container');
+        if (!information || !information.parentNode) return;
+
+        const map = document.createElement('section');
+        map.id = 'gw-core-contract-map';
+        map.className = 'gw-core-contract-map';
+        map.setAttribute('aria-label', 'GW CORE public and internal contract map');
+        map.innerHTML = [
+          '<div class="gw-core-contract-heading">',
+          '  <div><strong>How applications use GW CORE</strong><span>Public application contract versus internal resolution</span></div>',
+          '  <div class="gw-core-contract-legend"><span data-level="public">Public</span><span data-level="internal">Internal operation</span><span data-level="compat">Compatibility only</span></div>',
+          '</div>',
+          '<div class="gw-core-contract-flow">',
+          '  <div class="gw-core-contract-node" data-level="public"><b>Portal / channel</b><span>Browser or native UI</span></div>',
+          '  <div class="gw-core-contract-arrow" aria-hidden="true">→</div>',
+          '  <div class="gw-core-contract-node" data-level="public"><b>BFF / actor facade</b><span>requestClinicalSummary()</span></div>',
+          '  <div class="gw-core-contract-arrow" aria-hidden="true">→</div>',
+          '  <div class="gw-core-contract-node" data-level="public"><b>Communication/_batch</b><span>Auditable request and result channel</span></div>',
+          '  <div class="gw-core-contract-arrow" aria-hidden="true">→</div>',
+          '  <div class="gw-core-contract-node" data-level="internal"><b>Subject/$summary</b><span>Resolved inside GW; not called by application code</span></div>',
+          '  <div class="gw-core-contract-arrow" aria-hidden="true">→</div>',
+          '  <div class="gw-core-contract-node" data-level="internal"><b>Subject index</b><span>Composition, sections and encrypted projections</span></div>',
+          '</div>',
+          '<div class="gw-core-contract-secondary">',
+          '  <div><b>Identity bootstrap</b><span>DCR registers the actor device; SMART scopes the actor, subject and operation before protected data access.</span></div>',
+          '  <div><b>Administrative aggregates</b><span>Organization / License searches remain direct actor-scoped SDK operations; they are not clinical subject-index reads.</span></div>',
+          '  <div data-level="compat"><b>Compatibility only</b><span>Direct Bundle/_search, Composition routes and Subject/$summary HTTP calls remain lower-level test or migration surfaces.</span></div>',
+          '</div>',
+          '<div class="gw-core-contract-lifecycle" aria-label="Asynchronous GW request lifecycle">',
+          '  <b>Every asynchronous GW operation</b>',
+          '  <ol>',
+          '    <li><span>1</span><strong>Submit + thid</strong><small>Send one correlated command or query.</small></li>',
+          '    <li><span>2</span><strong>202 Accepted</strong><small>Work is pending, not yet authoritative.</small></li>',
+          '    <li><span>3</span><strong>Poll response</strong><small>Use the same thid until a final result.</small></li>',
+          '    <li><span>4</span><strong>Exact readback</strong><small>Render only the final aggregate or projection.</small></li>',
+          '  </ol>',
+          '</div>',
+        ].join('');
+        information.parentNode.insertBefore(map, information.nextSibling);
+      }
+
       function syncGlobalContextPanelState() {
         const launcher = document.getElementById('gw-api-global-context-launcher');
         const panel = document.getElementById('gw-api-global-context');
@@ -772,6 +829,7 @@ export function createApiDocsSetupOptions(
         }
 
         syncThemeContrastClass();
+        upsertCoreContractMap();
         ensureDefaultContextValues();
         upsertGlobalContextPanel();
         applyGlobalContextLayout();
@@ -781,6 +839,7 @@ export function createApiDocsSetupOptions(
 
         const observer = new MutationObserver(() => {
           syncThemeContrastClass();
+          upsertCoreContractMap();
           applyGlobalContextLayout();
           syncSwaggerParameterInputs(false);
           syncSwaggerRequestBodyEditors();
@@ -822,6 +881,64 @@ export function createApiDocsSetupOptions(
         overflow-wrap: anywhere !important;
         line-height: 1.5 !important;
         font-size: 0.95em !important;
+      }
+
+      .gw-core-contract-map {
+        max-width: 1460px;
+        margin: 8px auto 24px;
+        padding: 18px;
+        border: 1px solid #cbd5e1;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%);
+        color: #0f172a;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        box-sizing: border-box;
+      }
+
+      .gw-core-contract-heading,
+      .gw-core-contract-flow,
+      .gw-core-contract-secondary,
+      .gw-core-contract-legend {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .gw-core-contract-heading { justify-content: space-between; margin-bottom: 16px; }
+      .gw-core-contract-heading strong { display: block; font-size: 18px; }
+      .gw-core-contract-heading span { display: block; margin-top: 3px; font-size: 12px; }
+      .gw-core-contract-legend span { padding: 5px 8px; border-radius: 999px; font-weight: 700; }
+      .gw-core-contract-flow { align-items: stretch; }
+      .gw-core-contract-node { flex: 1 1 0; min-width: 0; padding: 12px; border: 2px solid #0f766e; border-radius: 10px; background: #ecfdf5; }
+      .gw-core-contract-node[data-level="internal"] { border-color: #b45309; background: #fffbeb; }
+      .gw-core-contract-node b, .gw-core-contract-secondary b { display: block; margin-bottom: 5px; font-size: 13px; }
+      .gw-core-contract-node span, .gw-core-contract-secondary span { display: block; font-size: 11px; line-height: 1.4; }
+      .gw-core-contract-arrow { align-self: center; flex: 0 0 auto; color: #475569; font-size: 22px; font-weight: 800; }
+      .gw-core-contract-secondary { margin-top: 12px; align-items: stretch; }
+      .gw-core-contract-secondary > div { flex: 1; padding: 10px 12px; border: 1px solid #94a3b8; border-radius: 9px; background: #fff; }
+      .gw-core-contract-secondary > div[data-level="compat"] { border-style: dashed; }
+      .gw-core-contract-lifecycle { margin-top: 14px; padding-top: 14px; border-top: 1px solid #cbd5e1; }
+      .gw-core-contract-lifecycle > b { display: block; margin-bottom: 10px; font-size: 13px; }
+      .gw-core-contract-lifecycle ol { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+      .gw-core-contract-lifecycle li { position: relative; min-width: 0; padding: 10px 10px 10px 38px; border-radius: 9px; background: #e0f2fe; }
+      .gw-core-contract-lifecycle li > span { position: absolute; left: 10px; top: 10px; display: grid; width: 20px; height: 20px; place-items: center; border-radius: 999px; background: #0369a1; color: #fff; font-size: 11px; font-weight: 800; }
+      .gw-core-contract-lifecycle strong, .gw-core-contract-lifecycle small { display: block; }
+      .gw-core-contract-lifecycle strong { font-size: 12px; }
+      .gw-core-contract-lifecycle small { margin-top: 3px; font-size: 10px; line-height: 1.35; }
+      .gw-core-contract-legend [data-level="public"] { background: #d1fae5; color: #065f46; }
+      .gw-core-contract-legend [data-level="internal"] { background: #fef3c7; color: #92400e; }
+      .gw-core-contract-legend [data-level="compat"] { background: #e2e8f0; color: #334155; }
+      .gw-api-docs-dark .gw-core-contract-map { background: #111827; color: #f8fafc; border-color: #475569; }
+      .gw-api-docs-dark .gw-core-contract-secondary > div { background: #1f2937; }
+      .gw-api-docs-dark .gw-core-contract-lifecycle { border-color: #475569; }
+      .gw-api-docs-dark .gw-core-contract-lifecycle li { background: #0c4a6e; }
+
+      @media (max-width: 1100px) {
+        .gw-core-contract-map { padding-top: 58px; }
+        .gw-core-contract-heading, .gw-core-contract-flow, .gw-core-contract-secondary { flex-direction: column; align-items: stretch; }
+        .gw-core-contract-lifecycle ol { grid-template-columns: 1fr; }
+        .gw-core-contract-arrow { transform: rotate(90deg); text-align: center; }
+        .gw-core-contract-legend { flex-wrap: wrap; }
       }
     `,
     swaggerOptions: {

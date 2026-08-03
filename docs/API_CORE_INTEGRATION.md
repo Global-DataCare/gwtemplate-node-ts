@@ -9,6 +9,8 @@ Short coverage summary for memory/thesis justification:
 
 ## Source-of-Truth Alignment
 
+- Visual public/internal contract map:
+  [01.I-GW-CORE-CONTRACT-MAP.md](01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md).
 - GW OpenAPI core profile served at: `/api-docs` (`/swagger-spec.json`).
 - GW full/reference OpenAPI served at: `/api-docs-reference` (`/swagger-spec.reference.json`).
 - SDK live core tests: `dataspace-client-sdk-node/tests/live-gw-uc5.e2e.test.mjs`.

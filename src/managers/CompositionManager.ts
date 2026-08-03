@@ -131,7 +131,8 @@ type CompositionSearchContext = {
  * - `individual`
  *   - still handles the lower-level direct `Composition` / `Bundle` routes
  *     that remain exposed for compatibility
- *   - still resolves `Subject/$summary` and direct document retrieval
+ *   - still resolves the internal `Subject/$summary` operation and direct
+ *     document retrieval
  *   - is also called indirectly by `CommunicationManager` when a
  *     `Communication` envelope embeds `Subject/$summary` or `Bundle/_search`
  * - `digitaltwin`
@@ -140,9 +141,10 @@ type CompositionSearchContext = {
  *   - those are delegated to `TwinCompositionManager`
  *
  * Important clarification:
- * - the canonical public read model for `individual` is `Communication`
- *   carrying structured requests, not teaching users to call direct
- *   `individual/.../Composition` routes first
+ * - the canonical application/BFF read boundary for `individual` is the
+ *   actor facade submitting a `Communication` carrying structured requests
+ * - `Subject/$summary`, `Bundle/_search` and direct
+ *   `individual/.../Composition` routes are not application-facing calls
  * - the direct `individual/.../Composition` routes therefore exist mainly as
  *   compatibility / lower-level plumbing and test anchors
  */

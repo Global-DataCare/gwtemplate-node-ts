@@ -166,11 +166,12 @@ const COMMUNICATION_SECTION_PREFIX = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDU
  *
  * Architectural intent:
  * - `individual` is the operational subject-index plane.
- * - The public read model for `individual` is not "one `_search` endpoint per
- *   clinical resource type".
- * - Instead, `Communication` carries the auditable request envelope and may
+ * - The public application/BFF boundary for subject-index I/O is the actor
+ *   facade that submits and polls `Communication`; it is not one direct route
+ *   per clinical resource or operation.
+ * - `Communication` carries the auditable request envelope and may
  *   embed references to:
- *   - `Subject/$summary` for canonical subject-summary retrieval
+ *   - `Subject/$summary` as GW's internal canonical summary operation
  *   - `Subject/_search` for structured subject-location requests
  *   - `Bundle/_search` for document/section retrieval
  *
@@ -179,6 +180,8 @@ const COMMUNICATION_SECTION_PREFIX = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDU
  * resolved deterministically.
  *
  * Important boundary:
+ * - the operation references above are not endpoints that portal code should
+ *   construct or invoke directly
  * - `individual` is for operational subject reads and document retrieval.
  * - `digitaltwin` is a different plane with different search semantics.
  * - `digitaltwin` should not be documented as "the same thing as individual

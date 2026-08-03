@@ -14,6 +14,19 @@ Use this document when you need to define or review:
 This document is intentionally product-facing and integration-facing.
 It does not replace lower-level SDK or GW route documentation.
 
+This is a generic facade design, not the route inventory of one deployed
+portal. Each product adapter must maintain its concrete BFF table beside its
+code and map every row back to this functional contract. For example, UHC
+Personal owns that concrete inventory in
+`custom/uhc-unidonline-next/docs/PORTAL_BFF_GW_MVP_FLOW.md` in the shared
+workspace.
+
+Read the visual GW execution model first in
+[`01.I-GW-CORE-CONTRACT-MAP.md`](01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md);
+the table below says *what* a portal facade exposes, while that map explains
+*how* actor identity, asynchronous transport, internal dispatch and exact
+readback work.
+
 ## Scope
 
 This table describes what it makes sense to expose from a portal backend.
@@ -113,13 +126,19 @@ What changes is the verification/preparation step before the start:
 
 ## IPS And Clinical Read
 
+All clinical subject-index input and output crosses the GW boundary as an
+auditable `Communication`. `Subject/$summary`, `Subject/_search` and
+`Bundle/_search` are operation references resolved inside GW, not routes that
+new BFF code constructs directly. See
+`docs/01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md`.
+
 | Portal API | Method | Frontend purpose | Portal backend behavior |
 |---|---|---|---|
-| `/subject/ips-requests` | `POST` | request full IPS or IPS with selected sections | launches the request into the relevant GW channel/filter |
+| `/subject/ips-requests` | `POST` | request full IPS or IPS with selected sections | calls the actor facade `requestClinicalSummary(...)`, which sends `Communication/_batch` carrying the internal `Subject/$summary` operation reference |
 | `/subject/ips-requests` | `GET` | list IPS requests launched from the portal | uses portal history/audit |
 | `/subject/ips-requests/{requestId}` | `GET` | get one IPS request and its result | reconstructs it from `Communication` or local cache |
-| `/subject/ips` | `GET` | retrieve the latest IPS view for rendering | resolves the latest materialized clinical result |
-| `/subject/clinical-bundle/search` | `POST` | run more flexible clinical search when IPS is not enough | uses `Bundle/_search` or the equivalent GW flow |
+| `/subject/ips` | `GET` | retrieve the latest IPS view for rendering | returns the authoritative Bundle obtained through `requestClinicalSummary(...)`; it does not call `Subject/$summary` directly |
+| `/subject/clinical-bundle/search` | `POST` | run a specialized index query when the summary is not enough | compatibility/specialized facade; the runtime may currently use direct `Bundle/_search`, but this is not the primary subject read contract |
 | `/subject/documents` | `GET` | list subject clinical/documents | retrieves `DocumentReference` and projections |
 | `/subject/documents/{documentId}` | `GET` | get one document detail | returns `DocumentReference` or a resolved document view |
 
@@ -139,7 +158,7 @@ Important:
 
 | Portal API | Method | Frontend purpose | Portal backend behavior |
 |---|---|---|---|
-| `/subject/access-consents` | `POST` | create an access consent / pre-authorization | today sends `Consent/_batch` to GW |
+| `/subject/access-consents` | `POST` | create an access consent / pre-authorization | sends a typed Consent Bundle attached to `Communication`; direct `Consent/_batch` is lower-level compatibility plumbing |
 | `/subject/access-consents` | `GET` | list consents with associated evidence | reconstructs a portal-side aggregate from storage/audit |
 | `/subject/access-consents/{consentId}` | `GET` | get one consent detail with original evidence | returns the consent aggregate plus evidence/references |
 
@@ -165,8 +184,8 @@ One `RelatedPerson`:
 
 | Portal API | Method | Frontend purpose | Portal backend behavior |
 |---|---|---|---|
-| `/subject/related-persons` | `POST` | create or update guardians, caregivers, or emergency contacts | today sends `RelatedPerson/_batch` to GW |
-| `/subject/related-persons` | `GET` | list related persons | returns a portal-materialized view |
+| `/subject/related-persons` | `POST` | create or update guardians, caregivers, or emergency contacts | sends a typed RelatedPerson Bundle attached to `Communication`; direct `RelatedPerson/_batch` is compatibility plumbing |
+| `/subject/related-persons` | `GET` | list related persons | refreshes the aggregate through the actor-scoped `RelatedPerson/_search` read and returns the portal-safe view |
 | `/subject/related-persons/{relatedPersonId}` | `GET` | get one related-person detail | returns the known detail |
 
 ## Subject Members
@@ -206,9 +225,10 @@ They are not for:
 
 ## Communications
 
-`Communication` exists in the system, but it should not become the first mental
-API for frontend developers except when a channel/history view is explicitly
-needed.
+`Communication` is the public GW transport boundary for subject-index work,
+but it should not become the product/domain API exposed to frontend developers.
+The frontend calls meaningful BFF routes such as `/subject/ips`; the BFF uses
+actor facades, and those facades author and submit the Communication.
 
 Use it as a backend concept when you need:
 
@@ -240,6 +260,8 @@ Use it as a backend concept when you need:
   - `_dcr`
   - SMART token
   - part of the `Communication` transport complexity
+  - direct `Subject/$summary`, `Subject/_search`, `Bundle/_search` and
+    `Composition` route construction
 - Treat these as product-facing backend facades even if a confidential or
   frontend runtime could call GW directly:
   - legal organization `verification-transaction`

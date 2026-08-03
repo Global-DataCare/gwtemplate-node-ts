@@ -36,6 +36,12 @@ Explicit endpoint classification used by profile generation.
 
 - All `/identity/openid/*` compatibility aliases not listed as core canonical.
 - `/auth/token`
+- Direct `individual/.../Subject/$summary` and `Patient/$summary` HTTP routes.
+  The canonical application flow is an actor-facade request transported by
+  `Communication/_batch`; GW resolves `$summary` internally.
+- Direct individual `Bundle/_search` and `Composition` routes when present in
+  the full/reference specification. They remain specialized or migration
+  surfaces rather than the primary subject-index contract.
 
 ## Extension
 
