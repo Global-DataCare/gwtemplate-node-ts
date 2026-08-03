@@ -339,6 +339,9 @@ describe('OpenIdAuthManager', () => {
         {
           ...testConsentRulePermitOrgDid,
           'Consent.actor-identifier': 'did:web:api.acme.org:employee:zDoctorEmailHash:ISCO-08|2211',
+          // Persistence expands the compact ISCO alias. The verified VP/DID
+          // may still carry the equivalent portable role token.
+          [ClaimConsent.actorRole]: 'org.ilo.isco-08|2211',
           'Consent.action': 'loinc|48765-2',
         },
       ] as any),
