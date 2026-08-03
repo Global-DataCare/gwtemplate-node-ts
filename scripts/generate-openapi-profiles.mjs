@@ -21,6 +21,8 @@ function classifyPath(p) {
 
   // Compatibility aliases and legacy-only routes.
   if (
+    p.includes('/individual/org.hl7.fhir.api/Subject/$summary') ||
+    p.includes('/individual/org.hl7.fhir.api/Patient/$summary') ||
     p.includes('/identity/openid/') ||
     p.includes('/auth/token')
   ) return 'compat';

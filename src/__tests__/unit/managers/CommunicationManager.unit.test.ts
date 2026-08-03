@@ -1620,6 +1620,10 @@ describe('CommunicationManager Unit Tests', () => {
     });
 
     it('executes Subject/$summary referenced in Communication.contentReference as a summary operation', async () => {
+      // Teaching goal:
+      // Prove the public-to-internal boundary: the caller submits one
+      // Communication job, and only CommunicationManager delegates its
+      // contentReference to the internal summary processor.
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
       mockCompositionManager.process.mockImplementation(async () => ({
@@ -1691,6 +1695,8 @@ describe('CommunicationManager Unit Tests', () => {
       };
 
       const response = await communicationManager.process(job);
+      // The test calls CommunicationManager only. A portal/BFF must never copy
+      // the forwarded job below into a direct Subject/$summary HTTP request.
       const data = (response.body as any)?.data;
       expect(Array.isArray(data)).toBe(true);
       expect(data[0]?.type).toBe('Bundle-summary-response-v1.0');

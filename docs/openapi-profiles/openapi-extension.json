@@ -5249,11 +5249,12 @@
     },
     "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary": {
       "post": {
+        "x-contract-level": "internal-compatibility",
         "tags": [
           "8.1 Subject Profile"
         ],
-        "summary": "Build the latest subject summary document",
-        "description": "Returns the latest consolidated summary document for a subject in supported\none-health sectors.\n\nCurrent enablement:\n- sectors starting with `health-`\n- sectors starting with `animal-`\n- sectors starting with `onehealth-`\n\nContract notes:\n- requests travel in the project DIDComm/FAPI envelope and batch conventions\n- `resource.meta.claims` remains the canonical non-standard claims carrier for\n  FHIR-like resources in those envelopes\n- `Subject/$summary` is the canonical route.\n- `Patient/$summary` is a compatibility alias with the same behavior.\n- request body should be a FHIR `Parameters` resource\n- minimum required parameter is `subject`\n- optional parameters include `document-type`, `section`, and `exclude-section`\n\nSee also:\n- `gdc-common-utils-ts/docs/101-COMMUNICATION_LAYERING.md`\n- `gdc-sdk-core-ts/docs/101-IPS_COMMUNICATION_OUTBOX.md`\n",
+        "summary": "Internal compatibility operation for subject summary resolution",
+        "description": "This HTTP route is an internal operation reference and lower-level\ncompatibility surface. Application and BFF code must use the actor-facade\n`requestClinicalSummary(...)` method. That method submits an auditable\n`Communication` through `Communication/_batch`; GW then resolves\n`Subject/$summary` internally and returns the Parameters/Bundle result through\nthe same Communication lifecycle.\n\nCurrent enablement:\n- sectors starting with `health-`\n- sectors starting with `animal-`\n- sectors starting with `onehealth-`\n\nContract notes:\n- requests travel in the project DIDComm/FAPI envelope and batch conventions\n- `resource.meta.claims` remains the canonical non-standard claims carrier for\n  FHIR-like resources in those envelopes\n- `Subject/$summary` is the canonical internal operation name, not the public\n  application transport boundary.\n- `Patient/$summary` is a compatibility alias with the same behavior.\n- request body should be a FHIR `Parameters` resource\n- minimum required parameter is `subject`\n- optional parameters include `document-type`, `section`, and `exclude-section`\n\nSee also:\n- `gdc-common-utils-ts/docs/101-COMMUNICATION_LAYERING.md`\n- `gdc-sdk-core-ts/docs/101-IPS_COMMUNICATION_OUTBOX.md`\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -5301,11 +5302,12 @@
             "description": "Accepted. Poll the Location URL for the result."
           }
         },
-        "x-profile": "core"
+        "x-profile": "compat"
       }
     },
     "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Patient/$summary": {
       "post": {
+        "x-contract-level": "internal-compatibility",
         "tags": [
           "8.1 Subject Profile"
         ],
@@ -5358,7 +5360,7 @@
             "description": "Accepted. Poll the Location URL for the result."
           }
         },
-        "x-profile": "core"
+        "x-profile": "compat"
       }
     },
     "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch": {

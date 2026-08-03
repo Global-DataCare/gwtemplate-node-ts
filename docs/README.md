@@ -40,6 +40,7 @@ docs/
   is the canonical cross-repository note for legal-organization controller recovery,
   professional device replacement, and individual-controller recovery.
 - **Portal API to GW CORE**: [PORTAL_API_TO_GW_CORE.md](PORTAL_API_TO_GW_CORE.md) is the canonical functional reference for portal/BFF endpoint design over GW CORE, including the separation between `employees`, `related persons`, `members`, and `consents`.
+- **Visual GW CORE contract map**: [01.I-GW-CORE-CONTRACT-MAP.md](01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md) shows the actor-facade and Communication public boundary, internal subject-index dispatch and compatibility routes; the compact map is also rendered above `/api-docs`.
 - **Communication layering source of truth**:
   - [101-COMMUNICATION_LAYERING.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
 - **BFF/channel front-story source of truth**:

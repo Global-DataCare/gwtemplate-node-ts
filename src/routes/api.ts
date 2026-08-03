@@ -1960,12 +1960,17 @@ export function createApiRouter(
   *
   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary:
   *   post:
+  *     x-contract-level: internal-compatibility
   *     tags:
   *       - 8.1 Subject Profile
-  *     summary: Build the latest subject summary document
+  *     summary: Internal compatibility operation for subject summary resolution
   *     description: |
-  *       Returns the latest consolidated summary document for a subject in supported
-  *       one-health sectors.
+  *       This HTTP route is an internal operation reference and lower-level
+  *       compatibility surface. Application and BFF code must use the actor-facade
+  *       `requestClinicalSummary(...)` method. That method submits an auditable
+  *       `Communication` through `Communication/_batch`; GW then resolves
+  *       `Subject/$summary` internally and returns the Parameters/Bundle result through
+  *       the same Communication lifecycle.
   *
   *       Current enablement:
   *       - sectors starting with `health-`
@@ -1976,7 +1981,8 @@ export function createApiRouter(
   *       - requests travel in the project DIDComm/FAPI envelope and batch conventions
   *       - `resource.meta.claims` remains the canonical non-standard claims carrier for
   *         FHIR-like resources in those envelopes
-  *       - `Subject/$summary` is the canonical route.
+  *       - `Subject/$summary` is the canonical internal operation name, not the public
+  *         application transport boundary.
   *       - `Patient/$summary` is a compatibility alias with the same behavior.
   *       - request body should be a FHIR `Parameters` resource
   *       - minimum required parameter is `subject`
@@ -2007,6 +2013,7 @@ export function createApiRouter(
   *
   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Patient/$summary:
   *   post:
+  *     x-contract-level: internal-compatibility
   *     tags:
   *       - 8.1 Subject Profile
   *     summary: Compatibility alias for Subject summary

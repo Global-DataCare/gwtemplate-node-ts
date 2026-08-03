@@ -40,6 +40,18 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Patient/$summary']).toBeDefined();
+    expect(
+      spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary']
+        ?.post?.description,
+    ).toContain('internal operation reference');
+    expect(
+      spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary']
+        ?.post?.description,
+    ).toContain('requestClinicalSummary');
+    expect(
+      spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary']
+        ?.post?.['x-contract-level'],
+    ).toBe('internal-compatibility');
     expect(spec.paths['/host/ping']).toBeDefined();
     expect(spec.paths['/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/ping']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/ping']).toBeDefined();

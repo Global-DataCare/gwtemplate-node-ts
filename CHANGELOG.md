@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [1.20.25] - 2026-08-03
+
+### Documentation
+
+- Add a visual GW CORE contract map to `/api-docs` and the canonical reading
+  order, separating actor-facade and `Communication/_batch` public boundaries
+  from internal `$summary` resolution and direct compatibility routes.
+- Extend that runtime map with DCR/SMART identity bootstrap and a numbered,
+  responsive submit/202/poll/exact-readback lifecycle so the Swagger catalogue
+  explains how GW behaves rather than presenting only a flat route list.
+- Correct the portal/BFF endpoint matrix, manager JSDoc and OpenAPI descriptions
+  so subject-index mutations and summary reads travel through Communication,
+  while administrative Organization/License reads remain distinct.
+
 ## [1.20.24] - 2026-08-02
 
 ### Fixed
