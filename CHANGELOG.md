@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [1.20.26] - 2026-08-03
+
+### Fixed
+
+- Match persisted canonical ISCO consent roles such as
+  `org.ilo.isco-08|2211` with the equivalent compact role carried by a
+  verified professional DID or VP (`ISCO-08|2211`). Role comparison remains
+  exact after normalization; unrelated occupation codes are still denied.
+
 ## [1.20.25] - 2026-08-03
 
 ### Documentation
