@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+### Fixed
+
+- Allow an authenticated product BFF to recover every individual Organization
+  indexed to an exact owner email/telephone without supplying a browser-known
+  nickname. Return a deduplicated searchset so card directories work across
+  browsers while wallet/device keys remain device-scoped.
+- Start the Consent CCAAS binary directly instead of through npm so the
+  non-root runtime does not depend on a writable npm home during release smoke.
+
 ## [1.20.26] - 2026-08-03
 
 ### Fixed

@@ -861,6 +861,11 @@ export class FamilyManager {
     };
   }
 
+  /**
+   * Resolves one idempotency record by owner+nickname or the complete owner
+   * directory when only indexed contact claims are sent. The directory is the
+   * browser-independent card recovery contract used by product BFFs.
+   */
   private async processFamilySearchEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
     const rawClaims = entry?.meta?.claims;
     const claims: ClaimsRecord | undefined = rawClaims ? (normalizeContextualizedClaims(rawClaims) as ClaimsRecord) : rawClaims;
@@ -881,9 +886,17 @@ export class FamilyManager {
     const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
     const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
     const nickname = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
+    if (!nickname && (ownerPhones.length > 0 || ownerEmails.length > 0)) {
+      return this.buildOwnedFamilyDirectoryResult(
+        tenantVaultId,
+        tenantCollectionName,
+        ownerPhones,
+        ownerEmails,
+      );
+    }
     if ((ownerPhones.length === 0 && ownerEmails.length === 0) || !nickname) {
       throw new ManagerError(
-        `Missing required claims for search: '${ClaimsOrganizationSchemaorg.alternateName}' and one of owner.telephone/owner.email`,
+        `Missing required claims for search: an owner email/telephone directory query, or '${ClaimsOrganizationSchemaorg.alternateName}' plus owner contact`,
         IssueType.Required,
       );
     }
@@ -1245,6 +1258,80 @@ export class FamilyManager {
       }
     }
     return undefined;
+  }
+
+  /**
+   * Returns every individual Organization indexed to an exact owner contact.
+   *
+   * This is the server-side card directory used after the application has
+   * verified the email/telephone. It never scans all individuals and it does
+   * not return wallet/device material. Results are deduplicated because one
+   * Organization may carry both verified contact claims.
+   */
+  private async findFamilyRegistrationDocsByOwner(
+    tenantCollectionName: string,
+    ownerPhones: string[],
+    ownerEmails: string[],
+  ): Promise<ConfidentialStorageDoc[]> {
+    const found = new Map<string, ConfidentialStorageDoc>();
+    for (const [name, values] of [
+      ['org.schema.Organization.owner.telephone', ownerPhones],
+      ['org.schema.Organization.owner.email', ownerEmails],
+    ] as const) {
+      for (const value of values) {
+        const results = await this.vaultRepository.query(tenantCollectionName, {
+          sectionId: INDIVIDUAL_SECTION,
+          where: [{ name, value }],
+        });
+        for (const result of results) found.set(result.id, result as ConfidentialStorageDoc);
+      }
+    }
+    return [...found.values()];
+  }
+
+  /** Builds the browser/BFF-safe searchset for an owner-directory lookup. */
+  private async buildOwnedFamilyDirectoryResult(
+    tenantVaultId: string,
+    tenantCollectionName: string,
+    ownerPhones: string[],
+    ownerEmails: string[],
+  ): Promise<BundleEntry> {
+    const documents = await this.findFamilyRegistrationDocsByOwner(
+      tenantCollectionName,
+      ownerPhones,
+      ownerEmails,
+    );
+    const entries = [];
+    for (const document of documents) {
+      const content = await this.kmsService.unprotectConfidentialData<FamilyRegistrationContent>(document, tenantVaultId);
+      const claims = content?.claims || {};
+      const storedPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
+      const storedEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
+      const matchesVerifiedContact = storedPhones.some(value => ownerPhones.includes(value))
+        || storedEmails.some(value => ownerEmails.includes(value));
+      if (!matchesVerifiedContact) continue;
+      entries.push({
+        fullUrl: `Organization/${document.id}`,
+        resource: {
+          resourceType: 'Organization',
+          id: document.id,
+          meta: {
+            claims: {
+              ...claims,
+              'org.schema.FamilyRegistration.status': content?.status === EntityLifecycleStatus.Active
+                ? 'already_exists'
+                : 'resume_required',
+            },
+          },
+        },
+      });
+    }
+    return {
+      type: 'Family-owner-directory-result-v1.0',
+      meta: { claims: { 'org.schema.FamilyRegistration.resultCount': String(entries.length) } },
+      resource: { resourceType: 'Bundle', type: 'searchset', entry: entries } as any,
+      response: { status: '200' },
+    };
   }
 
   private async handleServiceAttachment(service?: IncludedResource): Promise<IncludedResource | undefined> {

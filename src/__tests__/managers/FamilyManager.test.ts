@@ -872,6 +872,50 @@ describe('FamilyManager', () => {
   // -------------------------------------------------------------------------
 
   describe('_search / processFamilySearchEntry', () => {
+    it('returns every card owned by an exact indexed email when nickname is omitted', async () => {
+      const ownerEmail = 'controller@example.org';
+      mockVaultRepository.query.mockResolvedValue([
+        { id: 'own-org', jwe: { ciphertext: '' } } as any,
+        { id: 'represented-org', jwe: { ciphertext: '' } } as any,
+      ]);
+      mockKmsService.unprotectConfidentialData
+        .mockResolvedValueOnce(buildExampleFamilyRegistrationContent({
+          status: EntityLifecycleStatus.Active,
+          claims: {
+            [ClaimsOrganizationSchemaorg.ownerEmail]: ownerEmail,
+            [ClaimsOrganizationSchemaorg.alternateName]: 'My card',
+            [ClaimsOrganizationSchemaorg.sameAs]: 'did:web:unid.online:card:uhc:personal:own',
+            'org.schema.Organization.member.role': 'ONESELF',
+          },
+        }) as any)
+        .mockResolvedValueOnce(buildExampleFamilyRegistrationContent({
+          status: EntityLifecycleStatus.Active,
+          claims: {
+            [ClaimsOrganizationSchemaorg.ownerEmail]: ownerEmail,
+            [ClaimsOrganizationSchemaorg.alternateName]: 'Relative',
+            [ClaimsOrganizationSchemaorg.sameAs]: 'did:web:unid.online:card:uhc:personal:relative',
+            'org.schema.Organization.member.role': 'RESPRSN',
+          },
+        }) as any);
+
+      const response = await manager.process(makeSearchJob({
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+        [ClaimsOrganizationSchemaorg.ownerEmail]: ownerEmail,
+        [ClaimsOrganizationSchemaorg.alternateName]: '',
+      }));
+      const result = ((response.body as BundleJsonApi).data[0] as BundleEntry).resource as any;
+
+      expect(mockVaultRepository.query).toHaveBeenCalledWith(COLLECTION_NAME, {
+        sectionId: getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
+        where: [{ name: ClaimsOrganizationSchemaorg.ownerEmail, value: ownerEmail }],
+      });
+      expect(result).toMatchObject({ resourceType: 'Bundle', type: 'searchset' });
+      expect(result.entry.map((item: any) => item.resource.id)).toEqual(['own-org', 'represented-org']);
+      expect(result.entry[0].resource.meta.claims).toMatchObject({
+        [ClaimsOrganizationSchemaorg.sameAs]: 'did:web:unid.online:card:uhc:personal:own',
+      });
+    });
+
     it('not_found: returns not_found when no doc matches owner + alternateName', async () => {
       mockVaultRepository.query.mockResolvedValue([]);
 

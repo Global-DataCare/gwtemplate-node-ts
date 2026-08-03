@@ -6,12 +6,23 @@ set -euo pipefail
 : ${CORE_PEER_TLS_ENABLED:="false"}
 : ${DEBUG:="false"}
 
+chaincode_node="./node_modules/.bin/fabric-chaincode-node"
+
 if [ "${DEBUG,,}" = "true" ]; then
-  npm run start:server-debug
-elif [[ ! -v CHAINCODE_SERVER_ADDRESS ]]; then
-  npm start -- --peer.address $CORE_PEER_ADDRESS
+  export NODE_OPTIONS="--inspect=0.0.0.0:9229"
+fi
+
+if [[ ! -v CHAINCODE_SERVER_ADDRESS ]]; then
+  exec "${chaincode_node}" start --peer.address "${CORE_PEER_ADDRESS}"
 elif [ "${CORE_PEER_TLS_ENABLED,,}" = "true" ]; then
-  npm run start:server
+  exec "${chaincode_node}" server \
+    --chaincode-address="${CHAINCODE_SERVER_ADDRESS}" \
+    --chaincode-id="${CHAINCODE_ID}" \
+    --chaincode-tls-key-file=/hyperledger/privatekey.pem \
+    --chaincode-tls-client-cacert-file=/hyperledger/rootcert.pem \
+    --chaincode-tls-cert-file=/hyperledger/cert.pem
 else
-  npm run start:server-nontls
+  exec "${chaincode_node}" server \
+    --chaincode-address="${CHAINCODE_SERVER_ADDRESS}" \
+    --chaincode-id="${CHAINCODE_ID}"
 fi

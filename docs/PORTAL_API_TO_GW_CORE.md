@@ -93,7 +93,7 @@ calls.
 | `/subject/onboarding-fill` | `POST` | send PDF template + fields and receive the populated PDF | calls the onboarding PDF `DocumentReference/_create` flow |
 | `/subject/onboarding-fill/{requestId}` | `GET` | retrieve the populated PDF or latest result | reads the resulting `DocumentReference` or portal cache |
 | `/subject` | `POST` | register the individual organization and start onboarding | sends the individual start flow to GW |
-| `/subject` | `GET` | list subjects managed by the portal | uses a local/materialized subject model |
+| `/subject` | `GET` | list every subject owned by the authenticated account across browsers | queries GW by exact verified `Organization.owner.email`/`owner.telephone`, then merges delegated license/binding candidates; browser storage may choose a returned card but is never the directory |
 | `/subject/{subjectId}` | `GET` | get one subject detail | returns portal-known subject detail |
 | `/subject/license-offers` | `POST` | request an offer to buy/add licenses for the individual/family context | today the portal must orchestrate this as its own capability; GW does not yet expose one converged public route for this |
 | `/subject/license-offers` | `GET` | list personal license offers known by the portal | uses commercial/materialized history |
