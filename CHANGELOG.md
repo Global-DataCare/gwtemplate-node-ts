@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [1.20.27] - 2026-08-04
+
+### Security
+
+- Treat malformed and boundary-ended Consent periods as inactive, reject new
+  SMART issuance after expiry, and cap every issued token `exp` at the earliest
+  applicable `Consent.period-end`.
+
 ### Fixed
 
 - Allow an authenticated product BFF to recover every individual Organization

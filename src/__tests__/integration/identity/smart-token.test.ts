@@ -113,6 +113,7 @@ describe('SMART token issuance (integration)', () => {
       // Create the individual's physical vault and rules
       const subject = EXAMPLE_PORTAL_INDIVIDUAL_DID;
       const actorDid = EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID;
+      const consentPeriodEnd = new Date(Date.now() + 30_000).toISOString();
       const individualRulesSectionId = getIndividualSectionId(subject, 'rules');
       await vaultRepository.put(tenantVaultId, [{
         id: 'individual-self-read-integration',
@@ -123,6 +124,7 @@ describe('SMART token issuance (integration)', () => {
         [ClaimConsent.actorIdentifier]: subject,
         [ClaimConsent.action]: `${ServiceCapability.IndexReader}?section=*`,
         [ClaimConsent.purpose]: HealthcareConsentPurposes.Treatment,
+        [ClaimConsent.periodEnd]: consentPeriodEnd,
       } as any], individualRulesSectionId);
 
       // Exercise the real HTTP/queue/manager path with the production shared
@@ -179,6 +181,10 @@ describe('SMART token issuance (integration)', () => {
 
       expect(finalPayload?.access_token).toBeDefined();
       expect(finalPayload?.subject).toBe(subject);
+      expect(finalPayload?.expires_in).toBeGreaterThan(0);
+      expect(finalPayload?.expires_in).toBeLessThanOrEqual(30);
+      const tokenPayload = JSON.parse(Buffer.from(finalPayload.access_token.split('.')[1], 'base64url').toString('utf8'));
+      expect(tokenPayload.exp).toBeLessThanOrEqual(Math.floor(Date.parse(consentPeriodEnd) / 1000));
     } finally {
       queueAdapter.stop();
       delete process.env.SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS;
