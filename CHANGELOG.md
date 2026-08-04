@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.20.27] - 2026-08-04
+
 ### Security
 
 - Treat malformed and boundary-ended Consent periods as inactive, reject new
