@@ -225,13 +225,14 @@ export class OpenIdAuthManager implements IJobProcessor {
     if (memberCredential || professionalCredential) {
       this.addPortableMemberRuleAliases(rules, actor, actorSubjectAliases);
     }
+    const activeRules = (rules || []).filter((rule) => this.isRuleTimeActive(rule));
     let grantedScope = scope;
     const requestedScopeTokens = scope.split(/\s+/).map((value) => value.trim()).filter(Boolean);
     const compositionReadOnlyRequest = requestedScopeTokens.length > 0
       && requestedScopeTokens.every((value) =>
         /^organization\/Composition\.(?:r|rs)\?/i.test(value));
     const sharedProjection = compositionReadOnlyRequest
-      ? deriveGrantedSmartScopes(rules as ConsentRule[], {
+      ? deriveGrantedSmartScopes(activeRules as ConsentRule[], {
           requestedScopes: requestedScopeTokens,
           actor: {
             actorKind: actor.memberKind === 'individual' ? 'related-person' : 'professional',
@@ -247,14 +248,22 @@ export class OpenIdAuthManager implements IJobProcessor {
           purpose,
         })
       : undefined;
+    const sharedApplicableRules = sharedProjection
+      ? sharedProjection.evaluations.flatMap((consentEvaluation) => consentEvaluation.allowed
+          ? consentEvaluation.winningRules
+            .filter((match) => match.decision === 'permit')
+            .map((match) => match.rule)
+          : [])
+      : [];
     const evaluation = sharedProjection
       ? {
           allowed: sharedProjection.grantedScopes.length > 0,
           missingSections: sharedProjection.deniedSections,
           missingResourceTypes: [] as string[],
+          applicableRules: sharedApplicableRules,
         }
       : this.evaluateRequestedConsent({
-          rules,
+          rules: activeRules,
           subject,
           actor,
           purpose,
@@ -280,7 +289,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       grantedScope = sharedProjection.grantedScopes.join(' ');
     }
 
-    const lifetimeSeconds = Math.max(1, Math.min(3600, body.expires_in || 300));
+    const requestedLifetimeSeconds = Math.max(1, Math.min(3600, body.expires_in || 300));
     const tokenType = body.token_type || 'Bearer';
 
     const issuerVaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector, job.tenantId);
@@ -301,6 +310,14 @@ export class OpenIdAuthManager implements IJobProcessor {
     }
 
     const now = Math.floor(Date.now() / 1000);
+    const consentPeriodEnd = this.resolveEarliestPeriodEnd(evaluation.applicableRules);
+    const tokenExpiration = consentPeriodEnd === undefined
+      ? now + requestedLifetimeSeconds
+      : Math.min(now + requestedLifetimeSeconds, Math.floor(consentPeriodEnd / 1000));
+    if (tokenExpiration <= now) {
+      throw new ManagerError('The matching consent rule expired before the access token could be issued.', IssueType.Forbidden);
+    }
+    const lifetimeSeconds = tokenExpiration - now;
     const signingAlg = (signingKey as { alg?: string }).alg || 'ML-DSA-44';
     const jwtHeader = { alg: signingAlg, typ: 'JWT', kid: signingKey.kid };
     const jwtPayload = {
@@ -310,7 +327,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       scope: grantedScope,
       iat: now,
       nbf: now,
-      exp: now + lifetimeSeconds,
+      exp: tokenExpiration,
       acr: accessProof.acr,
       amr: accessProof.amr,
       vp_hash: accessProof.vpHash,
@@ -333,7 +350,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       thid,
       iss: issuerDid,
       aud: job.content?.iss as string,
-      exp: now + lifetimeSeconds,
+      exp: tokenExpiration,
       type: 'application/json',
       body: {
         access_token: accessToken,
@@ -800,9 +817,11 @@ export class OpenIdAuthManager implements IJobProcessor {
     allowed: boolean;
     missingSections: string[];
     missingResourceTypes: string[];
+    applicableRules: any[];
   } {
     const missingSections: string[] = [];
     const missingResourceTypes: string[] = [];
+    const applicableRules: any[] = [];
     const normalizedActorRole = input.actor.role?.trim()
       ? normalizeConsentActorRole(input.actor.role.trim(), input.actor.memberKind === 'individual' ? 'family' : 'professional')
       : undefined;
@@ -847,6 +866,8 @@ export class OpenIdAuthManager implements IJobProcessor {
         } else {
           missingResourceTypes.push(requestedPermission.resourceType);
         }
+      } else {
+        applicableRules.push(winner.rule);
       }
     }
 
@@ -854,15 +875,25 @@ export class OpenIdAuthManager implements IJobProcessor {
       allowed: missingSections.length === 0 && missingResourceTypes.length === 0,
       missingSections: Array.from(new Set(missingSections)),
       missingResourceTypes: Array.from(new Set(missingResourceTypes)),
+      applicableRules,
     };
+  }
+
+  private resolveEarliestPeriodEnd(rules: any[]): number | undefined {
+    const periodEnds = rules
+      .map((rule) => String(getClaimValue<string>(rule, 'Consent.period-end') || '').trim())
+      .filter(Boolean)
+      .map((value) => Date.parse(value))
+      .filter((value) => !Number.isNaN(value));
+    return periodEnds.length > 0 ? Math.min(...periodEnds) : undefined;
   }
 
   private isRuleTimeActive(rule: any): boolean {
     const now = Date.now();
     const start = String(getClaimValue<string>(rule, 'Consent.period-start') || '').trim();
     const end = String(getClaimValue<string>(rule, 'Consent.period-end') || '').trim();
-    if (start && !Number.isNaN(Date.parse(start)) && Date.parse(start) > now) return false;
-    if (end && !Number.isNaN(Date.parse(end)) && Date.parse(end) < now) return false;
+    if (start && (Number.isNaN(Date.parse(start)) || Date.parse(start) > now)) return false;
+    if (end && (Number.isNaN(Date.parse(end)) || Date.parse(end) <= now)) return false;
     return true;
   }
 

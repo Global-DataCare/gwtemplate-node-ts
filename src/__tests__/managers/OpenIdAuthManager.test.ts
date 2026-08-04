@@ -126,6 +126,19 @@ function buildAliasedIndividualSelfReadJob(vpToken: string): JobRequest {
 }
 
 describe('OpenIdAuthManager', () => {
+  it('fails closed when a consent expiry is malformed or has reached its boundary', () => {
+    const now = Date.parse('2026-08-31T18:30:00Z');
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      const isRuleTimeActive = (OpenIdAuthManager.prototype as any).isRuleTimeActive;
+      expect(isRuleTimeActive.call({}, { [ClaimConsent.periodEnd]: 'not-a-date' })).toBe(false);
+      expect(isRuleTimeActive.call({}, { [ClaimConsent.periodEnd]: '2026-08-31T18:30:00Z' })).toBe(false);
+      expect(isRuleTimeActive.call({}, { [ClaimConsent.periodEnd]: '2026-08-31T18:30:01Z' })).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it('issues only consented sections to an accepted individual member VP', async () => {
     const subjectDid = 'did:web:api.acme.org:individual:patricia';
     const actorId = 'firebase-member-001';
@@ -187,6 +200,7 @@ describe('OpenIdAuthManager', () => {
   });
 
   it('should issue a signed access_token for a tenant (org did rule)', async () => {
+    const consentPeriodEnd = new Date(Date.now() + 120_000).toISOString();
     const mockKmsService: jest.Mocked<IKmsService> = {
       init: jest.fn(),
       provisionKeys: jest.fn(),
@@ -225,7 +239,7 @@ describe('OpenIdAuthManager', () => {
       getContainersListInSection: jest.fn(),
       listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([
-        { ...testConsentRulePermitOrgDid },
+        { ...testConsentRulePermitOrgDid, [ClaimConsent.periodEnd]: consentPeriodEnd },
       ] as any),
       put: jest.fn(),
       get: jest.fn(),
@@ -287,6 +301,11 @@ describe('OpenIdAuthManager', () => {
     }));
     expect(response.body.scope).not.toContain('section=*');
     expect(response.body.ledger_verified).toBe(true);
+    expect(response.body.expires_in).toBeGreaterThan(0);
+    expect(response.body.expires_in).toBeLessThanOrEqual(120);
+    const accessTokenPayload = JSON.parse(Buffer.from(response.body.access_token.split('.')[1], 'base64url').toString('utf8'));
+    expect(accessTokenPayload.exp).toBe(response.exp);
+    expect(accessTokenPayload.exp).toBeLessThanOrEqual(Math.floor(Date.parse(consentPeriodEnd) / 1000));
     expect(mockKmsService.signWithManagedKey).toHaveBeenCalled();
     expect(mockClearingHouse.verifyVpToken).toHaveBeenCalled();
   });
