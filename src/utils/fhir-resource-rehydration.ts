@@ -3,6 +3,7 @@ import { getClaimValue, normalizeContextualizedClaims } from './claims';
 import { normalizeReference, tokenToCoding } from './fhir-data-utils';
 import { determineResourceId } from './resource';
 import { GatewayLocalFhirResourceTypes, ResourceTypesFhirR4 } from '../shared/fhir-constants';
+import { convertClaimsToFhirResource } from 'gdc-common-utils-ts/utils/bundle-document-builder';
 
 const PATIENT_REFERENCE_RESOURCE_TYPES = new Set<string>([
   ResourceTypesFhirR4.AllergyIntolerance,
@@ -69,10 +70,13 @@ export function buildFhirResourceFromIndexedClaims(
   const language = normalizeReference(getClaimValue<string>(claims, `${resourceType}.language`));
   const userSelected = normalizeReference(getClaimValue<string>(claims, `${resourceType}.user-selected`));
 
+  const projected = convertClaimsToFhirResource(claims) as Record<string, any>;
   const resource: Record<string, any> = {
+    ...projected,
     resourceType,
     id: String(record?.id || determineResourceId(identifier || randomUUID(), process.env.NODE_ENV)),
     meta: {
+      ...(projected?.meta && typeof projected.meta === 'object' ? projected.meta : {}),
       claims,
     },
   };

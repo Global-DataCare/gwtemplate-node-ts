@@ -111,12 +111,13 @@ export async function buildConsolidatedIpsBundleDocument(
           if (!belongsToSection(resourceRecord, sectionToken, allowImplicitSectionMembership)) continue;
           const resource = buildFhirResourceFromIndexedClaims(projectionConfig.resourceType, resourceRecord);
           const entryKey = resolveBundleEntryKey(undefined, resource);
-          if (!bundleEntries.has(entryKey)) {
-            bundleEntries.set(entryKey, {
-              fullUrl: resolveBundleEntryFullUrl(undefined, { resource }),
-              resource,
-            });
-          }
+          // One identifier is one logical clinical resource. Repeated vault
+          // rows are historical storage versions; the latest listed row is
+          // the current summary representation.
+          bundleEntries.set(entryKey, {
+            fullUrl: resolveBundleEntryFullUrl(undefined, { resource }),
+            resource,
+          });
           addSectionReference(sectionRefs, sectionToken, entryKey);
         }
       }

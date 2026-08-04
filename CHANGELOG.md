@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+### Fixed
+
+- Collapse historical versions sharing one business identifier in `$summary`
+  and rehydrate canonical
+  claims into native FHIR fields such as Immunization occurrence/lot data.
+
 ## [1.20.27] - 2026-08-04
 
 ### Security

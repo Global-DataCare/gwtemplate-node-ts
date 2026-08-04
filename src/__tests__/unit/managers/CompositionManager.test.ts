@@ -301,6 +301,69 @@ describe('CompositionManager', () => {
     expect(data[0].resource.entry.some((entry: any) => entry.resource?.resourceType === 'MedicationStatement')).toBe(true);
   });
 
+  it('returns one current native Immunization per business identifier in $summary', async () => {
+    const subjectDid = 'did:web:api.acme.org:individual:immunization-summary-001';
+    mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.composition)) {
+        return [{
+          id: 'composition-immunization-summary-001',
+          'Composition.identifier': 'urn:uuid:composition-immunization-summary-001',
+          'Composition.subject': subjectDid,
+          'Composition.section': HealthcareBasicSections.Immunizations.attributeValue,
+          'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+        }] as any;
+      }
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.immunizations)) {
+        return [
+          {
+            id: 'old-storage-version',
+            'Immunization.identifier': 'urn:uuid:covid-dose-2',
+            'Immunization.subject': subjectDid,
+            'Immunization.status': 'completed',
+            'Immunization.date': '2026-01-01T10:00:00Z',
+            'Immunization.vaccine-code': 'http://hl7.org/fhir/sid/cvx|208',
+            'Immunization.lot-number': 'OLD-LOT',
+          },
+          {
+            id: 'current-storage-version',
+            'Immunization.identifier': 'urn:uuid:covid-dose-2',
+            'Immunization.subject': subjectDid,
+            'Immunization.status': 'completed',
+            'Immunization.date': '2026-01-01T10:00:00Z',
+            'Immunization.vaccine-code': 'http://hl7.org/fhir/sid/cvx|208',
+            'Immunization.lot-number': 'CURRENT-LOT',
+          },
+        ] as any;
+      }
+      return [] as any;
+    });
+
+    const response = await manager.process(createJob({
+      sector: 'health-care',
+      section: 'individual',
+      format: 'org.hl7.fhir.r4',
+      resourceType: 'Subject',
+      action: '$summary',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [{ name: 'subject', valueString: subjectDid }],
+        },
+      } as any,
+    }));
+
+    const bundle = (response.body as any).data[0].resource;
+    const immunizations = bundle.entry.filter((entry: any) => entry.resource?.resourceType === 'Immunization');
+    expect(immunizations).toHaveLength(1);
+    expect(immunizations[0].resource).toMatchObject({
+      identifier: [{ value: 'urn:uuid:covid-dose-2' }],
+      status: 'completed',
+      occurrenceDateTime: '2026-01-01T10:00:00Z',
+      lotNumber: 'CURRENT-LOT',
+    });
+  });
+
   it('supports digitaltwin ResearchSubject/$summary with org.hl7.fhir.api claims-first materialization', async () => {
     const subjectDid = 'did:web:api.acme.org:research-subject:twin-summary-api-001';
     mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
