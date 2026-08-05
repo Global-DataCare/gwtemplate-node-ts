@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [1.20.29] - 2026-08-05
+
+### Fixed
+
+- Consume Common Utils 2.3.28 so every generated/indexed clinical claim uses
+  the stable `<ResourceType>.<concrete-param>` FHIR API vocabulary without
+  camelCase or version-specific claim namespaces.
+
 ## [1.20.28] - 2026-08-05
 
 ### Fixed
