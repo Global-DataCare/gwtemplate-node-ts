@@ -856,8 +856,8 @@ describe('MedicationStatement API (integration)', () => {
       expect(digitalTwinRecords).toHaveLength(1);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.medication-text']).toBe('Paracetamol 500mg cada 8 horas');
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
-      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.CodeDisplay']).toBe('Paracetamol 500 MG Oral Tablet');
-      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.CodeTextLocal']).toBe('Paracetamol 500mg cada 8 horas');
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code-display']).toBe('Paracetamol 500 MG Oral Tablet');
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code-text']).toBe('Paracetamol 500mg cada 8 horas');
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.language']).toBe('es');
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.user-selected']).toBe('true');
 
@@ -916,7 +916,7 @@ describe('MedicationStatement API (integration)', () => {
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.api',
-                    'MedicationStatement.CodeDisplay': 'oral tablet',
+                    'MedicationStatement.code-display': 'oral tablet',
                   },
                 },
               },
@@ -957,7 +957,7 @@ describe('MedicationStatement API (integration)', () => {
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.api',
-                    'MedicationStatement.CodeTextLocal': 'cada 8 horas',
+                    'MedicationStatement.code-text': 'cada 8 horas',
                   },
                 },
               },

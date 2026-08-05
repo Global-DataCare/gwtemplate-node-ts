@@ -1135,7 +1135,6 @@ export class CommunicationManager implements IJobProcessor {
 
     const codeableText = String(
       baseClaims[`${resourceType}.code-text`]
-      || baseClaims[`${resourceType}.CodeTextLocal`]
       || resource?.code?.text
       || resource?.medicationCodeableConcept?.text
       || resource?.vaccineCode?.text
@@ -1148,15 +1147,14 @@ export class CommunicationManager implements IJobProcessor {
       || resource?.category?.[0]?.coding?.[0];
     const codeDisplay = String(
       baseClaims[`${resourceType}.code-display`]
-      || baseClaims[`${resourceType}.CodeDisplay`]
       || codeCoding?.display
       || '',
     ).trim();
-    if (codeDisplay) {
-      baseClaims[`${resourceType}.CodeDisplay`] = codeDisplay;
+    if (codeDisplay && !baseClaims[`${resourceType}.code-display`]) {
+      baseClaims[`${resourceType}.code-display`] = codeDisplay;
     }
-    if (codeableText) {
-      baseClaims[`${resourceType}.CodeTextLocal`] = codeableText;
+    if (codeableText && !baseClaims[`${resourceType}.code-text`]) {
+      baseClaims[`${resourceType}.code-text`] = codeableText;
     }
     const userSelectedRaw = codeCoding?.userSelected;
     if (typeof userSelectedRaw === 'boolean') {

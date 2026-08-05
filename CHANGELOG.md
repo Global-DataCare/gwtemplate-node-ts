@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.20.28] - 2026-08-05
+
 ### Fixed
 
 - Collapse historical versions sharing one business identifier in `$summary`
