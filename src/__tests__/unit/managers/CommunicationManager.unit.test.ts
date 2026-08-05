@@ -586,10 +586,6 @@ describe('CommunicationManager Unit Tests', () => {
         || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.code-text'],
       ).toBe('Cacahuete');
       expect(
-        allergyRecord['AllergyIntolerance.CodeTextLocal']
-        || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.CodeTextLocal'],
-      ).toBe('Cacahuete');
-      expect(
         allergyRecord['AllergyIntolerance.code-display']
         || allergyRecord['org.hl7.fhir.api.AllergyIntolerance.code-display'],
       ).toBe('Peanut');
@@ -828,13 +824,9 @@ describe('CommunicationManager Unit Tests', () => {
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.identifier'],
       ).toBe('urn:uuid:medication-001');
       expect(
-        medicationRecord['MedicationStatement.CodeDisplay']
-        || medicationRecord['org.hl7.fhir.api.MedicationStatement.CodeDisplay'],
+        medicationRecord['MedicationStatement.code-display']
+        || medicationRecord['org.hl7.fhir.api.MedicationStatement.code-display'],
       ).toBe('Paracetamol 500 MG Oral Tablet');
-      expect(
-        medicationRecord['MedicationStatement.CodeTextLocal']
-        || medicationRecord['org.hl7.fhir.api.MedicationStatement.CodeTextLocal'],
-      ).toBe('Paracetamol 500mg');
       expect(
         medicationRecord['MedicationStatement.language']
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.language'],
@@ -847,8 +839,8 @@ describe('CommunicationManager Unit Tests', () => {
         expect.arrayContaining([
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.subject', value: subjectDid }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.identifier', value: 'urn:uuid:medication-001' }),
-          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.CodeDisplay', value: 'Paracetamol 500 MG Oral Tablet' }),
-          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.CodeTextLocal', value: 'Paracetamol 500mg' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.code-display', value: 'Paracetamol 500 MG Oral Tablet' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.code-text', value: 'Paracetamol 500mg' }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.language', value: 'es' }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.user-selected', value: 'true' }),
         ]),
@@ -869,13 +861,9 @@ describe('CommunicationManager Unit Tests', () => {
         || observationRecord['org.hl7.fhir.api.Observation.identifier'],
       ).toBe('urn:uuid:observation-001');
       expect(
-        observationRecord['Observation.CodeDisplay']
-        || observationRecord['org.hl7.fhir.api.Observation.CodeDisplay'],
+        observationRecord['Observation.code-display']
+        || observationRecord['org.hl7.fhir.api.Observation.code-display'],
       ).toBe('Blood pressure panel with all children optional');
-      expect(
-        observationRecord['Observation.CodeTextLocal']
-        || observationRecord['org.hl7.fhir.api.Observation.CodeTextLocal'],
-      ).toBe('Tension arterial');
       expect(
         observationRecord['Observation.language']
         || observationRecord['org.hl7.fhir.api.Observation.language'],
@@ -888,8 +876,8 @@ describe('CommunicationManager Unit Tests', () => {
         expect.arrayContaining([
           expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.subject', value: subjectDid }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.identifier', value: 'urn:uuid:observation-001' }),
-          expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.CodeDisplay', value: 'Blood pressure panel with all children optional' }),
-          expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.CodeTextLocal', value: 'Tension arterial' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.code-display', value: 'Blood pressure panel with all children optional' }),
+          expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.code-text', value: 'Tension arterial' }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.language', value: 'es' }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.Observation.user-selected', value: 'true' }),
         ]),

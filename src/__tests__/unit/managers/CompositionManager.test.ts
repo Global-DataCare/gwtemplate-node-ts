@@ -266,8 +266,8 @@ describe('CompositionManager', () => {
             'MedicationStatement.subject': subjectDid,
             'MedicationStatement.status': 'active',
             'MedicationStatement.medication-text': 'Lisinopril 10 mg',
-            'MedicationStatement.CodeDisplay': 'Lisinopril 10 MG Oral Tablet',
-            'MedicationStatement.CodeTextLocal': 'Lisinopril 10 mg',
+            'MedicationStatement.code-display': 'Lisinopril 10 MG Oral Tablet',
+            'MedicationStatement.code-text': 'Lisinopril 10 mg',
           },
         ] as any;
       }
@@ -301,6 +301,69 @@ describe('CompositionManager', () => {
     expect(data[0].resource.entry.some((entry: any) => entry.resource?.resourceType === 'MedicationStatement')).toBe(true);
   });
 
+  it('returns one current native Immunization per business identifier in $summary', async () => {
+    const subjectDid = 'did:web:api.acme.org:individual:immunization-summary-001';
+    mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.composition)) {
+        return [{
+          id: 'composition-immunization-summary-001',
+          'Composition.identifier': 'urn:uuid:composition-immunization-summary-001',
+          'Composition.subject': subjectDid,
+          'Composition.section': HealthcareBasicSections.Immunizations.attributeValue,
+          'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+        }] as any;
+      }
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.immunizations)) {
+        return [
+          {
+            id: 'old-storage-version',
+            'Immunization.identifier': 'urn:uuid:covid-dose-2',
+            'Immunization.subject': subjectDid,
+            'Immunization.status': 'completed',
+            'Immunization.date': '2026-01-01T10:00:00Z',
+            'Immunization.vaccine-code': 'http://hl7.org/fhir/sid/cvx|208',
+            'Immunization.lot-number': 'OLD-LOT',
+          },
+          {
+            id: 'current-storage-version',
+            'Immunization.identifier': 'urn:uuid:covid-dose-2',
+            'Immunization.subject': subjectDid,
+            'Immunization.status': 'completed',
+            'Immunization.date': '2026-01-01T10:00:00Z',
+            'Immunization.vaccine-code': 'http://hl7.org/fhir/sid/cvx|208',
+            'Immunization.lot-number': 'CURRENT-LOT',
+          },
+        ] as any;
+      }
+      return [] as any;
+    });
+
+    const response = await manager.process(createJob({
+      sector: 'health-care',
+      section: 'individual',
+      format: 'org.hl7.fhir.r4',
+      resourceType: 'Subject',
+      action: '$summary',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [{ name: 'subject', valueString: subjectDid }],
+        },
+      } as any,
+    }));
+
+    const bundle = (response.body as any).data[0].resource;
+    const immunizations = bundle.entry.filter((entry: any) => entry.resource?.resourceType === 'Immunization');
+    expect(immunizations).toHaveLength(1);
+    expect(immunizations[0].resource).toMatchObject({
+      identifier: [{ value: 'urn:uuid:covid-dose-2' }],
+      status: 'completed',
+      occurrenceDateTime: '2026-01-01T10:00:00Z',
+      lotNumber: 'CURRENT-LOT',
+    });
+  });
+
   it('supports digitaltwin ResearchSubject/$summary with org.hl7.fhir.api claims-first materialization', async () => {
     const subjectDid = 'did:web:api.acme.org:research-subject:twin-summary-api-001';
     mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
@@ -327,7 +390,7 @@ describe('CompositionManager', () => {
             'org.hl7.fhir.r4.Observation.subject': subjectDid,
             'org.hl7.fhir.r4.Observation.status': 'final',
             'org.hl7.fhir.r4.Observation.code-text': 'Blood pressure systolic',
-            'org.hl7.fhir.r4.Observation.CodeDisplay': 'Blood pressure',
+            'org.hl7.fhir.r4.Observation.code-display': 'Blood pressure',
           },
         ] as any;
       }
@@ -401,7 +464,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
       resourceType: 'MedicationStatement',
       sectionIdSuffix: 'medications',
-      displayClaimKey: 'MedicationStatement.CodeDisplay',
+      displayClaimKey: 'MedicationStatement.code-display',
       displayValue: 'Paracetamol 500 MG Oral Tablet',
       displaySearchValue: 'oral tablet',
       textClaimKey: 'MedicationStatement.code-text',
@@ -415,7 +478,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
       resourceType: 'AllergyIntolerance',
       sectionIdSuffix: 'allergies',
-      displayClaimKey: 'AllergyIntolerance.CodeDisplay',
+      displayClaimKey: 'AllergyIntolerance.code-display',
       displayValue: 'Penicillin allergy',
       displaySearchValue: 'penicillin',
       textClaimKey: 'AllergyIntolerance.code-text',
@@ -429,7 +492,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.ProblemList.attributeValue,
       resourceType: 'Condition',
       sectionIdSuffix: 'conditions',
-      displayClaimKey: 'Condition.CodeDisplay',
+      displayClaimKey: 'Condition.code-display',
       displayValue: 'Type 2 diabetes mellitus',
       displaySearchValue: 'diabetes',
       textClaimKey: 'Condition.code-text',
@@ -443,7 +506,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.Results.attributeValue,
       resourceType: 'Observation',
       sectionIdSuffix: 'observations',
-      displayClaimKey: 'Observation.CodeDisplay',
+      displayClaimKey: 'Observation.code-display',
       displayValue: 'Hemoglobin [Mass/volume] in Blood',
       displaySearchValue: 'hemoglobin',
       textClaimKey: 'Observation.code-text',
@@ -457,7 +520,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.Results.attributeValue,
       resourceType: 'DiagnosticReport',
       sectionIdSuffix: 'diagnostic-reports',
-      displayClaimKey: 'DiagnosticReport.CodeDisplay',
+      displayClaimKey: 'DiagnosticReport.code-display',
       displayValue: 'Chest radiology report',
       displaySearchValue: 'radiology',
       textClaimKey: 'DiagnosticReport.code-text',
@@ -471,7 +534,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.Procedures.attributeValue,
       resourceType: 'Procedure',
       sectionIdSuffix: 'procedures',
-      displayClaimKey: 'Procedure.CodeDisplay',
+      displayClaimKey: 'Procedure.code-display',
       displayValue: 'Appendectomy procedure',
       displaySearchValue: 'appendectomy',
       textClaimKey: 'Procedure.code-text',
@@ -485,7 +548,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.Immunizations.attributeValue,
       resourceType: 'Immunization',
       sectionIdSuffix: 'immunizations',
-      displayClaimKey: 'Immunization.CodeDisplay',
+      displayClaimKey: 'Immunization.code-display',
       displayValue: 'COVID-19 vaccine',
       displaySearchValue: 'covid',
       textClaimKey: 'Immunization.code-text',
@@ -499,7 +562,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.FunctionalStatus.attributeValue,
       resourceType: 'Condition',
       sectionIdSuffix: 'conditions',
-      displayClaimKey: 'Condition.CodeDisplay',
+      displayClaimKey: 'Condition.code-display',
       displayValue: 'Reduced mobility',
       displaySearchValue: 'mobility',
       textClaimKey: 'Condition.code-text',
@@ -513,7 +576,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.PlanOfCare.attributeValue,
       resourceType: 'CarePlan',
       sectionIdSuffix: 'care-plans',
-      displayClaimKey: 'CarePlan.CodeDisplay',
+      displayClaimKey: 'CarePlan.code-display',
       displayValue: 'Home monitoring care plan',
       displaySearchValue: 'monitoring',
       textClaimKey: 'CarePlan.code-text',
@@ -527,7 +590,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.PlanOfTreatment.attributeValue,
       resourceType: 'CarePlan',
       sectionIdSuffix: 'care-plans',
-      displayClaimKey: 'CarePlan.CodeDisplay',
+      displayClaimKey: 'CarePlan.code-display',
       displayValue: 'Treatment follow-up plan',
       displaySearchValue: 'follow-up',
       textClaimKey: 'CarePlan.code-text',
@@ -541,7 +604,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.SocialHistory.attributeValue,
       resourceType: 'Observation',
       sectionIdSuffix: 'observations',
-      displayClaimKey: 'Observation.CodeDisplay',
+      displayClaimKey: 'Observation.code-display',
       displayValue: 'Tobacco smoking status',
       displaySearchValue: 'smoking',
       textClaimKey: 'Observation.code-text',
@@ -555,7 +618,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.VitalSigns.attributeValue,
       resourceType: 'Observation',
       sectionIdSuffix: 'observations',
-      displayClaimKey: 'Observation.CodeDisplay',
+      displayClaimKey: 'Observation.code-display',
       displayValue: 'Blood pressure panel',
       displaySearchValue: 'pressure',
       textClaimKey: 'Observation.code-text',
@@ -569,7 +632,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.AdvanceDirectives.attributeValue,
       resourceType: 'Consent',
       sectionIdSuffix: 'consents',
-      displayClaimKey: 'Consent.CodeDisplay',
+      displayClaimKey: 'Consent.code-display',
       displayValue: 'Advance healthcare directive',
       displaySearchValue: 'directive',
       textClaimKey: 'Consent.code-text',
@@ -583,7 +646,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareBasicSections.HistoryOfPastIllness.attributeValue,
       resourceType: 'Condition',
       sectionIdSuffix: 'conditions',
-      displayClaimKey: 'Condition.CodeDisplay',
+      displayClaimKey: 'Condition.code-display',
       displayValue: 'Asthma',
       displaySearchValue: 'asthma',
       textClaimKey: 'Condition.code-text',
@@ -597,7 +660,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareSummarySections.PregnancyHistory.attributeValue,
       resourceType: 'Observation',
       sectionIdSuffix: 'observations',
-      displayClaimKey: 'Observation.CodeDisplay',
+      displayClaimKey: 'Observation.code-display',
       displayValue: 'Pregnancy status',
       displaySearchValue: 'pregnancy',
       textClaimKey: 'Observation.code-text',
@@ -611,7 +674,7 @@ describe('CompositionManager', () => {
       sectionToken: HealthcareSummarySections.GoalsAndPreferences.attributeValue,
       resourceType: 'Consent',
       sectionIdSuffix: 'consents',
-      displayClaimKey: 'Consent.CodeDisplay',
+      displayClaimKey: 'Consent.code-display',
       displayValue: 'Goals of care preferences',
       displaySearchValue: 'preferences',
       textClaimKey: 'Consent.code-text',
@@ -724,8 +787,8 @@ describe('CompositionManager', () => {
           {
             id: 'med-combo-1',
             'MedicationStatement.subject': subjectDid,
-            'MedicationStatement.CodeDisplay': 'Paracetamol 500 MG Oral Tablet',
-            'MedicationStatement.CodeTextLocal': 'Paracetamol 500mg cada 8 horas',
+            'MedicationStatement.code-display': 'Paracetamol 500 MG Oral Tablet',
+            'MedicationStatement.code-text': 'Paracetamol 500mg cada 8 horas',
             'MedicationStatement.medication-text': 'Paracetamol 500mg cada 8 horas',
             indexed: { attributes: [] },
           },
@@ -778,7 +841,7 @@ describe('CompositionManager', () => {
           {
             id: 'obs-combo-1',
             'Observation.subject': subjectDid,
-            'Observation.CodeDisplay': 'Blood pressure panel with all children optional',
+            'Observation.code-display': 'Blood pressure panel with all children optional',
             'Observation.code-text': 'Blood pressure',
             indexed: { attributes: [] },
           },

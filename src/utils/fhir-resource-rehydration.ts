@@ -1,8 +1,9 @@
 import { randomUUID } from 'crypto';
-import { getClaimValue, normalizeContextualizedClaims } from './claims';
+import { canonicalizeFhirClaims, getClaimValue } from './claims';
 import { normalizeReference, tokenToCoding } from './fhir-data-utils';
 import { determineResourceId } from './resource';
 import { GatewayLocalFhirResourceTypes, ResourceTypesFhirR4 } from '../shared/fhir-constants';
+import { convertClaimsToFhirResource } from 'gdc-common-utils-ts/utils/bundle-document-builder';
 
 const PATIENT_REFERENCE_RESOURCE_TYPES = new Set<string>([
   ResourceTypesFhirR4.AllergyIntolerance,
@@ -43,7 +44,10 @@ export function buildFhirResourceFromIndexedClaims(
   resourceType: string,
   record: Record<string, any>,
 ): Record<string, any> {
-  const claims = normalizeContextualizedClaims(record || {});
+  // Historical indexes may still carry version-specific FHIR prefixes. Read
+  // them for migration compatibility, but expose and persist only the stable
+  // FHIR API search-parameter namespace.
+  const claims = canonicalizeFhirClaims(record || {});
   const subject =
     normalizeReference(getClaimValue<string>(claims, `${resourceType}.subject`))
     || normalizeReference(getClaimValue<string>(claims, `${resourceType}.patient`));
@@ -61,18 +65,19 @@ export function buildFhirResourceFromIndexedClaims(
   );
   const codeText = normalizeReference(getClaimValue<string>(claims, `${resourceType}.code-text`));
   const codeDisplay = normalizeReference(
-    getClaimValue<string>(claims, `${resourceType}.code-display`)
-    || getClaimValue<string>(claims, `${resourceType}.CodeDisplay`),
+    getClaimValue<string>(claims, `${resourceType}.code-display`),
   );
-  const codeTextLocal = normalizeReference(getClaimValue<string>(claims, `${resourceType}.CodeTextLocal`));
   const medicationText = normalizeReference(getClaimValue<string>(claims, `${ResourceTypesFhirR4.MedicationStatement}.medication-text`));
   const language = normalizeReference(getClaimValue<string>(claims, `${resourceType}.language`));
   const userSelected = normalizeReference(getClaimValue<string>(claims, `${resourceType}.user-selected`));
 
+  const projected = convertClaimsToFhirResource(claims) as Record<string, any>;
   const resource: Record<string, any> = {
+    ...projected,
     resourceType,
     id: String(record?.id || determineResourceId(identifier || randomUUID(), process.env.NODE_ENV)),
     meta: {
+      ...(projected?.meta && typeof projected.meta === 'object' ? projected.meta : {}),
       claims,
     },
   };
@@ -100,7 +105,7 @@ export function buildFhirResourceFromIndexedClaims(
 
   if (resourceType === ResourceTypesFhirR4.MedicationStatement) {
     const medicationCodeableConcept = buildCodeableConcept({
-      text: medicationText || codeTextLocal,
+      text: medicationText || codeText,
       codeToken,
       codeDisplay,
       userSelected,
@@ -110,7 +115,7 @@ export function buildFhirResourceFromIndexedClaims(
     }
   } else {
     const code = buildCodeableConcept({
-      text: codeText || codeTextLocal,
+      text: codeText,
       codeToken,
       codeDisplay,
       userSelected,

@@ -10,8 +10,8 @@ describe('fhir-resource-rehydration utils', () => {
       'MedicationStatement.identifier': 'medication-identifier',
       'MedicationStatement.status': 'active',
       'MedicationStatement.medication-text': 'Aspirin 100 mg',
-      'MedicationStatement.CodeDisplay': 'Aspirin',
-      'MedicationStatement.CodeTextLocal': 'Aspirina',
+      'MedicationStatement.code-display': 'Aspirin',
+      'MedicationStatement.code-text': 'Aspirina',
       'MedicationStatement.code': 'http://snomed.info/sct|123',
       'MedicationStatement.user-selected': 'true',
       'MedicationStatement.effectiveDateTime': '2026-01-01T00:00:00Z',
@@ -87,7 +87,7 @@ describe('fhir-resource-rehydration utils', () => {
   ])('keeps the manually authored local name when rehydrating %s', (resourceType) => {
     const token = 'http://snomed.info/sct|373270004';
     const resource = buildFhirResourceFromIndexedClaims(resourceType, {
-      [`${resourceType}.subject`]: 'Patient/p-1',
+      [`${resourceType}.subject`]: 'did:web:patient.example:p-1',
       [`${resourceType}.code`]: token,
       [`${resourceType}.code-text`]: 'Penicilina',
       [`${resourceType}.code-display`]: 'Penicillin',
