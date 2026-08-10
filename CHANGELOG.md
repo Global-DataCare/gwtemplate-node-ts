@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+- Bind a multi-device seat to
+  `urn:multibase:<hash(normalized email or phone)>:professional|personal`, never
+  to a portal DID or IdP-local `sub`. Fabric subject-key DCR/revocation records
+  use that stable actor URN and retain each portal DID only as audit metadata.
+
 ## [1.21.0] - 2026-08-09
 
 - Consume Common Utils 2.4.0 and reuse its SubscriptionTopic matcher and

@@ -30,6 +30,7 @@ describe('controller key ledger registration', () => {
     const registerKey = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
     const upsertBinding = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
     const controllerDid = 'did:web:gateway.example.org:controller:primary';
+    const actorIdentifier = 'urn:multibase:zControllerHash:professional';
     const key = {
       kid: 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:legacy-pontus-x',
       kty: 'EC', crv: 'secp256k1', x: 'public-x', y: 'public-y', alg: 'ES256K', use: 'sig',
@@ -42,6 +43,7 @@ describe('controller key ledger registration', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-G02793479',
       },
       controllerDid,
+      actorIdentifier,
       verificationMethods: [{
         id: `${controllerDid}#${key.kid}`,
         controller: controllerDid,
@@ -63,15 +65,16 @@ describe('controller key ledger registration', () => {
     );
     expect(upsertBinding).toHaveBeenCalledWith(
       'Org1MSP',
-      expect.stringContaining(`employee_${controllerDid}__`),
+      expect.stringContaining(`employee_${actorIdentifier}__`),
       expect.objectContaining({
         subjectType: 'employee',
-        subjectId: controllerDid,
+        subjectId: actorIdentifier,
         relationship: 'legal-organization-controller-signing',
         status: 'active',
         meta: {
           attributes: expect.objectContaining({
             controllerDid,
+            did: controllerDid,
             transactionId: 'ica-approved-thread-001',
           }),
         },
@@ -90,6 +93,7 @@ describe('controller key ledger registration', () => {
     await expect(registerControllerKeysOnLedger({
       organizationClaims: {},
       controllerDid: 'did:web:controller.example.org',
+      actorIdentifier: 'urn:multibase:zControllerHash:professional',
       verificationMethods: [],
     })).rejects.toThrow('requires LEDGER_MSP_ID');
   });

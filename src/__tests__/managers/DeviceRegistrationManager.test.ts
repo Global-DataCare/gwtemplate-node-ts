@@ -17,6 +17,7 @@ import type { EntityConfig } from '../../gdc-backend-utils-node/models/entity';
 import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
+import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
 
 const TEST_API_BASE_URL = 'http://localhost:3001';
 const FABRIC_LEDGER_TEST_ENV = {
@@ -244,6 +245,9 @@ describe('DeviceRegistrationManager', () => {
         reactivationEnabled: false,
         exp: Math.floor(Date.now() / 1000) + 3600,
         subjectId: employeeId,
+        activatedBy: buildStableActorIdentifier({
+          contactKind: 'email', contact: 'employee@example.org', role: 'professional',
+        }),
         deviceId: previousDeviceId,
       } as any;
       const licenseDoc: ConfidentialStorageDoc = {
@@ -291,6 +295,16 @@ describe('DeviceRegistrationManager', () => {
       expect(registerKeySpy).toHaveBeenCalledTimes(2);
       expect(keySubmitSpy).not.toHaveBeenCalled();
       expect(bindingSpy).toHaveBeenCalled();
+      expect(bindingSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining('urn:multibase:'),
+        expect.objectContaining({
+          subjectId: license.activatedBy,
+          meta: expect.objectContaining({
+            attributes: expect.objectContaining({ did: employeeDid }),
+          }),
+        }),
+      );
     });
 
     it('should reject a third installation when the seat allowance is two', async () => {

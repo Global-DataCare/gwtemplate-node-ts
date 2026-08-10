@@ -51,7 +51,13 @@ export class IdentityTokenManager implements IJobProcessor {
     }
 
     const verificationResult = await this.appAuthManager.verifyIdToken(idToken);
-    const { sub: userId, tenant_id: tenantIdFromToken } = (verificationResult.payload || {}) as any;
+    const {
+      sub: userId,
+      tenant_id: tenantIdFromToken,
+      email,
+      email_verified: emailVerified,
+      phone_number: phone,
+    } = (verificationResult.payload || {}) as any;
     if (!userId) {
       throw new ManagerError('Missing sub claim in id_token.', IssueType.Security);
     }
@@ -69,7 +75,7 @@ export class IdentityTokenManager implements IJobProcessor {
       activationCode,
       tenantIdFromToken,
       job.sector as string,
-      userId,
+      { subject: userId, email, emailVerified, phone },
       body.client_instance_id,
     );
 

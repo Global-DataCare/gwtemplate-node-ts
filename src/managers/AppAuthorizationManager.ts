@@ -13,6 +13,15 @@ import { getTenantVaultId } from '../utils/tenant';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { getEnvSectionId } from '../utils/section-env';
 import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
+import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
+import { normalizeIndexedEmail, normalizeIndexedPhone } from '../utils/indexed-contact';
+
+type ActivationActor = Readonly<{
+  subject: string;
+  email?: string;
+  emailVerified?: boolean;
+  phone?: string;
+}>;
 
 /**
  * Manages application-specific authorization logic, such as validating tokens and codes.
@@ -94,7 +103,7 @@ export class AppAuthorizationManager {
     code: string,
     tenantId: string,
     sector: string,
-    authenticatedSubject?: string,
+    authenticatedIdentity?: string | ActivationActor,
     clientInstanceId?: string,
   ): Promise<{ valid: true; license: DeviceLicense; }> {
     const now = Math.floor(Date.now() / 1000);
@@ -139,9 +148,36 @@ export class AppAuthorizationManager {
       throw new ManagerError('Activation code has expired.', IssueType.BusinessRule);
     }
 
-    const actor = String(authenticatedSubject || '').trim();
+    const identity = typeof authenticatedIdentity === 'string'
+      ? { subject: authenticatedIdentity }
+      : authenticatedIdentity;
+    const email = normalizeIndexedEmail(String(identity?.email || ''));
+    const phone = normalizeIndexedPhone(String(identity?.phone || ''));
+    const issuedEmail = normalizeIndexedEmail(String(license.issuedToEmail || ''));
+    const issuedPhone = normalizeIndexedPhone(String(license.issuedToPhone || ''));
+    if (!issuedEmail && !issuedPhone) {
+      throw new ManagerError('License has no canonical email or phone actor contact.', IssueType.BusinessRule);
+    }
+    if (issuedEmail) {
+      if (!email || email !== issuedEmail) {
+        throw new ManagerError('Activation identity does not match the licensed email.', IssueType.Forbidden);
+      }
+      if (identity?.emailVerified === false) {
+        throw new ManagerError('Activation requires a verified licensed email.', IssueType.Forbidden);
+      }
+    } else if (!phone || phone !== issuedPhone) {
+      throw new ManagerError('Activation identity does not match the licensed phone.', IssueType.Forbidden);
+    }
+    const actor = buildStableActorIdentifier({
+      contactKind: issuedEmail ? 'email' : 'phone',
+      contact: issuedEmail || issuedPhone!,
+      role: license.userClass === 'employee' ? 'professional' : 'personal',
+    });
     if (license.status === 'active') {
-      if (license.activatedBy && (!actor || license.activatedBy !== actor)) {
+      const legacyActor = Boolean(license.activatedBy
+        && !/^urn:multibase:z[^:]+:(professional|personal)$/.test(String(license.activatedBy)));
+      const canMigrateLegacyActor = legacyActor;
+      if (license.activatedBy && !canMigrateLegacyActor && license.activatedBy !== actor) {
         throw new ManagerError('Active seat belongs to a different authenticated user.', IssueType.Forbidden);
       }
       const activeBindings = this.readActiveDeviceBindings(license);
@@ -153,7 +189,7 @@ export class AppAuthorizationManager {
       }
       // Migration for active legacy seats created before activatedBy/maxDevices.
       // The first authenticated reuse claims the seat; later reuses must match.
-      if (!license.activatedBy && actor) {
+      if (!license.activatedBy || canMigrateLegacyActor) {
         license.activatedBy = actor;
         license.maxDevices = allowance;
         licenseDoc.sequence++;
@@ -162,7 +198,7 @@ export class AppAuthorizationManager {
     } else {
       license.status = 'active';
       license.activatedAt = now;
-      if (actor) license.activatedBy = actor;
+      license.activatedBy = actor;
       license.maxDevices = this.readDeviceAllowance(license);
       licenseDoc.sequence++;
       await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));

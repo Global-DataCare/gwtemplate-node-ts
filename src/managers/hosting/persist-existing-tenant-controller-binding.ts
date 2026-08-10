@@ -13,6 +13,7 @@ import { getTenantVaultId } from '../../utils/tenant';
 import type { registerControllerKeysOnLedger as registerControllerKeysOnLedgerFunction } from '../../utils/ledger-device-registration';
 import type { IHostingTenantRegistry } from '../IHostingTenantRegistry';
 import { mergeActivationJwks } from './registration-keys';
+import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
 import type { ActivationParticipantMaterialLike } from './controller-entity-config';
 
 type PersistExistingTenantControllerBindingDeps = Readonly<{
@@ -42,6 +43,14 @@ export async function persistExistingTenantControllerBinding(
   // working without being mistaken for a controller-keyring replacement.
   if (!deps.controller?.jwks?.keys?.length) return;
   const controllerDid = String(deps.controller?.did || '').trim();
+  const controllerSameAs = String(deps.controller?.sameAs || '').trim();
+  const actorIdentifier = /^urn:multibase:z[^:]+:professional$/.test(controllerSameAs)
+    ? controllerSameAs
+    : /^urn:multibase:z[^:]+$/.test(controllerSameAs)
+      ? `${controllerSameAs}:professional`
+      : controllerSameAs.includes('@')
+        ? buildStableActorIdentifier({ contactKind: 'email', contact: controllerSameAs, role: 'professional' })
+        : '';
   const submittedKeys = mergeActivationJwks(
     [deps.controller?.publicKeyJwk],
     deps.controller?.jwks,
@@ -49,6 +58,9 @@ export async function persistExistingTenantControllerBinding(
 
   if (!controllerDid.startsWith('did:web:')) {
     throw new ManagerError('Existing-tenant controller binding requires a stable did:web identifier.', IssueType.Value);
+  }
+  if (!actorIdentifier) {
+    throw new ManagerError('Existing-tenant controller binding requires its stable actor identifier.', IssueType.Required);
   }
   if (submittedKeys.length < 2) {
     throw new ManagerError('Existing-tenant controller binding requires an explicit multi-key JWKS.', IssueType.Required);
@@ -114,6 +126,7 @@ export async function persistExistingTenantControllerBinding(
     jurisdiction: String(deps.claims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim() || undefined,
     organizationClaims: deps.claims,
     controllerDid,
+    actorIdentifier,
     verificationMethods: controllerDidDocument.verificationMethod || [],
     transactionId: deps.transactionId,
   });

@@ -8,6 +8,7 @@ import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
 import { getTenantVaultId } from '../../utils/tenant';
 import { getEnvSectionId } from '../../utils/section-env';
 import {
@@ -163,14 +164,17 @@ describe('AppAuthorizationManager', () => {
           id: 'license-1', tenantId: tenantId, status: 'issued', plan: 'annual',
           orderId: 'order-123', userClass: 'employee', type: 'mobile',
           renewalCycle: '12m', reactivationEnabled: true, exp: now + 3600,
-          activationCode,
+          activationCode, issuedToEmail: 'person@example.org',
         };
         const mockDoc: ConfidentialStorageDoc = { id: activationCode, status: mockLicense.status, sequence: 0, content: mockLicense };
         mockKmsService.getHmacBase64Url.mockResolvedValueOnce('hmac-name').mockResolvedValueOnce('hmac-value');
         mockVaultRepository.query.mockResolvedValue([mockDoc]);
   
         // Act
-        const result = await manager.verifyAndConsumeActivationCode(activationCode, tenantId, 'health-care');
+        const result = await manager.verifyAndConsumeActivationCode(
+          activationCode, tenantId, 'health-care',
+          { subject: 'portal-sub', email: 'person@example.org', emailVerified: true },
+        );
   
         // Assert
         expect(result.valid).toBe(true);
@@ -204,10 +208,13 @@ describe('AppAuthorizationManager', () => {
         // Arrange
         const mockLicense = {
           id: 'license-2', tenantId: 'acme', status: 'active', plan: 'annual',
-          orderId: 'order-456', userClass: 'individual', type: 'web',
+          orderId: 'order-456', userClass: 'employee', type: 'web',
           renewalCycle: null, reactivationEnabled: false, exp: now + 3600,
           activationCode: 'used-code',
-          activatedBy: 'firebase-user-1',
+          issuedToEmail: 'professional@example.org',
+          activatedBy: buildStableActorIdentifier({
+            contactKind: 'email', contact: 'professional@example.org', role: 'professional',
+          }),
           maxDevices: 2,
           deviceBindings: [{
             clientId: 'client-one', clientInstanceId: 'install-one', status: 'active',
@@ -218,11 +225,13 @@ describe('AppAuthorizationManager', () => {
         mockVaultRepository.query.mockResolvedValue([{ id: 'used-code', content: mockLicense, sequence: 0 }]);
 
         await expect(manager.verifyAndConsumeActivationCode(
-          'used-code', 'acme', 'health-care', 'firebase-user-1', 'install-two',
+          'used-code', 'acme', 'health-care',
+          { subject: 'portal-a-sub', email: 'professional@example.org', emailVerified: true }, 'install-two',
         )).resolves.toMatchObject({ valid: true });
         await expect(manager.verifyAndConsumeActivationCode(
-          'used-code', 'acme', 'health-care', 'firebase-user-2', 'install-two',
-        )).rejects.toThrow('different authenticated user');
+          'used-code', 'acme', 'health-care',
+          { subject: 'portal-b-sub', email: 'other@example.org', emailVerified: true }, 'install-two',
+        )).rejects.toThrow('does not match the licensed email');
       });
 
       it('should bind a legacy active seat to its first authenticated reuse', async () => {
@@ -230,16 +239,23 @@ describe('AppAuthorizationManager', () => {
           id: 'legacy-license', tenantId: 'acme', status: 'active', plan: 'annual',
           orderId: 'legacy-order', userClass: 'employee', type: 'web',
           renewalCycle: null, reactivationEnabled: false, exp: now + 3600,
-          activationCode: 'legacy-code',
+          activationCode: 'legacy-code', issuedToEmail: 'professional@example.org',
+          activatedBy: 'legacy-firebase-subject',
         } as DeviceLicense & Record<string, any>;
         mockKmsService.getHmacBase64Url.mockResolvedValueOnce('hmac-name').mockResolvedValueOnce('hmac-value');
         mockVaultRepository.query.mockResolvedValue([{ id: 'legacy-code', content: mockLicense, sequence: 0 }]);
 
         await manager.verifyAndConsumeActivationCode(
-          'legacy-code', 'acme', 'health-care', 'firebase-user-1', 'install-one',
+          'legacy-code', 'acme', 'health-care',
+          { subject: 'new-portal-subject', email: 'professional@example.org', emailVerified: true }, 'install-one',
         );
 
-        expect(mockLicense).toMatchObject({ activatedBy: 'firebase-user-1', maxDevices: 2 });
+        expect(mockLicense).toMatchObject({
+          activatedBy: buildStableActorIdentifier({
+            contactKind: 'email', contact: 'professional@example.org', role: 'professional',
+          }),
+          maxDevices: 2,
+        });
         expect(mockVaultRepository.put).toHaveBeenCalled();
       });
   });

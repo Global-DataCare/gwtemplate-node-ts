@@ -151,6 +151,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
         ext_device_info: registrationRequest.ext_device_info,
         softwareClaims,
         subjectId: deviceIdentityContext?.subjectId,
+        stableActorIdentifier: deviceIdentityContext?.actorIdentifier,
         verificationMethodIds: deviceIdentityContext?.newVerificationMethods.map((method) => method.id),
         createdAt: new Date().toISOString(),
       };
@@ -362,6 +363,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
     clientId: string;
   }): Promise<{
     subjectId: string;
+    actorIdentifier: string;
     employeeDoc: ConfidentialStorageDoc;
     employeeContent: EntityConfig;
     previousDeviceId?: string;
@@ -385,6 +387,10 @@ export class DeviceRegistrationManager implements IJobProcessor {
     if (!employeeContent?.didDocument?.id) return undefined;
 
     const license = (params.licenseDoc?.content || {}) as DeviceLicense & Record<string, any>;
+    const actorIdentifier = String(license.activatedBy || '').trim();
+    if (!/^urn:multibase:z[^:]+:(professional|personal)$/.test(actorIdentifier)) {
+      throw new ManagerError('DCR license is missing its stable actor identifier.', IssueType.BusinessRule);
+    }
     const clientInstanceId = String((params.registrationRequest.ext_device_info as any)?.device_id || params.clientId).trim();
     const replacedBinding = this.getDeviceBindings(license).find((binding) =>
       binding.status === 'active' && binding.clientInstanceId === clientInstanceId);
@@ -404,6 +410,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
     return {
       subjectId,
+      actorIdentifier,
       employeeDoc,
       employeeContent,
       previousDeviceId,
@@ -425,6 +432,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
     clientId: string;
     context: {
       subjectId: string;
+      actorIdentifier: string;
       employeeDoc: ConfidentialStorageDoc;
       employeeContent: EntityConfig;
       previousDeviceId?: string;
@@ -441,6 +449,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
       previousVerificationMethods,
       newVerificationMethods,
       subjectId,
+      actorIdentifier,
     } = params.context;
 
     const updatedDidDocument = this.mergeDeviceVerificationMethods(
@@ -475,7 +484,8 @@ export class DeviceRegistrationManager implements IJobProcessor {
         jurisdiction: params.job.jurisdiction,
         organizationId,
         subjectType: 'employee',
-        subjectId: updatedDidDocument.id,
+        subjectId: actorIdentifier,
+        subjectDid: updatedDidDocument.id,
         verificationMethods: previousVerificationMethods,
         deviceId: previousDeviceId,
       });
@@ -485,7 +495,8 @@ export class DeviceRegistrationManager implements IJobProcessor {
         jurisdiction: params.job.jurisdiction,
         organizationId,
         subjectType: 'employee',
-        subjectId: updatedDidDocument.id,
+        subjectId: actorIdentifier,
+        subjectDid: updatedDidDocument.id,
         verificationMethods: newVerificationMethods,
         deviceId: params.clientId,
       });

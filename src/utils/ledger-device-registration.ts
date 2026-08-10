@@ -37,6 +37,8 @@ export async function registerSubjectKeysOnLedger(params: {
   organizationId: string;
   subjectType: 'employee' | 'person';
   subjectId: string;
+  /** Portal-specific DID retained as audit metadata when subjectId is the stable actor URN. */
+  subjectDid?: string;
   verificationMethods: VerificationMethod[];
   deviceId?: string;
   relationshipPrefix?: 'employee-device' | 'legal-organization-controller';
@@ -100,7 +102,7 @@ export async function registerSubjectKeysOnLedger(params: {
       status: 'active',
       meta: {
         attributes: {
-          did: params.subjectId,
+          did: params.subjectDid || params.subjectId,
           verificationMethodId: method.id,
           kid: publicKeyJwk.kid,
           deviceId: params.deviceId,
@@ -121,6 +123,7 @@ export async function registerControllerKeysOnLedger(params: {
   jurisdiction?: string;
   organizationClaims: ClaimsRecord;
   controllerDid: string;
+  actorIdentifier: string;
   verificationMethods: VerificationMethod[];
   transactionId?: string;
 }): Promise<void> {
@@ -132,7 +135,8 @@ export async function registerControllerKeysOnLedger(params: {
     jurisdiction: params.jurisdiction,
     organizationId: resolveLedgerOrganizationId(params.organizationClaims),
     subjectType: 'employee',
-    subjectId: params.controllerDid,
+    subjectId: params.actorIdentifier,
+    subjectDid: params.controllerDid,
     verificationMethods: params.verificationMethods,
     relationshipPrefix: 'legal-organization-controller',
     keyOrigin: 'ica-verified-issue',
@@ -148,6 +152,7 @@ export async function revokeSubjectKeysOnLedger(params: {
   organizationId: string;
   subjectType: 'employee' | 'person';
   subjectId: string;
+  subjectDid?: string;
   verificationMethods: VerificationMethod[];
   deviceId?: string;
   revokedAtEpochSec?: number;
@@ -186,7 +191,7 @@ export async function revokeSubjectKeysOnLedger(params: {
       status: 'revoked',
       meta: {
         attributes: {
-          did: params.subjectId,
+          did: params.subjectDid || params.subjectId,
           verificationMethodId: method.id,
           kid: publicKeyJwk?.kid,
           deviceId: params.deviceId,

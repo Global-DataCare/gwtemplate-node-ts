@@ -28,9 +28,9 @@ Example:
       key-2026-01 -> { thumbprint, alg, status: "active" }
 
     subjectkeybinding-sc
-      employee-456__device-a-signing-key -> professional-signing, active
-      employee-456__device-b-signing-key -> professional-signing, suspended
-      controller-789__personal-device-key -> controller-signing, revoked
+      urn:multibase:zActorHash:professional__device-a-signing-key -> professional-signing, active
+      urn:multibase:zActorHash:professional__device-b-signing-key -> professional-signing, suspended
+      urn:multibase:zPersonalHash:personal__personal-device-key -> personal-signing, revoked
 
 The binding only stores `keyId`; it must not duplicate the JWK, thumbprint,
 algorithm or key lifecycle. Consumers resolve those fields from
@@ -107,14 +107,18 @@ authoritative audit state.
 Typical asset:
 
     {
-      "bindingId": "employee_<employee-uuid>__<key-id>",
+      "bindingId": "employee_<stable-actor-urn>__<key-id>",
       "subjectType": "employee",
-      "subjectId": "<employee-uuid>",
+      "subjectId": "urn:multibase:<contact-hash>:professional",
       "parentOrgId": "<organization-uuid>",
       "keyId": "<RFC-7638-thumbprint-or-key-id>",
       "relationship": "employee-device-signing",
       "status": "active"
     }
+
+The stable actor URN is the cross-portal subject. The portal-specific DID is
+stored only in `meta.attributes.did`, so changing portals or rotating a DID
+does not create a different person in the audit index.
 
 For the canonical controller operation-signing key, any derived binding must
 match hasCredential.material. A mismatch is an error; this chaincode must never
