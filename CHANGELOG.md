@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.21.0] - 2026-08-09
+
+- Consume Common Utils 2.4.0 and reuse its SubscriptionTopic matcher and
+  notification Bundle builder instead of duplicating neutral FHIR logic.
 - Allow two simultaneous DCR installations per professional/member seat by
   default. A second installation no longer revokes the first device profile,
   DID keys, or Fabric key bindings; same-installation registration remains a
