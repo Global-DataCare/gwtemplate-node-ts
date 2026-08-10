@@ -745,6 +745,7 @@ export function createDiscoveryRouter(
   const hostScopedWellKnownPrefix = '/host/cds-:hostCoverageScope/:version/:hostNetwork/.well-known';
   // This new route aligns with the hosted DID web specification for tenants.
   const tenantWellKnownPrefix = '/:tenantId/cds-:jurisdiction/:version/:sector/.well-known';
+  const tenantControllerDidPrefix = '/:tenantId/cds-:jurisdiction/:version/:sector/employee/:memberId/:role';
 
   router.get(
     [`${hostPingPrefix}/ping`, `${hostScopedWellKnownPrefix}/ping`, `${tenantWellKnownPrefix}/ping`],
@@ -757,6 +758,35 @@ export function createDiscoveryRouter(
     const didDocument = await tenantsCacheManager.getDidDocument(res.locals.vaultId);
     // The existence check was already done in resolveTenant, so we can be confident it exists.
     res.json(didDocument);
+  });
+
+  /**
+   * Resolves the separately governed controller did:web document retained in
+   * the tenant's public registration metadata. This path follows did:web path
+   * resolution and never exposes the protected employee record or private key
+   * material.
+   */
+  /**
+   * @openapi
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/employee/{memberId}/{role}/did.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Resolve the governed organization controller DID document
+   *     responses:
+   *       200:
+   *         description: Public controller DID document
+   *       404:
+   *         description: Controller DID is not registered for this tenant
+   */
+  router.get(`${tenantControllerDidPrefix}/did.json`, resolveTenant, async (req, res) => {
+    const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    const controllerDidDocument = tenantConfig?.meta?.controllerDidDocument;
+    const tenantDid = String(tenantConfig?.didDocument?.id || '').trim();
+    const requestedDid = `${tenantDid}:employee:${req.params.memberId}:${req.params.role}`;
+    if (!controllerDidDocument || controllerDidDocument.id !== requestedDid) {
+      return res.status(404).type('text').send('Not Found');
+    }
+    return res.json(controllerDidDocument);
   });
 
   router.get([`${hostScopedWellKnownPrefix}/jwks.json`, `${tenantWellKnownPrefix}/jwks.json`], resolveTenant, async (req, res) => {

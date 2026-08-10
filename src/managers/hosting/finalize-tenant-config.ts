@@ -27,6 +27,8 @@ type FinalizeTenantConfigDeps = Readonly<{
     operationalTenantUrl?: string;
     governanceVc?: VerifiableCredentialV2;
     networkName?: NetworkName;
+    controllerDid?: string;
+    controllerDidDocument?: DidDocument;
   };
   config: any;
   kmsService: any;
@@ -88,7 +90,12 @@ export async function finalizeTenantConfig(
     publicTenantUrl,
     hostedPublicUrl: isHosted ? hostedPublicUrl : undefined,
   });
-  const skeletonDidDoc: DidDocument = { '@context': 'https://www.w3.org/ns/did/v1', id: primaryDid, alsoKnownAs };
+  const skeletonDidDoc: DidDocument = {
+    '@context': 'https://www.w3.org/ns/did/v1',
+    id: primaryDid,
+    alsoKnownAs,
+    ...(deps.options?.controllerDid ? { controller: deps.options.controllerDid } : {}),
+  };
   const didConfigServices = initializeTenantServicesConfig(
     deps.sector,
     [],
@@ -193,7 +200,12 @@ export async function finalizeTenantConfig(
     legacySignAlg,
     legacyX509DerBase64: deps.config.legacyX509DerBase64,
     legacyX509ChainBase64: deps.config.legacyX509ChainBase64,
-    meta: { lastUpdated: new Date().toISOString() },
+    meta: {
+      lastUpdated: new Date().toISOString(),
+      ...(deps.options?.controllerDidDocument
+        ? { controllerDidDocument: deps.options.controllerDidDocument }
+        : {}),
+    },
   };
 
   return applyTenantAuthorizationStatus(tenantConfig, 'active');

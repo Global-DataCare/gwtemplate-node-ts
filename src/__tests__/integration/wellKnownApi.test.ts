@@ -118,6 +118,36 @@ describe('Well-Known DID Discovery API', () => {
     // It's called twice: once in the middleware to check existence, once in the handler to get the data.
     expect(mockTenantsCacheManager.getDidDocument).toHaveBeenCalledTimes(2);
   });
+
+  it('resolves the public multikey controller did:web document separately from the tenant DID', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const tenantDid = `did:web:gateway.example:${testTenant1AlternateName}:cds-${urnParts.jurisdiction}:${urnParts.version}:${urnParts.sector}`;
+    const memberId = 'zControllerEmailHash';
+    const role = 'RESPRSN';
+    const controllerDid = `${tenantDid}:employee:${memberId}:${role}`;
+    const controllerDidDocument: DidDocument = {
+      '@context': 'https://www.w3.org/ns/did/v1',
+      id: controllerDid,
+      verificationMethod: [
+        { id: `${controllerDid}#es384`, type: 'JsonWebKey2020', controller: controllerDid, publicKeyJwk: { kid: 'es384', kty: 'EC', crv: 'P-384', x: 'x', y: 'y', alg: 'ES384' } },
+        { id: `${controllerDid}#pontus`, type: 'JsonWebKey2020', controller: controllerDid, publicKeyJwk: { kid: 'pontus', kty: 'EC', crv: 'secp256k1', x: 'x', y: 'y', alg: 'ES256K' } },
+        { id: `${controllerDid}#pqc`, type: 'JsonWebKey2020', controller: controllerDid, publicKeyJwk: { kid: 'pqc', kty: 'AKP', alg: 'ML-DSA-65', pub: 'public' } },
+      ],
+    };
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: tenantDid } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({
+      didDocument: { id: tenantDid },
+      meta: { controllerDidDocument },
+    } as any);
+
+    const response = await invokeExpress(app, {
+      method: 'GET',
+      url: `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/employee/${memberId}/${role}/did.json`,
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.text)).toEqual(controllerDidDocument);
+  });
 });
 
 describe('Well-Known JWKS Discovery API', () => {

@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+### Added
+
+- Preserve a governed legal-organization controller DID and all submitted
+  public JWKS during activation, reference that DID from the tenant DID, and
+  resolve its separate multikey `did:web` document at the canonical employee
+  DID path.
+
 ## [1.20.29] - 2026-08-05
 
 ### Fixed
@@ -2345,6 +2352,13 @@
   `gwtemplate-node-ts`, `dataspace-ica-ts`, and `gdc-sdk-node-ts`.
 
 # Changelog
+
+- Existing-tenant `Organization/_issue` now promotes an ICA-approved stable
+  controller `did:web` and its complete public JWKS into the tenant registry,
+  provided the verified request signer belongs to that submitted keyring. In
+  Fabric-backed modes it also records each public key and its active
+  `legal-organization-controller-signing` binding; external key use remains
+  separate.
 
 All notable changes to this project will be documented in this file.
 
