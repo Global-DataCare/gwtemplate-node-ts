@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+- Allow two simultaneous DCR installations per professional/member seat by
+  default. A second installation no longer revokes the first device profile,
+  DID keys, or Fabric key bindings; same-installation registration remains a
+  rotation path and a third installation is rejected by allowance.
+- Implement the neutral FHIR R5 SubscriptionTopic runtime: filter validation,
+  handshake-gated activation, resource-event matching, encrypted notification
+  outbox, HTTPS delivery and bounded retry state. Production rest-hook hosts
+  require `FHIR_SUBSCRIPTION_ENDPOINT_HOSTS` allowlisting.
+
+- Added encrypted FHIR R5 `Subscription/_batch` registration on tenant/BFF
+  (`entity`) and exact-subject (`individual`) scopes, with device push fan-out
+  kept outside the clinical subscription resource.
+- Persist RFC 7591 DCR software and application metadata in device profiles.
+
+
 ## [1.20.30] - 2026-08-09
 
 ### Added
@@ -2356,11 +2371,6 @@
 # Changelog
 
 ## Unreleased
-
-- Added encrypted FHIR R5 `Subscription/_batch` registration on tenant/BFF
-  (`entity`) and exact-subject (`individual`) scopes, with device push fan-out
-  kept outside the clinical subscription resource.
-- Persist RFC 7591 DCR software and application metadata in device profiles.
 
 - Existing-tenant `Organization/_issue` now promotes an ICA-approved stable
   controller `did:web` and its complete public JWKS into the tenant registry,

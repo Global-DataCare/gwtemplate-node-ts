@@ -200,20 +200,47 @@ describe('AppAuthorizationManager', () => {
             .rejects.toThrow('Activation code not found or invalid.');
       });
 
-      it('should throw an error if activation code is already used', async () => {
+      it('should reuse an active seat for a second installation of the same authenticated user', async () => {
         // Arrange
-        const mockLicense: DeviceLicense = { 
+        const mockLicense = {
           id: 'license-2', tenantId: 'acme', status: 'active', plan: 'annual',
           orderId: 'order-456', userClass: 'individual', type: 'web',
           renewalCycle: null, reactivationEnabled: false, exp: now + 3600,
           activationCode: 'used-code',
-        };
+          activatedBy: 'firebase-user-1',
+          maxDevices: 2,
+          deviceBindings: [{
+            clientId: 'client-one', clientInstanceId: 'install-one', status: 'active',
+            deviceInfo: { clientInstanceId: 'install-one' }, activatedAt: now,
+          }],
+        } as DeviceLicense & Record<string, any>;
         mockKmsService.getHmacBase64Url.mockResolvedValueOnce('hmac-name').mockResolvedValueOnce('hmac-value');
         mockVaultRepository.query.mockResolvedValue([{ id: 'used-code', content: mockLicense, sequence: 0 }]);
 
-        // Act & Assert
-        await expect(manager.verifyAndConsumeActivationCode('used-code', 'acme', 'health-care'))
-            .rejects.toThrow('License is not in an activatable state.');
+        await expect(manager.verifyAndConsumeActivationCode(
+          'used-code', 'acme', 'health-care', 'firebase-user-1', 'install-two',
+        )).resolves.toMatchObject({ valid: true });
+        await expect(manager.verifyAndConsumeActivationCode(
+          'used-code', 'acme', 'health-care', 'firebase-user-2', 'install-two',
+        )).rejects.toThrow('different authenticated user');
+      });
+
+      it('should bind a legacy active seat to its first authenticated reuse', async () => {
+        const mockLicense = {
+          id: 'legacy-license', tenantId: 'acme', status: 'active', plan: 'annual',
+          orderId: 'legacy-order', userClass: 'employee', type: 'web',
+          renewalCycle: null, reactivationEnabled: false, exp: now + 3600,
+          activationCode: 'legacy-code',
+        } as DeviceLicense & Record<string, any>;
+        mockKmsService.getHmacBase64Url.mockResolvedValueOnce('hmac-name').mockResolvedValueOnce('hmac-value');
+        mockVaultRepository.query.mockResolvedValue([{ id: 'legacy-code', content: mockLicense, sequence: 0 }]);
+
+        await manager.verifyAndConsumeActivationCode(
+          'legacy-code', 'acme', 'health-care', 'firebase-user-1', 'install-one',
+        );
+
+        expect(mockLicense).toMatchObject({ activatedBy: 'firebase-user-1', maxDevices: 2 });
+        expect(mockVaultRepository.put).toHaveBeenCalled();
       });
   });
 

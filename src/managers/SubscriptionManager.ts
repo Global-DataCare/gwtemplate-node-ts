@@ -28,6 +28,7 @@ const OUTBOX_SECTION = 'fhir-r5-subscription-notifications';
 /** Owns FHIR R5 SubscriptionTopic registration, matching and durable rest-hook delivery. */
 export class SubscriptionManager implements ISubscriptionProcessor {
   private readonly fetchFn: FetchLike;
+  private readonly scheduledOutboxIds = new Set<string>();
 
   constructor(private readonly deps: SubscriptionManagerDeps) {
     this.fetchFn = deps.fetchFn || globalThis.fetch.bind(globalThis);
@@ -138,7 +139,7 @@ export class SubscriptionManager implements ISubscriptionProcessor {
 
   private async store(vaultId: string, section: string, id: string, status: string, content: any): Promise<void> {
     const existing = await this.deps.vaultRepository.get<ConfidentialStorageDoc>(vaultId, id, getEnvSectionId(section));
-    const doc: ConfidentialStorageDoc = { id, status, sequence: Number(existing?.sequence || -1) + 1, content };
+    const doc: ConfidentialStorageDoc = { id, status, sequence: Number(existing?.sequence ?? -1) + 1, content };
     const protectedDoc = await this.deps.kmsService.protectConfidentialData(doc, vaultId);
     await this.deps.vaultRepository.put(vaultId, [protectedDoc], getEnvSectionId(section));
   }
@@ -256,14 +257,29 @@ export class SubscriptionManager implements ISubscriptionProcessor {
       outbox.lastError = String(error?.message || error);
     }
     outbox.updatedAt = new Date().toISOString();
-    outbox.nextAttemptAt = Date.now() + Math.min(60_000, 1000 * (2 ** outbox.attempts));
+    const retryDelay = Math.min(60_000, 1000 * (2 ** outbox.attempts));
+    outbox.nextAttemptAt = Date.now() + retryDelay;
     await this.store(vaultId, OUTBOX_SECTION, outbox.id, outbox.status, outbox);
+    if (outbox.status === 'retryable') this.scheduleRetry(vaultId, outbox, retryDelay);
   }
 
   private async retryPending(vaultId: string): Promise<void> {
     const pending = await this.readSection(vaultId, OUTBOX_SECTION).catch(() => []);
     for (const outbox of pending) {
-      if (outbox.status === 'retryable' && Number(outbox.nextAttemptAt || 0) <= Date.now()) await this.deliver(vaultId, outbox);
+      if (outbox.status === 'retryable'
+        && !this.scheduledOutboxIds.has(outbox.id)
+        && Number(outbox.nextAttemptAt || 0) <= Date.now()) await this.deliver(vaultId, outbox);
     }
+  }
+
+  private scheduleRetry(vaultId: string, outbox: any, delay: number): void {
+    if (this.scheduledOutboxIds.has(outbox.id)) return;
+    this.scheduledOutboxIds.add(outbox.id);
+    const timer = setTimeout(() => {
+      this.scheduledOutboxIds.delete(outbox.id);
+      void this.deliver(vaultId, outbox).catch((error) =>
+        console.error(`[FHIR Subscription] retry failed for ${outbox.id}:`, error));
+    }, delay);
+    timer.unref?.();
   }
 }

@@ -122,10 +122,12 @@ describe('DeviceRegistrationManager', () => {
       );
       const updatedContent = (updatedLicense?.content || {}) as DeviceLicense;
       expect(updatedContent.deviceId).toBe(resource.client_id);
+      expect((updatedContent as any).maxDevices).toBe(2);
+      expect((updatedContent as any).deviceBindings).toHaveLength(1);
       expect(updatedContent.status).toBe('active');
     });
 
-    it('should replace the previous device for the same employee license and sync employee identity', async () => {
+    it('should keep two devices and both key sets active for the same employee seat', async () => {
       Object.assign(process.env, FABRIC_LEDGER_TEST_ENV);
 
       const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
@@ -260,14 +262,12 @@ describe('DeviceRegistrationManager', () => {
       expect(newClientId).toBeTruthy();
       expect(newClientId).not.toBe(previousDeviceId);
 
-      const revokedProfileDoc = await vaultRepository.get<ConfidentialStorageDoc>(
+      const previousProfileDoc = await vaultRepository.get<ConfidentialStorageDoc>(
         vaultId,
         previousDeviceId,
         getEnvSectionId('device-profiles'),
       );
-      const revokedProfileContent = await mockKmsService.unprotectConfidentialData<any>(revokedProfileDoc!, vaultId);
-      expect(revokedProfileDoc?.status).toBe('revoked');
-      expect(revokedProfileContent.replacedByClientId).toBe(newClientId);
+      expect(previousProfileDoc?.status).toBe('active');
 
       const updatedEmployeeDoc = await vaultRepository.get<ConfidentialStorageDoc>(
         vaultId,
@@ -278,13 +278,41 @@ describe('DeviceRegistrationManager', () => {
       expect(updatedEmployee.didDocument?.verificationMethod?.map((method) => method.id)).toEqual(
         expect.arrayContaining([`${employeeDid}#sig-new`, `${employeeDid}#enc-new`]),
       );
-      expect(updatedEmployee.didDocument?.verificationMethod?.map((method) => method.id)).not.toEqual(
+      expect(updatedEmployee.didDocument?.verificationMethod?.map((method) => method.id)).toEqual(
         expect.arrayContaining([`${employeeDid}#sig-old`, `${employeeDid}#enc-old`]),
       );
 
+      const updatedLicense = await vaultRepository.get<ConfidentialStorageDoc>(
+        vaultId, license.id, getEnvSectionId('device-licenses'),
+      );
+      expect((updatedLicense?.content as any).deviceId).toBe(previousDeviceId);
+      expect((updatedLicense?.content as any).deviceBindings.filter((binding: any) => binding.status === 'active')).toHaveLength(2);
+
       expect(registerKeySpy).toHaveBeenCalledTimes(2);
-      expect(keySubmitSpy).toHaveBeenCalledWith('Org1MSP', 'UpdateKeyStatus', expect.any(String), 'revoked', expect.any(String));
+      expect(keySubmitSpy).not.toHaveBeenCalled();
       expect(bindingSpy).toHaveBeenCalled();
+    });
+
+    it('should reject a third installation when the seat allowance is two', async () => {
+      const job = cloneDeep(DCR_REGISTRATION_JOB);
+      (job.content?.body as any).ext_device_info.device_id = 'install-third';
+      const activationCode = (job.content?.body as any).code;
+      const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+      await vaultRepository.put(vaultId, [{
+        id: 'license-full', status: 'active', sequence: 0, content: {
+          id: 'license-full', tenantId: job.tenantId, orderId: 'order', activationCode,
+          userClass: 'employee', type: 'web', status: 'active', plan: 'default',
+          renewalCycle: '12m', reactivationEnabled: false, exp: Math.floor(Date.now() / 1000) + 3600,
+          maxDevices: 2,
+          deviceBindings: ['one', 'two'].map((id) => ({
+            clientId: `client-${id}`, clientInstanceId: `install-${id}`, status: 'active',
+            deviceInfo: { clientInstanceId: `install-${id}` }, activatedAt: 1,
+          })),
+        },
+      } as any], getEnvSectionId('device-licenses'));
+
+      const result = await manager.process(job);
+      expect(((result.body as BundleJsonApi).data[0] as ErrorEntry).response.status).toBe('409');
     });
 
     it('should return a 400 error if redirect_uris are missing', async () => {

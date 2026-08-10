@@ -13,6 +13,7 @@ import { federateOidcIdTokenToFirebaseCustomToken } from '../auth/OidcFederation
 
 type TokenExchangeBody = {
   subject_token?: string;
+  client_instance_id?: string;
 };
 
 type FirebaseCustomTokenBody = {
@@ -64,7 +65,13 @@ export class IdentityTokenManager implements IJobProcessor {
       throw new ManagerError('Missing subject_token in request body.', IssueType.Value);
     }
 
-    await this.appAuthManager.verifyAndConsumeActivationCode(activationCode, tenantIdFromToken, job.sector as string);
+    await this.appAuthManager.verifyAndConsumeActivationCode(
+      activationCode,
+      tenantIdFromToken,
+      job.sector as string,
+      userId,
+      body.client_instance_id,
+    );
 
     const tokenLifetime = 60;
     const claims = {
