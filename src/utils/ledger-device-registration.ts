@@ -1,4 +1,5 @@
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import type { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { VerificationMethod } from '../gdc-backend-utils-node/models/did';
 import { resolveSubjectIdentityChannel } from './ledger';
 import { ManageAssetCryptographicKey, type CryptographicKeyLedgerPayload } from '../blockchain/fabric/v3/manageAssetCryptographicKey';
@@ -7,6 +8,7 @@ import { shouldUseFabricLedger } from '../adapters/credential-ledger-resolver';
 import {
   hashLedgerString,
   inferLedgerJwkUse,
+  resolveLedgerOrganizationId,
   tryGetJwkThumbprint,
 } from './ledger-organization-registration-helpers';
 
@@ -37,6 +39,9 @@ export async function registerSubjectKeysOnLedger(params: {
   subjectId: string;
   verificationMethods: VerificationMethod[];
   deviceId?: string;
+  relationshipPrefix?: 'employee-device' | 'legal-organization-controller';
+  keyOrigin?: string;
+  auditAttributes?: Record<string, unknown>;
 }): Promise<void> {
   if (!shouldSyncIdentityLedger()) return;
 
@@ -60,7 +65,8 @@ export async function registerSubjectKeysOnLedger(params: {
     const thumbprint = tryGetJwkThumbprint(publicKeyJwk);
     const keyId = resolveLedgerKeyId(method);
     const use = String((publicKeyJwk as any)?.use || '').trim() || inferLedgerJwkUse(publicKeyJwk);
-    const relationship = use === 'enc' ? 'employee-device-encryption' : 'employee-device-signing';
+    const relationshipPrefix = params.relationshipPrefix || 'employee-device';
+    const relationship = use === 'enc' ? `${relationshipPrefix}-encryption` : `${relationshipPrefix}-signing`;
 
     const keyPayload: CryptographicKeyLedgerPayload = {
       keyId,
@@ -73,7 +79,7 @@ export async function registerSubjectKeysOnLedger(params: {
       use: use as CryptographicKeyLedgerPayload['use'],
       purpose: relationship,
       status: 'active',
-      origin: 'did:web',
+      origin: params.keyOrigin || 'did:web',
     };
 
     try {
@@ -99,10 +105,42 @@ export async function registerSubjectKeysOnLedger(params: {
           kid: publicKeyJwk.kid,
           deviceId: params.deviceId,
           thumbprintMissing: !thumbprint,
+          ...(params.auditAttributes || {}),
         },
       },
     });
   }
+}
+
+/**
+ * Records the current controller DID key associations on the identity ledger.
+ * Fabric is the governed audit trail for bindings; it never receives private
+ * material and does not replace the external network where a key is used.
+ */
+export async function registerControllerKeysOnLedger(params: {
+  jurisdiction?: string;
+  organizationClaims: ClaimsRecord;
+  controllerDid: string;
+  verificationMethods: VerificationMethod[];
+  transactionId?: string;
+}): Promise<void> {
+  if (!shouldSyncIdentityLedger()) return;
+  if (!getLedgerMspId()) {
+    throw new Error('Controller ledger binding requires LEDGER_MSP_ID in a Fabric-backed network mode.');
+  }
+  await registerSubjectKeysOnLedger({
+    jurisdiction: params.jurisdiction,
+    organizationId: resolveLedgerOrganizationId(params.organizationClaims),
+    subjectType: 'employee',
+    subjectId: params.controllerDid,
+    verificationMethods: params.verificationMethods,
+    relationshipPrefix: 'legal-organization-controller',
+    keyOrigin: 'ica-verified-issue',
+    auditAttributes: {
+      controllerDid: params.controllerDid,
+      ...(params.transactionId ? { transactionId: params.transactionId } : {}),
+    },
+  });
 }
 
 export async function revokeSubjectKeysOnLedger(params: {

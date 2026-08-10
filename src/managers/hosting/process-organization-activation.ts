@@ -86,6 +86,8 @@ type ActivationDeps = Readonly<{
       publicTenantUrl?: string;
       governanceVc?: VerifiableCredentialV2;
       networkName?: NetworkName;
+      controllerDid?: string;
+      controllerDidDocument?: DidDocument;
     },
   ) => Promise<OrganizationConfig>;
   getCurrentUrnNetwork: () => string;
@@ -273,6 +275,22 @@ async function processActivationEntry(
   await deps.vaultRepository.createNewVault({ id: tenantCollectionName });
   await deps.kmsService.provisionKeys(vaultId);
 
+  const tenantUrn = createOrganizationUrn({
+    namespace: deps.config.namespace,
+    network: deps.getCurrentUrnNetwork(),
+    jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+    sector: requestedSector,
+    idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+    idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+  });
+  const controllerConfig = await deps.buildControllerEntityConfig(
+    person,
+    tenantUrn,
+    vaultId,
+    deps.extractRegistrationKeys(deps.jobMeta),
+    activation.controllerBinding,
+  );
+
   const finalTenantConfig = await deps.finalizeTenantConfig(
     organization,
     alternateName,
@@ -284,6 +302,8 @@ async function processActivationEntry(
       primaryDid: organizationDid,
       publicTenantUrl: normalizedPublicUrl,
       governanceVc: activation.organizationCredential as VerifiableCredentialV2 | undefined,
+      controllerDid: activation.controllerBinding?.did,
+      controllerDidDocument: controllerConfig.didDocument,
     },
   );
   if (activation.representativeCredential || activation.vpToken) {
@@ -325,21 +345,6 @@ async function processActivationEntry(
   const secureSelfDescDoc = await deps.kmsService.protectConfidentialData(selfDescDoc, vaultId);
   await deps.vaultRepository.put(tenantCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], getEnvSectionId('.well-known'));
 
-  const tenantUrn = createOrganizationUrn({
-    namespace: deps.config.namespace,
-    network: deps.getCurrentUrnNetwork(),
-    jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
-    sector: requestedSector,
-    idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
-    idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
-  });
-  const controllerConfig = await deps.buildControllerEntityConfig(
-    person,
-    tenantUrn,
-    vaultId,
-    deps.extractRegistrationKeys(deps.jobMeta),
-    activation.controllerBinding,
-  );
   await deps.storeControllerEntityConfig(controllerConfig, tenantCollectionName, vaultId);
   const icaDidRegistration = await deps.registerDidDocumentWithIca({
     vpToken: activation.vpToken,

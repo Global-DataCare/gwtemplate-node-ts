@@ -6778,6 +6778,23 @@
         "x-profile": "core"
       }
     },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/employee/{memberId}/{role}/did.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Resolve the governed organization controller DID document",
+        "responses": {
+          "200": {
+            "description": "Public controller DID document"
+          },
+          "404": {
+            "description": "Controller DID is not registered for this tenant"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/dspace-version": {
       "get": {
         "tags": [

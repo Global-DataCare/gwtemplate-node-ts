@@ -93,6 +93,12 @@ type VerificationDeps = Readonly<{
     resourceType: string;
   }) => Promise<any>;
   extractCredentialResourcesFromIcaPayload: (icaResponse: unknown) => Array<Record<string, unknown>>;
+  persistExistingTenantControllerBinding?: (input: {
+    claims: ClaimsRecord;
+    controller?: Record<string, unknown>;
+    verifiedSignerKid?: string;
+    transactionId?: string;
+  }) => Promise<void>;
 }>;
 
 export async function processOrganizationVerificationTransaction(
@@ -200,6 +206,12 @@ export async function processOrganizationIssue(
     environment: resourceType,
     fallbackAlternateName: deps.job.tenantId,
     bearerPayload: (deps.job.content as any)?.meta?.bearer?.jwt?.payload,
+  });
+  await deps.persistExistingTenantControllerBinding?.({
+    claims: processedClaims,
+    controller: resource.controller,
+    verifiedSignerKid: deps.job.content?.meta?.jws?.protected?.kid as string | undefined,
+    transactionId: deps.job.content?.thid as string | undefined,
   });
 
   return {

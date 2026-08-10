@@ -740,6 +740,22 @@ describe('HostingManager activation flow', () => {
       jwks: {
         keys: [
           {
+            kid: 'legacy-pontus-x-kid',
+            kty: 'EC',
+            crv: 'secp256k1',
+            x: 'legacy-pontus-x',
+            y: 'legacy-pontus-y',
+            alg: 'ES256K',
+            use: 'sig',
+          },
+          {
+            kid: 'controller-pqc-kid',
+            kty: 'AKP',
+            alg: 'ML-DSA-65',
+            pub: 'controller-pqc-public-key',
+            use: 'sig',
+          },
+          {
             kid: 'explicit-controller-enc-kid',
             kty: 'EC',
             crv: 'P-384',
@@ -803,6 +819,22 @@ describe('HostingManager activation flow', () => {
       jwks: {
         keys: [
           {
+            kid: 'legacy-pontus-x-kid',
+            kty: 'EC',
+            crv: 'secp256k1',
+            x: 'legacy-pontus-x',
+            y: 'legacy-pontus-y',
+            alg: 'ES256K',
+            use: 'sig',
+          },
+          {
+            kid: 'controller-pqc-kid',
+            kty: 'AKP',
+            alg: 'ML-DSA-65',
+            pub: 'controller-pqc-public-key',
+            use: 'sig',
+          },
+          {
             kid: 'explicit-controller-enc-kid',
             kty: 'EC',
             crv: 'P-384',
@@ -833,13 +865,21 @@ describe('HostingManager activation flow', () => {
     expect(controllerDidDocument.id).toBe('did:web:people.acme.org:controllers:primary');
     expect(controllerDidDocument.alsoKnownAs).toContain(controllerSameAs);
     expect(controllerDidDocument.verificationMethod?.[0]?.publicKeyJwk?.kid).toBe('explicit-controller-sig-kid');
+    expect(controllerDidDocument.verificationMethod.map((method: any) => method.publicKeyJwk.kid)).toEqual(
+      expect.arrayContaining(['explicit-controller-sig-kid', 'legacy-pontus-x-kid', 'controller-pqc-kid']),
+    );
     expect(controllerDidDocument.keyAgreement).toContain('did:web:people.acme.org:controllers:primary#explicit-controller-enc-kid');
 
     const icaRequestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const icaOrganization = icaRequestBody.body?.data?.[0]?.resource?.organization;
     const icaController = icaRequestBody.body?.data?.[0]?.resource?.controller;
+    expect(icaOrganization.didDocument.controller).toBe('did:web:people.acme.org:controllers:primary');
     expect(icaController.publicKeyJwk.kid).toBe('explicit-controller-sig-kid');
     expect(icaController.sameAs).toBe(controllerSameAs);
-    expect(icaController.jwks.keys[0].kid).toBe('explicit-controller-enc-kid');
+    expect(icaController.did).toBe('did:web:people.acme.org:controllers:primary');
+    expect(icaController.jwks.keys.map((key: any) => key.kid)).toEqual(
+      expect.arrayContaining(['legacy-pontus-x-kid', 'controller-pqc-kid', 'explicit-controller-enc-kid']),
+    );
   });
 
   it('should poll ICA DID creation when remote endpoint responds 202', async () => {

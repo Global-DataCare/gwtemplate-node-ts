@@ -44,6 +44,7 @@ import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { shouldUseFabricLedger } from '../adapters/credential-ledger-resolver';
+import { registerControllerKeysOnLedger } from '../utils/ledger-device-registration';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { buildGatewayInvoiceBundle } from '../utils/invoice-bundle';
 import { verifyOrderPaymentConfirmation } from '../utils/payment-confirmation';
@@ -68,6 +69,7 @@ import {
   processOrganizationVerificationTransaction as processOrganizationVerificationTransactionExternal,
 } from './hosting/process-organization-verification';
 import { processOrganizationActivation as processOrganizationActivationExternal } from './hosting/process-organization-activation';
+import { persistExistingTenantControllerBinding as persistExistingTenantControllerBindingExternal } from './hosting/persist-existing-tenant-controller-binding';
 import { finalizeTenantConfig as finalizeTenantConfigExternal } from './hosting/finalize-tenant-config';
 import { handleServiceAttachment } from './hosting/service-attachment';
 import {
@@ -880,6 +882,18 @@ export class HostingManager {
       createOrganizationIssueClaimsFromClaims: this.createOrganizationIssueClaimsFromClaims.bind(this),
       forwardOrganizationVerificationTransactionToIca: this.forwardOrganizationVerificationTransactionToIca.bind(this),
       extractCredentialResourcesFromIcaPayload: this.extractCredentialResourcesFromIcaPayload.bind(this),
+      persistExistingTenantControllerBinding: ({ claims, controller, verifiedSignerKid, transactionId }) =>
+        persistExistingTenantControllerBindingExternal({
+          claims,
+          controller,
+          verifiedSignerKid,
+          transactionId,
+          hostCollectionName: this.hostRuntime.hostCollectionName,
+          vaultRepository: this.vaultRepository,
+          kmsService: this.kmsService,
+          tenantsCacheManager: this.tenantsCacheManager,
+          registerControllerKeysOnLedger,
+        }),
     });
   }
 
@@ -1445,6 +1459,8 @@ export class HostingManager {
       operationalTenantUrl?: string;
       governanceVc?: VerifiableCredentialV2;
       networkName?: NetworkName;
+      controllerDid?: string;
+      controllerDidDocument?: DidDocument;
     },
   ): Promise<OrganizationConfig> {
     return finalizeTenantConfigExternal({
