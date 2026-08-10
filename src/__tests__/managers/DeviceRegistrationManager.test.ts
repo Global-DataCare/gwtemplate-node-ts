@@ -64,6 +64,8 @@ describe('DeviceRegistrationManager', () => {
       // Arrange
       const job = cloneDeep(DCR_REGISTRATION_JOB);
       (job.content?.body as any).application_type = 'web';
+      (job.content?.body as any).software_id = 'com.example.professional';
+      (job.content?.body as any).software_version = '2.4.0';
       const activationCode = (job.content?.body as any)?.code as string;
       const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
       const license: DeviceLicense = {
@@ -108,6 +110,10 @@ describe('DeviceRegistrationManager', () => {
       );
       expect(deviceProfileDoc).toBeDefined();
       expect(deviceProfileDoc?.jwe).toBeDefined();
+      const deviceProfile = await mockKmsService.unprotectConfidentialData<any>(deviceProfileDoc!, vaultId);
+      expect(deviceProfile.software_id).toBe('com.example.professional');
+      expect(deviceProfile.software_version).toBe('2.4.0');
+      expect(deviceProfile.application_type).toBe('web');
 
       const updatedLicense = await vaultRepository.get<ConfidentialStorageDoc>(
         vaultId,

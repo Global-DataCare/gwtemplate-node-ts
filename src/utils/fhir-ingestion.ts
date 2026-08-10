@@ -3,7 +3,7 @@
 
 import { toLedgerSafeMetaTags } from '../services/ai/metaTagSanitizer';
 
-export type SupportedFhirIngestionFormat = 'org.hl7.fhir.api' | 'org.hl7.fhir.r4';
+export type SupportedFhirIngestionFormat = 'org.hl7.fhir.api' | 'org.hl7.fhir.r4' | 'org.hl7.fhir.r5';
 export type ManagedFhirVersion = 'r4' | 'r5';
 export type FhirVersionValidator = (resource: any, expectedResourceType: string) => void;
 
@@ -23,11 +23,11 @@ export function clearFhirVersionValidators(): void {
 
 export function normalizeFhirIngestionFormat(format: string): SupportedFhirIngestionFormat {
   const normalized = String(format || '').trim().toLowerCase();
-  if (normalized === 'org.hl7.fhir.api' || normalized === 'org.hl7.fhir.r4') {
+  if (normalized === 'org.hl7.fhir.api' || normalized === 'org.hl7.fhir.r4' || normalized === 'org.hl7.fhir.r5') {
     return normalized as SupportedFhirIngestionFormat;
   }
   throw new Error(
-    `Unsupported FHIR format '${format}'. Allowed: org.hl7.fhir.api, org.hl7.fhir.r4.`,
+    `Unsupported FHIR format '${format}'. Allowed: org.hl7.fhir.api, org.hl7.fhir.r4, org.hl7.fhir.r5.`,
   );
 }
 
@@ -35,19 +35,17 @@ function resolveFhirVersion(
   format: SupportedFhirIngestionFormat,
 ): ManagedFhirVersion | undefined {
   if (format === 'org.hl7.fhir.r4') return 'r4';
+  if (format === 'org.hl7.fhir.r5') return 'r5';
   return undefined;
 }
 
 /**
  * Version-aware validation hook for ingestion payloads.
  * - `.api`: claims-first mode; no strict FHIR resource validation.
- * - `.r4`: validates `entry.resource.resourceType` and, if registered, invokes
+ * - `.r4`/`.r5`: validates `entry.resource.resourceType` and, if registered, invokes
  *   a concrete validator for that FHIR version.
  *
- * NOTE:
- * - R5 is not yet exposed as an ingestion format in URL routing.
- * - The validator registry is added now so R5 validators can be plugged later
- *   without changing manager logic.
+ * Deployments may register stricter version-specific validators.
  */
 export function validateFhirPayloadByVersion(
   format: SupportedFhirIngestionFormat,
@@ -61,17 +59,17 @@ export function validateFhirPayloadByVersion(
   const resource = entry?.resource;
   if (!resource || typeof resource !== 'object') {
     throw new Error(
-      `FHIR R4 validation requires entry.resource for '${expectedResourceType}'.`,
+      `FHIR validation requires entry.resource for '${expectedResourceType}'.`,
     );
   }
 
   const actualType = String(resource.resourceType || '').trim();
   if (!actualType) {
-    throw new Error('FHIR R4 validation failed: missing resource.resourceType.');
+    throw new Error('FHIR validation failed: missing resource.resourceType.');
   }
   if (actualType.toLowerCase() !== expectedResourceType.toLowerCase()) {
     throw new Error(
-      `FHIR R4 validation failed: expected resourceType '${expectedResourceType}' but got '${actualType}'.`,
+      `FHIR validation failed: expected resourceType '${expectedResourceType}' but got '${actualType}'.`,
     );
   }
 

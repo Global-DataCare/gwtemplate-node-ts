@@ -200,6 +200,15 @@ describe('Service Initialization Utilities', () => {
       expect(fhirApiService!.serviceEndpoint).toContain('Consent');
       expect(fhirApiService!.serviceEndpoint).toContain('DocumentReference');
 
+      const tenantSubscriptionService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'entity' &&
+          (s as any).selector?.format === 'org.hl7.fhir.r5' &&
+          s.serviceEndpoint === 'Subscription' &&
+          (s.actions || []).includes('_batch'),
+      );
+      expect(tenantSubscriptionService).toBeDefined();
+
       const subjectSearchService = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'individual' &&

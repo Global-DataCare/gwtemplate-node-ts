@@ -107,6 +107,9 @@ export class Worker {
         case 'Communication':
           manager = this.managers.communicationManager;
           break;
+        case 'Subscription':
+          manager = this.managers.subscriptionManager;
+          break;
         case 'Observation':
           manager = this.managers.observationManager;
           break;

@@ -2355,6 +2355,13 @@
 
 # Changelog
 
+## Unreleased
+
+- Added encrypted FHIR R5 `Subscription/_batch` registration on tenant/BFF
+  (`entity`) and exact-subject (`individual`) scopes, with device push fan-out
+  kept outside the clinical subscription resource.
+- Persist RFC 7591 DCR software and application metadata in device profiles.
+
 - Existing-tenant `Organization/_issue` now promotes an ICA-approved stable
   controller `did:web` and its complete public JWKS into the tenant registry,
   provided the verified request signer belongs to that submitted keyring. In

@@ -132,7 +132,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   const entityResources = ['Employee', 'EmployeeRole', 'Place', 'Organization', 'Bundle'];
   // NOTE: `Organization`/`Order` under `individual/org.schema` is used for the Family onboarding flow
   // (the "family" is modelled as an Organization representing a household).
-  const individualResources = ['Person', 'Organization', 'Order', 'Composition', 'Communication', 'Subscription', 'RelatedPerson', 'Bundle'];
+  const individualResources = ['Person', 'Organization', 'Order', 'Composition', 'Communication', 'RelatedPerson', 'Bundle'];
 
   if (isFhir) {
     entityResources.push('Practitioner', 'PractitionerRole', 'Location');
@@ -253,6 +253,20 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
       createDidEndpointConfigFromSelector(
         { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.r4' },
         fhirR4CoreBatchResources,
+        ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.r5' },
+        ['Subscription'],
+        ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'entity', format: 'org.hl7.fhir.r5' },
+        ['Subscription'],
         ['_batch'],
       ),
     );

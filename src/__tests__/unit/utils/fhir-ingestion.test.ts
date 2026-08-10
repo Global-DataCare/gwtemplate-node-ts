@@ -17,7 +17,7 @@ describe('fhir-ingestion utils', () => {
   it('normalizes allowed ingestion formats', () => {
     expect(normalizeFhirIngestionFormat('org.hl7.fhir.api')).toBe('org.hl7.fhir.api');
     expect(normalizeFhirIngestionFormat('ORG.HL7.FHIR.R4')).toBe('org.hl7.fhir.r4');
-    expect(() => normalizeFhirIngestionFormat('org.hl7.fhir.r5')).toThrow('Unsupported FHIR format');
+    expect(normalizeFhirIngestionFormat('org.hl7.fhir.r5')).toBe('org.hl7.fhir.r5');
   });
 
   it('skips strict validation in org.hl7.fhir.api mode', () => {
@@ -29,13 +29,13 @@ describe('fhir-ingestion utils', () => {
   it('requires resource/resourceType in org.hl7.fhir.r4 mode', () => {
     expect(() =>
       validateFhirPayloadByVersion('org.hl7.fhir.r4', 'Observation', { meta: { claims: {} } }),
-    ).toThrow("FHIR R4 validation requires entry.resource for 'Observation'.");
+    ).toThrow("FHIR validation requires entry.resource for 'Observation'.");
 
     expect(() =>
       validateFhirPayloadByVersion('org.hl7.fhir.r4', 'Observation', {
         resource: { resourceType: 'DocumentReference' },
       }),
-    ).toThrow("FHIR R4 validation failed: expected resourceType 'Observation' but got 'DocumentReference'.");
+    ).toThrow("FHIR validation failed: expected resourceType 'Observation' but got 'DocumentReference'.");
   });
 
   it('invokes registered r4 validator when format is org.hl7.fhir.r4', () => {
@@ -47,5 +47,15 @@ describe('fhir-ingestion utils', () => {
 
     expect(validator).toHaveBeenCalledTimes(1);
     expect(validator).toHaveBeenCalledWith(resource, 'Observation');
+  });
+
+  it('invokes registered r5 validator when format is org.hl7.fhir.r5', () => {
+    const validator = jest.fn();
+    registerFhirVersionValidator('r5', validator);
+    const resource = { resourceType: 'Subscription', status: 'requested' };
+
+    validateFhirPayloadByVersion('org.hl7.fhir.r5', 'Subscription', { resource });
+
+    expect(validator).toHaveBeenCalledWith(resource, 'Subscription');
   });
 });

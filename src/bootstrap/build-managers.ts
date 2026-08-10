@@ -27,6 +27,7 @@ import { CompositionManager } from '../managers/CompositionManager';
 import { TwinCompositionManager } from '../managers/TwinCompositionManager';
 import { DocumentReferenceManager } from '../managers/DocumentReferenceManager';
 import { CommunicationManager } from '../managers/CommunicationManager';
+import { SubscriptionManager } from '../managers/SubscriptionManager';
 import { DeviceRegistrationManager } from '../managers/DeviceRegistrationManager';
 import { LicenseManager } from '../managers/LicenseManager';
 import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
@@ -161,6 +162,7 @@ export function buildManagers(options: {
     compositionManager,
     individualManager,
   });
+  const subscriptionManager = new SubscriptionManager({ vaultRepository, kmsService, tenantsCacheManager: tenantManager });
   const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService);
   const licenseManager = new LicenseManager(vaultRepository, kmsService, tenantManager);
   const tokenVerifier = resolveTokenVerifierFromEnv(isTestEnv);
@@ -193,6 +195,7 @@ export function buildManagers(options: {
     twinCompositionManager,
     documentReferenceManager,
     communicationManager,
+    subscriptionManager,
     deviceRegistrationManager,
     licenseManager,
     appAuthManager,

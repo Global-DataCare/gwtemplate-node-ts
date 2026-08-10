@@ -57,7 +57,10 @@ export class DeviceRegistrationManager implements IJobProcessor {
       }
 
       const code = job.content?.body?.code;
-      const registrationRequest = job.content?.body as DcrRegistrationRequest;
+      const registrationRequest = job.content?.body as DcrRegistrationRequest & {
+        software_id?: string;
+        software_version?: string;
+      };
 
       // --- Validation Step ---
       this.validateRequest(code, registrationRequest);
@@ -96,6 +99,8 @@ export class DeviceRegistrationManager implements IJobProcessor {
         '@type': 'SoftwareApplication',
         'org.schema.SoftwareApplication.identifier': clientId,
       };
+      if (registrationRequest.software_id) softwareClaims['org.schema.SoftwareApplication.applicationCategory'] = registrationRequest.software_id;
+      if (registrationRequest.software_version) softwareClaims['org.schema.SoftwareApplication.softwareVersion'] = registrationRequest.software_version;
       if (registrationRequest.client_name) {
         softwareClaims['org.schema.SoftwareApplication.name'] = registrationRequest.client_name;
       }
@@ -131,6 +136,9 @@ export class DeviceRegistrationManager implements IJobProcessor {
         activationCode: code,
         redirect_uris: registrationRequest.redirect_uris,
         token_endpoint_auth_method: registrationRequest.token_endpoint_auth_method,
+        application_type: registrationRequest.application_type,
+        software_id: registrationRequest.software_id,
+        software_version: registrationRequest.software_version,
         jwks_uri: registrationRequest.jwks_uri,
         jwks: registrationRequest.jwks,
         ext_device_info: registrationRequest.ext_device_info,
