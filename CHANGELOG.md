@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+- Wire the existing FHIR R5 `SubscriptionManager` into the production worker
+  registry so Subscription and SubscriptionTopic jobs no longer fail as an
+  uninitialized manager.
+- Add a pinned HAPI FHIR R5 Docker profile and executable REST-hook E2E that
+  creates a topic, exact-patient subscription and Observation, then verifies
+  the resulting `subscription-notification` Bundle.
+- Publish the neutral Subscription and SubscriptionTopic `_batch` contracts in
+  generated OpenAPI and expand their runtime JSDoc boundaries.
+
 ## [1.21.1] - 2026-08-09
 
 - Bind a multi-device seat to

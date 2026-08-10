@@ -220,6 +220,61 @@ type RouteParams = {
 };
 
 /**
+ * @openapi
+ * /{tenantId}/cds-{jurisdiction}/v1/{sector}/{section}/org.hl7.fhir.r5/SubscriptionTopic/_batch:
+ *   post:
+ *     summary: Register FHIR R5 subscription topics
+ *     description: >-
+ *       Registers the neutral topic catalog used by GW CORE. The section is
+ *       normally entity. Topics are stored encrypted and later used to
+ *       validate Subscription filters.
+ *     tags: [FHIR R5 Subscriptions]
+ *     parameters:
+ *       - { in: path, name: tenantId, required: true, schema: { type: string } }
+ *       - { in: path, name: jurisdiction, required: true, schema: { type: string } }
+ *       - { in: path, name: sector, required: true, schema: { type: string } }
+ *       - { in: path, name: section, required: true, schema: { type: string, enum: [entity] } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/fhir+json:
+ *           schema: { type: object }
+ *     responses:
+ *       '202': { description: Accepted for asynchronous processing }
+ *       '400': { description: Invalid SubscriptionTopic or route }
+ *       '415': { description: Media type rejected by the active security profile }
+ */
+
+/**
+ * @openapi
+ * /{tenantId}/cds-{jurisdiction}/v1/{sector}/{section}/org.hl7.fhir.r5/Subscription/_batch:
+ *   post:
+ *     summary: Register FHIR R5 rest-hook subscriptions
+ *     description: >-
+ *       Registers an encrypted tenant or exact-subject Subscription. GW CORE
+ *       validates the filters against an active SubscriptionTopic, performs
+ *       the standard rest-hook handshake, and activates delivery only after a
+ *       successful response. Individual scope requires an exact patient or
+ *       subject filter.
+ *     tags: [FHIR R5 Subscriptions]
+ *     parameters:
+ *       - { in: path, name: tenantId, required: true, schema: { type: string } }
+ *       - { in: path, name: jurisdiction, required: true, schema: { type: string } }
+ *       - { in: path, name: sector, required: true, schema: { type: string } }
+ *       - { in: path, name: section, required: true, schema: { type: string, enum: [entity, individual] } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/fhir+json:
+ *           schema: { type: object }
+ *     responses:
+ *       '202': { description: Accepted for asynchronous processing }
+ *       '400': { description: Invalid Subscription, filter, topic, or endpoint }
+ *       '404': { description: Tenant vault or active topic not found }
+ *       '415': { description: Media type rejected by the active security profile }
+ */
+
+/**
  * Backward/forward compatibility adapter:
  * - Canonical SDK identity pattern (preferred for new integrations):
  *   /host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/{action}

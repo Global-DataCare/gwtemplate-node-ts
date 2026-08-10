@@ -29,7 +29,20 @@ const TOPICS_SECTION = 'fhir-r5-subscription-topics';
 const SUBSCRIPTIONS_SECTION = 'fhir-r5-subscriptions';
 const OUTBOX_SECTION = 'fhir-r5-subscription-notifications';
 
-/** Owns FHIR R5 SubscriptionTopic registration, matching and durable rest-hook delivery. */
+/**
+ * Owns the provider side of the neutral FHIR R5 subscription protocol.
+ *
+ * Responsibilities:
+ * - register `SubscriptionTopic` and `Subscription` resources
+ * - validate exact-subject filters and production endpoint allowlists
+ * - send the initial REST-hook handshake
+ * - match successful resource writes against active topics
+ * - persist notification Bundles before bounded retry delivery
+ *
+ * This manager does not implement a product-specific EHR connector, device
+ * push transport, user consent decision, or DCR. Those consumers receive the
+ * standard `Bundle.type = subscription-notification` output separately.
+ */
 export class SubscriptionManager implements ISubscriptionProcessor {
   private readonly fetchFn: FetchLike;
   private readonly scheduledOutboxIds = new Set<string>();
@@ -98,7 +111,10 @@ export class SubscriptionManager implements ISubscriptionProcessor {
     };
   }
 
-  /** Captures successful resource writes, matches active topics and delivers durable notifications. */
+  /**
+   * Captures successful resource writes and emits durable FHIR R5
+   * `subscription-notification` Bundles for every matching active subscription.
+   */
   public async captureEvents(job: JobRequest, result?: IDecodedDidcommPayload): Promise<void> {
     if (!job.tenantId || !job.sector) return;
     if (String(job.resourceType) === 'Subscription' || String(job.resourceType) === 'SubscriptionTopic') return;

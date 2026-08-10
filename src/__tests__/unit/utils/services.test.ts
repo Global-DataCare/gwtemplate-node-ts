@@ -204,7 +204,7 @@ describe('Service Initialization Utilities', () => {
         (s: DidService) =>
           (s as any).selector?.section === 'entity' &&
           (s as any).selector?.format === 'org.hl7.fhir.r5' &&
-          s.serviceEndpoint === 'Subscription' &&
+          String(s.serviceEndpoint).split(',').includes('Subscription') &&
           (s.actions || []).includes('_batch'),
       );
       expect(tenantSubscriptionService).toBeDefined();

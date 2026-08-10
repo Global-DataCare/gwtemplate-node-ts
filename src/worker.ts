@@ -152,7 +152,7 @@ export class Worker {
       // 2. Delegate to the manager to get the plaintext response.
       const payloadResponse = await manager.process(job);
       if (resourceType !== 'Subscription' && resourceType !== 'SubscriptionTopic') {
-        await this.managers.subscriptionManager?.captureEvents(job, payloadResponse);
+        await this.managers.subscriptionManager?.captureEvents?.(job, payloadResponse);
       }
 
       // --- ARCHITECTURE KEEPER: UNIFIED RESPONSE ENCODING ---

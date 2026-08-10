@@ -1,0 +1,16 @@
+services:
+  hapi-fhir-r5:
+    image: hapiproject/hapi:v8.10.0-3
+    environment:
+      hapi.fhir.fhir_version: R5
+      hapi.fhir.subscription.resthook_enabled: "true"
+      hapi.fhir.subscription.polling_interval_ms: "1000"
+    ports:
+      - "${HAPI_FHIR_PORT:-18080}:8080"
+    healthcheck:
+      test: ["CMD", "java", "-cp", "/app", "HealthCheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 45s
+

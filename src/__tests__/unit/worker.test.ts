@@ -4,7 +4,7 @@
 import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { Worker } from '../../worker';
-import { IJobProcessor, ManagerRegistry } from '../../managers/registry';
+import { IJobProcessor, ISubscriptionProcessor, ManagerRegistry } from '../../managers/registry';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { testCreateCustomerJobRequestProfessionalOnboarding } from '../data/customer-onboarding.data';
 import { createJobName } from '../../utils/naming';
@@ -107,6 +107,28 @@ describe('Worker', () => {
     expect(mockIndividualManager.process).not.toHaveBeenCalled();
     const errorIssue = response.body.data[0].response.outcome.issue![0];
     expect(errorIssue.diagnostics).toContain(`No manager configured for resourceType '${resourceType}'`);
+  });
+
+  it('routes FHIR R5 Subscription jobs to the configured subscription manager', async () => {
+    const subscriptionManager = mock<ISubscriptionProcessor>();
+    const localWorker = new Worker(mock<ManagerRegistry>({ subscriptionManager }), API_BASE_URL, mockKmsService);
+    const job: JobRequest = {
+      ...testCreateCustomerJobRequestProfessionalOnboarding,
+      tenantId: 'acme', sector: 'health-care', section: 'individual',
+      format: 'org.hl7.fhir.r5', resourceType: 'Subscription', action: '_batch',
+      contentType: 'application/fhir+json',
+    };
+    subscriptionManager.process.mockResolvedValue({
+      jti: 'subscription-response', type: 'batch-response', thid: job.content?.thid as string,
+      iss: API_BASE_URL, aud: 'did:web:client.example.com', body: { data: [] },
+    });
+    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'key-1' } as any);
+    mockKmsService.encodeResponse.mockResolvedValue('encrypted-subscription-response');
+
+    await localWorker.process(createJobName('health-care_acme', 'Subscription', '_batch'), job);
+
+    expect(subscriptionManager.process).toHaveBeenCalledWith(job);
+    expect(subscriptionManager.captureEvents).not.toHaveBeenCalled();
   });
 
   it('should normalize resource.meta.claims into entry.meta.claims before manager routing', async () => {
