@@ -266,7 +266,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'entity', format: 'org.hl7.fhir.r5' },
-        ['Subscription'],
+        ['Subscription', 'SubscriptionTopic'],
         ['_batch'],
       ),
     );

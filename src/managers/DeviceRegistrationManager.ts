@@ -121,6 +121,13 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
       const vaultId = getTenantVaultId(sector as any, tenantId);
       const licenseDoc = await this.resolveLicenseByActivationCode(code as string, vaultId);
+      const fingerprint: DeviceInfo = {
+        clientInstanceId: deviceInfo?.device_id || clientId,
+        os: deviceInfo?.os,
+        osVersion: deviceInfo?.os_version,
+        model: deviceInfo?.device_name,
+      };
+      if (licenseDoc) this.assertDeviceCapacity(licenseDoc.content as DeviceLicense, fingerprint.clientInstanceId);
       const deviceIdentityContext = await this.prepareEmployeeDeviceIdentityContext({
         job,
         vaultId,
@@ -164,17 +171,19 @@ export class DeviceRegistrationManager implements IJobProcessor {
       // Bind the activated license seat to this client_id and capture a minimal device fingerprint.
       if (licenseDoc) {
         const license = licenseDoc.content as DeviceLicense & Record<string, any>;
-        const fingerprint: DeviceInfo = {
-          clientInstanceId: deviceInfo?.device_id || clientId,
-          os: deviceInfo?.os,
-          osVersion: deviceInfo?.os_version,
-          model: deviceInfo?.device_name,
-        };
-
-        license.deviceId = clientId;
-        license.deviceInfo = fingerprint;
+        const now = Math.floor(Date.now() / 1000);
+        const existingBindings = this.getDeviceBindings(license);
+        license.maxDevices = this.getDeviceAllowance(license);
+        license.deviceBindings = [
+          ...existingBindings.map((binding) => binding.clientInstanceId === fingerprint.clientInstanceId
+            ? { ...binding, status: 'revoked', revokedAt: now }
+            : binding),
+          { clientId, clientInstanceId: fingerprint.clientInstanceId, status: 'active', deviceInfo: fingerprint, activatedAt: now },
+        ];
+        license.deviceId = license.deviceId || clientId;
+        license.deviceInfo = license.deviceInfo || fingerprint;
         license.status = 'active';
-        license.activatedAt = license.activatedAt || Math.floor(Date.now() / 1000);
+        license.activatedAt = license.activatedAt || now;
 
         licenseDoc.sequence = (licenseDoc.sequence || 0) + 1;
         await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
@@ -315,6 +324,36 @@ export class DeviceRegistrationManager implements IJobProcessor {
     return licenseDocs[0];
   }
 
+  private getDeviceAllowance(license: DeviceLicense & Record<string, any>): number {
+    const value = Number(license.maxDevices);
+    return Number.isInteger(value) && value > 0 ? value : 2;
+  }
+
+  private getDeviceBindings(license: DeviceLicense & Record<string, any>): any[] {
+    if (Array.isArray(license.deviceBindings)) return license.deviceBindings;
+    const clientId = String(license.deviceId || '').trim();
+    if (!clientId) return [];
+    const deviceInfo = license.deviceInfo || { clientInstanceId: clientId };
+    return [{
+      clientId,
+      clientInstanceId: String(deviceInfo.clientInstanceId || clientId),
+      status: 'active',
+      deviceInfo,
+      activatedAt: Number(license.activatedAt || 0),
+    }];
+  }
+
+  private assertDeviceCapacity(license: DeviceLicense & Record<string, any>, clientInstanceId: string): void {
+    const active = this.getDeviceBindings(license).filter((binding) => binding.status === 'active');
+    if (active.some((binding) => binding.clientInstanceId === clientInstanceId)) return;
+    if (active.length >= this.getDeviceAllowance(license)) {
+      throw new ManagerError(
+        `Device allowance exhausted for this license (${active.length}/${this.getDeviceAllowance(license)}).`,
+        IssueType.Conflict,
+      );
+    }
+  }
+
   private async prepareEmployeeDeviceIdentityContext(params: {
     job: JobRequest;
     vaultId: string;
@@ -345,7 +384,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
       : (employeeDoc.content as EntityConfig);
     if (!employeeContent?.didDocument?.id) return undefined;
 
-    const previousDeviceId = String((params.licenseDoc?.content as any)?.deviceId || '').trim() || undefined;
+    const license = (params.licenseDoc?.content || {}) as DeviceLicense & Record<string, any>;
+    const clientInstanceId = String((params.registrationRequest.ext_device_info as any)?.device_id || params.clientId).trim();
+    const replacedBinding = this.getDeviceBindings(license).find((binding) =>
+      binding.status === 'active' && binding.clientInstanceId === clientInstanceId);
+    const previousDeviceId = String(replacedBinding?.clientId || '').trim() || undefined;
     const previousDeviceProfileDoc = previousDeviceId
       ? await this.vaultRepository.get<ConfidentialStorageDoc>(
         params.vaultId,

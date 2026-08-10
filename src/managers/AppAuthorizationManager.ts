@@ -81,7 +81,8 @@ export class AppAuthorizationManager {
   }
 
   /**
-   * Verifies an activation code, and if valid, marks it as 'active' to consume it.
+   * Authorizes one installation with an activation code. The professional seat
+   * remains active and can register additional installations up to maxDevices.
    * This logic assumes the code was found in the URL and passed to the DCR handler.
    * @param code The activation code.
    * @param tenantId The tenant associated with the code.
@@ -89,7 +90,13 @@ export class AppAuthorizationManager {
    * @returns An object with `valid: true` and the license if successful.
    * @throws {ManagerError} If the code is invalid, already used, or expired.
    */
-  public async verifyAndConsumeActivationCode(code: string, tenantId: string, sector: string): Promise<{ valid: true; license: DeviceLicense; }> {
+  public async verifyAndConsumeActivationCode(
+    code: string,
+    tenantId: string,
+    sector: string,
+    authenticatedSubject?: string,
+    clientInstanceId?: string,
+  ): Promise<{ valid: true; license: DeviceLicense; }> {
     const now = Math.floor(Date.now() / 1000);
     const vaultId = getTenantVaultId(sector, tenantId);
 
@@ -123,23 +130,59 @@ export class AppAuthorizationManager {
     }
 
     const licenseDoc = licenseDocs[0];
-    const license = licenseDoc.content as DeviceLicense & { activationCode?: string; activatedAt?: number };
+    const license = licenseDoc.content as DeviceLicense & Record<string, any>;
 
-    // A license must be 'issued' to a user before it can be activated.
-    if (license.status !== 'issued') {
-      throw new ManagerError('License is not in an activatable state. It might have already been activated or was never issued.', IssueType.Conflict);
+    if (license.status !== 'issued' && license.status !== 'active') {
+      throw new ManagerError('License is not in an activatable or active multi-device state.', IssueType.Conflict);
     }
     if (license.exp < now) {
       throw new ManagerError('Activation code has expired.', IssueType.BusinessRule);
     }
 
-    // Mark as active and update
-    license.status = 'active';
-    license.activatedAt = now;
-    licenseDoc.sequence++;
-    await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+    const actor = String(authenticatedSubject || '').trim();
+    if (license.status === 'active') {
+      if (license.activatedBy && (!actor || license.activatedBy !== actor)) {
+        throw new ManagerError('Active seat belongs to a different authenticated user.', IssueType.Forbidden);
+      }
+      const activeBindings = this.readActiveDeviceBindings(license);
+      const sameInstallation = clientInstanceId && activeBindings.some((binding) =>
+        binding.clientInstanceId === clientInstanceId);
+      const allowance = this.readDeviceAllowance(license);
+      if (!sameInstallation && activeBindings.length >= allowance) {
+        throw new ManagerError(`Device allowance exhausted for this license (${activeBindings.length}/${allowance}).`, IssueType.Conflict);
+      }
+      // Migration for active legacy seats created before activatedBy/maxDevices.
+      // The first authenticated reuse claims the seat; later reuses must match.
+      if (!license.activatedBy && actor) {
+        license.activatedBy = actor;
+        license.maxDevices = allowance;
+        licenseDoc.sequence++;
+        await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+      }
+    } else {
+      license.status = 'active';
+      license.activatedAt = now;
+      if (actor) license.activatedBy = actor;
+      license.maxDevices = this.readDeviceAllowance(license);
+      licenseDoc.sequence++;
+      await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+    }
 
     return { valid: true, license };
+  }
+
+  private readDeviceAllowance(license: DeviceLicense & Record<string, any>): number {
+    const value = Number(license.maxDevices);
+    return Number.isInteger(value) && value > 0 ? value : 2;
+  }
+
+  private readActiveDeviceBindings(license: DeviceLicense & Record<string, any>): any[] {
+    if (Array.isArray(license.deviceBindings)) {
+      return license.deviceBindings.filter((binding: any) => binding.status === 'active');
+    }
+    const clientId = String(license.deviceId || '').trim();
+    if (!clientId) return [];
+    return [{ clientId, clientInstanceId: license.deviceInfo?.clientInstanceId || clientId, status: 'active' }];
   }
 
   /**

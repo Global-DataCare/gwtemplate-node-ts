@@ -91,6 +91,14 @@ If you need the planned separate research store later:
 - Enables legacy-compatible FHIR behavior where the runtime still supports it.
 - Useful only when you intentionally need compatibility paths.
 
+`FHIR_SUBSCRIPTION_ENDPOINT_HOSTS`
+- Comma-separated hostname allowlist for FHIR R5 rest-hook Subscription
+  endpoints (hostnames only, without scheme or path).
+- Required when `NODE_ENV=production`; registration fails closed if the HTTPS
+  endpoint hostname is not explicitly listed.
+- Include each trusted portal/BFF receiver separately. This is independent of
+  tenant routing and does not authorize clinical access by itself.
+
 `JSON_LEGACY`
 - Enables legacy JSON/API compatibility behavior.
 - Use only if the flow depends on older compatibility shapes.

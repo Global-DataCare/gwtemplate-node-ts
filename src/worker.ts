@@ -108,6 +108,7 @@ export class Worker {
           manager = this.managers.communicationManager;
           break;
         case 'Subscription':
+        case 'SubscriptionTopic':
           manager = this.managers.subscriptionManager;
           break;
         case 'Observation':
@@ -150,6 +151,9 @@ export class Worker {
 
       // 2. Delegate to the manager to get the plaintext response.
       const payloadResponse = await manager.process(job);
+      if (resourceType !== 'Subscription' && resourceType !== 'SubscriptionTopic') {
+        await this.managers.subscriptionManager?.captureEvents(job, payloadResponse);
+      }
 
       // --- ARCHITECTURE KEEPER: UNIFIED RESPONSE ENCODING ---
       // The Worker MUST ALWAYS use `IKmsService.encodeResponse` to prepare the job result.

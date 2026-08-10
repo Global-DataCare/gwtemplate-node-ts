@@ -17,6 +17,10 @@ export interface IJobProcessor {
   process(job: JobRequest): Promise<IDecodedDidcommPayload>;
 }
 
+export interface ISubscriptionProcessor extends IJobProcessor {
+  captureEvents(job: JobRequest, result?: IDecodedDidcommPayload): Promise<void>;
+}
+
 /**
  * A centralized registry of all manager instances in the application.
  * This is used for dependency injection into the worker.
@@ -37,7 +41,7 @@ export interface ManagerRegistry {
   twinCompositionManager?: IJobProcessor;
   documentReferenceManager?: IJobProcessor;
   communicationManager?: IJobProcessor;
-  subscriptionManager?: IJobProcessor;
+  subscriptionManager?: ISubscriptionProcessor;
   deviceRegistrationManager?: IJobProcessor;
   licenseManager?: IJobProcessor;
   openIdAuthManager?: IJobProcessor;
