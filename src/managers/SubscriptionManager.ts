@@ -3,6 +3,10 @@ import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confiden
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import type { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
+import {
+  buildFhirR5SubscriptionNotification,
+  matchesFhirR5SubscriptionEvent,
+} from 'gdc-common-utils-ts/models/fhir-r5-subscription';
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
@@ -115,7 +119,7 @@ export class SubscriptionManager implements ISubscriptionProcessor {
         const subscription = stored.resource;
         if (subscription?.status !== 'active') continue;
         const topic = topics.find((candidate) => candidate.resource?.url === subscription.topic)?.resource;
-        if (!topic || !this.matches(subscription, topic, resource)) continue;
+        if (!topic || !matchesFhirR5SubscriptionEvent(subscription, topic, resource)) continue;
         const eventNumber = Number(stored.eventCount || 0) + 1;
         stored.eventCount = eventNumber;
         await this.store(vaultId, SUBSCRIPTIONS_SECTION, subscription.id, 'active', stored);
@@ -199,33 +203,19 @@ export class SubscriptionManager implements ISubscriptionProcessor {
     }
   }
 
-  private matches(subscription: any, topic: any, resource: any): boolean {
-    if (!topic.resourceTrigger.some((trigger: any) => trigger.resource === resource.resourceType)) return false;
-    return (subscription.filterBy || []).every((filter: any) => {
-      if (filter.resourceType && filter.resourceType !== resource.resourceType) return true;
-      const values = this.readFilterValues(resource, filter.filterParameter);
-      const equal = values.includes(String(filter.value));
-      return filter.comparator === 'ne' ? !equal : equal;
-    });
-  }
-
-  private readFilterValues(resource: any, parameter: string): string[] {
-    const paths = parameter === 'patient' ? ['patient.reference', 'subject.reference']
-      : parameter === 'subject' ? ['subject.reference', 'patient.reference'] : [parameter];
-    return paths.flatMap((path) => {
-      let values = [resource];
-      for (const part of path.split('.')) values = values.flatMap((value: any) => Array.isArray(value?.[part]) ? value[part] : value?.[part] === undefined ? [] : [value[part]]);
-      return values.map(String);
-    });
-  }
-
   private async sendHandshake(subscription: any, topic: any): Promise<boolean> {
     const bundle = this.buildStatusBundle(subscription, topic, 'handshake');
     try { return (await this.post(subscription.endpoint, subscription.parameter || [], bundle)).ok; } catch { return false; }
   }
 
   private buildNotification(subscription: any, topic: any, resource: any, eventNumber: number): any {
-    const bundle = this.buildStatusBundle(subscription, topic, 'event-notification', eventNumber, `${resource.resourceType}/${resource.id}`);
+    const bundle: any = buildFhirR5SubscriptionNotification({
+      subscriptionReference: `Subscription/${subscription.id}`,
+      topic: topic.url,
+      eventNumber,
+      eventsSinceSubscriptionStart: eventNumber,
+      focusReference: `${resource.resourceType}/${resource.id}`,
+    });
     if (subscription.content === 'full-resource') bundle.entry.push({ resource });
     return bundle;
   }
