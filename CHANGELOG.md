@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.20.30] - 2026-08-09
+
 ### Added
 
 - Preserve a governed legal-organization controller DID and all submitted
