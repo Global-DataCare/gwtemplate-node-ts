@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.21.1] - 2026-08-09
+
 - Bind a multi-device seat to
   `urn:multibase:<hash(normalized email or phone)>:professional|personal`, never
   to a portal DID or IdP-local `sub`. Fabric subject-key DCR/revocation records
