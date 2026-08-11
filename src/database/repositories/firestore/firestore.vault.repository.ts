@@ -1,4 +1,4 @@
-import admin from 'firebase-admin';
+import type { CollectionReference, DocumentReference, Firestore } from 'firebase-admin/firestore';
 import { IVaultRepository, type VaultQueryOptions } from '../../../database/repositories/vault/vault.repository';
 import { RecordBase, VaultConfig } from 'gdc-common-utils-ts/models/resource-document';
 import { stripUndefinedDeep } from 'gdc-common-utils-ts';
@@ -42,22 +42,22 @@ function countBlobBackedDocs(records: unknown[]): number {
  *   be enforced by repository write code
  */
 export class FirestoreVaultRepository extends IVaultRepository {
-  private readonly db: admin.firestore.Firestore;
+  private readonly db: Firestore;
   private readonly hostCollectionName: string;
   private readonly blobStore?: IConfidentialBlobStore;
 
-  constructor(db: admin.firestore.Firestore, hostCollectionName: string, blobStore?: IConfidentialBlobStore) {
+  constructor(db: Firestore, hostCollectionName: string, blobStore?: IConfidentialBlobStore) {
     super();
     this.db = db;
     this.hostCollectionName = hostCollectionName;
     this.blobStore = blobStore;
   }
 
-  private sectionDocRef(collectionName: string, sectionId: string): admin.firestore.DocumentReference {
+  private sectionDocRef(collectionName: string, sectionId: string): DocumentReference {
     return this.db.collection(collectionName).doc(sectionId);
   }
 
-  private documentsCollectionRef(collectionName: string, sectionId: string): admin.firestore.CollectionReference {
+  private documentsCollectionRef(collectionName: string, sectionId: string): CollectionReference {
     return this.sectionDocRef(collectionName, sectionId).collection('documents');
   }
 

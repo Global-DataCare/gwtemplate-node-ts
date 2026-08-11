@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE } from 'gdc-common-utils-ts/utils/didcomm-submit';
 import {
@@ -106,6 +106,8 @@ function buildTransactionJob(): JobRequest {
     ...requestBody.data[0].meta.claims,
     'org.schema.Organization.alternateName': EXAMPLE_TENANT_ALTERNATE_NAME,
   };
+  delete requestBody.data[0].meta.claims[ClaimsPersonSchemaorg.hasOccupation];
+  requestBody.data[0].meta.claims[ClaimsPersonSchemaorg.hasOccupationalRoleValue] = 'RESPRSN';
   return {
     tenantId: 'host',
     jurisdiction: 'es',
@@ -139,6 +141,9 @@ function buildIssueJob(): JobRequest {
   const job = buildTransactionJob();
   job.action = '_issue';
   job.requestUrl = '/host/cds-es/v1/test-network/registry/org.schema/Organization/_issue';
+  // These tests exercise ICA credential retrieval and controller-seat reuse.
+  // Controller mutation has its own signer, DID, JWK and persistence suite.
+  delete (job.content as any).body.data[0].resource.controller;
   return job;
 }
 
@@ -493,9 +498,26 @@ describe('HostingManager legal organization verification transaction', () => {
     expect(mockVaultRepository.put).not.toHaveBeenCalled();
   });
 
-  it('reissues verification for an existing tenant without creating a new offer and returns one controller activation code', async () => {
+  it('returns ICA credentials separately from the controller License activation code', async () => {
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
-    const icaVerifyResponse = buildIcaVerifyResponse();
+    const icaVerifyResponse = buildIcaVerifyCredentialResponse();
+    (icaVerifyResponse.data as any[]).push({
+      type: 'OrganizationController-verification-v1.0',
+      resource: {
+        id: 'urn:uuid:controller-vc-001',
+        issuer: 'did:web:ica.example.org',
+        type: ['VerifiableCredential', 'ServiceCredential', 'OrganizationControllerCredential'],
+        credentialSubject: {
+          id: 'did:web:provider.example.org:service:tenant',
+          owner: {
+            sameAs: 'urn:multibase:zControllerHash',
+            hasCredential: {
+              material: 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:controller-thumbprint',
+            },
+          },
+        },
+      },
+    });
     const existingLicenseDoc = {
       id: 'license-seat-001',
       status: 'available',
@@ -558,14 +580,34 @@ describe('HostingManager legal organization verification transaction', () => {
     expect(fetchCalls[0]?.url).toBe(
       `${EXAMPLE_ICA_BASE_URL}/ica/cds-ES/v1/${EXAMPLE_SECTOR}/terms/pdf/${EXAMPLE_VERIFY_RESOURCE_TYPE}/_verify`,
     );
-    // Step 1: existing-tenant `_issue` is a controller/key/email reissue path,
+    // Step 1: Organization/_issue exposes all ICA credentials as VCs and keeps
+    // the complete raw ICA response separately.
+    expect((responseEntry as any)?.vc).toEqual(
+      (icaVerifyResponse.data as any[]).map((entry) => entry.resource),
+    );
+    expect((responseEntry as any)?.resource?.icaResponse).toEqual(icaVerifyResponse);
+    expect((responseEntry as any)?.vc).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: expect.arrayContaining(['OrganizationCredential']),
+      }),
+      expect.objectContaining({
+        type: expect.arrayContaining(['LegalRepresentativeCredential']),
+      }),
+      expect.objectContaining({
+        type: expect.arrayContaining(['OrganizationControllerCredential']),
+      }),
+    ]));
+    expect((responseEntry as any)?.vc).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'License:Issued' }),
+    ]));
+    // Step 2: existing-tenant `_issue` is a controller/key/email reissue path,
     // not a new commercial onboarding. It must therefore not create a new
     // `org.schema.Offer.identifier`.
     expect(claims[ClaimsOfferSchemaorg.identifier]).toBeUndefined();
-    // Step 2: no Offer means no workflow hint for `Order/_batch` either.
+    // Step 3: no Offer means no workflow hint for `Order/_batch` either.
     expect((responseEntry as any)?.resource?.next).toBeUndefined();
-    // Step 3: the response must instead carry the reissued controller
-    // activation material on the existing seat.
+    // Step 4: the License activation code is a separate claims projection. It
+    // is not one of the ICA VCs and is not a License/_issue response entry.
     expect(claims['org.schema.IndividualProduct.serialNumber']).toEqual(expect.any(String));
     expect(claims['org.schema.IndividualProduct.category']).toBe('professional');
     expect(mockVaultRepository.put).toHaveBeenCalledWith(
@@ -609,7 +651,7 @@ describe('HostingManager legal organization verification transaction', () => {
         id: 'employee-controller-001',
         claims: {
           'org.schema.Person.email': 'admin1@acme.org',
-          'org.schema.Person.hasOccupation': 'ISCO-08|1120',
+          'org.schema.Person.hasOccupation.identifier.value': 'RESPRSN',
         },
       },
     };
@@ -647,6 +689,7 @@ describe('HostingManager legal organization verification transaction', () => {
     const strictEntry = (strictJob.content as any).body.data[0];
     delete strictEntry.meta.claims['org.schema.Person.email'];
     delete strictEntry.meta.claims['org.schema.Person.hasOccupation'];
+    delete strictEntry.meta.claims['org.schema.Person.hasOccupation.identifier.value'];
     (strictJob.content as any).meta = {
       bearer: {
         token: 'Bearer strict-token',
@@ -685,7 +728,7 @@ describe('HostingManager legal organization verification transaction', () => {
         id: 'license-seat-002',
         content: expect.objectContaining({
           issuedToEmail: 'admin1@acme.org',
-          issuedToRole: 'ISCO-08|1120',
+          issuedToRole: 'RESPRSN',
         }),
       })],
       getEnvSectionId('device-licenses'),
@@ -712,7 +755,7 @@ describe('HostingManager legal organization verification transaction', () => {
         reactivationEnabled: false,
         exp: Math.floor(Date.now() / 1000) + 86400,
         issuedToEmail: 'controller@example.org',
-        issuedToRole: 'ISCO-08|1120',
+        issuedToRole: 'RESPRSN',
         activationCode: 'lic-old-code-001',
         activatedAt: Math.floor(Date.now() / 1000) - 3600,
         deviceId: 'device-old-001',
@@ -772,7 +815,7 @@ describe('HostingManager legal organization verification transaction', () => {
         content: expect.objectContaining({
           status: 'issued',
           issuedToEmail: 'controller@example.org',
-          issuedToRole: 'ISCO-08|1120',
+          issuedToRole: 'RESPRSN',
         }),
       })],
       getEnvSectionId('device-licenses'),

@@ -88,7 +88,7 @@ export async function resolveOrganizationIssueControllerIdentity(
   });
 
   if (isDemoMode && !role) {
-    role = 'ISCO-08|1120';
+    role = 'RESPRSN';
     console.log('[GW][demo] Organization/_issue controller role fallback applied', {
       tenantVaultId: deps.tenantVaultId,
       email,

@@ -41,6 +41,7 @@ import { ParameterData } from 'gdc-common-utils-ts/models/params';
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { VerificationMethod } from 'gdc-common-utils-ts/models/did';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import type { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
 import { shouldUseFabricLedger } from '../adapters/credential-ledger-resolver';
@@ -85,6 +86,7 @@ import {
   extractCredentialResourcesFromIcaPayload as extractCredentialResourcesFromIcaPayloadExternal,
   forwardOrganizationVerificationTransactionToIca as forwardOrganizationVerificationTransactionToIcaExternal,
 } from './hosting/ica-verification';
+import { verifyOrganizationRegistrationAuthorization } from './hosting/organization-registration-authorization';
 import {
   processIndividualOrganizationFlow as processIndividualOrganizationFlowExternal,
   resolveTenantCollectionForIndividuals as resolveTenantCollectionForIndividualsExternal,
@@ -214,7 +216,8 @@ type LegalOrganizationVerificationTransactionNextStep = Readonly<{
   };
 }>;
 type LegalOrganizationVerificationTransactionResponseResource = Readonly<{
-  icaResponse: unknown;
+  icaResponse?: unknown;
+  verificationResponse?: unknown;
   next: LegalOrganizationVerificationTransactionNextStep;
 }>;
 type LegalOrganizationIssueResponseResource = Readonly<{
@@ -268,6 +271,7 @@ export class HostingManager {
   private activationTrustAdapter: IActivationTrustAdapter;
   private offerOrderService: HostingOfferOrderService;
   private lifecycleService: HostingLifecycleService;
+  private cryptographyService?: ICryptography;
 
   constructor(
     vaultRepository: IVaultRepository,
@@ -279,6 +283,7 @@ export class HostingManager {
     hostRuntime?: IHostRuntime,
     clearingHouseService?: IClearingHouseService,
     activationTrustAdapter?: IActivationTrustAdapter,
+    cryptographyService?: ICryptography,
   ) {
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
@@ -292,6 +297,7 @@ export class HostingManager {
     };
     this.clearingHouseService = clearingHouseService || new ClearingHouseService();
     this.activationTrustAdapter = activationTrustAdapter || new DefaultActivationTrustAdapter(this.clearingHouseService);
+    this.cryptographyService = cryptographyService;
     this.offerOrderService = new HostingOfferOrderService(
       this.vaultRepository,
       this.kmsService,
@@ -869,6 +875,24 @@ export class HostingManager {
       createOrganizationIssueClaimsFromClaims: this.createOrganizationIssueClaimsFromClaims.bind(this),
       forwardOrganizationVerificationTransactionToIca: this.forwardOrganizationVerificationTransactionToIca.bind(this),
       extractCredentialResourcesFromIcaPayload: this.extractCredentialResourcesFromIcaPayload.bind(this),
+      verifyHostAuthorizationCredential: async ({ credential, claims, resource }) => {
+        if (!this.cryptographyService) {
+          throw new ManagerError('Host authorization cryptography is not configured.', IssueType.NotSupported);
+        }
+        const trustedIssuers = String(process.env.HOST_ORGANIZATION_AUTHORIZATION_ISSUERS || '')
+          .split(',')
+          .map(value => value.trim())
+          .filter(Boolean);
+        return verifyOrganizationRegistrationAuthorization({
+          credential,
+          claims,
+          controller: resource.controller,
+          organization: resource.organization,
+          controllerEmail: String(resource.legalRepresentativePayload?.email || resource.legalRepresentative?.email || ''),
+          cryptography: this.cryptographyService,
+          trustedIssuers,
+        });
+      },
     });
   }
 
@@ -1460,7 +1484,6 @@ export class HostingManager {
       governanceVc?: VerifiableCredentialV2;
       networkName?: NetworkName;
       controllerDid?: string;
-      controllerDidDocument?: DidDocument;
     },
   ): Promise<OrganizationConfig> {
     return finalizeTenantConfigExternal({

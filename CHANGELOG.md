@@ -1,5 +1,33 @@
 ## [Unreleased]
 
+- Consume `gdc-common-utils-ts@^2.5.1` from npm, align Fabric Gateway/Noble with
+  their ESM-compatible current releases, run Jest 30 consistently, and support
+  Node.js 22 or newer without relying on sibling workspace links.
+- Document and test the exact `Organization/_issue-response` boundary: all
+  deduplicated ICA credentials are returned in `vc[]`, the raw ICA payload is
+  preserved in `resource.icaResponse`, and the separate License activation code
+  is carried in `meta.claims` rather than a `License:Issued` VC/entry.
+- Keep controller `sameAs` as the simple ICA-compatible contact-hash URN and
+  persist the controller authorization role separately as the bare HL7 v3 code
+  `RESPRSN`; remove the invalid `professional` suffix and ISCO-08 `1120`
+  controller fallback.
+
+- Accept an attached organization registration authorization VC only for Test
+  Network `_transaction`, verifying trusted issuer, current human-controller
+  DID relationship, active assertion method, ML-DSA-65 proof and exact
+  application/controller/postal bindings; production remains ICA-backed.
+- Model legal-organization control as an additive DID `controller` array. Each
+  controller is stored and resolved as an independent encrypted Employee DID
+  document; new writes no longer cache a singular `meta.controllerDidDocument`.
+  Adding or rotating a controller must be signed by an active controller that
+  is already present; only the first bootstrap may self-sign with the submitted
+  actor key. A single actor public JWK is sufficient; DCR/device keys are not
+  part of this controller operation.
+- Derive Employee/controller JWK `kid` values from public material as RFC 9278
+  SHA-256 thumbprint URNs and index `org.schema.Person.identifier`, `email`,
+  `hasOccupation.identifier.value` and repeated `hasCredential.material`.
+  Legacy `email`, `role` and `kid` indexes remain during migration.
+
 - Wire the existing FHIR R5 `SubscriptionManager` into the production worker
   registry so Subscription and SubscriptionTopic jobs no longer fail as an
   uninitialized manager.

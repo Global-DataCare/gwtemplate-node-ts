@@ -28,7 +28,6 @@ type FinalizeTenantConfigDeps = Readonly<{
     governanceVc?: VerifiableCredentialV2;
     networkName?: NetworkName;
     controllerDid?: string;
-    controllerDidDocument?: DidDocument;
   };
   config: any;
   kmsService: any;
@@ -94,7 +93,7 @@ export async function finalizeTenantConfig(
     '@context': 'https://www.w3.org/ns/did/v1',
     id: primaryDid,
     alsoKnownAs,
-    ...(deps.options?.controllerDid ? { controller: deps.options.controllerDid } : {}),
+    ...(deps.options?.controllerDid ? { controller: [deps.options.controllerDid] } : {}),
   };
   const didConfigServices = initializeTenantServicesConfig(
     deps.sector,
@@ -202,9 +201,6 @@ export async function finalizeTenantConfig(
     legacyX509ChainBase64: deps.config.legacyX509ChainBase64,
     meta: {
       lastUpdated: new Date().toISOString(),
-      ...(deps.options?.controllerDidDocument
-        ? { controllerDidDocument: deps.options.controllerDidDocument }
-        : {}),
     },
   };
 

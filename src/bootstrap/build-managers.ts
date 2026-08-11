@@ -104,6 +104,8 @@ export function buildManagers(options: {
     config,
     hostRuntime,
     clearingHouseService,
+    undefined,
+    cryptographyService,
   );
   const icaManager = new IcaManager(vaultRepository, kmsService);
   const messagingManager = new MessagingManager(vaultRepository, kmsService);

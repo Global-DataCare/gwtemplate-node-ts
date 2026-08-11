@@ -1,4 +1,4 @@
-import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import type { IServerConfig } from '../config';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { FirestoreVaultRepository } from '../database/repositories/firestore/firestore.vault.repository';
@@ -84,7 +84,7 @@ export async function buildInfrastructure(options: {
 
   let vaultRepository: IVaultRepository;
   if (config.dbProvider === 'firestore') {
-    const db = admin.firestore();
+    const db = getFirestore();
     vaultRepository = new FirestoreVaultRepository(db, hostCollectionName, confidentialBlobStore);
     console.log('[GW-API] Using Firestore Vault Repository.');
   } else if (config.dbProvider === 'postgres') {

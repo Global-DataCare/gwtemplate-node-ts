@@ -27,6 +27,8 @@ import {
   HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS,
   HOST_TRANSACTION_REQUIRED_OUTPUT_CLAIMS,
 } from './hosting-claim-contracts';
+import type { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
+import type { HostAuthorizationVerificationResult } from './organization-registration-authorization';
 
 type LegalOrganizationVerificationTransactionResource = Readonly<{
   controller?: Record<string, unknown>;
@@ -34,6 +36,7 @@ type LegalOrganizationVerificationTransactionResource = Readonly<{
   legalRepresentativePayload?: Record<string, unknown>;
   legalRepresentative?: Record<string, unknown>;
   verification?: Record<string, unknown>;
+  authorizationCredential?: VerifiableCredentialV2;
 }>;
 
 type LegalOrganizationVerificationTransactionEntry = Readonly<{
@@ -53,7 +56,8 @@ type LegalOrganizationVerificationTransactionNextStep = Readonly<{
 }>;
 
 type LegalOrganizationVerificationTransactionResponseResource = Readonly<{
-  icaResponse: unknown;
+  icaResponse?: unknown;
+  verificationResponse?: unknown;
   next: LegalOrganizationVerificationTransactionNextStep;
 }>;
 
@@ -93,6 +97,11 @@ type VerificationDeps = Readonly<{
     resourceType: string;
   }) => Promise<any>;
   extractCredentialResourcesFromIcaPayload: (icaResponse: unknown) => Array<Record<string, unknown>>;
+  verifyHostAuthorizationCredential?: (input: {
+    credential: VerifiableCredentialV2;
+    claims: ClaimsRecord;
+    resource: LegalOrganizationVerificationTransactionResource;
+  }) => Promise<HostAuthorizationVerificationResult>;
   persistExistingTenantControllerBinding?: (input: {
     claims: ClaimsRecord;
     controller?: Record<string, unknown>;
@@ -126,15 +135,26 @@ export async function processOrganizationVerificationTransaction(
     throw new ManagerError(`Missing required claim: '${HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS[1]}'`, IssueType.Required);
   }
 
-  const icaResponse = await deps.forwardOrganizationVerificationTransactionToIca({
-    job: deps.job,
-    entry,
-    claims,
-    resource,
-    requestedSector,
-    resourceType,
-  });
-  const vc = deps.extractCredentialResourcesFromIcaPayload(icaResponse);
+  const hostAuthorization = resource.authorizationCredential;
+  if (hostAuthorization && resourceType !== 'test-network') {
+    throw new ManagerError('Host authorization VC is accepted only for Test Network registration.', IssueType.Security);
+  }
+  if (hostAuthorization && !deps.verifyHostAuthorizationCredential) {
+    throw new ManagerError('Host authorization verification is not configured.', IssueType.NotSupported);
+  }
+  const verificationResponse = hostAuthorization
+    ? await deps.verifyHostAuthorizationCredential!({ credential: hostAuthorization, claims, resource })
+    : await deps.forwardOrganizationVerificationTransactionToIca({
+        job: deps.job,
+        entry,
+        claims,
+        resource,
+        requestedSector,
+        resourceType,
+      });
+  const vc = hostAuthorization
+    ? [hostAuthorization as unknown as Record<string, unknown>]
+    : deps.extractCredentialResourcesFromIcaPayload(verificationResponse);
   const requestedPrimaryDid = typeof resource.organization?.did === 'string'
     ? resource.organization.did.trim()
     : '';
@@ -163,7 +183,11 @@ export async function processOrganizationVerificationTransaction(
         type: ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE_TYPE,
         ...(vc.length > 0 ? { vc } : {}),
         meta: { claims: processedClaims },
-        resource: buildOrganizationVerificationTransactionResponseResource(icaResponse, processedClaims),
+        resource: buildOrganizationVerificationTransactionResponseResource(
+          verificationResponse,
+          processedClaims,
+          hostAuthorization ? 'host' : 'ica',
+        ),
         response: { status: '200' },
       }],
     },
@@ -236,12 +260,13 @@ export async function processOrganizationIssue(
 }
 
 export function buildOrganizationVerificationTransactionResponseResource(
-  icaResponse: unknown,
+  verificationResponse: unknown,
   processedClaims: ClaimsRecord,
+  source: 'ica' | 'host' = 'ica',
 ): LegalOrganizationVerificationTransactionResponseResource {
   const offerId = String(processedClaims[HOST_TRANSACTION_REQUIRED_OUTPUT_CLAIMS[0]] || '').trim() || undefined;
   return {
-    icaResponse,
+    ...(source === 'ica' ? { icaResponse: verificationResponse } : { verificationResponse }),
     next: {
       action: ORGANIZATION_VERIFICATION_TRANSACTION_NEXT_ACTION,
       acceptedOffer: {
@@ -422,7 +447,7 @@ async function resolveOrganizationIssueControllerIdentity(input: {
   const email = isDemoMode ? (emailFromPayload || emailFromBearer) : emailFromBearer;
   let role = roleFromPayload || await input.findStoredControllerRoleByEmail(input.tenantVaultId, email);
   if (isDemoMode && !role) {
-    role = 'ISCO-08|1120';
+    role = 'RESPRSN';
     console.log('[GW][demo] Organization/_issue controller role fallback applied', {
       tenantVaultId: input.tenantVaultId,
       email,

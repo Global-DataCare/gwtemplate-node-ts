@@ -140,6 +140,7 @@ const organizationVerificationTransactionBody = {
         [ClaimsOrganizationSchemaorg.taxId]: 'VATES-B00112233',
         [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
         [ClaimsPersonSchemaorg.email]: 'controller@example.org',
+        [ClaimsPersonSchemaorg.hasOccupationalRoleValue]: 'RESPRSN',
         [ClaimsServiceSchemaorg.category]: 'health-care',
         [ClaimsServiceSchemaorg.identifier]: 'did:web:tenant.example.org',
         [ClaimsServiceSchemaorg.url]: 'https://operator.example.net/acme/cds-es/v1/health-care',
@@ -149,7 +150,8 @@ const organizationVerificationTransactionBody = {
     },
     resource: {
       controller: {
-        did: 'did:key:zDnaekW6GaRk6x9t6yC3r5vQk4wMdx0controller',
+        did: 'did:web:controller.example.org',
+        sameAs: 'urn:multibase:zExampleStableActorHash',
         publicKeyJwk: {
           kid: 'controller-signing-es384-001',
           kty: 'EC',
@@ -425,8 +427,47 @@ export const ORGANIZATION_ACTIVATION_RESPONSE = {
   }
 };
 
+const ORGANIZATION_ISSUE_ICA_CREDENTIALS = [
+  {
+    id: 'urn:uuid:organization-credential-001',
+    issuer: 'did:web:ica.example.org',
+    type: ['VerifiableCredential', 'OrganizationCredential'],
+    credentialSubject: {
+      id: 'did:web:tenant.example.org',
+      taxID: 'VATES-B00112233',
+    },
+  },
+  {
+    id: 'urn:uuid:legal-representative-credential-001',
+    issuer: 'did:web:ica.example.org',
+    type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
+    credentialSubject: {
+      id: 'did:web:tenant.example.org:actor:representative',
+      memberOf: { taxID: 'VATES-B00112233' },
+    },
+  },
+  {
+    id: 'urn:uuid:organization-controller-credential-001',
+    issuer: 'did:web:ica.example.org',
+    type: ['VerifiableCredential', 'ServiceCredential', 'OrganizationControllerCredential'],
+    credentialSubject: {
+      id: 'did:web:tenant.example.org:service:hosted',
+      provider: { taxID: 'VATES-B00112233' },
+      owner: {
+        sameAs: 'urn:multibase:zControllerHash',
+        hasOccupation: { identifier: 'RESPRSN' },
+        hasCredential: {
+          material: 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:controller-thumbprint',
+        },
+      },
+    },
+  },
+];
+
 /**
- * Canonical `_issue-response` shape for controller recovery/rebind.
+ * Canonical `_issue-response` shape for existing-tenant organization
+ * credential reissuance. Device rebind happens later through
+ * `Token/_exchange -> Device/_dcr`.
  */
 export const ORGANIZATION_ISSUE_RESPONSE = {
   "jti": "organization-issue-response-<test-id>",
@@ -440,6 +481,7 @@ export const ORGANIZATION_ISSUE_RESPONSE = {
     "total": 1,
     "data": [{
       "type": "Organization-issue-response-v1.0",
+      "vc": ORGANIZATION_ISSUE_ICA_CREDENTIALS,
       "meta": {
         "claims": {
           "@context": "org.schema",
@@ -454,13 +496,11 @@ export const ORGANIZATION_ISSUE_RESPONSE = {
         "icaResponse": {
           "resourceType": "Bundle",
           "type": "batch-response",
-          "total": 1,
-          "data": [{
+          "total": ORGANIZATION_ISSUE_ICA_CREDENTIALS.length,
+          "data": ORGANIZATION_ISSUE_ICA_CREDENTIALS.map((credential) => ({
             "type": "VerifyResponse-v1.0",
-            "resource": {
-              "resourceType": "Bundle"
-            }
-          }]
+            "resource": credential
+          }))
         }
       },
       "response": { "status": "200" }
@@ -924,9 +964,10 @@ export const ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST = {
 };
 
 /**
- * Existing-tenant recovery request. The payload family intentionally matches
- * `_transaction` because GW forwards the same legal evidence set to ICA
- * `_verify`, but the continuation semantics differ: no new Offer is created.
+ * Existing-tenant organization credential reissuance request. The payload
+ * family intentionally matches `_transaction` because GW forwards the same
+ * legal evidence set to ICA `_verify`, but the continuation semantics differ:
+ * no new Offer is created and device rebind happens only after the later DCR.
  */
 export const ORGANIZATION_ISSUE_REQUEST = {
   ...ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST,

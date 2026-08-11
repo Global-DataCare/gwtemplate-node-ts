@@ -13,7 +13,7 @@ import { getTenantVaultId } from '../utils/tenant';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { getEnvSectionId } from '../utils/section-env';
 import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
-import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
+import { normalizeSameAsHash, normalizeTelephoneHash } from 'gdc-common-utils-ts/utils/same-as';
 import { normalizeIndexedEmail, normalizeIndexedPhone } from '../utils/indexed-contact';
 
 type ActivationActor = Readonly<{
@@ -168,14 +168,12 @@ export class AppAuthorizationManager {
     } else if (!phone || phone !== issuedPhone) {
       throw new ManagerError('Activation identity does not match the licensed phone.', IssueType.Forbidden);
     }
-    const actor = buildStableActorIdentifier({
-      contactKind: issuedEmail ? 'email' : 'phone',
-      contact: issuedEmail || issuedPhone!,
-      role: license.userClass === 'employee' ? 'professional' : 'personal',
-    });
+    const actor = issuedEmail
+      ? normalizeSameAsHash(issuedEmail)
+      : normalizeTelephoneHash(issuedPhone!);
     if (license.status === 'active') {
       const legacyActor = Boolean(license.activatedBy
-        && !/^urn:multibase:z[^:]+:(professional|personal)$/.test(String(license.activatedBy)));
+        && !/^urn:multibase:z[^:]+$/.test(String(license.activatedBy)));
       const canMigrateLegacyActor = legacyActor;
       if (license.activatedBy && !canMigrateLegacyActor && license.activatedBy !== actor) {
         throw new ManagerError('Active seat belongs to a different authenticated user.', IssueType.Forbidden);

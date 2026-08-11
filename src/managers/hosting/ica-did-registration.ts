@@ -1,6 +1,7 @@
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { DidDocument } from 'gdc-common-utils-ts/models/did';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import {
   DIDCOMM_DEFAULT_ACCEPT_HEADER,
   DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE,
@@ -247,6 +248,9 @@ export async function registerDidDocumentWithIca(params: {
   if ((organizationSigningKey as any).kid && (organizationSigningKey as any).kid === (controllerSigningKey as any).kid) {
     throw new ManagerError('Organization and controller signing keys must be different for ICA DID registration.', IssueType.Conflict);
   }
+  const canonicalJwks = (jwks?: { keys: any[] }) => jwks
+    ? { keys: jwks.keys.map((key) => ({ ...key, kid: toJwkThumbprintSha256Urn(key) })) }
+    : undefined;
 
   const fetchImpl = params.fetchImpl || fetch;
   const res = await fetchImpl(url, {
@@ -269,7 +273,7 @@ export async function registerDidDocumentWithIca(params: {
               did: params.organizationDidDocument.id,
               didDocument: params.organizationDidDocument,
               publicKeyJwk: organizationSigningKey,
-              ...(params.organizationBinding?.jwks ? { jwks: params.organizationBinding.jwks } : {}),
+              ...(params.organizationBinding?.jwks ? { jwks: canonicalJwks(params.organizationBinding.jwks) } : {}),
             },
             controller: {
               credential: params.representativeCredential,
@@ -277,7 +281,7 @@ export async function registerDidDocumentWithIca(params: {
               didDocument: params.controllerDidDocument,
               publicKeyJwk: controllerSigningKey,
               ...(params.controllerBinding?.sameAs ? { sameAs: params.controllerBinding.sameAs } : {}),
-              ...(params.controllerBinding?.jwks ? { jwks: params.controllerBinding.jwks } : {}),
+              ...(params.controllerBinding?.jwks ? { jwks: canonicalJwks(params.controllerBinding.jwks) } : {}),
             },
           },
         }],

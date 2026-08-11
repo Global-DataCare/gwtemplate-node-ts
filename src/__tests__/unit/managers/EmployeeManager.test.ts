@@ -26,6 +26,7 @@ import { normalizeCodeSystemAndValue } from '../../../utils/normalize-codeAndSys
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -110,14 +111,19 @@ describe('EmployeeManager', () => {
       expect(mockTenantsCacheManager.getTenantIdentifierUrn).toHaveBeenCalledWith(TENANT_VAULT_ID);
 
       // Verify that all expected attributes were sent to be protected for indexing
-      const signerKid = job.content?.meta?.jws?.protected?.jwk?.kid;
-      const encrypterKid = job.content?.meta?.jwe?.header?.jwk?.kid;
+      const signerKid = toJwkThumbprintSha256Urn(job.content?.meta?.jws?.protected?.jwk as any);
+      const encrypterKid = toJwkThumbprintSha256Urn(job.content?.meta?.jwe?.header?.jwk as any);
       const email = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email];
       const roleCode = testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.hasOccupation];
 
       expect(mockKmsService.protectAttributesNameAndValue).toHaveBeenNthCalledWith(
         2,
         [
+          { name: ClaimsPersonSchemaorg.identifier, value: expect.stringMatching(/^urn:antifraud:/), unique: true, type: 'uri'},
+          { name: ClaimsPersonSchemaorg.email, value: email, unique: true, type: 'string'},
+          { name: ClaimsPersonSchemaorg.hasOccupationalRoleValue, value: normalizeCodeSystemAndValue(roleCode as string), unique: false, type: 'token'},
+          { name: ClaimsPersonSchemaorg.hasCredentialMaterial, value: signerKid, unique: false, type: 'string'},
+          { name: ClaimsPersonSchemaorg.hasCredentialMaterial, value: encrypterKid, unique: false, type: 'string'},
           { name: 'email', value: email, unique: true, type: 'string'},
           { name: 'role', value: normalizeCodeSystemAndValue(roleCode as string), unique: false, type: 'token'},
           { name: 'kid', value: signerKid, unique: false, type: 'string'},
@@ -134,8 +140,8 @@ describe('EmployeeManager', () => {
       );
 
       // Verify that the protected indexes from the mock were added to the document
-      expect(docToProtect.indexed?.attributes).toHaveLength(4);
-      expect(docToProtect.indexed?.attributes[0].name).toBe('hmac(email)');
+      expect(docToProtect.indexed?.attributes).toHaveLength(9);
+      expect(docToProtect.indexed?.attributes[0].name).toBe(`hmac(${ClaimsPersonSchemaorg.identifier})`);
       
       const savedDocs = mockVaultRepository.put.mock.calls[0][1] as (RecordBase | ConfidentialStorageDoc)[];
       expect(savedDocs).toHaveLength(2);

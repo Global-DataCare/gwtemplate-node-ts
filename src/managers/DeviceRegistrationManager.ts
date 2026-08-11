@@ -388,7 +388,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
     const license = (params.licenseDoc?.content || {}) as DeviceLicense & Record<string, any>;
     const actorIdentifier = String(license.activatedBy || '').trim();
-    if (!/^urn:multibase:z[^:]+:(professional|personal)$/.test(actorIdentifier)) {
+    if (!/^urn:multibase:z[^:]+$/.test(actorIdentifier)) {
       throw new ManagerError('DCR license is missing its stable actor identifier.', IssueType.BusinessRule);
     }
     const clientInstanceId = String((params.registrationRequest.ext_device_info as any)?.device_id || params.clientId).trim();

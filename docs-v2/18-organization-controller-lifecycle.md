@@ -39,20 +39,24 @@ It does not cover:
 
 ## Core Rule
 
-`Organization/_issue` is a recovery/rebind step for an **existing tenant**.
+`Organization/_issue` is the organization-credential
+reissuance/reverification step for an **existing tenant**. It does not itself
+rebind a device.
 
 It must:
 
 - refresh ICA-backed legal verification,
-- reissue one activation code for the current controller,
+- expose one License activation code for the current controller separately
+  from the ICA `vc[]`,
 - preserve already contracted seats,
 - preserve seats bought after the original registration,
 - avoid creating a new `Offer`,
 - avoid requiring `Order/_batch`.
 
-That recovery/rebind step must happen **before** tenant disable/purge when the
-goal is to prove that the current controller can enroll the current device
-again.
+The complete credential-reissuance and device-enrollment sequence
+`Organization/_issue -> Token/_exchange -> Device/_dcr` must happen **before**
+tenant disable/purge when the goal is to prove that the current controller can
+enroll the current device again.
 
 ## Starting Points
 
@@ -86,10 +90,29 @@ Poll:
 
 Expected result:
 
-- refreshed ICA response,
-- refreshed claims,
-- controller activation code in
+- every deduplicated ICA-issued credential in `body.data[0].vc[]`,
+- the complete raw ICA response in
+  `body.data[0].resource.icaResponse`,
+- refreshed claims in `body.data[0].meta.claims`, including the controller
+  License activation code in
   `org.schema.IndividualProduct.serialNumber`.
+
+These fields have different meanings. `Organization/_issue` is an
+organization-credential reissuance/reverification operation. It is not
+`License/_issue`: the activation code is not a VC, and the canonical response
+does not return a `License:Issued` entry. A typed `License:Issued` result belongs
+to the separate License operation. `OperationOutcome.issue[]` remains the
+unrelated diagnostic array used for errors and warnings.
+
+The response anatomy is:
+
+```text
+body.data[0]
+├── vc[]                         all deduplicated ICA-issued VCs
+├── resource.icaResponse         complete raw ICA response
+└── meta.claims
+    └── IndividualProduct.serialNumber   License activation code
+```
 
 ### B. Exchange the controller activation code
 
@@ -165,8 +188,8 @@ That proof uses:
 - `OrganizationControllerSdk.submitLegalOrganizationVerificationTransaction(...)`
 - `HostOnboardingSdk.activateOrganizationInGatewayFromIcaProof(...)`
 - `OrganizationControllerSdk.confirmOrganizationLicenseOrder(...)`
-- `OrganizationControllerSdk.submitLegalOrganizationIssue(...)`
-- `recoverOrganizationControllerWithIssueWithDeps(...)`
+- `OrganizationControllerSdk.submitLegalOrganizationCredentialReissuance(...)`
+- `recoverOrganizationControllerWithCredentialReissuanceWithDeps(...)`
 - `OrganizationControllerSdk.disableTenant(...)`
 - `OrganizationControllerSdk.purgeTenant(...)`
 

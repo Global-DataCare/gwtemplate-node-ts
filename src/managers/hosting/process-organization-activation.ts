@@ -87,7 +87,6 @@ type ActivationDeps = Readonly<{
       governanceVc?: VerifiableCredentialV2;
       networkName?: NetworkName;
       controllerDid?: string;
-      controllerDidDocument?: DidDocument;
     },
   ) => Promise<OrganizationConfig>;
   getCurrentUrnNetwork: () => string;
@@ -303,7 +302,6 @@ async function processActivationEntry(
       publicTenantUrl: normalizedPublicUrl,
       governanceVc: activation.organizationCredential as VerifiableCredentialV2 | undefined,
       controllerDid: activation.controllerBinding?.did,
-      controllerDidDocument: controllerConfig.didDocument,
     },
   );
   if (activation.representativeCredential || activation.vpToken) {
