@@ -10,6 +10,7 @@ import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbpri
 import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 type VerificationInput = Readonly<{
   credential: VerifiableCredentialV2;
@@ -19,6 +20,15 @@ type VerificationInput = Readonly<{
   controllerEmail?: string;
   cryptography: ICryptography;
   trustedIssuers: string[];
+  trustedSigners?: ReadonlyArray<Readonly<{
+    issuer: string;
+    actorDid: string;
+    role: string;
+    jwkThumbprints: readonly string[];
+    allowHostAttestedKeys?: boolean;
+    status?: 'active' | 'revoked';
+  }>>;
+  hostAttestationSecret?: string;
   fetchImpl?: typeof fetch;
   now?: Date;
 }>;
@@ -30,7 +40,7 @@ export type HostAuthorizationVerificationResult = Readonly<{
   signer: string;
   checks: Readonly<{
     trustedIssuer: true;
-    signerCurrentlyControlsIssuer: true;
+    signerCurrentlyAuthorizedByIssuer: true;
     signerMethodActive: true;
     detachedPqcProof: true;
     applicationBinding: true;
@@ -39,9 +49,10 @@ export type HostAuthorizationVerificationResult = Readonly<{
 }>;
 
 /**
- * Verifies the Test Network VC without calling ICA. The signer must still be a
- * currently published controller of the trusted issuer; removing either DID
- * relationship makes a later transaction fail closed.
+ * Verifies the Test Network VC without calling ICA. Published DID governance
+ * is preferred. The Test Network MVP can instead use an issuer-maintained
+ * employee DID, role and key-thumbprint registry until employee governance
+ * keys are published; deleting or revoking an entry fails closed.
  */
 export async function verifyOrganizationRegistrationAuthorization(
   input: VerificationInput,
@@ -63,6 +74,10 @@ export async function verifyOrganizationRegistrationAuthorization(
   if (subject.postalActivationLicense?.status !== 'delivered'
     || !subject.postalActivationLicense?.deliveredAt) {
     fail('Postal activation delivery is not confirmed.');
+  }
+  const protectedCode = subject.postalActivationLicense?.protectedCode;
+  if (protectedCode?.algorithm !== 'scrypt-v1' || !protectedCode?.salt || !protectedCode?.digest) {
+    fail('Postal activation code binding is missing or unsupported.');
   }
   const organizationIdentifier = String(
     input.claims[ClaimsOrganizationSchemaorg.identifierValue]
@@ -91,27 +106,51 @@ export async function verifyOrganizationRegistrationAuthorization(
   const verificationMethod = String(proof.verificationMethod);
   const signerDid = verificationMethod.split('#')[0];
   const fetchImpl = input.fetchImpl || fetch;
-  const [issuerDocument, signerDocument] = await Promise.all([
-    resolveDidWebDocument(issuer, fetchImpl),
-    resolveDidWebDocument(signerDid, fetchImpl),
-  ]);
-  const issuerControllers = Array.isArray(issuerDocument.controller)
-    ? issuerDocument.controller
-    : issuerDocument.controller ? [issuerDocument.controller] : [];
-  if (!issuerControllers.includes(signerDid)) fail('Authorization signer is not a current issuer controller.');
-  if ((signerDocument as any).deactivated === true || String((signerDocument as any).status || '') === 'revoked') {
-    fail('Authorization signer is revoked.');
-  }
-  const method = (signerDocument.verificationMethod || []).find(item => item.id === verificationMethod);
-  if (!method?.publicKeyJwk || !relationshipContains(signerDocument.assertionMethod, verificationMethod)) {
-    fail('Authorization signer method is not an active assertion method.');
+  const embeddedJwk = (proof as any).publicKeyJwk as PublicJwk | undefined;
+  const registeredSigner = input.trustedSigners?.find(entry => entry.issuer === issuer && entry.actorDid === signerDid);
+  let signerJwk: PublicJwk;
+  if (registeredSigner) {
+    if (registeredSigner.status === 'revoked') fail('Authorization signer is revoked.');
+    if (registeredSigner.role !== 'RESPRSN') fail('Authorization signer role is not authorized.');
+    if (!embeddedJwk) fail('Registered authorization signer proof must embed its public JWK.');
+    const thumbprint = toJwkThumbprintSha256Urn(embeddedJwk);
+    const thumbprintRegistered = registeredSigner.jwkThumbprints.includes(thumbprint);
+    const hostAttested = registeredSigner.allowHostAttestedKeys === true
+      && verifyHostAttestation({
+        credential, proof, issuer, signerDid, role: registeredSigner.role,
+        thumbprint, secret: input.hostAttestationSecret,
+      });
+    if (!thumbprintRegistered && !hostAttested) {
+      fail('Authorization signer key is not active in the host registry.');
+    }
+    if (verificationMethod !== `${signerDid}#${embeddedJwk.kid}`) {
+      fail('Authorization verification method does not match its registered public key.');
+    }
+    signerJwk = embeddedJwk;
+  } else {
+    const [issuerDocument, signerDocument] = await Promise.all([
+      resolveDidWebDocument(issuer, fetchImpl),
+      resolveDidWebDocument(signerDid, fetchImpl),
+    ]);
+    const issuerControllers = Array.isArray(issuerDocument.controller)
+      ? issuerDocument.controller
+      : issuerDocument.controller ? [issuerDocument.controller] : [];
+    if (!issuerControllers.includes(signerDid)) fail('Authorization signer is not a current issuer controller.');
+    if ((signerDocument as any).deactivated === true || String((signerDocument as any).status || '') === 'revoked') {
+      fail('Authorization signer is revoked.');
+    }
+    const method = (signerDocument.verificationMethod || []).find(item => item.id === verificationMethod);
+    if (!method?.publicKeyJwk || !relationshipContains(signerDocument.assertionMethod, verificationMethod)) {
+      fail('Authorization signer method is not an active assertion method.');
+    }
+    signerJwk = method.publicKeyJwk as PublicJwk;
   }
   const header = JSON.parse(Buffer.from(String(proof.jws).split('.')[0] || '', 'base64url').toString('utf8'));
   if (header.alg !== 'ML-DSA-65') fail('Organization authorization requires ML-DSA-65.');
   const valid = await input.cryptography.verifyDetachedJws(
     new TextEncoder().encode(canonicalizeOrganizationRegistrationAuthorizationCredential(credential)),
     String(proof.jws),
-    method.publicKeyJwk as PublicJwk,
+    signerJwk,
   );
   if (!valid) fail('Organization authorization proof is invalid.');
 
@@ -122,13 +161,31 @@ export async function verifyOrganizationRegistrationAuthorization(
     signer: signerDid,
     checks: {
       trustedIssuer: true,
-      signerCurrentlyControlsIssuer: true,
+      signerCurrentlyAuthorizedByIssuer: true,
       signerMethodActive: true,
       detachedPqcProof: true,
       applicationBinding: true,
       postalDelivered: true,
     },
   };
+}
+
+function verifyHostAttestation(input: Readonly<{
+  credential: VerifiableCredentialV2; proof: any; issuer: string; signerDid: string;
+  role: string; thumbprint: string; secret?: string;
+}>): boolean {
+  const attestation = input.proof?.hostAttestation;
+  const secret = String(input.secret || '').trim();
+  if (attestation?.type !== 'HmacSha256V1'
+    || attestation?.keyId !== 'unid-professional-host-authorization-v1'
+    || !attestation?.value || !secret) return false;
+  const payload = [
+    canonicalizeOrganizationRegistrationAuthorizationCredential(input.credential),
+    input.issuer, input.signerDid, input.role, input.thumbprint,
+  ].join('\u0000');
+  const actual = Buffer.from(String(attestation.value), 'base64url');
+  const expected = createHmac('sha256', secret).update(payload).digest();
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 function relationshipContains(

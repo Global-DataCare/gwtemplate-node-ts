@@ -1,7 +1,9 @@
 /**
  * Flow contract: Test Network bypasses ICA only when the attached VC is bound
  * to the same organization, controller key and delivered postal licence, and a
- * current controller of a configured issuer supplied the ML-DSA-65 proof.
+ * currently authorized employee of a configured issuer supplied the
+ * ML-DSA-65 proof. Tests cover both published DID governance and the explicit,
+ * revocable Test Network signer registry used by the MVP.
  */
 import { verifyOrganizationRegistrationAuthorization } from '../../../managers/hosting/organization-registration-authorization';
 import { processOrganizationVerificationTransaction } from '../../../managers/hosting/process-organization-verification';
@@ -14,7 +16,7 @@ import {
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 
 const controllerJwk = { kty: 'AKP', alg: 'ML-DSA-65', pub: 'controller-public' } as const;
-const signerJwk = { kty: 'AKP', alg: 'ML-DSA-65', pub: 'unid-signer-public' } as const;
+const signerJwk = { kid: 'pqc', kty: 'AKP', alg: 'ML-DSA-65', pub: 'unid-signer-public' } as const;
 const issuer = 'did:web:unid.example:VATES-G02793479';
 const signer = 'did:web:unid.example:VATES-G02793479:member:cto';
 const organizationDid = 'did:web:host.example:VATES-B00112233';
@@ -40,6 +42,7 @@ function credential() {
       controllerEmail: 'developer@dsrc.example',
       controllerKeyMaterial: toJwkThumbprintSha256Urn(controllerJwk),
       postalAddressHash: 'sha256-address',
+      protectedCode: { algorithm: 'scrypt-v1', salt: 'salt', digest: 'digest' },
       hostDid: 'did:web:host.example',
       network: 'test-network',
       status: 'delivered',
@@ -54,6 +57,7 @@ function credential() {
       type: 'JsonWebSignature2020',
       proofPurpose: 'contractAgreement',
       verificationMethod: `${signer}#pqc`,
+      publicKeyJwk: signerJwk,
       jws: `${Buffer.from(JSON.stringify({ alg: 'ML-DSA-65' })).toString('base64url')}..signature`,
     },
   };
@@ -115,6 +119,53 @@ describe('organization registration authorization verifier', () => {
       now: new Date('2026-08-10T12:00:00.000Z'),
     })).rejects.toThrow('not a current issuer controller');
   });
+
+  it('accepts the MVP signer registry without pretending the employee DID is already published', async () => {
+    const fetchImpl = jest.fn();
+    const verifyDetachedJws = jest.fn().mockResolvedValue(true);
+    const result = await verifyOrganizationRegistrationAuthorization({
+      credential: credential(),
+      claims: { [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233' },
+      controller: { publicKeyJwk: controllerJwk },
+      organization: { did: organizationDid },
+      controllerEmail: 'developer@dsrc.example',
+      cryptography: { verifyDetachedJws } as any,
+      trustedIssuers: [issuer],
+      trustedSigners: [{
+        issuer,
+        actorDid: signer,
+        role: 'RESPRSN',
+        status: 'active',
+        jwkThumbprints: [toJwkThumbprintSha256Urn(signerJwk)],
+      }],
+      fetchImpl: fetchImpl as typeof fetch,
+      now: new Date('2026-08-10T12:00:00.000Z'),
+    });
+
+    expect(result.checks.signerCurrentlyAuthorizedByIssuer).toBe(true);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(verifyDetachedJws).toHaveBeenCalledWith(expect.any(Uint8Array), expect.any(String), signerJwk);
+  });
+
+  it('fails closed when the MVP signer registry revokes the employee', async () => {
+    await expect(verifyOrganizationRegistrationAuthorization({
+      credential: credential(),
+      claims: { [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233' },
+      controller: { publicKeyJwk: controllerJwk },
+      organization: { did: organizationDid },
+      controllerEmail: 'developer@dsrc.example',
+      cryptography: { verifyDetachedJws: jest.fn() } as any,
+      trustedIssuers: [issuer],
+      trustedSigners: [{
+        issuer,
+        actorDid: signer,
+        role: 'RESPRSN',
+        status: 'revoked',
+        jwkThumbprints: [toJwkThumbprintSha256Urn(signerJwk)],
+      }],
+      now: new Date('2026-08-10T12:00:00.000Z'),
+    })).rejects.toThrow('signer is revoked');
+  });
 });
 
 describe('Test Network transaction routing', () => {
@@ -136,6 +187,7 @@ describe('Test Network transaction routing', () => {
       job: {
         action: 'Organization/_transaction',
         tenantId: 'host',
+        sector: 'test-network',
         content: {
           thid: 'transaction-dsrc',
           iss: 'did:web:controller.dsrc.example',
@@ -143,7 +195,7 @@ describe('Test Network transaction routing', () => {
             meta: { claims },
             resource: {
               authorizationCredential,
-              verification: { resourceType: 'test-network' },
+              verification: { resourceType: 'contract' },
               organization: { did: organizationDid },
               controller: { publicKeyJwk: controllerJwk },
               legalRepresentativePayload: { email: 'developer@dsrc.example' },
@@ -152,7 +204,7 @@ describe('Test Network transaction routing', () => {
         },
       } as any,
       issuerDid: 'did:web:host.example',
-      config: { namespace: 'example', sectorsAllowed: [] },
+      config: { namespace: 'example', sectorsAllowed: [], networkMode: 'test-network' },
       normalizeClaims: value => value,
       createPendingTenantRegistrationFromClaims: async () => ({
         ...claims,
@@ -171,5 +223,32 @@ describe('Test Network transaction routing', () => {
       next: { action: 'Order/_batch' },
     });
     expect(response.body.data[0]?.vc).toEqual([authorizationCredential]);
+  });
+
+  it.each([
+    ['network route', 'network', 'test-network'],
+    ['network runtime', 'test-network', 'network'],
+  ])('rejects the host credential on a %s', async (_label, sector, networkMode) => {
+    const authorizationCredential = credential();
+    await expect(processOrganizationVerificationTransaction({
+      job: {
+        action: 'Organization/_transaction', tenantId: 'host', sector,
+        content: { thid: 'transaction-dsrc', body: { data: [{
+          meta: { claims: { [ClaimsServiceSchemaorg.category]: 'health-care' } },
+          resource: {
+            authorizationCredential,
+            verification: { resourceType: 'contract' },
+          },
+        }] } },
+      } as any,
+      issuerDid: 'did:web:host.example',
+      config: { namespace: 'example', sectorsAllowed: [], networkMode },
+      normalizeClaims: value => value,
+      createPendingTenantRegistrationFromClaims: jest.fn(),
+      createOrganizationIssueClaimsFromClaims: jest.fn(),
+      forwardOrganizationVerificationTransactionToIca: jest.fn(),
+      extractCredentialResourcesFromIcaPayload: jest.fn(),
+      verifyHostAuthorizationCredential: jest.fn(),
+    })).rejects.toThrow('Test Network route on a Test Network host');
   });
 });

@@ -883,6 +883,9 @@ export class HostingManager {
           .split(',')
           .map(value => value.trim())
           .filter(Boolean);
+        const trustedSigners = parseOrganizationAuthorizationSigners(
+          process.env.HOST_ORGANIZATION_AUTHORIZATION_SIGNERS,
+        );
         return verifyOrganizationRegistrationAuthorization({
           credential,
           claims,
@@ -891,6 +894,8 @@ export class HostingManager {
           controllerEmail: String(resource.legalRepresentativePayload?.email || resource.legalRepresentative?.email || ''),
           cryptography: this.cryptographyService,
           trustedIssuers,
+          trustedSigners,
+          hostAttestationSecret: process.env.HOST_ORGANIZATION_AUTHORIZATION_ATTESTATION_SECRET,
         });
       },
     });
@@ -981,6 +986,7 @@ export class HostingManager {
     jobMeta?: DidCommDecodedMetadata;
     fallbackAlternateName?: string;
     primaryDid?: string;
+    postalActivationCodeBinding?: { algorithm: 'scrypt-v1'; salt: string; digest: string };
   }): Promise<ClaimsRecord> {
     return createPendingTenantRegistration({
       claims: input.claims,
@@ -988,6 +994,7 @@ export class HostingManager {
       jobMeta: input.jobMeta,
       fallbackAlternateName: input.fallbackAlternateName,
       primaryDid: input.primaryDid,
+      postalActivationCodeBinding: input.postalActivationCodeBinding,
       config: this.config,
       vaultRepository: this.vaultRepository,
       kmsService: this.kmsService,
@@ -1534,5 +1541,43 @@ export class HostingManager {
 
   private extractResources(claims: ClaimsRecord, environment?: string) {
     return extractResourcesFromClaims(claims, environment);
+  }
+}
+
+function parseOrganizationAuthorizationSigners(raw: string | undefined): Array<{
+  issuer: string;
+  actorDid: string;
+  role: string;
+  jwkThumbprints: string[];
+  allowHostAttestedKeys?: boolean;
+  status?: 'active' | 'revoked';
+}> {
+  if (!raw?.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('not_an_array');
+    return parsed.map((entry: any) => {
+      const status: 'active' | 'revoked' = entry?.status === 'revoked' ? 'revoked' : 'active';
+      const normalized = {
+        issuer: String(entry?.issuer || '').trim(),
+        actorDid: String(entry?.actorDid || '').trim(),
+        role: String(entry?.role || '').trim(),
+        jwkThumbprints: Array.isArray(entry?.jwkThumbprints)
+          ? entry.jwkThumbprints.map((value: unknown) => String(value).trim()).filter(Boolean)
+          : [],
+        allowHostAttestedKeys: entry?.allowHostAttestedKeys === true,
+        status,
+      };
+      if (!normalized.issuer || !normalized.actorDid || !normalized.role
+        || (normalized.jwkThumbprints.length === 0 && !normalized.allowHostAttestedKeys)) {
+        throw new Error('missing_required_signer_field');
+      }
+      return normalized;
+    });
+  } catch (error) {
+    throw new ManagerError(
+      `HOST_ORGANIZATION_AUTHORIZATION_SIGNERS is invalid: ${(error as Error).message}`,
+      IssueType.Invalid,
+    );
   }
 }
