@@ -34,6 +34,9 @@ export interface IDiscoveryTenantRegistry {
    */
   getDidDocument(vaultId: string): Promise<DidDocument | undefined>;
 
+  /** Resolves a controller from its normal encrypted employee record. */
+  getEmployeeDidDocument(vaultId: string, employeeDid: string): Promise<DidDocument | undefined>;
+
   /**
    * Returns published DID service entries for the tenant.
    */

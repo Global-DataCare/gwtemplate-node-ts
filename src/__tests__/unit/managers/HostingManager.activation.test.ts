@@ -421,6 +421,7 @@ describe('HostingManager activation flow', () => {
 
   it('should activate a tenant from ICA proof and persist the final tenant config', async () => {
     const job = buildActivationJob();
+    const expectedControllerKid = toJwkThumbprintSha256Urn(job.content!.meta!.jws!.protected!.jwk as any);
 
     const responsePayload = await hostingManager.process(job);
     const entry = responsePayload.body.data[0];
@@ -465,7 +466,7 @@ describe('HostingManager activation flow', () => {
       getEnvSectionId('employees'),
     );
     expect(employeeDocs.length).toBe(1);
-    expect((employeeDocs[0] as any).content?.didDocument?.verificationMethod?.[0]?.publicKeyJwk?.kid).toBe('controller-sig-kid');
+    expect((employeeDocs[0] as any).content?.didDocument?.verificationMethod?.[0]?.publicKeyJwk?.kid).toBe(expectedControllerKid);
 
     const proofDoc = await vaultRepository.get(
       tenantCollectionName,
@@ -767,7 +768,6 @@ describe('HostingManager activation flow', () => {
         ],
       },
     };
-
     const responsePayload = await hostingManager.process(job);
     expect(responsePayload.body.data[0].response.status).toBe('201');
     expect(mockLogger.warn).not.toHaveBeenCalledWith(
@@ -847,6 +847,12 @@ describe('HostingManager activation flow', () => {
       },
     };
 
+    const requestedController = (job.content!.body as any).controller;
+    const expectedControllerKids = [
+      requestedController.publicKeyJwk,
+      ...requestedController.jwks.keys,
+    ].map((key: any) => toJwkThumbprintSha256Urn(key));
+
     const responsePayload = await hostingManager.process(job);
     expect(responsePayload.body.data[0].response.status).toBe('201');
 
@@ -864,21 +870,21 @@ describe('HostingManager activation flow', () => {
     const controllerDidDocument = (employeeDocs[0] as any).content?.didDocument;
     expect(controllerDidDocument.id).toBe('did:web:people.acme.org:controllers:primary');
     expect(controllerDidDocument.alsoKnownAs).toContain(controllerSameAs);
-    expect(controllerDidDocument.verificationMethod?.[0]?.publicKeyJwk?.kid).toBe('explicit-controller-sig-kid');
+    expect(controllerDidDocument.verificationMethod?.[0]?.publicKeyJwk?.kid).toBe(expectedControllerKids[0]);
     expect(controllerDidDocument.verificationMethod.map((method: any) => method.publicKeyJwk.kid)).toEqual(
-      expect.arrayContaining(['explicit-controller-sig-kid', 'legacy-pontus-x-kid', 'controller-pqc-kid']),
+      expect.arrayContaining(expectedControllerKids.slice(0, 3)),
     );
-    expect(controllerDidDocument.keyAgreement).toContain('did:web:people.acme.org:controllers:primary#explicit-controller-enc-kid');
+    expect(controllerDidDocument.keyAgreement).toContain(`did:web:people.acme.org:controllers:primary#${expectedControllerKids[3]}`);
 
     const icaRequestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
     const icaOrganization = icaRequestBody.body?.data?.[0]?.resource?.organization;
     const icaController = icaRequestBody.body?.data?.[0]?.resource?.controller;
-    expect(icaOrganization.didDocument.controller).toBe('did:web:people.acme.org:controllers:primary');
-    expect(icaController.publicKeyJwk.kid).toBe('explicit-controller-sig-kid');
+    expect(icaOrganization.didDocument.controller).toEqual(['did:web:people.acme.org:controllers:primary']);
+    expect(icaController.publicKeyJwk.kid).toBe(expectedControllerKids[0]);
     expect(icaController.sameAs).toBe(controllerSameAs);
     expect(icaController.did).toBe('did:web:people.acme.org:controllers:primary');
     expect(icaController.jwks.keys.map((key: any) => key.kid)).toEqual(
-      expect.arrayContaining(['legacy-pontus-x-kid', 'controller-pqc-kid', 'explicit-controller-enc-kid']),
+      expect.arrayContaining(expectedControllerKids.slice(1)),
     );
   });
 

@@ -507,6 +507,7 @@
                     "org.schema.Organization.taxID": "VATES-B00112233",
                     "org.schema.Organization.address.addressCountry": "ES",
                     "org.schema.Person.email": "controller@example.org",
+                    "org.schema.Person.hasOccupation.identifier.value": "RESPRSN",
                     "org.schema.Service.category": "health-care",
                     "org.schema.Service.identifier": "did:web:tenant.example.org",
                     "org.schema.Service.url": "https://operator.example.net/acme/cds-es/v1/health-care",
@@ -515,7 +516,8 @@
                 },
                 "resource": {
                   "controller": {
-                    "did": "did:key:zDnaekW6GaRk6x9t6yC3r5vQk4wMdx0controller",
+                    "did": "did:web:controller.example.org",
+                    "sameAs": "urn:multibase:zExampleStableActorHash",
                     "publicKeyJwk": {
                       "kid": "controller-signing-es384-001",
                       "kty": "EC",
@@ -616,6 +618,7 @@
                     "org.schema.Organization.taxID": "VATES-B00112233",
                     "org.schema.Organization.address.addressCountry": "ES",
                     "org.schema.Person.email": "controller@example.org",
+                    "org.schema.Person.hasOccupation.identifier.value": "RESPRSN",
                     "org.schema.Service.category": "health-care",
                     "org.schema.Service.identifier": "did:web:tenant.example.org",
                     "org.schema.Service.url": "https://operator.example.net/acme/cds-es/v1/health-care",
@@ -624,7 +627,8 @@
                 },
                 "resource": {
                   "controller": {
-                    "did": "did:key:zDnaekW6GaRk6x9t6yC3r5vQk4wMdx0controller",
+                    "did": "did:web:controller.example.org",
+                    "sameAs": "urn:multibase:zExampleStableActorHash",
                     "publicKeyJwk": {
                       "kid": "controller-signing-es384-001",
                       "kty": "EC",
@@ -716,6 +720,58 @@
             "data": [
               {
                 "type": "Organization-issue-response-v1.0",
+                "vc": [
+                  {
+                    "id": "urn:uuid:organization-credential-001",
+                    "issuer": "did:web:ica.example.org",
+                    "type": [
+                      "VerifiableCredential",
+                      "OrganizationCredential"
+                    ],
+                    "credentialSubject": {
+                      "id": "did:web:tenant.example.org",
+                      "taxID": "VATES-B00112233"
+                    }
+                  },
+                  {
+                    "id": "urn:uuid:legal-representative-credential-001",
+                    "issuer": "did:web:ica.example.org",
+                    "type": [
+                      "VerifiableCredential",
+                      "LegalRepresentativeCredential"
+                    ],
+                    "credentialSubject": {
+                      "id": "did:web:tenant.example.org:actor:representative",
+                      "memberOf": {
+                        "taxID": "VATES-B00112233"
+                      }
+                    }
+                  },
+                  {
+                    "id": "urn:uuid:organization-controller-credential-001",
+                    "issuer": "did:web:ica.example.org",
+                    "type": [
+                      "VerifiableCredential",
+                      "ServiceCredential",
+                      "OrganizationControllerCredential"
+                    ],
+                    "credentialSubject": {
+                      "id": "did:web:tenant.example.org:service:hosted",
+                      "provider": {
+                        "taxID": "VATES-B00112233"
+                      },
+                      "owner": {
+                        "sameAs": "urn:multibase:zControllerHash",
+                        "hasOccupation": {
+                          "identifier": "RESPRSN"
+                        },
+                        "hasCredential": {
+                          "material": "urn:ietf:params:oauth:jwk-thumbprint:sha-256:controller-thumbprint"
+                        }
+                      }
+                    }
+                  }
+                ],
                 "meta": {
                   "claims": {
                     "@context": "org.schema",
@@ -741,12 +797,65 @@
                   "icaResponse": {
                     "resourceType": "Bundle",
                     "type": "batch-response",
-                    "total": 1,
+                    "total": 3,
                     "data": [
                       {
                         "type": "VerifyResponse-v1.0",
                         "resource": {
-                          "resourceType": "Bundle"
+                          "id": "urn:uuid:organization-credential-001",
+                          "issuer": "did:web:ica.example.org",
+                          "type": [
+                            "VerifiableCredential",
+                            "OrganizationCredential"
+                          ],
+                          "credentialSubject": {
+                            "id": "did:web:tenant.example.org",
+                            "taxID": "VATES-B00112233"
+                          }
+                        }
+                      },
+                      {
+                        "type": "VerifyResponse-v1.0",
+                        "resource": {
+                          "id": "urn:uuid:legal-representative-credential-001",
+                          "issuer": "did:web:ica.example.org",
+                          "type": [
+                            "VerifiableCredential",
+                            "LegalRepresentativeCredential"
+                          ],
+                          "credentialSubject": {
+                            "id": "did:web:tenant.example.org:actor:representative",
+                            "memberOf": {
+                              "taxID": "VATES-B00112233"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "VerifyResponse-v1.0",
+                        "resource": {
+                          "id": "urn:uuid:organization-controller-credential-001",
+                          "issuer": "did:web:ica.example.org",
+                          "type": [
+                            "VerifiableCredential",
+                            "ServiceCredential",
+                            "OrganizationControllerCredential"
+                          ],
+                          "credentialSubject": {
+                            "id": "did:web:tenant.example.org:service:hosted",
+                            "provider": {
+                              "taxID": "VATES-B00112233"
+                            },
+                            "owner": {
+                              "sameAs": "urn:multibase:zControllerHash",
+                              "hasOccupation": {
+                                "identifier": "RESPRSN"
+                              },
+                              "hasCredential": {
+                                "material": "urn:ietf:params:oauth:jwk-thumbprint:sha-256:controller-thumbprint"
+                              }
+                            }
+                          }
                         }
                       }
                     ]
@@ -3220,7 +3329,7 @@
           "1.1 Organization Registration"
         ],
         "summary": "Poll the existing-tenant reissue result",
-        "description": "Polls the asynchronous job submitted to `.../Organization/_issue`.\n\nPolling semantics:\n- submit (`_issue`) returns immediate errors if the request cannot be accepted/enqueued\n- poll (`_issue-response`) returns `202` while pending, then `200` with:\n  - `resource.icaResponse`: the verification payload returned by ICA `_verify`\n  - `vc[]`: extracted credential resources from that ICA payload\n  - `meta.claims`: refreshed organization/controller claims plus one reissued activation code for `Token/_exchange` + `Device/_dcr`\n",
+        "description": "Polls the asynchronous job submitted to `.../Organization/_issue`.\n\nPolling semantics:\n- submit (`_issue`) returns immediate errors if the request cannot be accepted/enqueued\n- poll (`_issue-response`) returns `202` while pending, then `200` with:\n  - `resource.icaResponse`: the complete verification payload returned by ICA `_verify`\n  - `vc[]`: all deduplicated credential resources extracted from that ICA payload\n  - `meta.claims`: refreshed organization/controller claims plus the License activation code in `org.schema.IndividualProduct.serialNumber` for `Token/_exchange` + `Device/_dcr`\n\nResponse-boundary rule:\n- this is an organization-credential reissuance/reverification result, not a `License/_issue` result\n- the activation code is not a VC and `License:Issued` is not the canonical response entry type\n- `OperationOutcome.issue[]` remains the unrelated diagnostics array\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

@@ -36,6 +36,7 @@ import {
 
 const mockTenantsCacheManager = {
   getDidDocument: jest.fn(),
+  getEmployeeDidDocument: jest.fn(),
   getTenant: jest.fn(),
   isTenantOperational: jest.fn(async () => true),
   getTenantDomainUrl: jest.fn(async () => 'https://host.example.com'),
@@ -135,10 +136,7 @@ describe('Well-Known DID Discovery API', () => {
       ],
     };
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: tenantDid } as any);
-    mockTenantsCacheManager.getTenant.mockResolvedValue({
-      didDocument: { id: tenantDid },
-      meta: { controllerDidDocument },
-    } as any);
+    mockTenantsCacheManager.getEmployeeDidDocument.mockResolvedValue(controllerDidDocument);
 
     const response = await invokeExpress(app, {
       method: 'GET',
@@ -147,6 +145,7 @@ describe('Well-Known DID Discovery API', () => {
 
     expect(response.status).toBe(200);
     expect(JSON.parse(response.text)).toEqual(controllerDidDocument);
+    expect(mockTenantsCacheManager.getEmployeeDidDocument).toHaveBeenCalledWith(testTenant1VaultId, controllerDid);
   });
 });
 

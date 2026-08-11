@@ -819,9 +819,14 @@ export function createApiRouter(
    *       Polling semantics:
    *       - submit (`_issue`) returns immediate errors if the request cannot be accepted/enqueued
    *       - poll (`_issue-response`) returns `202` while pending, then `200` with:
-   *         - `resource.icaResponse`: the verification payload returned by ICA `_verify`
-   *         - `vc[]`: extracted credential resources from that ICA payload
-   *         - `meta.claims`: refreshed organization/controller claims plus one reissued activation code for `Token/_exchange` + `Device/_dcr`
+   *         - `resource.icaResponse`: the complete verification payload returned by ICA `_verify`
+   *         - `vc[]`: all deduplicated credential resources extracted from that ICA payload
+   *         - `meta.claims`: refreshed organization/controller claims plus the License activation code in `org.schema.IndividualProduct.serialNumber` for `Token/_exchange` + `Device/_dcr`
+   *
+   *       Response-boundary rule:
+   *       - this is an organization-credential reissuance/reverification result, not a `License/_issue` result
+   *       - the activation code is not a VC and `License:Issued` is not the canonical response entry type
+   *       - `OperationOutcome.issue[]` remains the unrelated diagnostics array
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'

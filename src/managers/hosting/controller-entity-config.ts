@@ -7,6 +7,7 @@ import type { JwkSet } from 'gdc-common-utils-ts/models/jwk';
 import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { EntityLifecycleStatus, EntityType } from '../../gdc-backend-utils-node/models/enums';
 import type { EntityConfig } from '../../gdc-backend-utils-node/models/entity';
 import type { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
@@ -98,6 +99,8 @@ export async function buildControllerEntityConfig(
   if (!signerJwk?.kid || !encrypterJwk?.kid) {
     throw new ManagerError('Admin keys are missing "kid" properties.', IssueType.Required);
   }
+  signerJwk = { ...signerJwk, kid: toJwkThumbprintSha256Urn(signerJwk as any) } as PublicJwk;
+  encrypterJwk = { ...encrypterJwk, kid: toJwkThumbprintSha256Urn(encrypterJwk as any) } as PublicJwk;
 
   const didId = deps.explicitBinding?.did || employeeUrn;
   const alsoKnownAs = Array.from(new Set([
@@ -105,7 +108,15 @@ export async function buildControllerEntityConfig(
     deps.explicitBinding?.sameAs,
   ].filter((value): value is string => Boolean(value))));
 
-  const mergedJwks = deps.mergeActivationJwks([signerJwk, encrypterJwk], deps.explicitBinding?.jwks);
+  const mergedJwks = {
+    keys: Array.from(new Map(
+      (deps.mergeActivationJwks([signerJwk, encrypterJwk], deps.explicitBinding?.jwks).keys as PublicJwk[])
+        .map((key) => {
+          const kid = toJwkThumbprintSha256Urn(key as any);
+          return [kid, { ...key, kid }];
+        }),
+    ).values()),
+  } as JwkSet;
   const didDocument: DidDocument = didId.startsWith('did:web:')
     ? populateDidDocumentFromJwks(
       {
@@ -175,6 +186,16 @@ export async function storeControllerEntityConfig(
   const roleCode = getPersonOccupationClaim(deps.controllerConfig.claims as Record<string, any> | undefined);
 
   const attributesToIndex: ParameterData[] = [
+    ...(deps.controllerConfig.didDocument?.id
+      ? [{ name: ClaimsPersonSchemaorg.identifier, value: deps.controllerConfig.didDocument.id, unique: true, type: 'uri' } as ParameterData]
+      : []),
+    ...(email ? [{ name: ClaimsPersonSchemaorg.email, value: email, unique: true, type: 'string' } as ParameterData] : []),
+    ...(roleCode ? [{ name: ClaimsPersonSchemaorg.hasOccupationalRoleValue, value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token' } as ParameterData] : []),
+    ...verificationMethods
+      .map((vm) => (vm.publicKeyJwk as PublicJwk | undefined)?.kid)
+      .filter((kid): kid is string => Boolean(kid))
+      .map((kid) => ({ name: ClaimsPersonSchemaorg.hasCredentialMaterial, value: kid, unique: false, type: 'string' } as ParameterData)),
+    // Transitional aliases retained for older queries.
     ...(email ? [{ name: 'email', value: email, unique: true, type: 'string' } as ParameterData] : []),
     ...(roleCode ? [{ name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token' } as ParameterData] : []),
     { name: 'lifecycleRole', value: deps.bootstrapLifecycleRole, unique: false, type: 'string' } as ParameterData,

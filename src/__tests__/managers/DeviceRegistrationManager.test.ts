@@ -17,7 +17,7 @@ import type { EntityConfig } from '../../gdc-backend-utils-node/models/entity';
 import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
-import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
+import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
 
 const TEST_API_BASE_URL = 'http://localhost:3001';
 const FABRIC_LEDGER_TEST_ENV = {
@@ -245,9 +245,7 @@ describe('DeviceRegistrationManager', () => {
         reactivationEnabled: false,
         exp: Math.floor(Date.now() / 1000) + 3600,
         subjectId: employeeId,
-        activatedBy: buildStableActorIdentifier({
-          contactKind: 'email', contact: 'employee@example.org', role: 'professional',
-        }),
+        activatedBy: normalizeSameAsHash('employee@example.org'),
         deviceId: previousDeviceId,
       } as any;
       const licenseDoc: ConfidentialStorageDoc = {

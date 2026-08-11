@@ -760,12 +760,7 @@ export function createDiscoveryRouter(
     res.json(didDocument);
   });
 
-  /**
-   * Resolves the separately governed controller did:web document retained in
-   * the tenant's public registration metadata. This path follows did:web path
-   * resolution and never exposes the protected employee record or private key
-   * material.
-   */
+  /** Resolves a controller DID document from its normal employee record. */
   /**
    * @openapi
    * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/employee/{memberId}/{role}/did.json:
@@ -779,11 +774,11 @@ export function createDiscoveryRouter(
    *         description: Controller DID is not registered for this tenant
    */
   router.get(`${tenantControllerDidPrefix}/did.json`, resolveTenant, async (req, res) => {
-    const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
-    const controllerDidDocument = tenantConfig?.meta?.controllerDidDocument;
-    const tenantDid = String(tenantConfig?.didDocument?.id || '').trim();
+    const tenantDidDocument = await tenantsCacheManager.getDidDocument(res.locals.vaultId);
+    const tenantDid = String(tenantDidDocument?.id || '').trim();
     const requestedDid = `${tenantDid}:employee:${req.params.memberId}:${req.params.role}`;
-    if (!controllerDidDocument || controllerDidDocument.id !== requestedDid) {
+    const controllerDidDocument = await tenantsCacheManager.getEmployeeDidDocument(res.locals.vaultId, requestedDid);
+    if (!controllerDidDocument) {
       return res.status(404).type('text').send('Not Found');
     }
     return res.json(controllerDidDocument);

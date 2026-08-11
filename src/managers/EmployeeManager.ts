@@ -21,6 +21,7 @@ import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { ParameterData } from 'gdc-common-utils-ts/models/params';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { DidDocument, VerificationMethod } from '../gdc-backend-utils-node/models/did';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { EntityLifecycleStatus, EntityType } from '../gdc-backend-utils-node/models/enums';
@@ -396,6 +397,8 @@ export class EmployeeManager {
     if (!signerJwk.kid || !encrypterJwk.kid) {
       throw new ManagerError('Embedded JWKs must have a "kid" property.', IssueType.Required);
     }
+    signerJwk = { ...signerJwk, kid: toJwkThumbprintSha256Urn(signerJwk as any) } as PublicJwk;
+    encrypterJwk = { ...encrypterJwk, kid: toJwkThumbprintSha256Urn(encrypterJwk as any) } as PublicJwk;
 
     // Construct the hierarchical URN using the parent tenant's URN.
     const employeeUrn = employeeUrnForKeys;
@@ -461,6 +464,13 @@ export class EmployeeManager {
     };
 
     const attributesToIndex: ParameterData[] = [
+      { name: ClaimsPersonSchemaorg.identifier, value: employeeDidDocument.id, unique: true, type: 'uri' },
+      { name: ClaimsPersonSchemaorg.email, value: email, unique: true, type: 'string'},
+      { name: ClaimsPersonSchemaorg.hasOccupationalRoleValue, value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token'},
+      { name: ClaimsPersonSchemaorg.hasCredentialMaterial, value: signerJwk.kid, unique: false, type: 'string'},
+      { name: ClaimsPersonSchemaorg.hasCredentialMaterial, value: encrypterJwk.kid, unique: false, type: 'string'},
+      // Transitional aliases retained while deployed callers migrate to the
+      // canonical reverse-DNS Person attributes above.
       { name: 'email', value: email, unique: true, type: 'string'},
       // The role code is normalized before HMAC to ensure consistent searching.
       { name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token'},

@@ -12,7 +12,7 @@ import { IVaultRepository } from '../database/repositories/vault/vault.repositor
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { getIdentifierUrnFromClaims, generateTenantCollectionNameFromClaims } from '../utils/tenant';
 import { DidDocument, DidService, VerificationMethod } from '../gdc-backend-utils-node/models/did';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBaseUrlFromDidWeb, normalizeDidDocumentKeyRelationships } from '../utils/did-backend';
 import { parseTenantUrn } from '../utils/urn';
@@ -295,6 +295,31 @@ export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRe
   public async getCollectionName(vaultId: string): Promise<string | undefined> {
     const tenantConfig = await this._ensureTenantIsInCache(vaultId);
     return tenantConfig?.collectionName;
+  }
+
+  /**
+   * Resolves a public DID document from the employee collection while keeping
+   * the rest of the encrypted employee configuration private.
+   */
+  public async getEmployeeDidDocument(vaultId: string, employeeDid: string): Promise<DidDocument | undefined> {
+    const collectionName = await this.getCollectionName(vaultId);
+    if (!collectionName || !employeeDid) return undefined;
+    const [identifierIndex] = await this.kmsService.protectAttributesNameAndValue([
+      { name: ClaimsPersonSchemaorg.identifier, value: employeeDid, unique: true, type: 'uri' },
+    ], vaultId);
+    const records = await this.vaultRepository.query(collectionName, {
+      sectionId: getEnvSectionId('employees'),
+      where: [{ name: identifierIndex.name, value: identifierIndex.value }],
+    });
+    for (const record of records || []) {
+      try {
+        const employee = await this.kmsService.unprotectConfidentialData<any>(record, vaultId);
+        if (employee?.didDocument?.id === employeeDid) return employee.didDocument;
+      } catch {
+        // A corrupt or inaccessible employee record is not publicly resolvable.
+      }
+    }
+    return undefined;
   }
 
   public async getTenantAuthorizationStatus(vaultId: string): Promise<TenantAuthorizationLifecycleStatus | undefined> {

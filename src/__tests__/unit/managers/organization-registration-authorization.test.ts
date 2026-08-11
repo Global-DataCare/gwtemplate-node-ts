@@ -1,0 +1,175 @@
+/**
+ * Flow contract: Test Network bypasses ICA only when the attached VC is bound
+ * to the same organization, controller key and delivered postal licence, and a
+ * current controller of a configured issuer supplied the ML-DSA-65 proof.
+ */
+import { verifyOrganizationRegistrationAuthorization } from '../../../managers/hosting/organization-registration-authorization';
+import { processOrganizationVerificationTransaction } from '../../../managers/hosting/process-organization-verification';
+import { buildOrganizationRegistrationAuthorizationCredential } from 'gdc-common-utils-ts/utils/organization-registration-authorization';
+import {
+  ClaimsOfferSchemaorg,
+  ClaimsOrganizationSchemaorg,
+  ClaimsServiceSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
+
+const controllerJwk = { kty: 'AKP', alg: 'ML-DSA-65', pub: 'controller-public' } as const;
+const signerJwk = { kty: 'AKP', alg: 'ML-DSA-65', pub: 'unid-signer-public' } as const;
+const issuer = 'did:web:unid.example:VATES-G02793479';
+const signer = 'did:web:unid.example:VATES-G02793479:member:cto';
+const organizationDid = 'did:web:host.example:VATES-B00112233';
+
+function credential() {
+  const unsigned = buildOrganizationRegistrationAuthorizationCredential({
+    issuerDid: issuer,
+    subjectDid: organizationDid,
+    credentialId: 'urn:uuid:application-dsrc',
+    validFrom: '2026-08-10T00:00:00.000Z',
+    validUntil: '2027-08-10T00:00:00.000Z',
+    legalName: 'DSRC',
+    organizationIdentifier: 'VATES-B00112233',
+    controllerEmail: 'developer@dsrc.example',
+    controllerKeyMaterial: toJwkThumbprintSha256Urn(controllerJwk),
+    applicationId: 'application-dsrc',
+    accessPath: 'test-network',
+    targetNetwork: 'test-network',
+    postalLicense: {
+      licenseId: 'postal-application-dsrc',
+      applicationId: 'application-dsrc',
+      organizationIdentifier: 'VATES-B00112233',
+      controllerEmail: 'developer@dsrc.example',
+      controllerKeyMaterial: toJwkThumbprintSha256Urn(controllerJwk),
+      postalAddressHash: 'sha256-address',
+      hostDid: 'did:web:host.example',
+      network: 'test-network',
+      status: 'delivered',
+      issuedAt: '2026-08-01T00:00:00.000Z',
+      expiresAt: '2026-09-01T00:00:00.000Z',
+      deliveredAt: '2026-08-09T00:00:00.000Z',
+    },
+  });
+  return {
+    ...unsigned,
+    proof: {
+      type: 'JsonWebSignature2020',
+      proofPurpose: 'contractAgreement',
+      verificationMethod: `${signer}#pqc`,
+      jws: `${Buffer.from(JSON.stringify({ alg: 'ML-DSA-65' })).toString('base64url')}..signature`,
+    },
+  };
+}
+
+describe('organization registration authorization verifier', () => {
+  it('accepts a current UNID controller proof bound to the submitted application', async () => {
+    const fetchImpl = jest.fn(async (url: string | URL | Request) => {
+      const value = String(url);
+      const document = value.includes('/member/cto/')
+        ? {
+            '@context': 'https://www.w3.org/ns/did/v1',
+            id: signer,
+            verificationMethod: [{ id: `${signer}#pqc`, type: 'JsonWebKey2020', controller: signer, publicKeyJwk: signerJwk }],
+            assertionMethod: [`${signer}#pqc`],
+          }
+        : { '@context': 'https://www.w3.org/ns/did/v1', id: issuer, controller: [signer] };
+      return { ok: true, json: async () => document } as Response;
+    }) as typeof fetch;
+    const verifyDetachedJws = jest.fn().mockResolvedValue(true);
+
+    const result = await verifyOrganizationRegistrationAuthorization({
+      credential: credential(),
+      claims: { [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233' },
+      controller: { publicKeyJwk: controllerJwk },
+      organization: { did: organizationDid },
+      controllerEmail: 'developer@dsrc.example',
+      cryptography: { verifyDetachedJws } as any,
+      trustedIssuers: [issuer],
+      fetchImpl,
+      now: new Date('2026-08-10T12:00:00.000Z'),
+    });
+
+    expect(result.mode).toBe('host-authorization-vc');
+    expect(result.signer).toBe(signer);
+    expect(verifyDetachedJws).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed after the signer is removed from the issuer controller list', async () => {
+    const fetchImpl = jest.fn(async (url: string | URL | Request) => ({
+      ok: true,
+      json: async () => String(url).includes('/member/cto/')
+        ? {
+            '@context': 'https://www.w3.org/ns/did/v1', id: signer,
+            verificationMethod: [{ id: `${signer}#pqc`, publicKeyJwk: signerJwk }],
+            assertionMethod: [`${signer}#pqc`],
+          }
+        : { '@context': 'https://www.w3.org/ns/did/v1', id: issuer, controller: [] },
+    })) as unknown as typeof fetch;
+    await expect(verifyOrganizationRegistrationAuthorization({
+      credential: credential(),
+      claims: { [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233' },
+      controller: { publicKeyJwk: controllerJwk },
+      organization: { did: organizationDid },
+      controllerEmail: 'developer@dsrc.example',
+      cryptography: { verifyDetachedJws: jest.fn() } as any,
+      trustedIssuers: [issuer],
+      fetchImpl,
+      now: new Date('2026-08-10T12:00:00.000Z'),
+    })).rejects.toThrow('not a current issuer controller');
+  });
+});
+
+describe('Test Network transaction routing', () => {
+  it('uses the attached host authorization and never calls ICA', async () => {
+    const authorizationCredential = credential();
+    const forwardToIca = jest.fn();
+    const verifyHostAuthorizationCredential = jest.fn().mockResolvedValue({
+      mode: 'host-authorization-vc',
+      credentialId: authorizationCredential.id,
+      issuer,
+      signer,
+      checks: {},
+    });
+    const claims = {
+      [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233',
+      [ClaimsServiceSchemaorg.category]: 'health-care',
+    };
+    const response = await processOrganizationVerificationTransaction({
+      job: {
+        action: 'Organization/_transaction',
+        tenantId: 'host',
+        content: {
+          thid: 'transaction-dsrc',
+          iss: 'did:web:controller.dsrc.example',
+          body: { data: [{
+            meta: { claims },
+            resource: {
+              authorizationCredential,
+              verification: { resourceType: 'test-network' },
+              organization: { did: organizationDid },
+              controller: { publicKeyJwk: controllerJwk },
+              legalRepresentativePayload: { email: 'developer@dsrc.example' },
+            },
+          }] },
+        },
+      } as any,
+      issuerDid: 'did:web:host.example',
+      config: { namespace: 'example', sectorsAllowed: [] },
+      normalizeClaims: value => value,
+      createPendingTenantRegistrationFromClaims: async () => ({
+        ...claims,
+        [ClaimsOfferSchemaorg.identifier]: 'urn:example:Offer:dsrc',
+      }),
+      createOrganizationIssueClaimsFromClaims: jest.fn(),
+      forwardOrganizationVerificationTransactionToIca: forwardToIca,
+      extractCredentialResourcesFromIcaPayload: jest.fn(),
+      verifyHostAuthorizationCredential,
+    });
+
+    expect(forwardToIca).not.toHaveBeenCalled();
+    expect(verifyHostAuthorizationCredential).toHaveBeenCalledTimes(1);
+    expect(response.body.data[0]?.resource).toMatchObject({
+      verificationResponse: { mode: 'host-authorization-vc' },
+      next: { action: 'Order/_batch' },
+    });
+    expect(response.body.data[0]?.vc).toEqual([authorizationCredential]);
+  });
+});
