@@ -29,6 +29,7 @@ type CreatePendingTenantRegistrationDeps = Readonly<{
   jobMeta?: DidCommDecodedMetadata;
   fallbackAlternateName?: string;
   primaryDid?: string;
+  postalActivationCodeBinding?: { algorithm: 'scrypt-v1'; salt: string; digest: string };
   config: IServerConfig;
   vaultRepository: IVaultRepository;
   kmsService: IKmsService;
@@ -143,6 +144,7 @@ export async function createPendingTenantRegistration(
       claims: processedClaims,
       contained: [person, processedService].filter(Boolean),
       ...(deps.primaryDid ? { primaryDid: deps.primaryDid } : {}),
+      ...(deps.postalActivationCodeBinding ? { postalActivationCodeBinding: deps.postalActivationCodeBinding } : {}),
       ...(registrationKeys.signerJwk || registrationKeys.encrypterJwk ? { registrationKeys } : {}),
     },
   };

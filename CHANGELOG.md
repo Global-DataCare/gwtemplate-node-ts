@@ -16,6 +16,14 @@
   Network `_transaction`, verifying trusted issuer, current human-controller
   DID relationship, active assertion method, ML-DSA-65 proof and exact
   application/controller/postal bindings; production remains ICA-backed.
+- Resolve the human reviewer through the host signer registry by employee
+  actor DID, normalized-email hash, `RESPRSN` role and active/revoked state.
+  Permit a host HMAC attestation only for registry entries explicitly allowed
+  to introduce the reviewer's unlocked-wallet ML-DSA-65 key; this bootstrap
+  policy can move to Fabric without changing the VC contract.
+- Persist the protected postal-code binding outside client claims and redeem
+  the same physically delivered activation/licence code during Order; never
+  issue a second secret for the registration.
 - Model legal-organization control as an additive DID `controller` array. Each
   controller is stored and resolved as an independent encrypted Employee DID
   document; new writes no longer cache a singular `meta.controllerDidDocument`.
@@ -2417,6 +2425,18 @@
   `gwtemplate-node-ts`, `dataspace-ica-ts`, and `gdc-sdk-node-ts`.
 
 # Changelog
+
+## Unreleased
+
+- Restrict host authorization VCs to the Test Network route/runtime, support a
+  revocable employee signer registry until DID publication, and preserve the
+  single postal code through Order, exchange and DCR using its protected VC
+  binding.
+
+- Fail closed when a Test Network organization-authorization VC is sent to a
+  non-Test-Network route or runtime. Keep `verification.resourceType` as the
+  canonical `contract` resource type and derive the registration environment
+  from authoritative host routing.
 
 ## Unreleased
 

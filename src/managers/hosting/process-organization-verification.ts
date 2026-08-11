@@ -73,7 +73,7 @@ export const ORGANIZATION_ISSUE_RESPONSE_TYPE = 'Organization-issue-response-v1.
 type VerificationDeps = Readonly<{
   job: JobRequest;
   issuerDid: string;
-  config: { sectorsAllowed: Sector[]; namespace: string; securityMode?: string };
+  config: { sectorsAllowed: Sector[]; namespace: string; securityMode?: string; networkMode?: string };
   normalizeClaims: (claims: ClaimsRecord) => ClaimsRecord;
   createPendingTenantRegistrationFromClaims: (input: {
     claims: ClaimsRecord;
@@ -81,6 +81,7 @@ type VerificationDeps = Readonly<{
     jobMeta?: DidCommDecodedMetadata;
     fallbackAlternateName?: string;
     primaryDid?: string;
+    postalActivationCodeBinding?: { algorithm: 'scrypt-v1'; salt: string; digest: string };
   }) => Promise<ClaimsRecord>;
   createOrganizationIssueClaimsFromClaims: (input: {
     claims: ClaimsRecord;
@@ -131,13 +132,21 @@ export async function processOrganizationVerificationTransaction(
   const resource = (entry.resource || {}) as LegalOrganizationVerificationTransactionResource;
   const requestedSector = String(claims[ClaimsServiceSchemaorg.category] || '').trim();
   const resourceType = String(resource.verification?.resourceType || 'contract').trim() || 'contract';
+  const hostNetwork = String(deps.job.sector || '').trim().toLowerCase();
+  const runtimeNetwork = String(deps.config.networkMode || '').trim().toLowerCase();
   if (!requestedSector) {
     throw new ManagerError(`Missing required claim: '${HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS[1]}'`, IssueType.Required);
   }
 
   const hostAuthorization = resource.authorizationCredential;
-  if (hostAuthorization && resourceType !== 'test-network') {
-    throw new ManagerError('Host authorization VC is accepted only for Test Network registration.', IssueType.Security);
+  if (hostAuthorization && (hostNetwork !== 'test-network' || runtimeNetwork !== 'test-network')) {
+    throw new ManagerError(
+      'Host authorization VC is accepted only by the Test Network route on a Test Network host.',
+      IssueType.Security,
+    );
+  }
+  if (hostAuthorization && resourceType !== 'contract') {
+    throw new ManagerError('Host authorization VC requires the canonical contract resource type.', IssueType.Security);
   }
   if (hostAuthorization && !deps.verifyHostAuthorizationCredential) {
     throw new ManagerError('Host authorization verification is not configured.', IssueType.NotSupported);
@@ -161,12 +170,16 @@ export async function processOrganizationVerificationTransaction(
   if (requestedPrimaryDid && !/^did:[a-z0-9]+:.+$/i.test(requestedPrimaryDid)) {
     throw new ManagerError('Organization verification organization.did must be a valid DID.', IssueType.Value);
   }
+  const postalCodeBinding = hostAuthorization
+    ? (hostAuthorization.credentialSubject as any)?.postalActivationLicense?.protectedCode
+    : undefined;
   const processedClaims = await deps.createPendingTenantRegistrationFromClaims({
     claims,
-    environment: resourceType,
+    environment: hostNetwork || runtimeNetwork || undefined,
     jobMeta: deps.job.content?.meta,
     fallbackAlternateName: deps.job.tenantId,
     primaryDid: requestedPrimaryDid || undefined,
+    postalActivationCodeBinding: postalCodeBinding,
   });
 
   return {

@@ -27,6 +27,8 @@ export type IssueActivationCodeParams = {
   type: typeof LICENSE_TYPE_MOBILE | typeof LICENSE_TYPE_WEB;
   email: string;
   role: string;
+  /** Pre-verified code for a host-authorized postal licence; never log it. */
+  activationCode?: string;
 };
 
 /**
@@ -103,7 +105,7 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
     throw new Error(`No reusable or available license found for userClass='${userClass}'.`);
   }
 
-  const activationCode = `lic-${randomBytes(9).toString('base64url')}`;
+  const activationCode = params.activationCode || `lic-${randomBytes(9).toString('base64url')}`;
 
   const license = match.content as DeviceLicense & Record<string, any>;
   license.activationCode = activationCode;

@@ -29,6 +29,7 @@ import { buildGatewayInvoiceBundle } from '../../utils/invoice-bundle';
 import { verifyOrderPaymentConfirmation } from '../../utils/payment-confirmation';
 import { createOrganizationUrn } from '../../utils/urn';
 import { formatMissingRequiredClaimDiagnostic } from '../../utils/claim-contract';
+import { verifyBoundPostalActivationCode } from './postal-activation-code';
 import {
   HOST_ORDER_REQUIRED_INPUT_CLAIMS,
   HOST_ORDER_REQUIRED_INPUT_DISPLAY_CLAIMS,
@@ -124,6 +125,14 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
   }
 
   const { claims: processedClaims, contained } = decryptedContent as any;
+  const postalActivationCodeBinding = (decryptedContent as any).postalActivationCodeBinding;
+  const postalActivationCode = postalActivationCodeBinding
+    ? verifyBoundPostalActivationCode(claims, {
+        'gdc.activationLicense.codeAlgorithm': postalActivationCodeBinding.algorithm,
+        'gdc.activationLicense.codeSalt': postalActivationCodeBinding.salt,
+        'gdc.activationLicense.codeDigest': postalActivationCodeBinding.digest,
+      }, process.env.HOST_POSTAL_ACTIVATION_PEPPER)
+    : undefined;
   const alternateName = processedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
   const sector = processedClaims[ClaimsServiceSchemaorg.category] as Sector;
   const tenantUrn = createOrganizationUrn({
@@ -256,6 +265,7 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
           type: 'mobile',
           email: legalRepEmail,
           role: legalRepRole,
+          activationCode: postalActivationCode,
         });
         (processedClaims as any)['org.schema.IndividualProduct.serialNumber'] = activationCode;
         (processedClaims as any)['org.schema.IndividualProduct.category'] = 'professional';
