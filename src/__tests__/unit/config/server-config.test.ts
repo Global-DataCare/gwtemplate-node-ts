@@ -56,6 +56,10 @@ describe('server-config sector resolution', () => {
     ]);
   });
 
+  it('should accept the independent antifraud sector for Company Book and Family Book', () => {
+    expect(parseAndValidateSectors('antifraud')).toEqual(['antifraud']);
+  });
+
   it('should preserve the independently addressable onehealth-research compatibility sector', () => {
     expect(parseAndValidateSectors(
       'health-care,health-research,health-tech,health-insurance,onehealth-research',

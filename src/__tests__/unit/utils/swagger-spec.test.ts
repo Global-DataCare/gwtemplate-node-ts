@@ -170,6 +170,13 @@ describe('Swagger Spec Generation', () => {
       spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate']
         ?.post?.requestBody?.content?.['application/didcomm-plain+json']?.examples?.message?.$ref,
     ).toBe('#/components/examples/OrganizationActivationPlaintextMessage');
+    const activationDescription = String(
+      spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate']
+        ?.post?.description || '',
+    );
+    expect(activationDescription).toContain('ServiceControllerCredential');
+    expect(activationDescription).toContain('legacy two-VC compatibility');
+    expect(activationDescription).toContain('ISCO-08|1120');
     expect(
       spec.paths['/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_issue']
         ?.post?.requestBody?.content?.['application/didcomm-plain+json']?.examples?.message?.$ref,
@@ -200,7 +207,7 @@ describe('Swagger Spec Generation', () => {
     const organizationClaims =
       spec.components.examples.OrganizationRegistrationPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
     const verificationTransactionClaims =
-      spec.components.examples.OrganizationVerificationTransactionPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
+      spec.components.examples.OrganizationVerificationTransactionPlaintextMessage?.value?.body?.data?.[0]?.resource?.meta?.claims;
     expect(organizationClaims).toBeDefined();
     expect(organizationClaims['org.schema.Organization.identifier.value']).toBe('acme-id');
     expect(organizationClaims['org.schema.Organization.alternateName']).toBeUndefined();

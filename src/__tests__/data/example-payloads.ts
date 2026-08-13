@@ -131,8 +131,9 @@ const organizationVerificationTransactionBody = {
   total: 1,
   data: [{
     type: 'Organization-verification-transaction-request-v1.0',
-    meta: {
-      claims: {
+    resource: {
+      meta: {
+        claims: {
         '@context': 'org.schema',
         [ClaimsOrganizationSchemaorg.legalName]: 'ACME HEALTH SL',
         [ClaimsOrganizationSchemaorg.identifierType]: 'taxID',
@@ -146,9 +147,8 @@ const organizationVerificationTransactionBody = {
         [ClaimsServiceSchemaorg.url]: 'https://operator.example.net/acme/cds-es/v1/health-care',
         [ClaimsServiceSchemaorg.serviceType]:
           testClaimsRegisterTenantExpanded[ClaimsServiceSchemaorg.serviceType],
+        },
       },
-    },
-    resource: {
       controller: {
         did: 'did:web:controller.example.org',
         sameAs: 'urn:multibase:zExampleStableActorHash',
@@ -326,9 +326,11 @@ export const ORGANIZATION_ORDER_RESPONSE = {
  *
  * Contract priority:
  * - `vp_token` is the canonical proof carrier and should embed the ICA evidence
- * - the VP inside `vp_token` is assembled from the ICA-issued organization VC,
- *   ICA-issued legal-representative VC, presenter signing key id, and target
- *   host operator id before external signing
+ * - canonical VP contains OrganizationCredential, LegalRepresentativeCredential
+ *   and ServiceControllerCredential; RESPRSN and JWK binding come from
+ *   the controller VC, not from the representative's ISCO occupation
+ * - legacy two-VC VP is accepted only when the old representative VC itself
+ *   contains both RESPRSN and matching hasCredential material
  * - `org.schema.Service.url` is the hosting URL selected by the controller
  *   during onboarding; it points to the chosen hosting operator/connector
  *   location and must not be confused with the tenant public `did:web`
@@ -444,18 +446,23 @@ const ORGANIZATION_ISSUE_ICA_CREDENTIALS = [
     credentialSubject: {
       id: 'did:web:tenant.example.org:actor:representative',
       memberOf: { taxID: 'VATES-B00112233' },
+      hasOccupation: {
+        '@type': 'Occupation',
+        occupationalCategory: 'ISCO-08|1120',
+      },
     },
   },
   {
-    id: 'urn:uuid:organization-controller-credential-001',
+    id: 'urn:uuid:service-controller-credential-001',
     issuer: 'did:web:ica.example.org',
-    type: ['VerifiableCredential', 'ServiceCredential', 'OrganizationControllerCredential'],
+    type: ['VerifiableCredential', 'ServiceCredential', 'ServiceControllerCredential'],
     credentialSubject: {
       id: 'did:web:tenant.example.org:service:hosted',
       provider: { taxID: 'VATES-B00112233' },
       owner: {
+        additionalType: 'RESPRSN',
         sameAs: 'urn:multibase:zControllerHash',
-        hasOccupation: { identifier: 'RESPRSN' },
+        hasOccupation: { '@type': 'Occupation', occupationalCategory: 'ISCO-08|1330' },
         hasCredential: {
           material: 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:controller-thumbprint',
         },
@@ -482,17 +489,17 @@ export const ORGANIZATION_ISSUE_RESPONSE = {
     "data": [{
       "type": "Organization-issue-response-v1.0",
       "vc": ORGANIZATION_ISSUE_ICA_CREDENTIALS,
-      "meta": {
-        "claims": {
-          "@context": "org.schema",
-          ...testClaimsRegisterTenantExpanded,
-          "org.schema.Organization.alternateName": "acme-health",
-          "org.schema.IndividualProduct.serialNumber": "lic-reactivation-code-001",
-          "org.schema.IndividualProduct.category": "professional",
-          "org.schema.IndividualProduct.additionalType": "mobile"
-        }
-      },
       "resource": {
+        "meta": {
+          "claims": {
+            "@context": "org.schema",
+            ...testClaimsRegisterTenantExpanded,
+            "org.schema.Organization.alternateName": "acme-health",
+            "org.schema.IndividualProduct.serialNumber": "lic-reactivation-code-001",
+            "org.schema.IndividualProduct.category": "professional",
+            "org.schema.IndividualProduct.additionalType": "mobile"
+          }
+        },
         "icaResponse": {
           "resourceType": "Bundle",
           "type": "batch-response",
@@ -981,7 +988,7 @@ export const ORGANIZATION_ISSUE_REQUEST = {
  *
  * The response must preserve two independent concerns:
  * - ICA verification output (`resource.icaResponse`)
- * - host-side continuation contract (`meta.claims` + `resource.next`) so the
+ * - host-side continuation contract (`resource.meta.claims` + `resource.next`) so the
  *   caller can submit `Order/_batch` with the generated Offer identifier
  */
 export const ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE = {
@@ -996,34 +1003,25 @@ export const ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE = {
     total: 1,
     data: [{
       type: 'Organization-verification-transaction-response-v1.0',
-      vc: [{
-        resourceType: 'Organization',
-        id: 'urn:uuid:org-vc-001',
-        type: ['VerifiableCredential', 'OrganizationCredential'],
-        credentialSubject: {
-          id: 'did:web:globaldatacare.es:onehealth:organization:taxid:VATES-B00112233',
-          taxID: 'VATES-B00112233',
-        },
-      }],
-      meta: {
-        claims: {
-          '@context': 'org.schema',
-          ...testClaimsRegisterTenantExpanded,
-          'org.schema.Organization.alternateName': 'acme-health',
-          'org.schema.Offer.identifier': 'urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>',
-        },
-      },
+      vc: ORGANIZATION_ISSUE_ICA_CREDENTIALS,
       resource: {
+        meta: {
+          claims: {
+            '@context': 'org.schema',
+            ...testClaimsRegisterTenantExpanded,
+            'org.schema.Organization.alternateName': 'acme-health',
+            'org.schema.Offer.identifier': 'urn:cds:ES:v1:health-care:product:org.schema:Offer:<offer-uuid>',
+          },
+        },
         icaResponse: {
           resourceType: 'Bundle',
           type: 'batch-response',
-          total: 1,
-          data: [{
+          total: ORGANIZATION_ISSUE_ICA_CREDENTIALS.length,
+          data: ORGANIZATION_ISSUE_ICA_CREDENTIALS.map((credential) => ({
             type: 'VerifyResponse-v1.0',
-            resource: {
-              resourceType: 'Bundle',
-            },
-          }],
+            resource: credential,
+            response: { status: '200' },
+          })),
         },
         next: {
           action: 'Order/_batch',

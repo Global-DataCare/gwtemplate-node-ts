@@ -31,6 +31,7 @@ import type { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiab
 import type { HostAuthorizationVerificationResult } from './organization-registration-authorization';
 
 type LegalOrganizationVerificationTransactionResource = Readonly<{
+  meta?: { claims?: ClaimsRecord };
   controller?: Record<string, unknown>;
   organization?: Record<string, unknown>;
   legalRepresentativePayload?: Record<string, unknown>;
@@ -41,6 +42,7 @@ type LegalOrganizationVerificationTransactionResource = Readonly<{
 
 type LegalOrganizationVerificationTransactionEntry = Readonly<{
   type?: string;
+  /** @deprecated Accept only for callers that predate resource-scoped claims. */
   meta?: {
     claims?: ClaimsRecord;
   };
@@ -56,12 +58,14 @@ type LegalOrganizationVerificationTransactionNextStep = Readonly<{
 }>;
 
 type LegalOrganizationVerificationTransactionResponseResource = Readonly<{
+  meta: { claims: ClaimsRecord };
   icaResponse?: unknown;
   verificationResponse?: unknown;
   next: LegalOrganizationVerificationTransactionNextStep;
 }>;
 
 type LegalOrganizationIssueResponseResource = Readonly<{
+  meta: { claims: ClaimsRecord };
   icaResponse: unknown;
 }>;
 
@@ -106,6 +110,7 @@ type VerificationDeps = Readonly<{
   persistExistingTenantControllerBinding?: (input: {
     claims: ClaimsRecord;
     controller?: Record<string, unknown>;
+    controllerCredential?: Record<string, unknown>;
     verifiedSignerKid?: string;
     transactionId?: string;
   }) => Promise<void>;
@@ -117,7 +122,7 @@ export async function processOrganizationVerificationTransaction(
   /**
    * Contract for first-time legal-organization onboarding:
    * - `_transaction` must return the canonical commercial Offer in
-   *   `meta.claims['org.schema.Offer.identifier']`
+   *   `resource.meta.claims['org.schema.Offer.identifier']`
    * - the same value is mirrored in `resource.next.acceptedOffer.identifier`
    *   only as a workflow hint for `Order/_batch`
    * - follow-up commercial confirmation is mandatory and consumes
@@ -128,8 +133,8 @@ export async function processOrganizationVerificationTransaction(
    * seat without creating a new commercial Offer.
    */
   const entry = (deps.job.content?.body?.data?.[0] || {}) as LegalOrganizationVerificationTransactionEntry;
-  const claims = normalizeContextualizedClaims(entry.meta?.claims || {});
   const resource = (entry.resource || {}) as LegalOrganizationVerificationTransactionResource;
+  const claims = normalizeContextualizedClaims(resource.meta?.claims || entry.meta?.claims || {});
   const requestedSector = String(claims[ClaimsServiceSchemaorg.category] || '').trim();
   const resourceType = String(resource.verification?.resourceType || 'contract').trim() || 'contract';
   const hostNetwork = String(deps.job.sector || '').trim().toLowerCase();
@@ -195,7 +200,6 @@ export async function processOrganizationVerificationTransaction(
       data: [{
         type: ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE_TYPE,
         ...(vc.length > 0 ? { vc } : {}),
-        meta: { claims: processedClaims },
         resource: buildOrganizationVerificationTransactionResponseResource(
           verificationResponse,
           processedClaims,
@@ -217,12 +221,12 @@ export async function processOrganizationIssue(
    * - `_issue` must not mint a new commercial Offer when seats and order terms
    *   stay unchanged
    * - callers must therefore not expect
-   *   `meta.claims['org.schema.Offer.identifier']` nor a `resource.next`
+   *   `resource.meta.claims['org.schema.Offer.identifier']` nor a `resource.next`
    *   commercial step in this response
    */
   const entry = (deps.job.content?.body?.data?.[0] || {}) as LegalOrganizationVerificationTransactionEntry;
-  const claims = normalizeContextualizedClaims(entry.meta?.claims || {});
   const resource = (entry.resource || {}) as LegalOrganizationVerificationTransactionResource;
+  const claims = normalizeContextualizedClaims(resource.meta?.claims || entry.meta?.claims || {});
   const requestedSector = String(claims[ClaimsServiceSchemaorg.category] || '').trim();
   const resourceType = String(resource.verification?.resourceType || 'contract').trim() || 'contract';
   if (!requestedSector) {
@@ -247,6 +251,11 @@ export async function processOrganizationIssue(
   await deps.persistExistingTenantControllerBinding?.({
     claims: processedClaims,
     controller: resource.controller,
+    controllerCredential: vc.find((credential) => {
+      const types = Array.isArray(credential.type) ? credential.type : [credential.type];
+      return types.includes('ServiceControllerCredential')
+        || types.includes('OrganizationControllerCredential');
+    }),
     verifiedSignerKid: deps.job.content?.meta?.jws?.protected?.kid as string | undefined,
     transactionId: deps.job.content?.thid as string | undefined,
   });
@@ -264,8 +273,7 @@ export async function processOrganizationIssue(
       data: [{
         type: ORGANIZATION_ISSUE_RESPONSE_TYPE,
         ...(vc.length > 0 ? { vc } : {}),
-        meta: { claims: processedClaims },
-        resource: buildOrganizationIssueResponseResource(icaResponse),
+        resource: buildOrganizationIssueResponseResource(icaResponse, processedClaims),
         response: { status: '200' },
       }],
     },
@@ -279,6 +287,7 @@ export function buildOrganizationVerificationTransactionResponseResource(
 ): LegalOrganizationVerificationTransactionResponseResource {
   const offerId = String(processedClaims[HOST_TRANSACTION_REQUIRED_OUTPUT_CLAIMS[0]] || '').trim() || undefined;
   return {
+    meta: { claims: processedClaims },
     ...(source === 'ica' ? { icaResponse: verificationResponse } : { verificationResponse }),
     next: {
       action: ORGANIZATION_VERIFICATION_TRANSACTION_NEXT_ACTION,
@@ -292,8 +301,9 @@ export function buildOrganizationVerificationTransactionResponseResource(
 
 export function buildOrganizationIssueResponseResource(
   icaResponse: unknown,
+  processedClaims: ClaimsRecord,
 ): LegalOrganizationIssueResponseResource {
-  return { icaResponse };
+  return { meta: { claims: processedClaims }, icaResponse };
 }
 
 type IssueClaimsDeps = Readonly<{

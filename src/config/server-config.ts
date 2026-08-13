@@ -6,7 +6,7 @@ const DEFAULT_MAX_HEADER_SIZE_BYTES = 128 * 1024;
 
 const MAIN_SECTORS = ['animal', 'health'] as const;
 const SUBSECTORS = ['research', 'care', 'index', 'tech', 'insurance'] as const;
-const COMPATIBILITY_SECTORS = ['onehealth-research'] as const;
+const COMPATIBILITY_SECTORS = ['onehealth-research', 'antifraud'] as const;
 
 export type NetworkMode = 'test' | 'local-network' | 'test-network' | 'network';
 export type ResearchStoreProvider = 'postgres' | 'supabase' | 'firestore';

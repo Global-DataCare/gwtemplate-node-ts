@@ -9,6 +9,7 @@ import {
 } from 'gdc-common-utils-ts/utils/didcomm-submit';
 
 type LegalOrganizationVerificationTransactionResource = Readonly<{
+  meta?: { claims?: ClaimsRecord };
   controller?: Record<string, unknown>;
   organization?: Record<string, unknown>;
   legalRepresentativePayload?: Record<string, unknown>;
@@ -18,6 +19,7 @@ type LegalOrganizationVerificationTransactionResource = Readonly<{
 
 type LegalOrganizationVerificationTransactionEntry = Readonly<{
   type?: string;
+  /** @deprecated Read-only compatibility with older GW callers. */
   meta?: {
     claims?: ClaimsRecord;
   };
@@ -45,6 +47,7 @@ type ForwardOrganizationVerificationTransactionToIcaDeps = Readonly<{
  *
  * Contract:
  * - request body always reprojects host claims/resources into a single-entry bundle
+ * - flattened transport claims live at `body.data[].resource.meta.claims`
  * - `202 Accepted` must be followed via polling until the final JSON payload arrives
  * - non-JSON success responses are tolerated and normalized to `{}` so callers can
  *   still continue with deterministic claim-side processing
@@ -64,10 +67,10 @@ export async function forwardOrganizationVerificationTransactionToIca(
     total: 1,
     data: [{
       type: deps.entry.type || deps.organizationVerificationTransactionRequestType,
-      meta: {
-        claims: deps.claims,
-      },
       resource: {
+        meta: {
+          claims: deps.claims,
+        },
         ...(deps.resource.controller ? { controller: deps.resource.controller } : {}),
         ...(deps.resource.organization ? { organization: deps.resource.organization } : {}),
         ...(deps.resource.legalRepresentativePayload
@@ -131,8 +134,9 @@ export async function forwardOrganizationVerificationTransactionToIca(
  * Extracts credential-like resources from arbitrary ICA envelopes.
  *
  * Transitional response contract:
- * - `resource.icaResponse` keeps the full raw payload
- * - `resource.vc[]` exposes just deduplicated credential-shaped nodes
+ * - the response entry keeps `vc[]` as the client-facing credential projection
+ * - `resource.icaResponse` keeps the raw upstream ICA envelope only for
+ *   audit/debug compatibility; clients should not parse it when `vc[]` exists
  */
 export function extractCredentialResourcesFromIcaPayload(
   icaResponse: unknown,

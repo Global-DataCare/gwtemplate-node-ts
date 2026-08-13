@@ -40,6 +40,8 @@ const mockTenantsCacheManager = {
   getTenant: jest.fn(),
   isTenantOperational: jest.fn(async () => true),
   getTenantDomainUrl: jest.fn(async () => 'https://host.example.com'),
+  getTenantOperationalUrl: jest.fn(async () => 'https://gateway.example/tenant/cds-es/v1/health-care'),
+  getTenantSector: jest.fn(async () => 'health-care'),
   listAutodiscoverableTenants: jest.fn(),
   listRegisteredTenants: jest.fn(),
 } as unknown as jest.Mocked<TenantsCacheManager>;
@@ -146,6 +148,29 @@ describe('Well-Known DID Discovery API', () => {
     expect(response.status).toBe(200);
     expect(JSON.parse(response.text)).toEqual(controllerDidDocument);
     expect(mockTenantsCacheManager.getEmployeeDidDocument).toHaveBeenCalledWith(testTenant1VaultId, controllerDid);
+  });
+
+  it('returns tenant-specific FHIR metadata that instantiates the UNID profile', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1DidWebHosted } as any);
+    mockTenantsCacheManager.getTenantOperationalUrl.mockResolvedValue(
+      `https://gateway.example/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}`,
+    );
+
+    const response = await invokeExpress(app, {
+      method: 'GET',
+      url: `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/fhir/metadata`,
+    });
+    const statement = JSON.parse(response.text);
+
+    expect(response.status).toBe(200);
+    expect(statement.kind).toBe('instance');
+    expect(statement.implementation.url).toBe(
+      `https://gateway.example/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/fhir`,
+    );
+    expect(statement.instantiates).toContain(
+      'https://unid.online/standards/fhir/CapabilityStatement/gw-core|1.0.0',
+    );
   });
 });
 

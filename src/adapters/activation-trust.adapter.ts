@@ -20,6 +20,7 @@ export type ActivationTrustEvaluationInput = {
   presentationSubmission?: any;
   organizationCredential?: any;
   representativeCredential?: any;
+  controllerCredential?: any;
   primaryDid?: string;
   jurisdiction?: string;
   sector?: string;
@@ -75,6 +76,7 @@ function assertActivationCredentialConsistency(params: {
   primaryDid?: string;
   organizationCredential?: any;
   representativeCredential?: any;
+  controllerCredential?: any;
 }): { organizationDid: string; representativeDid?: string } {
   /**
    * Representative proof is intentionally split into two dimensions:
@@ -87,7 +89,7 @@ function assertActivationCredentialConsistency(params: {
    * demo/local flows may still need higher-level fallbacks when signed PDF
    * evidence did not carry `person.email`.
    */
-  const { primaryDid, organizationCredential, representativeCredential } = params;
+  const { primaryDid, organizationCredential, representativeCredential, controllerCredential } = params;
   if (!organizationCredential) {
     throw new ManagerError('Missing ICA-issued organization credential.', IssueType.Required);
   }
@@ -106,11 +108,14 @@ function assertActivationCredentialConsistency(params: {
   const policyErrors = validateActivationRepresentativePolicy({
     organizationCredential,
     representativeCredential,
+    controllerCredential,
     requiredRoleCode: 'RESPRSN',
   });
   if (policyErrors.length > 0) {
     const first = policyErrors[0];
-    const issue = first.code === 'REPRESENTATIVE_TAXID_MISMATCH' ? IssueType.Conflict : IssueType.Required;
+    const issue = first.code === 'REPRESENTATIVE_TAXID_MISMATCH' || first.code === 'CONTROLLER_TAXID_MISMATCH'
+      ? IssueType.Conflict
+      : IssueType.Required;
     throw new ManagerError(first.message, issue);
   }
 
@@ -143,6 +148,7 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
       primaryDid: input.primaryDid,
       organizationCredential: input.organizationCredential,
       representativeCredential: input.representativeCredential,
+      controllerCredential: input.controllerCredential,
     });
 
     const clearingHouse = await this.clearingHouseService.verifyVpToken({
@@ -162,6 +168,7 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
       representativeDid: consistency.representativeDid,
       organizationCredential: input.organizationCredential,
       representativeCredential: input.representativeCredential,
+      controllerCredential: input.controllerCredential,
     });
 
     return {

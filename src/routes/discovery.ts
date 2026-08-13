@@ -1357,8 +1357,8 @@ export function createDiscoveryRouter(
   });
   
   // Note: The FHIR metadata endpoint uses the full structured path.
-  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/fhir/metadata', resolveTenant, checkFhirSector, (req, res) => {
-    const statement = discoveryService.getCapabilityStatement(res.locals.vaultId);
+  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/fhir/metadata', resolveTenant, checkFhirSector, async (req, res) => {
+    const statement = await discoveryService.getCapabilityStatement(res.locals.vaultId);
     if (statement) {
       res.json(statement);
     } else {

@@ -18,11 +18,15 @@ import type { EntityConfig } from '../../gdc-backend-utils-node/models/entity';
 import { mergeActivationJwks } from './registration-keys';
 import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
 import type { ActivationParticipantMaterialLike } from './controller-entity-config';
-import { getPersonOccupationClaim } from '../../utils/occupation';
+import {
+  extractServiceControllerOccupationCodes,
+  extractServiceControllerRoleCodes,
+} from 'gdc-common-utils-ts/utils/activation-policy';
 
 type PersistExistingTenantControllerBindingDeps = Readonly<{
   claims: ClaimsRecord;
   controller?: ActivationParticipantMaterialLike;
+  controllerCredential?: Record<string, unknown>;
   verifiedSignerKid?: string;
   transactionId?: string;
   hostCollectionName?: string;
@@ -49,7 +53,9 @@ export async function persistExistingTenantControllerBinding(
   const controllerDid = String(deps.controller?.did || '').trim();
   const controllerSameAs = String(deps.controller?.sameAs || '').trim();
   const actorIdentifier = normalizeSameAsHash(controllerSameAs);
-  const controllerRole = getPersonOccupationClaim(deps.claims as Record<string, any> | undefined);
+  const controllerRoles = extractServiceControllerRoleCodes(deps.controllerCredential);
+  const controllerOccupations = extractServiceControllerOccupationCodes(deps.controllerCredential);
+  const controllerRole = controllerRoles.find((role) => role === 'RESPRSN');
   const submittedKeysWithCallerKids = mergeActivationJwks(
     [deps.controller?.publicKeyJwk],
     deps.controller?.jwks,
@@ -61,8 +67,11 @@ export async function persistExistingTenantControllerBinding(
   if (!/^urn:multibase:z[^:]+$/.test(actorIdentifier)) {
     throw new ManagerError('Existing-tenant controller binding requires its stable actor identifier.', IssueType.Required);
   }
+  if (!deps.controllerCredential) {
+    throw new ManagerError('Existing-tenant controller binding requires an ICA-issued ServiceControllerCredential.', IssueType.Required);
+  }
   if (controllerRole !== 'RESPRSN') {
-    throw new ManagerError('Existing-tenant controller binding requires controller role RESPRSN.', IssueType.Required);
+    throw new ManagerError('ServiceControllerCredential requires RESPRSN in credentialSubject.owner.additionalType.', IssueType.Required);
   }
   if (submittedKeysWithCallerKids.length < 1) {
     throw new ManagerError('Existing-tenant controller binding requires at least one public JWK.', IssueType.Required);
@@ -78,6 +87,15 @@ export async function persistExistingTenantControllerBinding(
     const canonicalKid = toJwkThumbprintSha256Urn(key as any);
     return [canonicalKid, { ...key, kid: canonicalKid } as PublicJwk];
   })).values());
+  const controllerSubject = (deps.controllerCredential.credentialSubject || {}) as Record<string, any>;
+  const credentialOwner = (controllerSubject.owner || {}) as Record<string, any>;
+  if (normalizeSameAsHash(String(credentialOwner.sameAs || '')) !== actorIdentifier) {
+    throw new ManagerError('Controller actor identifier does not match the ICA-issued controller credential.', IssueType.Conflict);
+  }
+  const credentialMaterial = String(credentialOwner.hasCredential?.material || '').trim();
+  if (!submittedKeys.some((key) => key.kid === credentialMaterial)) {
+    throw new ManagerError('Controller JWK does not match the ICA-issued controller credential binding.', IssueType.Conflict);
+  }
 
   const alternateName = String(deps.claims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
   const sector = String(deps.claims[ClaimsServiceSchemaorg.category] || '').trim() as Sector;
@@ -183,7 +201,8 @@ export async function persistExistingTenantControllerBinding(
     claims: {
       [ClaimsPersonSchemaorg.identifier]: controllerDid,
       [PERSON_SAME_AS_CLAIM]: actorIdentifier,
-      [ClaimsPersonSchemaorg.hasOccupationalRoleValue]: controllerRole,
+      [ClaimsPersonSchemaorg.additionalType]: controllerRole,
+      [ClaimsPersonSchemaorg.hasOccupationalCategory]: controllerOccupations,
       [ClaimsPersonSchemaorg.hasCredentialMaterial]: credentialMaterials[0],
     },
     didDocument: controllerDidDocument,
@@ -193,7 +212,13 @@ export async function persistExistingTenantControllerBinding(
   const employeeAttributes = await deps.kmsService.protectAttributesNameAndValue([
     { name: ClaimsPersonSchemaorg.identifier, value: controllerDid, unique: true, type: 'uri' },
     { name: PERSON_SAME_AS_CLAIM, value: actorIdentifier, unique: false, type: 'uri' },
-    { name: ClaimsPersonSchemaorg.hasOccupationalRoleValue, value: controllerRole, unique: false, type: 'string' },
+    { name: ClaimsPersonSchemaorg.additionalType, value: controllerRole, unique: false, type: 'string' },
+    ...controllerOccupations.map((occupation) => ({
+      name: ClaimsPersonSchemaorg.hasOccupationalCategory,
+      value: occupation,
+      unique: false,
+      type: 'string',
+    })),
     ...credentialMaterials.flatMap((material) => [
       { name: ClaimsPersonSchemaorg.hasCredentialMaterial, value: material, unique: false, type: 'string' },
       // Transitional lookup compatibility for signed-request resolution.

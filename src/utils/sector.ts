@@ -7,6 +7,7 @@ const LEGACY_FHIR_SECTORS = new Set([
   'health-insurance',
   'health-tech',
   'health-it',
+  'antifraud',
 ]);
 
 const SYNTHETIC_FHIR_SECTOR_PATTERN = /^(animal|health)-(care|index|tech)$/;

@@ -34,7 +34,7 @@ describe('Host transaction Offer/Order route story', () => {
    * Canonical host onboarding contract guard.
    *
    * This test proves the producer side of `_transaction-response` through the
-   * canonical claim path first: `meta.claims['org.schema.Offer.identifier']`.
+   * canonical claim path first: `resource.meta.claims['org.schema.Offer.identifier']`.
    * The `resource.next` helper may exist, but it is not the source of truth.
    */
   it('submit _transaction, poll Offer, submit Order, and poll commercial confirmation', async () => {
@@ -44,12 +44,12 @@ describe('Host transaction Offer/Order route story', () => {
     transactionPayload.body.data[0].resource = transactionPayload.body.data[0].resource || {};
     transactionPayload.body.data[0].resource.meta = {
       claims: {
-        ...(transactionPayload.body.data[0].meta?.claims || {}),
+        ...(transactionPayload.body.data[0].resource?.meta?.claims || {}),
         [ClaimsPersonSchemaorg.email]: 'admin1@acme.org',
         'org.schema.Person.hasOccupation.identifier.value': 'RESPRSN',
       },
     };
-    transactionPayload.body.data[0].meta = {};
+    delete transactionPayload.body.data[0].meta;
 
     const transactionSubmit = await invokeExpress(harness.app, {
       method: 'POST',
@@ -67,7 +67,7 @@ describe('Host transaction Offer/Order route story', () => {
     expect(transactionPoll.status).toBe(200);
 
     const transactionEntry = transactionPoll.body.data[0];
-    const offerId = String(transactionEntry.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
+    const offerId = String(transactionEntry.resource?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
 
     expect(transactionEntry.response.status).toBe('200');
     expect(transactionEntry.resource?.next?.action).toBe('Order/_batch');
@@ -134,12 +134,12 @@ describe('Host transaction Offer/Order route story', () => {
     transactionPayload.body.data[0].resource = transactionPayload.body.data[0].resource || {};
     transactionPayload.body.data[0].resource.meta = {
       claims: {
-        ...(transactionPayload.body.data[0].meta?.claims || {}),
+        ...(transactionPayload.body.data[0].resource?.meta?.claims || {}),
         [ClaimsPersonSchemaorg.email]: 'admin1@acme.org',
         'org.schema.Person.hasOccupation.identifier.value': 'RESPRSN',
       },
     };
-    transactionPayload.body.data[0].meta = {};
+    delete transactionPayload.body.data[0].meta;
 
     const transactionSubmit = await invokeExpress(harness.app, {
       method: 'POST',
@@ -199,20 +199,16 @@ describe('Host transaction Offer/Order route story', () => {
     const transactionPayload = structuredClone(ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST) as any;
     transactionPayload.thid = 'host-transaction-missing-category-thid';
     transactionPayload.jti = 'host-transaction-missing-category-jti';
-    delete transactionPayload.body.data[0].meta.claims[HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS[1]];
+    delete transactionPayload.body.data[0].resource.meta.claims[HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS[1]];
     transactionPayload.body.data[0].resource = transactionPayload.body.data[0].resource || {};
     transactionPayload.body.data[0].resource.meta = {
       claims: {
-        ...(transactionPayload.body.data[0].meta?.claims || {}),
+        ...(transactionPayload.body.data[0].resource?.meta?.claims || {}),
         [ClaimsPersonSchemaorg.email]: 'admin1@acme.org',
         'org.schema.Person.hasOccupation.identifier.value': 'RESPRSN',
       },
     };
-    transactionPayload.body.data[0].meta = {
-      claims: {
-        ...(transactionPayload.body.data[0].meta?.claims || {}),
-      },
-    };
+    delete transactionPayload.body.data[0].meta;
 
     const transactionSubmit = await invokeExpress(harness.app, {
       method: 'POST',

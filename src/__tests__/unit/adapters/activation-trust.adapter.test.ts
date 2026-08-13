@@ -10,6 +10,18 @@ import { ITrustRegistryAdapter } from '../../../adapters/trust-registry.adapter'
 import { buildDeterministicVpTokenFixture } from '../../utils/deterministic-jwt-fixtures';
 
 const TEST_ORGANIZATION_DID = 'did:web:provider.example:health-care:organization:taxid:VATES-ESB00112233';
+const TEST_CONTROLLER_CREDENTIAL = {
+  type: ['VerifiableCredential', 'ServiceCredential', 'ServiceControllerCredential'],
+  credentialSubject: {
+    provider: { taxID: 'ESB00112233' },
+    owner: {
+      additionalType: 'RESPRSN',
+      sameAs: 'urn:multibase:zController',
+      hasOccupation: { '@type': 'Occupation', occupationalCategory: 'ISCO-08|1330' },
+      hasCredential: { material: 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:test' },
+    },
+  },
+};
 
 describe('DefaultActivationTrustAdapter', () => {
   const previousEnv = process.env;
@@ -42,11 +54,17 @@ describe('DefaultActivationTrustAdapter', () => {
     const organizationCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL);
     organizationCredential.credentialSubject.id = TEST_ORGANIZATION_DID;
 
+    const representativeCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL);
+    representativeCredential.credentialSubject.hasOccupation = {
+      '@type': 'Occupation', identifier: { additionalType: 'ISCO-08', value: '1120' },
+    };
+    delete representativeCredential.credentialSubject.hasCredential;
     const result = await adapter.evaluate({
       networkMode: 'test-network',
       vpToken: vpTokenCompact,
       organizationCredential,
-      representativeCredential: cloneExample(EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL),
+      representativeCredential,
+      controllerCredential: TEST_CONTROLLER_CREDENTIAL,
     });
 
     expect(result.organizationDid).toBe(TEST_ORGANIZATION_DID);
@@ -90,6 +108,46 @@ describe('DefaultActivationTrustAdapter', () => {
     });
   });
 
+  it('accepts only the old combined representative authority as a two-VC compatibility fallback', async () => {
+    const clearingHouseService: IClearingHouseService = {
+      verifyVpToken: jest.fn(async () => ({ acr: 'urn:test:acr', ledgerVerified: true })),
+    };
+    const trustRegistryAdapter: ITrustRegistryAdapter = {
+      verifyActivationTrust: jest.fn(async () => ({
+        revocationChecked: true,
+        issuerKeyStatusChecked: true,
+        subjectKeyStatusChecked: true,
+        onChainChecked: false,
+      })),
+    };
+    const organizationCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL);
+    organizationCredential.credentialSubject.id = TEST_ORGANIZATION_DID;
+    const legacyRepresentative: any = cloneExample(EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL);
+    legacyRepresentative.credentialSubject.hasOccupation = { identifier: { value: 'RESPRSN' } };
+    legacyRepresentative.credentialSubject.hasCredential = {
+      material: 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:legacy-controller',
+    };
+    const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
+
+    await expect(adapter.evaluate({
+      networkMode: 'test-network',
+      vpToken: vpTokenCompact,
+      organizationCredential,
+      representativeCredential: legacyRepresentative,
+    })).resolves.toMatchObject({ organizationDid: TEST_ORGANIZATION_DID });
+
+    legacyRepresentative.credentialSubject.hasOccupation = {
+      '@type': 'Occupation',
+      identifier: { additionalType: 'ISCO-08', value: '1120' },
+    };
+    await expect(adapter.evaluate({
+      networkMode: 'test-network',
+      vpToken: vpTokenCompact,
+      organizationCredential,
+      representativeCredential: legacyRepresentative,
+    })).rejects.toThrow('controller role RESPRSN in credentialSubject.hasOccupation');
+  });
+
   it('verifies one deterministically signed ES384 vp_token in strict mode when the controller JWK is embedded', async () => {
     process.env = {
       ...previousEnv,
@@ -121,6 +179,7 @@ describe('DefaultActivationTrustAdapter', () => {
       credentials: [
         organizationCredential,
         representativeCredential,
+        TEST_CONTROLLER_CREDENTIAL,
       ],
     });
     const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
@@ -130,6 +189,7 @@ describe('DefaultActivationTrustAdapter', () => {
       vpToken: vpFixture.compactToken,
       organizationCredential,
       representativeCredential,
+      controllerCredential: TEST_CONTROLLER_CREDENTIAL,
     })).resolves.toMatchObject({
       organizationDid: TEST_ORGANIZATION_DID,
       trustPolicy: { networkMode: 'test-network' },

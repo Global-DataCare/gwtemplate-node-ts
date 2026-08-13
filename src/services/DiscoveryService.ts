@@ -5,6 +5,7 @@ import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { DidDocument } from '../gdc-backend-utils-node/models/did';
 import { JwkSet } from '../gdc-backend-utils-node/models/jwk';
 import type { IDiscoveryTenantRegistry } from '../managers/IDiscoveryTenantRegistry';
+import { buildGovernedCapabilityStatement } from './fhir-governance-artifacts';
 
 function ensureTrailingSlash(url: string): string {
   return url.endsWith('/') ? url : `${url}/`;
@@ -123,15 +124,24 @@ export class DiscoveryService {
   }
 
   /**
-   * Generates a placeholder FHIR Capability Statement.
+   * Generates the FHIR CapabilityStatement and links every advertised custom
+   * SearchParameter to its governance-controlled canonical definition.
    * @param vaultId The unique vault identifier of the tenant.
    * @returns A partial CapabilityStatement object.
    */
-  getCapabilityStatement(vaultId: string): object {
-    return {
-      resourceType: 'CapabilityStatement',
-      status: 'active',
-      // The full capability statement would be dynamically generated here.
-    };
+  async getCapabilityStatement(vaultId: string): Promise<object | undefined> {
+    const operationalUrl = await this.tenantsCacheManager.getTenantOperationalUrl(vaultId);
+    if (!operationalUrl) return undefined;
+    const implementationUrl = new URL('fhir', ensureTrailingSlash(operationalUrl)).toString();
+    return buildGovernedCapabilityStatement({
+      canonicalBaseUrl: process.env.FHIR_GOVERNANCE_CANONICAL_BASE_URL
+        || 'https://unid.online/standards/fhir',
+      implementationVersion: process.env.FHIR_GOVERNANCE_IMPLEMENTATION_VERSION
+        || '1.0.0',
+      implementationUrl,
+      implementationDescription: `Tenant FHIR index for ${vaultId}`,
+      enableContractSearchParameters:
+        String(process.env.FHIR_ENABLE_CONTRACT_SEARCH_PARAMETERS || '').toLowerCase() === 'true',
+    });
   }
 }

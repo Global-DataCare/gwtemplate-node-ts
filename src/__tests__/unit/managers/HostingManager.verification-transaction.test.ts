@@ -101,13 +101,13 @@ function buildConfig(): IServerConfig {
 
 function buildTransactionJob(): JobRequest {
   const requestBody = JSON.parse(JSON.stringify(ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST.body));
-  requestBody.data[0].meta.claims = {
+  requestBody.data[0].resource.meta.claims = {
     ...testClaimsRegisterTenantExpanded,
-    ...requestBody.data[0].meta.claims,
+    ...requestBody.data[0].resource.meta.claims,
     'org.schema.Organization.alternateName': EXAMPLE_TENANT_ALTERNATE_NAME,
   };
-  delete requestBody.data[0].meta.claims[ClaimsPersonSchemaorg.hasOccupation];
-  requestBody.data[0].meta.claims[ClaimsPersonSchemaorg.hasOccupationalRoleValue] = 'RESPRSN';
+  delete requestBody.data[0].resource.meta.claims[ClaimsPersonSchemaorg.hasOccupation];
+  requestBody.data[0].resource.meta.claims[ClaimsPersonSchemaorg.hasOccupationalRoleValue] = 'RESPRSN';
   return {
     tenantId: 'host',
     jurisdiction: 'es',
@@ -259,18 +259,19 @@ describe('HostingManager legal organization verification transaction', () => {
     expect(sentBody.attachments?.[0]?.data?.links?.[0]).toBe(
       ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST.attachments?.[0]?.data?.links?.[0],
     );
-    expect(sentBody.body.data[0]?.meta?.claims?.[ClaimsServiceSchemaorg.serviceType]).toBe(
+    expect(sentBody.body.data[0]?.resource?.meta?.claims?.[ClaimsServiceSchemaorg.serviceType]).toBe(
       testClaimsRegisterTenantExpanded[ClaimsServiceSchemaorg.serviceType],
     );
+    expect(sentBody.body.data[0]?.meta).toBeUndefined();
 
     expect(response.body.type).toBe(EXAMPLE_TRANSACTION_BUNDLE_TYPE);
     expect(response.body.data[0]?.type).toBe(EXAMPLE_TRANSACTION_RESPONSE_TYPE);
     expect(response.body.data[0]?.response?.status).toBe(EXAMPLE_RESPONSE_STATUS_OK);
     expect(response.body.data[0]?.resource?.icaResponse).toEqual(icaVerifyResponse);
     expect(
-      response.body.data[0]?.meta?.claims?.[ClaimsServiceSchemaorg.category],
+      (response.body.data[0]?.resource as any)?.meta?.claims?.[ClaimsServiceSchemaorg.category],
     ).toBe(EXAMPLE_SECTOR);
-    const offerId = String(response.body.data[0]?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
+    const offerId = String((response.body.data[0]?.resource as any)?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
     expect(offerId).toContain(':Offer:');
     expect(response.body.data[0]?.resource?.next).toEqual({
       action: EXAMPLE_NEXT_ACTION,
@@ -456,7 +457,7 @@ describe('HostingManager legal organization verification transaction', () => {
     );
 
     const job = buildTransactionJob();
-    delete (job.content as any).body.data[0].meta.claims[ClaimsServiceSchemaorg.category];
+    delete (job.content as any).body.data[0].resource.meta.claims[ClaimsServiceSchemaorg.category];
 
     const response = await manager.process(job, 'test', false);
     const errorEntry = response.body.data[0];
@@ -502,15 +503,17 @@ describe('HostingManager legal organization verification transaction', () => {
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
     const icaVerifyResponse = buildIcaVerifyCredentialResponse();
     (icaVerifyResponse.data as any[]).push({
-      type: 'OrganizationController-verification-v1.0',
+      type: 'ServiceController-verification-v1.0',
       resource: {
         id: 'urn:uuid:controller-vc-001',
         issuer: 'did:web:ica.example.org',
-        type: ['VerifiableCredential', 'ServiceCredential', 'OrganizationControllerCredential'],
+        type: ['VerifiableCredential', 'ServiceCredential', 'ServiceControllerCredential'],
         credentialSubject: {
           id: 'did:web:provider.example.org:service:tenant',
           owner: {
+            additionalType: 'RESPRSN',
             sameAs: 'urn:multibase:zControllerHash',
+            hasOccupation: { '@type': 'Occupation', occupationalCategory: 'ISCO-08|1330' },
             hasCredential: {
               material: 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:controller-thumbprint',
             },
@@ -574,7 +577,7 @@ describe('HostingManager legal organization verification transaction', () => {
 
     const response = await manager.process(buildIssueJob(), 'test', false);
     const responseEntry = response.body.data[0];
-    const claims = responseEntry?.meta?.claims || {};
+    const claims = (responseEntry?.resource as any)?.meta?.claims || {};
 
     expect(responseEntry?.response?.status).toBe(EXAMPLE_RESPONSE_STATUS_OK);
     expect(fetchCalls[0]?.url).toBe(
@@ -594,7 +597,7 @@ describe('HostingManager legal organization verification transaction', () => {
         type: expect.arrayContaining(['LegalRepresentativeCredential']),
       }),
       expect.objectContaining({
-        type: expect.arrayContaining(['OrganizationControllerCredential']),
+        type: expect.arrayContaining(['ServiceControllerCredential']),
       }),
     ]));
     expect((responseEntry as any)?.vc).not.toEqual(expect.arrayContaining([
@@ -687,9 +690,9 @@ describe('HostingManager legal organization verification transaction', () => {
 
     const strictJob = buildIssueJob();
     const strictEntry = (strictJob.content as any).body.data[0];
-    delete strictEntry.meta.claims['org.schema.Person.email'];
-    delete strictEntry.meta.claims['org.schema.Person.hasOccupation'];
-    delete strictEntry.meta.claims['org.schema.Person.hasOccupation.identifier.value'];
+    delete strictEntry.resource.meta.claims['org.schema.Person.email'];
+    delete strictEntry.resource.meta.claims['org.schema.Person.hasOccupation'];
+    delete strictEntry.resource.meta.claims['org.schema.Person.hasOccupation.identifier.value'];
     (strictJob.content as any).meta = {
       bearer: {
         token: 'Bearer strict-token',
@@ -715,7 +718,7 @@ describe('HostingManager legal organization verification transaction', () => {
     );
 
     const response = await manager.process(strictJob, 'test', false);
-    const claims = response.body.data[0]?.meta?.claims || {};
+    const claims = (response.body.data[0]?.resource as any)?.meta?.claims || {};
 
     expect(response.body.data[0]?.response?.status).toBe(EXAMPLE_RESPONSE_STATUS_OK);
     expect(fetchCalls[0]?.url).toBe(
@@ -801,7 +804,7 @@ describe('HostingManager legal organization verification transaction', () => {
     );
 
     const response = await manager.process(buildIssueJob(), 'test', false);
-    const claims = response.body.data[0]?.meta?.claims || {};
+    const claims = (response.body.data[0]?.resource as any)?.meta?.claims || {};
 
     expect(response.body.data[0]?.response?.status).toBe(EXAMPLE_RESPONSE_STATUS_OK);
     expect(fetchCalls[0]?.url).toBe(
@@ -861,7 +864,7 @@ describe('HostingManager legal organization verification transaction', () => {
 
     const response = await manager.process(buildTransactionJob(), 'test', false);
     const responseEntry = response.body.data[0];
-    const claims = responseEntry?.meta?.claims || {};
+    const claims = (responseEntry?.resource as any)?.meta?.claims || {};
     const offerId = String(claims[ClaimsOfferSchemaorg.identifier] || '');
 
     // Step 1: first-time legal `_transaction` must create the canonical Offer.

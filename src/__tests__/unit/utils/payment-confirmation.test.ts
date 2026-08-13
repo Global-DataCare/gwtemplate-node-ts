@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from '@jest/globals';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import {
   PAYMENT_METHOD_STRIPE,
   PAYMENT_ORCHESTRATION_MODE_GW_CORE,
@@ -39,6 +39,25 @@ describe('payment-confirmation', () => {
     expect(result.paymentMethod).toBe(PAYMENT_METHOD_STRIPE);
   });
 
+  it('accepts a zero-price test-network offer without pretending Stripe was exercised', async () => {
+    process.env.PAYMENT_ORCHESTRATION_MODE = PAYMENT_ORCHESTRATION_MODE_PORTAL_BFF;
+    process.env.PAYMENT_VERIFICATION_MODE = 'live';
+
+    await expect(verifyOrderPaymentConfirmation({
+      offerClaims: { [ClaimsOfferSchemaorg.price]: '0' },
+      orderClaims: {},
+      stripeClient: {
+        checkout: { sessions: { retrieve: async () => { throw new Error('Stripe must not be called'); } } },
+        invoices: { retrieve: async () => { throw new Error('Stripe must not be called'); } },
+      } as any,
+    })).resolves.toEqual({
+      verified: true,
+      paymentMethod: undefined,
+      invoiceId: undefined,
+      paymentUrl: undefined,
+    });
+  });
+
   it('rejects portal-bff paid orders without proof', async () => {
     process.env.PAYMENT_ORCHESTRATION_MODE = PAYMENT_ORCHESTRATION_MODE_PORTAL_BFF;
 
@@ -63,5 +82,60 @@ describe('payment-confirmation', () => {
     });
 
     expect(result.verified).toBe(true);
+  });
+
+  it('verifies Stripe live checkout against offer, tenant, quantity, amount and currency', async () => {
+    process.env.PAYMENT_ORCHESTRATION_MODE = PAYMENT_ORCHESTRATION_MODE_PORTAL_BFF;
+    process.env.PAYMENT_VERIFICATION_MODE = 'live';
+    const stripeClient = {
+      checkout: { sessions: { retrieve: async () => ({
+        payment_status: 'paid',
+        client_reference_id: 'tenant-001',
+        amount_total: 9998,
+        currency: 'eur',
+        metadata: { offerId: 'offer-001', quantity: '2' },
+      }) } },
+      invoices: { retrieve: async () => { throw new Error('not used'); } },
+    } as any;
+
+    await expect(verifyOrderPaymentConfirmation({
+      offerClaims: {
+        [ClaimsOfferSchemaorg.identifier]: 'offer-001',
+        [ClaimsOfferSchemaorg.price]: '49.99',
+        [ClaimsOfferSchemaorg.priceCurrency]: 'EUR',
+        [ClaimsOfferSchemaorg.eligibleQuantityValue]: 2,
+        [ClaimsOrganizationSchemaorg.alternateName]: 'tenant-001',
+      },
+      orderClaims: {
+        [ClaimsOrderSchemaorg.paymentMethod]: PAYMENT_METHOD_STRIPE,
+        [ClaimsOrderSchemaorg.partOfInvoice]: 'cs_test_001',
+      },
+      stripeClient,
+    })).resolves.toMatchObject({ verified: true, invoiceId: 'cs_test_001' });
+  });
+
+  it('rejects a paid Stripe checkout bound to another offer', async () => {
+    process.env.PAYMENT_ORCHESTRATION_MODE = PAYMENT_ORCHESTRATION_MODE_PORTAL_BFF;
+    process.env.PAYMENT_VERIFICATION_MODE = 'live';
+    const stripeClient = {
+      checkout: { sessions: { retrieve: async () => ({
+        payment_status: 'paid', client_reference_id: 'tenant-001', amount_total: 9998, currency: 'eur',
+        metadata: { offerId: 'another-offer', quantity: '2' },
+      }) } },
+      invoices: { retrieve: async () => { throw new Error('not used'); } },
+    } as any;
+
+    await expect(verifyOrderPaymentConfirmation({
+      offerClaims: {
+        [ClaimsOfferSchemaorg.identifier]: 'offer-001', [ClaimsOfferSchemaorg.price]: '49.99',
+        [ClaimsOfferSchemaorg.priceCurrency]: 'EUR', [ClaimsOfferSchemaorg.eligibleQuantityValue]: 2,
+        [ClaimsOrganizationSchemaorg.alternateName]: 'tenant-001',
+      },
+      orderClaims: {
+        [ClaimsOrderSchemaorg.paymentMethod]: PAYMENT_METHOD_STRIPE,
+        [ClaimsOrderSchemaorg.partOfInvoice]: 'cs_test_001',
+      },
+      stripeClient,
+    })).rejects.toThrow('does not match offer');
   });
 });

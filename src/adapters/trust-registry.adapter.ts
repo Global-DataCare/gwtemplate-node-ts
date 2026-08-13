@@ -8,6 +8,7 @@ export type TrustRegistryVerificationInput = {
   representativeDid?: string;
   organizationCredential?: any;
   representativeCredential?: any;
+  controllerCredential?: any;
   now?: Date;
 };
 

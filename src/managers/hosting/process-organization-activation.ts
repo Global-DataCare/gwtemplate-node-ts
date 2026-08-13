@@ -44,6 +44,7 @@ type ActivationMaterial = {
   presentationSubmission: any;
   organizationCredential: any;
   representativeCredential: any;
+  controllerCredential: any;
   legacyOrganizationCredential: any;
   legacyRepresentativeCredential: any;
   primaryDid: any;
@@ -181,6 +182,7 @@ async function processActivationEntry(
     primaryDid: activation.primaryDid,
     organizationCredential: activation.organizationCredential,
     representativeCredential: activation.representativeCredential,
+    controllerCredential: activation.controllerCredential,
     jurisdiction: deps.body?.jurisdiction,
     sector: deps.body?.sector,
   });

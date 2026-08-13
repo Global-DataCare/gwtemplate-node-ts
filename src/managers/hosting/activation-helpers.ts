@@ -17,6 +17,7 @@ export type ActivationMaterial = {
   presentationSubmission: any;
   organizationCredential: any;
   representativeCredential: any;
+  controllerCredential: any;
   legacyOrganizationCredential: any;
   legacyRepresentativeCredential: any;
   primaryDid: any;
@@ -295,6 +296,10 @@ export function extractActivationMaterial(input: {
   const representativeCredential =
     legacyRepresentativeCredential
     || extractCredentialFromVpToken(vpToken, ['LegalRepresentativeCredential', 'PersonCredential']);
+  const controllerCredential = extractCredentialFromVpToken(vpToken, [
+    'ServiceControllerCredential',
+    'OrganizationControllerCredential',
+  ]);
   const primaryDid =
     entryResource?.didDocument?.id
     || entryResource?.organizationDid
@@ -311,6 +316,7 @@ export function extractActivationMaterial(input: {
       || entryResource?.presentation_submission,
     organizationCredential,
     representativeCredential,
+    controllerCredential,
     legacyOrganizationCredential,
     legacyRepresentativeCredential,
     primaryDid,

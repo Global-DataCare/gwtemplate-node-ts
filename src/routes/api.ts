@@ -696,8 +696,11 @@ export function createApiRouter(
    *       - production: `network`
    *
    *       Expected semantics:
-   *       - canonical proof input is `body.vp_token`; the ICA organization + representative evidence belongs there
-   *       - the VP carried by `body.vp_token` is built from the ICA-issued organization VC, ICA-issued legal representative VC, presenter signing key id, and target host operator id before external signing
+   *       - canonical proof input is `body.vp_token`; it contains the ICA-issued OrganizationCredential, LegalRepresentativeCredential and ServiceControllerCredential
+   *       - LegalRepresentativeCredential carries legal capacity and professional ISCO occupation; it does not grant tenant control by itself
+   *       - ServiceControllerCredential carries `RESPRSN` in `owner.additionalType`, ISCO in `owner.hasOccupation.occupationalCategory`, and `owner.hasCredential.material` bound to the presenter actor JWK
+   *       - legacy two-VC compatibility is accepted only when the old LegalRepresentativeCredential itself contains both `RESPRSN` and matching `hasCredential` material
+   *       - a two-VC VP whose representative carries only `ISCO-08|1120` fails; unsigned request claims never replace signed controller authority
    *       - if ICA also issued a `SoftwareApplication` VC for the portal/backend, its `SoftwareApplication.material` field is the public cryptographic material of that software application, typically the communication signing key id bound during ICA registration
    *       - when that key id is represented as a JWK thumbprint, RFC 7638 defines the canonical thumbprint calculation over the public signing / verification JWK and RFC 9278 defines the canonical URN form `urn:ietf:params:oauth:jwk-thumbprint:sha-256:<base64url>`
    *       - the controller-side signature belongs to the prior ICA registration step; later operational app-service proofs should be signed by the app-service key itself
@@ -819,11 +822,12 @@ export function createApiRouter(
    *       Polling semantics:
    *       - submit (`_issue`) returns immediate errors if the request cannot be accepted/enqueued
    *       - poll (`_issue-response`) returns `202` while pending, then `200` with:
-   *         - `resource.icaResponse`: the complete verification payload returned by ICA `_verify`
-   *         - `vc[]`: all deduplicated credential resources extracted from that ICA payload
-   *         - `meta.claims`: refreshed organization/controller claims plus the License activation code in `org.schema.IndividualProduct.serialNumber` for `Token/_exchange` + `Device/_dcr`
+   *         - `resource.meta.claims`: refreshed organization/controller claims plus the License activation code in `org.schema.IndividualProduct.serialNumber` for `Token/_exchange` + `Device/_dcr`
+   *         - `vc[]`: all deduplicated credential resources extracted from ICA
+   *         - `resource.icaResponse`: transitional raw upstream ICA envelope retained for audit/debug; clients should consume `vc[]` instead of parsing it
    *
    *       Response-boundary rule:
+   *       - claims are canonical only at `data[].resource.meta.claims`; new writers do not emit `data[].meta.claims`
    *       - this is an organization-credential reissuance/reverification result, not a `License/_issue` result
    *       - the activation code is not a VC and `License:Issued` is not the canonical response entry type
    *       - `OperationOutcome.issue[]` remains the unrelated diagnostics array
@@ -880,13 +884,16 @@ export function createApiRouter(
    *
    *       Responsibilities of this transaction:
    *       - carry the signed terms PDF evidence or PDF URL attachment
+   *       - carry flattened application claims in `body.data[].resource.meta.claims`; entry-level `meta.claims` is accepted only as legacy input
    *       - carry the controller business binding key in `body.data[].resource.controller.publicKeyJwk`
    *       - optionally carry the organization VC-signing public key in `body.data[].resource.organization.publicKeyJwk`
    *       - carry the legal organization claims and representative payload that GW CORE forwards to ICA `_verify`
+   *       - return three ICA credentials when controller identity and JWK evidence are complete: OrganizationCredential, LegalRepresentativeCredential and ServiceControllerCredential
    *
    *       Separation of concerns:
    *       - `meta.jws` / `meta.jwe` remain communication/runtime keys of the portal app, confidential app, device profile, or BFF
-   *       - `body.data[].resource.controller.publicKeyJwk` is the controller business/operation-signing key that ICA should project into representative `hasCredential.material`
+   *       - `body.data[].resource.controller.publicKeyJwk` is the controller business/operation-signing key that ICA projects into `ServiceControllerCredential.owner.hasCredential.material`
+   *       - LegalRepresentativeCredential defaults to `hasOccupation.occupationalCategory = ISCO-08|1120`; ServiceControllerCredential uses `owner.additionalType = RESPRSN` plus controller occupation `ISCO-08|1330` unless the signed PDF provides an explicit occupation
    *       - `body.data[].resource.organization.publicKeyJwk` is the organization credential-signing key when the hosting operator/runtime already knows it
    *       - this route is distinct from `Organization/_activate`, which starts from an already-issued ICA proof (`vp_token`)
    *
@@ -943,9 +950,9 @@ export function createApiRouter(
    *       Polling semantics:
    *       - submit (`_transaction`) returns immediate errors if the request cannot be accepted/enqueued
    *       - poll (`_transaction-response`) returns `202` while pending, then `200` with:
-   *         - `resource.icaResponse`: the verification payload returned by ICA `_verify`
+   *         - `resource.meta.claims`: canonical host continuation claims, including the Offer identifier
+   *         - `resource.icaResponse`: transitional raw ICA envelope retained for audit/debug; application clients should read `vc[]`
    *         - `vc[]`: extracted credential resources from that ICA payload
-   *         - `meta.claims`: the host-side pending-registration and generated Offer claims
    *         - `resource.next`: the explicit follow-up contract for `Order/_batch`
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'

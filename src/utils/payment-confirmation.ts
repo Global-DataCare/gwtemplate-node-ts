@@ -1,7 +1,7 @@
 // Copyright 2026 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import Stripe from 'stripe';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 
@@ -68,17 +68,55 @@ function extractStripeReference(
 async function verifyStripePaymentLive(
   invoiceId: string | undefined,
   paymentUrl: string | undefined,
+  offerClaims: Record<string, unknown>,
+  stripeClientOverride?: Pick<Stripe, 'invoices' | 'checkout'>,
 ): Promise<void> {
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!stripeClientOverride && !process.env.STRIPE_SECRET_KEY) {
     throw new ManagerError('Stripe live payment verification requires STRIPE_SECRET_KEY.', IssueType.Required);
   }
-  const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-12-15.clover' });
+  const stripeClient = stripeClientOverride
+    || new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-12-15.clover' });
   const refs = extractStripeReference(invoiceId, paymentUrl);
+  const offerId = normalizeText(offerClaims[ClaimsOfferSchemaorg.identifier]);
+  const tenantId = normalizeText(offerClaims[ClaimsOrganizationSchemaorg.alternateName]);
+  const quantity = Number(offerClaims[ClaimsOfferSchemaorg.eligibleQuantityValue] || 1);
+  const unitPrice = Number(offerClaims[ClaimsOfferSchemaorg.price] || 0);
+  const expectedAmount = Math.round(unitPrice * quantity * 100);
+  const expectedCurrency = normalizeText(offerClaims[ClaimsOfferSchemaorg.priceCurrency])?.toLowerCase() || 'eur';
+  const assertPaymentBinding = (payment: {
+    amount?: number | null;
+    currency?: string | null;
+    tenantId?: string | null;
+    offerId?: string | null;
+    quantity?: string | null;
+  }) => {
+    if (!offerId || payment.offerId !== offerId) {
+      throw new ManagerError('Stripe payment does not match offer identifier.', IssueType.Conflict);
+    }
+    if (!tenantId || payment.tenantId !== tenantId) {
+      throw new ManagerError('Stripe payment does not match tenant identifier.', IssueType.Conflict);
+    }
+    if (payment.quantity !== undefined && Number(payment.quantity) !== quantity) {
+      throw new ManagerError('Stripe payment does not match license quantity.', IssueType.Conflict);
+    }
+    if (payment.amount !== expectedAmount) {
+      throw new ManagerError('Stripe payment does not match offer amount.', IssueType.Conflict);
+    }
+    if (String(payment.currency || '').toLowerCase() !== expectedCurrency) {
+      throw new ManagerError('Stripe payment does not match offer currency.', IssueType.Conflict);
+    }
+  };
   if (refs.invoiceId) {
     const invoice = await stripeClient.invoices.retrieve(refs.invoiceId);
     if (invoice.status !== 'paid') {
       throw new ManagerError(`Stripe invoice '${refs.invoiceId}' is not paid.`, IssueType.Conflict);
     }
+    assertPaymentBinding({
+      amount: invoice.amount_paid,
+      currency: invoice.currency,
+      tenantId: invoice.metadata?.tenantId,
+      offerId: invoice.metadata?.offerId,
+    });
     return;
   }
   if (refs.checkoutSessionId) {
@@ -86,6 +124,13 @@ async function verifyStripePaymentLive(
     if (session.payment_status !== 'paid') {
       throw new ManagerError(`Stripe checkout session '${refs.checkoutSessionId}' is not paid.`, IssueType.Conflict);
     }
+    assertPaymentBinding({
+      amount: session.amount_total,
+      currency: session.currency,
+      tenantId: session.client_reference_id,
+      offerId: session.metadata?.offerId,
+      quantity: session.metadata?.quantity,
+    });
     return;
   }
   throw new ManagerError(
@@ -97,6 +142,7 @@ async function verifyStripePaymentLive(
 export async function verifyOrderPaymentConfirmation(input: {
   orderClaims: Record<string, unknown>;
   offerClaims: Record<string, unknown>;
+  stripeClient?: Pick<Stripe, 'invoices' | 'checkout'>;
 }): Promise<PaymentConfirmationResult> {
   const { orderClaims, offerClaims } = input;
   const amount = resolveOrderPrice(offerClaims);
@@ -136,7 +182,7 @@ export async function verifyOrderPaymentConfirmation(input: {
 
   if (paymentMethod === PAYMENT_METHOD_STRIPE) {
     if (resolvePaymentVerificationMode() === PAYMENT_VERIFICATION_MODE_LIVE) {
-      await verifyStripePaymentLive(invoiceId, paymentUrl);
+      await verifyStripePaymentLive(invoiceId, paymentUrl, offerClaims, input.stripeClient);
     }
     return { verified: true, paymentMethod, invoiceId, paymentUrl };
   }

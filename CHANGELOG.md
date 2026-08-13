@@ -1,12 +1,40 @@
 ## [Unreleased]
 
+## [1.21.2] - 2026-08-13
+
+- Canonicalize legal-organization `_transaction` and `_issue` claims at
+  `data[].resource.meta.claims` across portal input, GW output and ICA
+  forwarding. Entry-level `meta.claims` remains a deprecated input fallback.
+
+- Move legal-organization `_transaction` and `_issue` response claims from
+  deprecated `data[].meta.claims` to canonical
+  `data[].resource.meta.claims`; retain `resource.icaResponse` only as a raw
+  transitional envelope and normalized credentials in sibling `vc[]`.
+- Document and test canonical three-VC activation and the narrow legacy two-VC
+  fallback requiring `RESPRSN` plus representative key binding.
+- Validate tenant controller authority and key binding from the signed
+  canonical `ServiceControllerCredential`, with `owner.additionalType = RESPRSN`
+  and `owner.hasOccupation.occupationalCategory = ISCO-08|1330`, while keeping
+  representative ISCO occupation independent; persist controller ISCO
+  occupations as separately indexed employee attributes and preserve existing
+  DID controllers.
+- In portal-managed Stripe live mode, require paid Checkout/Invoice evidence
+  to match the accepted offer, tenant, quantity, amount and currency before
+  materializing licenses. Zero-price test-network offers remain explicitly
+  payment-free and do not exercise Stripe.
+
+- Accept `antifraud` as an independent FHIR-capable tenant sector for Company
+  Book, Family Book and future non-health applications.
+- Publish governance-controlled `unid.online/standards/fhir` canonical definitions from
+  the tenant `CapabilityStatement`, including active custom Communication
+  search parameters and feature-gated future Contract parameters.
 - Consume `gdc-common-utils-ts@^2.5.1` from npm, align Fabric Gateway/Noble with
   their ESM-compatible current releases, run Jest 30 consistently, and support
   Node.js 22 or newer without relying on sibling workspace links.
 - Document and test the exact `Organization/_issue-response` boundary: all
   deduplicated ICA credentials are returned in `vc[]`, the raw ICA payload is
   preserved in `resource.icaResponse`, and the separate License activation code
-  is carried in `meta.claims` rather than a `License:Issued` VC/entry.
+  is carried in `resource.meta.claims` rather than a `License:Issued` VC/entry.
 - Keep controller `sameAs` as the simple ICA-compatible contact-hash URN and
   persist the controller authorization role separately as the bare HL7 v3 code
   `RESPRSN`; remove the invalid `professional` suffix and ISCO-08 `1120`
@@ -33,7 +61,8 @@
   part of this controller operation.
 - Derive Employee/controller JWK `kid` values from public material as RFC 9278
   SHA-256 thumbprint URNs and index `org.schema.Person.identifier`, `email`,
-  `hasOccupation.identifier.value` and repeated `hasCredential.material`.
+  `additionalType`, `hasOccupation.occupationalCategory` and repeated
+  `hasCredential.material`.
   Legacy `email`, `role` and `kid` indexes remain during migration.
 
 - Wire the existing FHIR R5 `SubscriptionManager` into the production worker

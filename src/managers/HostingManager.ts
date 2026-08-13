@@ -911,10 +911,11 @@ export class HostingManager {
       createOrganizationIssueClaimsFromClaims: this.createOrganizationIssueClaimsFromClaims.bind(this),
       forwardOrganizationVerificationTransactionToIca: this.forwardOrganizationVerificationTransactionToIca.bind(this),
       extractCredentialResourcesFromIcaPayload: this.extractCredentialResourcesFromIcaPayload.bind(this),
-      persistExistingTenantControllerBinding: ({ claims, controller, verifiedSignerKid, transactionId }) =>
+      persistExistingTenantControllerBinding: ({ claims, controller, controllerCredential, verifiedSignerKid, transactionId }) =>
         persistExistingTenantControllerBindingExternal({
           claims,
           controller,
+          controllerCredential,
           verifiedSignerKid,
           transactionId,
           hostCollectionName: this.hostRuntime.hostCollectionName,
@@ -944,7 +945,7 @@ export class HostingManager {
    *   later consumed by Order
    *
    * Canonical claim rule:
-   * - the real Offer contract must live in `meta.claims['org.schema.Offer.identifier']`
+   * - the real Offer contract must live in `resource.meta.claims['org.schema.Offer.identifier']`
    * - `resource.next.acceptedOffer.identifier` is only a derived workflow hint
    * - tests must fail if the canonical claim disappears, even if `resource.next`
    *   still contains a copied identifier
@@ -958,8 +959,9 @@ export class HostingManager {
 
   private buildOrganizationIssueResponseResource(
     icaResponse: unknown,
+    processedClaims: ClaimsRecord,
   ): LegalOrganizationIssueResponseResource {
-    return buildOrganizationIssueResponseResource(icaResponse);
+    return buildOrganizationIssueResponseResource(icaResponse, processedClaims);
   }
 
   /**

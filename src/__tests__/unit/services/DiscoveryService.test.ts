@@ -28,4 +28,22 @@ describe('DiscoveryService', () => {
       token_endpoint: 'https://operator.gateway.net/acme/cds-es/v1/health-care/identity/oidc/token',
     }));
   });
+
+  it('should publish tenant-specific FHIR instance metadata', async () => {
+    const tenantsCacheManager = {
+      getTenantOperationalUrl: jest.fn(async () => 'https://operator.gateway.net/acme/cds-es/v1/antifraud'),
+    } as any;
+    const service = new DiscoveryService(tenantsCacheManager);
+
+    const statement = await service.getCapabilityStatement('antifraud_acme') as any;
+
+    expect(tenantsCacheManager.getTenantOperationalUrl).toHaveBeenCalledWith('antifraud_acme');
+    expect(statement.kind).toBe('instance');
+    expect(statement.implementation.url).toBe(
+      'https://operator.gateway.net/acme/cds-es/v1/antifraud/fhir',
+    );
+    expect(statement.instantiates[0]).toBe(
+      'https://unid.online/standards/fhir/CapabilityStatement/gw-core|1.0.0',
+    );
+  });
 });

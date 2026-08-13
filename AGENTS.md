@@ -34,9 +34,11 @@ must not be represented as the audited production profile.
 - `DocumentReference.contenthash` is content hash/CID
 - hash-based retrieval must use canonical claim name (`contenthash`), with legacy aliases only if documented.
 4. Communication atomic profile constraints must not be presented as native FHIR limitations.
-5. Activation representative checks must consume shared policy from `gdc-common-utils-ts` (no duplicated local parsing).
-6. Canonical representative occupation in examples/docs:
-- `credentialSubject.hasOccupation.identifier.value = "RESPRSN"`
+5. Activation controller checks must consume shared policy from `gdc-common-utils-ts` (no duplicated local role parsing).
+6. Canonical examples/docs keep these dimensions separate:
+- legal-representative and technical occupations use ISCO-08;
+- tenant controller authority uses bare `RESPRSN` in
+  `ServiceControllerCredential.credentialSubject.owner.additionalType`;
 - avoid `|RESPRSN` as canonical output.
 
 ## Naming Discipline
