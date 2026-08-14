@@ -4,6 +4,11 @@ import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { getBaseUrlFromDidWeb } from '../../utils/did-backend';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
+import {
+  ORGANIZATION_ACTIVATION_VC_TYPES,
+  REPRESENTATIVE_ACTIVATION_VC_TYPES,
+  SERVICE_CONTROLLER_ACTIVATION_VC_TYPES,
+} from 'gdc-common-utils-ts/constants/verifiable-credentials';
 
 export type ActivationParticipantMaterial = {
   did?: string;
@@ -20,6 +25,7 @@ export type ActivationMaterial = {
   controllerCredential: any;
   legacyOrganizationCredential: any;
   legacyRepresentativeCredential: any;
+  legacyControllerCredential: any;
   primaryDid: any;
   publicTenantUrl: any;
   organizationBinding?: ActivationParticipantMaterial;
@@ -290,16 +296,25 @@ export function extractActivationMaterial(input: {
     || entryResource?.representativeCredential
     || entryResource?.representative_credential
     || entryResource?.legalRepresentativeCredential;
+  const legacyControllerCredential =
+    input.body?.controllerCredential
+    || input.body?.controller_credential
+    || input.body?.serviceControllerCredential
+    || entryMeta?.controllerCredential
+    || entryMeta?.controller_credential
+    || entryMeta?.serviceControllerCredential
+    || entryResource?.controllerCredential
+    || entryResource?.controller_credential
+    || entryResource?.serviceControllerCredential;
   const organizationCredential =
     legacyOrganizationCredential
-    || extractCredentialFromVpToken(vpToken, ['OrganizationCredential', 'LegalOrganizationCredential']);
+    || extractCredentialFromVpToken(vpToken, [...ORGANIZATION_ACTIVATION_VC_TYPES]);
   const representativeCredential =
     legacyRepresentativeCredential
-    || extractCredentialFromVpToken(vpToken, ['LegalRepresentativeCredential', 'PersonCredential']);
-  const controllerCredential = extractCredentialFromVpToken(vpToken, [
-    'ServiceControllerCredential',
-    'OrganizationControllerCredential',
-  ]);
+    || extractCredentialFromVpToken(vpToken, [...REPRESENTATIVE_ACTIVATION_VC_TYPES]);
+  const controllerCredential =
+    legacyControllerCredential
+    || extractCredentialFromVpToken(vpToken, [...SERVICE_CONTROLLER_ACTIVATION_VC_TYPES]);
   const primaryDid =
     entryResource?.didDocument?.id
     || entryResource?.organizationDid
@@ -319,6 +334,7 @@ export function extractActivationMaterial(input: {
     controllerCredential,
     legacyOrganizationCredential,
     legacyRepresentativeCredential,
+    legacyControllerCredential,
     primaryDid,
     publicTenantUrl:
       entryResource?.organizationUrl

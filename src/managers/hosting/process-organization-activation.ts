@@ -47,6 +47,7 @@ type ActivationMaterial = {
   controllerCredential: any;
   legacyOrganizationCredential: any;
   legacyRepresentativeCredential: any;
+  legacyControllerCredential: any;
   primaryDid: any;
   publicTenantUrl: any;
   organizationBinding?: ActivationParticipantMaterial;

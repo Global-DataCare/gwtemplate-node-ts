@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [1.21.3] - 2026-08-13
+
+- Refresh Google Cloud runtime dependencies and enforce audited transitive
+  versions; the production dependency tree now reports zero known
+  vulnerabilities.
+- Preserve legacy primary-device projection when the same stable installation
+  receives a replacement DCR client, and match canonical medication
+  `code-display`/`code-text-local` filters case-insensitively.
+- Resolve organization, legal-representative and service-controller activation
+  credentials through the shared canonical VC type sets, including the
+  deprecated controller subtype only as explicit compatibility.
+
 - Add controller-authorized `Device/_revoke` support for one selected employee
   installation. Revocation removes that device's DID verification methods,
   revokes its ledger bindings and profile, and preserves the employee seat and

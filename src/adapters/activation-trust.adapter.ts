@@ -109,7 +109,6 @@ function assertActivationCredentialConsistency(params: {
     organizationCredential,
     representativeCredential,
     controllerCredential,
-    requiredRoleCode: 'RESPRSN',
   });
   if (policyErrors.length > 0) {
     const first = policyErrors[0];

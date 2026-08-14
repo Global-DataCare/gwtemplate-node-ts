@@ -470,10 +470,12 @@ export class HostingManager {
   private warnOnLegacyActivationCredentialFields(activation: {
     legacyOrganizationCredential?: any;
     legacyRepresentativeCredential?: any;
+    legacyControllerCredential?: any;
   }): void {
     const usedLegacyFields = [
       activation.legacyOrganizationCredential ? 'organizationCredential' : undefined,
       activation.legacyRepresentativeCredential ? 'representativeCredential' : undefined,
+      activation.legacyControllerCredential ? 'controllerCredential' : undefined,
     ].filter((value): value is string => Boolean(value));
     if (!usedLegacyFields.length) {
       return;
