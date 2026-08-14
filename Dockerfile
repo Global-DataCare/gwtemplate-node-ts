@@ -9,22 +9,18 @@ ARG NPM_TOKEN
 # Set the working directory
 WORKDIR /usr/src/gwtemplate-node-ts
 
-# Copy local file-based dependencies into the build context.
-COPY gdc-common-utils-ts /usr/src/gdc-common-utils-ts
-
 # Copy package.json and package-lock.json
-COPY gwtemplate-node-ts/package*.json ./
+COPY package*.json ./
 
 # Install all dependencies (including devDependencies needed for building)
 RUN npm install
 
 # Copy the source code
-COPY gwtemplate-node-ts ./
+COPY . ./
 
 # Build the TypeScript code
 # Fail fast on type errors before emitting build output.
 RUN npm run type-check
-ENV EXTRA_TS_PATCH_DIRS=/usr/src/gdc-common-utils-ts/src
 RUN npm run build
 
 # Stage 2: Production
@@ -34,10 +30,7 @@ FROM node:22-alpine
 WORKDIR /usr/src/gwtemplate-node-ts
 
 # Copy package.json and package-lock.json
-COPY gwtemplate-node-ts/package*.json ./
-
-# Copy local file-based dependencies into the runtime image.
-COPY --from=builder /usr/src/gdc-common-utils-ts /usr/src/gdc-common-utils-ts
+COPY package*.json ./
 
 # Install ONLY production dependencies
 RUN npm install --omit=dev
