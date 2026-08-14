@@ -42,6 +42,7 @@ if (!payloadName) {
 const tenantId = process.env.TENANT_ID || 'acme-id';
 const subjectDid = process.env.SUBJECT_ID || `did:web:api.${tenantId}.org:individual:subject-001`;
 const clientAssertionAudience = process.env.SMART_TOKEN_AUDIENCE;
+const providerOrganizationDid = process.env.PROVIDER_ORGANIZATION_DID;
 
 function buildConsentEntry(resourceClaims: Record<string, unknown>): BundleEntry {
   return {
@@ -115,19 +116,19 @@ const rendered = await (async () => {
     }
     case 'RESEARCH_SMART_TOKEN_REQUEST_ROLE_ALLOW':
       return buildDemoResearchSmartTokenRequest({
-        tenantId, subjectDid, clientAssertionAudience, ...matrix.allowByRole,
+        tenantId, subjectDid, clientAssertionAudience, providerOrganizationDid, ...matrix.allowByRole,
       });
     case 'RESEARCH_SMART_TOKEN_REQUEST_ROLE_DENY':
       return buildDemoResearchSmartTokenRequest({
-        tenantId, subjectDid, clientAssertionAudience, ...matrix.denyByRole,
+        tenantId, subjectDid, clientAssertionAudience, providerOrganizationDid, ...matrix.denyByRole,
       });
     case 'RESEARCH_SMART_TOKEN_REQUEST_EMAIL_ALLOW':
       return buildDemoResearchSmartTokenRequest({
-        tenantId, subjectDid, clientAssertionAudience, ...matrix.allowByEmail,
+        tenantId, subjectDid, clientAssertionAudience, providerOrganizationDid, ...matrix.allowByEmail,
       });
     case 'RESEARCH_SMART_TOKEN_REQUEST_EMAIL_DENY':
       return buildDemoResearchSmartTokenRequest({
-        tenantId, subjectDid, clientAssertionAudience, ...matrix.denyByEmail,
+        tenantId, subjectDid, clientAssertionAudience, providerOrganizationDid, ...matrix.denyByEmail,
       });
     case 'DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST':
       return buildDemoDigitalTwinCompositionSearchRequest();

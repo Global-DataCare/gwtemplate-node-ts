@@ -104,10 +104,15 @@ poll_async_json() {
 render_smart_payload() {
   local payload_name="$1"
   (
-    export TENANT_ID SUBJECT_ID
+    export TENANT_ID SUBJECT_ID PROVIDER_ORGANIZATION_DID
     export SMART_TOKEN_AUDIENCE="${SMART_TOKEN_ENDPOINT}"
     render_demo_smart_access_payload "${payload_name}"
   )
+}
+
+resolve_provider_organization_did() {
+  local did_url="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/.well-known/did.json"
+  curl -fsS "${did_url}" | jq -er '.id | select(type == "string" and length > 0)'
 }
 
 submit_consent_batch_and_verify_asset() {
@@ -222,6 +227,9 @@ if [[ "${BOOTSTRAP_INDIVIDUAL_AND_DATA}" == "true" ]]; then
   SUBJECT_ID="${SUBJECT_ID}" \
   bash "${ROOT_DIR}/scripts/demo-communication-medications-ips.sh"
 fi
+
+PROVIDER_ORGANIZATION_DID="${PROVIDER_ORGANIZATION_DID:-$(resolve_provider_organization_did)}"
+echo "[smart-access-smoke] provider organization DID: ${PROVIDER_ORGANIZATION_DID}"
 
 echo "[smart-access-smoke] verifying individual SMART access"
 submit_consent_batch_and_verify_asset INDIVIDUAL_CONSENT_BATCH_REQUEST INDIVIDUAL_RULE_ID_LIST

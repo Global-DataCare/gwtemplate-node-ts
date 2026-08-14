@@ -33,6 +33,8 @@ grep -Fq "case 'INDIVIDUAL_RULE_ID_LIST':" \
   ./scripts/render-demo-smart-access-payload.mts
 grep -Fq 'clientAssertionAudience = process.env.SMART_TOKEN_AUDIENCE' \
   ./scripts/render-demo-smart-access-payload.mts
+grep -Fq 'PROVIDER_ORGANIZATION_DID="${PROVIDER_ORGANIZATION_DID:-$(resolve_provider_organization_did)}"' \
+  ./scripts/smoke-smart-access-local-network.sh
 
 if grep -Fq '../../gdc-common-utils-ts/src/' ./scripts/render-demo-smart-access-payload.mts; then
   echo 'ERROR: release payload rendering must not import sibling workspace source.' >&2
