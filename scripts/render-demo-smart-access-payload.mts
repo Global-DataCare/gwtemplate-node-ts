@@ -1,6 +1,7 @@
 import {
   DEMO_SMART_ACCESS_LOCAL_DIDS,
   buildDemoDigitalTwinCompositionSearchRequest,
+  buildDemoIndividualIpsPermitConsent,
   buildDemoIndividualIpsSearchRequest,
   buildDemoIndividualSmartTokenRequest,
   buildDemoResearchPermitByEmailConsent,
@@ -8,10 +9,15 @@ import {
   buildDemoResearchRequesterMatrix,
   buildDemoResearchSmartTokenRequest,
 } from '../src/__tests__/data/demo-smart-access-local-network.data.ts';
-import { buildConsentRulePrimaryDocument } from '../../gdc-common-utils-ts/src/utils/permission-templates.ts';
-import type { BundleEntry } from '../../gdc-common-utils-ts/src/models/bundle.ts';
+import { buildConsentRulePrimaryDocument } from '../src/utils/consent-access-blockchain.ts';
+import { getClaimValue, normalizeContextualizedClaims } from '../src/utils/claims.ts';
+import { expandConsentActorRoles } from '../src/utils/consent.ts';
+import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
+import type { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 
 type PayloadName =
+  | 'INDIVIDUAL_CONSENT_BATCH_REQUEST'
+  | 'INDIVIDUAL_RULE_ID_LIST'
   | 'INDIVIDUAL_SMART_TOKEN_REQUEST'
   | 'INDIVIDUAL_IPS_SEARCH_REQUEST'
   | 'RESEARCH_CONSENT_BATCH_REQUEST_ROLE'
@@ -29,12 +35,13 @@ const payloadName = process.argv[2] as PayloadName | undefined;
 
 if (!payloadName) {
   throw new Error(
-    'Usage: render-demo-smart-access-payload.mts <INDIVIDUAL_SMART_TOKEN_REQUEST|INDIVIDUAL_IPS_SEARCH_REQUEST|RESEARCH_CONSENT_BATCH_REQUEST_ROLE|RESEARCH_RULE_ID_LIST_ROLE|RESEARCH_CONSENT_BATCH_REQUEST_EMAIL|RESEARCH_RULE_ID_LIST_EMAIL|RESEARCH_SMART_TOKEN_REQUEST_ROLE_ALLOW|RESEARCH_SMART_TOKEN_REQUEST_ROLE_DENY|RESEARCH_SMART_TOKEN_REQUEST_EMAIL_ALLOW|RESEARCH_SMART_TOKEN_REQUEST_EMAIL_DENY|DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST|RESEARCH_CONSUMER_ORGANIZATION_DID>',
+    'Usage: render-demo-smart-access-payload.mts <INDIVIDUAL_CONSENT_BATCH_REQUEST|INDIVIDUAL_RULE_ID_LIST|INDIVIDUAL_SMART_TOKEN_REQUEST|INDIVIDUAL_IPS_SEARCH_REQUEST|RESEARCH_CONSENT_BATCH_REQUEST_ROLE|RESEARCH_RULE_ID_LIST_ROLE|RESEARCH_CONSENT_BATCH_REQUEST_EMAIL|RESEARCH_RULE_ID_LIST_EMAIL|RESEARCH_SMART_TOKEN_REQUEST_ROLE_ALLOW|RESEARCH_SMART_TOKEN_REQUEST_ROLE_DENY|RESEARCH_SMART_TOKEN_REQUEST_EMAIL_ALLOW|RESEARCH_SMART_TOKEN_REQUEST_EMAIL_DENY|DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST|RESEARCH_CONSUMER_ORGANIZATION_DID>',
   );
 }
 
 const tenantId = process.env.TENANT_ID || 'acme-id';
 const subjectDid = process.env.SUBJECT_ID || `did:web:api.${tenantId}.org:individual:subject-001`;
+const clientAssertionAudience = process.env.SMART_TOKEN_AUDIENCE;
 
 function buildConsentEntry(resourceClaims: Record<string, unknown>): BundleEntry {
   return {
@@ -50,6 +57,20 @@ function buildConsentEntry(resourceClaims: Record<string, unknown>): BundleEntry
   } as BundleEntry;
 }
 
+function buildProjectedConsentEntry(resourceClaims: Record<string, unknown>): BundleEntry {
+  const claims = normalizeContextualizedClaims(resourceClaims);
+  const actorRoles = getClaimValue<string>(claims, ClaimConsent.actorRole);
+  if (actorRoles) {
+    const context = String(claims['@context'] || '').replace(/\.$/, '');
+    const contextualizedKey = context ? `${context}.${ClaimConsent.actorRole}` : ClaimConsent.actorRole;
+    const targetKey = claims[contextualizedKey] !== undefined
+      ? contextualizedKey
+      : ClaimConsent.actorRole;
+    claims[targetKey] = expandConsentActorRoles(actorRoles, 'auto').join(',');
+  }
+  return buildConsentEntry(claims);
+}
+
 function buildConsentBatch(resourceClaims: Record<string, unknown>): { thid: string; data: BundleEntry[] } {
   const entry = buildConsentEntry(resourceClaims);
   return {
@@ -62,32 +83,52 @@ const matrix = buildDemoResearchRequesterMatrix();
 
 const rendered = await (async () => {
   switch (payloadName) {
+    case 'INDIVIDUAL_CONSENT_BATCH_REQUEST':
+      return buildConsentBatch(buildDemoIndividualIpsPermitConsent({ tenantId, subjectDid }) as Record<string, unknown>);
+    case 'INDIVIDUAL_RULE_ID_LIST': {
+      const entry = buildProjectedConsentEntry(
+        buildDemoIndividualIpsPermitConsent({ tenantId, subjectDid }) as Record<string, unknown>,
+      );
+      return buildConsentRulePrimaryDocument([entry]).data.map((item) => item.id);
+    }
     case 'INDIVIDUAL_SMART_TOKEN_REQUEST':
-      return buildDemoIndividualSmartTokenRequest({ tenantId, subjectDid });
+      return buildDemoIndividualSmartTokenRequest({ tenantId, subjectDid, clientAssertionAudience });
     case 'INDIVIDUAL_IPS_SEARCH_REQUEST':
       return buildDemoIndividualIpsSearchRequest({ subjectDid });
     case 'RESEARCH_CONSENT_BATCH_REQUEST_ROLE': {
       return buildConsentBatch(buildDemoResearchPermitByRoleConsent({ subjectDid }) as Record<string, unknown>);
     }
     case 'RESEARCH_RULE_ID_LIST_ROLE': {
-      const entry = buildConsentEntry(buildDemoResearchPermitByRoleConsent({ subjectDid }) as Record<string, unknown>);
+      const entry = buildProjectedConsentEntry(
+        buildDemoResearchPermitByRoleConsent({ subjectDid }) as Record<string, unknown>,
+      );
       return buildConsentRulePrimaryDocument([entry]).data.map((item) => item.id);
     }
     case 'RESEARCH_CONSENT_BATCH_REQUEST_EMAIL': {
       return buildConsentBatch(buildDemoResearchPermitByEmailConsent({ subjectDid }) as Record<string, unknown>);
     }
     case 'RESEARCH_RULE_ID_LIST_EMAIL': {
-      const entry = buildConsentEntry(buildDemoResearchPermitByEmailConsent({ subjectDid }) as Record<string, unknown>);
+      const entry = buildProjectedConsentEntry(
+        buildDemoResearchPermitByEmailConsent({ subjectDid }) as Record<string, unknown>,
+      );
       return buildConsentRulePrimaryDocument([entry]).data.map((item) => item.id);
     }
     case 'RESEARCH_SMART_TOKEN_REQUEST_ROLE_ALLOW':
-      return buildDemoResearchSmartTokenRequest({ tenantId, subjectDid, ...matrix.allowByRole });
+      return buildDemoResearchSmartTokenRequest({
+        tenantId, subjectDid, clientAssertionAudience, ...matrix.allowByRole,
+      });
     case 'RESEARCH_SMART_TOKEN_REQUEST_ROLE_DENY':
-      return buildDemoResearchSmartTokenRequest({ tenantId, subjectDid, ...matrix.denyByRole });
+      return buildDemoResearchSmartTokenRequest({
+        tenantId, subjectDid, clientAssertionAudience, ...matrix.denyByRole,
+      });
     case 'RESEARCH_SMART_TOKEN_REQUEST_EMAIL_ALLOW':
-      return buildDemoResearchSmartTokenRequest({ tenantId, subjectDid, ...matrix.allowByEmail });
+      return buildDemoResearchSmartTokenRequest({
+        tenantId, subjectDid, clientAssertionAudience, ...matrix.allowByEmail,
+      });
     case 'RESEARCH_SMART_TOKEN_REQUEST_EMAIL_DENY':
-      return buildDemoResearchSmartTokenRequest({ tenantId, subjectDid, ...matrix.denyByEmail });
+      return buildDemoResearchSmartTokenRequest({
+        tenantId, subjectDid, clientAssertionAudience, ...matrix.denyByEmail,
+      });
     case 'DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST':
       return buildDemoDigitalTwinCompositionSearchRequest();
     case 'RESEARCH_CONSUMER_ORGANIZATION_DID':

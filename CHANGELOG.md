@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+- Align the canonical individual image smoke with the transaction registration
+  endpoint and namespaced accepted-offer claim, and fail immediately when the
+  family order does not return `201` instead of continuing with a broken SMART
+  setup. Seed the individual's consent rule and bind the client assertion
+  audience to the actual SMART token endpoint before requesting access. Render
+  consent projections through repository/package APIs instead of importing
+  source files from a sibling workspace checkout. Canonical and compatibility
+  role-system spellings now resolve to the same immutable consent rule ID.
+
 ## [1.21.6] - 2026-08-14
 
 - Generate local Fabric profiles with an overridable peer endpoint so host

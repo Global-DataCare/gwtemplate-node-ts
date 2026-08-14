@@ -269,10 +269,10 @@ function normalizeConsentRoleForRuleKey(value: unknown): string {
   const code = claim.slice(rawSeparatorIndex + 1).trim().toLowerCase();
   if (!code) return claim.toLowerCase();
 
-  if (system === 'isco-08') {
+  if (system === 'isco-08' || system === 'org.ilo.isco-08') {
     return `org.ilo.isco-08.${code}`;
   }
-  if (system === 'v3-rolecode') {
+  if (system === 'v3-rolecode' || system === 'org.hl7.terminology.codesystem.v3-rolecode') {
     return `org.hl7.terminology.codesystem.v3-rolecode.${code}`;
   }
   if (system === 'v3-personalrelationshiproletype') {

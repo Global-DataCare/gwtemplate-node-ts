@@ -20,6 +20,24 @@ bash ./scripts/smoke-docker-local-network.sh --help | grep -q 'Fabric local-netw
 node ./scripts/bootstrap-local-fabric-stack.mjs --help | grep -q -- '--prepare-only'
 grep -Fq 'FABRIC_PEER_ENDPOINT_VALUE="${FABRIC_PEER_ENDPOINT_VALUE:-localhost:7051}"' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh
+grep -Fq 'org.schema.Order.acceptedOffer.identifier' \
+  ./scripts/demo-create-individual-organization.sh
+grep -Fq 'Organization/_transaction' ./scripts/demo-create-individual-organization.sh
+grep -Fq 'SMART_TOKEN_AUDIENCE="${SMART_TOKEN_ENDPOINT}"' \
+  ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'submit_consent_batch_and_verify_asset INDIVIDUAL_CONSENT_BATCH_REQUEST' \
+  ./scripts/smoke-smart-access-local-network.sh
+grep -Fq "case 'INDIVIDUAL_CONSENT_BATCH_REQUEST':" \
+  ./scripts/render-demo-smart-access-payload.mts
+grep -Fq "case 'INDIVIDUAL_RULE_ID_LIST':" \
+  ./scripts/render-demo-smart-access-payload.mts
+grep -Fq 'clientAssertionAudience = process.env.SMART_TOKEN_AUDIENCE' \
+  ./scripts/render-demo-smart-access-payload.mts
+
+if grep -Fq '../../gdc-common-utils-ts/src/' ./scripts/render-demo-smart-access-payload.mts; then
+  echo 'ERROR: release payload rendering must not import sibling workspace source.' >&2
+  exit 1
+fi
 
 if grep -Fq '"$WORKSPACE_ROOT"' ./docker_build_local.sh; then
   echo 'ERROR: the local Docker build must not send the workspace root.' >&2
