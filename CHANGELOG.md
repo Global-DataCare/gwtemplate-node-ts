@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [1.21.9] - 2026-08-14
+
+- Align the research SMART image smoke with the canonical medication fixture:
+  search the indexed `MedicationStatement.code-text` claim without requiring a
+  non-existent `code-display` claim, and print the complete asynchronous
+  response when the digital-twin release gate fails.
+
 ## [1.21.8] - 2026-08-14
 
 - Bind the research SMART smoke contract to the live tenant DID discovered
