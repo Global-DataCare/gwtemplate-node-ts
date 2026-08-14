@@ -131,7 +131,6 @@ describe('demo smart access local-network builders', () => {
         resourceType: 'Parameters',
         parameter: [
           { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
-          { name: 'MedicationStatement.code-display', valueString: 'ibuprofen' },
           { name: 'MedicationStatement.code-text', valueString: 'ibuprofen' },
         ],
       },
