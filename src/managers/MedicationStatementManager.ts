@@ -112,6 +112,8 @@ export class MedicationStatementManager implements IJobProcessor {
     if (
       normalizedClaimName.endsWith('.medication-text')
       || normalizedClaimName.endsWith('.code-text')
+      || normalizedClaimName.endsWith('.code-display')
+      || normalizedClaimName.endsWith('.code-text-local')
       || normalizedClaimName.endsWith('.codedisplay')
       || normalizedClaimName.endsWith('.codetextlocal')
       || normalizedClaimName.endsWith('.note')

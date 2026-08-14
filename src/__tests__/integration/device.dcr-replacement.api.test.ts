@@ -51,6 +51,8 @@ import { ManageAssetOrganization } from '../../blockchain/fabric/v3/manageAssetO
 import { ManageAssetArtifact } from '../../blockchain/fabric/v3/manageAssetArtifact';
 import { ManageAssetArtifactEvent } from '../../blockchain/fabric/v3/manageAssetArtifactEvent';
 import { ClearingHouseService } from '../../services/ClearingHouseService';
+import { EXAMPLE_EMAIL_PROFESSIONAL } from 'gdc-common-utils-ts/examples/shared';
+import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
 
 describe('Device DCR replacement route story', () => {
   let app: express.Express;
@@ -286,6 +288,7 @@ describe('Device DCR replacement route story', () => {
       reactivationEnabled: false,
       exp: Math.floor(Date.now() / 1000) + 3600,
       subjectId: employeeId,
+      activatedBy: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
       deviceId: previousDeviceId,
     } as any;
     await vaultRepository.put(tenantVaultId, [{
@@ -318,7 +321,7 @@ describe('Device DCR replacement route story', () => {
             ],
           },
           ext_device_info: {
-            device_id: 'iphone-17',
+            device_id: previousDeviceId,
             device_name: 'Dr Phone',
             os: 'iOS',
             os_version: '18.0',

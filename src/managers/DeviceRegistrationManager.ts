@@ -184,6 +184,9 @@ export class DeviceRegistrationManager implements IJobProcessor {
         const license = licenseDoc.content as DeviceLicense & Record<string, any>;
         const now = Math.floor(Date.now() / 1000);
         const existingBindings = this.getDeviceBindings(license);
+        const replacedBinding = existingBindings.find((binding) =>
+          binding.status === DeviceBindingStatuses.Active
+          && binding.clientInstanceId === fingerprint.clientInstanceId);
         license.maxDevices = this.getDeviceAllowance(license);
         license.deviceBindings = [
           ...existingBindings.map((binding) => binding.clientInstanceId === fingerprint.clientInstanceId
@@ -191,8 +194,9 @@ export class DeviceRegistrationManager implements IJobProcessor {
             : binding),
           { clientId, clientInstanceId: fingerprint.clientInstanceId, status: DeviceBindingStatuses.Active, deviceInfo: fingerprint, activatedAt: now },
         ];
-        license.deviceId = license.deviceId || clientId;
-        license.deviceInfo = license.deviceInfo || fingerprint;
+        const replacesLegacyPrimary = replacedBinding && license.deviceId === replacedBinding.clientId;
+        license.deviceId = replacesLegacyPrimary ? clientId : (license.deviceId || clientId);
+        license.deviceInfo = replacesLegacyPrimary ? fingerprint : (license.deviceInfo || fingerprint);
         license.status = 'active';
         license.activatedAt = license.activatedAt || now;
 

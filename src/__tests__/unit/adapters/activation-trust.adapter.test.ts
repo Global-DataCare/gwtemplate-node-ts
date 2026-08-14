@@ -1,7 +1,11 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import {
   EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL,
+  EXAMPLE_ORG_ACTIVATION_CONTROLLER_CREDENTIAL,
   EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL,
+  EXAMPLE_LEGAL_REPRESENTATIVE_ISCO_CODE,
+  EXAMPLE_ORG_CONTROLLER_SIGNING_KEY_ID,
+  EXAMPLE_REPRESENTATIVE_ROLE_CODE,
   cloneExample,
 } from 'gdc-common-utils-ts';
 import { DefaultActivationTrustAdapter } from '../../../adapters/activation-trust.adapter';
@@ -10,19 +14,6 @@ import { ITrustRegistryAdapter } from '../../../adapters/trust-registry.adapter'
 import { buildDeterministicVpTokenFixture } from '../../utils/deterministic-jwt-fixtures';
 
 const TEST_ORGANIZATION_DID = 'did:web:provider.example:health-care:organization:taxid:VATES-ESB00112233';
-const TEST_CONTROLLER_CREDENTIAL = {
-  type: ['VerifiableCredential', 'ServiceCredential', 'ServiceControllerCredential'],
-  credentialSubject: {
-    provider: { taxID: 'ESB00112233' },
-    owner: {
-      additionalType: 'RESPRSN',
-      sameAs: 'urn:multibase:zController',
-      hasOccupation: { '@type': 'Occupation', occupationalCategory: 'ISCO-08|1330' },
-      hasCredential: { material: 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:test' },
-    },
-  },
-};
-
 describe('DefaultActivationTrustAdapter', () => {
   const previousEnv = process.env;
   const vpTokenCompact = [
@@ -55,6 +46,7 @@ describe('DefaultActivationTrustAdapter', () => {
     organizationCredential.credentialSubject.id = TEST_ORGANIZATION_DID;
 
     const representativeCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL);
+    const controllerCredential = cloneExample(EXAMPLE_ORG_ACTIVATION_CONTROLLER_CREDENTIAL);
     representativeCredential.credentialSubject.hasOccupation = {
       '@type': 'Occupation', identifier: { additionalType: 'ISCO-08', value: '1120' },
     };
@@ -64,7 +56,7 @@ describe('DefaultActivationTrustAdapter', () => {
       vpToken: vpTokenCompact,
       organizationCredential,
       representativeCredential,
-      controllerCredential: TEST_CONTROLLER_CREDENTIAL,
+      controllerCredential,
     });
 
     expect(result.organizationDid).toBe(TEST_ORGANIZATION_DID);
@@ -123,9 +115,11 @@ describe('DefaultActivationTrustAdapter', () => {
     const organizationCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL);
     organizationCredential.credentialSubject.id = TEST_ORGANIZATION_DID;
     const legacyRepresentative: any = cloneExample(EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL);
-    legacyRepresentative.credentialSubject.hasOccupation = { identifier: { value: 'RESPRSN' } };
+    legacyRepresentative.credentialSubject.hasOccupation = {
+      identifier: { value: EXAMPLE_REPRESENTATIVE_ROLE_CODE },
+    };
     legacyRepresentative.credentialSubject.hasCredential = {
-      material: 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:legacy-controller',
+      material: EXAMPLE_ORG_CONTROLLER_SIGNING_KEY_ID,
     };
     const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
 
@@ -138,7 +132,7 @@ describe('DefaultActivationTrustAdapter', () => {
 
     legacyRepresentative.credentialSubject.hasOccupation = {
       '@type': 'Occupation',
-      identifier: { additionalType: 'ISCO-08', value: '1120' },
+      identifier: { additionalType: 'ISCO-08', value: EXAMPLE_LEGAL_REPRESENTATIVE_ISCO_CODE },
     };
     await expect(adapter.evaluate({
       networkMode: 'test-network',
@@ -172,6 +166,7 @@ describe('DefaultActivationTrustAdapter', () => {
     const organizationCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL);
     organizationCredential.credentialSubject.id = TEST_ORGANIZATION_DID;
     const representativeCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL);
+    const controllerCredential = cloneExample(EXAMPLE_ORG_ACTIVATION_CONTROLLER_CREDENTIAL);
     const vpFixture = await buildDeterministicVpTokenFixture({
       seed: 'gw-activation-trust-seed-001',
       issuerDid: 'did:web:controller.demo.example',
@@ -179,7 +174,7 @@ describe('DefaultActivationTrustAdapter', () => {
       credentials: [
         organizationCredential,
         representativeCredential,
-        TEST_CONTROLLER_CREDENTIAL,
+        controllerCredential,
       ],
     });
     const adapter = new DefaultActivationTrustAdapter(clearingHouseService, trustRegistryAdapter);
@@ -189,7 +184,7 @@ describe('DefaultActivationTrustAdapter', () => {
       vpToken: vpFixture.compactToken,
       organizationCredential,
       representativeCredential,
-      controllerCredential: TEST_CONTROLLER_CREDENTIAL,
+      controllerCredential,
     })).resolves.toMatchObject({
       organizationDid: TEST_ORGANIZATION_DID,
       trustPolicy: { networkMode: 'test-network' },
