@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+- Let the canonical Fabric bootstrap prepare `local-network` without starting
+  a host process so the Docker release smoke validates only the selected image.
+
 ## [1.21.4] - 2026-08-14
 
 - Scope the canonical local and cloud Docker builds to the GW CORE repository,
