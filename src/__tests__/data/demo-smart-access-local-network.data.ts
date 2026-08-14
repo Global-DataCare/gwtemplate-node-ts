@@ -339,7 +339,6 @@ export function buildDemoDigitalTwinCompositionSearchRequest(): Record<string, u
       resourceType: 'Parameters',
       parameter: [
         { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
-        { name: 'MedicationStatement.code-display', valueString: 'ibuprofen' },
         { name: 'MedicationStatement.code-text', valueString: 'ibuprofen' },
       ],
     },

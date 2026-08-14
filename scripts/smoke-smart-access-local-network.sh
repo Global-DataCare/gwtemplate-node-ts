@@ -212,8 +212,16 @@ run_digital_twin_search_with_token() {
 
   local search_payload
   search_payload="$(poll_async_json "${DIGITAL_TWIN_SEARCH_POLL_ENDPOINT}" "${thid}" 40 1)"
-  jq -e '.resourceType == "Bundle" and .data[0].response.status == "200"' <<<"${search_payload}" >/dev/null
-  jq -e '.data[0].type == "Composition-search-response-v1.0" and (.data[0].resource.total // 0) >= 1' <<<"${search_payload}" >/dev/null
+  if ! jq -e '.resourceType == "Bundle" and .data[0].response.status == "200"' <<<"${search_payload}" >/dev/null; then
+    echo "ERROR: digital-twin search did not return a successful batch response" >&2
+    echo "${search_payload}" >&2
+    return 1
+  fi
+  if ! jq -e '.data[0].type == "Composition-search-response-v1.0" and (.data[0].resource.total // 0) >= 1' <<<"${search_payload}" >/dev/null; then
+    echo "ERROR: digital-twin search returned no matching Composition" >&2
+    echo "${search_payload}" >&2
+    return 1
+  fi
   echo "[smart-access-smoke] verified digitaltwin Composition/_search through SMART token"
 }
 
