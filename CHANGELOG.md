@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.21.7] - 2026-08-14
+
 - Align the canonical individual image smoke with the transaction registration
   endpoint and namespaced accepted-offer claim, and fail immediately when the
   family order does not return `201` instead of continuing with a broken SMART
