@@ -1,9 +1,13 @@
 ## [Unreleased]
 
+## [1.21.4] - 2026-08-14
+
 - Scope the canonical local and cloud Docker builds to the GW CORE repository,
   consume the published `gdc-common-utils-ts` dependency from the lockfile,
   exclude local secrets and generated directories, and pin release images to
-  `linux/amd64` by default.
+  `linux/amd64` by default. Add image-level Fabric `local-network` smoke,
+  reuse the tested image during publication, deploy the resolved registry
+  digest, and block completion until rollout and public health checks pass.
 
 ## [1.21.3] - 2026-08-13
 

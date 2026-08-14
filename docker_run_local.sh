@@ -2,10 +2,12 @@
 set -euo pipefail
 
 HOST_PORT="${HOST_PORT:-8080}"
+CONTAINER_PORT="${CONTAINER_PORT:-3000}"
 ENV_FILE="${ENV_FILE:-./.env.local-demo}"
 CONTAINER_NAME="${CONTAINER_NAME:-gwtemplate}"
 IMAGE_NAME="${IMAGE_NAME:-gwtemplate}"
 FORCE_RECREATE="${FORCE_RECREATE:-false}"
+DOCKER_NETWORK="${DOCKER_NETWORK:-}"
 
 confirm_or_force() {
   local message="$1"
@@ -40,5 +42,15 @@ elif [ -n "$EXISTING_CONTAINER_ID" ]; then
   docker rm "$CONTAINER_NAME"
 fi
 
-docker run -d --env-file "$ENV_FILE" -p "${HOST_PORT}:3000" --name "$CONTAINER_NAME" "$IMAGE_NAME"
-echo "Container '${CONTAINER_NAME}' listening on http://localhost:${HOST_PORT}"
+DOCKER_NETWORK_ARGS=()
+if [[ -n "$DOCKER_NETWORK" ]]; then
+  DOCKER_NETWORK_ARGS=(--network "$DOCKER_NETWORK")
+fi
+
+docker run -d \
+  --env-file "$ENV_FILE" \
+  -p "${HOST_PORT}:${CONTAINER_PORT}" \
+  --name "$CONTAINER_NAME" \
+  "${DOCKER_NETWORK_ARGS[@]}" \
+  "$IMAGE_NAME"
+echo "Container '${CONTAINER_NAME}' maps localhost:${HOST_PORT} to container:${CONTAINER_PORT}"

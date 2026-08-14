@@ -1,6 +1,6 @@
 {
   "name": "gwtemplate-node-ts",
-  "version": "1.21.3",
+  "version": "1.21.4",
   "private": true,
   "license": "Apache-2.0",
   "main": "src/server.ts",
@@ -75,6 +75,7 @@
     "pki:bundle": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"NodeNext\",\"moduleResolution\":\"NodeNext\",\"allowImportingTsExtensions\":true}' node --loader ts-node/esm --experimental-specifier-resolution=node scripts/generate-trust-bundle.ts",
     "update-deps": "node update-deps.js",
     "docker:build": "./docker_build_local.sh",
+    "docker:smoke:local-network": "bash ./scripts/smoke-docker-local-network.sh",
     "test:release-scripts": "bash ./scripts/test-local-image-release-scripts.sh",
     "docker:run": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",
     "docker:run:mem": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",
