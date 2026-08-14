@@ -235,8 +235,9 @@ export function buildDemoResearchPermitByEmailConsent(input: Readonly<{
 function buildDemoResearchContractCredential(input: Readonly<{
   tenantId: string;
   subjectDid: string;
+  providerOrganizationDid?: string;
 }>): Record<string, unknown> {
-  const providerOrganizationDid = buildProviderOrganizationDid(input.tenantId);
+  const providerOrganizationDid = input.providerOrganizationDid || buildProviderOrganizationDid(input.tenantId);
   return buildInterTenantAccessContractCredential({
     issuer: DEMO_SMART_ACCESS_LOCAL_DIDS.consumerControllerDid,
     validFrom: '2026-06-30T00:00:00.000Z',
@@ -269,6 +270,7 @@ export function buildDemoResearchContractVpToken(input: Readonly<{
   tenantId: string;
   subjectDid: string;
   actorDid: string;
+  providerOrganizationDid?: string;
 }>): string {
   const vpPayload = createVP({
     iss: DEMO_SMART_ACCESS_LOCAL_DIDS.consumerOrganizationDid,
@@ -277,6 +279,7 @@ export function buildDemoResearchContractVpToken(input: Readonly<{
   addVC(vpPayload, buildDemoResearchContractCredential({
     tenantId: input.tenantId,
     subjectDid: input.subjectDid,
+    providerOrganizationDid: input.providerOrganizationDid,
   }));
   return JSON.stringify(vpPayload);
 }
@@ -293,9 +296,10 @@ export async function buildDemoResearchSmartTokenRequest(input: Readonly<{
   clientSuffix: string;
   thid: string;
   clientAssertionAudience?: string;
+  providerOrganizationDid?: string;
 }>): Promise<Record<string, unknown>> {
   const clientId = buildResearchClientId(input.actorEmail, input.clientSuffix);
-  const audience = buildProviderOrganizationDid(input.tenantId);
+  const audience = input.providerOrganizationDid || buildProviderOrganizationDid(input.tenantId);
   const scope =
     `${ServiceCapability.DigitalTwinReader}?subject=${encodeURIComponent(String(input.subjectDid || '').trim())}`;
   return {
@@ -317,6 +321,7 @@ export async function buildDemoResearchSmartTokenRequest(input: Readonly<{
         tenantId: input.tenantId,
         subjectDid: input.subjectDid,
         actorDid: input.actorDid,
+        providerOrganizationDid: audience,
       }),
       acr_values: 'urn:antifraud:acr:openid4vp:employee',
     },

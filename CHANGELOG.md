@@ -9,7 +9,9 @@
   audience to the actual SMART token endpoint before requesting access. Render
   consent projections through repository/package APIs instead of importing
   source files from a sibling workspace checkout. Canonical and compatibility
-  role-system spellings now resolve to the same immutable consent rule ID.
+  role-system spellings now resolve to the same immutable consent rule ID. The
+  research proof binds its provider to the live tenant DID discovered from the
+  selected image instead of a fixture-only hostname.
 
 ## [1.21.6] - 2026-08-14
 

@@ -5,6 +5,7 @@ import {
 } from 'gdc-common-utils-ts/constants/healthcare';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import { summarizeInterTenantAccessContract } from 'gdc-common-utils-ts/utils/inter-tenant-access-contract';
 import {
   DEMO_SMART_ACCESS_LOCAL_DIDS,
   DEMO_SMART_ACCESS_LOCAL_EMAILS,
@@ -97,9 +98,11 @@ describe('demo smart access local-network builders', () => {
 
   it('builds one research smart token request rooted at organization/ResearchSubject.rs', async () => {
     const matrix = buildDemoResearchRequesterMatrix();
+    const providerOrganizationDid = 'did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care';
     const payload = await buildDemoResearchSmartTokenRequest({
       tenantId,
       subjectDid,
+      providerOrganizationDid,
       ...matrix.allowByRole,
     });
 
@@ -111,6 +114,12 @@ describe('demo smart access local-network builders', () => {
         sub: matrix.allowByRole.actorDid,
         client_assertion_type: 'client_assertion',
       },
+    });
+    expect(payload.aud).toBe(providerOrganizationDid);
+    const vpToken = JSON.parse(String((payload as any).body.vp_token));
+    expect(summarizeInterTenantAccessContract(vpToken.vp.verifiableCredential[0])).toMatchObject({
+      providerOrganizationDid,
+      consumerOrganizationDid: DEMO_SMART_ACCESS_LOCAL_DIDS.consumerOrganizationDid,
     });
     expect(String((payload as any).body.vp_token || '')).toContain('verifiableCredential');
   });
