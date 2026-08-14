@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.21.11] - 2026-08-14
+
+- Preserve an explicitly selected local image in the GKE deployment profile so
+  `SKIP_BUILD=true` publishes the exact image that passed the full Fabric smoke.
+  Guard the overridable profile contract in the release-script tests.
+
 ## [1.21.10] - 2026-08-14
 
 - Isolate direct-email consent coverage from organization-role coverage by
