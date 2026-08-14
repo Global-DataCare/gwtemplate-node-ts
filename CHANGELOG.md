@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+- Generate local Fabric profiles with an overridable peer endpoint so host
+  processes use `localhost:7051` while Docker image smokes use the Fabric
+  network DNS name `peer0-org1:7051`.
+
 ## [1.21.5] - 2026-08-14
 
 - Let the canonical Fabric bootstrap prepare `local-network` without starting
