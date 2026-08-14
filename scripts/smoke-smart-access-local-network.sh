@@ -27,6 +27,7 @@ ORG1_MSP_ID="${ORG1_MSP_ID:-Org1MSP}"
 AUTH_BEARER="${AUTH_BEARER:-demo-token}"
 SUBJECT_ID="${SUBJECT_ID:-did:web:api.${TENANT_ID}.org:individual:subject-001}"
 BOOTSTRAP_INDIVIDUAL_AND_DATA="${BOOTSTRAP_INDIVIDUAL_AND_DATA:-true}"
+RUN_RESEARCH_SMART_SMOKE="${RUN_RESEARCH_SMART_SMOKE:-true}"
 
 CONSENT_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.hl7.fhir.r4/Consent/_batch"
 CONSENT_POLL_ENDPOINT="${CONSENT_ENDPOINT}-response"
@@ -104,6 +105,7 @@ render_smart_payload() {
   local payload_name="$1"
   (
     export TENANT_ID SUBJECT_ID
+    export SMART_TOKEN_AUDIENCE="${SMART_TOKEN_ENDPOINT}"
     render_demo_smart_access_payload "${payload_name}"
   )
 }
@@ -151,7 +153,7 @@ request_smart_token() {
   local thid
   thid="$(jq -r '.thid' <<<"${request_payload}")"
 
-  echo "[smart-access-smoke] POST smart token ${payload_name}"
+  echo "[smart-access-smoke] POST smart token ${payload_name}" >&2
   post_json "${SMART_TOKEN_ENDPOINT}" "mock" "${request_payload}" >/dev/null
 
   local token_payload
@@ -162,13 +164,13 @@ request_smart_token() {
   if [[ "${expect_access_token}" == "true" ]]; then
     if [[ -z "${access_token}" ]]; then
       echo "ERROR: expected access_token for ${payload_name}" >&2
-      echo "${token_payload}"
+      echo "${token_payload}" >&2
       exit 1
     fi
   else
     if [[ -n "${access_token}" ]]; then
       echo "ERROR: expected denial for ${payload_name} but received access_token" >&2
-      echo "${token_payload}"
+      echo "${token_payload}" >&2
       exit 1
     fi
   fi
@@ -222,9 +224,15 @@ if [[ "${BOOTSTRAP_INDIVIDUAL_AND_DATA}" == "true" ]]; then
 fi
 
 echo "[smart-access-smoke] verifying individual SMART access"
+submit_consent_batch_and_verify_asset INDIVIDUAL_CONSENT_BATCH_REQUEST INDIVIDUAL_RULE_ID_LIST
 individual_token_payload="$(request_smart_token INDIVIDUAL_SMART_TOKEN_REQUEST true)"
 individual_access_token="$(jq -r '.access_token' <<<"${individual_token_payload}")"
 run_individual_bundle_search_with_token "${individual_access_token}"
+
+if [[ "${RUN_RESEARCH_SMART_SMOKE}" != "true" ]]; then
+  echo "[smart-access-smoke] cross-portal research flow skipped by release profile"
+  exit 0
+fi
 
 echo "[smart-access-smoke] seeding research consent rules on ledger"
 submit_consent_batch_and_verify_asset RESEARCH_CONSENT_BATCH_REQUEST_ROLE RESEARCH_RULE_ID_LIST_ROLE

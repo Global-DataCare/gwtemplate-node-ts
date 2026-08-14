@@ -12,8 +12,8 @@ set -euo pipefail
 #   and not the older `individual/org.schema/Person` alias
 #
 # Flow performed here:
-# 1. submit `FAMILY_REGISTRATION_REQUEST` to `.../individual/org.schema/Organization/_batch`
-# 2. poll `_batch-response` until an Offer arrives
+# 1. submit `FAMILY_REGISTRATION_REQUEST` to `.../individual/org.schema/Organization/_transaction`
+# 2. poll `_transaction-response` until an Offer arrives
 # 3. submit `FAMILY_ORDER_REQUEST` with that exact `org.schema.Offer.identifier`
 # 4. poll the Order response until the legacy order is confirmed
 #
@@ -46,6 +46,7 @@ INDIVIDUAL_MEMBER_EMAIL="${INDIVIDUAL_MEMBER_EMAIL:-child1@example.com}"
 INDIVIDUAL_ORGANIZATION_IDENTIFIER="${INDIVIDUAL_ORGANIZATION_IDENTIFIER:-00000000-0000-4000-8000-000000000001}"
 INDIVIDUAL_MEMBER_IDENTIFIER="${INDIVIDUAL_MEMBER_IDENTIFIER:-00000000-0000-4000-8000-000000000002}"
 INDIVIDUAL_ALTERNATE_NAME="${INDIVIDUAL_ALTERNATE_NAME:-Doraemon}"
+INDIVIDUAL_UHC_ID="${INDIVIDUAL_UHC_ID:-}"
 INDIVIDUAL_CONTROLLER_GIVEN_NAME="${INDIVIDUAL_CONTROLLER_GIVEN_NAME:-Dora}"
 INDIVIDUAL_CONTROLLER_FAMILY_NAME="${INDIVIDUAL_CONTROLLER_FAMILY_NAME:-Nobi}"
 INDIVIDUAL_CONTROLLER_ID_NUMBER="${INDIVIDUAL_CONTROLLER_ID_NUMBER:-ID-DEMO-DORAEMON-001}"
@@ -66,8 +67,8 @@ REGISTRATION_JTI="${REGISTRATION_JTI:-family-registration-request-$(date +%s)}"
 ORDER_JTI="${ORDER_JTI:-family-order-request-$(date +%s)}"
 TENANT_DID_WEB="${TENANT_DID_WEB:-did:web:api.${TENANT_ID}.org}"
 
-INDIVIDUAL_ORGANIZATION_BATCH_URL="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.schema/Organization/_batch"
-INDIVIDUAL_ORGANIZATION_POLL_URL="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.schema/Organization/_batch-response"
+INDIVIDUAL_ORGANIZATION_BATCH_URL="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.schema/Organization/_transaction"
+INDIVIDUAL_ORGANIZATION_POLL_URL="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.schema/Organization/_transaction-response"
 INDIVIDUAL_ORDER_BATCH_URL="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.schema/Order/_batch"
 INDIVIDUAL_ORDER_POLL_URL="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.schema/Order/_batch-response"
 
@@ -111,6 +112,7 @@ registration_overrides="$(jq -n \
   --arg memberIdentifier "$INDIVIDUAL_MEMBER_IDENTIFIER" \
   --arg sector "$SECTOR" \
   --arg alternateName "$INDIVIDUAL_ALTERNATE_NAME" \
+  --arg uhcId "$INDIVIDUAL_UHC_ID" \
   --arg controllerGivenName "$INDIVIDUAL_CONTROLLER_GIVEN_NAME" \
   --arg controllerFamilyName "$INDIVIDUAL_CONTROLLER_FAMILY_NAME" \
   --arg controllerIdNumber "$INDIVIDUAL_CONTROLLER_ID_NUMBER" \
@@ -134,6 +136,7 @@ registration_overrides="$(jq -n \
     "/body/data/0/meta/claims/Person.email": $memberEmail,
     "/body/data/0/meta/claims/Person.identifier.value": $memberIdentifier,
     "/body/data/0/meta/claims/Service.category": $sector,
+    "/body/data/0/meta/claims/Organization.sameAs": $uhcId,
     "/body/data/0/meta/kyc": {
       "method": $signatureFlow,
       "individualAlternateName": $alternateName,
@@ -153,6 +156,10 @@ registration_overrides="$(jq -n \
       }
     }
   }')"
+
+if [[ -z "${INDIVIDUAL_UHC_ID}" ]]; then
+  registration_overrides="$(jq 'del(.["/body/data/0/meta/claims/Organization.sameAs"])' <<<"${registration_overrides}")"
+fi
 
 if [[ "${INDIVIDUAL_SIGNATURE_FLOW}" == "certificate" ]]; then
   registration_fixture="FAMILY_REGISTRATION_REQUEST_INLINE_BASE64"
@@ -197,7 +204,7 @@ order_overrides="$(jq -n \
     "/thid": $thid,
     "/iss": $iss,
     "/aud": $aud,
-    "/body/data/0/meta/claims/Order.acceptedOffer.identifier": $offerIdentifier
+    "/body/data/0/meta/claims/org.schema.Order.acceptedOffer.identifier": $offerIdentifier
   }')"
 order_payload="$(render_example_payload FAMILY_ORDER_REQUEST "$order_overrides")"
 
@@ -211,6 +218,11 @@ echo "${order_submit}" | jq '.'
 echo "[individual] Polling ${INDIVIDUAL_ORDER_POLL_URL}"
 order_done="$(poll_async "${INDIVIDUAL_ORDER_POLL_URL}" "${ORDER_THID}")"
 echo "${order_done}" | jq '.'
+order_status="$(jq -r '.body.data[0].response.status // .data[0].response.status // empty' <<<"${order_done}")"
+if [[ "${order_status}" != "201" ]]; then
+  echo "ERROR: individual order failed with status ${order_status:-missing}" >&2
+  exit 1
+fi
 
 echo "[individual] OK: legacy-compatible individual organization prepared"
 echo "[individual] Expected subject DID for follow-up demos: ${EXPECTED_SUBJECT_ID}"

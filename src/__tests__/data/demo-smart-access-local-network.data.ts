@@ -9,6 +9,8 @@ import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabil
 import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import {
   EXAMPLE_API_ORGANIZATION_DID,
+  EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
+  EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
   EXAMPLE_CONTROLLER_DID,
   EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
   EXAMPLE_RESEARCH_CONTROLLER_DID,
@@ -34,6 +36,7 @@ import {
 export const DEMO_SMART_ACCESS_LOCAL_IDS = Object.freeze({
   individualSmartThreadId: 'local-network-individual-smart-token-001',
   individualBundleSearchThreadId: 'local-network-individual-bundle-search-001',
+  individualConsentIdentifier: 'urn:uuid:local-network-individual-ips-consent-001',
   researchRoleSmartThreadId: 'local-network-research-role-smart-token-001',
   researchRoleDeniedSmartThreadId: 'local-network-research-role-smart-token-denied-001',
   researchEmailSmartThreadId: 'local-network-research-email-smart-token-001',
@@ -98,12 +101,38 @@ export function buildDemoIndividualProfessionalVpToken(input: Readonly<{
 }
 
 /**
+ * Builds the exact subject, actor, purpose and IPS-section consent consumed by
+ * the mandatory same-portal SMART release smoke. Keeping this rule beside the
+ * token fixture makes the smoke self-contained instead of relying on an
+ * unrelated generic ConsentAccess example having run first.
+ */
+export function buildDemoIndividualIpsPermitConsent(input: Readonly<{
+  tenantId: string;
+  subjectDid: string;
+}>): ConsentRule {
+  return {
+    '@context': 'org.hl7.fhir.api',
+    [ClaimConsent.identifier]: DEMO_SMART_ACCESS_LOCAL_IDS.individualConsentIdentifier,
+    [ClaimConsent.subject]: String(input.subjectDid || '').trim(),
+    [ClaimConsent.actorIdentifier]: buildIndividualProfessionalDid(input.tenantId),
+    [ClaimConsent.actorRole]: HealthcareActorRoles.Physician,
+    [ClaimConsent.decision]: ConsentDecisions.Permit,
+    [ClaimConsent.purpose]: HealthcareConsentPurposes.EmergencyTreatment,
+    [ClaimConsent.action]: HealthcareBasicSections.PatientSummaryDocument.claim,
+    [ClaimConsent.date]: '2026-08-01',
+    [ClaimConsent.attachmentContentType]: EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
+    [ClaimConsent.attachmentData]: EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
+  } as const;
+}
+
+/**
  * Builds one `smart/token` request body for the current local individual
  * consent smoke.
  */
 export async function buildDemoIndividualSmartTokenRequest(input: Readonly<{
   tenantId: string;
   subjectDid: string;
+  clientAssertionAudience?: string;
 }>): Promise<Record<string, unknown>> {
   const clientId = buildIndividualClientId(input.tenantId);
   const audience = buildProviderOrganizationDid(input.tenantId);
@@ -116,7 +145,10 @@ export async function buildDemoIndividualSmartTokenRequest(input: Readonly<{
     aud: audience,
     body: {
       client_id: clientId,
-      client_assertion: await buildClientAssertionJwt({ clientId, audience }),
+      client_assertion: await buildClientAssertionJwt({
+        clientId,
+        audience: input.clientAssertionAudience || audience,
+      }),
       client_assertion_type: 'private_key_jwt',
       sub: buildIndividualProfessionalDid(input.tenantId),
       purpose: HealthcareConsentPurposes.EmergencyTreatment,
@@ -173,6 +205,8 @@ export function buildDemoResearchPermitByRoleConsent(input: Readonly<{
     [ClaimConsent.purpose]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
     [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
     [ClaimConsent.date]: '2026-06-30',
+    [ClaimConsent.attachmentContentType]: EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
+    [ClaimConsent.attachmentData]: EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
   } as const;
 }
 
@@ -193,6 +227,8 @@ export function buildDemoResearchPermitByEmailConsent(input: Readonly<{
     [ClaimConsent.purpose]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
     [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
     [ClaimConsent.date]: '2026-06-30',
+    [ClaimConsent.attachmentContentType]: EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
+    [ClaimConsent.attachmentData]: EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
   } as const;
 }
 
@@ -256,6 +292,7 @@ export async function buildDemoResearchSmartTokenRequest(input: Readonly<{
   actorRole: string;
   clientSuffix: string;
   thid: string;
+  clientAssertionAudience?: string;
 }>): Promise<Record<string, unknown>> {
   const clientId = buildResearchClientId(input.actorEmail, input.clientSuffix);
   const audience = buildProviderOrganizationDid(input.tenantId);
@@ -267,7 +304,10 @@ export async function buildDemoResearchSmartTokenRequest(input: Readonly<{
     aud: audience,
     body: {
       client_id: clientId,
-      client_assertion: await buildClientAssertionJwt({ clientId, audience }),
+      client_assertion: await buildClientAssertionJwt({
+        clientId,
+        audience: input.clientAssertionAudience || audience,
+      }),
       client_assertion_type: 'client_assertion',
       sub: String(input.actorDid || '').trim(),
       purpose: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
