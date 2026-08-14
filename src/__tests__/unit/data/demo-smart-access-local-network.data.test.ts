@@ -71,7 +71,7 @@ describe('demo smart access local-network builders', () => {
     expect(buildDemoResearchPermitByEmailConsent({ subjectDid })).toMatchObject({
       'Consent.subject': subjectDid,
       'Consent.actor-identifier': DEMO_SMART_ACCESS_LOCAL_EMAILS.researchAllowed,
-      'Consent.actor-role': HealthcareActorRoles.Physician,
+      'Consent.actor-role': HealthcareActorRoles.NursingProfessional,
       'Consent.purpose': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
       'Consent.action': ServiceCapability.DigitalTwinReader,
     });
@@ -89,9 +89,11 @@ describe('demo smart access local-network builders', () => {
       },
       allowByEmail: {
         actorEmail: DEMO_SMART_ACCESS_LOCAL_EMAILS.researchAllowed,
+        actorRole: HealthcareActorRoles.NursingProfessional,
       },
       denyByEmail: {
         actorEmail: DEMO_SMART_ACCESS_LOCAL_EMAILS.researchDenied,
+        actorRole: HealthcareActorRoles.NursingProfessional,
       },
     });
   });
