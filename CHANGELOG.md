@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.21.10] - 2026-08-14
+
+- Isolate direct-email consent coverage from organization-role coverage by
+  using a different professional role for the email policy matrix. The allow
+  case now proves the email rule itself, while the mismatched email is denied.
+
 ## [1.21.9] - 2026-08-14
 
 - Align the research SMART image smoke with the canonical medication fixture:
