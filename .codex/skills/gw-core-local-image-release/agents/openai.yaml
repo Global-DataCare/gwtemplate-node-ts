@@ -1,0 +1,4 @@
+interface:
+  display_name: "GW CORE Image Release"
+  short_description: "Build and deploy immutable GW CORE images"
+  default_prompt: "Use $gw-core-local-image-release to build, validate, publish, and deploy GW CORE safely."

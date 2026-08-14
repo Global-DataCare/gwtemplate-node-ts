@@ -98,7 +98,32 @@ resolve_versioned_image() {
 
   echo "$image_ref"
 }
+
+resolve_pushed_digest() {
+  local image_ref="$1"
+  local image_repo repo_digest
+
+  if [[ "$image_ref" == *@sha256:* ]]; then
+    echo "$image_ref"
+    return 0
+  fi
+
+  image_repo="${image_ref%:*}"
+  while IFS= read -r repo_digest; do
+    if [[ "$repo_digest" == "${image_repo}@"* ]]; then
+      echo "$repo_digest"
+      return 0
+    fi
+  done < <(docker image inspect "$image_ref" --format '{{range .RepoDigests}}{{println .}}{{end}}')
+
+  echo "ERROR: pushed digest not found for ${image_ref}" >&2
+  return 1
+}
+
 confirm_or_exit() {
+  if [[ "${DEPLOY_CONFIRM:-false}" == "true" ]]; then
+    return 0
+  fi
   read -p "Are you sure you want to proceed with the deployment? (y/n): " -n 1 -r
   echo ""
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -304,6 +329,12 @@ deploy_gke() {
   echo "  Public URL:         $GDC_PUBLIC_URL"
   echo "  Static IP Name:     $GDC_STATIC_IP_NAME"
   echo "  Runtime Providers:  DB=${DB_PROVIDER:-} STORAGE=${STORAGE_PROVIDER:-} QUEUE=${QUEUE_PROVIDER:-}"
+
+  if [[ "${DEPLOY_DRY_RUN:-false}" == "true" ]]; then
+    echo "✅ GKE deployment configuration validated (dry run)."
+    return 0
+  fi
+
   confirm_or_exit
 
   check_prereqs
@@ -314,12 +345,20 @@ deploy_gke() {
   gcloud services enable container.googleapis.com artifactregistry.googleapis.com
 
   build_and_push_image "$GCP_PROJECT_ID" "$GCP_REGION" "$GDC_IMAGE" "$repo_name" "gwtemplate-gke-${profile}" "${LOCAL_IMAGE_NAME:-gwtemplate}"
+  GDC_IMAGE="$(resolve_pushed_digest "$GDC_IMAGE")"
+  export GDC_IMAGE
+  echo "✅ Deploying immutable digest: ${GDC_IMAGE}"
 
   echo "⚙️  Fetching GKE credentials for cluster: $GKE_CLUSTER"
   gcloud container clusters get-credentials "$GKE_CLUSTER" --region "$GCP_REGION"
 
   echo "⚙️  Applying GW GKE manifests..."
   bash "$FABRIC_MULTICLOUD_DIR/scripts/05-k8s-deploy-gdc.sh"
+
+  local resource_name="${GDC_RESOURCE_NAME:-gwtemplate}"
+  kubectl -n "$K8S_NAMESPACE_GDC" rollout status "deployment/${resource_name}" --timeout="${ROLLOUT_TIMEOUT:-180s}"
+  curl --fail --silent --show-error --max-time 20 "${GDC_PUBLIC_URL%/}/host/ping" >/dev/null
+  curl --fail --silent --show-error --max-time 20 "${GDC_PUBLIC_URL%/}/api-docs/" >/dev/null
 
   echo "--- ✅ GKE deployment submitted ---"
   echo "Public URL: $GDC_PUBLIC_URL"
