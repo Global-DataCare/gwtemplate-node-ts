@@ -1,8 +1,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_TOKEN_FILE=""
+LOCAL_IMAGE_NAME="${LOCAL_IMAGE_NAME:-gwtemplate}"
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 for candidate in ".env.local-demo" ".env.local-postgres" ".env.cloud-supabase"; do
   if [[ -f "$SCRIPT_DIR/$candidate" ]]; then
     ENV_TOKEN_FILE="$SCRIPT_DIR/$candidate"
@@ -12,6 +13,9 @@ done
 NPM_TOKEN_VALUE=""
 if [[ -n "$ENV_TOKEN_FILE" ]]; then
   NPM_TOKEN_VALUE="$(grep NPM_TOKEN "$ENV_TOKEN_FILE" | cut -d '=' -f2)"
+fi
+if [[ "$NPM_TOKEN_VALUE" == "your-npm-token" || "$NPM_TOKEN_VALUE" == "replace-me" ]]; then
+  NPM_TOKEN_VALUE=""
 fi
 FORCE_NO_CACHE=false
 CACHE_MARKER="$SCRIPT_DIR/.docker-build-deps.sha256"
@@ -37,7 +41,7 @@ if ! docker info > /dev/null 2>&1; then
 fi
 echo "Docker is running."
 
-DEPS_HASH="$(hash_deps | awk '{print $1}' | tr '\n' ' ')"
+DEPS_HASH="$(hash_deps | awk '{print $1}' | paste -sd ' ' -)"
 if [[ ! -f "$CACHE_MARKER" ]]; then
   FORCE_NO_CACHE=true
 else
@@ -54,6 +58,9 @@ echo "Running local TypeScript check (tsc --noEmit)..."
 )
 
 echo "Building Docker image..."
+echo "Image: ${LOCAL_IMAGE_NAME}"
+echo "Platform: ${DOCKER_PLATFORM}"
+echo "Context: ${SCRIPT_DIR}"
 if [[ "$FORCE_NO_CACHE" == "true" ]]; then
   echo "Using --no-cache (dependency changes detected or flag provided)."
   NO_CACHE_FLAG="--no-cache"
@@ -64,16 +71,19 @@ fi
 if [ -n "$NPM_TOKEN_VALUE" ]; then
   docker build \
     $NO_CACHE_FLAG \
+    --platform "$DOCKER_PLATFORM" \
     --build-arg NPM_TOKEN="$NPM_TOKEN_VALUE" \
-    -t gwtemplate \
+    -t "$LOCAL_IMAGE_NAME" \
     -f "$SCRIPT_DIR/Dockerfile" \
-    "$WORKSPACE_ROOT"
+    "$SCRIPT_DIR"
 else
   docker build \
     $NO_CACHE_FLAG \
-    -t gwtemplate \
+    --platform "$DOCKER_PLATFORM" \
+    -t "$LOCAL_IMAGE_NAME" \
     -f "$SCRIPT_DIR/Dockerfile" \
-    "$WORKSPACE_ROOT"
+    "$SCRIPT_DIR"
 fi
 
 echo "$DEPS_HASH" > "$CACHE_MARKER"
+echo "Built ${LOCAL_IMAGE_NAME} for ${DOCKER_PLATFORM}."

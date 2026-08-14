@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+- Scope the canonical local and cloud Docker builds to the GW CORE repository,
+  consume the published `gdc-common-utils-ts` dependency from the lockfile,
+  exclude local secrets and generated directories, and pin release images to
+  `linux/amd64` by default.
+
 ## [1.21.3] - 2026-08-13
 
 - Refresh Google Cloud runtime dependencies and enforce audited transitive

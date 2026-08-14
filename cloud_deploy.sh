@@ -162,10 +162,10 @@ build_and_push_image() {
     echo "⚙️  Building the Docker image: $image_path"
     if [[ -n "${NPM_TOKEN:-}" ]]; then
       echo "(NPM_TOKEN found, passing it as a build argument)"
-      docker build --build-arg NPM_TOKEN="$NPM_TOKEN" -t "$image_path" -f "$SCRIPT_DIR/Dockerfile" "$WORKSPACE_ROOT"
+      docker build --platform "${DOCKER_PLATFORM:-linux/amd64}" --build-arg NPM_TOKEN="$NPM_TOKEN" -t "$image_path" -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR"
     else
       echo "(NPM_TOKEN not found, building without it)"
-      docker build -t "$image_path" -f "$SCRIPT_DIR/Dockerfile" "$WORKSPACE_ROOT"
+      docker build --platform "${DOCKER_PLATFORM:-linux/amd64}" -t "$image_path" -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR"
     fi
   fi
 

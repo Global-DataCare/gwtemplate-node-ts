@@ -75,6 +75,7 @@
     "pki:bundle": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"NodeNext\",\"moduleResolution\":\"NodeNext\",\"allowImportingTsExtensions\":true}' node --loader ts-node/esm --experimental-specifier-resolution=node scripts/generate-trust-bundle.ts",
     "update-deps": "node update-deps.js",
     "docker:build": "./docker_build_local.sh",
+    "test:release-scripts": "bash ./scripts/test-local-image-release-scripts.sh",
     "docker:run": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",
     "docker:run:mem": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",
     "docker:run:firestore-demo": "ENV_FILE=./.env.firestore-demo ./docker_run_local.sh",

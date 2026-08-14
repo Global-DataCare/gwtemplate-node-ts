@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+bash -n ./docker_build_local.sh ./docker_run_local.sh ./cloud_deploy.sh
+
+grep -qx 'node_modules' .dockerignore
+grep -qx 'build' .dockerignore
+grep -qx '.git' .dockerignore
+grep -qx '.env\*' .dockerignore
+grep -qx 'chaincode' .dockerignore
+grep -Fq 'Context: ${SCRIPT_DIR}' ./docker_build_local.sh
+grep -Fq '"$SCRIPT_DIR"' ./docker_build_local.sh
+grep -Fq '"$SCRIPT_DIR"' ./cloud_deploy.sh
+
+if grep -Fq '"$WORKSPACE_ROOT"' ./docker_build_local.sh; then
+  echo 'ERROR: the local Docker build must not send the workspace root.' >&2
+  exit 1
+fi
+if grep -Eq 'COPY (gwtemplate-node-ts|gdc-common-utils-ts)' ./Dockerfile; then
+  echo 'ERROR: the Dockerfile must consume only the repository-scoped context.' >&2
+  exit 1
+fi
+if grep -Eq 'COPY .*\.env' ./Dockerfile; then
+  echo 'ERROR: runtime profiles must be injected, never copied into the image.' >&2
+  exit 1
+fi
+
+echo 'Local image release scripts validated.'
