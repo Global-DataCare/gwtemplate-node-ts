@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## [1.21.8] - 2026-08-14
+
+- Bind the research SMART smoke contract to the live tenant DID discovered
+  from the selected image instead of a fixture-only provider hostname.
+
 ## [1.21.7] - 2026-08-14
 
 - Align the canonical individual image smoke with the transaction registration
@@ -9,9 +14,7 @@
   audience to the actual SMART token endpoint before requesting access. Render
   consent projections through repository/package APIs instead of importing
   source files from a sibling workspace checkout. Canonical and compatibility
-  role-system spellings now resolve to the same immutable consent rule ID. The
-  research proof binds its provider to the live tenant DID discovered from the
-  selected image instead of a fixture-only hostname.
+  role-system spellings now resolve to the same immutable consent rule ID.
 
 ## [1.21.6] - 2026-08-14
 
