@@ -21,6 +21,13 @@ import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import { DidDocument, VerificationMethod } from '../gdc-backend-utils-node/models/did';
 import { registerSubjectKeysOnLedger, revokeSubjectKeysOnLedger } from '../utils/ledger-device-registration';
+import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
+import {
+  IdentityAuthActions,
+  IdentityAuthRequestFields,
+  IdentityAuthResponseEntryTypes,
+  IdentityAuthResponseTypes,
+} from 'gdc-common-utils-ts/constants/identity-auth';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -52,8 +59,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
       if (!action) {
         throw new ManagerError('Missing action.', IssueType.Required);
       }
-      if (action === '_search') {
+      if (action === IdentityAuthActions.Search) {
         return this.handleSearch(job);
+      }
+      if (action === IdentityAuthActions.Revoke) {
+        return this.handleRevoke(job);
       }
 
       const code = job.content?.body?.code;
@@ -158,7 +168,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
       const deviceProfileDoc: ConfidentialStorageDoc = {
         id: clientId,
-        status: 'active',
+        status: DeviceBindingStatuses.Active,
         sequence: 0,
         content: deviceProfile,
       };
@@ -177,9 +187,9 @@ export class DeviceRegistrationManager implements IJobProcessor {
         license.maxDevices = this.getDeviceAllowance(license);
         license.deviceBindings = [
           ...existingBindings.map((binding) => binding.clientInstanceId === fingerprint.clientInstanceId
-            ? { ...binding, status: 'revoked', revokedAt: now }
+            ? { ...binding, status: DeviceBindingStatuses.Revoked, revokedAt: now }
             : binding),
-          { clientId, clientInstanceId: fingerprint.clientInstanceId, status: 'active', deviceInfo: fingerprint, activatedAt: now },
+          { clientId, clientInstanceId: fingerprint.clientInstanceId, status: DeviceBindingStatuses.Active, deviceInfo: fingerprint, activatedAt: now },
         ];
         license.deviceId = license.deviceId || clientId;
         license.deviceInfo = license.deviceInfo || fingerprint;
@@ -338,14 +348,14 @@ export class DeviceRegistrationManager implements IJobProcessor {
     return [{
       clientId,
       clientInstanceId: String(deviceInfo.clientInstanceId || clientId),
-      status: 'active',
+      status: DeviceBindingStatuses.Active,
       deviceInfo,
       activatedAt: Number(license.activatedAt || 0),
     }];
   }
 
   private assertDeviceCapacity(license: DeviceLicense & Record<string, any>, clientInstanceId: string): void {
-    const active = this.getDeviceBindings(license).filter((binding) => binding.status === 'active');
+    const active = this.getDeviceBindings(license).filter((binding) => binding.status === DeviceBindingStatuses.Active);
     if (active.some((binding) => binding.clientInstanceId === clientInstanceId)) return;
     if (active.length >= this.getDeviceAllowance(license)) {
       throw new ManagerError(
@@ -393,7 +403,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
     }
     const clientInstanceId = String((params.registrationRequest.ext_device_info as any)?.device_id || params.clientId).trim();
     const replacedBinding = this.getDeviceBindings(license).find((binding) =>
-      binding.status === 'active' && binding.clientInstanceId === clientInstanceId);
+      binding.status === DeviceBindingStatuses.Active && binding.clientInstanceId === clientInstanceId);
     const previousDeviceId = String(replacedBinding?.clientId || '').trim() || undefined;
     const previousDeviceProfileDoc = previousDeviceId
       ? await this.vaultRepository.get<ConfidentialStorageDoc>(
@@ -508,11 +518,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
         : (previousDeviceProfileDoc.content as any);
       const revokedDeviceProfileDoc: ConfidentialStorageDoc = {
         ...previousDeviceProfileDoc,
-        status: 'revoked',
+        status: DeviceBindingStatuses.Revoked,
         sequence: (previousDeviceProfileDoc.sequence || 0) + 1,
         content: {
           ...(previousContent || {}),
-          status: 'revoked',
+          status: DeviceBindingStatuses.Revoked,
           revokedAt: new Date().toISOString(),
           replacedByClientId: params.clientId,
           subjectId,
@@ -680,6 +690,97 @@ export class DeviceRegistrationManager implements IJobProcessor {
       aud: job.content?.iss as string,
       type: 'transaction-response',
       body: responseBundle,
+    };
+  }
+
+  /** Revokes one installation while preserving the employee seat and its other active devices. */
+  private async handleRevoke(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const tenantId = String(job.tenantId || '').trim();
+    const sector = String(job.sector || '').trim();
+    const requestBody = job.content?.body as Record<string, unknown> | undefined;
+    const licenseId = String(requestBody?.[IdentityAuthRequestFields.LicenseId] || '').trim();
+    const clientId = String(requestBody?.[IdentityAuthRequestFields.ClientId] || '').trim();
+    if (!tenantId || !sector) throw new ManagerError('Missing tenantId or sector.', IssueType.Required);
+    if (!licenseId || !clientId) throw new ManagerError('license_id and client_id are required.', IssueType.Required);
+
+    const vaultId = getTenantVaultId(sector as any, tenantId);
+    const licenseDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(
+      vaultId, licenseId, getEnvSectionId('device-licenses'),
+    );
+    if (!licenseDoc) throw new ManagerError('License not found.', IssueType.NotFound);
+    const license = licenseDoc.content as DeviceLicense & Record<string, any>;
+    const bindings = this.getDeviceBindings(license);
+    const target = bindings.find((binding) => binding.status === DeviceBindingStatuses.Active && binding.clientId === clientId);
+    if (!target) throw new ManagerError('Active device binding not found for this license.', IssueType.NotFound);
+
+    const now = Math.floor(Date.now() / 1000);
+    license.deviceBindings = bindings.map((binding) => binding.clientId === clientId
+      ? { ...binding, status: DeviceBindingStatuses.Revoked, revokedAt: now }
+      : binding);
+    licenseDoc.sequence = (licenseDoc.sequence || 0) + 1;
+    await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+
+    const profileDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(
+      vaultId, clientId, getEnvSectionId('device-profiles'),
+    );
+    const profile = profileDoc
+      ? (this.kmsService ? await this.kmsService.unprotectConfidentialData<any>(profileDoc, vaultId) : profileDoc.content as any)
+      : undefined;
+    if (profileDoc) {
+      const revokedProfile: ConfidentialStorageDoc = {
+        ...profileDoc,
+        status: DeviceBindingStatuses.Revoked,
+        sequence: (profileDoc.sequence || 0) + 1,
+        content: { ...(profile || {}), status: DeviceBindingStatuses.Revoked, revokedAt: new Date().toISOString() },
+      };
+      await this.vaultRepository.put(vaultId, [this.kmsService
+        ? await this.kmsService.protectConfidentialData(revokedProfile, vaultId)
+        : revokedProfile], getEnvSectionId('device-profiles'));
+    }
+
+    const subjectId = String(license.subjectId || '').trim();
+    if (subjectId && profile) {
+      const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(
+        vaultId, subjectId, getEnvSectionId('employees'),
+      );
+      if (employeeDoc) {
+        const employee = this.kmsService
+          ? await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId)
+          : employeeDoc.content as EntityConfig;
+        if (employee.didDocument) {
+          const methods = this.extractVerificationMethodsFromProfile(employee.didDocument, profile);
+          employee.didDocument = this.mergeDeviceVerificationMethods(
+            employee.didDocument, methods.map((method) => method.id), [],
+          );
+          const updatedEmployeeDoc: ConfidentialStorageDoc = {
+            ...employeeDoc,
+            sequence: (employeeDoc.sequence || 0) + 1,
+            content: employee,
+          };
+          await this.vaultRepository.put(vaultId, [this.kmsService
+            ? await this.kmsService.protectConfidentialData(updatedEmployeeDoc, vaultId)
+            : updatedEmployeeDoc], getEnvSectionId('employees'));
+          if (methods.length) await revokeSubjectKeysOnLedger({
+            jurisdiction: job.jurisdiction,
+            organizationId: tenantId,
+            subjectType: 'employee',
+            subjectId: String(license.activatedBy || subjectId),
+            subjectDid: employee.didDocument.id,
+            verificationMethods: methods,
+            deviceId: clientId,
+          });
+        }
+      }
+    }
+
+    return {
+      jti: uuidv4(), thid: job.content?.thid as string, type: IdentityAuthResponseTypes.DeviceRevoke,
+      iss: composeHostDidWebId(this.apiBaseUrl), aud: job.content?.iss as string,
+      exp: Math.floor(Date.now() / 1000) + 300,
+      body: {
+        resourceType: 'Bundle', type: 'transaction-response', total: 1,
+        data: [{ type: IdentityAuthResponseEntryTypes.DeviceRevoked, response: { status: '200' }, resource: { resourceType: 'Device', id: clientId, status: DeviceBindingStatuses.Revoked } }],
+      },
     };
   }
 }

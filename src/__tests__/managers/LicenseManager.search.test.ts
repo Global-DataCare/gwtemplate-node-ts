@@ -135,6 +135,8 @@ function newDocumentsLicenseSearchFixture(): ConfidentialStorageDoc[] {
     issuedToEmail: EXAMPLE_EMAIL_CONTROLLER_ORG,
     issuedToPhone: EXAMPLE_FORM_CONTROLLER_PHONE,
     issuedToRole: EXAMPLE_HEALTHCARE_ACTOR_ROLE_GENERALIST_MEDICAL_PRACTITIONER,
+    maxDevices: 2,
+    deviceBindings: [{ clientId: 'client-one', clientInstanceId: 'install-one', status: 'active', deviceInfo: { clientInstanceId: 'install-one', model: 'Browser A' }, activatedAt: 1 }],
   };
 
   const availableLicense: DeviceLicense & Record<string, unknown> = {
@@ -193,6 +195,8 @@ describe('LicenseManager (_search)', () => {
         meta: expect.objectContaining({
           status: LicenseStatuses.Active,
           subjectId: EXAMPLE_LICENSE_SUBJECT_ID_ACTIVE,
+          maxDevices: 2,
+          deviceBindings: [expect.objectContaining({ clientId: 'client-one', status: 'active' })],
           claims: expect.objectContaining({
             [ClaimsOfferSchemaorg.serialNumber]: EXAMPLE_LICENSE_SEAT_UUID_ACTIVE,
             [ClaimsIndividualProductSchemaorg.category]: LicenseCategories.Professional,

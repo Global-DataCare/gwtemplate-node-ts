@@ -4204,7 +4204,7 @@
           "2.1.4 License Issuance (Invite)"
         ],
         "summary": "Issue (reserve) an activation code from the tenant license pool (async)",
-        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_issue`.\nThis `identity/openid` route is maintained as a temporary compatibility alias.\n\nTenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role\nand returns a single-use activation code for subsequent `Token/_exchange`.\nUser licenses can issue multiple activation codes for different device profiles (mobile/web).\nDevice licenses only issue a single activation code per seat.\n",
+        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_issue`.\nThis `identity/openid` route is maintained as a temporary compatibility alias.\n\nTenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role\nand returns the seat activation credential for subsequent `Token/_exchange`.\nThe same credential can activate distinct installations up to `maxDevices`\n(two by default); it does not consume another employee seat.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -6498,6 +6498,29 @@
           }
         },
         "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_revoke": {
+      "post": {
+        "tags": [
+          "2.1.3 Dynamic Client Registration"
+        ],
+        "summary": "Revoke one employee device while preserving its seat",
+        "description": "Canonical route: `/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_revoke`.\nA controller supplies `body.license_id` and `body.client_id`. GW revokes\nthat device profile, its employee DID verification methods and ledger\nkey bindings. Other devices and the employee licence remain active.\n",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the paired `_revoke-response` route."
+          },
+          "404": {
+            "description": "Licence or active device binding not found."
+          }
+        },
+        "x-profile": "compat"
       }
     },
     "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr": {

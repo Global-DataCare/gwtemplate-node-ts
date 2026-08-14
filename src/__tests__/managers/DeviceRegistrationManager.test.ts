@@ -18,6 +18,17 @@ import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
+import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
+import { IdentityAuthActions, IdentityAuthRequestFields } from 'gdc-common-utils-ts/constants/identity-auth';
+import {
+  EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY,
+  EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_TERTIARY,
+  ExampleHttpStatusText,
+} from 'gdc-common-utils-ts/examples/shared';
+import {
+  EXAMPLE_EMPLOYEE_ACTIVE_DEVICE_BINDINGS,
+  EXAMPLE_LICENSE_ACTIVE_RECORD,
+} from 'gdc-common-utils-ts/examples/license';
 
 const TEST_API_BASE_URL = 'http://localhost:3001';
 const FABRIC_LEDGER_TEST_ENV = {
@@ -307,7 +318,7 @@ describe('DeviceRegistrationManager', () => {
 
     it('should reject a third installation when the seat allowance is two', async () => {
       const job = cloneDeep(DCR_REGISTRATION_JOB);
-      (job.content?.body as any).ext_device_info.device_id = 'install-third';
+      (job.content?.body as any).ext_device_info.device_id = EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_TERTIARY;
       const activationCode = (job.content?.body as any).code;
       const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
       await vaultRepository.put(vaultId, [{
@@ -315,16 +326,50 @@ describe('DeviceRegistrationManager', () => {
           id: 'license-full', tenantId: job.tenantId, orderId: 'order', activationCode,
           userClass: 'employee', type: 'web', status: 'active', plan: 'default',
           renewalCycle: '12m', reactivationEnabled: false, exp: Math.floor(Date.now() / 1000) + 3600,
-          maxDevices: 2,
-          deviceBindings: ['one', 'two'].map((id) => ({
-            clientId: `client-${id}`, clientInstanceId: `install-${id}`, status: 'active',
-            deviceInfo: { clientInstanceId: `install-${id}` }, activatedAt: 1,
-          })),
+          maxDevices: EXAMPLE_EMPLOYEE_ACTIVE_DEVICE_BINDINGS.length,
+          deviceBindings: EXAMPLE_EMPLOYEE_ACTIVE_DEVICE_BINDINGS,
         },
       } as any], getEnvSectionId('device-licenses'));
 
       const result = await manager.process(job);
-      expect(((result.body as BundleJsonApi).data[0] as ErrorEntry).response.status).toBe('409');
+      expect(((result.body as BundleJsonApi).data[0] as ErrorEntry).response.status).toBe(ExampleHttpStatusText.Conflict);
+    });
+
+    it('revokes one selected installation and keeps the other device active on the same seat', async () => {
+      const job = cloneDeep(DCR_REGISTRATION_JOB);
+      job.action = IdentityAuthActions.Revoke;
+      job.content!.body = {
+        [IdentityAuthRequestFields.LicenseId]: EXAMPLE_LICENSE_ACTIVE_RECORD.id,
+        [IdentityAuthRequestFields.ClientId]: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY,
+      } as any;
+      const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+      await vaultRepository.put(vaultId, [{
+        id: EXAMPLE_LICENSE_ACTIVE_RECORD.id, status: EXAMPLE_LICENSE_ACTIVE_RECORD.status, sequence: 0, content: {
+          id: EXAMPLE_LICENSE_ACTIVE_RECORD.id, tenantId: job.tenantId, orderId: 'order', userClass: 'employee',
+          type: 'web', status: 'active', plan: 'default', renewalCycle: '12m',
+          reactivationEnabled: false, exp: Math.floor(Date.now() / 1000) + 3600, maxDevices: 2,
+          deviceBindings: EXAMPLE_EMPLOYEE_ACTIVE_DEVICE_BINDINGS,
+        },
+      } as any], getEnvSectionId('device-licenses'));
+      const profile = await mockKmsService.protectConfidentialData({
+        id: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, status: DeviceBindingStatuses.Active, sequence: 0,
+        content: { clientId: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, verificationMethodIds: [] },
+      } as ConfidentialStorageDoc, vaultId);
+      await vaultRepository.put(vaultId, [profile], getEnvSectionId('device-profiles'));
+
+      const result = await manager.process(job);
+      expect(((result.body as BundleJsonApi).data[0] as BundleEntryResponse).response.status).toBe(ExampleHttpStatusText.Ok);
+      const updated = await vaultRepository.get<ConfidentialStorageDoc>(
+        vaultId, EXAMPLE_LICENSE_ACTIVE_RECORD.id, getEnvSectionId('device-licenses'),
+      );
+      expect((updated?.content as any).deviceBindings.filter((binding: any) => binding.status === DeviceBindingStatuses.Active))
+        .toHaveLength(1);
+      expect((updated?.content as any).deviceBindings.find((binding: any) => binding.clientId === EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY).status)
+        .toBe(DeviceBindingStatuses.Revoked);
+      const revokedProfile = await vaultRepository.get<ConfidentialStorageDoc>(
+        vaultId, EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, getEnvSectionId('device-profiles'),
+      );
+      expect(revokedProfile?.status).toBe(DeviceBindingStatuses.Revoked);
     });
 
     it('should return a 400 error if redirect_uris are missing', async () => {
