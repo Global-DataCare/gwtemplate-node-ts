@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.21.5] - 2026-08-14
+
 - Let the canonical Fabric bootstrap prepare `local-network` without starting
   a host process so the Docker release smoke validates only the selected image.
 
