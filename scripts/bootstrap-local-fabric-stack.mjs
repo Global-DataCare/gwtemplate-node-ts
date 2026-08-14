@@ -36,6 +36,7 @@ const config = {
   deployChaincode: args.deployChaincode,
   startGw: args.startGw,
   restartGw: args.restartGw,
+  prepareOnly: args.prepareOnly,
 };
 
 const envFileValues = existsSync(config.envFile) ? parseSimpleEnv(readFileSync(config.envFile, 'utf8')) : {};
@@ -128,6 +129,14 @@ async function main() {
     });
   }
 
+  if (config.prepareOnly) {
+    console.log('\n[local-fabric-stack] local-network prepared without starting GW');
+    console.log(`  env: ${config.envFile}`);
+    console.log(`  data channel: ${config.dataChannel}`);
+    console.log(`  identity channel: ${config.identityChannel}`);
+    return;
+  }
+
   if (config.restartGw) {
     await runStep('gw-stop-existing', {
       cwd: repoRoot,
@@ -190,6 +199,7 @@ function parseArgs(argv) {
     deployChaincode: true,
     startGw: true,
     restartGw: false,
+    prepareOnly: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -206,6 +216,7 @@ function parseArgs(argv) {
     else if (arg === '--no-deploy-chaincode') result.deployChaincode = false;
     else if (arg === '--no-start-gw') result.startGw = false;
     else if (arg === '--restart-gw') result.restartGw = true;
+    else if (arg === '--prepare-only') result.prepareOnly = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
 
@@ -230,6 +241,7 @@ Options:
   --bootstrap-individual     Also create the canonical individual baseline
   --no-deploy-chaincode      Skip consentaccess-sc deploy
   --no-start-gw              Do not start GW if it is not already reachable
+  --prepare-only             Prepare Fabric, chaincodes and env, then exit
   --restart-gw               Stop the current GW process before starting a new one
   --help, -h                 Show this help
 
