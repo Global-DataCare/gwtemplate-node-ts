@@ -16,6 +16,7 @@ grep -Fq '"$SCRIPT_DIR"' ./docker_build_local.sh
 grep -Fq '"$SCRIPT_DIR"' ./cloud_deploy.sh
 grep -Fq 'resolve_pushed_digest' ./cloud_deploy.sh
 grep -Fq 'DEPLOY_DRY_RUN' ./cloud_deploy.sh
+grep -Fq 'LOCAL_IMAGE_NAME="${LOCAL_IMAGE_NAME:-gwtemplate}"' ./demo-deploy.config.example
 bash ./scripts/smoke-docker-local-network.sh --help | grep -q 'Fabric local-network'
 node ./scripts/bootstrap-local-fabric-stack.mjs --help | grep -q -- '--prepare-only'
 grep -Fq 'FABRIC_PEER_ENDPOINT_VALUE="${FABRIC_PEER_ENDPOINT_VALUE:-localhost:7051}"' \
