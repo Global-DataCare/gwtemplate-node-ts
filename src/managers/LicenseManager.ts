@@ -256,7 +256,8 @@ export class LicenseManager implements IJobProcessor {
    * Issues (reserves) an activation code from the tenant's pool of `device-licenses`.
    *
    * This is a tenant-admin/IT operation used to invite a professional after licenses were purchased.
-   * It converts a single `DeviceLicense` from `available` -> `issued` and attaches an `activationCode`.
+   * It converts a `DeviceLicense` from `available` -> `issued` and attaches the
+   * seat credential used for its bounded set of device installations.
    *
    * Input: accept both JSON:API (`body.data[]`) and FHIR-like (`body.entry[]`) envelopes,
    * reading `entry.meta.claims`.

@@ -28,6 +28,7 @@ import {
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
 import { mergeServiceCapabilityClaims } from './service-capability-claims';
+import { IdentityAuthActions } from 'gdc-common-utils-ts/constants/identity-auth';
 
 export type HostRegistrySector = 'test' | 'local-network' | 'test-network' | 'network';
 
@@ -493,13 +494,13 @@ export function initializeTenantServicesConfig(
     createDidEndpointConfigFromSelector(
       { sector, section: 'identity', format: 'openid' },
       ['Device'],
-      ['_dcr'],
+      [IdentityAuthActions.Dcr],
     ),
     // Device search (admin listing).
     createDidEndpointConfigFromSelector(
       { sector, section: 'identity', format: 'openid' },
       ['Device'],
-      ['_search'],
+      [IdentityAuthActions.Search, IdentityAuthActions.Revoke],
     ),
     // SMART token issuance endpoint.
     createDidEndpointConfigFromSelector(

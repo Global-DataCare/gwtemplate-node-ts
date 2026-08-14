@@ -114,6 +114,24 @@ export async function searchLicenseDocuments(
           ...(license.authorizedSubjectDid ? { authorizedSubjectDid: license.authorizedSubjectDid } : {}),
           ...(license.relatedPersonId ? { relatedPersonId: license.relatedPersonId } : {}),
           ...(license.invitationId ? { invitationId: license.invitationId } : {}),
+          maxDevices: Number.isInteger(Number(license.maxDevices)) && Number(license.maxDevices) > 0
+            ? Number(license.maxDevices)
+            : 2,
+          deviceBindings: Array.isArray(license.deviceBindings)
+            ? license.deviceBindings.map((binding: any) => ({
+                clientId: String(binding.clientId || ''),
+                clientInstanceId: String(binding.clientInstanceId || ''),
+                status: String(binding.status || ''),
+                deviceInfo: {
+                  clientInstanceId: String(binding.deviceInfo?.clientInstanceId || binding.clientInstanceId || ''),
+                  model: String(binding.deviceInfo?.model || ''),
+                  os: String(binding.deviceInfo?.os || ''),
+                  osVersion: String(binding.deviceInfo?.osVersion || ''),
+                },
+                activatedAt: Number(binding.activatedAt || 0),
+                ...(binding.revokedAt ? { revokedAt: Number(binding.revokedAt) } : {}),
+              }))
+            : [],
           claims: buildLicenseSearchClaims(license),
         },
       };

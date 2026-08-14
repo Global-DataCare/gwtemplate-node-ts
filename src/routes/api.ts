@@ -26,6 +26,7 @@ import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
 import { ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE } from '../constants/domain';
 import { getTenantAuthorizationStatus as readTenantAuthorizationStatusFromConfig } from '../utils/tenant-lifecycle';
 import { enforceSmartScopeRouteCompatibility } from '../utils/smart-scope-route-authorization';
+import { IdentityAuthActions } from 'gdc-common-utils-ts/constants/identity-auth';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -298,13 +299,15 @@ function normalizeUnifiedIdentityAuthRouteParams(raw: RouteParams): RouteParams 
   let mappedFormat: string | undefined;
   let mappedResourceType: string | undefined;
 
-  if (actionBase === '_dcr') {
+  if (actionBase === IdentityAuthActions.Dcr
+    || actionBase === IdentityAuthActions.Revoke
+    || actionBase === IdentityAuthActions.Search) {
     mappedFormat = 'openid';
     mappedResourceType = 'Device';
   } else if (actionBase === '_code' || actionBase === '_token' || actionBase === '_exchange') {
     mappedFormat = 'openid';
     mappedResourceType = 'Token';
-  } else if (actionBase === '_issue') {
+  } else if (actionBase === IdentityAuthActions.Issue) {
     mappedFormat = 'openid';
     mappedResourceType = 'License';
   } else if (actionBase === '_custom') {
@@ -1281,9 +1284,9 @@ export function createApiRouter(
    *       This `identity/openid` route is maintained as a temporary compatibility alias.
    *
    *       Tenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role
-   *       and returns a single-use activation code for subsequent `Token/_exchange`.
-   *       User licenses can issue multiple activation codes for different device profiles (mobile/web).
-   *       Device licenses only issue a single activation code per seat.
+   *       and returns the seat activation credential for subsequent `Token/_exchange`.
+   *       The same credential can activate distinct installations up to `maxDevices`
+   *       (two by default); it does not consume another employee seat.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -2538,6 +2541,20 @@ export function createApiRouter(
    *       '400': { description: Missing or invalid thid. }
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_revoke:
+   *   post:
+   *     tags: [2.1.3 Dynamic Client Registration]
+   *     summary: Revoke one employee device while preserving its seat
+   *     description: |
+   *       Canonical route: `/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_revoke`.
+   *       A controller supplies `body.license_id` and `body.client_id`. GW revokes
+   *       that device profile, its employee DID verification methods and ledger
+   *       key bindings. Other devices and the employee licence remain active.
+   *     security: [{ BearerAuth: [] }]
+   *     responses:
+   *       '202': { description: Accepted. Poll the paired `_revoke-response` route. }
+   *       '404': { description: Licence or active device binding not found. }
    *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr:
    *   post:

@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+- Add controller-authorized `Device/_revoke` support for one selected employee
+  installation. Revocation removes that device's DID verification methods,
+  revokes its ledger bindings and profile, and preserves the employee seat and
+  every other active installation.
+
 ## [1.21.2] - 2026-08-13
 
 - Canonicalize legal-organization `_transaction` and `_issue` claims at
