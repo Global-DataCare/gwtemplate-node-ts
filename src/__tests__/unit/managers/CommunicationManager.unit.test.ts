@@ -26,6 +26,7 @@ describe('CommunicationManager Unit Tests', () => {
   let mockVaultRepository: jest.Mocked<IVaultRepository>;
   let mockCompositionManager: { process: jest.Mock };
   let mockIndividualManager: { process: jest.Mock };
+  let storedRecords: Map<string, any>;
   const testServerDid = 'did:web:test-server.com';
 
   beforeEach(() => {
@@ -34,9 +35,15 @@ describe('CommunicationManager Unit Tests', () => {
       getTenantDid: jest.fn(),
       tenantExists: jest.fn(async () => true),
     } as unknown as jest.Mocked<TenantsCacheManager>;
+    storedRecords = new Map<string, any>();
     mockVaultRepository = {
       vaultExists: jest.fn(async () => false),
-      put: jest.fn(async () => undefined),
+      put: jest.fn(async (vaultId: string, items: any[], sectionId?: string) => {
+        items.forEach((item) => storedRecords.set(`${vaultId}|${sectionId}|${item.id}`, item));
+        return true;
+      }),
+      get: jest.fn(async (vaultId: string, id: string, sectionId?: string) =>
+        storedRecords.get(`${vaultId}|${sectionId}|${id}`)),
       query: jest.fn(async () => []),
       listContainersInSection: jest.fn(async () => []),
       getAllSections: jest.fn(async () => []),
@@ -1117,7 +1124,10 @@ describe('CommunicationManager Unit Tests', () => {
 
       const tenantVaultId = 'health-care_acme';
       const individualCompositionSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'composition');
-      const digitalTwinCompositionSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
+      const aliasPut = mockVaultRepository.put.mock.calls.find((args) =>
+        String(args[2] || '').includes('digitaltwin_subject_aliases'));
+      const twinSubjectId = (aliasPut?.[1] as any[])?.[0]?.twinSubjectId;
+      const digitalTwinCompositionSectionId = getSubjectScopedSectionId(twinSubjectId, 'digitaltwin', 'composition');
       const compositionPuts = mockVaultRepository.put.mock.calls.filter(
         (args) =>
           args[0] === tenantVaultId
@@ -1134,6 +1144,15 @@ describe('CommunicationManager Unit Tests', () => {
         'LOINC|10160-0',
         'LOINC|8716-3',
       ]));
+      const researchRecords = compositionPuts
+        .filter((args) => args[2] === digitalTwinCompositionSectionId)
+        .flatMap((args) => (args[1] as any[]) || []);
+      expect(researchRecords).toHaveLength(2);
+      for (const record of researchRecords) {
+        const subjectKey = Object.keys(record).find((key) => key.endsWith('Composition.subject'));
+        expect(record[subjectKey as string]).toBe(twinSubjectId);
+        expect(JSON.stringify(record)).not.toContain(subjectDid);
+      }
     });
 
     it('does not project duplicate clinical resources when the replayed IPS changes container ids, dates, and narrative text', async () => {

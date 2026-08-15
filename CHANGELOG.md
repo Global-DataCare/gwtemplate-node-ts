@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [1.21.12] - 2026-08-15
+
+- Project individual clinical ingestion into a minimal research-safe digital
+  twin: retain a private stable subject alias, replace identifiers and
+  subject references, remove patient and free text/display/narrative claims, and
+  exclude identity-bearing Patient, RelatedPerson and Consent resources.
+- Permit `DigitalTwinReader` for a verified employee of the provider tenant
+  without an inter-tenant contract; foreign organizations still require the
+  matching contract and consent policy. Research SMART scopes now expose the
+  pseudonymous twin subject instead of the operational individual DID.
+- Replace free-text twin search examples and E2E cases with coded FHIR claims.
+
 ## [1.21.11] - 2026-08-14
 
 - Preserve an explicitly selected local image in the GKE deployment profile so

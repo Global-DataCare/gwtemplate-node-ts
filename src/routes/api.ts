@@ -1730,16 +1730,17 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 9. Research Digital Twin
-   *     summary: Search digital twin Composition indexes by IPS section and textual claims
+   *     summary: Search digital twin Composition indexes by IPS section and coded claims
    *     description: |
    *       Submits an async section-first digital twin search request.
    *
    *       Public search intent:
    *       - the result artifact is `Composition`
    *       - the client filters by IPS `section` first
-   *       - the client then adds resource-scoped textual filters such as
-   *         `MedicationStatement.code-display`, `MedicationStatement.code-text`,
-   *         `Observation.code-display`, or `Observation.code-text`
+   *       - the client then adds resource-scoped coded filters such as
+   *         `MedicationStatement.code`, `Observation.code`, or
+   *         `AllergyIntolerance.clinical-status`
+   *       - free-text and display claims are absent from the research projection
    *       - internal matching may fan out to indexed resource families for the
    *         requested section, but the response returns matched `Composition`
    *         projections rather than leaf resources

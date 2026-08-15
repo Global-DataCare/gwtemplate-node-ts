@@ -12,6 +12,7 @@ import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 import { testTenant1TenantId } from '../data/organization.data';
+import { getDigitalTwinSubjectAliasSectionId } from '../../utils/digital-twin-research-projection';
 
 describe('Composition Bundle _search API (integration)', () => {
   function loadIpsAllSectionsFixture(subjectDid: string): any {
@@ -579,7 +580,7 @@ describe('Composition Bundle _search API (integration)', () => {
     }
   });
 
-  it('ingests the IPS all-sections fixture through Communication and supports digitaltwin Composition/_search by section plus display/text', async () => {
+  it('ingests the IPS all-sections fixture and supports coded digitaltwin Composition/_search', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -694,14 +695,19 @@ describe('Composition Bundle _search API (integration)', () => {
       }
       expect(communicationPayload?.data?.[0]?.response?.status).toBe('200');
 
-      const digitalTwinMedicationsSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'medications');
-      const digitalTwinObservationsSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'observations');
-      const digitalTwinCompositionSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
+      const aliases = await vaultRepository.getContainersInSection<any>(tenantVaultId, getDigitalTwinSubjectAliasSectionId());
+      const twinSubjectId = aliases.find((alias: any) =>
+        alias.id === createHash('sha256').update(subjectDid).digest('hex'))?.twinSubjectId;
+      expect(twinSubjectId).toMatch(/^urn:uuid:/);
+      const digitalTwinMedicationsSection = getSubjectScopedSectionId(twinSubjectId, 'digitaltwin', 'medications');
+      const digitalTwinObservationsSection = getSubjectScopedSectionId(twinSubjectId, 'digitaltwin', 'observations');
+      const digitalTwinCompositionSection = getSubjectScopedSectionId(twinSubjectId, 'digitaltwin', 'composition');
       const medicationRecords = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinMedicationsSection);
       const observationRecords = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinObservationsSection);
       const compositionRecords = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinCompositionSection);
       expect(medicationRecords.length).toBeGreaterThan(0);
       expect(observationRecords.length).toBeGreaterThan(0);
+      expect(JSON.stringify([...medicationRecords, ...observationRecords, ...compositionRecords])).not.toContain(subjectDid);
       expect(compositionRecords.some((record: any) =>
         record['Composition.section'] === HealthcareBasicSections.HistoryOfMedicationUse.attributeValue
         || record['org.hl7.fhir.r4.Composition.section'] === HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
@@ -880,17 +886,22 @@ describe('Composition Bundle _search API (integration)', () => {
 
       // Step 2: verify the section resource and Composition projection exist under the exact code.
       expect(sectionUpdatePayload?.data?.[0]?.response?.status).toBe('200');
+      const sectionAliases = await vaultRepository.getContainersInSection<any>(tenantVaultId, getDigitalTwinSubjectAliasSectionId());
+      const sectionTwinSubjectId = sectionAliases.find((alias: any) =>
+        alias.id === createHash('sha256').update(sectionSubjectDid).digest('hex'))?.twinSubjectId;
       const allergyRecords = await vaultRepository.getContainersInSection<any>(
         tenantVaultId,
-        getSubjectScopedSectionId(sectionSubjectDid, 'digitaltwin', 'allergies'),
+        getSubjectScopedSectionId(sectionTwinSubjectId, 'digitaltwin', 'allergies'),
       );
       const updatedCompositionRecords = await vaultRepository.getContainersInSection<any>(
         tenantVaultId,
-        getSubjectScopedSectionId(sectionSubjectDid, 'digitaltwin', 'composition'),
+        getSubjectScopedSectionId(sectionTwinSubjectId, 'digitaltwin', 'composition'),
       );
       expect(allergyRecords.some((record: any) =>
-        record['AllergyIntolerance.identifier'] === 'urn:uuid:allergy-section-update-integration-001'
-        || record['org.hl7.fhir.api.AllergyIntolerance.identifier'] === 'urn:uuid:allergy-section-update-integration-001',
+        (record['AllergyIntolerance.identifier'] || record['org.hl7.fhir.api.AllergyIntolerance.identifier'])
+          !== 'urn:uuid:allergy-section-update-integration-001'
+        && (record['AllergyIntolerance.subject'] || record['org.hl7.fhir.api.AllergyIntolerance.subject'])
+          === sectionTwinSubjectId,
       )).toBe(true);
       expect(updatedCompositionRecords.some((record: any) =>
         record['Composition.section'] === allergiesSection
@@ -964,32 +975,32 @@ describe('Composition Bundle _search API (integration)', () => {
         'AllergyIntolerance.onset-datetime': '2026-07-24T09:30:00Z',
       });
 
+      const researchAliases = await vaultRepository.getContainersInSection<any>(tenantVaultId, getDigitalTwinSubjectAliasSectionId());
+      const twinFor = (source: string) => researchAliases.find((alias: any) =>
+        alias.id === createHash('sha256').update(source).digest('hex'))?.twinSubjectId;
       const searchCases = [
         {
           thid: 'ips-all-sections-med-search-001',
+          expectedSubject: twinFor(subjectDid),
           parameters: [
             { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
-            { name: 'MedicationStatement.code-display', valueString: 'lisinopril' },
-            { name: 'MedicationStatement.code-text', valueString: 'lisinopril' },
+            { name: 'MedicationStatement.code', valueString: 'http://snomed.info/sct|108575001' },
           ],
         },
         {
           thid: 'ips-all-sections-vs-search-001',
+          expectedSubject: twinFor(subjectDid),
           parameters: [
             { name: 'section', valueString: HealthcareBasicSections.VitalSigns.attributeValue },
-            { name: 'Observation.code-display', valueString: 'pressure' },
-            { name: 'Observation.code-text', valueString: 'pressure' },
+            { name: 'Observation.code', valueString: 'http://loinc.org|85354-9' },
           ],
         },
         {
           thid: 'allergy-section-update-search-001',
-          expectedSubject: sectionSubjectDid,
+          expectedSubject: twinFor(sectionSubjectDid),
           parameters: [
             { name: 'section', valueString: allergiesSection },
-            {
-              name: 'AllergyIntolerance.identifier',
-              valueString: 'urn:uuid:allergy-section-update-integration-001',
-            },
+            { name: 'AllergyIntolerance.criticality', valueString: 'high' },
           ],
         },
       ];
@@ -1033,7 +1044,7 @@ describe('Composition Bundle _search API (integration)', () => {
           || firstMatch?.['org.hl7.fhir.r4.Composition.subject']
           || firstMatch?.meta?.claims?.['Composition.subject']
           || firstMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'],
-        ).toBe(searchCase.expectedSubject || subjectDid);
+        ).toBe(searchCase.expectedSubject);
       }
     } finally {
       queueAdapter.stop();
@@ -1267,6 +1278,11 @@ describe('Composition Bundle _search API (integration)', () => {
         await new Promise((r) => setTimeout(r, 50));
       }
 
+      const aliases = await vaultRepository.getContainersInSection<any>(tenantVaultId, getDigitalTwinSubjectAliasSectionId());
+      const twinSubjectId = aliases.find((alias: any) =>
+        alias.id === createHash('sha256').update(subjectDid).digest('hex'))?.twinSubjectId;
+      expect(twinSubjectId).toMatch(/^urn:uuid:/);
+
       const searchResp = await invokeExpress(app, {
         method: 'POST',
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
@@ -1277,8 +1293,7 @@ describe('Composition Bundle _search API (integration)', () => {
             resourceType: 'Parameters',
             parameter: [
               { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
-              { name: 'MedicationStatement.code-display', valueString: 'lisinopril' },
-              { name: 'MedicationStatement.code-text', valueString: 'lisinopril' },
+              { name: 'MedicationStatement.code', valueString: 'http://snomed.info/sct|108575001' },
             ],
           },
         },
@@ -1304,7 +1319,7 @@ describe('Composition Bundle _search API (integration)', () => {
         || searchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.r4.Composition.subject']
         || searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.claims?.['Composition.subject']
         || searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'];
-      expect(matchedSubject).toBe(subjectDid);
+      expect(matchedSubject).toBe(twinSubjectId);
 
       const r4MaterializeResp = await invokeExpress(app, {
         method: 'POST',
@@ -1321,12 +1336,12 @@ describe('Composition Bundle _search API (integration)', () => {
                 resource: {
                   resourceType: 'Communication',
                   status: 'completed',
-                  subject: { reference: subjectDid },
+                  subject: { reference: twinSubjectId },
                   sent: '2026-06-26T11:00:00Z',
                   payload: [
                     {
                       contentReference: {
-                        reference: `digitaltwin/org.hl7.fhir.r4/ResearchSubject/$summary?subject=${encodeURIComponent(subjectDid)}`,
+                        reference: `digitaltwin/org.hl7.fhir.r4/ResearchSubject/$summary?subject=${encodeURIComponent(twinSubjectId)}`,
                       },
                     },
                   ],
@@ -1380,7 +1395,7 @@ describe('Composition Bundle _search API (integration)', () => {
                 resource: {
                   resourceType: 'Communication',
                   status: 'completed',
-                  subject: { reference: subjectDid },
+                  subject: { reference: twinSubjectId },
                   sent: '2026-06-26T11:05:00Z',
                   payload: [
                     {
@@ -1392,7 +1407,7 @@ describe('Composition Bundle _search API (integration)', () => {
                         data: Buffer.from(JSON.stringify({
                           resourceType: 'Parameters',
                           parameter: [
-                            { name: 'subject', valueString: subjectDid },
+                            { name: 'subject', valueString: twinSubjectId },
                             {
                               name: 'section',
                               valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
@@ -1434,7 +1449,7 @@ describe('Composition Bundle _search API (integration)', () => {
         ?.find((entry: any) => entry?.resource?.resourceType === 'MedicationStatement');
       expect(Object.keys(apiMedicationEntry.resource).sort()).toEqual(['id', 'meta', 'resourceType']);
       expect(apiMedicationEntry.resource.meta.claims).toBeDefined();
-      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.subject']).toBe(subjectDid);
+      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.subject']).toBe(twinSubjectId);
     } finally {
       queueAdapter.stop();
     }

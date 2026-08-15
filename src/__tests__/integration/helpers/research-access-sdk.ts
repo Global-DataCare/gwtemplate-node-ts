@@ -1,22 +1,21 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
+import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
-  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL,
-  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
 } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import {
   buildDemoResearchPermitByEmailConsent,
   buildDemoResearchPermitByRoleConsent,
   buildDemoResearchRequesterMatrix,
+  buildDemoResearchContractVpToken,
   buildDemoResearchSmartTokenRequest,
 } from '../../data/demo-smart-access-local-network.data';
-import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
 import { initializeTenantServicesConfig } from '../../../utils/services';
 import { getIndividualSectionId } from '../../../utils/individual-sections';
 import { getEnvSectionId } from '../../../utils/section-env';
@@ -53,14 +52,13 @@ export const RESEARCH_ACCESS_TEST_IDS = Object.freeze({
 /**
  * Search fixture consumed by the digital-twin search facade.
  *
- * The section and text pair are deliberately aligned with the IPS all-sections
+ * The section and coded medication are deliberately aligned with the IPS all-sections
  * fixture already proven in the composition search integration suite.
  */
 export const RESEARCH_ACCESS_SEARCH_FIXTURE = Object.freeze({
   section: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-  displayText: 'lisinopril',
-  displayClaim: 'MedicationStatement.code-display',
-  textClaim: 'MedicationStatement.code-text',
+  medicationCode: 'http://snomed.info/sct|108575001',
+  codeClaim: 'MedicationStatement.code',
 });
 
 /**
@@ -70,11 +68,11 @@ export const RESEARCH_ACCESS_SEARCH_FIXTURE = Object.freeze({
 export const RESEARCH_ACCESS_DEMO_MEDICATION_CASES = Object.freeze({
   ibuprofen: Object.freeze({
     caseIndex: 0,
-    searchText: 'ibuprofen',
+    searchCode: demoCommunicationMedicationIpsDefaults.demoMedicationCases[0].demoMedicationCode,
   }),
   paracetamol: Object.freeze({
     caseIndex: 1,
-    searchText: 'paracetamol',
+    searchCode: demoCommunicationMedicationIpsDefaults.demoMedicationCases[1].demoMedicationCode,
   }),
 });
 
@@ -247,7 +245,7 @@ export class TestResearchOrgControllerSdk {
           [ClaimConsent.actorRole]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.actorRole,
           [ClaimConsent.decision]: ConsentDecisions.Permit,
           [ClaimConsent.purpose]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
-          [ClaimConsent.action]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.requestedSection,
+          [ClaimConsent.action]: `${ServiceCapability.DigitalTwinReader}?subject=*`,
           [ClaimConsent.date]: '2026-06-29',
         }],
         getIndividualSectionId(subjectDid, 'rules'),
@@ -409,12 +407,11 @@ export class TestResearchOrgControllerSdk {
    * VC shape itself comes from `gdc-common-utils-ts`.
    */
   public buildResearchAccessContractVpToken(): string {
-    const vpPayload = createVP({
-      iss: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
-      sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
+    return buildDemoResearchContractVpToken({
+      tenantId: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerTenantId,
+      subjectDid: RESEARCH_ACCESS_TEST_IDS.doraemonSubjectDid,
+      actorDid: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
     });
-    addVC(vpPayload, EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CREDENTIAL);
-    return JSON.stringify(vpPayload);
   }
 
   private async registerHostedTenant(input: {
@@ -475,7 +472,7 @@ export class TestResearchDigitalTwinSdk {
         body: {
           sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
           purpose: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.purpose,
-          scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+          scope: `${ServiceCapability.DigitalTwinReader}?subject=${encodeURIComponent(RESEARCH_ACCESS_TEST_IDS.doraemonSubjectDid)}`,
           expires_in: 60,
           vp_token: vpToken,
           acr_values: 'urn:antifraud:acr:openid4vp:employee',
@@ -535,35 +532,33 @@ export class TestResearchDigitalTwinSdk {
   }
 
   /**
-   * Searches the provider digital-twin index using the same section-first
-   * `Composition/_search` route already covered by the dedicated composition
-   * integration tests.
+   * Searches the provider digital-twin medication index by coded data.
    */
-  public async searchCompositionBundleByMedicationText(accessToken: string): Promise<any> {
-    return this.searchCompositionBundleByMedicationTextValue(accessToken, RESEARCH_ACCESS_SEARCH_FIXTURE.displayText);
+  public async searchMedicationTwinsByCode(accessToken: string): Promise<any> {
+    return this.searchMedicationTwinsByCodeValue(accessToken, RESEARCH_ACCESS_SEARCH_FIXTURE.medicationCode);
   }
 
   /**
-   * Searches the provider digital-twin index by one medication free-text term.
+   * Searches the provider digital-twin index by one exact medication code.
    */
-  public async searchCompositionBundleByMedicationTextValue(
+  public async searchMedicationTwinsByCodeValue(
     accessToken: string,
-    medicationText: string,
+    medicationCode: string,
   ): Promise<any> {
-    const searchThreadId = `${RESEARCH_ACCESS_TEST_IDS.compositionSearchThreadId}-${String(medicationText || '').toLowerCase()}`;
+    const searchThreadId = `${RESEARCH_ACCESS_TEST_IDS.compositionSearchThreadId}-${String(medicationCode || '').split('|').pop()}`;
     const submitResp = await invokeExpress(this.deps.app, {
       method: 'POST',
-      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
+      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
       headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
       body: {
         thid: searchThreadId,
-        body: {
-          resourceType: 'Parameters',
-          parameter: [
-            { name: 'section', valueString: RESEARCH_ACCESS_SEARCH_FIXTURE.section },
-            { name: 'MedicationStatement.medication-text', valueString: medicationText },
-          ],
-        },
+        body: { data: [{
+          type: 'MedicationStatement-search-request-v1.0',
+          meta: { claims: {
+            '@context': 'org.hl7.fhir.api',
+            [RESEARCH_ACCESS_SEARCH_FIXTURE.codeClaim]: medicationCode,
+          } },
+        }] },
       },
     });
 
@@ -573,7 +568,7 @@ export class TestResearchDigitalTwinSdk {
 
     return pollAcceptedGatewayOperation({
       app: this.deps.app,
-      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
+      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
       thid: searchThreadId,
     });
   }

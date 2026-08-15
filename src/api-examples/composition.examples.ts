@@ -53,8 +53,8 @@ export const DIGITAL_TWIN_COMPOSITION_SEARCH_MESSAGE_EXAMPLE = {
         valueString: 'LOINC|10160-0',
       },
       {
-        name: 'MedicationStatement.code-display',
-        valueString: 'amoxicillin',
+        name: 'MedicationStatement.code',
+        valueString: 'http://snomed.info/sct|372687004',
       },
     ],
   },

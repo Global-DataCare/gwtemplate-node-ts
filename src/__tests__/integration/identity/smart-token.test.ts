@@ -305,7 +305,8 @@ describe('SMART token issuance (integration)', () => {
       }
 
       expect(finalPayload?.access_token).toBeDefined();
-      expect(finalPayload?.subject).toBe(subject);
+      expect(finalPayload?.subject).toMatch(/^urn:uuid:/);
+      expect(finalPayload?.subject).not.toBe(subject);
     } finally {
       queueAdapter.stop();
     }
@@ -559,7 +560,8 @@ describe('SMART token issuance (integration)', () => {
       }
 
       expect(finalPayload?.access_token).toBeDefined();
-      expect(finalPayload?.subject).toBe(subject);
+      expect(finalPayload?.subject).toMatch(/^urn:uuid:/);
+      expect(finalPayload?.subject).not.toBe(subject);
       expect(finalPayload?.ledger_verified).toBe(true);
     } finally {
       queueAdapter.stop();

@@ -26,6 +26,7 @@ import { deriveGrantedSmartScopes } from 'gdc-common-utils-ts/utils/smart-scope'
 import type { ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
 import { getMatchingIndividualMemberCredentialFromVpToken } from 'gdc-common-utils-ts/utils/individual-smart';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { getOrCreateDigitalTwinSubjectId } from '../utils/digital-twin-research-projection';
 import { getMatchingProfessionalCredentialFromVpToken } from 'gdc-common-utils-ts/utils/professional-smart';
 
 type TokenRequestBody = {
@@ -222,6 +223,9 @@ export class OpenIdAuthManager implements IJobProcessor {
           role: actor.role,
         })
       : undefined;
+    const sameTenantEmployeeResearchAccess = isInterTenantResearchAccess
+      && actor.organization === issuerDid
+      && Boolean(professionalCredential);
     if (memberCredential || professionalCredential) {
       this.addPortableMemberRuleAliases(rules, actor, actorSubjectAliases);
     }
@@ -255,7 +259,14 @@ export class OpenIdAuthManager implements IJobProcessor {
             .map((match) => match.rule)
           : [])
       : [];
-    const evaluation = sharedProjection
+    const evaluation = sameTenantEmployeeResearchAccess
+      ? {
+          allowed: true,
+          missingSections: [] as string[],
+          missingResourceTypes: [] as string[],
+          applicableRules: [] as ConsentRule[],
+        }
+      : sharedProjection
       ? {
           allowed: sharedProjection.grantedScopes.length > 0,
           missingSections: sharedProjection.deniedSections,
@@ -287,6 +298,20 @@ export class OpenIdAuthManager implements IJobProcessor {
     }
     if (sharedProjection) {
       grantedScope = sharedProjection.grantedScopes.join(' ');
+    }
+    let accessSubject = subject;
+    if (isInterTenantResearchAccess && subject.includes(':individual:')) {
+      accessSubject = await getOrCreateDigitalTwinSubjectId({
+        vaultRepository: this.vaultRepository,
+        tenantVaultId,
+        sourceSubject: subject,
+      });
+      grantedScope = grantedScope.split(/\s+/).map((scopeToken) => {
+        const [head, query = ''] = scopeToken.split('?');
+        const params = new URLSearchParams(query);
+        if (params.get('subject') === subject) params.set('subject', accessSubject);
+        return params.size > 0 ? `${head}?${params.toString()}` : head;
+      }).join(' ');
     }
 
     const requestedLifetimeSeconds = Math.max(1, Math.min(3600, body.expires_in || 300));
@@ -357,7 +382,7 @@ export class OpenIdAuthManager implements IJobProcessor {
         token_type: tokenType,
         expires_in: lifetimeSeconds,
         scope: grantedScope,
-        subject,
+        subject: accessSubject,
         ledger_verified: accessProof.ledgerVerified,
       },
     };

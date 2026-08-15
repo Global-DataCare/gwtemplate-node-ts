@@ -5,7 +5,6 @@ import {
 import {
   RESEARCH_ACCESS_REQUESTER_MATRIX,
   RESEARCH_ACCESS_DEMO_MEDICATION_CASES,
-  RESEARCH_ACCESS_SEARCH_FIXTURE,
   RESEARCH_ACCESS_TEST_IDS,
   TestResearchDigitalTwinSdk,
   TestResearchOrgControllerSdk,
@@ -81,50 +80,45 @@ describe('Research access conversation (integration)', () => {
       const smartTokenPayload = await digitalTwinSdk.requestResearchSmartAccessToken(contractVpToken);
 
       expect(smartTokenPayload?.access_token).toBeDefined();
-      expect(smartTokenPayload?.subject).toBe(EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid);
+      const smartAccessPayload = JSON.parse(Buffer.from(String(smartTokenPayload?.access_token).split('.')[1], 'base64url').toString('utf8'));
+      expect(smartAccessPayload.scope).toContain('urn%3Auuid%3A');
 
-      const compositionSearchPayload = await digitalTwinSdk.searchCompositionBundleByMedicationText(
+      const compositionSearchPayload = await digitalTwinSdk.searchMedicationTwinsByCode(
         String(smartTokenPayload?.access_token || ''),
       );
 
       expect(compositionSearchPayload?.resourceType).toBe('Bundle');
-      expect(compositionSearchPayload?.data?.[0]?.type).toBe('Composition-search-response-v1.0');
+      expect(compositionSearchPayload?.data?.[0]?.type).toBe('MedicationStatement-search-response-v1.0');
       expect(compositionSearchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
 
       const firstMatch = compositionSearchPayload?.data?.[0]?.resource?.data?.[0];
       expect(
-        firstMatch?.['Composition.subject']
-        || firstMatch?.['org.hl7.fhir.r4.Composition.subject']
-        || firstMatch?.meta?.claims?.['Composition.subject']
-        || firstMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'],
-      ).toBe(EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid);
-      expect(
-        firstMatch?.['Composition.section']
-        || firstMatch?.['org.hl7.fhir.r4.Composition.section']
-        || firstMatch?.meta?.claims?.['Composition.section']
-        || firstMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.section'],
-      ).toBe(RESEARCH_ACCESS_SEARCH_FIXTURE.section);
+        firstMatch?.['MedicationStatement.subject']
+        || firstMatch?.['org.hl7.fhir.api.MedicationStatement.subject']
+        || firstMatch?.meta?.claims?.['MedicationStatement.subject']
+        || firstMatch?.meta?.claims?.['org.hl7.fhir.api.MedicationStatement.subject'],
+      ).toMatch(/^urn:uuid:/);
 
-      const novitaIbuprofenSearchPayload = await digitalTwinSdk.searchCompositionBundleByMedicationTextValue(
+      const novitaIbuprofenSearchPayload = await digitalTwinSdk.searchMedicationTwinsByCodeValue(
         String(smartTokenPayload?.access_token || ''),
-        RESEARCH_ACCESS_DEMO_MEDICATION_CASES.ibuprofen.searchText,
+        RESEARCH_ACCESS_DEMO_MEDICATION_CASES.ibuprofen.searchCode,
       );
-      const novitaParacetamolSearchPayload = await digitalTwinSdk.searchCompositionBundleByMedicationTextValue(
+      const novitaParacetamolSearchPayload = await digitalTwinSdk.searchMedicationTwinsByCodeValue(
         String(smartTokenPayload?.access_token || ''),
-        RESEARCH_ACCESS_DEMO_MEDICATION_CASES.paracetamol.searchText,
+        RESEARCH_ACCESS_DEMO_MEDICATION_CASES.paracetamol.searchCode,
       );
 
       for (const payload of [novitaIbuprofenSearchPayload, novitaParacetamolSearchPayload]) {
         expect(payload?.resourceType).toBe('Bundle');
-        expect(payload?.data?.[0]?.type).toBe('Composition-search-response-v1.0');
+        expect(payload?.data?.[0]?.type).toBe('MedicationStatement-search-response-v1.0');
         expect(payload?.data?.[0]?.resource?.total).toBe(1);
         const onlyMatch = payload?.data?.[0]?.resource?.data?.[0];
         expect(
-          onlyMatch?.['Composition.subject']
-          || onlyMatch?.['org.hl7.fhir.r4.Composition.subject']
-          || onlyMatch?.meta?.claims?.['Composition.subject']
-          || onlyMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'],
-        ).toBe(RESEARCH_ACCESS_TEST_IDS.novitaSubjectDid);
+          onlyMatch?.['MedicationStatement.subject']
+          || onlyMatch?.['org.hl7.fhir.api.MedicationStatement.subject']
+          || onlyMatch?.meta?.claims?.['MedicationStatement.subject']
+          || onlyMatch?.meta?.claims?.['org.hl7.fhir.api.MedicationStatement.subject'],
+        ).toMatch(/^urn:uuid:/);
       }
 
       await organizationControllerSdk.grantResearchPermitByRoleForSubjects([

@@ -6,20 +6,28 @@ import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
 import { getEnvSectionId } from '../../../utils/section-env';
 
 describe('MedicationStatementManager', () => {
+  const storedRecords = new Map<string, any>();
   const mockVaultRepository = {
     vaultExists: jest.fn(),
     put: jest.fn(),
     query: jest.fn(),
     getAllSections: jest.fn(),
     listContainersInSection: jest.fn(),
+    get: jest.fn(),
   } as unknown as jest.Mocked<IVaultRepository>;
 
   const manager = new MedicationStatementManager(mockVaultRepository);
 
   beforeEach(() => {
     jest.clearAllMocks();
+    storedRecords.clear();
     mockVaultRepository.vaultExists.mockResolvedValue(true as any);
-    mockVaultRepository.put.mockResolvedValue(true as any);
+    mockVaultRepository.put.mockImplementation(async (vaultId: string, items: any[], sectionId?: string) => {
+      items.forEach((item) => storedRecords.set(`${vaultId}|${sectionId}|${item.id}`, item));
+      return true;
+    });
+    mockVaultRepository.get.mockImplementation(async (vaultId: string, id: string, sectionId?: string) =>
+      storedRecords.get(`${vaultId}|${sectionId}|${id}`));
     mockVaultRepository.query.mockResolvedValue([] as any);
     mockVaultRepository.getAllSections.mockResolvedValue([] as any);
     mockVaultRepository.listContainersInSection.mockResolvedValue([] as any);
@@ -104,40 +112,21 @@ describe('MedicationStatementManager', () => {
     const job = createBatchJob();
     await manager.process(job);
 
-    expect(mockVaultRepository.put).toHaveBeenCalledTimes(2);
-    const digitalTwinSectionId = getSubjectScopedSectionId(
-      'Organization/subject-001',
-      'digitaltwin',
-      'medications',
-    );
-    const digitalTwinPutArgs = (mockVaultRepository.put as any).mock.calls[1];
+    expect(mockVaultRepository.put).toHaveBeenCalledTimes(3);
+    const aliasPutArgs = (mockVaultRepository.put as any).mock.calls.find((args: any[]) =>
+      String(args[2] || '').includes('digitaltwin_subject_aliases'));
+    const twinSubjectId = aliasPutArgs?.[1]?.[0]?.twinSubjectId;
+    const digitalTwinSectionId = getSubjectScopedSectionId(twinSubjectId, 'digitaltwin', 'medications');
+    const digitalTwinPutArgs = (mockVaultRepository.put as any).mock.calls.find((args: any[]) => args[2] === digitalTwinSectionId);
     expect(digitalTwinPutArgs[0]).toBe('health-care_acme');
     expect(digitalTwinPutArgs[2]).toBe(digitalTwinSectionId);
+    const researchRecord = digitalTwinPutArgs[1][0];
+    const subjectKey = Object.keys(researchRecord).find((key) => key.endsWith('MedicationStatement.subject'));
+    expect(researchRecord[subjectKey as string]).toBe(twinSubjectId);
+    expect(Object.keys(researchRecord).some((key) => key.endsWith('MedicationStatement.medication-text'))).toBe(false);
   });
 
-  it('searches digital twin medications across subjects by medication text', async () => {
-    mockVaultRepository.getAllSections.mockResolvedValueOnce([
-      getEnvSectionId('digitaltwin_medications_hash-a'),
-      getEnvSectionId('digitaltwin_medications_hash-b'),
-    ] as any);
-    mockVaultRepository.listContainersInSection
-      .mockResolvedValueOnce([
-        {
-          id: 'med-a',
-          'MedicationStatement.subject': 'did:web:example:subject:a',
-          'MedicationStatement.medication-text': 'Paracetamol 500mg',
-          indexed: { attributes: [{ name: 'MedicationStatement.medication-text', value: 'Paracetamol 500mg' }] },
-        },
-      ] as any)
-      .mockResolvedValueOnce([
-        {
-          id: 'med-b',
-          'MedicationStatement.subject': 'did:web:example:subject:b',
-          'MedicationStatement.medication-text': 'Ibuprofeno 400mg',
-          indexed: { attributes: [{ name: 'MedicationStatement.medication-text', value: 'Ibuprofeno 400mg' }] },
-        },
-      ] as any);
-
+  it('does not search digital twin medications by free text', async () => {
     const job = createBatchJob({
       action: '_search',
       section: 'digitaltwin',
@@ -166,8 +155,9 @@ describe('MedicationStatementManager', () => {
     const response = await manager.process(job);
     const data = (response.body as any).data;
     expect(data[0].response.status).toBe('200');
-    expect(data[0].resource.total).toBe(1);
-    expect(data[0].resource.data[0].id).toBe('med-a');
+    expect(data[0].resource.total).toBe(0);
+    expect(data[0].resource.data).toEqual([]);
+    expect(mockVaultRepository.getAllSections).not.toHaveBeenCalled();
   });
 
   it('searches digital twin medications across subjects by exact medication code', async () => {

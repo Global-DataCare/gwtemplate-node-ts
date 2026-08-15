@@ -125,6 +125,60 @@ function buildAliasedIndividualSelfReadJob(vpToken: string): JobRequest {
   } as JobRequest;
 }
 
+function buildSameTenantDigitalTwinManager(): OpenIdAuthManager {
+  const kmsService = {
+    getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' }),
+    signWithManagedKey: jest.fn().mockResolvedValue({
+      payload: '',
+      signatures: [{ protected: 'p', signature: 'sig' }],
+    }),
+  } as unknown as jest.Mocked<IKmsService>;
+  const tenants = {
+    getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' }),
+    tenantExists: jest.fn().mockResolvedValue(true),
+  } as unknown as jest.Mocked<TenantsCacheManager>;
+  const vault = {
+    getContainersInSection: jest.fn().mockResolvedValue([]),
+  } as unknown as jest.Mocked<IVaultRepository>;
+  const clearingHouse = {
+    verifyVpToken: jest.fn().mockResolvedValue({
+      acr: 'urn:antifraud:acr:openid4vp:employee',
+      amr: ['openid4vp', 'vc'],
+      vpHash: 'hash',
+      ledgerVerified: true,
+    }),
+  } as unknown as jest.Mocked<IClearingHouseService>;
+  return new OpenIdAuthManager(kmsService, tenants, vault, clearingHouse);
+}
+
+function buildSameTenantDigitalTwinJob(actorDid: string, vpToken: string): JobRequest {
+  return {
+    tenantId: 'acme',
+    jurisdiction: 'ES',
+    sector: 'health-care',
+    section: 'identity',
+    format: 'openid',
+    resourceType: 'smart',
+    action: 'token',
+    id: '',
+    sequence: 0,
+    status: 'DRAFT' as any,
+    createdAtTimestamp: Date.now(),
+    content: {
+      thid: 'same-tenant-digital-twin',
+      iss: 'did:web:device.example',
+      aud: 'did:web:api.acme.org',
+      body: {
+        sub: actorDid,
+        scope: `${ServiceCapability.DigitalTwinReader}?subject=did:web:api.acme.org:research-subject:any`,
+        purpose: 'RESEARCH',
+        vp_token: vpToken,
+        acr_values: 'urn:antifraud:acr:openid4vp:employee',
+      },
+    } as any,
+  } as JobRequest;
+}
+
 describe('OpenIdAuthManager', () => {
   it('fails closed when a consent expiry is malformed or has reached its boundary', () => {
     const now = Date.parse('2026-08-31T18:30:00Z');
@@ -1308,6 +1362,37 @@ describe('OpenIdAuthManager', () => {
     } as JobRequest);
 
     expect(response.body.access_token).toBeDefined();
+    expect(response.body.subject).toMatch(/^urn:uuid:/);
+  });
+
+  it('issues DigitalTwinReader to a verified employee of the provider tenant without a consent rule', async () => {
+    const actorDid = 'did:web:api.acme.org:employee:zDoctorEmailHash:ISCO-08|2211';
+    const vpToken = buildUnsignedProfessionalIdentityVpJwt({
+      clientId: actorDid,
+      actorDid,
+      role: 'ISCO-08|2211',
+    });
+
+    const response = await buildSameTenantDigitalTwinManager().process(
+      buildSameTenantDigitalTwinJob(actorDid, vpToken),
+    );
+
+    expect(response.body.access_token).toBeDefined();
+    expect(response.body.scope).toContain(ServiceCapability.DigitalTwinReader);
+  });
+
+  it('denies same-tenant DigitalTwinReader when the verified VP does not identify the requesting employee', async () => {
+    const actorDid = 'did:web:api.acme.org:employee:zDoctorEmailHash:ISCO-08|2211';
+    const otherActorDid = 'did:web:api.acme.org:employee:zOtherHash:ISCO-08|2211';
+    const vpToken = buildUnsignedProfessionalIdentityVpJwt({
+      clientId: otherActorDid,
+      actorDid: otherActorDid,
+      role: 'ISCO-08|2211',
+    });
+
+    await expect(buildSameTenantDigitalTwinManager().process(
+      buildSameTenantDigitalTwinJob(actorDid, vpToken),
+    )).rejects.toThrow('No matching consent rule found');
   });
 
   it('should issue an individual self-read token without requiring an inter-tenant research contract', async () => {

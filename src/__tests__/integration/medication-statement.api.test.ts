@@ -13,6 +13,7 @@ import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { testTenant1TenantId } from '../data/organization.data';
+import { getDigitalTwinSubjectAliasSectionId } from '../../utils/digital-twin-research-projection';
 
 describe('MedicationStatement API (integration)', () => {
   afterEach(() => {
@@ -680,7 +681,7 @@ describe('MedicationStatement API (integration)', () => {
     }
   });
 
-  it('mirrors medication updates into digital twin scope and finds twins by medication text and code', async () => {
+  it('projects medication updates into a pseudonymous digital twin and finds them by coded data', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -851,138 +852,24 @@ describe('MedicationStatement API (integration)', () => {
       }
       expect(communicationPayload?.data?.[0]?.response?.status).toBe('200');
 
-      const digitalTwinMedicationsSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'medications');
+      const aliases = await vaultRepository.getContainersInSection<any>(
+        tenantVaultId,
+        getDigitalTwinSubjectAliasSectionId(),
+      );
+      expect(aliases).toHaveLength(1);
+      const twinSubjectId = aliases[0].twinSubjectId;
+      expect(twinSubjectId).toMatch(/^urn:uuid:/);
+      const digitalTwinMedicationsSection = getSubjectScopedSectionId(twinSubjectId, 'digitaltwin', 'medications');
       const digitalTwinRecords = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinMedicationsSection);
       expect(digitalTwinRecords).toHaveLength(1);
-      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.medication-text']).toBe('Paracetamol 500mg cada 8 horas');
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.subject']).toBe(twinSubjectId);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
-      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code-display']).toBe('Paracetamol 500 MG Oral Tablet');
-      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code-text']).toBe('Paracetamol 500mg cada 8 horas');
+      expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.identifier']).not.toBe('urn:uuid:medication-digitaltwin-001');
+      expect(Object.keys(digitalTwinRecords[0]).some((key) =>
+        key !== '@context' && /(?:[.\-_])(text|display|note)$/i.test(key))).toBe(false);
+      expect(JSON.stringify(digitalTwinRecords[0])).not.toContain(subjectDid);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.language']).toBe('es');
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.user-selected']).toBe('true');
-
-      const searchByTextThid = 'digitaltwin-medication-text-search-001';
-      const textSearchResp = await invokeExpress(app, {
-        method: 'POST',
-        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
-        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
-        body: {
-          thid: searchByTextThid,
-          body: {
-            data: [
-              {
-                type: 'MedicationStatement-search-request-v1.0',
-                meta: {
-                  claims: {
-                    '@context': 'org.hl7.fhir.api',
-                    'MedicationStatement.medication-text': 'paracetamol',
-                  },
-                },
-              },
-            ],
-          },
-        },
-      });
-      expect(textSearchResp.status).toBe(202);
-
-      let textSearchPayload: any;
-      for (let i = 0; i < 50; i++) {
-        const pollResp = await invokeExpress(app, {
-          method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
-          headers: { 'content-type': 'application/json' },
-          body: { thid: searchByTextThid },
-        });
-        if (pollResp.status === 200) {
-          textSearchPayload = JSON.parse(pollResp.text);
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 50));
-      }
-      expect(textSearchPayload?.data?.[0]?.resource?.total).toBe(1);
-      expect(textSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.subject']).toBe(subjectDid);
-
-      const searchByDisplayThid = 'digitaltwin-medication-display-search-001';
-      const displaySearchResp = await invokeExpress(app, {
-        method: 'POST',
-        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
-        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
-        body: {
-          thid: searchByDisplayThid,
-          body: {
-            data: [
-              {
-                type: 'MedicationStatement-search-request-v1.0',
-                meta: {
-                  claims: {
-                    '@context': 'org.hl7.fhir.api',
-                    'MedicationStatement.code-display': 'oral tablet',
-                  },
-                },
-              },
-            ],
-          },
-        },
-      });
-      expect(displaySearchResp.status).toBe(202);
-
-      let displaySearchPayload: any;
-      for (let i = 0; i < 50; i++) {
-        const pollResp = await invokeExpress(app, {
-          method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
-          headers: { 'content-type': 'application/json' },
-          body: { thid: searchByDisplayThid },
-        });
-        if (pollResp.status === 200) {
-          displaySearchPayload = JSON.parse(pollResp.text);
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 50));
-      }
-      expect(displaySearchPayload?.data?.[0]?.resource?.total).toBe(1);
-      expect(displaySearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.subject']).toBe(subjectDid);
-
-      const searchByLocalTextThid = 'digitaltwin-medication-localtext-search-001';
-      const localTextSearchResp = await invokeExpress(app, {
-        method: 'POST',
-        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
-        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
-        body: {
-          thid: searchByLocalTextThid,
-          body: {
-            data: [
-              {
-                type: 'MedicationStatement-search-request-v1.0',
-                meta: {
-                  claims: {
-                    '@context': 'org.hl7.fhir.api',
-                    'MedicationStatement.code-text': 'cada 8 horas',
-                  },
-                },
-              },
-            ],
-          },
-        },
-      });
-      expect(localTextSearchResp.status).toBe(202);
-
-      let localTextSearchPayload: any;
-      for (let i = 0; i < 50; i++) {
-        const pollResp = await invokeExpress(app, {
-          method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
-          headers: { 'content-type': 'application/json' },
-          body: { thid: searchByLocalTextThid },
-        });
-        if (pollResp.status === 200) {
-          localTextSearchPayload = JSON.parse(pollResp.text);
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 50));
-      }
-      expect(localTextSearchPayload?.data?.[0]?.resource?.total).toBe(1);
-      expect(localTextSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.subject']).toBe(subjectDid);
 
       const searchByCodeThid = 'digitaltwin-medication-code-search-001';
       const codeSearchResp = await invokeExpress(app, {
@@ -1024,6 +911,7 @@ describe('MedicationStatement API (integration)', () => {
       }
       expect(codeSearchPayload?.data?.[0]?.resource?.total).toBe(1);
       expect(codeSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
+      expect(codeSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.subject']).toBe(twinSubjectId);
     } finally {
       queueAdapter.stop();
     }
