@@ -13,6 +13,9 @@ import { getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 import { testTenant1TenantId } from '../data/organization.data';
 import { getDigitalTwinSubjectAliasSectionId } from '../../utils/digital-twin-research-projection';
+import { buildOrganizationDidWeb, buildProfessionalDidWeb } from 'gdc-common-utils-ts/utils/did';
+import { EXAMPLE_HOST_PUBLIC_HOSTNAME, EXAMPLE_ROUTE_VERSION } from 'gdc-common-utils-ts/examples/shared';
+import { ExampleEmployeeEmails, ExampleEmployeeRoles } from 'gdc-common-utils-ts/examples/employee';
 
 describe('Composition Bundle _search API (integration)', () => {
   function loadIpsAllSectionsFixture(subjectDid: string): any {
@@ -1096,9 +1099,21 @@ describe('Composition Bundle _search API (integration)', () => {
       await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
       await tenantManager.getTenant(tenantVaultId);
 
-      const subjectDid = 'did:web:api.lab.org:research-subject:branch-composition-001';
-      const branchCompositionId =
-        'urn:twin:researchsubject-branch-composition-001:branch:employee-001:version:01JZ4CV2G1X2M5Y8Y3V4W6Q7R8';
+      const subjectDid = 'urn:uuid:00000000-0000-4000-8000-000000000101';
+      const hostedOrganizationDid = buildOrganizationDidWeb({
+        hostDidWeb: `did:web:${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
+        tenantId: testTenant1TenantId,
+        jurisdiction: 'ES',
+        version: EXAMPLE_ROUTE_VERSION,
+        sector: 'health-care',
+      });
+      const operationalEmployeeDid = buildProfessionalDidWeb({
+        organizationDidWeb: hostedOrganizationDid,
+        email: ExampleEmployeeEmails.SharedProfessional,
+        role: ExampleEmployeeRoles.Doctor,
+      });
+      const branchId = `urn:gdc:digital-twin-selection:${createHash('sha256').update(subjectDid).digest('base64url')}:employee:${createHash('sha256').update(operationalEmployeeDid).digest('base64url')}`;
+      const branchCompositionId = `${branchId}:version:01JZ4CV2G1X2M5Y8Y3V4W6Q7R8`;
       const branchTag = {
         id: 'Composition.meta.tag[0]',
         system: 'urn:research:tag:score',
@@ -1131,7 +1146,9 @@ describe('Composition Bundle _search API (integration)', () => {
                     'Composition.subject': subjectDid,
                     'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
                     'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
-                    'Composition.author': 'did:web:api.lab.org:employee:researcher1@lab.org:ISCO-08|2211',
+                    'Composition.author': operationalEmployeeDid,
+                    'Composition.branch': branchId,
+                    'Composition.branch-version': '01JZ4CV2G1X2M5Y8Y3V4W6Q7R8',
                     'Composition.date': '2026-07-01T10:00:00Z',
                   },
                   tag: [branchTag],

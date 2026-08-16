@@ -19,6 +19,29 @@ import {
   COMPOSITION_SEARCH_BUNDLE_EXAMPLE,
   COMPOSITION_SEARCH_PARAMETERS_EXAMPLE,
 } from '../../../api-examples';
+import { buildOrganizationDidWeb, buildProfessionalDidWeb } from 'gdc-common-utils-ts/utils/did';
+import {
+  EXAMPLE_HOST_PUBLIC_HOSTNAME,
+  EXAMPLE_ROUTE_VERSION,
+  EXAMPLE_TENANT_ROUTE_CONTEXT,
+} from 'gdc-common-utils-ts/examples/shared';
+import {
+  ExampleEmployeeEmails,
+  ExampleEmployeeRoles,
+} from 'gdc-common-utils-ts/examples/employee';
+
+const HOSTED_ORGANIZATION_DID = buildOrganizationDidWeb({
+  hostDidWeb: `did:web:${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
+  tenantId: EXAMPLE_TENANT_ROUTE_CONTEXT.tenantId,
+  jurisdiction: EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction,
+  version: EXAMPLE_ROUTE_VERSION,
+  sector: EXAMPLE_TENANT_ROUTE_CONTEXT.sector,
+});
+const OPERATIONAL_EMPLOYEE_DID = buildProfessionalDidWeb({
+  organizationDidWeb: HOSTED_ORGANIZATION_DID,
+  email: ExampleEmployeeEmails.SharedProfessional,
+  role: ExampleEmployeeRoles.Doctor,
+});
 
 describe('CompositionManager', () => {
   const mockVaultRepository = {
@@ -96,6 +119,23 @@ describe('CompositionManager', () => {
     const putArgs = (mockVaultRepository.put as any).mock.calls[0];
     expect(putArgs[0]).toBe('animal-research_acme');
     expect(putArgs[2]).toBe(expectedSectionId);
+  });
+
+  it('rejects a digital-twin branch whose author differs from the authenticated employee', async () => {
+    const entry = structuredClone(COMPOSITION_BATCH_ENTRY_EXAMPLE) as any;
+    entry.meta.claims['Composition.author'] = `${OPERATIONAL_EMPLOYEE_DID}:another`;
+    const response = await manager.process(createJob({
+      content: {
+        ...(createJob().content as any),
+        meta: { bearer: { jwt: { payload: { sub: OPERATIONAL_EMPLOYEE_DID } } } },
+        body: { resourceType: 'Bundle', type: 'batch', entry: [entry] },
+      } as any,
+    }));
+
+    const data = (response.body as any).data;
+    expect(data[0].response.status).toBe('400');
+    expect(JSON.stringify(data[0])).toContain('author must match the authenticated employee');
+    expect(mockVaultRepository.put).not.toHaveBeenCalled();
   });
 
   it('ignores OperationOutcome entries from preconversion payload', async () => {
@@ -902,6 +942,18 @@ describe('CompositionManager', () => {
             'Composition.subject': subjectDid,
             'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
             'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            'Composition.author': OPERATIONAL_EMPLOYEE_DID,
+            'Composition.branch': 'urn:gdc:digital-twin-selection:twin:employee:owner',
+            meta: { tag: [branchTag] },
+            tag: [branchTag],
+          },
+          {
+            id: `${branchCompositionId}-another-employee`,
+            'Composition.subject': subjectDid,
+            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            'Composition.author': `${OPERATIONAL_EMPLOYEE_DID}:another`,
+            'Composition.branch': 'urn:gdc:digital-twin-selection:twin:employee:other',
             meta: { tag: [branchTag] },
             tag: [branchTag],
           },
@@ -914,6 +966,7 @@ describe('CompositionManager', () => {
       action: '_search',
       content: {
         ...(createJob().content as any),
+        meta: { bearer: { jwt: { payload: { sub: OPERATIONAL_EMPLOYEE_DID } } } },
         body: {
           resourceType: 'Parameters',
           parameter: [

@@ -41,6 +41,7 @@ import type { IVaultRepository } from '../database/repositories/vault/vault.repo
 import type { IJobProcessor } from './registry';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
+import { getAuthenticatedJobActorDid } from '../utils/authenticated-job-actor';
 import {
   extractCompositionExcludedSearchSections,
   extractCompositionSearchSections,
@@ -276,6 +277,7 @@ export class CompositionManager implements IJobProcessor {
         requiredSections: search.searchSections,
         excludedSections: search.excludedSearchSections,
         body: context.body,
+        authenticatedActorDid: getAuthenticatedJobActorDid(job),
         filterMatchesBySectionsAndTypes: this.filterMatchesBySectionsAndTypes.bind(this),
       });
 
@@ -398,8 +400,16 @@ export class CompositionManager implements IJobProcessor {
         const section = getClaimValue<string>(claims, 'Composition.section');
         if (!section) throw new Error('Missing required claim: Composition.section');
 
-        const author = getClaimValue<string>(claims, 'Composition.author') || job.content?.iss;
+        const submittedAuthor = getClaimValue<string>(claims, 'Composition.author');
+        const authenticatedAuthor = context.normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN
+          ? getAuthenticatedJobActorDid(job)
+          : undefined;
+        if (authenticatedAuthor && submittedAuthor && submittedAuthor !== authenticatedAuthor) {
+          throw new Error('Digital twin working-selection author must match the authenticated employee.');
+        }
+        const author = authenticatedAuthor || submittedAuthor || job.content?.iss;
         if (!author) throw new Error('Missing required claim: Composition.author');
+        claims['Composition.author'] = author;
 
         const date = getClaimValue<string>(claims, 'Composition.date') || new Date().toISOString();
         const entryRefs = getClaimValue<string>(claims, 'Composition.entry') || '';

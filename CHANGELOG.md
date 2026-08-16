@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.21.13] - 2026-08-16
+
+- Enforce employee-private digital-twin worksets from the authenticated SMART
+  subject: tagged Composition searches are scoped to that hosted employee DID,
+  and branch writes reject a different client-supplied author.
+
 ## [1.21.12] - 2026-08-15
 
 - Project individual clinical ingestion into a minimal research-safe digital
