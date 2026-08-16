@@ -357,6 +357,20 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
+        ['Composition'],
+        ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
+        ['Composition'],
+        ['_batch'],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
         ['Communication'],
         ['_batch'],
       ),
@@ -380,23 +394,6 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
         { sector, section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
         ['ResearchSubject'],
         ['$summary'],
-      ),
-    );
-  }
-
-  if (isResearch) {
-    services.push(
-      createDidEndpointConfigFromSelector(
-        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
-        ['Composition'],
-        ['_batch'],
-      ),
-    );
-    services.push(
-      createDidEndpointConfigFromSelector(
-        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
-        ['Composition'],
-        ['_batch'],
       ),
     );
   }

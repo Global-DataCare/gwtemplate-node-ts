@@ -1105,25 +1105,59 @@ describe('Composition Bundle _search API (integration)', () => {
         code: '10',
       };
 
-      const digitalTwinCompositionSection = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
-      await vaultRepository.put(
-        tenantVaultId,
-        [
-          {
-            id: branchCompositionId,
-            '@context': 'org.hl7.fhir.api',
-            'Composition.identifier': branchCompositionId,
-            'Composition.subject': subjectDid,
-            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
-            'Composition.author': 'did:web:api.lab.org:employee:researcher1@lab.org:ISCO-08|2211',
-            'Composition.date': '2026-07-01T10:00:00Z',
-            meta: { tag: [branchTag] },
-            tag: [branchTag],
+      const saveResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'researcher-branch-composition-save-001',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [{
+              type: 'Composition',
+              request: {
+                method: 'POST',
+                url: 'digitaltwin/org.hl7.fhir.r4/Composition',
+              },
+              resource: {
+                resourceType: 'Composition',
+                id: branchCompositionId,
+                meta: {
+                  claims: {
+                    '@context': 'org.hl7.fhir.r4',
+                    '@type': 'Composition:ResearcherWorkingSelection',
+                    'Composition.identifier': branchCompositionId,
+                    'Composition.subject': subjectDid,
+                    'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+                    'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+                    'Composition.author': 'did:web:api.lab.org:employee:researcher1@lab.org:ISCO-08|2211',
+                    'Composition.date': '2026-07-01T10:00:00Z',
+                  },
+                  tag: [branchTag],
+                },
+              },
+            }],
           },
-        ],
-        digitalTwinCompositionSection,
-      );
+        },
+      });
+      expect(saveResp.status).toBe(202);
+
+      let savePayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'researcher-branch-composition-save-001' },
+        });
+        if (pollResp.status === 200) {
+          savePayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(savePayload?.data?.[0]?.response?.status).toBe('201');
 
       const searchResp = await invokeExpress(app, {
         method: 'POST',

@@ -76,7 +76,16 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
       .includes(normalizedResourceType);
     if (!resourceAllowed) return false;
 
-    const actionAllowed = (service.actions || []).includes(normalizedAction);
+    const actions = service.actions || [];
+    const legacyDigitalTwinWorkingSelection =
+      normalizedSection === 'digitaltwin' &&
+      normalizedResourceType === 'composition' &&
+      normalizedAction === '_batch' &&
+      actions.includes('_search');
+    // Existing tenants may predate the explicit Composition/_batch service
+    // declaration. A tenant that already exposes digital-twin Composition
+    // search also exposes the researcher working-selection persistence step.
+    const actionAllowed = actions.includes(normalizedAction) || legacyDigitalTwinWorkingSelection;
     return actionAllowed;
   });
 }

@@ -93,6 +93,24 @@ describe('isRequestValid', () => {
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
   });
+
+  it('keeps tagged digital-twin working selections available to tenants with the legacy search-only declaration', () => {
+    const legacyDigitalTwinServices: DidService[] = [{
+      id: '#digitaltwin:org.hl7.fhir.r4',
+      type: 'ApiService',
+      serviceEndpoint: 'Composition',
+      actions: ['_search'],
+      selector: { section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
+    }];
+
+    expect(isRequestValid(legacyDigitalTwinServices, {
+      sector: Sector.HEALTH_CARE,
+      section: 'digitaltwin',
+      format: 'org.hl7.fhir.r4',
+      resourceType: 'Composition',
+      action: '_batch',
+    })).toBe(true);
+  });
   
   it('should return TRUE for a request where resourceType has different casing', () => {
     const params = {

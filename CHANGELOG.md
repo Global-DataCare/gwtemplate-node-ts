@@ -11,6 +11,11 @@
   matching contract and consent policy. Research SMART scopes now expose the
   pseudonymous twin subject instead of the operational individual DID.
 - Replace free-text twin search examples and E2E cases with coded FHIR claims.
+- Publish `digitaltwin/Composition/_batch` for FHIR tenants so researchers can
+  persist ledger-safe tagged working selections between coded discovery and
+  `ResearchSubject/$summary`. Preserve that route for existing tenants whose
+  stored service declaration exposed only Composition search, and prove the
+  public batch-to-`Composition.meta-tag=system|code` lifecycle.
 
 ## [1.21.11] - 2026-08-14
 

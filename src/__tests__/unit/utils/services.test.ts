@@ -244,6 +244,15 @@ describe('Service Initialization Utilities', () => {
           (s.actions || []).includes('_search'),
       );
       expect(individualCommercialSearchService).toBeDefined();
+
+      const digitalTwinWorkingSelectionService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'digitaltwin' &&
+          (s as any).selector?.format === 'org.hl7.fhir.r4' &&
+          s.serviceEndpoint === 'Composition' &&
+          (s.actions || []).includes('_batch'),
+      );
+      expect(digitalTwinWorkingSelectionService).toBeDefined();
     });
 
     it('should treat synthetic animal-tech as FHIR-enabled', () => {
