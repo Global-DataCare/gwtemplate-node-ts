@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+- Use the canonical HL7 v3 ActReason `HRESCH` for healthcare-research SMART,
+  Consent, and inter-tenant contract authorization instead of the ad-hoc
+  `RESEARCH` token.
+
+- Remove the non-FHIR `Composition.branch` and `Composition.branch-version`
+  claims from researcher working selections. Ownership and recovery now use
+  standard `Composition.identifier`, `subject`, and `author` claims together
+  with ledger-safe `meta.tag` coding metadata.
 - Require Test Network onboarding to carry the reviewer-signed
   `OrganizationTestNetworkCredential` plus exactly three normal domain VCs
   marked `TestNetworkCredential`. Verify every ML-DSA-65 proof, PDF/identity
@@ -13,6 +21,29 @@
 - Document the existing-tenant boundary faithfully: GW projects the ICA-issued
   ServiceControllerCredential into tenant/controller storage, while a portal
   BFF independently persists the three returned `vc[]` records.
+
+## [1.21.13] - 2026-08-16
+
+- Enforce employee-private digital-twin worksets from the authenticated SMART
+  subject: tagged Composition searches are scoped to that hosted employee DID,
+  and working-selection writes reject a different client-supplied author.
+
+## [1.21.12] - 2026-08-15
+
+- Project individual clinical ingestion into a minimal research-safe digital
+  twin: retain a private stable subject alias, replace identifiers and
+  subject references, remove patient and free text/display/narrative claims, and
+  exclude identity-bearing Patient, RelatedPerson and Consent resources.
+- Permit `DigitalTwinReader` for a verified employee of the provider tenant
+  without an inter-tenant contract; foreign organizations still require the
+  matching contract and consent policy. Research SMART scopes now expose the
+  pseudonymous twin subject instead of the operational individual DID.
+- Replace free-text twin search examples and E2E cases with coded FHIR claims.
+- Publish `digitaltwin/Composition/_batch` for FHIR tenants so researchers can
+  persist ledger-safe tagged working selections between coded discovery and
+  `ResearchSubject/$summary`. Preserve that route for existing tenants whose
+  stored service declaration exposed only Composition search, and prove the
+  public batch-to-`Composition.meta-tag=system|code` lifecycle.
 
 ## [1.21.11] - 2026-08-14
 
@@ -720,16 +751,16 @@
   - `src/__tests__/managers/OpenIdAuthManager.test.ts`
   - `src/__tests__/integration/identity/smart-token.test.ts`
 - Extended `digitaltwin/.../Composition/_search` so one request can match
-  directly against researcher-branch `Composition` records stored in the
+  directly against researcher working-selection `Composition` records stored in the
   digital-twin composition collection, instead of only fanning out through
   leaf resource families first. The first direct `Composition.*` capability
   now covered is `Composition.meta-tag`, matched as a tokenized
   `system|code` filter against stored `meta.tag[]` / `tag[]` values.
   TDD coverage now proves:
-  - one unit-level digital twin `Composition` branch tagged with
+  - one unit-level digital twin working-selection `Composition` tagged with
     `urn:research:tag:score|10` is returned by
     `Composition/_search(section + Composition.meta-tag)`
-  - one integration-level `digitaltwin` search returns a branch composition
+  - one integration-level `digitaltwin` search returns a selection composition
     persisted in the tenant vault with the same `meta.tag[]` payload
   Files:
   - `src/managers/TwinCompositionManager.ts`

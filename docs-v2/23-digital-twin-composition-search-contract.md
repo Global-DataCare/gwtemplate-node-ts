@@ -69,12 +69,10 @@ Current rule:
 Examples:
 
 - `section = LOINC|10160-0`
-- `MedicationStatement.code-display = lisinopril`
-- `MedicationStatement.code-text = lisinopril`
+- `MedicationStatement.code = http://snomed.info/sct|108575001`
 
 - `section = LOINC|8716-3`
-- `Observation.code-display = pressure`
-- `Observation.code-text = pressure`
+- `Observation.code = http://loinc.org|85354-9`
 
 ## Public parameter semantics
 
@@ -83,36 +81,23 @@ Section parameters:
 - `section`
 - `composition.section`
 
-Resource-scoped text filters accepted by the current implementation:
+Resource-scoped coded filters accepted by the current implementation use the
+canonical `<ResourceType>.<claim>` name, for example:
 
-- `<ResourceType>.code-display`
-- `<ResourceType>.CodeDisplay`
-- `<ResourceType>.code-text`
-- `<ResourceType>.code-text-local`
-- `<ResourceType>.CodeTextLocal`
+- `MedicationStatement.code`
+- `Observation.code`
+- `Condition.code`
 
 Current support rule:
 
-- every supported `section -> resourceType` mapping should accept both
-  `code-display` and `code-text` textual matching
+- research discovery uses machine-readable codes retained by the research-safe
+  projection
 - tests should exist for each supported section/resource pair
-- token/code exact matching and date/period range filters are planned next, but
-  they are not the MVP contract today
+- `display`, narrative `text`, local text, and free-text matching are not part
+  of this contract because those values are removed from research data
 
-Special compatibility rule for medications:
-
-- `MedicationStatement.code-text` may match either:
-  - `MedicationStatement.CodeTextLocal`
-  - `MedicationStatement.medication-text`
-
-Matching semantics:
-
-- `code-display`
-  case-insensitive partial text match
-- `code-text`
-  case-insensitive partial text match
-- non-textual claims
-  exact match
+Matching semantics are exact coded-claim matching after the gateway's normal
+claim/token normalization.
 
 Current malformed-input rules:
 
@@ -142,7 +127,7 @@ Important:
 - and that `Composition` is the twin index/descriptor used to identify one
   matched `ResearchSubject` / digital twin.
 
-## Search vs Materialization
+## Search, Working Selection, and Materialization
 
 This contract intentionally separates:
 
@@ -150,8 +135,17 @@ This contract intentionally separates:
 - `digitaltwin/.../Composition/_search`
 - returns 0..n matched twin `Composition` indexes
 
-2. materialization
-- happens later, when the researcher chooses one or more matched twins
+2. working-selection persistence
+- when the researcher chooses a match, the client may save a separate
+  researcher-owned `Composition` through `digitaltwin/.../Composition/_batch`
+- the selection keeps the matched pseudonymous `Composition.subject`, the
+  employee DID in `Composition.author`, and ledger-safe `meta.tag[]`
+- the canonical twin is not modified and no clinical data is copied
+- a workset is reopened through `Composition/_search` with
+  `Composition.meta-tag = system|code`
+
+3. materialization
+- happens after the researcher chooses or reopens one or more matched twins
 - the request should be carried in a `Bundle` of `Communication`
 - each `Communication` asks for the summary of one matched
   `ResearchSubject` / twin
@@ -166,8 +160,41 @@ Target materialization semantics:
 This means:
 
 - `Composition/_search` answers "which twins match?"
+- `Composition/_batch` answers "save this employee's tagged working selection"
+- `Composition.meta-tag` answers "which saved selections belong to this exact
+  coded workset/status/cohort?"
 - `ResearchSubject/$summary` answers "materialize this twin in a concrete
   representation"
+
+### Researcher tags
+
+Tags are organization-defined working metadata, not clinical claims. Only the
+ledger-safe fields `id`, `system`, `code`, optional `version`, and optional
+`userSelected` are retained. `display`, free text, names, and individual
+identifiers must not be stored in a tag.
+
+Example working-selection metadata:
+
+```json
+{
+  "claims": {
+    "Composition.subject": "urn:uuid:pseudonymous-twin-subject",
+    "Composition.author": "did:web:api.acme.org:employee:researcher-1:ISCO-08|2211",
+    "Composition.section": "LOINC|10160-0"
+  },
+  "tag": [
+    {
+      "id": "Composition.meta.tag[0]",
+      "system": "urn:acme:research:workset",
+      "code": "study-2026-04",
+      "userSelected": true
+    }
+  ]
+}
+```
+
+The exact recovery filter is
+`Composition.meta-tag = urn:acme:research:workset|study-2026-04`.
 
 ## Materialized output formats
 
@@ -254,8 +281,12 @@ The tested flow is:
 5. project one `Composition` index per IPS section into `digitaltwin`
 6. call `digitaltwin/.../Composition/_search` with:
    - `section`
-   - one or more resource-scoped text filters for the same family
+   - one or more resource-scoped coded filters for the same family
 7. receive matched `Composition` results
+8. save one selected twin as a tagged working-selection `Composition`
+9. reopen it by exact `Composition.meta-tag = system|code`
+10. materialize its `Composition.subject` through
+    `Communication -> ResearchSubject/$summary`
 
 Concrete test anchors:
 

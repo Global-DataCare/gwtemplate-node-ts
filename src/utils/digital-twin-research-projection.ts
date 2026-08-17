@@ -1,0 +1,131 @@
+import { createHash, randomUUID } from 'crypto';
+import type { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
+import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
+import { getEnvSectionId } from './section-env';
+
+const DIGITAL_TWIN_SUBJECT_ALIAS_SECTION = 'digitaltwin_subject_aliases';
+const RESEARCH_PROJECTION_AUTHOR = 'urn:gdc:research-projection';
+
+export type DigitalTwinSubjectAlias = RecordBase & {
+  type: 'digital-twin-subject-alias';
+  sourceSubjectHash: string;
+  twinSubjectId: string;
+};
+
+const BLOCKED_RESEARCH_CLAIM_SEGMENT = /(?:^|[.\-_])(display|text|title|description|note|instruction|name|address|telecom|contact|narrative)(?:$|[.\-_])/i;
+const RESEARCH_IDENTIFIER_CLAIM = /(?:^|\.)(?:id|identifier)(?:\.value)?$/i;
+const RESEARCH_PATIENT_CLAIM = /(?:^|\.)patient(?:\.reference)?$/i;
+const RESEARCH_SUBJECT_CLAIM = /(?:^|\.)subject(?:\.reference)?$/i;
+
+const RESEARCH_RESOURCE_TYPES = new Set([
+  'MedicationStatement',
+  'Observation',
+  'AllergyIntolerance',
+  'Condition',
+  'DeviceUseStatement',
+  'Flag',
+  'Procedure',
+  'ImagingStudy',
+  'Immunization',
+  'DiagnosticReport',
+  'CarePlan',
+  'Encounter',
+  'AdverseEvent',
+  'Composition',
+]);
+
+function sourceSubjectHash(sourceSubject: string): string {
+  return createHash('sha256').update(String(sourceSubject || '').trim(), 'utf8').digest('hex');
+}
+
+function stableResearchUuid(seed: string): string {
+  const bytes = createHash('sha256').update(seed, 'utf8').digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** Returns the private tenant section that binds operational subjects to research twins. */
+export function getDigitalTwinSubjectAliasSectionId(): string {
+  return getEnvSectionId(DIGITAL_TWIN_SUBJECT_ALIAS_SECTION);
+}
+
+/**
+ * Gets or creates the stable, non-resolvable research subject assigned to one
+ * operational individual inside a tenant. The reversible binding remains in
+ * the confidential tenant vault and is never copied into the research record.
+ */
+export async function getOrCreateDigitalTwinSubjectId(input: {
+  vaultRepository: IVaultRepository;
+  tenantVaultId: string;
+  sourceSubject: string;
+}): Promise<string> {
+  const normalizedSource = String(input.sourceSubject || '').trim();
+  if (!normalizedSource) throw new Error('sourceSubject is required');
+  const id = sourceSubjectHash(normalizedSource);
+  const sectionId = getDigitalTwinSubjectAliasSectionId();
+  const existing = typeof input.vaultRepository.get === 'function'
+    ? await input.vaultRepository.get<DigitalTwinSubjectAlias>(input.tenantVaultId, id, sectionId)
+    : undefined;
+  if (existing?.twinSubjectId) return existing.twinSubjectId;
+
+  const twinSubjectId = `urn:uuid:${randomUUID()}`;
+  await input.vaultRepository.put<DigitalTwinSubjectAlias>(input.tenantVaultId, [{
+    id,
+    type: 'digital-twin-subject-alias',
+    sourceSubjectHash: id,
+    twinSubjectId,
+  }], sectionId);
+  return twinSubjectId;
+}
+
+/** Returns whether a clinical resource is eligible for the minimal research projection. */
+export function isDigitalTwinResearchResourceType(resourceType: string): boolean {
+  return RESEARCH_RESOURCE_TYPES.has(String(resourceType || '').trim());
+}
+
+/**
+ * Builds the fail-closed minimal research projection used before DataConv is
+ * integrated. Free text and identifying claims are removed; resource and
+ * business identifiers are replaced deterministically within the twin, and
+ * every patient/subject reference is rebound to the research subject.
+ */
+export function projectClaimsForDigitalTwin(input: {
+  claims: Record<string, unknown>;
+  resourceType: string;
+  twinSubjectId: string;
+}): Record<string, unknown> {
+  const resourceType = String(input.resourceType || '').trim();
+  const twinSubjectId = String(input.twinSubjectId || '').trim();
+  if (!isDigitalTwinResearchResourceType(resourceType)) {
+    throw new Error(`Resource type '${resourceType}' is not allowed in digital twin research projection.`);
+  }
+  if (!twinSubjectId) throw new Error('twinSubjectId is required');
+
+  const projected: Record<string, unknown> = {};
+  for (const [key, rawValue] of Object.entries(input.claims || {})) {
+    const normalizedKey = String(key || '').trim();
+    if (!normalizedKey) continue;
+    if (normalizedKey === '@context') {
+      projected[normalizedKey] = rawValue;
+      continue;
+    }
+    if (BLOCKED_RESEARCH_CLAIM_SEGMENT.test(normalizedKey)) continue;
+    if (RESEARCH_PATIENT_CLAIM.test(normalizedKey)) continue;
+    if (RESEARCH_SUBJECT_CLAIM.test(normalizedKey)) {
+      projected[normalizedKey] = twinSubjectId;
+      continue;
+    }
+    if (/\.author$/i.test(normalizedKey)) {
+      projected[normalizedKey] = RESEARCH_PROJECTION_AUTHOR;
+      continue;
+    }
+    if (RESEARCH_IDENTIFIER_CLAIM.test(normalizedKey)) {
+      projected[normalizedKey] = `urn:uuid:${stableResearchUuid(`${twinSubjectId}|${resourceType}|${normalizedKey}|${String(rawValue || '')}`)}`;
+      continue;
+    }
+    projected[normalizedKey] = rawValue;
+  }
+  return projected;
+}

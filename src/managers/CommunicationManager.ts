@@ -38,6 +38,11 @@ import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { persistConsentRuleAndAttachment } from '../utils/consent-storage';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
+import {
+  getOrCreateDigitalTwinSubjectId,
+  isDigitalTwinResearchResourceType,
+  projectClaimsForDigitalTwin,
+} from '../utils/digital-twin-research-projection';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -692,7 +697,6 @@ export class CommunicationManager implements IJobProcessor {
       claims['org.hl7.fhir.r4.Composition.meta.versionId'] = contentVersionId;
 
       const individualSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
-      const digitalTwinSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_DIGITAL_TWIN, 'composition');
       const versionId = this.normalizeOptionalString(
         claims['Composition.meta.versionId']
         || claims['org.hl7.fhir.r4.Composition.meta.versionId'],
@@ -709,7 +713,25 @@ export class CommunicationManager implements IJobProcessor {
       );
       const record = { id: recordId, ...claims } as any;
       await this.vaultRepository.put(tenantVaultId, [record], individualSectionId);
-      await this.vaultRepository.put(tenantVaultId, [record], digitalTwinSectionId);
+      const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
+        vaultRepository: this.vaultRepository,
+        tenantVaultId,
+        sourceSubject: subject,
+      });
+      const researchClaims = projectClaimsForDigitalTwin({
+        claims,
+        resourceType: 'Composition',
+        twinSubjectId,
+      });
+      const researchVersionId = claimsToContentCid(researchClaims).cid;
+      researchClaims['Composition.meta.versionId'] = researchVersionId;
+      researchClaims['org.hl7.fhir.r4.Composition.meta.versionId'] = researchVersionId;
+      const researchRecordId = this.buildStableProjectionRecordId(
+        'digital-twin-composition',
+        `${String(researchClaims['Composition.identifier'] || researchClaims['org.hl7.fhir.r4.Composition.identifier'] || researchVersionId)}|${sectionCode}`,
+      );
+      const digitalTwinSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, 'composition');
+      await this.vaultRepository.put(tenantVaultId, [{ id: researchRecordId, ...researchClaims } as any], digitalTwinSectionId);
     }
   }
 
@@ -1051,8 +1073,28 @@ export class CommunicationManager implements IJobProcessor {
           indexed: { attributes: this.buildIndexedAttributesFromClaims(claims) },
         };
         await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
-        const digitalTwinSectionId = getSubjectScopedSectionId(subjectRef, SUBJECT_SECTION_DIGITAL_TWIN, config.collectionId);
-        await this.vaultRepository.put(tenantVaultId, [record as any], digitalTwinSectionId);
+        if (isDigitalTwinResearchResourceType(resourceType)) {
+          const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
+            vaultRepository: this.vaultRepository,
+            tenantVaultId,
+            sourceSubject: subjectRef,
+          });
+          const researchClaims = projectClaimsForDigitalTwin({ claims, resourceType, twinSubjectId });
+          const researchVersionId = claimsToContentCid(researchClaims).cid;
+          researchClaims[`${resourceType}.meta.versionId`] = researchVersionId;
+          researchClaims[`org.hl7.fhir.r4.${resourceType}.meta.versionId`] = researchVersionId;
+          const researchRecordId = String(
+            researchClaims[`${resourceType}.identifier`]
+            || researchClaims[`org.hl7.fhir.r4.${resourceType}.identifier`]
+            || researchVersionId,
+          );
+          const digitalTwinSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, config.collectionId);
+          await this.vaultRepository.put(tenantVaultId, [{
+            id: researchRecordId,
+            ...researchClaims,
+            indexed: { attributes: this.buildIndexedAttributesFromClaims(researchClaims) },
+          } as any], digitalTwinSectionId);
+        }
         if (resourceType === 'Consent' && this.getFirstClaimValue(claims, ['Consent.decision', 'org.hl7.fhir.api.Consent.decision'])) {
           await persistConsentRuleAndAttachment({
             vaultRepository: this.vaultRepository,

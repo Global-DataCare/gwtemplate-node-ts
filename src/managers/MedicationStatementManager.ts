@@ -13,6 +13,10 @@ import { getSubjectScopedSectionId, SubjectSectionScope } from '../utils/individ
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 import type { ITenantsManager } from './ITenantsManager';
 import { getEnvSectionId } from '../utils/section-env';
+import {
+  getOrCreateDigitalTwinSubjectId,
+  projectClaimsForDigitalTwin,
+} from '../utils/digital-twin-research-projection';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -34,8 +38,7 @@ type FhirBundleLike = {
  * - It also mirrors accepted operational medication updates into the tenant's
  *   `digitaltwin` scope.
  * - The current `digitaltwin/.../MedicationStatement/_search` behavior is a
- *   stepping stone used to prove claim extraction and deterministic text/code
- *   matching.
+ *   compatibility route limited to exact coded-claim matching.
  *
  * It is NOT the intended long-term public digital twin contract.
  *
@@ -86,11 +89,14 @@ export class MedicationStatementManager implements IJobProcessor {
     tenantVaultId: string,
     claims: Record<string, any>,
   ): Promise<any[]> {
+    const filters = Object.entries(claims)
+      .filter(([k, v]) => k !== '@context' && v !== undefined && v !== null && String(v).trim() !== '');
+    const hasUnsafeTextFilter = filters.some(([name]) =>
+      /(?:^|[.\-_])(display|text|title|description|note|instruction|name|address|telecom|contact|narrative)(?:$|[.\-_])/i.test(name));
+    if (hasUnsafeTextFilter) return [];
     const allSections = await this.vaultRepository.getAllSections(tenantVaultId);
     const digitalTwinMedicationPrefix = getEnvSectionId(`${SUBJECT_SECTION_DIGITAL_TWIN}_medications_`);
     const sectionIds = allSections.filter((sectionId) => String(sectionId || '').startsWith(digitalTwinMedicationPrefix));
-    const filters = Object.entries(claims)
-      .filter(([k, v]) => k !== '@context' && v !== undefined && v !== null && String(v).trim() !== '');
 
     const matches: any[] = [];
     for (const sectionId of sectionIds) {
@@ -107,19 +113,6 @@ export class MedicationStatementManager implements IJobProcessor {
   private matchesDigitalTwinFilter(record: Record<string, any>, claimName: string, expectedValue: string): boolean {
     const actualValue = this.readRecordClaimValue(record, claimName);
     if (!actualValue || !expectedValue) return false;
-
-    const normalizedClaimName = claimName.toLowerCase();
-    if (
-      normalizedClaimName.endsWith('.medication-text')
-      || normalizedClaimName.endsWith('.code-text')
-      || normalizedClaimName.endsWith('.code-display')
-      || normalizedClaimName.endsWith('.code-text-local')
-      || normalizedClaimName.endsWith('.codedisplay')
-      || normalizedClaimName.endsWith('.codetextlocal')
-      || normalizedClaimName.endsWith('.note')
-    ) {
-      return actualValue.toLowerCase().includes(expectedValue.toLowerCase());
-    }
 
     return actualValue === expectedValue;
   }
@@ -200,8 +193,27 @@ export class MedicationStatementManager implements IJobProcessor {
           const sectionId = getSubjectScopedSectionId(subject, scope, 'medications');
           await this.vaultRepository.put(tenantVaultId, [record], sectionId);
           if (scope === SUBJECT_SECTION_INDIVIDUAL) {
-            const digitalTwinSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_DIGITAL_TWIN, 'medications');
-            await this.vaultRepository.put(tenantVaultId, [record], digitalTwinSectionId);
+            const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
+              vaultRepository: this.vaultRepository,
+              tenantVaultId,
+              sourceSubject: subject,
+            });
+            const researchClaims = projectClaimsForDigitalTwin({
+              claims,
+              resourceType: 'MedicationStatement',
+              twinSubjectId,
+            });
+            const researchId = String(
+              researchClaims['MedicationStatement.identifier']
+              || researchClaims['org.hl7.fhir.api.MedicationStatement.identifier']
+              || determineResourceId(undefined, process.env.NODE_ENV),
+            );
+            const digitalTwinSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, 'medications');
+            await this.vaultRepository.put(tenantVaultId, [{
+              id: researchId,
+              ...researchClaims,
+              indexed: { attributes: this.buildIndexedAttributesFromClaims(researchClaims) },
+            } as any], digitalTwinSectionId);
           }
 
           responseEntries.push({

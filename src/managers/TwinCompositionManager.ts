@@ -18,6 +18,7 @@ import {
   SearchFilters,
 } from '../utils/search-request';
 import { SUBJECT_SECTION_DIGITAL_TWIN } from '../constants/domain';
+import { getAuthenticatedJobActorDid } from '../utils/authenticated-job-actor';
 import { GatewayEnvelopeTypes, GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { BundleType } from '../utils/bundle';
 import type { IJobProcessor } from './registry';
@@ -107,6 +108,7 @@ export class TwinCompositionManager {
 
     const tenantVaultId = getTenantVaultId(String(job.sector || ''), String(job.tenantId || ''));
     const body = job.content?.body as any;
+    const authenticatedActorDid = getAuthenticatedJobActorDid(job);
     const searchSections = this.getSearchFilterValues(body, ['section', 'composition.section']);
     const excludedSections = this.getSearchFilterValues(body, ['section:not', 'composition.section:not']);
     const matches = await this.searchBySectionAndClaims({
@@ -114,6 +116,7 @@ export class TwinCompositionManager {
       requiredSections: searchSections,
       excludedSections,
       body,
+      authenticatedActorDid,
       filterMatchesBySectionsAndTypes: (records, required, excluded) =>
         records.filter((record) => {
           const sectionToken = String(
@@ -160,6 +163,7 @@ export class TwinCompositionManager {
     requiredSections: string[];
     excludedSections: string[];
     body: any;
+    authenticatedActorDid?: string;
     filterMatchesBySectionsAndTypes: (matches: any[], requiredSections: string[], excludedSections: string[], requiredTypes: string[]) => any[];
   }): Promise<any[]> {
     if (!Array.isArray(params.requiredSections) || params.requiredSections.length === 0) {
@@ -167,6 +171,13 @@ export class TwinCompositionManager {
     }
 
     const filters = this.collectSearchFilters(params.body);
+    const searchesPrivateTags = Object.keys(filters).some((key) => {
+      const normalized = stripKnownFhirClaimContextPrefix(String(key || '').trim()).toLowerCase();
+      return normalized === 'composition.meta-tag' || normalized === 'composition.meta.tag';
+    });
+    if (searchesPrivateTags && params.authenticatedActorDid) {
+      filters['Composition.author'] = [params.authenticatedActorDid];
+    }
     const requestedResourceTypes = new Set<string>();
     for (const key of Object.keys(filters)) {
       const match = /^([A-Za-z][A-Za-z0-9]*)\./.exec(String(key || '').trim());
@@ -186,6 +197,7 @@ export class TwinCompositionManager {
         requiredSections: params.requiredSections,
         excludedSections: params.excludedSections,
         filters,
+        authenticatedActorDid: params.authenticatedActorDid,
         filterMatchesBySectionsAndTypes: params.filterMatchesBySectionsAndTypes,
       });
     }
@@ -243,6 +255,7 @@ export class TwinCompositionManager {
     requiredSections: string[];
     excludedSections: string[];
     filters: SearchFilters;
+    authenticatedActorDid?: string;
     filterMatchesBySectionsAndTypes: (matches: any[], requiredSections: string[], excludedSections: string[], requiredTypes: string[]) => any[];
   }): Promise<any[]> {
     const allSections = await this.vaultRepository.getAllSections(params.tenantVaultId);

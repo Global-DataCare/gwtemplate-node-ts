@@ -19,6 +19,29 @@ import {
   COMPOSITION_SEARCH_BUNDLE_EXAMPLE,
   COMPOSITION_SEARCH_PARAMETERS_EXAMPLE,
 } from '../../../api-examples';
+import { buildOrganizationDidWeb, buildProfessionalDidWeb } from 'gdc-common-utils-ts/utils/did';
+import {
+  EXAMPLE_HOST_PUBLIC_HOSTNAME,
+  EXAMPLE_ROUTE_VERSION,
+  EXAMPLE_TENANT_ROUTE_CONTEXT,
+} from 'gdc-common-utils-ts/examples/shared';
+import {
+  ExampleEmployeeEmails,
+  ExampleEmployeeRoles,
+} from 'gdc-common-utils-ts/examples/employee';
+
+const HOSTED_ORGANIZATION_DID = buildOrganizationDidWeb({
+  hostDidWeb: `did:web:${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
+  tenantId: EXAMPLE_TENANT_ROUTE_CONTEXT.tenantId,
+  jurisdiction: EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction,
+  version: EXAMPLE_ROUTE_VERSION,
+  sector: EXAMPLE_TENANT_ROUTE_CONTEXT.sector,
+});
+const OPERATIONAL_EMPLOYEE_DID = buildProfessionalDidWeb({
+  organizationDidWeb: HOSTED_ORGANIZATION_DID,
+  email: ExampleEmployeeEmails.SharedProfessional,
+  role: ExampleEmployeeRoles.Doctor,
+});
 
 describe('CompositionManager', () => {
   const mockVaultRepository = {
@@ -96,6 +119,23 @@ describe('CompositionManager', () => {
     const putArgs = (mockVaultRepository.put as any).mock.calls[0];
     expect(putArgs[0]).toBe('animal-research_acme');
     expect(putArgs[2]).toBe(expectedSectionId);
+  });
+
+  it('rejects a digital-twin working selection whose author differs from the authenticated employee', async () => {
+    const entry = structuredClone(COMPOSITION_BATCH_ENTRY_EXAMPLE) as any;
+    entry.meta.claims['Composition.author'] = `${OPERATIONAL_EMPLOYEE_DID}:another`;
+    const response = await manager.process(createJob({
+      content: {
+        ...(createJob().content as any),
+        meta: { bearer: { jwt: { payload: { sub: OPERATIONAL_EMPLOYEE_DID } } } },
+        body: { resourceType: 'Bundle', type: 'batch', entry: [entry] },
+      } as any,
+    }));
+
+    const data = (response.body as any).data;
+    expect(data[0].response.status).toBe('400');
+    expect(JSON.stringify(data[0])).toContain('author must match the authenticated employee');
+    expect(mockVaultRepository.put).not.toHaveBeenCalled();
   });
 
   it('ignores OperationOutcome entries from preconversion payload', async () => {
@@ -880,12 +920,11 @@ describe('CompositionManager', () => {
     expect(data[0].resource.data[0].id).toBe('comp-obs-combo-1');
   });
 
-  it('supports digitaltwin Composition/_search by section plus Composition.meta-tag for one researcher branch composition', async () => {
-    const subjectDid = 'did:web:api.lab.org:research-subject:branch-tag-001';
+  it('supports digitaltwin Composition/_search by section plus Composition.meta-tag for one researcher selection', async () => {
+    const subjectDid = 'did:web:api.lab.org:research-subject:selection-tag-001';
     const compositionSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
-    const branchCompositionId =
-      'urn:twin:researchsubject-branch-tag-001:branch:employee-001:version:01JZ4CV2G1X2M5Y8Y3V4W6Q7R8';
-    const branchTag = {
+    const selectionCompositionId = 'research-selection-01JZ4CV2G1X2M5Y8Y3V4W6Q7R8';
+    const selectionTag = {
       id: 'Composition.meta.tag[0]',
       system: 'urn:research:tag:score',
       code: '10',
@@ -898,12 +937,24 @@ describe('CompositionManager', () => {
       if (sectionId === compositionSectionId) {
         return [
           {
-            id: branchCompositionId,
+            id: selectionCompositionId,
+            'Composition.identifier': selectionCompositionId,
             'Composition.subject': subjectDid,
             'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
             'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
-            meta: { tag: [branchTag] },
-            tag: [branchTag],
+            'Composition.author': OPERATIONAL_EMPLOYEE_DID,
+            meta: { tag: [selectionTag] },
+            tag: [selectionTag],
+          },
+          {
+            id: `${selectionCompositionId}-another-employee`,
+            'Composition.identifier': `${selectionCompositionId}-another-employee`,
+            'Composition.subject': subjectDid,
+            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            'Composition.author': `${OPERATIONAL_EMPLOYEE_DID}:another`,
+            meta: { tag: [selectionTag] },
+            tag: [selectionTag],
           },
         ] as any;
       }
@@ -914,6 +965,7 @@ describe('CompositionManager', () => {
       action: '_search',
       content: {
         ...(createJob().content as any),
+        meta: { bearer: { jwt: { payload: { sub: OPERATIONAL_EMPLOYEE_DID } } } },
         body: {
           resourceType: 'Parameters',
           parameter: [
@@ -927,7 +979,7 @@ describe('CompositionManager', () => {
     const data = (response.body as any).data;
     expect(data[0].type).toBe('Composition-search-response-v1.0');
     expect(data[0].resource.total).toBe(1);
-    expect(data[0].resource.data[0].id).toBe(branchCompositionId);
+    expect(data[0].resource.data[0].id).toBe(selectionCompositionId);
     expect(data[0].resource.data[0].meta?.tag?.[0]?.system).toBe('urn:research:tag:score');
     expect(data[0].resource.data[0].meta?.tag?.[0]?.code).toBe('10');
   });

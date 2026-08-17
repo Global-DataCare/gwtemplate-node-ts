@@ -305,7 +305,8 @@ describe('SMART token issuance (integration)', () => {
       }
 
       expect(finalPayload?.access_token).toBeDefined();
-      expect(finalPayload?.subject).toBe(subject);
+      expect(finalPayload?.subject).toMatch(/^urn:uuid:/);
+      expect(finalPayload?.subject).not.toBe(subject);
     } finally {
       queueAdapter.stop();
     }
@@ -368,7 +369,7 @@ describe('SMART token issuance (integration)', () => {
       await vaultRepository.put(tenantVaultId, [{
         ...testConsentRulePermitOrgDid,
         'Consent.actor-identifier': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
-        'Consent.purpose': 'RESEARCH',
+        'Consent.purpose': HealthcareConsentPurposes.Research,
       } as any], individualRulesSectionId);
 
       // Research external profile:
@@ -378,7 +379,7 @@ describe('SMART token issuance (integration)', () => {
         iss: 'https://pontus-x.example',
         aud: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerOrganizationDid,
         consumerOrganizationDid: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
-        purpose: 'RESEARCH',
+        purpose: HealthcareConsentPurposes.Research,
         scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
       };
       const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-003';
@@ -406,7 +407,7 @@ describe('SMART token issuance (integration)', () => {
             client_assertion: clientAssertion,
             client_assertion_type: 'private_key_jwt',
             sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
-            purpose: 'RESEARCH',
+            purpose: HealthcareConsentPurposes.Research,
             scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
             expires_in: 60,
             acr_values: 'urn:antifraud:acr:openid4vp:employee',
@@ -496,7 +497,7 @@ describe('SMART token issuance (integration)', () => {
       await vaultRepository.put(tenantVaultId, [{
         ...testConsentRulePermitOrgDid,
         'Consent.actor-identifier': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
-        'Consent.purpose': 'RESEARCH',
+        'Consent.purpose': HealthcareConsentPurposes.Research,
         'Consent.action': 'ResearchSubject.rs',
       } as any], individualRulesSectionId);
 
@@ -505,7 +506,7 @@ describe('SMART token issuance (integration)', () => {
         iss: 'https://pontus-x.example',
         aud: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerOrganizationDid,
         consumerOrganizationDid: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.consumerOrganizationDid,
-        purpose: 'RESEARCH',
+        purpose: HealthcareConsentPurposes.Research,
         scope: researchSubjectScope,
       };
       const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-004';
@@ -533,7 +534,7 @@ describe('SMART token issuance (integration)', () => {
             client_assertion: clientAssertion,
             client_assertion_type: 'private_key_jwt',
             sub: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_PROFESSIONAL_DID,
-            purpose: 'RESEARCH',
+            purpose: HealthcareConsentPurposes.Research,
             scope: researchSubjectScope,
             expires_in: 60,
             acr_values: 'urn:antifraud:acr:openid4vp:employee',
@@ -559,7 +560,8 @@ describe('SMART token issuance (integration)', () => {
       }
 
       expect(finalPayload?.access_token).toBeDefined();
-      expect(finalPayload?.subject).toBe(subject);
+      expect(finalPayload?.subject).toMatch(/^urn:uuid:/);
+      expect(finalPayload?.subject).not.toBe(subject);
       expect(finalPayload?.ledger_verified).toBe(true);
     } finally {
       queueAdapter.stop();
