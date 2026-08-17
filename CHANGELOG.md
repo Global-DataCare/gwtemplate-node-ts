@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+- Make `ALLOWED_SECTORS` the authoritative explicit gateway sector catalog,
+  retain `SECTORS_ALLOWED` and `MAINSECTOR` + `SUBSECTORSALLOWED` only as
+  deprecated fallbacks, and preserve independently addressed compatibility
+  sectors such as `onehealth-research` without reconstructing their names.
+
 ## [1.21.15] - 2026-08-16
 
 - Separate Test Network admission from postal-address verification. The host

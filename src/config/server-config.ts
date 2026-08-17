@@ -198,12 +198,18 @@ export function buildSectorsFromMainAndSubsectors(main: MainSector, subsectors: 
 }
 
 export function resolveAllowedSectorsFromEnv(env: NodeJS.ProcessEnv): Sector[] {
+  const canonicalCsv = String(env.ALLOWED_SECTORS || '').trim();
+  if (canonicalCsv) {
+    return parseAndValidateSectors(canonicalCsv);
+  }
+
   const legacyCsv = String(env.SECTORS_ALLOWED || '').trim();
   if (legacyCsv) {
-    console.warn('[Config] SECTORS_ALLOWED is deprecated. Use MAINSECTOR + SUBSECTORSALLOWED.');
+    console.warn('[Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.');
     return parseAndValidateSectors(legacyCsv);
   }
 
+  console.warn('[Config] MAINSECTOR + SUBSECTORSALLOWED are deprecated. Use ALLOWED_SECTORS.');
   const main = parseAndValidateMainSector(env.MAINSECTOR);
   const subsectors = parseAndValidateSubsectors(env.SUBSECTORSALLOWED);
   return buildSectorsFromMainAndSubsectors(main, subsectors);
