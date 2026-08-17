@@ -43,7 +43,7 @@ type VerificationInput = Readonly<{
   now?: Date;
 }>;
 
-export type HostAuthorizationVerificationResult = Readonly<{
+export type TestNetworkAdmissionVerificationResult = Readonly<{
   mode: 'organization-test-network-vc';
   credentialId: string;
   issuer: string;
@@ -67,7 +67,7 @@ export type HostAuthorizationVerificationResult = Readonly<{
  */
 export async function verifyOrganizationTestNetworkCredential(
   input: VerificationInput,
-): Promise<HostAuthorizationVerificationResult> {
+): Promise<TestNetworkAdmissionVerificationResult> {
   const credential = input.credential;
   const issuer = typeof credential.issuer === 'string'
     ? credential.issuer
@@ -75,13 +75,13 @@ export async function verifyOrganizationTestNetworkCredential(
   if (!credential.type.includes(ContractCredentialTypes.OrganizationTestNetworkCredential)) {
     fail('Unexpected organization Test Network credential type.');
   }
-  if (!input.trustedIssuers.includes(issuer)) fail('Organization authorization issuer is not trusted.');
+  if (!input.trustedIssuers.includes(issuer)) fail('Organization Test Network admission issuer is not trusted.');
   const now = input.now || new Date();
-  if (credential.validFrom && now < new Date(credential.validFrom)) fail('Organization authorization is not active yet.');
-  if (credential.validUntil && now >= new Date(credential.validUntil)) fail('Organization authorization has expired.');
+  if (credential.validFrom && now < new Date(credential.validFrom)) fail('Organization Test Network admission is not active yet.');
+  if (credential.validUntil && now >= new Date(credential.validUntil)) fail('Organization Test Network admission has expired.');
 
   const subject = credential.credentialSubject as Record<string, any>;
-  if (subject.targetNetwork !== 'test-network') fail('Host authorization VC is restricted to Test Network.');
+  if (subject.targetNetwork !== 'test-network') fail('Test Network admission VC is restricted to Test Network.');
   if (subject.postalActivationLicense?.status !== 'delivered'
     || !subject.postalActivationLicense?.deliveredAt) {
     fail('Postal activation delivery is not confirmed.');
@@ -96,24 +96,24 @@ export async function verifyOrganizationTestNetworkCredential(
       || '',
   ).trim();
   if (!organizationIdentifier || subject.organization?.identifier !== organizationIdentifier) {
-    fail('Authorization organization identifier does not match transaction claims.');
+    fail('Admission organization identifier does not match transaction claims.');
   }
   if (String(input.organization?.did || '') !== String(subject.id || '')) {
-    fail('Authorization subject DID does not match the requested organization DID.');
+    fail('Admission subject DID does not match the requested organization DID.');
   }
   if (String(input.controllerEmail || '').trim().toLowerCase()
     !== String(subject.controller?.email || '').trim().toLowerCase()) {
-    fail('Authorization controller email does not match the transaction.');
+    fail('Admission controller email does not match the transaction.');
   }
   const controllerJwk = input.controller?.publicKeyJwk as PublicJwk | undefined;
   if (!controllerJwk
     || toJwkThumbprintSha256Urn(controllerJwk) !== subject.controller?.hasCredential?.material) {
-    fail('Authorization controller key does not match the transaction.');
+    fail('Admission controller key does not match the transaction.');
   }
 
   const proofs = Array.isArray(credential.proof) ? credential.proof : credential.proof ? [credential.proof] : [];
   const proof = proofs.find(item => item.proofPurpose === 'contractAgreement' && item.jws && item.verificationMethod);
-  if (!proof) fail('Organization authorization requires a contractAgreement proof.');
+  if (!proof) fail('Organization Test Network admission requires a contractAgreement proof.');
   const verificationMethod = String(proof.verificationMethod);
   const signerDid = verificationMethod.split('#')[0];
   const fetchImpl = input.fetchImpl || fetch;
@@ -121,9 +121,9 @@ export async function verifyOrganizationTestNetworkCredential(
   const registeredSigner = input.trustedSigners?.find(entry => entry.issuer === issuer && entry.actorDid === signerDid);
   let signerJwk: PublicJwk;
   if (registeredSigner) {
-    if (registeredSigner.status === 'revoked') fail('Authorization signer is revoked.');
-    if (registeredSigner.role !== 'RESPRSN') fail('Authorization signer role is not authorized.');
-    if (!embeddedJwk) fail('Registered authorization signer proof must embed its public JWK.');
+    if (registeredSigner.status === 'revoked') fail('Admission signer is revoked.');
+    if (registeredSigner.role !== 'RESPRSN') fail('Admission signer role is not authorized.');
+    if (!embeddedJwk) fail('Registered admission signer proof must embed its public JWK.');
     const thumbprint = toJwkThumbprintSha256Urn(embeddedJwk);
     const thumbprintRegistered = registeredSigner.jwkThumbprints.includes(thumbprint);
     const hostAttested = registeredSigner.allowHostAttestedKeys === true
@@ -132,10 +132,10 @@ export async function verifyOrganizationTestNetworkCredential(
         thumbprint, secret: input.hostAttestationSecret,
       });
     if (!thumbprintRegistered && !hostAttested) {
-      fail('Authorization signer key is not active in the host registry.');
+      fail('Admission signer key is not active in the host registry.');
     }
     if (verificationMethod !== `${signerDid}#${embeddedJwk.kid}`) {
-      fail('Authorization verification method does not match its registered public key.');
+      fail('Admission verification method does not match its registered public key.');
     }
     signerJwk = embeddedJwk;
   } else {
@@ -146,28 +146,28 @@ export async function verifyOrganizationTestNetworkCredential(
     const issuerControllers = Array.isArray(issuerDocument.controller)
       ? issuerDocument.controller
       : issuerDocument.controller ? [issuerDocument.controller] : [];
-    if (!issuerControllers.includes(signerDid)) fail('Authorization signer is not a current issuer controller.');
+    if (!issuerControllers.includes(signerDid)) fail('Admission signer is not a current issuer controller.');
     if ((signerDocument as any).deactivated === true || String((signerDocument as any).status || '') === 'revoked') {
-      fail('Authorization signer is revoked.');
+      fail('Admission signer is revoked.');
     }
     const method = (signerDocument.verificationMethod || []).find(item => item.id === verificationMethod);
     if (!method?.publicKeyJwk || !relationshipContains(signerDocument.assertionMethod, verificationMethod)) {
-      fail('Authorization signer method is not an active assertion method.');
+      fail('Admission signer method is not an active assertion method.');
     }
     signerJwk = method.publicKeyJwk as PublicJwk;
   }
   const header = JSON.parse(Buffer.from(String(proof.jws).split('.')[0] || '', 'base64url').toString('utf8'));
-  if (header.alg !== 'ML-DSA-65') fail('Organization authorization requires ML-DSA-65.');
+  if (header.alg !== 'ML-DSA-65') fail('Organization Test Network admission requires ML-DSA-65.');
   const valid = await input.cryptography.verifyDetachedJws(
     new TextEncoder().encode(canonicalizeOrganizationTestNetworkCredential(credential)),
     String(proof.jws),
     signerJwk,
   );
-  if (!valid) fail('Organization authorization proof is invalid.');
+  if (!valid) fail('Organization Test Network admission proof is invalid.');
 
   const credentials = await verifyTestNetworkDomainCredentials({
     credentials: input.testNetworkCredentials,
-    authorizationCredential: credential,
+    organizationTestNetworkCredential: credential,
     signerJwk,
     verificationMethod,
     controllerEmail: input.controllerEmail,
@@ -212,7 +212,7 @@ function verifyHostAttestation(input: Readonly<{
 
 async function verifyTestNetworkDomainCredentials(input: Readonly<{
   credentials?: readonly VerifiableCredentialV2[];
-  authorizationCredential: VerifiableCredentialV2;
+  organizationTestNetworkCredential: VerifiableCredentialV2;
   signerJwk: PublicJwk;
   verificationMethod: string;
   controllerEmail?: string;
@@ -228,7 +228,7 @@ async function verifyTestNetworkDomainCredentials(input: Readonly<{
   if (organization.length !== 1 || representative.length !== 1 || controller.length !== 1) {
     fail('Test Network admission requires Organization, LegalRepresentative and ServiceController credentials.');
   }
-  const admissionSubject = input.authorizationCredential.credentialSubject as Record<string, any>;
+  const admissionSubject = input.organizationTestNetworkCredential.credentialSubject as Record<string, any>;
   const pdfEvidenceId = `urn:sha256:${String(admissionSubject.applicationEvidence?.pdfSha256 || '')}`;
   const controllerActor = buildStableActorIdentifier({
     contactKind: 'email', contact: String(input.controllerEmail || ''),
@@ -252,7 +252,7 @@ async function verifyTestNetworkDomainCredentials(input: Readonly<{
   for (const domainCredential of credentials) {
     if (!domainCredential.type.includes(EnvironmentCredentialTypes.TestNetworkCredential)
       || domainCredential.credentialSubject?.targetNetwork !== 'test-network'
-      || domainCredential.issuer !== input.authorizationCredential.issuer
+      || domainCredential.issuer !== input.organizationTestNetworkCredential.issuer
       || !Array.isArray(domainCredential.evidence)
       || !(domainCredential.evidence as any[]).some(item => item?.id === pdfEvidenceId)) {
       fail('Test Network domain credential scope, issuer or PDF evidence is invalid.');
@@ -282,7 +282,7 @@ function relationshipContains(
 }
 
 async function resolveDidWebDocument(did: string, fetchImpl: typeof fetch): Promise<DidDocument> {
-  if (!did.startsWith('did:web:')) fail('Authorization proof requires did:web identities.');
+  if (!did.startsWith('did:web:')) fail('Admission proof requires did:web identities.');
   const parts = did.slice('did:web:'.length).split(':');
   const domain = decodeURIComponent(parts.shift() || '');
   const url = parts.length > 0

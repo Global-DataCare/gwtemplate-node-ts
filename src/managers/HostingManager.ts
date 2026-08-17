@@ -877,7 +877,7 @@ export class HostingManager {
       createOrganizationIssueClaimsFromClaims: this.createOrganizationIssueClaimsFromClaims.bind(this),
       forwardOrganizationVerificationTransactionToIca: this.forwardOrganizationVerificationTransactionToIca.bind(this),
       extractCredentialResourcesFromIcaPayload: this.extractCredentialResourcesFromIcaPayload.bind(this),
-      verifyHostAuthorizationCredential: async ({ credential, claims, resource }) => {
+      verifyTestNetworkAdmissionCredential: async ({ credential, claims, resource }) => {
         if (!this.cryptographyService) {
           throw new ManagerError('Host authorization cryptography is not configured.', IssueType.NotSupported);
         }
