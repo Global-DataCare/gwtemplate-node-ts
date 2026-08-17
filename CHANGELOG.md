@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+- Require Test Network onboarding to carry the reviewer-signed
+  `OrganizationTestNetworkCredential` plus exactly three normal domain VCs
+  marked `TestNetworkCredential`. Verify every ML-DSA-65 proof, PDF/identity
+  binding and return only the Organization, LegalRepresentative and
+  ServiceController credentials in `vc[]`.
+- Use `resource.controller.email` for controller binding instead of confusing
+  it with the distinct legal-representative compatibility payload.
+
 ## [1.21.11] - 2026-08-14
 
 - Preserve an explicitly selected local image in the GKE deployment profile so

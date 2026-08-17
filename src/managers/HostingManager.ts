@@ -86,7 +86,7 @@ import {
   extractCredentialResourcesFromIcaPayload as extractCredentialResourcesFromIcaPayloadExternal,
   forwardOrganizationVerificationTransactionToIca as forwardOrganizationVerificationTransactionToIcaExternal,
 } from './hosting/ica-verification';
-import { verifyOrganizationRegistrationAuthorization } from './hosting/organization-registration-authorization';
+import { verifyOrganizationTestNetworkCredential } from './hosting/organization-test-network-credential';
 import {
   processIndividualOrganizationFlow as processIndividualOrganizationFlowExternal,
   resolveTenantCollectionForIndividuals as resolveTenantCollectionForIndividualsExternal,
@@ -888,12 +888,14 @@ export class HostingManager {
         const trustedSigners = parseOrganizationAuthorizationSigners(
           process.env.HOST_ORGANIZATION_AUTHORIZATION_SIGNERS,
         );
-        return verifyOrganizationRegistrationAuthorization({
+        return verifyOrganizationTestNetworkCredential({
           credential,
           claims,
           controller: resource.controller,
           organization: resource.organization,
-          controllerEmail: String(resource.legalRepresentativePayload?.email || resource.legalRepresentative?.email || ''),
+          controllerEmail: String(resource.controller?.email || ''),
+          legalRepresentativeEmail: String(resource.legalRepresentativePayload?.email || resource.legalRepresentative?.email || ''),
+          testNetworkCredentials: resource.testNetworkCredentials,
           cryptography: this.cryptographyService,
           trustedIssuers,
           trustedSigners,
