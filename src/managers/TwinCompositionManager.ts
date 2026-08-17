@@ -274,14 +274,7 @@ export class TwinCompositionManager {
         [],
       );
       compositionMatches.push(
-        ...sectionMatches.filter((record) => {
-          const branchId = this.readClaimValue(record, 'Composition.branch');
-          if (branchId && params.authenticatedActorDid) {
-            const authorDid = this.readClaimValue(record, 'Composition.author');
-            if (authorDid !== params.authenticatedActorDid) return false;
-          }
-          return this.matchesCompositionFilters(record, params.filters);
-        }),
+        ...sectionMatches.filter((record) => this.matchesCompositionFilters(record, params.filters)),
       );
     }
 

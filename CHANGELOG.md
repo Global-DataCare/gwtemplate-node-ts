@@ -1,10 +1,19 @@
 ## [Unreleased]
 
+- Use the canonical HL7 v3 ActReason `HRESCH` for healthcare-research SMART,
+  Consent, and inter-tenant contract authorization instead of the ad-hoc
+  `RESEARCH` token.
+
+- Remove the non-FHIR `Composition.branch` and `Composition.branch-version`
+  claims from researcher working selections. Ownership and recovery now use
+  standard `Composition.identifier`, `subject`, and `author` claims together
+  with ledger-safe `meta.tag` coding metadata.
+
 ## [1.21.13] - 2026-08-16
 
 - Enforce employee-private digital-twin worksets from the authenticated SMART
   subject: tagged Composition searches are scoped to that hosted employee DID,
-  and branch writes reject a different client-supplied author.
+  and working-selection writes reject a different client-supplied author.
 
 ## [1.21.12] - 2026-08-15
 
@@ -729,16 +738,16 @@
   - `src/__tests__/managers/OpenIdAuthManager.test.ts`
   - `src/__tests__/integration/identity/smart-token.test.ts`
 - Extended `digitaltwin/.../Composition/_search` so one request can match
-  directly against researcher-branch `Composition` records stored in the
+  directly against researcher working-selection `Composition` records stored in the
   digital-twin composition collection, instead of only fanning out through
   leaf resource families first. The first direct `Composition.*` capability
   now covered is `Composition.meta-tag`, matched as a tokenized
   `system|code` filter against stored `meta.tag[]` / `tag[]` values.
   TDD coverage now proves:
-  - one unit-level digital twin `Composition` branch tagged with
+  - one unit-level digital twin working-selection `Composition` tagged with
     `urn:research:tag:score|10` is returned by
     `Composition/_search(section + Composition.meta-tag)`
-  - one integration-level `digitaltwin` search returns a branch composition
+  - one integration-level `digitaltwin` search returns a selection composition
     persisted in the tenant vault with the same `meta.tag[]` payload
   Files:
   - `src/managers/TwinCompositionManager.ts`

@@ -121,7 +121,7 @@ describe('CompositionManager', () => {
     expect(putArgs[2]).toBe(expectedSectionId);
   });
 
-  it('rejects a digital-twin branch whose author differs from the authenticated employee', async () => {
+  it('rejects a digital-twin working selection whose author differs from the authenticated employee', async () => {
     const entry = structuredClone(COMPOSITION_BATCH_ENTRY_EXAMPLE) as any;
     entry.meta.claims['Composition.author'] = `${OPERATIONAL_EMPLOYEE_DID}:another`;
     const response = await manager.process(createJob({
@@ -920,12 +920,11 @@ describe('CompositionManager', () => {
     expect(data[0].resource.data[0].id).toBe('comp-obs-combo-1');
   });
 
-  it('supports digitaltwin Composition/_search by section plus Composition.meta-tag for one researcher branch composition', async () => {
-    const subjectDid = 'did:web:api.lab.org:research-subject:branch-tag-001';
+  it('supports digitaltwin Composition/_search by section plus Composition.meta-tag for one researcher selection', async () => {
+    const subjectDid = 'did:web:api.lab.org:research-subject:selection-tag-001';
     const compositionSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
-    const branchCompositionId =
-      'urn:twin:researchsubject-branch-tag-001:branch:employee-001:version:01JZ4CV2G1X2M5Y8Y3V4W6Q7R8';
-    const branchTag = {
+    const selectionCompositionId = 'research-selection-01JZ4CV2G1X2M5Y8Y3V4W6Q7R8';
+    const selectionTag = {
       id: 'Composition.meta.tag[0]',
       system: 'urn:research:tag:score',
       code: '10',
@@ -938,24 +937,24 @@ describe('CompositionManager', () => {
       if (sectionId === compositionSectionId) {
         return [
           {
-            id: branchCompositionId,
+            id: selectionCompositionId,
+            'Composition.identifier': selectionCompositionId,
             'Composition.subject': subjectDid,
             'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
             'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
             'Composition.author': OPERATIONAL_EMPLOYEE_DID,
-            'Composition.branch': 'urn:gdc:digital-twin-selection:twin:employee:owner',
-            meta: { tag: [branchTag] },
-            tag: [branchTag],
+            meta: { tag: [selectionTag] },
+            tag: [selectionTag],
           },
           {
-            id: `${branchCompositionId}-another-employee`,
+            id: `${selectionCompositionId}-another-employee`,
+            'Composition.identifier': `${selectionCompositionId}-another-employee`,
             'Composition.subject': subjectDid,
             'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
             'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
             'Composition.author': `${OPERATIONAL_EMPLOYEE_DID}:another`,
-            'Composition.branch': 'urn:gdc:digital-twin-selection:twin:employee:other',
-            meta: { tag: [branchTag] },
-            tag: [branchTag],
+            meta: { tag: [selectionTag] },
+            tag: [selectionTag],
           },
         ] as any;
       }
@@ -980,7 +979,7 @@ describe('CompositionManager', () => {
     const data = (response.body as any).data;
     expect(data[0].type).toBe('Composition-search-response-v1.0');
     expect(data[0].resource.total).toBe(1);
-    expect(data[0].resource.data[0].id).toBe(branchCompositionId);
+    expect(data[0].resource.data[0].id).toBe(selectionCompositionId);
     expect(data[0].resource.data[0].meta?.tag?.[0]?.system).toBe('urn:research:tag:score');
     expect(data[0].resource.data[0].meta?.tag?.[0]?.code).toBe('10');
   });

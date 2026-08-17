@@ -138,7 +138,7 @@ This contract intentionally separates:
 2. working-selection persistence
 - when the researcher chooses a match, the client may save a separate
   researcher-owned `Composition` through `digitaltwin/.../Composition/_batch`
-- the branch keeps the matched pseudonymous `Composition.subject`, the
+- the selection keeps the matched pseudonymous `Composition.subject`, the
   employee DID in `Composition.author`, and ledger-safe `meta.tag[]`
 - the canonical twin is not modified and no clinical data is copied
 - a workset is reopened through `Composition/_search` with
@@ -173,7 +173,7 @@ ledger-safe fields `id`, `system`, `code`, optional `version`, and optional
 `userSelected` are retained. `display`, free text, names, and individual
 identifiers must not be stored in a tag.
 
-Example branch metadata:
+Example working-selection metadata:
 
 ```json
 {

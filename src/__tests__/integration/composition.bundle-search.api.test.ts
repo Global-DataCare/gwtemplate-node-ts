@@ -1,5 +1,5 @@
 import { invokeExpress } from './helpers/invokeExpress';
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
@@ -1054,7 +1054,7 @@ describe('Composition Bundle _search API (integration)', () => {
     }
   });
 
-  it('stores one researcher branch Composition in digitaltwin and finds it by Composition.meta-tag', async () => {
+  it('stores one researcher working-selection Composition and finds it by Composition.meta-tag', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -1112,9 +1112,8 @@ describe('Composition Bundle _search API (integration)', () => {
         email: ExampleEmployeeEmails.SharedProfessional,
         role: ExampleEmployeeRoles.Doctor,
       });
-      const branchId = `urn:gdc:digital-twin-selection:${createHash('sha256').update(subjectDid).digest('base64url')}:employee:${createHash('sha256').update(operationalEmployeeDid).digest('base64url')}`;
-      const branchCompositionId = `${branchId}:version:01JZ4CV2G1X2M5Y8Y3V4W6Q7R8`;
-      const branchTag = {
+      const selectionCompositionId = 'research-selection-01JZ4CV2G1X2M5Y8Y3V4W6Q7R8';
+      const selectionTag = {
         id: 'Composition.meta.tag[0]',
         system: 'urn:research:tag:score',
         code: '10',
@@ -1125,7 +1124,7 @@ describe('Composition Bundle _search API (integration)', () => {
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
-          thid: 'researcher-branch-composition-save-001',
+          thid: 'researcher-selection-composition-save-001',
           body: {
             resourceType: 'Bundle',
             type: 'batch',
@@ -1137,21 +1136,19 @@ describe('Composition Bundle _search API (integration)', () => {
               },
               resource: {
                 resourceType: 'Composition',
-                id: branchCompositionId,
+                id: selectionCompositionId,
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.r4',
                     '@type': 'Composition:ResearcherWorkingSelection',
-                    'Composition.identifier': branchCompositionId,
+                    'Composition.identifier': selectionCompositionId,
                     'Composition.subject': subjectDid,
                     'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
                     'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
                     'Composition.author': operationalEmployeeDid,
-                    'Composition.branch': branchId,
-                    'Composition.branch-version': '01JZ4CV2G1X2M5Y8Y3V4W6Q7R8',
                     'Composition.date': '2026-07-01T10:00:00Z',
                   },
-                  tag: [branchTag],
+                  tag: [selectionTag],
                 },
               },
             }],
@@ -1166,7 +1163,7 @@ describe('Composition Bundle _search API (integration)', () => {
           method: 'POST',
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
           headers: { 'content-type': 'application/json' },
-          body: { thid: 'researcher-branch-composition-save-001' },
+          body: { thid: 'researcher-selection-composition-save-001' },
         });
         if (pollResp.status === 200) {
           savePayload = JSON.parse(pollResp.text);
@@ -1181,7 +1178,7 @@ describe('Composition Bundle _search API (integration)', () => {
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
-          thid: 'researcher-branch-composition-search-001',
+          thid: 'researcher-selection-composition-search-001',
           body: {
             resourceType: 'Parameters',
             parameter: [
@@ -1199,7 +1196,7 @@ describe('Composition Bundle _search API (integration)', () => {
           method: 'POST',
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
           headers: { 'content-type': 'application/json' },
-          body: { thid: 'researcher-branch-composition-search-001' },
+          body: { thid: 'researcher-selection-composition-search-001' },
         });
         if (pollResp.status === 200) {
           searchPayload = JSON.parse(pollResp.text);
@@ -1211,7 +1208,7 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(searchPayload?.resourceType).toBe('Bundle');
       expect(searchPayload?.data?.[0]?.type).toBe('Composition-search-response-v1.0');
       expect(searchPayload?.data?.[0]?.resource?.total).toBe(1);
-      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.id).toBe(branchCompositionId);
+      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.id).toBe(selectionCompositionId);
       expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.tag?.[0]?.system).toBe('urn:research:tag:score');
       expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.tag?.[0]?.code).toBe('10');
     } finally {

@@ -22,6 +22,7 @@ import { getMatchingSubjectIdentityBindingFromVpToken } from 'gdc-common-utils-t
 import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
 import { getEnvSectionId } from '../utils/section-env';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
+import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { deriveGrantedSmartScopes } from 'gdc-common-utils-ts/utils/smart-scope';
 import type { ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
 import { getMatchingIndividualMemberCredentialFromVpToken } from 'gdc-common-utils-ts/utils/individual-smart';
@@ -156,7 +157,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     //   3. capability allows the requested scope
     //      example: `organization/ResearchSubject.rs`
     //   4. purpose allows the requested business reason
-    //      example: `RESEARCH`
+    //      example: `HRESCH` (HL7 v3 ActReason)
     if (isInterTenantResearchAccess && actor.organization && actor.organization !== issuerDid) {
       if (accessProof.mode === 'vp_token') {
         const matchingContract = getMatchingInterTenantAccessContractFromVpToken(vpToken!, {
@@ -587,7 +588,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     bearerPayload?: Record<string, any>;
   }): AccessProofResult {
     const purpose = String(params.purpose || '').trim().toUpperCase();
-    if (purpose !== 'RESEARCH') {
+    if (purpose !== HealthcareConsentPurposes.Research) {
       throw new ManagerError("Missing 'vp_token' in token request body.", IssueType.Required);
     }
 
