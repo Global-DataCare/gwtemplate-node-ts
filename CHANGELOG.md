@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+- Separate Test Network admission from postal-address verification. The host
+  no longer requires or persists `postalActivationLicense` material from the
+  review VC; Order remains responsible for issuing the controller activation
+  credential later consumed by `Token/_exchange` and DCR.
+
 ## [1.21.14] - 2026-08-16
 
 - Use the canonical HL7 v3 ActReason `HRESCH` for healthcare-research SMART,

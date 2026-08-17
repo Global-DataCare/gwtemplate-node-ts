@@ -176,16 +176,12 @@ export async function processOrganizationVerificationTransaction(
   if (requestedPrimaryDid && !/^did:[a-z0-9]+:.+$/i.test(requestedPrimaryDid)) {
     throw new ManagerError('Organization verification organization.did must be a valid DID.', IssueType.Value);
   }
-  const postalCodeBinding = testNetworkAdmissionCredential
-    ? (testNetworkAdmissionCredential.credentialSubject as any)?.postalActivationLicense?.protectedCode
-    : undefined;
   const processedClaims = await deps.createPendingTenantRegistrationFromClaims({
     claims,
     environment: hostNetwork || runtimeNetwork || undefined,
     jobMeta: deps.job.content?.meta,
     fallbackAlternateName: deps.job.tenantId,
     primaryDid: requestedPrimaryDid || undefined,
-    postalActivationCodeBinding: postalCodeBinding,
   });
 
   return {

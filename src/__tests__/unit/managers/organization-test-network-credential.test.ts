@@ -1,6 +1,6 @@
 /**
  * Flow contract: Test Network bypasses ICA only when the attached VC is bound
- * to the same organization, controller key and delivered postal licence, and a
+ * to the same reviewed application, organization and controller key, and a
  * currently authorized employee of a configured issuer supplied the
  * ML-DSA-65 proof. Tests cover both published DID governance and the explicit,
  * revocable Test Network signer registry used by the MVP.
@@ -36,21 +36,6 @@ function credential() {
     applicationId: 'application-dsrc',
     accessPath: 'test-network',
     targetNetwork: 'test-network',
-    postalLicense: {
-      licenseId: 'postal-application-dsrc',
-      applicationId: 'application-dsrc',
-      organizationIdentifier: 'VATES-B00112233',
-      controllerEmail: 'developer@dsrc.example',
-      controllerKeyMaterial: toJwkThumbprintSha256Urn(controllerJwk),
-      postalAddressHash: 'sha256-address',
-      protectedCode: { algorithm: 'scrypt-v1', salt: 'salt', digest: 'digest' },
-      hostDid: 'did:web:host.example',
-      network: 'test-network',
-      status: 'delivered',
-      issuedAt: '2026-08-01T00:00:00.000Z',
-      expiresAt: '2026-09-01T00:00:00.000Z',
-      deliveredAt: '2026-08-09T00:00:00.000Z',
-    },
   });
   return {
     ...unsigned,
@@ -129,6 +114,7 @@ describe('organization Test Network credential verifier', () => {
 
     expect(result.mode).toBe('organization-test-network-vc');
     expect(result.signer).toBe(signer);
+    expect(result.checks).not.toHaveProperty('postalDelivered');
     expect(verifyDetachedJws).toHaveBeenCalledTimes(4);
   });
 
@@ -211,6 +197,10 @@ describe('Test Network transaction routing', () => {
     const organizationTestNetworkCredential = credential();
     const issuedCredentials = domainCredentials();
     const forwardToIca = jest.fn();
+    const createPendingTenantRegistrationFromClaims = jest.fn(async () => ({
+      ...claims,
+      [ClaimsOfferSchemaorg.identifier]: 'urn:example:Offer:dsrc',
+    }));
     const verifyTestNetworkAdmissionCredential = jest.fn().mockResolvedValue({
       mode: 'organization-test-network-vc',
       credentialId: organizationTestNetworkCredential.id,
@@ -247,10 +237,7 @@ describe('Test Network transaction routing', () => {
       issuerDid: 'did:web:host.example',
       config: { namespace: 'example', sectorsAllowed: [], networkMode: 'test-network' },
       normalizeClaims: value => value,
-      createPendingTenantRegistrationFromClaims: async () => ({
-        ...claims,
-        [ClaimsOfferSchemaorg.identifier]: 'urn:example:Offer:dsrc',
-      }),
+      createPendingTenantRegistrationFromClaims,
       createOrganizationIssueClaimsFromClaims: jest.fn(),
       forwardOrganizationVerificationTransactionToIca: forwardToIca,
       extractCredentialResourcesFromIcaPayload: jest.fn(),
@@ -259,6 +246,9 @@ describe('Test Network transaction routing', () => {
 
     expect(forwardToIca).not.toHaveBeenCalled();
     expect(verifyTestNetworkAdmissionCredential).toHaveBeenCalledTimes(1);
+    expect(createPendingTenantRegistrationFromClaims).toHaveBeenCalledWith(
+      expect.not.objectContaining({ postalActivationCodeBinding: expect.anything() }),
+    );
     expect(response.body.data[0]?.resource).toMatchObject({
       verificationResponse: { mode: 'organization-test-network-vc' },
       next: { action: 'Order/_batch' },
