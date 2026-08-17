@@ -54,7 +54,6 @@ export type TestNetworkAdmissionVerificationResult = Readonly<{
     signerMethodActive: true;
     detachedPqcProof: true;
     applicationBinding: true;
-    postalDelivered: true;
   }>;
   credentials: readonly VerifiableCredentialV2[];
 }>;
@@ -82,14 +81,6 @@ export async function verifyOrganizationTestNetworkCredential(
 
   const subject = credential.credentialSubject as Record<string, any>;
   if (subject.targetNetwork !== 'test-network') fail('Test Network admission VC is restricted to Test Network.');
-  if (subject.postalActivationLicense?.status !== 'delivered'
-    || !subject.postalActivationLicense?.deliveredAt) {
-    fail('Postal activation delivery is not confirmed.');
-  }
-  const protectedCode = subject.postalActivationLicense?.protectedCode;
-  if (protectedCode?.algorithm !== 'scrypt-v1' || !protectedCode?.salt || !protectedCode?.digest) {
-    fail('Postal activation code binding is missing or unsupported.');
-  }
   const organizationIdentifier = String(
     input.claims[ClaimsOrganizationSchemaorg.identifierValue]
       || input.claims[ClaimsOrganizationSchemaorg.taxId]
@@ -186,7 +177,6 @@ export async function verifyOrganizationTestNetworkCredential(
       signerMethodActive: true,
       detachedPqcProof: true,
       applicationBinding: true,
-      postalDelivered: true,
     },
     credentials,
   };
