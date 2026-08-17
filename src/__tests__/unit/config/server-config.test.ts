@@ -37,6 +37,17 @@ describe('server-config sector resolution', () => {
     expect(sectors).toEqual(['health-research', 'health-care', 'health-index']);
   });
 
+  it('should prioritize canonical ALLOWED_SECTORS over every legacy sector setting', () => {
+    const sectors = resolveAllowedSectorsFromEnv({
+      ALLOWED_SECTORS: 'health-care,onehealth-research',
+      SECTORS_ALLOWED: 'animal-care',
+      MAINSECTOR: 'animal',
+      SUBSECTORSALLOWED: 'research,care,index',
+    } as NodeJS.ProcessEnv);
+
+    expect(sectors).toEqual(['health-care', 'onehealth-research']);
+  });
+
   it('should prioritize deprecated SECTORS_ALLOWED when present', () => {
     const sectors = resolveAllowedSectorsFromEnv({
       MAINSECTOR: 'animal',
@@ -47,7 +58,7 @@ describe('server-config sector resolution', () => {
     expect(sectors).toEqual(['health-care', 'research']);
   });
 
-  it('should accept synthetic sectors in deprecated SECTORS_ALLOWED', () => {
+  it('should accept synthetic sectors in an explicit allowed-sector list', () => {
     expect(parseAndValidateSectors('animal-care,animal-index,animal-tech,animal-insurance')).toEqual([
       'animal-care',
       'animal-index',
