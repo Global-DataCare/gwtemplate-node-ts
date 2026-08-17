@@ -8,6 +8,19 @@
   claims from researcher working selections. Ownership and recovery now use
   standard `Composition.identifier`, `subject`, and `author` claims together
   with ledger-safe `meta.tag` coding metadata.
+- Require Test Network onboarding to carry the reviewer-signed
+  `OrganizationTestNetworkCredential` plus exactly three normal domain VCs
+  marked `TestNetworkCredential`. Verify every ML-DSA-65 proof, PDF/identity
+  binding and return only the Organization, LegalRepresentative and
+  ServiceController credentials in `vc[]`.
+- Use `resource.controller.email` for controller binding instead of confusing
+  it with the distinct legal-representative compatibility payload.
+- Consume Common Utils 2.5.7 and accept the Test Network admission VC only at
+  `resource.organizationTestNetworkCredential`; remove the authorization-named
+  transport and internal verifier terminology without an alias.
+- Document the existing-tenant boundary faithfully: GW projects the ICA-issued
+  ServiceControllerCredential into tenant/controller storage, while a portal
+  BFF independently persists the three returned `vc[]` records.
 
 ## [1.21.13] - 2026-08-16
 

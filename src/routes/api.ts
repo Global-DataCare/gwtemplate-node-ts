@@ -769,8 +769,11 @@ export function createApiRouter(
    *       - carry the signed terms PDF evidence or PDF URL attachment again
    *       - carry the current controller business binding key in `body.data[].resource.controller.publicKeyJwk`
    *       - forward the legal evidence to ICA `_verify`
-   *       - refresh the hosted legal-organization verification result without creating a new commercial Offer
-   *       - reserve/reissue one new activation code for the current legal representative/controller so the frontend can continue with `Token/_exchange` + `Device/_dcr`
+   *       - return the refreshed OrganizationCredential, LegalRepresentativeCredential and ServiceControllerCredential in `vc[]` without creating a new commercial Offer
+   *       - use ServiceControllerCredential to append or refresh the technical controller employee and tenant DID controller reference
+   *       - reserve/reissue one new activation code for that controller so the frontend can continue with `Token/_exchange` + `Device/_dcr`
+   *       - leave portal-owned organization and representative database projections to the consuming BFF; GW does not mutate an external portal database
+   *       - never infer controller authority from a LegalRepresentativeCredential carrying only ISCO-08|1120
    *
    *       Commercial rule:
    *       - this route must not overwrite the already contracted seat count
@@ -831,6 +834,7 @@ export function createApiRouter(
    *
    *       Response-boundary rule:
    *       - claims are canonical only at `data[].resource.meta.claims`; new writers do not emit `data[].meta.claims`
+   *       - consumers upsert the three `vc[]` types independently; the legal representative is not a controller unless a separate valid ServiceControllerCredential says so
    *       - this is an organization-credential reissuance/reverification result, not a `License/_issue` result
    *       - the activation code is not a VC and `License:Issued` is not the canonical response entry type
    *       - `OperationOutcome.issue[]` remains the unrelated diagnostics array
@@ -881,7 +885,7 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 1.1 Organization Registration
-   *     summary: Submit the first legal-organization onboarding transaction and forward it to ICA `_verify`
+   *     summary: Submit the first legal-organization onboarding transaction to ICA or Test Network review
    *     description: |
    *       Canonical first host-side onboarding step for a legal organization.
    *
@@ -892,10 +896,13 @@ export function createApiRouter(
    *       - optionally carry the organization VC-signing public key in `body.data[].resource.organization.publicKeyJwk`
    *       - carry the legal organization claims and representative payload that GW CORE forwards to ICA `_verify`
    *       - return three ICA credentials when controller identity and JWK evidence are complete: OrganizationCredential, LegalRepresentativeCredential and ServiceControllerCredential
+   *       - on Test Network only, accept `OrganizationTestNetworkCredential` plus exactly those three domain credentials marked `TestNetworkCredential`, verify the reviewer's ML-DSA-65 proofs and return the three domain credentials in `vc[]` without calling ICA
+   *       - carry that admission VC only in `body.data[].resource.organizationTestNetworkCredential` and the three domain VCs in `body.data[].resource.testNetworkCredentials`; no authorization-named alias is accepted
    *
    *       Separation of concerns:
    *       - `meta.jws` / `meta.jwe` remain communication/runtime keys of the portal app, confidential app, device profile, or BFF
    *       - `body.data[].resource.controller.publicKeyJwk` is the controller business/operation-signing key that ICA projects into `ServiceControllerCredential.owner.hasCredential.material`
+   *       - `body.data[].resource.controller.email` is the technical controller; it is not inferred from the separate legal representative payload
    *       - LegalRepresentativeCredential defaults to `hasOccupation.occupationalCategory = ISCO-08|1120`; ServiceControllerCredential uses `owner.additionalType = RESPRSN` plus controller occupation `ISCO-08|1330` unless the signed PDF provides an explicit occupation
    *       - `body.data[].resource.organization.publicKeyJwk` is the organization credential-signing key when the hosting operator/runtime already knows it
    *       - this route is distinct from `Organization/_activate`, which starts from an already-issued ICA proof (`vp_token`)

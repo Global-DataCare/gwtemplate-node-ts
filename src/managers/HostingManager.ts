@@ -86,7 +86,7 @@ import {
   extractCredentialResourcesFromIcaPayload as extractCredentialResourcesFromIcaPayloadExternal,
   forwardOrganizationVerificationTransactionToIca as forwardOrganizationVerificationTransactionToIcaExternal,
 } from './hosting/ica-verification';
-import { verifyOrganizationRegistrationAuthorization } from './hosting/organization-registration-authorization';
+import { verifyOrganizationTestNetworkCredential } from './hosting/organization-test-network-credential';
 import {
   processIndividualOrganizationFlow as processIndividualOrganizationFlowExternal,
   resolveTenantCollectionForIndividuals as resolveTenantCollectionForIndividualsExternal,
@@ -877,7 +877,7 @@ export class HostingManager {
       createOrganizationIssueClaimsFromClaims: this.createOrganizationIssueClaimsFromClaims.bind(this),
       forwardOrganizationVerificationTransactionToIca: this.forwardOrganizationVerificationTransactionToIca.bind(this),
       extractCredentialResourcesFromIcaPayload: this.extractCredentialResourcesFromIcaPayload.bind(this),
-      verifyHostAuthorizationCredential: async ({ credential, claims, resource }) => {
+      verifyTestNetworkAdmissionCredential: async ({ credential, claims, resource }) => {
         if (!this.cryptographyService) {
           throw new ManagerError('Host authorization cryptography is not configured.', IssueType.NotSupported);
         }
@@ -888,12 +888,14 @@ export class HostingManager {
         const trustedSigners = parseOrganizationAuthorizationSigners(
           process.env.HOST_ORGANIZATION_AUTHORIZATION_SIGNERS,
         );
-        return verifyOrganizationRegistrationAuthorization({
+        return verifyOrganizationTestNetworkCredential({
           credential,
           claims,
           controller: resource.controller,
           organization: resource.organization,
-          controllerEmail: String(resource.legalRepresentativePayload?.email || resource.legalRepresentative?.email || ''),
+          controllerEmail: String(resource.controller?.email || ''),
+          legalRepresentativeEmail: String(resource.legalRepresentativePayload?.email || resource.legalRepresentative?.email || ''),
+          testNetworkCredentials: resource.testNetworkCredentials,
           cryptography: this.cryptographyService,
           trustedIssuers,
           trustedSigners,
