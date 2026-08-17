@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.21.14] - 2026-08-16
+
 - Use the canonical HL7 v3 ActReason `HRESCH` for healthcare-research SMART,
   Consent, and inter-tenant contract authorization instead of the ad-hoc
   `RESEARCH` token.
