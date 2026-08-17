@@ -28,7 +28,7 @@ import {
   HOST_TRANSACTION_REQUIRED_OUTPUT_CLAIMS,
 } from './hosting-claim-contracts';
 import type { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
-import type { HostAuthorizationVerificationResult } from './organization-test-network-credential';
+import type { TestNetworkAdmissionVerificationResult } from './organization-test-network-credential';
 
 type LegalOrganizationVerificationTransactionResource = Readonly<{
   meta?: { claims?: ClaimsRecord };
@@ -37,7 +37,7 @@ type LegalOrganizationVerificationTransactionResource = Readonly<{
   legalRepresentativePayload?: Record<string, unknown>;
   legalRepresentative?: Record<string, unknown>;
   verification?: Record<string, unknown>;
-  authorizationCredential?: VerifiableCredentialV2;
+  organizationTestNetworkCredential?: VerifiableCredentialV2;
   testNetworkCredentials?: readonly VerifiableCredentialV2[];
 }>;
 
@@ -103,11 +103,11 @@ type VerificationDeps = Readonly<{
     resourceType: string;
   }) => Promise<any>;
   extractCredentialResourcesFromIcaPayload: (icaResponse: unknown) => Array<Record<string, unknown>>;
-  verifyHostAuthorizationCredential?: (input: {
+  verifyTestNetworkAdmissionCredential?: (input: {
     credential: VerifiableCredentialV2;
     claims: ClaimsRecord;
     resource: LegalOrganizationVerificationTransactionResource;
-  }) => Promise<HostAuthorizationVerificationResult>;
+  }) => Promise<TestNetworkAdmissionVerificationResult>;
   persistExistingTenantControllerBinding?: (input: {
     claims: ClaimsRecord;
     controller?: Record<string, unknown>;
@@ -144,21 +144,21 @@ export async function processOrganizationVerificationTransaction(
     throw new ManagerError(`Missing required claim: '${HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS[1]}'`, IssueType.Required);
   }
 
-  const hostAuthorization = resource.authorizationCredential;
-  if (hostAuthorization && (hostNetwork !== 'test-network' || runtimeNetwork !== 'test-network')) {
+  const testNetworkAdmissionCredential = resource.organizationTestNetworkCredential;
+  if (testNetworkAdmissionCredential && (hostNetwork !== 'test-network' || runtimeNetwork !== 'test-network')) {
     throw new ManagerError(
-      'Host authorization VC is accepted only by the Test Network route on a Test Network host.',
+      'Test Network admission VC is accepted only by the Test Network route on a Test Network host.',
       IssueType.Security,
     );
   }
-  if (hostAuthorization && resourceType !== 'contract') {
-    throw new ManagerError('Host authorization VC requires the canonical contract resource type.', IssueType.Security);
+  if (testNetworkAdmissionCredential && resourceType !== 'contract') {
+    throw new ManagerError('Test Network admission VC requires the canonical contract resource type.', IssueType.Security);
   }
-  if (hostAuthorization && !deps.verifyHostAuthorizationCredential) {
+  if (testNetworkAdmissionCredential && !deps.verifyTestNetworkAdmissionCredential) {
     throw new ManagerError('Host authorization verification is not configured.', IssueType.NotSupported);
   }
-  const verificationResponse = hostAuthorization
-    ? await deps.verifyHostAuthorizationCredential!({ credential: hostAuthorization, claims, resource })
+  const verificationResponse = testNetworkAdmissionCredential
+    ? await deps.verifyTestNetworkAdmissionCredential!({ credential: testNetworkAdmissionCredential, claims, resource })
     : await deps.forwardOrganizationVerificationTransactionToIca({
         job: deps.job,
         entry,
@@ -167,8 +167,8 @@ export async function processOrganizationVerificationTransaction(
         requestedSector,
         resourceType,
       });
-  const vc = hostAuthorization
-    ? [...(verificationResponse as HostAuthorizationVerificationResult).credentials] as unknown as Array<Record<string, unknown>>
+  const vc = testNetworkAdmissionCredential
+    ? [...(verificationResponse as TestNetworkAdmissionVerificationResult).credentials] as unknown as Array<Record<string, unknown>>
     : deps.extractCredentialResourcesFromIcaPayload(verificationResponse);
   const requestedPrimaryDid = typeof resource.organization?.did === 'string'
     ? resource.organization.did.trim()
@@ -176,8 +176,8 @@ export async function processOrganizationVerificationTransaction(
   if (requestedPrimaryDid && !/^did:[a-z0-9]+:.+$/i.test(requestedPrimaryDid)) {
     throw new ManagerError('Organization verification organization.did must be a valid DID.', IssueType.Value);
   }
-  const postalCodeBinding = hostAuthorization
-    ? (hostAuthorization.credentialSubject as any)?.postalActivationLicense?.protectedCode
+  const postalCodeBinding = testNetworkAdmissionCredential
+    ? (testNetworkAdmissionCredential.credentialSubject as any)?.postalActivationLicense?.protectedCode
     : undefined;
   const processedClaims = await deps.createPendingTenantRegistrationFromClaims({
     claims,
@@ -204,7 +204,7 @@ export async function processOrganizationVerificationTransaction(
         resource: buildOrganizationVerificationTransactionResponseResource(
           verificationResponse,
           processedClaims,
-          hostAuthorization ? 'host' : 'ica',
+          testNetworkAdmissionCredential ? 'host' : 'ica',
         ),
         response: { status: '200' },
       }],

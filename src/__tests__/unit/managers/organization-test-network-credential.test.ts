@@ -208,12 +208,12 @@ describe('organization Test Network credential verifier', () => {
 
 describe('Test Network transaction routing', () => {
   it('uses the attached host authorization and never calls ICA', async () => {
-    const authorizationCredential = credential();
+    const organizationTestNetworkCredential = credential();
     const issuedCredentials = domainCredentials();
     const forwardToIca = jest.fn();
-    const verifyHostAuthorizationCredential = jest.fn().mockResolvedValue({
+    const verifyTestNetworkAdmissionCredential = jest.fn().mockResolvedValue({
       mode: 'organization-test-network-vc',
-      credentialId: authorizationCredential.id,
+      credentialId: organizationTestNetworkCredential.id,
       issuer,
       signer,
       checks: {},
@@ -234,7 +234,7 @@ describe('Test Network transaction routing', () => {
           body: { data: [{
             meta: { claims },
             resource: {
-              authorizationCredential,
+              organizationTestNetworkCredential,
               testNetworkCredentials: issuedCredentials,
               verification: { resourceType: 'contract' },
               organization: { did: organizationDid },
@@ -254,11 +254,11 @@ describe('Test Network transaction routing', () => {
       createOrganizationIssueClaimsFromClaims: jest.fn(),
       forwardOrganizationVerificationTransactionToIca: forwardToIca,
       extractCredentialResourcesFromIcaPayload: jest.fn(),
-      verifyHostAuthorizationCredential,
+      verifyTestNetworkAdmissionCredential,
     });
 
     expect(forwardToIca).not.toHaveBeenCalled();
-    expect(verifyHostAuthorizationCredential).toHaveBeenCalledTimes(1);
+    expect(verifyTestNetworkAdmissionCredential).toHaveBeenCalledTimes(1);
     expect(response.body.data[0]?.resource).toMatchObject({
       verificationResponse: { mode: 'organization-test-network-vc' },
       next: { action: 'Order/_batch' },
@@ -271,14 +271,14 @@ describe('Test Network transaction routing', () => {
     ['network route', 'network', 'test-network'],
     ['network runtime', 'test-network', 'network'],
   ])('rejects the host credential on a %s', async (_label, sector, networkMode) => {
-    const authorizationCredential = credential();
+    const organizationTestNetworkCredential = credential();
     await expect(processOrganizationVerificationTransaction({
       job: {
         action: 'Organization/_transaction', tenantId: 'host', sector,
         content: { thid: 'transaction-dsrc', body: { data: [{
           meta: { claims: { [ClaimsServiceSchemaorg.category]: 'health-care' } },
           resource: {
-            authorizationCredential,
+            organizationTestNetworkCredential,
             verification: { resourceType: 'contract' },
           },
         }] } },
@@ -290,7 +290,7 @@ describe('Test Network transaction routing', () => {
       createOrganizationIssueClaimsFromClaims: jest.fn(),
       forwardOrganizationVerificationTransactionToIca: jest.fn(),
       extractCredentialResourcesFromIcaPayload: jest.fn(),
-      verifyHostAuthorizationCredential: jest.fn(),
+      verifyTestNetworkAdmissionCredential: jest.fn(),
     })).rejects.toThrow('Test Network route on a Test Network host');
   });
 });
