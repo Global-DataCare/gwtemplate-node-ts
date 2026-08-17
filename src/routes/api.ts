@@ -881,7 +881,7 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 1.1 Organization Registration
-   *     summary: Submit the first legal-organization onboarding transaction and forward it to ICA `_verify`
+   *     summary: Submit the first legal-organization onboarding transaction to ICA or Test Network review
    *     description: |
    *       Canonical first host-side onboarding step for a legal organization.
    *
@@ -892,10 +892,12 @@ export function createApiRouter(
    *       - optionally carry the organization VC-signing public key in `body.data[].resource.organization.publicKeyJwk`
    *       - carry the legal organization claims and representative payload that GW CORE forwards to ICA `_verify`
    *       - return three ICA credentials when controller identity and JWK evidence are complete: OrganizationCredential, LegalRepresentativeCredential and ServiceControllerCredential
+   *       - on Test Network only, accept `OrganizationTestNetworkCredential` plus exactly those three domain credentials marked `TestNetworkCredential`, verify the reviewer's ML-DSA-65 proofs and return the three domain credentials in `vc[]` without calling ICA
    *
    *       Separation of concerns:
    *       - `meta.jws` / `meta.jwe` remain communication/runtime keys of the portal app, confidential app, device profile, or BFF
    *       - `body.data[].resource.controller.publicKeyJwk` is the controller business/operation-signing key that ICA projects into `ServiceControllerCredential.owner.hasCredential.material`
+   *       - `body.data[].resource.controller.email` is the technical controller; it is not inferred from the separate legal representative payload
    *       - LegalRepresentativeCredential defaults to `hasOccupation.occupationalCategory = ISCO-08|1120`; ServiceControllerCredential uses `owner.additionalType = RESPRSN` plus controller occupation `ISCO-08|1330` unless the signed PDF provides an explicit occupation
    *       - `body.data[].resource.organization.publicKeyJwk` is the organization credential-signing key when the hosting operator/runtime already knows it
    *       - this route is distinct from `Organization/_activate`, which starts from an already-issued ICA proof (`vp_token`)

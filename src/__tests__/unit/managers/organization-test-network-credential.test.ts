@@ -5,9 +5,10 @@
  * ML-DSA-65 proof. Tests cover both published DID governance and the explicit,
  * revocable Test Network signer registry used by the MVP.
  */
-import { verifyOrganizationRegistrationAuthorization } from '../../../managers/hosting/organization-registration-authorization';
+import { verifyOrganizationTestNetworkCredential } from '../../../managers/hosting/organization-test-network-credential';
 import { processOrganizationVerificationTransaction } from '../../../managers/hosting/process-organization-verification';
-import { buildOrganizationRegistrationAuthorizationCredential } from 'gdc-common-utils-ts/utils/organization-registration-authorization';
+import { buildOrganizationTestNetworkCredential } from 'gdc-common-utils-ts/utils/organization-test-network-credential';
+import { buildTestNetworkOrganizationCredentialSet } from 'gdc-common-utils-ts/utils/test-network-organization-credentials';
 import {
   ClaimsOfferSchemaorg,
   ClaimsOrganizationSchemaorg,
@@ -22,7 +23,7 @@ const signer = 'did:web:unid.example:VATES-G02793479:member:cto';
 const organizationDid = 'did:web:host.example:VATES-B00112233';
 
 function credential() {
-  const unsigned = buildOrganizationRegistrationAuthorizationCredential({
+  const unsigned = buildOrganizationTestNetworkCredential({
     issuerDid: issuer,
     subjectDid: organizationDid,
     credentialId: 'urn:uuid:application-dsrc',
@@ -53,6 +54,10 @@ function credential() {
   });
   return {
     ...unsigned,
+    credentialSubject: {
+      ...unsigned.credentialSubject,
+      applicationEvidence: { pdfSha256: 'a'.repeat(64) },
+    },
     proof: {
       type: 'JsonWebSignature2020',
       proofPurpose: 'contractAgreement',
@@ -63,7 +68,36 @@ function credential() {
   };
 }
 
-describe('organization registration authorization verifier', () => {
+function domainCredentials() {
+  return buildTestNetworkOrganizationCredentialSet({
+    issuerDid: issuer,
+    organizationDid,
+    applicationId: 'application-dsrc',
+    validFrom: '2026-08-10T00:00:00.000Z',
+    validUntil: '2027-08-10T00:00:00.000Z',
+    pdfSha256: 'a'.repeat(64),
+    documentVersion: '2026081001',
+    legalName: 'DSRC',
+    organizationIdentifier: 'VATES-B00112233',
+    identifierType: 'taxID',
+    addressCountry: 'ES',
+    serviceCategory: 'health-care',
+    legalRepresentativeEmail: 'developer@dsrc.example',
+    legalRepresentativeFullName: 'Example Representative',
+    controllerEmail: 'developer@dsrc.example',
+    controllerKeyMaterial: toJwkThumbprintSha256Urn(controllerJwk),
+  }).map(item => ({
+    ...item,
+    proof: {
+      type: 'JsonWebSignature2020',
+      proofPurpose: 'assertionMethod',
+      verificationMethod: `${signer}#pqc`,
+      jws: `${Buffer.from(JSON.stringify({ alg: 'ML-DSA-65' })).toString('base64url')}..signature`,
+    },
+  }));
+}
+
+describe('organization Test Network credential verifier', () => {
   it('accepts a current UNID controller proof bound to the submitted application', async () => {
     const fetchImpl = jest.fn(async (url: string | URL | Request) => {
       const value = String(url);
@@ -79,21 +113,23 @@ describe('organization registration authorization verifier', () => {
     }) as typeof fetch;
     const verifyDetachedJws = jest.fn().mockResolvedValue(true);
 
-    const result = await verifyOrganizationRegistrationAuthorization({
+    const result = await verifyOrganizationTestNetworkCredential({
       credential: credential(),
       claims: { [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233' },
       controller: { publicKeyJwk: controllerJwk },
       organization: { did: organizationDid },
       controllerEmail: 'developer@dsrc.example',
+      legalRepresentativeEmail: 'developer@dsrc.example',
+      testNetworkCredentials: domainCredentials(),
       cryptography: { verifyDetachedJws } as any,
       trustedIssuers: [issuer],
       fetchImpl,
       now: new Date('2026-08-10T12:00:00.000Z'),
     });
 
-    expect(result.mode).toBe('host-authorization-vc');
+    expect(result.mode).toBe('organization-test-network-vc');
     expect(result.signer).toBe(signer);
-    expect(verifyDetachedJws).toHaveBeenCalledTimes(1);
+    expect(verifyDetachedJws).toHaveBeenCalledTimes(4);
   });
 
   it('fails closed after the signer is removed from the issuer controller list', async () => {
@@ -107,7 +143,7 @@ describe('organization registration authorization verifier', () => {
           }
         : { '@context': 'https://www.w3.org/ns/did/v1', id: issuer, controller: [] },
     })) as unknown as typeof fetch;
-    await expect(verifyOrganizationRegistrationAuthorization({
+    await expect(verifyOrganizationTestNetworkCredential({
       credential: credential(),
       claims: { [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233' },
       controller: { publicKeyJwk: controllerJwk },
@@ -123,12 +159,14 @@ describe('organization registration authorization verifier', () => {
   it('accepts the MVP signer registry without pretending the employee DID is already published', async () => {
     const fetchImpl = jest.fn();
     const verifyDetachedJws = jest.fn().mockResolvedValue(true);
-    const result = await verifyOrganizationRegistrationAuthorization({
+    const result = await verifyOrganizationTestNetworkCredential({
       credential: credential(),
       claims: { [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233' },
       controller: { publicKeyJwk: controllerJwk },
       organization: { did: organizationDid },
       controllerEmail: 'developer@dsrc.example',
+      legalRepresentativeEmail: 'developer@dsrc.example',
+      testNetworkCredentials: domainCredentials(),
       cryptography: { verifyDetachedJws } as any,
       trustedIssuers: [issuer],
       trustedSigners: [{
@@ -148,7 +186,7 @@ describe('organization registration authorization verifier', () => {
   });
 
   it('fails closed when the MVP signer registry revokes the employee', async () => {
-    await expect(verifyOrganizationRegistrationAuthorization({
+    await expect(verifyOrganizationTestNetworkCredential({
       credential: credential(),
       claims: { [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233' },
       controller: { publicKeyJwk: controllerJwk },
@@ -171,13 +209,15 @@ describe('organization registration authorization verifier', () => {
 describe('Test Network transaction routing', () => {
   it('uses the attached host authorization and never calls ICA', async () => {
     const authorizationCredential = credential();
+    const issuedCredentials = domainCredentials();
     const forwardToIca = jest.fn();
     const verifyHostAuthorizationCredential = jest.fn().mockResolvedValue({
-      mode: 'host-authorization-vc',
+      mode: 'organization-test-network-vc',
       credentialId: authorizationCredential.id,
       issuer,
       signer,
       checks: {},
+      credentials: issuedCredentials,
     });
     const claims = {
       [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B00112233',
@@ -195,9 +235,10 @@ describe('Test Network transaction routing', () => {
             meta: { claims },
             resource: {
               authorizationCredential,
+              testNetworkCredentials: issuedCredentials,
               verification: { resourceType: 'contract' },
               organization: { did: organizationDid },
-              controller: { publicKeyJwk: controllerJwk },
+              controller: { email: 'developer@dsrc.example', publicKeyJwk: controllerJwk },
               legalRepresentativePayload: { email: 'developer@dsrc.example' },
             },
           }] },
@@ -219,10 +260,11 @@ describe('Test Network transaction routing', () => {
     expect(forwardToIca).not.toHaveBeenCalled();
     expect(verifyHostAuthorizationCredential).toHaveBeenCalledTimes(1);
     expect(response.body.data[0]?.resource).toMatchObject({
-      verificationResponse: { mode: 'host-authorization-vc' },
+      verificationResponse: { mode: 'organization-test-network-vc' },
       next: { action: 'Order/_batch' },
     });
-    expect(response.body.data[0]?.vc).toEqual([authorizationCredential]);
+    expect(response.body.data[0]?.resource.verificationResponse).not.toHaveProperty('credentials');
+    expect(response.body.data[0]?.vc).toEqual(issuedCredentials);
   });
 
   it.each([

@@ -28,7 +28,7 @@ import {
   HOST_TRANSACTION_REQUIRED_OUTPUT_CLAIMS,
 } from './hosting-claim-contracts';
 import type { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
-import type { HostAuthorizationVerificationResult } from './organization-registration-authorization';
+import type { HostAuthorizationVerificationResult } from './organization-test-network-credential';
 
 type LegalOrganizationVerificationTransactionResource = Readonly<{
   meta?: { claims?: ClaimsRecord };
@@ -38,6 +38,7 @@ type LegalOrganizationVerificationTransactionResource = Readonly<{
   legalRepresentative?: Record<string, unknown>;
   verification?: Record<string, unknown>;
   authorizationCredential?: VerifiableCredentialV2;
+  testNetworkCredentials?: readonly VerifiableCredentialV2[];
 }>;
 
 type LegalOrganizationVerificationTransactionEntry = Readonly<{
@@ -167,7 +168,7 @@ export async function processOrganizationVerificationTransaction(
         resourceType,
       });
   const vc = hostAuthorization
-    ? [hostAuthorization as unknown as Record<string, unknown>]
+    ? [...(verificationResponse as HostAuthorizationVerificationResult).credentials] as unknown as Array<Record<string, unknown>>
     : deps.extractCredentialResourcesFromIcaPayload(verificationResponse);
   const requestedPrimaryDid = typeof resource.organization?.did === 'string'
     ? resource.organization.did.trim()
@@ -286,9 +287,13 @@ export function buildOrganizationVerificationTransactionResponseResource(
   source: 'ica' | 'host' = 'ica',
 ): LegalOrganizationVerificationTransactionResponseResource {
   const offerId = String(processedClaims[HOST_TRANSACTION_REQUIRED_OUTPUT_CLAIMS[0]] || '').trim() || undefined;
+  const hostVerification = source === 'host' && verificationResponse && typeof verificationResponse === 'object'
+    ? Object.fromEntries(Object.entries(verificationResponse as Record<string, unknown>)
+      .filter(([key]) => key !== 'credentials'))
+    : verificationResponse;
   return {
     meta: { claims: processedClaims },
-    ...(source === 'ica' ? { icaResponse: verificationResponse } : { verificationResponse }),
+    ...(source === 'ica' ? { icaResponse: verificationResponse } : { verificationResponse: hostVerification }),
     next: {
       action: ORGANIZATION_VERIFICATION_TRANSACTION_NEXT_ACTION,
       acceptedOffer: {
