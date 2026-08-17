@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.21.15] - 2026-08-16
+
 - Separate Test Network admission from postal-address verification. The host
   no longer requires or persists `postalActivationLicense` material from the
   review VC; Order remains responsible for issuing the controller activation
