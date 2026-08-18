@@ -62,8 +62,10 @@ describe('MedicationStatementManager', () => {
               '@context': 'org.hl7.fhir.api',
               'MedicationStatement.subject': 'Organization/subject-001',
               'MedicationStatement.identifier': 'urn:uuid:med-001',
-              'MedicationStatement.medication-text': 'Paracetamol',
+              'MedicationStatement.code-text': 'Paracetamol',
               'MedicationStatement.code': 'http://www.nlm.nih.gov/research/umls/rxnorm|161',
+              'MedicationStatement.medication': 'Medication/medication-161',
+              'MedicationStatement.adherence': 'http://hl7.org/fhir/CodeSystem/medication-statement-adherence|taking-as-directed',
               'MedicationStatement.status': 'active',
             },
           },
@@ -93,9 +95,32 @@ describe('MedicationStatementManager', () => {
     expect(putArgs[2]).toBe(expectedSectionId);
     expect(putArgs[1][0].indexed.attributes).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.subject', value: 'Organization/subject-001' }),
-      expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.medication-text', value: 'Paracetamol' }),
+      expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.code-text', value: 'Paracetamol' }),
       expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.code', value: 'http://www.nlm.nih.gov/research/umls/rxnorm|161' }),
+      expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.medication', value: 'Medication/medication-161' }),
+      expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.adherence', value: 'http://hl7.org/fhir/CodeSystem/medication-statement-adherence|taking-as-directed' }),
     ]));
+  });
+
+  it('omits malformed FHIR claim keys, warns, and persists the valid claims in the same entry', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const job = createBatchJob();
+    const entryClaims = (job.content as any).body.entry[0].meta.claims;
+    entryClaims['MedicationStatement.CodeDisplay'] = 'Paracetamol';
+    entryClaims['MedicationStatement.code_display'] = 'Paracetamol';
+
+    const response = await manager.process(job);
+
+    expect((response.body as any).data[0].response.status).toBe('201');
+    const individualPut = (mockVaultRepository.put as any).mock.calls.find((args: any[]) =>
+      args[2] === getSubjectScopedSectionId('Organization/subject-001', 'individual', 'medications'));
+    expect(individualPut[1][0]).toEqual(expect.objectContaining({
+      'org.hl7.fhir.api.MedicationStatement.status': 'active',
+    }));
+    expect(individualPut[1][0]).not.toHaveProperty('org.hl7.fhir.api.MedicationStatement.CodeDisplay');
+    expect(individualPut[1][0]).not.toHaveProperty('org.hl7.fhir.api.MedicationStatement.code_display');
+    expect(warn).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
   });
 
   it('supports _search by subject-scoped section and claim filters', async () => {
@@ -123,7 +148,7 @@ describe('MedicationStatementManager', () => {
     const researchRecord = digitalTwinPutArgs[1][0];
     const subjectKey = Object.keys(researchRecord).find((key) => key.endsWith('MedicationStatement.subject'));
     expect(researchRecord[subjectKey as string]).toBe(twinSubjectId);
-    expect(Object.keys(researchRecord).some((key) => key.endsWith('MedicationStatement.medication-text'))).toBe(false);
+    expect(Object.keys(researchRecord).some((key) => key.endsWith('MedicationStatement.code-text'))).toBe(false);
   });
 
   it('does not search digital twin medications by free text', async () => {
@@ -143,7 +168,7 @@ describe('MedicationStatementManager', () => {
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.api',
-                  'MedicationStatement.medication-text': 'paracetamol',
+                  'MedicationStatement.code-text': 'paracetamol',
                 },
               },
             },

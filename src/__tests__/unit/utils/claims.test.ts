@@ -2,6 +2,7 @@
 
 import {
   buildFhirClaimKeys,
+  canonicalizeFhirClaims,
   getClaimValue,
   getFirstClaimValueByKeys,
   normalizeContextualizedClaims,
@@ -80,6 +81,7 @@ describe('normalizeContextualizedClaims', () => {
   const originalIdentityStorageMode = process.env.CLAIMS_IDENTITY_STORAGE_MODE;
 
   afterEach(() => {
+    jest.restoreAllMocks();
     if (originalIdentityStorageMode === undefined) {
       delete process.env.CLAIMS_IDENTITY_STORAGE_MODE;
       return;
@@ -117,6 +119,59 @@ describe('normalizeContextualizedClaims', () => {
     expect(getClaimValue(claims, 'Consent.actor-role')).toBe('ISCO-08|2211');
   });
 
+  test.each([
+    'MedicationStatement.CodeDisplay',
+    'MedicationStatement.code_display',
+    'org.hl7.fhir.api.MedicationStatement.CodeTextLocal',
+  ])('omits non-kebab-case FHIR API claim %s and warns before persistence', (claimKey) => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const claims = normalizeContextualizedClaims({
+      '@context': 'org.hl7.fhir.api',
+      [claimKey]: 'invalid',
+      'MedicationStatement.status': 'active',
+    });
+
+    expect(claims).toEqual({
+      '@context': 'org.hl7.fhir.api',
+      'org.hl7.fhir.api.MedicationStatement.status': 'active',
+    });
+    expect(warn).toHaveBeenCalledWith('[claims] omitted malformed claim', expect.objectContaining({
+      context: 'org.hl7.fhir.api',
+      claimKey,
+      vocabulary: 'FHIR API',
+    }));
+  });
+
+  test('keeps Schema.org camelCase claims and omits hyphens and underscores', () => {
+    expect(normalizeContextualizedClaims({
+      '@context': 'org.schema',
+      'Organization.legalName': 'Acme Health',
+      'org.schema.Service.serviceType': 'health-care',
+    })).toEqual(expect.objectContaining({
+      'org.schema.Organization.legalName': 'Acme Health',
+      'org.schema.Service.serviceType': 'health-care',
+    }));
+
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    expect(normalizeContextualizedClaims({
+      '@context': 'org.schema',
+      'Organization.legal-name': 'Acme Health',
+      'Organization.name': 'Acme',
+    })).toEqual({
+      '@context': 'org.schema',
+      'org.schema.Organization.name': 'Acme',
+    });
+    expect(normalizeContextualizedClaims({
+      '@context': 'org.schema',
+      'Organization.legal_name': 'Acme Health',
+      'Organization.name': 'Acme',
+    })).toEqual({
+      '@context': 'org.schema',
+      'org.schema.Organization.name': 'Acme',
+    });
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
   test('should strip the org.schema prefix when identity storage mode is canonical', () => {
     process.env.CLAIMS_IDENTITY_STORAGE_MODE = 'canonical';
 
@@ -139,16 +194,48 @@ describe('normalizeContextualizedClaims', () => {
 });
 
 describe('FHIR claim key helpers', () => {
+  test('canonicalizes only recognized historical FHIR aliases and lets canonical keys win', () => {
+    expect(canonicalizeFhirClaims({
+      '@context': 'org.hl7.fhir.r4',
+      'MedicationStatement.CodeDisplay': 'legacy display',
+      'MedicationStatement.CodeTextLocal': 'legacy local text',
+      'MedicationStatement.code-display': 'canonical display',
+    })).toEqual({
+      '@context': 'org.hl7.fhir.api',
+      'MedicationStatement.code-display': 'canonical display',
+      'MedicationStatement.code-text': 'legacy local text',
+    });
+  });
+
+  test('omits and warns about other malformed historical FHIR claims during summary canonicalization', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const claims = canonicalizeFhirClaims({
+      id: 'internal-record-id',
+      'Observation.status': 'final',
+      'Observation.BadClaim': 'bad camel case',
+      'Observation.bad_claim': 'bad underscore',
+    });
+
+    expect(claims).toEqual({
+      '@context': 'org.hl7.fhir.api',
+      id: 'internal-record-id',
+      'Observation.status': 'final',
+    });
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
   test('builds canonical plus contextualized FHIR claim keys centrally', () => {
     expect(buildFhirClaimKeys('Composition.type')).toEqual([
       'Composition.type',
       'org.hl7.fhir.api.Composition.type',
       'org.hl7.fhir.r4.Composition.type',
+      'org.hl7.fhir.r5.Composition.type',
     ]);
   });
 
   test('strips supported FHIR context prefixes from claim keys', () => {
     expect(stripKnownFhirClaimContextPrefix('org.hl7.fhir.r4.Composition.section')).toBe('Composition.section');
+    expect(stripKnownFhirClaimContextPrefix('org.hl7.fhir.r5.Composition.section')).toBe('Composition.section');
     expect(stripKnownFhirClaimContextPrefix('org.hl7.fhir.api.Composition.section')).toBe('Composition.section');
   });
 

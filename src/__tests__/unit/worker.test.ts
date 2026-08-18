@@ -80,6 +80,53 @@ describe('Worker', () => {
     expect(mockKmsService.protectConfidentialData).not.toHaveBeenCalled();
   });
 
+  it('logs failed bundle-entry OperationOutcomes before encrypting the response', async () => {
+    // Step 1. A manager returns a mixed batch response; only the failed entry
+    // has an OperationOutcome that must become observable in service logs.
+    const jobName = createJobName('health-care_acme', 'Person', '_batch');
+    const job: JobRequest = {
+      ...testCreateCustomerJobRequestProfessionalOnboarding,
+      tenantId: 'acme',
+      sector: 'health-care',
+      resourceType: 'Person',
+      contentType: 'application/json',
+    };
+    const outcome = {
+      resourceType: 'OperationOutcome',
+      issue: [{ severity: 'error', code: 'invalid', diagnostics: 'Malformed claim' }],
+    };
+    mockIndividualManager.process.mockResolvedValue({
+      jti: 'response-with-outcome',
+      type: 'batch-response',
+      thid: job.content?.thid as string,
+      iss: API_BASE_URL,
+      aud: 'did:web:client.example.com',
+      body: {
+        data: [
+          { type: 'Person', response: { status: '201' } },
+          { type: 'Person', response: { status: '422', outcome } },
+        ],
+      },
+    } as IDecodedDidcommPayload);
+    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'key-1' } as any);
+    mockKmsService.encodeResponse.mockResolvedValue('encrypted.jwe.string');
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    // Step 2. The failed entry is logged once with routing context and the
+    // unchanged OperationOutcome, while normal response encryption continues.
+    await worker.process(jobName, job);
+
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    expect(errorLog).toHaveBeenCalledWith('[Worker] bundle entry OperationOutcome', expect.objectContaining({
+      jobName,
+      entryIndex: 1,
+      status: 422,
+      outcome,
+    }));
+    expect(mockKmsService.encodeResponse).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+
   it('should throw an error for an unconfigured resourceType', async () => {
     // ARRANGE
     const resourceType = 'UnknownResource';

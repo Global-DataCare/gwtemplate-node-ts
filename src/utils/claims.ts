@@ -3,6 +3,7 @@
 
 import { v4 as uuidv4, validate as uuidValidate} from 'uuid';
 import { knownDomainsReversed } from "gdc-common-utils-ts/models/urlPath";
+import { normalizeFhirApiClaimKey } from 'gdc-common-utils-ts/utils/fhir-api-claim-helpers';
 import { findCanonicalClaimCase } from '../gdc-backend-utils-node/models/schema-definitions';
 
 /**
@@ -92,7 +93,106 @@ export function getClaimValue<T = any>(claims: Record<string, any>, key: string)
 const DEFAULT_FHIR_CLAIM_CONTEXTS = Object.freeze([
   'org.hl7.fhir.api',
   'org.hl7.fhir.r4',
+  'org.hl7.fhir.r5',
 ] as const);
+
+const CANONICAL_SCHEMA_ORG_CLAIM = /^[A-Z][A-Za-z0-9]*(?:\.[a-z][A-Za-z0-9]*)+$/;
+
+type ClaimVocabularyValidation = {
+  vocabulary: 'FHIR API' | 'Schema.org';
+  valid: boolean;
+  reason?: string;
+};
+
+function validateClaimKeyForContext(claimKey: string, context: string): ClaimVocabularyValidation | undefined {
+  const key = String(claimKey || '').trim();
+  const normalizedContext = String(context || '').trim();
+  const lowerContext = normalizedContext.toLowerCase();
+  const isExplicitFhir = /^(?:org\.hl7\.fhir\.(?:api|r4|r5)|api)\./.test(key);
+  const isExplicitSchema = key.startsWith('org.schema.');
+  if (isExplicitFhir) {
+    const shortKey = stripKnownFhirClaimContextPrefix(key);
+    let valid = true;
+    try {
+      normalizeFhirApiClaimKey(shortKey);
+    } catch {
+      valid = false;
+    }
+    return {
+      vocabulary: 'FHIR API',
+      valid,
+      ...(!valid ? { reason: 'expected <ResourceType>.<lower-kebab-case-search-param>' } : {}),
+    };
+  }
+
+  if (isExplicitSchema) {
+    const shortKey = key.slice('org.schema.'.length);
+    const valid = CANONICAL_SCHEMA_ORG_CLAIM.test(shortKey);
+    return {
+      vocabulary: 'Schema.org',
+      valid,
+      ...(!valid ? { reason: 'expected <Type>.<camelCase-property-path> without hyphens or underscores' } : {}),
+    };
+  }
+
+  const isForeignInteroperable = knownDomainsReversed.some((domain) =>
+    key.toLowerCase().startsWith(`${domain}.`),
+  );
+  if (isForeignInteroperable) return undefined;
+
+  if (lowerContext === 'api' || lowerContext.startsWith('org.hl7.fhir')) {
+    const shortKey = stripKnownFhirClaimContextPrefix(key);
+    let valid = true;
+    try {
+      normalizeFhirApiClaimKey(shortKey);
+    } catch {
+      valid = false;
+    }
+    return {
+      vocabulary: 'FHIR API',
+      valid,
+      ...(!valid ? { reason: 'expected <ResourceType>.<lower-kebab-case-search-param>' } : {}),
+    };
+  }
+
+  if (lowerContext.startsWith('org.schema')) {
+    let shortKey = key;
+    if (!isExplicitSchema && !/^[A-Z][A-Za-z0-9]*\./.test(shortKey)) {
+      const contextType = normalizedContext.slice('org.schema.'.length);
+      if (contextType) shortKey = `${contextType}.${shortKey}`;
+    }
+    const valid = CANONICAL_SCHEMA_ORG_CLAIM.test(shortKey);
+    return {
+      vocabulary: 'Schema.org',
+      valid,
+      ...(!valid ? { reason: 'expected <Type>.<camelCase-property-path> without hyphens or underscores' } : {}),
+    };
+  }
+
+  return undefined;
+}
+
+function omitMalformedContextClaims(rawClaims: Record<string, any>, context: string): Record<string, any> {
+  const validClaims: Record<string, any> = {};
+  for (const [claimKey, value] of Object.entries(rawClaims || {})) {
+    if (claimKey === '@context' || claimKey === '@type') {
+      validClaims[claimKey] = value;
+      continue;
+    }
+    const validation = validateClaimKeyForContext(claimKey, context);
+    if (validation && !validation.valid) {
+      console.warn('[claims] omitted malformed claim', {
+        context,
+        claimKey,
+        vocabulary: validation.vocabulary,
+        reason: validation.reason,
+      });
+      continue;
+    }
+    validClaims[claimKey] = value;
+  }
+  return validClaims;
+}
 
 export function getSupportedFhirClaimContexts(): string[] {
   const configured = String(process.env.CLAIMS_FHIR_CONTEXT_PREFIXES || '')
@@ -120,13 +220,41 @@ export function canonicalizeFhirClaims(rawClaims: Record<string, any>, targetCon
     '@context': targetContext,
   };
 
-  for (const [key, value] of Object.entries(rawClaims || {})) {
+  const entries = Object.entries(rawClaims || {});
+  const canonicalKeyFor = (key: string): string => stripKnownFhirClaimContextPrefix(key)
+    .replace(/\.CodeDisplay$/, '.code-display')
+    .replace(/\.CodeTextLocal$/, '.code-text');
+
+  // Compatibility aliases are applied first. A canonical key always wins
+  // independently of the insertion order of the persisted record.
+  for (const [key, value] of entries) {
+    if (!/\.(?:CodeDisplay|CodeTextLocal)$/.test(stripKnownFhirClaimContextPrefix(key))) continue;
+    canonicalClaims[canonicalKeyFor(key)] = value;
+  }
+
+  for (const [key, value] of entries) {
     if (key === '@type') {
       canonicalClaims[key] = value;
       continue;
     }
     if (key === '@context') continue;
-    canonicalClaims[stripKnownFhirClaimContextPrefix(key)] = value;
+    const shortKey = stripKnownFhirClaimContextPrefix(key);
+    if (/\.(?:CodeDisplay|CodeTextLocal)$/.test(shortKey)) continue;
+    const isFhirClaim = /^(?:org\.hl7\.fhir\.(?:api|r4|r5)|api)\./.test(key)
+      || /^[A-Z][A-Za-z0-9]+\./.test(shortKey);
+    if (isFhirClaim) {
+      const validation = validateClaimKeyForContext(key, targetContext);
+      if (validation && !validation.valid) {
+        console.warn('[claims] omitted malformed claim', {
+          context: targetContext,
+          claimKey: key,
+          vocabulary: validation.vocabulary,
+          reason: validation.reason,
+        });
+        continue;
+      }
+    }
+    canonicalClaims[canonicalKeyFor(key)] = value;
   }
 
   return sortClaimsAlphabetically(canonicalClaims);
@@ -169,37 +297,38 @@ export function normalizeContextualizedClaims(rawClaims: Record<string, any>): R
   }
 
   const trimmedContext = context.trim();
+  const claimsToNormalize = omitMalformedContextClaims(rawClaims, trimmedContext);
   const prefix = trimmedContext.endsWith('.') ? trimmedContext : `${trimmedContext}.`;
   const storageMode = resolveClaimsStorageMode(trimmedContext);
   if (storageMode === 'canonical') {
     const canonicalized: Record<string, any> = {};
-    for (const key of Object.keys(rawClaims)) {
+    for (const key of Object.keys(claimsToNormalize)) {
       if (key === '@context' || key === '@type') {
-        canonicalized[key] = rawClaims[key];
+        canonicalized[key] = claimsToNormalize[key];
         continue;
       }
-      canonicalized[stripContextualPrefix(key, trimmedContext)] = rawClaims[key];
+      canonicalized[stripContextualPrefix(key, trimmedContext)] = claimsToNormalize[key];
     }
     return sortClaimsAlphabetically(canonicalized);
   }
 
   const normalized: Record<string, any> = {};
-  for (const key of Object.keys(rawClaims)) {
+  for (const key of Object.keys(claimsToNormalize)) {
     if (key === '@context' || key === '@type') {
-      normalized[key] = rawClaims[key];
+      normalized[key] = claimsToNormalize[key];
       continue;
     }
 
     const lowerKey = key.toLowerCase();
     const isInteroperable = knownDomainsReversed.some((domain) => lowerKey.startsWith(`${domain}.`));
     if (isInteroperable || key.startsWith(prefix)) {
-      normalized[key] = rawClaims[key];
+      normalized[key] = claimsToNormalize[key];
       continue;
     }
 
     const normalizedKey = `${prefix}${key}`;
     if (normalized[normalizedKey] === undefined) {
-      normalized[normalizedKey] = rawClaims[key];
+      normalized[normalizedKey] = claimsToNormalize[key];
     }
   }
 
