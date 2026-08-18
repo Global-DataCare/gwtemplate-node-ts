@@ -59,6 +59,13 @@ IMAGE_NAME="${local_image}" npm run docker:smoke:local-network
 Do not publish after a ping-only smoke. The release gate includes canonical
 ConsentAccess and SMART individual/research flows on Fabric local-network.
 
+Research search fixtures must query claims preserved by the fail-closed
+digital-twin projection. Prefer exact token claims such as
+`MedicationStatement.code`; do not query `code-text`, `code-display`, `note`,
+or other free text removed to prevent re-identification. A successful token
+issuance followed by zero results can therefore indicate an impossible smoke
+filter rather than missing Composition projections.
+
 ## Publish and deploy
 
 Use `.env.gke.gdc` and `demo-deploy.config` after verifying their values:

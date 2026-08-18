@@ -19,6 +19,7 @@ import {
 import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import { ClaimConsent, ConsentDecisions, type ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
 import { ClaimInterTenantAccessContract } from 'gdc-common-utils-ts/models/inter-tenant-access-contract';
+import { MedicationStatementClaim } from 'gdc-common-utils-ts/models/interoperable-claims';
 import {
   buildClientAssertionJwt,
   buildInterTenantAccessContractCredential,
@@ -26,6 +27,7 @@ import {
   createVP,
   addVC,
 } from 'gdc-common-utils-ts';
+import { demoCommunicationMedicationIpsDefaults } from './demo-communication-medications-ips.data';
 
 /**
  * Canonical ids reused by the local-network SMART access smoke.
@@ -333,13 +335,17 @@ export async function buildDemoResearchSmartTokenRequest(input: Readonly<{
  * local research smoke.
  */
 export function buildDemoDigitalTwinCompositionSearchRequest(): Record<string, unknown> {
+  const ibuprofenCode = demoCommunicationMedicationIpsDefaults.demoMedicationCases[0].demoMedicationCode;
   return {
     thid: DEMO_SMART_ACCESS_LOCAL_IDS.digitalTwinSearchThreadId,
     body: {
       resourceType: 'Parameters',
       parameter: [
         { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
-        { name: 'MedicationStatement.code-text', valueString: 'ibuprofen' },
+        // Research projections intentionally remove free text such as
+        // `code-text`; use the preserved token claim for deterministic
+        // digital-twin discovery without weakening de-identification.
+        { name: MedicationStatementClaim.Code, valueString: ibuprofenCode },
       ],
     },
   };
