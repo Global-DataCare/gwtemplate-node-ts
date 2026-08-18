@@ -429,8 +429,8 @@ describe('CompositionManager', () => {
             'org.hl7.fhir.r4.Observation.identifier': 'urn:uuid:observation-twin-summary-api-001',
             'org.hl7.fhir.r4.Observation.subject': subjectDid,
             'org.hl7.fhir.r4.Observation.status': 'final',
-            'org.hl7.fhir.r4.Observation.code-text': 'Blood pressure systolic',
-            'org.hl7.fhir.r4.Observation.code-display': 'Blood pressure',
+            'org.hl7.fhir.r4.Observation.CodeTextLocal': 'Blood pressure systolic',
+            'org.hl7.fhir.r4.Observation.CodeDisplay': 'Blood pressure',
           },
         ] as any;
       }
@@ -477,9 +477,13 @@ describe('CompositionManager', () => {
       meta: {
         claims: expect.objectContaining({
           'Observation.subject': subjectDid,
+          'Observation.code-text': 'Blood pressure systolic',
+          'Observation.code-display': 'Blood pressure',
         }),
       },
     });
+    expect(nonCompositionEntry.resource.meta.claims).not.toHaveProperty('Observation.CodeTextLocal');
+    expect(nonCompositionEntry.resource.meta.claims).not.toHaveProperty('Observation.CodeDisplay');
   });
 
   it('declares the searchable digital twin IPS section to resource map', () => {

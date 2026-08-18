@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+- Omit malformed vocabulary claims before persistence with a structured warning:
+  FHIR API search parameters require lower kebab-case, while Schema.org flat
+  property paths retain camelCase and reject hyphens/underscores. Normalize the
+  historical `CodeDisplay` and `CodeTextLocal` aliases to `code-display` and
+  `code-text` when materializing `$summary`.
+- Cover MedicationStatement's distinct official search claims: `code` is the
+  medication-concept token, `medication` is a reference, and R5 `adherence` is
+  an adherence-code token. Human-readable medication concept companions use
+  canonical `code-text` and `code-display`.
+- Log every 4xx/5xx bundle-entry `OperationOutcome` structurally in the worker
+  before encrypting the response, including job/thread/resource/index context.
+
 - Make `ALLOWED_SECTORS` the authoritative explicit gateway sector catalog,
   retain `SECTORS_ALLOWED` and `MAINSECTOR` + `SUBSECTORSALLOWED` only as
   deprecated fallbacks, and preserve independently addressed compatibility

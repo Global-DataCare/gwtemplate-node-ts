@@ -4,6 +4,7 @@
 import { IJobProcessor, ManagerRegistry } from './managers/registry';
 import { createErrorBundle } from './utils/bundle';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { parseJobName } from './utils/naming';
 import { composeHostDidWebId } from './utils/did-backend';
 import { IKmsService } from './gdc-backend-utils-node/models/IKmsService';
@@ -25,6 +26,29 @@ export class Worker {
     this.managers = managers;
     this.apiBaseUrl = apiBaseUrl;
     this.kmsService = kmsService;
+  }
+
+  /**
+   * Emits one structured error log for every failed bundle entry that carries
+   * an OperationOutcome. Logging happens before response encryption so 4xx/5xx
+   * diagnostics remain observable without decrypting the async result store.
+   */
+  private logResponseOperationOutcomes(jobName: string, job: JobRequest, payloadResponse: IDecodedDidcommPayload): void {
+    const body = payloadResponse?.body as { data?: any[]; entry?: any[] } | undefined;
+    const entries = Array.isArray(body?.data) ? body.data : (Array.isArray(body?.entry) ? body.entry : []);
+    entries.forEach((entry, entryIndex) => {
+      const status = Number.parseInt(String(entry?.response?.status || ''), 10);
+      const outcome = entry?.response?.outcome;
+      if (status < 400 || status > 599 || !outcome) return;
+      console.error('[Worker] bundle entry OperationOutcome', {
+        jobName,
+        thid: job.content?.thid,
+        resourceType: entry?.resource?.resourceType || entry?.type || job.resourceType,
+        entryIndex,
+        status,
+        outcome,
+      });
+    });
   }
 
   /**
@@ -151,6 +175,7 @@ export class Worker {
 
       // 2. Delegate to the manager to get the plaintext response.
       const payloadResponse = await manager.process(job);
+      this.logResponseOperationOutcomes(jobName, job, payloadResponse);
       if (resourceType !== 'Subscription' && resourceType !== 'SubscriptionTopic') {
         await this.managers.subscriptionManager?.captureEvents?.(job, payloadResponse);
       }
