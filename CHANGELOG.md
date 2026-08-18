@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [1.21.16] - 2026-08-18
+
+- Reject dotted FHIRPath-like pseudo-claims globally: short FHIR claim keys
+  contain exactly the ResourceType separator dot and one lower kebab-case
+  SearchParameter segment.
+- Resolve Common Utils typings from the exact lockfile-installed package so
+  local typecheck/build cannot silently use a stale sibling checkout.
 - Omit malformed vocabulary claims before persistence with a structured warning:
   FHIR API search parameters require lower kebab-case, while Schema.org flat
   property paths retain camelCase and reject hyphens/underscores. Normalize the
