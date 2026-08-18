@@ -121,7 +121,7 @@ function validateClaimKeyForContext(claimKey: string, context: string): ClaimVoc
     return {
       vocabulary: 'FHIR API',
       valid,
-      ...(!valid ? { reason: 'expected <ResourceType>.<lower-kebab-case-search-param>' } : {}),
+      ...(!valid ? { reason: 'expected exactly <ResourceType>.<lower-kebab-case-search-param>; FHIRPath dots are not claim syntax' } : {}),
     };
   }
 
@@ -151,7 +151,7 @@ function validateClaimKeyForContext(claimKey: string, context: string): ClaimVoc
     return {
       vocabulary: 'FHIR API',
       valid,
-      ...(!valid ? { reason: 'expected <ResourceType>.<lower-kebab-case-search-param>' } : {}),
+      ...(!valid ? { reason: 'expected exactly <ResourceType>.<lower-kebab-case-search-param>; FHIRPath dots are not claim syntax' } : {}),
     };
   }
 

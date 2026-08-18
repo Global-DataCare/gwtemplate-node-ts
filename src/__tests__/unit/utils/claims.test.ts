@@ -122,6 +122,8 @@ describe('normalizeContextualizedClaims', () => {
   test.each([
     'MedicationStatement.CodeDisplay',
     'MedicationStatement.code_display',
+    'MedicationStatement.adherence.code',
+    'Observation.component.code',
     'org.hl7.fhir.api.MedicationStatement.CodeTextLocal',
   ])('omits non-kebab-case FHIR API claim %s and warns before persistence', (claimKey) => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
