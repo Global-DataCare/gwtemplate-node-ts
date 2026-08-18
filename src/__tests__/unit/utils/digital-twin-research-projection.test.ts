@@ -38,6 +38,7 @@ describe('digital twin research projection', () => {
         'MedicationStatement.subject': 'did:web:api.acme.org:individual:123',
         'MedicationStatement.patient': 'did:web:api.acme.org:individual:123',
         'MedicationStatement.code': 'http://snomed.info/sct|387207008',
+        'MedicationStatement.code-text': 'Ibuprofen',
         'MedicationStatement.dosage-instruction': 'Take after dinner',
         'MedicationStatement.code-display': 'Ibuprofen prescribed to Alice',
         'MedicationStatement.medication-text': 'Alice takes ibuprofen',
@@ -49,6 +50,9 @@ describe('digital twin research projection', () => {
     expect(projected['MedicationStatement.identifier']).toMatch(/^urn:uuid:/);
     expect(projected['MedicationStatement.identifier']).not.toBe('clinical-medication-123');
     expect(projected['MedicationStatement.code']).toBe('http://snomed.info/sct|387207008');
+    // Digital-twin discovery must use the preserved token above; local/manual
+    // CodeableConcept text is intentionally absent from the research plane.
+    expect(projected).not.toHaveProperty('MedicationStatement.code-text');
     expect(projected).not.toHaveProperty('MedicationStatement.code-display');
     expect(projected).not.toHaveProperty('MedicationStatement.patient');
     expect(projected).not.toHaveProperty('MedicationStatement.dosage-instruction');

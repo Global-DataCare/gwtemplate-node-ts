@@ -126,14 +126,14 @@ describe('demo smart access local-network builders', () => {
     expect(String((payload as any).body.vp_token || '')).toContain('verifiableCredential');
   });
 
-  it('builds one canonical digital-twin Composition search request for ibuprofen', () => {
+  it('builds one coded digital-twin Composition search without relying on redacted free text', () => {
     expect(buildDemoDigitalTwinCompositionSearchRequest()).toEqual({
       thid: DEMO_SMART_ACCESS_LOCAL_IDS.digitalTwinSearchThreadId,
       body: {
         resourceType: 'Parameters',
         parameter: [
           { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
-          { name: 'MedicationStatement.code-text', valueString: 'ibuprofen' },
+          { name: 'MedicationStatement.code', valueString: 'http://snomed.info/sct|387207008' },
         ],
       },
     });

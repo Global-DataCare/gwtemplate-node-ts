@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [1.21.17] - 2026-08-18
+
+- Fix the local research SMART smoke to discover medication Compositions with
+  the preserved `MedicationStatement.code` token instead of the deliberately
+  redacted `code-text` free-text claim, preventing false zero-result failures
+  without weakening digital-twin de-identification.
+
 ## [1.21.16] - 2026-08-18
 
 - Reject dotted FHIRPath-like pseudo-claims globally: short FHIR claim keys
