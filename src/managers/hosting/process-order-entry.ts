@@ -52,7 +52,7 @@ type ProcessHostOrderEntryDeps = Readonly<{
     processedClaims: ClaimsRecord,
     sector: Sector,
     vaultId: string,
-    options?: { primaryDid?: string },
+    options?: { primaryDid?: string; controllerDid?: string },
   ) => Promise<any>;
   isLedgerRegistrationEnabled: () => boolean;
   extractServiceEvidence: (service: any) => any;
@@ -110,16 +110,15 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
       decryptedContent?.status === EntityLifecycleStatus.Active
       && String(projectedClaims[ClaimsOfferSchemaorg.identifier] || '').trim() === offerId
     ) {
-      return processActivatedTenantOrderEntry({
-        orderClaims: claims,
-        offerId,
-        matchedOfferClaims: projectedClaims,
-        vaultRepository: deps.vaultRepository,
-        kmsService: deps.kmsService,
-        logger: deps.logger,
-        config: deps.config,
-        hostRuntime: deps.hostRuntime,
-      });
+      return {
+        type: 'Organization-order-response-v1.0',
+        meta: { claims: {
+          ...projectedClaims,
+          [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
+        } },
+        resource: { resourceType: 'Organization', id: String(decryptedContent.id || '') },
+        response: { status: '200' },
+      };
     }
     throw new ManagerError(`Found registration for offerId '${offerId}', but it is not in 'pending' state.`, IssueType.Conflict);
   }
@@ -153,6 +152,19 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
   await deps.vaultRepository.createNewVault({ id: tenantCollectionName });
   await deps.kmsService.provisionKeys(vaultId);
 
+  // `_transaction` stores the verified representative and the request keys in
+  // the pending registration. Build that historical bootstrap controller
+  // before finalizing the tenant so its DID is present in the organization DID
+  // from the first active version, as it was in the legacy verify/activate
+  // flow. A later service controller is appended; it does not replace this DID.
+  const [legalRep, processedService] = [person, service];
+  const storedKeys = (decryptedContent as any)?.registrationKeys as
+    | { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk }
+    | undefined;
+  const employeeConfig = legalRep
+    ? await deps.buildControllerEntityConfig(legalRep, tenantUrn, vaultId, storedKeys)
+    : undefined;
+
   const finalTenantConfig = await deps.finalizeTenantConfig(
     organization,
     alternateName,
@@ -163,6 +175,7 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
       primaryDid: typeof (decryptedContent as any).primaryDid === 'string'
         ? (decryptedContent as any).primaryDid
         : undefined,
+      controllerDid: employeeConfig?.didDocument?.id,
     },
   );
 
@@ -211,12 +224,7 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
   const secureSelfDescDoc = await deps.kmsService.protectConfidentialData(selfDescDoc, vaultId);
   await deps.vaultRepository.put(tenantCollectionName, [secureLegalParticipantDoc, secureLegacyVcDoc, secureSelfDescDoc], getEnvSectionId('.well-known'));
 
-  const [legalRep, processedService] = [person, service];
-  if (legalRep) {
-    const storedKeys = (decryptedContent as any)?.registrationKeys as
-      | { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk }
-      | undefined;
-    const employeeConfig = await deps.buildControllerEntityConfig(legalRep, tenantUrn, vaultId, storedKeys);
+  if (employeeConfig) {
     await deps.storeControllerEntityConfig(employeeConfig, tenantCollectionName, vaultId);
   }
   if (processedService) {

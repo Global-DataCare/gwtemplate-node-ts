@@ -62,7 +62,7 @@ type LegalOrganizationVerificationTransactionResponseResource = Readonly<{
   meta: { claims: ClaimsRecord };
   icaResponse?: unknown;
   verificationResponse?: unknown;
-  next: LegalOrganizationVerificationTransactionNextStep;
+  next?: LegalOrganizationVerificationTransactionNextStep;
 }>;
 
 type LegalOrganizationIssueResponseResource = Readonly<{
@@ -108,6 +108,12 @@ type VerificationDeps = Readonly<{
     claims: ClaimsRecord;
     resource: LegalOrganizationVerificationTransactionResource;
   }) => Promise<TestNetworkAdmissionVerificationResult>;
+  reregisterExistingLegacyRepresentativeController?: (input: {
+    claims: ClaimsRecord;
+    credentials: Array<Record<string, unknown>>;
+    environment?: string;
+    jobMeta?: DidCommDecodedMetadata;
+  }) => Promise<ClaimsRecord | undefined>;
   persistExistingTenantControllerBinding?: (input: {
     claims: ClaimsRecord;
     controller?: Record<string, unknown>;
@@ -176,9 +182,16 @@ export async function processOrganizationVerificationTransaction(
   if (requestedPrimaryDid && !/^did:[a-z0-9]+:.+$/i.test(requestedPrimaryDid)) {
     throw new ManagerError('Organization verification organization.did must be a valid DID.', IssueType.Value);
   }
-  const processedClaims = await deps.createPendingTenantRegistrationFromClaims({
+  const environment = hostNetwork || runtimeNetwork || undefined;
+  const reRegisteredClaims = await deps.reregisterExistingLegacyRepresentativeController?.({
     claims,
-    environment: hostNetwork || runtimeNetwork || undefined,
+    credentials: vc,
+    environment,
+    jobMeta: deps.job.content?.meta,
+  });
+  const processedClaims = reRegisteredClaims || await deps.createPendingTenantRegistrationFromClaims({
+    claims,
+    environment,
     jobMeta: deps.job.content?.meta,
     fallbackAlternateName: deps.job.tenantId,
     primaryDid: requestedPrimaryDid || undefined,
@@ -201,6 +214,7 @@ export async function processOrganizationVerificationTransaction(
           verificationResponse,
           processedClaims,
           testNetworkAdmissionCredential ? 'host' : 'ica',
+          !reRegisteredClaims,
         ),
         response: { status: '200' },
       }],
@@ -281,6 +295,7 @@ export function buildOrganizationVerificationTransactionResponseResource(
   verificationResponse: unknown,
   processedClaims: ClaimsRecord,
   source: 'ica' | 'host' = 'ica',
+  includeNext = true,
 ): LegalOrganizationVerificationTransactionResponseResource {
   const offerId = String(processedClaims[HOST_TRANSACTION_REQUIRED_OUTPUT_CLAIMS[0]] || '').trim() || undefined;
   const hostVerification = source === 'host' && verificationResponse && typeof verificationResponse === 'object'
@@ -290,13 +305,13 @@ export function buildOrganizationVerificationTransactionResponseResource(
   return {
     meta: { claims: processedClaims },
     ...(source === 'ica' ? { icaResponse: verificationResponse } : { verificationResponse: hostVerification }),
-    next: {
+    ...(includeNext ? { next: {
       action: ORGANIZATION_VERIFICATION_TRANSACTION_NEXT_ACTION,
       acceptedOffer: {
         ...(offerId ? { identifier: offerId } : {}),
         identifierClaim: ClaimsOrderSchemaorg.acceptedOfferIdentifier,
       },
-    },
+    } } : {}),
   };
 }
 

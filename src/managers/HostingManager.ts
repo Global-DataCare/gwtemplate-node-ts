@@ -71,6 +71,7 @@ import {
 } from './hosting/process-organization-verification';
 import { processOrganizationActivation as processOrganizationActivationExternal } from './hosting/process-organization-activation';
 import { persistExistingTenantControllerBinding as persistExistingTenantControllerBindingExternal } from './hosting/persist-existing-tenant-controller-binding';
+import { allowsLegacyRepresentativeBootstrap } from './hosting/legacy-representative-bootstrap-policy';
 import { finalizeTenantConfig as finalizeTenantConfigExternal } from './hosting/finalize-tenant-config';
 import { handleServiceAttachment } from './hosting/service-attachment';
 import {
@@ -218,7 +219,7 @@ type LegalOrganizationVerificationTransactionNextStep = Readonly<{
 type LegalOrganizationVerificationTransactionResponseResource = Readonly<{
   icaResponse?: unknown;
   verificationResponse?: unknown;
-  next: LegalOrganizationVerificationTransactionNextStep;
+  next?: LegalOrganizationVerificationTransactionNextStep;
 }>;
 type LegalOrganizationIssueResponseResource = Readonly<{
   icaResponse: unknown;
@@ -877,6 +878,7 @@ export class HostingManager {
       createOrganizationIssueClaimsFromClaims: this.createOrganizationIssueClaimsFromClaims.bind(this),
       forwardOrganizationVerificationTransactionToIca: this.forwardOrganizationVerificationTransactionToIca.bind(this),
       extractCredentialResourcesFromIcaPayload: this.extractCredentialResourcesFromIcaPayload.bind(this),
+      reregisterExistingLegacyRepresentativeController: this.reregisterExistingLegacyRepresentativeController.bind(this),
       verifyTestNetworkAdmissionCredential: async ({ credential, claims, resource }) => {
         if (!this.cryptographyService) {
           throw new ManagerError('Host authorization cryptography is not configured.', IssueType.NotSupported);
@@ -903,6 +905,100 @@ export class HostingManager {
         });
       },
     });
+  }
+
+  /**
+   * Idempotently re-applies the historical GlobalDataCare representative
+   * controller after ICA verification. This is the existing-tenant branch of
+   * `_transaction`; it is deliberately separate from service-controller
+   * `_issue` and never replaces another controller DID.
+   */
+  private async reregisterExistingLegacyRepresentativeController(input: {
+    claims: ClaimsRecord;
+    credentials: Array<Record<string, unknown>>;
+    environment?: string;
+    jobMeta?: DidCommDecodedMetadata;
+  }): Promise<ClaimsRecord | undefined> {
+    const representativeCredential = input.credentials.find((credential) => {
+      const types = Array.isArray(credential.type) ? credential.type : [credential.type];
+      return types.includes('LegalRepresentativeCredential');
+    });
+    const normalizedClaims = this.applyLegalOrganizationIdentityCompatibility(input.claims);
+    if (!representativeCredential) return undefined;
+
+    validateNewOrganizationClaims(normalizedClaims);
+    const alternateName = String(normalizedClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+    const sector = String(normalizedClaims[ClaimsServiceSchemaorg.category] || '').trim() as Sector;
+    const vaultId = getTenantVaultId(sector, alternateName);
+    if (!await this.vaultRepository.vaultExists(vaultId)) return undefined;
+
+    const { person } = this.extractResources(normalizedClaims, input.environment);
+    if (!person) {
+      throw new ManagerError('Legacy representative re-registration requires representative claims.', IssueType.Required);
+    }
+    const tenantUrn = createOrganizationUrn({
+      namespace: this.config.namespace,
+      network: this.getCurrentUrnNetwork(),
+      jurisdiction: normalizedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+      sector,
+      idType: normalizedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
+      idValue: normalizedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
+    });
+    const controllerConfig = await this.buildControllerEntityConfig(
+      person,
+      tenantUrn,
+      vaultId,
+      this.extractRegistrationKeys(input.jobMeta),
+    );
+    const hostCollectionName = this.hostRuntime.hostCollectionName;
+    const storedDoc = await this.vaultRepository.get(
+      hostCollectionName!,
+      vaultId,
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc | undefined;
+    if (!storedDoc) {
+      throw new ManagerError(`Tenant registry document not found for '${vaultId}'.`, IssueType.NotFound);
+    }
+    const storedTenant = await this.kmsService.unprotectConfidentialData(storedDoc, 'host') as OrganizationConfig;
+    const controllerDid = controllerConfig.didDocument?.id;
+    if (!storedTenant.didDocument?.id || !controllerDid) {
+      throw new ManagerError('Legacy representative re-registration requires tenant and controller DID documents.', IssueType.Required);
+    }
+    const existingOfferId = String(readProjectedOfferOrderClaims(storedDoc)[ClaimsOfferSchemaorg.identifier] || '').trim();
+    if (!existingOfferId) {
+      throw new ManagerError(`Existing tenant '${vaultId}' has no historical Offer identifier.`, IssueType.NotFound);
+    }
+    const currentControllers = Array.isArray(storedTenant.didDocument.controller)
+      ? storedTenant.didDocument.controller
+      : storedTenant.didDocument.controller ? [storedTenant.didDocument.controller] : [];
+    const updatedTenant: OrganizationConfig = {
+      ...storedTenant,
+      didDocument: {
+        ...storedTenant.didDocument,
+        controller: Array.from(new Set([...currentControllers, controllerDid])),
+      },
+      meta: { ...(storedTenant.meta || {}), lastUpdated: new Date().toISOString() },
+    };
+    const updatedDoc: ConfidentialStorageDoc = {
+      ...storedDoc,
+      status: updatedTenant.status,
+      sequence: Number(storedDoc.sequence || 0) + 1,
+      content: updatedTenant,
+    };
+    const secureUpdatedDoc = await this.kmsService.protectConfidentialData(updatedDoc, 'host');
+    await this.vaultRepository.put(hostCollectionName!, [secureUpdatedDoc], getEnvSectionId('tenants'));
+    const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(vaultId)
+      || generateTenantCollectionNameFromClaims(normalizedClaims);
+    if (!await this.vaultRepository.vaultExists(tenantCollectionName)) {
+      await this.vaultRepository.createNewVault({ id: tenantCollectionName });
+    }
+    await this.storeControllerEntityConfig(controllerConfig, tenantCollectionName, vaultId);
+    await this.tenantsCacheManager.refreshTenant(vaultId);
+    return {
+      ...normalizedClaims,
+      [ClaimsOrganizationSchemaorg.identifier]: tenantUrn,
+      [ClaimsOfferSchemaorg.identifier]: existingOfferId,
+    };
   }
 
   private async processOrganizationIssue(job: JobRequest): Promise<IDecodedDidcommPayload> {
@@ -937,16 +1033,18 @@ export class HostingManager {
    *
    * Why this shape exists:
    * - `icaResponse` preserves the verification VCs/Bundle returned by ICA
-   * - `meta.claims` already carries the generated host-side commercial offer
-   * - `resource.next` makes the next mandatory host action explicit so the
-   *   caller can continue directly with `Order/_batch`
+   * - first-time `meta.claims` carries the generated host-side commercial offer
+   * - first-time `resource.next` makes `Order/_batch` explicit
+   * - exact existing-tenant legacy re-registration omits both because it only
+   *   upserts the historical controller
    *
    * Contract rule:
    * - `_transaction` is the canonical legal-organization onboarding step
    * - `_activate` remains a legacy compatibility route, not a required
    *   continuation after `_transaction`
-   * - the response prepares the host-side pending registration/offer state
-   *   later consumed by Order
+   * - first-time response prepares pending registration/offer state for Order
+   * - existing-tenant legacy re-registration returns the updated claims
+   *   directly and creates no commercial continuation
    *
    * Canonical claim rule:
    * - the real Offer contract must live in `resource.meta.claims['org.schema.Offer.identifier']`
@@ -1182,6 +1280,7 @@ export class HostingManager {
       buildControllerEntityConfig: this.buildControllerEntityConfig.bind(this),
       extractRegistrationKeys: this.extractRegistrationKeys.bind(this),
       storeControllerEntityConfig: this.storeControllerEntityConfig.bind(this),
+      refreshTenant: this.tenantsCacheManager.refreshTenant.bind(this.tenantsCacheManager),
       registerDidDocumentWithIca: this.registerDidDocumentWithIca.bind(this),
       isLedgerRegistrationEnabled: this.isLedgerRegistrationEnabled.bind(this),
       extractServiceEvidence: this.extractServiceEvidence.bind(this),

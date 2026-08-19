@@ -467,6 +467,11 @@ describe('HostingManager activation flow', () => {
     );
     expect(employeeDocs.length).toBe(1);
     expect((employeeDocs[0] as any).content?.didDocument?.verificationMethod?.[0]?.publicKeyJwk?.kid).toBe(expectedControllerKid);
+    // Legacy GlobalDataCare activation derives the controller DID from the
+    // verified representative when no explicit controller binding is sent.
+    expect(finalDoc.content!.didDocument.controller).toEqual([
+      (employeeDocs[0] as any).content?.didDocument?.id,
+    ]);
 
     const proofDoc = await vaultRepository.get(
       tenantCollectionName,
@@ -536,6 +541,89 @@ describe('HostingManager activation flow', () => {
 
     expect(entry.response.status).toBe('201');
     expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
+  });
+
+  it('keeps the scoped historical representative as the first controller without requiring legacy RESPRSN', async () => {
+    const job = buildActivationJob();
+    const credential = (job.content!.body as any).representativeCredential;
+    credential.id = 'urn:example:credential:historical-representative';
+    credential.issuer = 'did:web:ica.example.test';
+    credential.type = ['VerifiableCredential', 'LegalRepresentativeCredential'];
+    credential.credentialSubject.memberOf = { taxID: 'VATES-B00112233' };
+    credential.credentialSubject.hasOccupation = {
+      identifier: 'urn:ilo:ilostat:isco-08:1120',
+    };
+    delete credential.credentialSubject.hasCredential;
+
+    const claims = job.content!.body!.data[0]!.meta!.claims;
+    process.env.HOST_LEGACY_CONTROLLER_SCOPES = `${claims[ClaimsOrganizationSchemaorg.alternateName]}|${claims[ClaimsServiceSchemaorg.category]}`;
+    try {
+      const responsePayload = await hostingManager.process(job);
+      expect(responsePayload.body.data[0].response.status).toBe('201');
+
+      const tenantVaultId = tenantUtils.getTenantVaultId(
+        claims[ClaimsServiceSchemaorg.category] as Sector,
+        claims[ClaimsOrganizationSchemaorg.alternateName] as string,
+      );
+      const tenantDoc = await vaultRepository.get(
+        hostCollectionName,
+        tenantVaultId,
+        getEnvSectionId('tenants'),
+      ) as ConfidentialStorageDoc;
+      expect(tenantDoc.content?.didDocument?.controller).toHaveLength(1);
+
+      const legacyControllerDid = tenantDoc.content?.didDocument?.controller?.[0];
+      const serviceControllerDid = 'did:web:api.acme.org:controllers:service-controller';
+      tenantDoc.content!.didDocument.controller = [legacyControllerDid, serviceControllerDid];
+      await vaultRepository.put(hostCollectionName, [tenantDoc], getEnvSectionId('tenants'));
+
+      const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
+        ...claims,
+        [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
+      } as any);
+      const beforeRotation = await vaultRepository.getContainersInSection(
+        tenantCollectionName,
+        getEnvSectionId('employees'),
+      );
+      const oldKids = ((beforeRotation[0] as any).content?.didDocument?.verificationMethod || [])
+        .map((method: any) => method.publicKeyJwk?.kid);
+
+      // A verified re-registration may carry renewed credentials and new
+      // portal keys. It replaces only this stable legacy controller document;
+      // the independently registered service controller remains untouched.
+      (job.content!.meta as any).jws.protected = {
+        alg: 'ML-DSA-44',
+        kid: 'controller-sig-kid-rotated',
+        jwk: { kty: 'AKP', alg: 'ML-DSA-44', pub: 'controller-sig-pub-rotated' },
+      };
+      (job.content!.meta as any).jwe.header = {
+        enc: 'A256GCM',
+        skid: 'controller-enc-kid-rotated',
+        jwk: { kty: 'OKP', crv: 'ML-KEM-768', x: 'controller-enc-x-rotated' },
+      };
+      const reRegistrationResponse = await hostingManager.process(job);
+      expect(reRegistrationResponse.body.data[0].response.status).toBe('200');
+      const reRegisteredTenantDoc = await vaultRepository.get(
+        hostCollectionName,
+        tenantVaultId,
+        getEnvSectionId('tenants'),
+      ) as ConfidentialStorageDoc;
+      expect(reRegisteredTenantDoc.content?.didDocument?.controller).toEqual([
+        legacyControllerDid,
+        serviceControllerDid,
+      ]);
+      const afterRotation = await vaultRepository.getContainersInSection(
+        tenantCollectionName,
+        getEnvSectionId('employees'),
+      );
+      expect(afterRotation).toHaveLength(1);
+      expect((afterRotation[0] as any).content?.didDocument?.id).toBe(legacyControllerDid);
+      const rotatedMethods = (afterRotation[0] as any).content?.didDocument?.verificationMethod || [];
+      expect(rotatedMethods.some((method: any) => method.publicKeyJwk?.pub === 'controller-sig-pub-rotated')).toBe(true);
+      expect(rotatedMethods.map((method: any) => method.publicKeyJwk?.kid)).not.toEqual(oldKids);
+    } finally {
+      delete process.env.HOST_LEGACY_CONTROLLER_SCOPES;
+    }
   });
 
   it('should apply demo representative binding fallback from meta.jws when ICA omits hasCredential', async () => {

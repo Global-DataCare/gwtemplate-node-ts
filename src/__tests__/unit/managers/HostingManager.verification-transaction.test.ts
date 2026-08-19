@@ -286,6 +286,95 @@ describe('HostingManager legal organization verification transaction', () => {
     );
   });
 
+  it('re-registers the scoped legacy representative controller through _transaction without a new Offer', async () => {
+    const job = buildTransactionJob();
+    (job.content!.meta as any).jws.protected.jwk = {
+      kid: 'portal-runtime-signing-key-001',
+      kty: 'AKP',
+      alg: 'ML-DSA-44',
+      pub: 'historical-portal-public-key',
+      use: 'sig',
+    };
+    (job.content!.meta as any).jwe = {
+      header: {
+        skid: 'portal-runtime-encryption-key-001',
+        jwk: {
+          kid: 'portal-runtime-encryption-key-001',
+          kty: 'OKP',
+          crv: 'ML-KEM-768',
+          x: 'historical-portal-encryption-key',
+          use: 'enc',
+        },
+      },
+    };
+    process.env.HOST_LEGACY_CONTROLLER_SCOPES = `${EXAMPLE_TENANT_ALTERNATE_NAME}|${EXAMPLE_SECTOR}`;
+    const tenantVaultId = `${EXAMPLE_SECTOR}_${EXAMPLE_TENANT_ALTERNATE_NAME}`;
+    const tenantCollectionName = 'ES_VATES_B00112233_health-care';
+    const storedTenant = {
+      status: 'active',
+      didDocument: { id: 'did:web:provider.example.org:organization:taxid:VATES-B00112233' },
+      meta: {},
+    };
+    (mockVaultRepository.vaultExists as any).mockResolvedValue(true);
+    (mockVaultRepository as any).get = jest.fn(async () => ({
+      id: tenantVaultId,
+      status: 'active',
+      sequence: 0,
+      content: storedTenant,
+    }));
+    (mockVaultRepository as any).createNewVault = jest.fn(async () => undefined);
+    (mockKmsService as any).provisionKeys = jest.fn(async () => ({ keys: [] }));
+    (mockTenantsCacheManager as any).getCollectionName = jest.fn(async () => tenantCollectionName);
+    (mockTenantsCacheManager as any).refreshTenant = jest.fn(async () => storedTenant);
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: EXAMPLE_RESPONSE_STATUS_ACCEPTED,
+        headers: { get: (name: string) => name.toLowerCase() === 'location' ? EXAMPLE_ICA_POLL_URL : null },
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: Number(EXAMPLE_RESPONSE_STATUS_OK),
+        headers: { get: () => EXAMPLE_ICA_RESPONSE_CONTENT_TYPE },
+        json: async () => buildIcaVerifyCredentialResponse(),
+      } as any) as any;
+
+    try {
+      const manager = new HostingManager(
+        mockVaultRepository,
+        mockKmsService,
+        mockTenantsCacheManager,
+        mockStorageAdapter,
+        mockLogger,
+        buildConfig(),
+        mockHostRuntime,
+      );
+      const response = await manager.process(job, 'test', false);
+      const resource = response.body.data[0]?.resource as any;
+
+      expect(response.body.data[0]?.response?.status).toBe(EXAMPLE_RESPONSE_STATUS_OK);
+      expect(resource.next).toBeUndefined();
+      expect(resource.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeUndefined();
+      expect(mockVaultRepository.put).toHaveBeenCalledWith(
+        EXAMPLE_HOST_COLLECTION,
+        [expect.objectContaining({
+          content: expect.objectContaining({
+            didDocument: expect.objectContaining({ controller: [expect.any(String)] }),
+          }),
+        })],
+        getEnvSectionId('tenants'),
+      );
+      expect(mockVaultRepository.put).toHaveBeenCalledWith(
+        tenantCollectionName,
+        [expect.objectContaining({ content: expect.objectContaining({ didDocument: expect.any(Object) }) })],
+        getEnvSectionId('employees'),
+      );
+    } finally {
+      delete process.env.HOST_LEGACY_CONTROLLER_SCOPES;
+      (mockVaultRepository.vaultExists as any).mockResolvedValue(false);
+    }
+  });
+
   it('resolves ICA jurisdiction from the trusted ICA did:web instead of the host route jurisdiction', async () => {
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
     global.fetch = jest.fn(async (url: string | URL | Request, init?: RequestInit) => {

@@ -31,6 +31,7 @@ import {
   HOST_ACTIVATE_REQUIRED_INPUT_CLAIMS,
   HOST_ACTIVATE_REQUIRED_OUTPUT_CLAIMS,
 } from './hosting-claim-contracts';
+import { allowsLegacyRepresentativeBootstrap } from './legacy-representative-bootstrap-policy';
 
 type ActivationParticipantMaterial = {
   did?: string;
@@ -101,6 +102,7 @@ type ActivationDeps = Readonly<{
   ) => Promise<EntityConfig>;
   extractRegistrationKeys: (jobMeta?: DidCommDecodedMetadata) => { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk };
   storeControllerEntityConfig: (controllerConfig: EntityConfig, tenantCollectionName: string, vaultId: string) => Promise<void>;
+  refreshTenant: (vaultId: string) => Promise<unknown>;
   registerDidDocumentWithIca: (params: {
     vpToken: string;
     presentationSubmission?: any;
@@ -176,6 +178,16 @@ async function processActivationEntry(
   if (!activation.vpToken || typeof activation.vpToken !== 'string') {
     throw new ManagerError("Missing required activation proof 'vp_token'.", IssueType.Required);
   }
+  const rawClaims = deps.entry?.meta?.claims;
+  const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
+  if (!claims) {
+    throw new ManagerError('Malformed activation entry: missing meta.claims', IssueType.Required);
+  }
+  const allowLegacyRepresentativeBootstrap = allowsLegacyRepresentativeBootstrap({
+    claims,
+    representativeCredential: activation.representativeCredential,
+    configuredScopes: process.env.HOST_LEGACY_CONTROLLER_SCOPES,
+  });
   const trustResult = await deps.activationTrustAdapter.evaluate({
     networkMode: deps.config.networkMode,
     vpToken: activation.vpToken,
@@ -186,15 +198,10 @@ async function processActivationEntry(
     controllerCredential: activation.controllerCredential,
     jurisdiction: deps.body?.jurisdiction,
     sector: deps.body?.sector,
+    allowLegacyRepresentativeBootstrap,
   });
   const clearingResult = trustResult.clearingHouse;
   const { organizationDid } = trustResult;
-
-  const rawClaims = deps.entry?.meta?.claims;
-  const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
-  if (!claims) {
-    throw new ManagerError('Malformed activation entry: missing meta.claims', IssueType.Required);
-  }
 
   const normalizedClaims = deps.backfillOrganizationActivationRouteDefaults(
     deps.applyLegalOrganizationIdentityCompatibility(claims, activation.organizationCredential),
@@ -233,7 +240,8 @@ async function processActivationEntry(
   }
 
   const vaultId = getTenantVaultId(requestedSector, alternateName);
-  if (await deps.vaultRepository.vaultExists(vaultId)) {
+  const tenantAlreadyExists = await deps.vaultRepository.vaultExists(vaultId);
+  if (tenantAlreadyExists && !allowLegacyRepresentativeBootstrap) {
     throw new ManagerError(`Conflict: a vault for '${vaultId}' already exists`, IssueType.Conflict);
   }
 
@@ -258,24 +266,28 @@ async function processActivationEntry(
   if (!(processedClaims as any)[ClaimsOrganizationSchemaorg.identifier]) {
     (processedClaims as any)[ClaimsOrganizationSchemaorg.identifier] = deps.createOrganizationUrnSafely(processedClaims, requestedSector);
   }
-  Object.assign(
-    processedClaims,
-    deps.withHostedOrganizationOfferClaims(
+  if (!tenantAlreadyExists) {
+    Object.assign(
       processedClaims,
-      requestedSector,
-      processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
-    ),
-  );
-  if (!String(processedClaims[HOST_ACTIVATE_REQUIRED_OUTPUT_CLAIMS[0]] || '').trim()) {
-    throw new ManagerError(
-      `Missing required generated claim for activation: '${HOST_ACTIVATE_REQUIRED_OUTPUT_CLAIMS[0]}'`,
-      IssueType.Required,
+      deps.withHostedOrganizationOfferClaims(
+        processedClaims,
+        requestedSector,
+        processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+      ),
     );
+    if (!String(processedClaims[HOST_ACTIVATE_REQUIRED_OUTPUT_CLAIMS[0]] || '').trim()) {
+      throw new ManagerError(
+        `Missing required generated claim for activation: '${HOST_ACTIVATE_REQUIRED_OUTPUT_CLAIMS[0]}'`,
+        IssueType.Required,
+      );
+    }
   }
 
   const tenantCollectionName = generateTenantCollectionNameFromClaims(processedClaims);
-  await deps.vaultRepository.createNewVault({ id: tenantCollectionName });
-  await deps.kmsService.provisionKeys(vaultId);
+  if (!tenantAlreadyExists) {
+    await deps.vaultRepository.createNewVault({ id: tenantCollectionName });
+    await deps.kmsService.provisionKeys(vaultId);
+  }
 
   const tenantUrn = createOrganizationUrn({
     namespace: deps.config.namespace,
@@ -293,6 +305,71 @@ async function processActivationEntry(
     activation.controllerBinding,
   );
 
+  if (tenantAlreadyExists) {
+    const hostCollectionName = deps.hostRuntime.hostCollectionName;
+    if (!hostCollectionName) {
+      throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
+    }
+    const storedDoc = await deps.vaultRepository.get(
+      hostCollectionName,
+      vaultId,
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc | undefined;
+    if (!storedDoc) {
+      throw new ManagerError(`Tenant registry document not found for '${vaultId}'.`, IssueType.NotFound);
+    }
+    const storedTenant = await deps.kmsService.unprotectConfidentialData(storedDoc, 'host') as OrganizationConfig;
+    const storedDid = storedTenant?.didDocument;
+    const controllerDid = controllerConfig.didDocument?.id;
+    if (!storedDid?.id || !controllerDid) {
+      throw new ManagerError('Legacy controller re-registration requires tenant and controller DID documents.', IssueType.Required);
+    }
+    if (storedDid.id !== organizationDid) {
+      throw new ManagerError('Re-registration organization DID does not match the existing tenant DID.', IssueType.Conflict);
+    }
+    const controllers = Array.from(new Set([
+      ...(Array.isArray(storedDid.controller)
+        ? storedDid.controller
+        : storedDid.controller ? [storedDid.controller] : []),
+      controllerDid,
+    ]));
+    const updatedTenant: OrganizationConfig = {
+      ...storedTenant,
+      didDocument: { ...storedDid, controller: controllers },
+      meta: { ...(storedTenant.meta || {}), lastUpdated: new Date().toISOString() },
+    };
+    const updatedDoc: ConfidentialStorageDoc = {
+      ...storedDoc,
+      status: updatedTenant.status,
+      sequence: Number(storedDoc.sequence || 0) + 1,
+      content: updatedTenant,
+    };
+    const secureUpdatedDoc = await deps.kmsService.protectConfidentialData(updatedDoc, 'host');
+    await deps.vaultRepository.put(hostCollectionName, [secureUpdatedDoc], getEnvSectionId('tenants'));
+    if (!await deps.vaultRepository.vaultExists(tenantCollectionName)) {
+      await deps.vaultRepository.createNewVault({ id: tenantCollectionName });
+    }
+    await deps.storeControllerEntityConfig(controllerConfig, tenantCollectionName, vaultId);
+    await deps.refreshTenant(vaultId);
+
+    return {
+      type: 'Organization-activation-response-v1.0',
+      meta: {
+        claims: {
+          ...processedClaims,
+          'org.schema.Organization.did': storedDid.id,
+          'org.schema.Action.clearingHouse.acr': clearingResult.acr,
+          'org.schema.Action.clearingHouse.ledgerVerified': String(clearingResult.ledgerVerified),
+          'org.schema.Action.activation.networkMode': trustResult.trustPolicy.networkMode,
+          'org.schema.Action.activation.revocationChecked': String(trustResult.trustPolicy.revocationChecked),
+          'org.schema.Action.activation.onChainChecked': String(trustResult.trustPolicy.onChainChecked),
+        },
+      },
+      resource: { resourceType: 'Organization', id: organization.id },
+      response: { status: '200' },
+    };
+  }
+
   const finalTenantConfig = await deps.finalizeTenantConfig(
     organization,
     alternateName,
@@ -304,7 +381,11 @@ async function processActivationEntry(
       primaryDid: organizationDid,
       publicTenantUrl: normalizedPublicUrl,
       governanceVc: activation.organizationCredential as VerifiableCredentialV2 | undefined,
-      controllerDid: activation.controllerBinding?.did,
+      // The legacy GlobalDataCare flow does not submit an explicit controller
+      // DID. In that case the controller builder derives it from the verified
+      // representative and registration keys; the tenant DID must reference
+      // that derived DID instead of silently dropping the controller link.
+      controllerDid: activation.controllerBinding?.did || controllerConfig.didDocument?.id,
     },
   );
   if (activation.representativeCredential || activation.vpToken) {

@@ -24,6 +24,8 @@ export type ActivationTrustEvaluationInput = {
   primaryDid?: string;
   jurisdiction?: string;
   sector?: string;
+  /** Tenant/sector-scoped historical first-controller compatibility only. */
+  allowLegacyRepresentativeBootstrap?: boolean;
 };
 
 export type ActivationTrustEvaluationResult = {
@@ -77,6 +79,7 @@ function assertActivationCredentialConsistency(params: {
   organizationCredential?: any;
   representativeCredential?: any;
   controllerCredential?: any;
+  allowLegacyRepresentativeBootstrap?: boolean;
 }): { organizationDid: string; representativeDid?: string } {
   /**
    * Representative proof is intentionally split into two dimensions:
@@ -89,7 +92,13 @@ function assertActivationCredentialConsistency(params: {
    * demo/local flows may still need higher-level fallbacks when signed PDF
    * evidence did not carry `person.email`.
    */
-  const { primaryDid, organizationCredential, representativeCredential, controllerCredential } = params;
+  const {
+    primaryDid,
+    organizationCredential,
+    representativeCredential,
+    controllerCredential,
+    allowLegacyRepresentativeBootstrap,
+  } = params;
   if (!organizationCredential) {
     throw new ManagerError('Missing ICA-issued organization credential.', IssueType.Required);
   }
@@ -109,7 +118,10 @@ function assertActivationCredentialConsistency(params: {
     organizationCredential,
     representativeCredential,
     controllerCredential,
-  });
+  }).filter(error => !allowLegacyRepresentativeBootstrap || ![
+    'MISSING_REPRESENTATIVE_ROLE_RESPRSN',
+    'MISSING_REPRESENTATIVE_CREDENTIAL_BINDING',
+  ].includes(error.code));
   if (policyErrors.length > 0) {
     const first = policyErrors[0];
     const issue = first.code === 'REPRESENTATIVE_TAXID_MISMATCH' || first.code === 'CONTROLLER_TAXID_MISMATCH'
@@ -148,6 +160,7 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
       organizationCredential: input.organizationCredential,
       representativeCredential: input.representativeCredential,
       controllerCredential: input.controllerCredential,
+      allowLegacyRepresentativeBootstrap: input.allowLegacyRepresentativeBootstrap,
     });
 
     const clearingHouse = await this.clearingHouseService.verifyVpToken({

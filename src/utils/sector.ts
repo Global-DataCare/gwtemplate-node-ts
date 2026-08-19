@@ -10,7 +10,7 @@ const LEGACY_FHIR_SECTORS = new Set([
   'antifraud',
 ]);
 
-const SYNTHETIC_FHIR_SECTOR_PATTERN = /^(animal|health)-(care|index|tech)$/;
+const SYNTHETIC_FHIR_SECTOR_PATTERN = /^(animal|health)-(care|index|tech|research)$|^onehealth-research$/;
 const SYNTHETIC_RESEARCH_SECTOR_PATTERN = /^(animal|health)-research$/;
 
 export function isFhirSector(sector: string | undefined | null): boolean {

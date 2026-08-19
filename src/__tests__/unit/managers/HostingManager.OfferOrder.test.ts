@@ -258,6 +258,14 @@ describe('HostingManager - Offer/Order Flow', () => {
     );
     if (finalEntry.response.status === '201') {
       expect(legalParticipantDoc).toBeDefined();
+      const controllerDocs = await vaultRepository.getContainersInSection(
+        tenantCollectionName,
+        getEnvSectionId('employees'),
+      );
+      expect(controllerDocs).toHaveLength(1);
+      expect(finalDoc.content!.didDocument.controller).toEqual([
+        (controllerDocs[0] as any).content?.didDocument?.id,
+      ]);
     }
 
     const communications = await vaultRepository.getContainersInSection(

@@ -49,6 +49,7 @@ docs/
   - [101-IPS_COMMUNICATION_OUTBOX.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-IPS_COMMUNICATION_OUTBOX.md)
 - **Consent access status**: [90.E-TODO_SMART_EHR_COMPAT.md](90.E-TODO_SMART_EHR_COMPAT.md) also records the current live SMART consent-evaluation behavior, including deny precedence and permission-request lookup identifiers.
 - **Tenant identifier migration note**: [90.K-TODO_TENANT_IDENTIFIER_V2.md](90.K-TODO_TENANT_IDENTIFIER_V2.md) tracks the deferred `v2.0` redesign away from `alternateName`-based hosted compatibility.
+- **UNID legacy controller compatibility**: [03.K-UNID-LEGACY-CONTROLLER-COMPATIBILITY.md](03-IDENTITY-AND-TRUST/03.K-UNID-LEGACY-CONTROLLER-COMPATIBILITY.md) preserves the historical first controller during tenant creation and keeps later service-controller `_issue` independent.
 - **Current GW 101 path**: [../docs-v2/101-README.md](../docs-v2/101-README.md) is the current ordered reading path for active integrator/runtime guidance.
 - **Current GW lifecycle contract**: [../docs-v2/16-deactivation-and-purge-lifecycle.md](../docs-v2/16-deactivation-and-purge-lifecycle.md) is the current lifecycle contract for integrators/auditors.
 - **Current GW integrators guide**: [../docs-v2/09-api-integrators-guide.md](../docs-v2/09-api-integrators-guide.md) is the clean onboarding path without legacy route drift.
@@ -153,6 +154,7 @@ Memory aid:
 *   **[03.H-ICA-CERTIFICATE-ISSUANCE.md](03-IDENTITY-AND-TRUST/03.H-ICA-CERTIFICATE-ISSUANCE.md)**: Documents the split between Fabric operational enrollment and dataspace ICA Host VC issuance, plus the boundary between host certificate bootstrap and host autodiscovery.
 *   **[03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md](03-IDENTITY-AND-TRUST/03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md)**: Audit reference for the hosting-operator bootstrap boundary, including `env -> vault -> Fabric bootstrap` resolution order and the separation between hosting validation, operational enrollment, and Host VC issuance.
 *   **[03.J-PROFESSIONAL-CONSENT-SMART.md](03-IDENTITY-AND-TRUST/03.J-PROFESSIONAL-CONSENT-SMART.md)**: Canonical professional DID reuse across employee/profile identity, Consent, VP and SMART, including endpoint audience resolution and hash-boundary semantics.
+*   **[03.K-UNID-LEGACY-CONTROLLER-COMPATIBILITY.md](03-IDENTITY-AND-TRUST/03.K-UNID-LEGACY-CONTROLLER-COMPATIBILITY.md)**: Fail-closed UNID-only restoration of one historical legal-representative bootstrap controller without checked-in personal identifiers.
 
 ### 📂 04-DEEP-DIVES
 *   **[04.A-VC-ARCHITECTURE-DEEP-DIVE.md](04-DEEP-DIVES/04.A-VC-ARCHITECTURE-DEEP-DIVE.md)**: A deep dive into the Verifiable Credentials architecture.

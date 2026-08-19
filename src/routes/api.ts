@@ -702,8 +702,11 @@ export function createApiRouter(
    *       - canonical proof input is `body.vp_token`; it contains the ICA-issued OrganizationCredential, LegalRepresentativeCredential and ServiceControllerCredential
    *       - LegalRepresentativeCredential carries legal capacity and professional ISCO occupation; it does not grant tenant control by itself
    *       - ServiceControllerCredential carries `RESPRSN` in `owner.additionalType`, ISCO in `owner.hasOccupation.occupationalCategory`, and `owner.hasCredential.material` bound to the presenter actor JWK
-   *       - legacy two-VC compatibility is accepted only when the old LegalRepresentativeCredential itself contains both `RESPRSN` and matching `hasCredential` material
-   *       - a two-VC VP whose representative carries only `ISCO-08|1120` fails; unsigned request claims never replace signed controller authority
+   *       - legacy two-VC compatibility normally requires the old LegalRepresentativeCredential itself to contain both `RESPRSN` and matching `hasCredential` material
+   *       - an exact UNID deployment bootstrap policy may accept one historical credential that predates those two fields, but only when tenant, sector, credential id, issuer and verified portal signer kid all match
+   *       - that historical credential may retain professional occupation `ISCO-08|1120`; the bootstrap policy does not rewrite it as `RESPRSN`
+   *       - that narrow exception applies only while creating or re-registering the historical first controller; `_issue` and ordinary employee lifecycle never consult it
+   *       - submitting the same exact legacy binding again for an existing tenant performs an idempotent controller upsert and recreates the tenant collection when it is missing
    *       - if ICA also issued a `SoftwareApplication` VC for the portal/backend, its `SoftwareApplication.material` field is the public cryptographic material of that software application, typically the communication signing key id bound during ICA registration
    *       - when that key id is represented as a JWK thumbprint, RFC 7638 defines the canonical thumbprint calculation over the public signing / verification JWK and RFC 9278 defines the canonical URN form `urn:ietf:params:oauth:jwk-thumbprint:sha-256:<base64url>`
    *       - the controller-side signature belongs to the prior ICA registration step; later operational app-service proofs should be signed by the app-service key itself
@@ -711,7 +714,7 @@ export function createApiRouter(
    *       - `org.schema.Service.serviceType` is already required at this step because GW uses it to validate the requested tenant capabilities and prepare the pending Offer that will later be confirmed in `Order/_batch`
    *       - `body.controller.*` is the explicit controller key-binding contract inherited from the ICA model and is used when GW must publish/bootstrap the controller person DID
    *       - `body.organizationCredential` / `body.representativeCredential` are deprecated compatibility fields and must not be treated as the canonical proof contract
-   *       - the host validates the ICA proof and activates the tenant backend/connector
+   *       - the host validates the ICA proof, creates the bootstrap controller employee and references its DID from the tenant DID in the first active version
    *       - activation response includes Offer claims derived from `org.schema.Organization.numberOfEmployees`
    *         (include that claim in `meta.claims` to size requested seats)
    *         so clients can continue with order/payment and licensing without a separate `_batch` submit
@@ -906,6 +909,9 @@ export function createApiRouter(
    *       - LegalRepresentativeCredential defaults to `hasOccupation.occupationalCategory = ISCO-08|1120`; ServiceControllerCredential uses `owner.additionalType = RESPRSN` plus controller occupation `ISCO-08|1330` unless the signed PDF provides an explicit occupation
    *       - `body.data[].resource.organization.publicKeyJwk` is the organization credential-signing key when the hosting operator/runtime already knows it
    *       - this route is distinct from `Organization/_activate`, which starts from an already-issued ICA proof (`vp_token`)
+   *       - this route persists the pending representative and verified request registration keys; the following `Order/_batch` builds that historical first controller before activating the tenant
+   *       - for an existing tenant, the same exact allowlisted GlobalDataCare binding re-registers that representative controller idempotently, returns no new Offer and does not require another Order
+   *       - a later UNID portal `_issue` independently appends the service controller from its `ServiceControllerCredential`; it does not replace the bootstrap controller
    *
    *       BFF/confidential-app note:
    *       - a BFF or confidential app may protect the DIDComm/FAPI envelope with its own communication key
@@ -960,10 +966,11 @@ export function createApiRouter(
    *       Polling semantics:
    *       - submit (`_transaction`) returns immediate errors if the request cannot be accepted/enqueued
    *       - poll (`_transaction-response`) returns `202` while pending, then `200` with:
-   *         - `resource.meta.claims`: canonical host continuation claims, including the Offer identifier
+   *         - `resource.meta.claims`: canonical host claims; first-time onboarding includes the Offer identifier
    *         - `resource.icaResponse`: transitional raw ICA envelope retained for audit/debug; application clients should read `vc[]`
    *         - `vc[]`: extracted credential resources from that ICA payload
-   *         - `resource.next`: the explicit follow-up contract for `Order/_batch`
+   *         - first-time `resource.next`: the explicit follow-up contract for `Order/_batch`
+   *         - exact existing-tenant legacy re-registration omits Offer and `resource.next` after idempotently upserting the representative controller
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -2130,6 +2137,9 @@ export function createApiRouter(
    *       The Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the
    *       Offer returned by the Organization activation `_activate-response`.
    *       This step is always required (including `0` amount offers).
+   *       When the Offer came from legacy legal-organization onboarding, GW builds
+   *       the representative controller before tenant finalization and includes
+   *       that controller DID in the organization DID from version one.
    *       The final polled result typically contains payment/checkout claims and the first controller
    *       activation code (`org.schema.IndividualProduct.serialNumber`).
    *     parameters:

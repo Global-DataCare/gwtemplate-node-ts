@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+- Preserve the controller employee produced by legacy organization onboarding
+  in the tenant DID from its first active version. Both `_activate` and the
+  `_transaction` plus `Order/_batch` finalization now retain that controller;
+  later `_issue` remains the independent `ServiceControllerCredential` path
+  that appends, rather than replaces, the bootstrap controller.
+- Allow a PII-free UNID tenant/sector scope to accept historical representative
+  VCs that predate `RESPRSN` and embedded key material during `_activate`, while
+  retaining normal VP, credential and trust-registry verification without
+  pinning a credential id, issuer or portal signer `kid`.
+- Make legacy `_activate` or `_transaction` re-registration
+  idempotently upsert the representative controller on an existing tenant,
+  append its DID without replacing service controllers, recreate a missing
+  tenant collection and avoid generating a new Offer or Order. A newly verified
+  portal key replaces only that legacy controller's DID key material.
+
 ## [1.21.17] - 2026-08-18
 
 - Fix the local research SMART smoke to discover medication Compositions with
@@ -2614,7 +2629,6 @@
 
 ## Unreleased
 
-- Restrict host authorization VCs to the Test Network route/runtime, support a
   revocable employee signer registry until DID publication, and preserve the
   single postal code through Order, exchange and DCR using its protected VC
   binding.
