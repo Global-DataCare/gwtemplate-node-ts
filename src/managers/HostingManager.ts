@@ -312,6 +312,7 @@ export class HostingManager {
       this.tenantsCacheManager,
       this.config,
       this.hostRuntime,
+      this.storageAdapter,
       (error, type, meta) => this.handleError(error, type, meta),
     );
   }

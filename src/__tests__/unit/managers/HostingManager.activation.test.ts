@@ -1093,7 +1093,7 @@ describe('HostingManager activation flow', () => {
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('only be enabled from disabled');
   });
 
-  it('should reject tenant disable while active employee descendants remain', async () => {
+  it('should disable active employee descendants with the tenant', async () => {
     const activationJob = buildActivationJob();
     await hostingManager.process(activationJob);
 
@@ -1109,12 +1109,10 @@ describe('HostingManager activation flow', () => {
     );
 
     const response = await hostingManager.process(buildLifecycleJob('_disable'));
-    const errorEntry = response.body.data[0];
-    expect(errorEntry.response.status).toBe('409');
-    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('employee record(s) remain active');
+    expect(response.body.data[0].response.status).toBe('200');
   });
 
-  it('should reject tenant purge while descendants are disabled but not purged', async () => {
+  it('should purge disabled descendants with the tenant', async () => {
     const activationJob = buildActivationJob();
     await hostingManager.process(activationJob);
 
@@ -1133,9 +1131,7 @@ describe('HostingManager activation flow', () => {
     );
 
     const response = await hostingManager.process(buildLifecycleJob('_purge'));
-    const errorEntry = response.body.data[0];
-    expect(errorEntry.response.status).toBe('409');
-    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('employee record(s) are not purged yet');
+    expect(response.body.data[0].response.status).toBe('200');
   });
 
   it('should reject tenant disable when controller proof bearer memberOf.taxID does not match the target tenant', async () => {

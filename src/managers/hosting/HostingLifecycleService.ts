@@ -13,6 +13,7 @@ import { EntityLifecycleStatus } from '../../gdc-backend-utils-node/models/enums
 import type { IServerConfig } from '../../config';
 import type { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import type { IVaultRepository } from '../../database/repositories/vault/vault.repository';
+import type { IStorageAdapter } from '../../database/storage/IStorageAdapter';
 import { composeHostDidWebId } from '../../utils/did-backend';
 import { getBundleResponseTypeForAction } from '../../utils/bundle';
 import { normalizeContextualizedClaims } from '../../utils/claims';
@@ -63,6 +64,7 @@ export class HostingLifecycleService {
     private readonly tenantsCacheManager: IHostingTenantRegistry,
     private readonly config: IServerConfig,
     private readonly hostRuntime: IHostRuntime,
+    private readonly storageAdapter: IStorageAdapter,
     private readonly handleError: (error: unknown, type: string, meta?: Record<string, unknown>) => ErrorEntry,
   ) {}
 
@@ -177,11 +179,8 @@ export class HostingLifecycleService {
           response: { status: '200' },
         };
       }
-      await this.assertTenantPurgeAllowed(vaultId, currentStatus);
-      const tenantVaultPurged = await this.vaultRepository.purge(vaultId);
-      if (!tenantVaultPurged) {
-        throw new ManagerError(`Tenant data purge failed for '${vaultId}'.`, IssueType.Exception);
-      }
+      await this.assertTenantPurgeAllowed(currentStatus);
+      await this.purgeTenantDescendants(vaultId);
       const tenantRegistryDeleted = await this.vaultRepository.delete(hostCollectionName, vaultId, getEnvSectionId('tenants'));
       if (!tenantRegistryDeleted) {
         throw new ManagerError(`Tenant registry purge failed for '${vaultId}'.`, IssueType.Exception);
@@ -211,7 +210,7 @@ export class HostingLifecycleService {
     if (isHostLifecycle) {
       await this.assertHostLifecycleAllowed(action, hostCollectionName);
     } else {
-      await this.assertTenantDisableAllowed(action, vaultId);
+      if (action === ACTION_DISABLE) await this.disableTenantDescendants(vaultId);
     }
     const updatedConfig = applyTenantAuthorizationStatus(tenantConfig, nextStatus, authorization.actorDid);
     const existing = isHostLifecycle
@@ -325,26 +324,6 @@ export class HostingLifecycleService {
     return 'active';
   }
 
-  private async assertTenantDisableAllowed(action: TenantLifecycleAction, vaultId: string): Promise<void> {
-    if (action !== ACTION_DISABLE) {
-      return;
-    }
-
-    const descendants = await this.inspectTenantDescendants(vaultId);
-    if (descendants.activeEmployees > 0) {
-      throw new ManagerError(
-        `Tenant cannot be disabled while ${descendants.activeEmployees} employee record(s) remain active.`,
-        IssueType.Conflict,
-      );
-    }
-    if (descendants.activeIndividuals > 0) {
-      throw new ManagerError(
-        `Tenant cannot be disabled while ${descendants.activeIndividuals} individual/member record(s) remain active.`,
-        IssueType.Conflict,
-      );
-    }
-  }
-
   private async assertHostLifecycleAllowed(
     action: TenantLifecycleAction,
     hostCollectionName: string,
@@ -362,27 +341,60 @@ export class HostingLifecycleService {
     }
   }
 
-  private async assertTenantPurgeAllowed(
-    vaultId: string,
-    currentStatus: TenantAuthorizationLifecycleStatus,
-  ): Promise<void> {
+  private async assertTenantPurgeAllowed(currentStatus: TenantAuthorizationLifecycleStatus): Promise<void> {
     if (currentStatus !== 'suspended') {
       throw new ManagerError('Tenant authorization must be disabled before purge.', IssueType.Conflict);
     }
+  }
 
-    const descendants = await this.inspectTenantDescendants(vaultId);
-    if (descendants.unpurgedEmployees > 0) {
-      throw new ManagerError(
-        `Tenant cannot be purged while ${descendants.unpurgedEmployees} employee record(s) are not purged yet.`,
-        IssueType.Conflict,
-      );
+  private async tenantCollectionNames(vaultId: string): Promise<string[]> {
+    const collectionName = await this.tenantsCacheManager.getCollectionName(vaultId);
+    return [...new Set([vaultId, collectionName].filter(Boolean) as string[])];
+  }
+
+  private async disableTenantDescendants(vaultId: string): Promise<void> {
+    for (const collectionName of await this.tenantCollectionNames(vaultId)) {
+      for (const sectionId of await this.vaultRepository.getAllSections(collectionName)) {
+        const records = await this.vaultRepository.getContainersInSection<any>(collectionName, sectionId);
+        const inactive = records.map((record) => ({
+          ...record,
+          status: EntityLifecycleStatus.Inactive,
+          content: record.content && typeof record.content === 'object'
+            ? { ...record.content, status: EntityLifecycleStatus.Inactive }
+            : record.content,
+        }));
+        if (inactive.length > 0) await this.vaultRepository.put(collectionName, inactive, sectionId);
+      }
     }
-    if (descendants.unpurgedIndividuals > 0) {
-      throw new ManagerError(
-        `Tenant cannot be purged while ${descendants.unpurgedIndividuals} individual/member record(s) are not purged yet.`,
-        IssueType.Conflict,
-      );
+  }
+
+  private async purgeTenantDescendants(vaultId: string): Promise<void> {
+    for (const collectionName of await this.tenantCollectionNames(vaultId)) {
+      for (const sectionId of await this.vaultRepository.getAllSections(collectionName)) {
+        const records = await this.vaultRepository.getContainersInSection<any>(collectionName, sectionId);
+        for (const record of records) {
+          await this.deleteBlobReferences(record);
+          await this.vaultRepository.delete(collectionName, String(record.id), sectionId);
+        }
+      }
+      if (!await this.vaultRepository.purge(collectionName)) {
+        throw new ManagerError(`Tenant data purge failed for '${collectionName}'.`, IssueType.Exception);
+      }
     }
+  }
+
+  private async deleteBlobReferences(value: unknown): Promise<void> {
+    const references = this.collectBlobReferences(value);
+    for (const reference of references) await this.storageAdapter.delete?.(reference).catch(() => undefined);
+  }
+
+  private collectBlobReferences(value: unknown): string[] {
+    if (!value || typeof value !== 'object') return [];
+    if (Array.isArray(value)) return value.flatMap((entry) => this.collectBlobReferences(entry));
+    return Object.entries(value as Record<string, unknown>).flatMap(([key, nested]) => [
+      ...(typeof nested === 'string' && (key === 'blobRef' || key.endsWith('#hash')) ? [nested] : []),
+      ...this.collectBlobReferences(nested),
+    ]);
   }
 
   private async inspectHostedTenantRegistry(
