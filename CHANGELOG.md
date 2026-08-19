@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+- Let an authorized tenant controller complete a two-phase administrative
+  shutdown: tenant disable cascades suspension to employees, individual
+  organizations, and members; tenant purge then cascades cleanup of remaining
+  descendant records, licenses, and blob references without requiring each
+  individual controller to act.
+
 - Make a verified legacy `Organization/_activate` re-registration of an
   existing tenant complete directly with `200`; it updates the historical
   representative controller without an Offer, Order, payment, license, or
@@ -10,15 +16,15 @@
   `_transaction` plus `Order/_batch` finalization now retain that controller;
   later `_issue` remains the independent `ServiceControllerCredential` path
   that appends, rather than replaces, the bootstrap controller.
-- Allow a PII-free UNID tenant/sector scope to accept historical representative
-  VCs that predate `RESPRSN` and embedded key material during `_activate`, while
-  retaining normal VP, credential and trust-registry verification without
-  pinning a credential id, issuer or portal signer `kid`.
-- Make legacy `_activate` or `_transaction` re-registration
-  idempotently upsert the representative controller on an existing tenant,
-  append its DID without replacing service controllers, recreate a missing
-  tenant collection and avoid generating a new Offer or Order. A newly verified
-  portal key replaces only that legacy controller's DID key material.
+- Allow explicitly configured legacy tenant/sector scopes to accept historical
+  representative VCs that predate `RESPRSN` and embedded key material during
+  `_activate`, while retaining normal VP, credential, and trust-registry
+  verification without pinning a credential id, issuer, or portal signer `kid`.
+- Make legacy `_activate` or `_transaction` re-registration idempotently upsert
+  the representative controller on an existing tenant, append its DID without
+  replacing service controllers, recreate a missing tenant collection, and
+  avoid generating a new Offer or Order. A newly verified portal key replaces
+  only that legacy controller's DID key material.
 
 ## [1.21.17] - 2026-08-18
 
