@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+- Make a verified legacy `Organization/_activate` re-registration of an
+  existing tenant complete directly with `200`; it updates the historical
+  representative controller without an Offer, Order, payment, license, or
+  second tenant provisioning.
+
 - Preserve the controller employee produced by legacy organization onboarding
   in the tenant DID from its first active version. Both `_activate` and the
   `_transaction` plus `Order/_batch` finalization now retain that controller;

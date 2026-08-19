@@ -1,10 +1,9 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { processOrganizationVerificationTransaction } from '../../../managers/hosting/process-organization-verification';
 
 describe('processOrganizationVerificationTransaction legacy re-registration', () => {
   it('uses the existing-tenant controller upsert and does not create a new Offer', async () => {
-    const offerId = 'urn:example:Offer:existing';
     const claims = {
       [ClaimsOrganizationSchemaorg.alternateName]: 'VATES-G00000000',
       [ClaimsServiceSchemaorg.category]: 'onehealth-research',
@@ -20,7 +19,6 @@ describe('processOrganizationVerificationTransaction legacy re-registration', ()
     const reregisterExistingLegacyRepresentativeController = jest.fn(async () => ({
       ...claims,
       [ClaimsOrganizationSchemaorg.identifier]: 'urn:example:organization:existing',
-      [ClaimsOfferSchemaorg.identifier]: offerId,
     }));
 
     const response = await processOrganizationVerificationTransaction({
@@ -52,7 +50,6 @@ describe('processOrganizationVerificationTransaction legacy re-registration', ()
     }));
     expect(createPendingTenantRegistrationFromClaims).not.toHaveBeenCalled();
     expect((response.body.data[0].resource as any).next).toBeUndefined();
-    expect((response.body.data[0].resource as any).meta.claims[ClaimsOfferSchemaorg.identifier]).toBe(offerId);
     expect((response.body.data[0].resource as any).meta.claims[ClaimsOrganizationSchemaorg.identifier])
       .toBe('urn:example:organization:existing');
   });

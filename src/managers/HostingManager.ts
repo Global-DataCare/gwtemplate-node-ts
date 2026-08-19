@@ -964,10 +964,6 @@ export class HostingManager {
     if (!storedTenant.didDocument?.id || !controllerDid) {
       throw new ManagerError('Legacy representative re-registration requires tenant and controller DID documents.', IssueType.Required);
     }
-    const existingOfferId = String(readProjectedOfferOrderClaims(storedDoc)[ClaimsOfferSchemaorg.identifier] || '').trim();
-    if (!existingOfferId) {
-      throw new ManagerError(`Existing tenant '${vaultId}' has no historical Offer identifier.`, IssueType.NotFound);
-    }
     const currentControllers = Array.isArray(storedTenant.didDocument.controller)
       ? storedTenant.didDocument.controller
       : storedTenant.didDocument.controller ? [storedTenant.didDocument.controller] : [];
@@ -997,7 +993,6 @@ export class HostingManager {
     return {
       ...normalizedClaims,
       [ClaimsOrganizationSchemaorg.identifier]: tenantUrn,
-      [ClaimsOfferSchemaorg.identifier]: existingOfferId,
     };
   }
 

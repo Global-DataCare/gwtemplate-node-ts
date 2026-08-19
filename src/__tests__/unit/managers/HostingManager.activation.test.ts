@@ -526,7 +526,7 @@ describe('HostingManager activation flow', () => {
 
     const orderResponse = await hostingManager.process(orderJob);
 
-    expect(orderResponse.body.data[0].response.status).toBe('201');
+    expect(orderResponse.body.data[0].response.status).toBe('200');
     expect(
       orderResponse.body.data[0].meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier],
     ).toBe(offerId);
@@ -603,6 +603,7 @@ describe('HostingManager activation flow', () => {
       };
       const reRegistrationResponse = await hostingManager.process(job);
       expect(reRegistrationResponse.body.data[0].response.status).toBe('200');
+      expect(reRegistrationResponse.body.data[0].meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeUndefined();
       const reRegisteredTenantDoc = await vaultRepository.get(
         hostCollectionName,
         tenantVaultId,
