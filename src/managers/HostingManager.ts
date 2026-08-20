@@ -909,7 +909,7 @@ export class HostingManager {
   }
 
   /**
-   * Idempotently re-applies the historical GlobalDataCare representative
+   * Idempotently re-applies a scoped historical representative
    * controller after ICA verification. This is the existing-tenant branch of
    * `_transaction`; it is deliberately separate from service-controller
    * `_issue` and never replaces another controller DID.

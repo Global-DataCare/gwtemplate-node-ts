@@ -381,7 +381,7 @@ async function processActivationEntry(
       primaryDid: organizationDid,
       publicTenantUrl: normalizedPublicUrl,
       governanceVc: activation.organizationCredential as VerifiableCredentialV2 | undefined,
-      // The legacy GlobalDataCare flow does not submit an explicit controller
+      // The legacy two-credential flow does not submit an explicit controller
       // DID. In that case the controller builder derives it from the verified
       // representative and registration keys; the tenant DID must reference
       // that derived DID instead of silently dropping the controller link.
