@@ -7,6 +7,10 @@
   opaque tenant paths or the returned DID document.
 - Keep the legacy representative-controller skill, route documentation and
   examples deployment-neutral and free of product-specific identifiers.
+- Accept secure asynchronous polling requests with `thid` protected inside the
+  form-encoded `request=<JWE>` envelope, matching the SDK submit-and-poll
+  transport contract for every `*-response` endpoint.
+
 - Let an authorized tenant controller complete a two-phase administrative
   shutdown: tenant disable cascades suspension to employees, individual
   organizations, and members; tenant purge then cascades cleanup of remaining

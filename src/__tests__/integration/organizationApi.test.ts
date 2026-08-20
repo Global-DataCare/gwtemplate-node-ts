@@ -707,6 +707,44 @@ describe('Organization Registration API', () => {
   });
 
   describe('POST /host/.../_batch (Job Submission)', () => {
+    it('decrypts the thid from a secure form polling request', async () => {
+      const thid = 'secure-poll-thread';
+      const encryptedPoll = 'secure.poll.request';
+      await asyncResponseStore.set(thid, { status: 'PENDING', vaultId: 'host' });
+      mockKmsService.decodeRequest.mockResolvedValueOnce({
+        id: 'secure-poll-job',
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        section: 'unknown',
+        format: 'unknown',
+        resourceType: 'unknown',
+        action: 'unknown',
+        content: {
+          thid,
+          jti: 'secure-poll-jti',
+          iss: 'did:web:poller.example.org',
+          aud: 'did:web:host.example.org',
+          type: 'application/api+json',
+          body: {},
+        },
+      });
+
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: '/host/cds-es/v1/test/registry/org.schema/Organization/_issue-response',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: 'Bearer fake-oidc-id-token',
+        },
+        body: { request: encryptedPoll },
+      });
+
+      expect(response.status).toBe(202);
+      expect(JSON.parse(response.text)).toEqual({ thid, status: 'PENDING' });
+      expect(mockKmsService.decodeRequest).toHaveBeenCalledWith(encryptedPoll);
+    });
+
     it('should decode the request, queue a job, and return 202 Accepted', async () => {
       const registrationUrl = `/host/cds-es/v1/test/registry/org.schema/Organization/_batch`;
       const expectedPollingUrl = `http://host.example.com${registrationUrl.replace('/_batch', '/_batch-response')}`;
