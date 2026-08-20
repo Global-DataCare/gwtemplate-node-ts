@@ -356,6 +356,11 @@ deploy_gke() {
   bash "$FABRIC_MULTICLOUD_DIR/scripts/05-k8s-deploy-gdc.sh"
 
   local resource_name="${GDC_RESOURCE_NAME:-gwtemplate}"
+  if [[ -n "${HOST_LEGACY_REPRESENTATIVE_CONTROLLER:-}" ]]; then
+    echo "⚙️  Applying legacy representative-controller compatibility policy..."
+    kubectl -n "$K8S_NAMESPACE_GDC" set env "deployment/${resource_name}" \
+      HOST_LEGACY_REPRESENTATIVE_CONTROLLER="$HOST_LEGACY_REPRESENTATIVE_CONTROLLER"
+  fi
   kubectl -n "$K8S_NAMESPACE_GDC" rollout status "deployment/${resource_name}" --timeout="${ROLLOUT_TIMEOUT:-180s}"
   curl --fail --silent --show-error --max-time 20 "${GDC_PUBLIC_URL%/}/host/ping" >/dev/null
   curl --fail --silent --show-error --max-time 20 "${GDC_PUBLIC_URL%/}/api-docs/" >/dev/null

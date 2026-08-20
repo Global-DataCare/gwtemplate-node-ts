@@ -724,7 +724,7 @@ export function createApiRouter(
    *       - LegalRepresentativeCredential carries legal capacity and professional ISCO occupation; it does not grant tenant control by itself
    *       - ServiceControllerCredential carries `RESPRSN` in `owner.additionalType`, ISCO in `owner.hasOccupation.occupationalCategory`, and `owner.hasCredential.material` bound to the presenter actor JWK
    *       - legacy two-VC compatibility normally requires the old LegalRepresentativeCredential itself to contain both `RESPRSN` and matching `hasCredential` material
-   *       - a deployment-scoped bootstrap policy may accept one historical credential that predates those two fields, while normal VP, credential and trust checks remain mandatory
+   *       - a deployment-wide compatibility policy may accept historical representative credentials that predate those two fields, while normal VP, credential and trust checks remain mandatory
    *       - that historical credential may retain professional occupation `ISCO-08|1120`; the bootstrap policy does not rewrite it as `RESPRSN`
    *       - that narrow exception applies only while creating or re-registering the historical first controller; `_issue` and ordinary employee lifecycle never consult it
    *       - submitting the same exact legacy binding again for an existing tenant performs an idempotent controller upsert and recreates the tenant collection when it is missing
@@ -932,7 +932,7 @@ export function createApiRouter(
    *       - `body.data[].resource.organization.publicKeyJwk` is the organization credential-signing key when the hosting operator/runtime already knows it
    *       - this route is distinct from `Organization/_activate`, which starts from an already-issued ICA proof (`vp_token`)
    *       - this route persists the pending representative and verified request registration keys; the following `Order/_batch` builds that historical first controller before activating the tenant
-   *       - for an existing tenant, the same scoped legacy binding re-registers that representative controller idempotently, returns no new Offer and does not require another Order
+   *       - for an existing tenant, the same deployment-authorized legacy binding re-registers that representative controller idempotently, returns no new Offer and does not require another Order
    *       - a later independent `_issue` appends the service controller from its `ServiceControllerCredential`; it does not replace the bootstrap controller
    *
    *       BFF/confidential-app note:

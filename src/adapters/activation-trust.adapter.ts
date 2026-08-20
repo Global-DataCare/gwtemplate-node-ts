@@ -24,7 +24,7 @@ export type ActivationTrustEvaluationInput = {
   primaryDid?: string;
   jurisdiction?: string;
   sector?: string;
-  /** Tenant/sector-scoped historical first-controller compatibility only. */
+  /** Deployment-wide historical first-controller compatibility only. */
   allowLegacyRepresentativeBootstrap?: boolean;
 };
 

@@ -550,7 +550,7 @@ describe('HostingManager activation flow', () => {
    * keys. A separately designated technical controller is added later by its
    * own sector `_issue`/DCR and must survive representative re-registration.
    */
-  it('keeps the scoped historical representative as the first controller without requiring legacy RESPRSN', async () => {
+  it('keeps the deployment-authorized historical representative as first controller without legacy RESPRSN', async () => {
     const job = buildActivationJob();
     const credential = (job.content!.body as any).representativeCredential;
     credential.id = 'urn:example:credential:historical-representative';
@@ -563,7 +563,7 @@ describe('HostingManager activation flow', () => {
     delete credential.credentialSubject.hasCredential;
 
     const claims = job.content!.body!.data[0]!.meta!.claims;
-    process.env.HOST_LEGACY_CONTROLLER_SCOPES = `${claims[ClaimsOrganizationSchemaorg.alternateName]}|${claims[ClaimsServiceSchemaorg.category]}`;
+    process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER = 'true';
     try {
       const responsePayload = await hostingManager.process(job);
       expect(responsePayload.body.data[0].response.status).toBe('201');
@@ -642,7 +642,7 @@ describe('HostingManager activation flow', () => {
       expect(rotatedMethods.some((method: any) => method.publicKeyJwk?.pub === 'controller-sig-pub-rotated')).toBe(true);
       expect(rotatedMethods.map((method: any) => method.publicKeyJwk?.kid)).not.toEqual(oldKids);
     } finally {
-      delete process.env.HOST_LEGACY_CONTROLLER_SCOPES;
+      delete process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER;
     }
   });
 
