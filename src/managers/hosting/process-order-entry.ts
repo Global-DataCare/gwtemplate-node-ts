@@ -16,7 +16,7 @@ import type { HostingOfferOrderService } from './HostingOfferOrderService';
 import { getClaimValue, normalizeContextualizedClaims } from '../../utils/claims';
 import { readProjectedOfferOrderClaims, buildOfferOrderIndexedAttributes } from '../../utils/offer-order-read-model';
 import { getEnvSectionId } from '../../utils/section-env';
-import { composeHostDidWebId } from '../../utils/did-backend';
+import { composeHostDidWebId, createHostedDidWeb } from '../../utils/did-backend';
 import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../utils/tenant';
 import { AllowedIndexableClaims } from '../../gdc-backend-utils-node/models/indexing';
 import { registerOrganizationOnLedger } from '../../utils/ledger-organization-registration';
@@ -59,6 +59,7 @@ type ProcessHostOrderEntryDeps = Readonly<{
   buildControllerEntityConfig: (
     legalRep: any,
     tenantUrn: string,
+    hostedTenantDid: string,
     vaultId: string,
     storedKeys?: { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk },
   ) => Promise<any>;
@@ -148,6 +149,15 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
   const containedService = deps.extractContainedService(contained);
   const vaultId = getTenantVaultId(sector, alternateName);
   const tenantCollectionName = generateTenantCollectionNameFromClaims(processedClaims);
+  const hostedTenantDid = createHostedDidWeb(
+    composeHostDidWebId(deps.config.apiBaseUrl, deps.config.hostExternalDomain),
+    alternateName,
+    {
+      jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+      version: 'v1',
+      sector,
+    },
+  );
 
   await deps.vaultRepository.createNewVault({ id: tenantCollectionName });
   await deps.kmsService.provisionKeys(vaultId);
@@ -156,13 +166,15 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
   // the pending registration. Build that historical bootstrap controller
   // before finalizing the tenant so its DID is present in the organization DID
   // from the first active version, as it was in the legacy verify/activate
-  // flow. A later service controller is appended; it does not replace this DID.
+  // flow. This actor owns the submitted JWK. A differently designated
+  // technical controller remains pending until its own sector binding/DCR and
+  // is appended later; it does not replace this DID.
   const [legalRep, processedService] = [person, service];
   const storedKeys = (decryptedContent as any)?.registrationKeys as
     | { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk }
     | undefined;
   const employeeConfig = legalRep
-    ? await deps.buildControllerEntityConfig(legalRep, tenantUrn, vaultId, storedKeys)
+    ? await deps.buildControllerEntityConfig(legalRep, tenantUrn, hostedTenantDid, vaultId, storedKeys)
     : undefined;
 
   const finalTenantConfig = await deps.finalizeTenantConfig(

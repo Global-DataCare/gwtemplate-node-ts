@@ -3,6 +3,7 @@ import type { IVaultRepository } from '../database/repositories/vault/vault.repo
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import type { IDiscoveryTenantRegistry } from '../managers/IDiscoveryTenantRegistry';
 import type { EntityConfig } from '../gdc-backend-utils-node/models/entity';
+import type { DidDocument } from 'gdc-common-utils-ts/models/did';
 import { getEnvSectionId } from '../utils/section-env';
 
 export type ControllerBindingStatus = 'required' | 'credential_issued' | 'dcr_active' | 'inconsistent';
@@ -68,9 +69,11 @@ export class TenantStatusService {
       getEnvSectionId('device-licenses'),
     );
 
+    const employees = await Promise.all(employeeDocs.map((document) => this.safeUnprotect<EntityConfig>(document, vaultId)));
     const controllers = await Promise.all(controllerDids.map(async (did) => {
-      const stored = employeeDocs.find((document) => document.id === did);
-      const employee = stored ? await this.safeUnprotect<EntityConfig>(stored, vaultId) : undefined;
+      const employee = employees.find((candidate) => (
+        candidate?.id === did || candidate?.didDocument?.id === did
+      ));
       const didDocument = employee?.didDocument;
       const actorIdentifier = String(employee?.claims?.[SAME_AS_CLAIM] || '').trim();
       const dcrActive = actorIdentifier && licenses.some((document) => {
@@ -106,6 +109,36 @@ export class TenantStatusService {
       controllers,
       ...(tenant.meta?.lastUpdated ? { updatedAt: String(tenant.meta.lastUpdated) } : {}),
     };
+  }
+
+  /**
+   * Resolves one public controller DID document from the authoritative tenant
+   * controller list and the separately protected employee records. Historical
+   * single-controller metadata remains a read-only compatibility fallback.
+   */
+  public async resolveControllerDidDocument(
+    vaultId: string,
+    memberId: string,
+    role: string,
+  ): Promise<DidDocument | undefined> {
+    const tenant = await this.tenants.getTenant(vaultId);
+    if (!tenant) return undefined;
+    const suffix = `:employee:${String(memberId).trim()}:${String(role).trim()}`;
+    const controllerDid = this.asStrings(tenant.didDocument?.controller)
+      .find((did) => did.endsWith(suffix));
+    if (!controllerDid) return undefined;
+
+    const collectionName = await this.tenants.getCollectionName(vaultId);
+    const employeeDocs = collectionName
+      ? await this.safeList(collectionName, getEnvSectionId('employees'))
+      : [];
+    for (const document of employeeDocs) {
+      const employee = await this.safeUnprotect<EntityConfig>(document, vaultId);
+      if (employee?.didDocument?.id === controllerDid) return employee.didDocument;
+    }
+
+    const compatibilityDocument = tenant.meta?.controllerDidDocument as DidDocument | undefined;
+    return compatibilityDocument?.id === controllerDid ? compatibilityDocument : undefined;
   }
 
   private projectKids(didDocument: EntityConfig['didDocument'] | undefined): TenantControllerStatus['kids'] {

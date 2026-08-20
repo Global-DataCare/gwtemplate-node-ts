@@ -5,6 +5,9 @@ import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confiden
 import type { ParameterData } from 'gdc-common-utils-ts/models/params';
 import type { JwkSet } from 'gdc-common-utils-ts/models/jwk';
 import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
+import { buildProfessionalDidWeb } from 'gdc-common-utils-ts/utils/did';
+import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
@@ -34,6 +37,7 @@ export type ControllerRegistrationKeys = Readonly<{
 type BuildControllerEntityConfigDeps = Readonly<{
   legalRep: IncludedResource;
   tenantUrn: string;
+  hostedTenantDid: string;
   kmsService: IKmsService;
   mergeActivationJwks: (keys: Array<PublicJwk | undefined>, jwks?: JwkSet) => JwkSet;
   findJwkByUse: (jwks: JwkSet | undefined, use: 'sig' | 'enc') => PublicJwk | undefined;
@@ -56,6 +60,11 @@ type StoreControllerEntityConfigDeps = Readonly<{
  * Builds the synthetic bootstrap controller employee used during tenant
  * onboarding.
  *
+ * Legacy identity contract: `legalRep` is the actor that registered the
+ * organization and owns the supplied JWK. A different technical controller
+ * merely designated in signed organization evidence is not built here and
+ * must later bind its own JWK through the sector `_issue` and DCR flow.
+ *
  * Required input claims on `legalRep.meta.claims`:
  * - `Person.email`
  * - `Person.hasOccupation`
@@ -72,6 +81,9 @@ export async function buildControllerEntityConfig(
   const parsedTenantUrn = parseTenantUrn(deps.tenantUrn);
   if (!parsedTenantUrn) {
     throw new ManagerError(`Invalid tenant URN format: '${deps.tenantUrn}'`, IssueType.Value);
+  }
+  if (!deps.hostedTenantDid.startsWith('did:web:')) {
+    throw new ManagerError(`Invalid hosted tenant DID: '${deps.hostedTenantDid}'`, IssueType.Value);
   }
 
   const employeeUrn = createEmployeeUrn({
@@ -102,10 +114,24 @@ export async function buildControllerEntityConfig(
   signerJwk = { ...signerJwk, kid: toJwkThumbprintSha256Urn(signerJwk as any) } as PublicJwk;
   encrypterJwk = { ...encrypterJwk, kid: toJwkThumbprintSha256Urn(encrypterJwk as any) } as PublicJwk;
 
-  const didId = deps.explicitBinding?.did || employeeUrn;
+  // The URN above is an internal storage/continuity alias. Public controllers
+  // are always real did:web identifiers built with the shared SDK algorithm.
+  // Portal-specific card/profile DIDs are aliases. They must not replace the
+  // operational controller DID published and verified by this GW.
+  const didId = buildProfessionalDidWeb({
+    organizationDidWeb: deps.hostedTenantDid,
+    email,
+    role: HealthcareActorRoles.Controller,
+  });
+  const presentedDid = String(deps.explicitBinding?.did || '').trim();
+  if (presentedDid && !presentedDid.startsWith('did:web:')) {
+    throw new ManagerError('Presented controller alias must use a did:web identifier.', IssueType.Value);
+  }
+  const actorSameAs = normalizeSameAsHash(deps.explicitBinding?.sameAs || email);
   const alsoKnownAs = Array.from(new Set([
-    didId !== employeeUrn ? employeeUrn : undefined,
-    deps.explicitBinding?.sameAs,
+    employeeUrn,
+    presentedDid && presentedDid !== didId ? presentedDid : undefined,
+    actorSameAs,
   ].filter((value): value is string => Boolean(value))));
 
   const mergedJwks = {
@@ -161,10 +187,15 @@ export async function buildControllerEntityConfig(
   const signerMethodId = verificationMethods.find((method) => (method.publicKeyJwk as any)?.kid === signerJwk?.kid)?.id;
 
   return {
-    id: deps.legalRep.id,
+    id: didId,
     type: EntityType.Person,
     status: EntityLifecycleStatus.Active,
-    claims: deps.legalRep.meta?.claims || {},
+    claims: {
+      ...(deps.legalRep.meta?.claims || {}),
+      [ClaimsPersonSchemaorg.identifier]: didId,
+      [ClaimsPersonSchemaorg.additionalType]: HealthcareActorRoles.Controller,
+      [ClaimsPersonSchemaorg.sameAs]: actorSameAs,
+    },
     didDocument: {
       ...didDocument,
       authentication: signerMethodId ? [signerMethodId] : didDocument.authentication,
