@@ -374,7 +374,28 @@ export function createApiRouter(
   // --- ASYNC JOB POLLING ENDPOINT (MUST BE DEFINED BEFORE THE GENERIC SUBMISSION ENDPOINT) ---
 
   const pollingHandler = async (req: express.Request, res: express.Response) => {
-    const thid = (req.method === 'POST' ? req.body.thid : req.query.thid) as string | undefined;
+    let thid = String(req.method === 'POST' ? req.body?.thid || '' : req.query.thid || '').trim();
+
+    // Secure submit and poll requests use the same form-encoded JWE contract.
+    // The SDK therefore protects `{ thid }` inside `request=<JWE>` instead of
+    // leaking the correlation identifier as an extra plaintext form field.
+    if (!thid && req.method === 'POST' && parseIncomingContentType(normalizeContentType(req.headers['content-type'])) === 'secure-form') {
+      const compactJwe = String(req.body?.request || '').trim();
+      if (compactJwe) {
+        try {
+          const decodedPoll = await kmsService.decodeRequest(compactJwe);
+          thid = String(decodedPoll.content?.thid || '').trim();
+        } catch (error: any) {
+          return sendDidcommEarlyError(
+            req,
+            res,
+            400,
+            IssueType.Security,
+            `Failed to process secure polling request: ${error?.message || 'JWE decoding failed.'}`,
+          );
+        }
+      }
+    }
 
     if (!thid) {
       return sendDidcommEarlyError(
@@ -848,6 +869,10 @@ export function createApiRouter(
    *       - $ref: '#/components/parameters/HostRegistrySector'
    *       - $ref: '#/components/parameters/Thid'
    *     requestBody:
+   *       description: |
+   *         Plain JSON polling sends `{ "thid": "..." }`. Secure polling
+   *         protects that same object inside form field `request=<JWE>`; it
+   *         does not expose `thid` as a second plaintext form field.
    *       required: true
    *       content:
    *         application/json:
@@ -858,10 +883,7 @@ export function createApiRouter(
    *               $ref: '#/components/examples/AsyncPollRequest'
    *         application/x-www-form-urlencoded:
    *           schema:
-   *             $ref: '#/components/schemas/AsyncPollRequest'
-   *           examples:
-   *             message:
-   *               $ref: '#/components/examples/AsyncPollRequest'
+   *             $ref: '#/components/schemas/SecureRequest'
    *     security:
    *       - BearerAuth: []
    *     responses:

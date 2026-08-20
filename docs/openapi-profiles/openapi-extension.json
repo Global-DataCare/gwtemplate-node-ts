@@ -3472,6 +3472,7 @@
           }
         ],
         "requestBody": {
+          "description": "Plain JSON polling sends `{ \"thid\": \"...\" }`. Secure polling\nprotects that same object inside form field `request=<JWE>`; it\ndoes not expose `thid` as a second plaintext form field.\n",
           "required": true,
           "content": {
             "application/json": {
@@ -3486,12 +3487,7 @@
             },
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/AsyncPollRequest"
-              },
-              "examples": {
-                "message": {
-                  "$ref": "#/components/examples/AsyncPollRequest"
-                }
+                "$ref": "#/components/schemas/SecureRequest"
               }
             }
           }
