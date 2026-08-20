@@ -122,9 +122,17 @@ export class DemoKmsService implements IKmsService {
     const parts = message.split('.');
     
     if (parts.length === 5) {
-      // This is a simulated Compact JWE. The payload is the 4th part (index 3).
-      console.warn(`[DemoKmsService] Detected simulated Compact JWE format.`);
       const protectedHeader = Content.base64UrlSafeToJSON(parts[0]);
+      const isSimulatedEnvelope = (protectedHeader as { alg?: string; enc?: string }).alg === 'none'
+        && (protectedHeader as { alg?: string; enc?: string }).enc === 'none';
+      if (!isSimulatedEnvelope) {
+        console.warn('[DemoKmsService] Delegating standards-based Compact JWE decryption.');
+        return this._realKmsService.decodeRequest(message);
+      }
+      // Only alg=none/enc=none is the explicit simulated Compact JWE. A
+      // standards-based five-part JWE must never have its ciphertext decoded
+      // directly as UTF-8 JSON.
+      console.warn(`[DemoKmsService] Detected simulated Compact JWE format.`);
       const payload = Content.base64UrlSafeToJSON(parts[3]);
                   // ARCHITECTURE: This function must be tolerant to handle multiple JWE formats
       // to support both new (standard) and legacy (non-standard) test clients.
@@ -168,6 +176,13 @@ export class DemoKmsService implements IKmsService {
   }
 
   async encodeResponse(payload: any, recipientJwks: JWK[], senderId: string): Promise<string> {
+    const hasStandardsBasedRecipient = recipientJwks.some((jwk) => Boolean(
+      jwk?.kty && ((jwk as any).pub || (jwk as any).x || (jwk as any).n),
+    ));
+    if (hasStandardsBasedRecipient) {
+      console.warn('[DemoKmsService] Delegating standards-based Compact JWE encryption.');
+      return this._realKmsService.encodeResponse(payload, recipientJwks, senderId);
+    }
     console.warn(`[DemoKmsService] Bypassing encryption. Returning Compact JWE representation.`);
     
     // This simulates the JARM response format (response=<JWE>) by creating a structurally valid

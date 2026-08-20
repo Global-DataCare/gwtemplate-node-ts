@@ -70,13 +70,24 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
       return false;
     }
 
-    const resourceAllowed = String(service.serviceEndpoint || '')
+    const configuredResources = String(service.serviceEndpoint || '')
       .split(',')
-      .map((r) => r.trim().toLowerCase())
-      .includes(normalizedResourceType);
+      .map((r) => r.trim().toLowerCase());
+    const actions = service.actions || [];
+    const legacyEmployeeLicenseInventorySelection =
+      normalizedSection === 'entity' &&
+      normalizedFormat === 'org.schema' &&
+      normalizedResourceType === 'license' &&
+      normalizedAction === '_search' &&
+      configuredResources.includes('employee') &&
+      actions.includes('_search');
+    // Historical tenants published Employee/_search before the associated
+    // controller licence inventory endpoint was added. Keep that exact read
+    // available without widening any mutation capability.
+    const resourceAllowed = configuredResources.includes(normalizedResourceType)
+      || legacyEmployeeLicenseInventorySelection;
     if (!resourceAllowed) return false;
 
-    const actions = service.actions || [];
     const legacyDigitalTwinWorkingSelection =
       normalizedSection === 'digitaltwin' &&
       normalizedResourceType === 'composition' &&
@@ -85,7 +96,9 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
     // Existing tenants may predate the explicit Composition/_batch service
     // declaration. A tenant that already exposes digital-twin Composition
     // search also exposes the researcher working-selection persistence step.
-    const actionAllowed = actions.includes(normalizedAction) || legacyDigitalTwinWorkingSelection;
+    const actionAllowed = actions.includes(normalizedAction)
+      || legacyDigitalTwinWorkingSelection
+      || legacyEmployeeLicenseInventorySelection;
     return actionAllowed;
   });
 }

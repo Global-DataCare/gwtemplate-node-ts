@@ -2651,6 +2651,17 @@
 
 ## Unreleased
 
+- Publish the organization-controller `License/_search` capability for new
+  tenants and retain that exact read-only inventory operation for historical
+  tenants that already exposed `Employee/_search`. This prevents failed seat
+  discovery from being presented as an authoritative zero without widening
+  licence mutations.
+- In compatibility/demo deployments, delegate standards-based compact JWE
+  requests and responses to the real KMS implementation. The simulated
+  ciphertext-as-JSON path now applies only to explicit
+  `alg=none`/`enc=none` envelopes, preventing real encrypted controller
+  operations from failing with UTF-8 decoding errors.
+
   revocable employee signer registry until DID publication, and preserve the
   single postal code through Order, exchange and DCR using its protected VC
   binding.

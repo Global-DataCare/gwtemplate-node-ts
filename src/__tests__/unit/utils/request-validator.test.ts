@@ -222,6 +222,26 @@ describe('isRequestValid', () => {
     expect(isRequestValid(mockServices, params)).toBe(true);
   });
 
+  it('keeps employee licence inventory readable for historical tenant service declarations', () => {
+    expect(isRequestValid(mockServices, {
+      sector: Sector.HEALTH_CARE,
+      section: 'entity',
+      format: 'org.schema',
+      resourceType: 'License',
+      action: '_search',
+    })).toBe(true);
+  });
+
+  it('does not widen historical employee search into licence mutations', () => {
+    expect(isRequestValid(mockServices, {
+      sector: Sector.HEALTH_CARE,
+      section: 'entity',
+      format: 'org.schema',
+      resourceType: 'License',
+      action: '_issue',
+    })).toBe(false);
+  });
+
   it('should return TRUE for registry Offer _search', () => {
     const params = {
       sector: 'test',
