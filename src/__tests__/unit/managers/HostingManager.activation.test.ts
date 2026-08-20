@@ -9,6 +9,7 @@ import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import {
   ClaimsOfferSchemaorg,
@@ -551,6 +552,11 @@ describe('HostingManager activation flow', () => {
    * own sector `_issue`/DCR and must survive representative re-registration.
    */
   it('keeps the deployment-authorized historical representative as first controller without legacy RESPRSN', async () => {
+    const putSpy = jest.spyOn(vaultRepository, 'put');
+    let generatedId = 0;
+    (uuidv4 as jest.Mock).mockImplementation(
+      () => `00000000-0000-4000-8000-${String(generatedId += 1).padStart(12, '0')}`,
+    );
     const job = buildActivationJob();
     const credential = (job.content!.body as any).representativeCredential;
     credential.id = 'urn:example:credential:historical-representative';
@@ -641,6 +647,20 @@ describe('HostingManager activation flow', () => {
       const rotatedMethods = (afterRotation[0] as any).content?.didDocument?.verificationMethod || [];
       expect(rotatedMethods.some((method: any) => method.publicKeyJwk?.pub === 'controller-sig-pub-rotated')).toBe(true);
       expect(rotatedMethods.map((method: any) => method.publicKeyJwk?.kid)).not.toEqual(oldKids);
+      const employeeSeats = await vaultRepository.getContainersInSection(
+        tenantVaultId,
+        getEnvSectionId('device-licenses'),
+      );
+      expect(putSpy).toHaveBeenCalledWith(
+        tenantVaultId,
+        expect.any(Array),
+        getEnvSectionId('device-licenses'),
+      );
+      expect(employeeSeats).toHaveLength(2);
+      expect(employeeSeats.filter((doc) =>
+        ((doc as ConfidentialStorageDoc).content as DeviceLicense)?.issuedToEmail
+          === claims[ClaimsPersonSchemaorg.email],
+      )).toHaveLength(1);
     } finally {
       delete process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER;
     }

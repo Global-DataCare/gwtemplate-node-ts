@@ -14,7 +14,7 @@ describe('fhir-resource-rehydration utils', () => {
       'MedicationStatement.code-text': 'Aspirina',
       'MedicationStatement.code': 'http://snomed.info/sct|123',
       'MedicationStatement.user-selected': 'true',
-      'MedicationStatement.effectiveDateTime': '2026-01-01T00:00:00Z',
+      'MedicationStatement.effective': '2026-01-01T00:00:00Z',
       'MedicationStatement.language': 'es',
     });
 

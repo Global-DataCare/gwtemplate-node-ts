@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [1.21.19] - 2026-08-20
+
+- Read and persist employee records in the tenant's resolved physical
+  collection while keeping licences in the logical tenant vault.
+- Keep employee creation and licence issuance as separate operations so
+  create-plus-issue returns the activation credential reliably.
+- Reconcile legacy representative re-registration to two employee seats
+  without replacing technical controllers, synchronize outer and inner active
+  licence status, and default new organization offers to two seats.
+- Raise the default per-seat installation allowance from two to five
+  independently revocable device/channel bindings.
 ## [1.21.18] - 2026-08-20
 
 - Add deployment-wide `HOST_LEGACY_REPRESENTATIVE_CONTROLLER` compatibility

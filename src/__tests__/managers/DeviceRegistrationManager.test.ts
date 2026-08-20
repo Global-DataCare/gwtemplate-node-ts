@@ -134,9 +134,10 @@ describe('DeviceRegistrationManager', () => {
       );
       const updatedContent = (updatedLicense?.content || {}) as DeviceLicense;
       expect(updatedContent.deviceId).toBe(resource.client_id);
-      expect((updatedContent as any).maxDevices).toBe(2);
+      expect((updatedContent as any).maxDevices).toBe(5);
       expect((updatedContent as any).deviceBindings).toHaveLength(1);
       expect(updatedContent.status).toBe('active');
+      expect(updatedLicense?.status).toBe('active');
     });
 
     it('should keep two devices and both key sets active for the same employee seat', async () => {

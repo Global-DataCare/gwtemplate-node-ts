@@ -18,5 +18,8 @@ export const LICENSE_STATUS_AVAILABLE = 'available';
 export const LICENSE_STATUS_ISSUED = 'issued';
 export const LICENSE_STATUS_ACTIVE = 'active';
 
+/** Default number of independently revocable channel/device installations per actor seat. */
+export const DEFAULT_LICENSE_DEVICE_ALLOWANCE = 5;
+
 export const LICENSE_CATEGORY_PROFESSIONAL = 'professional';
 export const LICENSE_CATEGORY_INDIVIDUAL = 'individual';

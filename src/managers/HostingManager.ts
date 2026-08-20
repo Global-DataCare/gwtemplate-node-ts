@@ -17,7 +17,7 @@ import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { DidCommDecodedMetadata, IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsIndividualProductSchemaorg, ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
@@ -44,6 +44,13 @@ import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import type { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { issueActivationCodeFromPool } from '../utils/license-issuance';
+import {
+  LICENSE_STATUS_ACTIVE,
+  LICENSE_STATUS_AVAILABLE,
+  LICENSE_STATUS_ISSUED,
+  LICENSE_TYPE_MOBILE,
+  LICENSE_USER_CLASS_EMPLOYEE,
+} from '../constants/domain';
 import { shouldUseFabricLedger } from '../adapters/credential-ledger-resolver';
 import { registerControllerKeysOnLedger } from '../utils/ledger-device-registration';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
@@ -1005,11 +1012,95 @@ export class HostingManager {
       await this.vaultRepository.createNewVault({ id: tenantCollectionName });
     }
     await this.storeControllerEntityConfig(controllerConfig, tenantCollectionName, vaultId);
+    const representativeActivationCode = await this.reconcileLegacyRepresentativeEmployeeSeats({
+      tenantVaultId: vaultId,
+      tenantId: alternateName,
+      claims: normalizedClaims,
+    });
     await this.tenantsCacheManager.refreshTenant(vaultId);
     return {
       ...normalizedClaims,
       [ClaimsOrganizationSchemaorg.identifier]: tenantUrn,
+      ...(representativeActivationCode ? {
+        [ClaimsIndividualProductSchemaorg.serialNumber]: representativeActivationCode,
+        [ClaimsIndividualProductSchemaorg.category]: 'professional',
+      } : {}),
     };
+  }
+
+  /**
+   * Repairs the historical legal-organization onboarding invariant without
+   * replacing any independently registered controller or assigned seat.
+   *
+   * Legacy re-registration guarantees a two-seat employee pool: one seat may
+   * already belong to a technical controller and the verified representative
+   * receives the other. Replays reuse the representative's existing
+   * issued/active seat and never increase the pool beyond two.
+   */
+  private async reconcileLegacyRepresentativeEmployeeSeats(input: {
+    tenantVaultId: string;
+    tenantId: string;
+    claims: ClaimsRecord;
+  }): Promise<string | undefined> {
+    const sectionId = getEnvSectionId('device-licenses');
+    const all = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+      input.tenantVaultId,
+      sectionId,
+    ) || [];
+    const employeeSeats = all.filter((doc) => {
+      const license = doc.content as DeviceLicense | undefined;
+      return license?.userClass === LICENSE_USER_CLASS_EMPLOYEE;
+    });
+    const now = Math.floor(Date.now() / 1000);
+    const missing = Math.max(0, 2 - employeeSeats.length);
+    const created: ConfidentialStorageDoc[] = [];
+    for (let index = 0; index < missing; index += 1) {
+      const id = uuidv4();
+      const license: DeviceLicense = {
+        id,
+        tenantId: input.tenantId,
+        orderId: `legacy-default:${input.tenantId}`,
+        userClass: LICENSE_USER_CLASS_EMPLOYEE,
+        userCategory: 'default',
+        type: LICENSE_TYPE_MOBILE,
+        status: LICENSE_STATUS_AVAILABLE,
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        exp: now + 31_536_000,
+      };
+      created.push({ id, status: LICENSE_STATUS_AVAILABLE, sequence: 0, content: license });
+    }
+    if (created.length > 0) {
+      await this.vaultRepository.put(input.tenantVaultId, created, sectionId);
+      employeeSeats.push(...created);
+    }
+
+    const email = normalizeIndexedEmail(
+      String(input.claims[ClaimsPersonSchemaorg.email] || ''),
+    );
+    const role = getPersonOccupationClaim(input.claims);
+    if (!email || !role) return undefined;
+    const existing = employeeSeats.find((doc) => {
+      const license = doc.content as DeviceLicense | undefined;
+      return normalizeIndexedEmail(String(license?.issuedToEmail || '')) === email
+        && normalizeCodeSystemAndValue(String(license?.issuedToRole || ''))
+          === normalizeCodeSystemAndValue(role)
+        && (license?.status === LICENSE_STATUS_ISSUED || license?.status === LICENSE_STATUS_ACTIVE);
+    });
+    if (existing) {
+      return String((existing.content as DeviceLicense).activationCode || '').trim() || undefined;
+    }
+    const { activationCode } = await issueActivationCodeFromPool({
+      vaultRepository: this.vaultRepository,
+      kmsService: this.kmsService,
+      tenantVaultId: input.tenantVaultId,
+      userClass: LICENSE_USER_CLASS_EMPLOYEE,
+      type: LICENSE_TYPE_MOBILE,
+      email,
+      role,
+    });
+    return activationCode;
   }
 
   private async processOrganizationIssue(job: JobRequest): Promise<IDecodedDidcommPayload> {
@@ -1291,6 +1382,7 @@ export class HostingManager {
       buildControllerEntityConfig: this.buildControllerEntityConfig.bind(this),
       extractRegistrationKeys: this.extractRegistrationKeys.bind(this),
       storeControllerEntityConfig: this.storeControllerEntityConfig.bind(this),
+      reconcileLegacyRepresentativeEmployeeSeats: this.reconcileLegacyRepresentativeEmployeeSeats.bind(this),
       refreshTenant: this.tenantsCacheManager.refreshTenant.bind(this.tenantsCacheManager),
       registerDidDocumentWithIca: this.registerDidDocumentWithIca.bind(this),
       isLedgerRegistrationEnabled: this.isLedgerRegistrationEnabled.bind(this),
@@ -1319,8 +1411,14 @@ export class HostingManager {
     jurisdiction: string,
   ): ClaimsRecord {
     const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
+    const requestedEmployeeCount = Number(
+      claims[ClaimsOrganizationSchemaorg.numberOfEmployees],
+    );
+    const employeeCount = Number.isInteger(requestedEmployeeCount) && requestedEmployeeCount > 0
+      ? requestedEmployeeCount
+      : 2;
     const offerClaims = generateLicenseOffer(
-      claims[ClaimsOrganizationSchemaorg.numberOfEmployees] as number,
+      employeeCount,
       hostDid,
       jurisdiction,
       requestedSector,

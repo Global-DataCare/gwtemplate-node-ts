@@ -10,7 +10,7 @@ import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
-import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { RecordBase, ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { JwkSet } from '../../../gdc-backend-utils-node/models/jwk';
 import {
@@ -155,7 +155,7 @@ describe('EmployeeManager', () => {
       expect(response.iss).toBe(TENANT_URN);
     });
 
-    it('should return an Offer when employee licenses exist but none are available', async () => {
+    it('should leave seat issuance to the following License operation', async () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
       mockTenantsCacheManager.getTenantDid.mockResolvedValue('did:web:host.example.com');
@@ -179,18 +179,15 @@ describe('EmployeeManager', () => {
 
       const response = await employeeManager.process(job);
 
-      const entry = response.body.data[0] as any;
-      expect(entry.type).toBe('Employee-license-offer-v1.0');
-      expect(entry.meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeDefined();
-      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
-      expect(mockVaultRepository.put).toHaveBeenCalledWith(
-        HOST_COLLECTION_NAME,
-        expect.any(Array),
-        getEnvSectionId('communications'),
+      expect((response.body.data[0] as any).response.status).toBe('201');
+      expect(mockVaultRepository.getContainersInSection).not.toHaveBeenCalledWith(
+        TENANT_VAULT_ID,
+        getEnvSectionId('device-licenses'),
       );
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
     });
 
-    it('should consume an available employee license before creating the employee', async () => {
+    it('should not consume an available employee license before the explicit License issue step', async () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       mockVaultRepository.put.mockResolvedValue(true);
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
@@ -215,21 +212,11 @@ describe('EmployeeManager', () => {
 
       const response = await employeeManager.process(job);
 
-      // First `put` consumes the license; second `put` persists the employee.
-      expect(mockVaultRepository.put).toHaveBeenCalledTimes(2);
-      const consumeCall = mockVaultRepository.put.mock.calls[0];
-      expect(consumeCall[0]).toBe(TENANT_VAULT_ID);
-      expect(consumeCall[2]).toBe(getEnvSectionId('device-licenses'));
-      const consumedLicense = (consumeCall[1] as ConfidentialStorageDoc[])[0]
-        .content as DeviceLicense;
-      expect(consumedLicense.subjectId).toBe(MOCKED_OCCUPATION_UUID);
-      expect(consumedLicense.issuedToEmail).toBe(
-        testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email],
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+      expect(mockVaultRepository.getContainersInSection).not.toHaveBeenCalledWith(
+        TENANT_VAULT_ID,
+        getEnvSectionId('device-licenses'),
       );
-      expect(consumedLicense.issuedToRole).toBe(
-        testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.hasOccupation],
-      );
-
       expect(response.body.data[0].response.status).toBe('201');
     });
 
@@ -388,6 +375,7 @@ describe('EmployeeManager', () => {
         ],
       } as any;
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockTenantsCacheManager.getCollectionName.mockResolvedValue('physical-tenant-collection');
       mockVaultRepository.getContainersInSection.mockResolvedValue([
         {
           id: 'employee-search-hit',
@@ -417,6 +405,14 @@ describe('EmployeeManager', () => {
 
       const response = await employeeManager.process(job);
 
+      expect(mockVaultRepository.getContainersInSection).toHaveBeenCalledWith(
+        'physical-tenant-collection',
+        getEnvSectionId('employees'),
+      );
+      expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledWith(
+        expect.any(Object),
+        TENANT_VAULT_ID,
+      );
       expect(response.body.data[0].type).toBe('Employee-search-response-v1.0');
       expect((response.body.data[0] as any).resource.total).toBe(1);
       expect((response.body.data[0] as any).resource.data[0].id).toBe('employee-search-hit');

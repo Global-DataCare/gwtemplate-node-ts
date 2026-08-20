@@ -4200,7 +4200,7 @@
           "2.1.4 License Issuance (Invite)"
         ],
         "summary": "Issue (reserve) an activation code from the tenant license pool (async)",
-        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_issue`.\nThis `identity/openid` route is maintained as a temporary compatibility alias.\n\nTenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role\nand returns the seat activation credential for subsequent `Token/_exchange`.\nThe same credential can activate distinct installations up to `maxDevices`\n(two by default); it does not consume another employee seat.\n",
+        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_issue`.\nThis `identity/openid` route is maintained as a temporary compatibility alias.\n\nTenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role\nand returns the seat activation credential for subsequent `Token/_exchange`.\nThe same credential can activate distinct installations up to `maxDevices`\n(five by default); it does not consume another employee seat.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

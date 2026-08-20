@@ -103,6 +103,11 @@ type ActivationDeps = Readonly<{
   ) => Promise<EntityConfig>;
   extractRegistrationKeys: (jobMeta?: DidCommDecodedMetadata) => { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk };
   storeControllerEntityConfig: (controllerConfig: EntityConfig, tenantCollectionName: string, vaultId: string) => Promise<void>;
+  reconcileLegacyRepresentativeEmployeeSeats: (input: {
+    tenantVaultId: string;
+    tenantId: string;
+    claims: ClaimsRecord;
+  }) => Promise<string | undefined>;
   refreshTenant: (vaultId: string) => Promise<unknown>;
   registerDidDocumentWithIca: (params: {
     vpToken: string;
@@ -360,6 +365,11 @@ async function processActivationEntry(
       await deps.vaultRepository.createNewVault({ id: tenantCollectionName });
     }
     await deps.storeControllerEntityConfig(controllerConfig, tenantCollectionName, vaultId);
+    const representativeActivationCode = await deps.reconcileLegacyRepresentativeEmployeeSeats({
+      tenantVaultId: vaultId,
+      tenantId: alternateName,
+      claims: processedClaims,
+    });
     await deps.refreshTenant(vaultId);
 
     return {
@@ -368,6 +378,10 @@ async function processActivationEntry(
         claims: {
           ...processedClaims,
           'org.schema.Organization.did': storedDid.id,
+          ...(representativeActivationCode ? {
+            'org.schema.IndividualProduct.serialNumber': representativeActivationCode,
+            'org.schema.IndividualProduct.category': 'professional',
+          } : {}),
           'org.schema.Action.clearingHouse.acr': clearingResult.acr,
           'org.schema.Action.clearingHouse.ledgerVerified': String(clearingResult.ledgerVerified),
           'org.schema.Action.activation.networkMode': trustResult.trustPolicy.networkMode,

@@ -49,7 +49,7 @@ const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
 export class EmployeeManager {
   private vaultRepository: IVaultRepository;
   private kmsService: IKmsService;
-  private tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn'>;
+  private tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn' | 'getCollectionName'>;
   private tenantDidRegistryMutator: ITenantDidRegistryMutator;
   private hostRuntime: IHostRuntime;
 
@@ -72,7 +72,7 @@ export class EmployeeManager {
   constructor(
     vaultRepository: IVaultRepository,
     kmsService: IKmsService,
-    tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn'>,
+    tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn' | 'getCollectionName'>,
     tenantDidRegistryMutator: ITenantDidRegistryMutator,
     hostRuntime: IHostRuntime,
   ) {
@@ -100,6 +100,7 @@ export class EmployeeManager {
     if (!issuerUrn) {
       throw new ManagerError(`Tenant with ID '${job.tenantId}' not found.`, IssueType.NotFound);
     }
+    const employeeCollectionName = await this.tenantsManager.getCollectionName(vaultId) || vaultId;
 
     if (!job.content.meta) {
       // This should ideally never happen if the request passed through the security layer.
@@ -107,7 +108,7 @@ export class EmployeeManager {
     }
 
     if (job.action === '_search') {
-      return this.processSearch(job, vaultId, issuerUrn);
+      return this.processSearch(job, employeeCollectionName, vaultId, issuerUrn);
     }
 
     const responseEntries: (BundleEntry | ErrorEntry)[] = [];
@@ -119,6 +120,7 @@ export class EmployeeManager {
           entry,
           job.action,
           vaultId,
+          employeeCollectionName,
           String(job.tenantId || ''),
           issuerUrn,
           job.content.meta,
@@ -155,7 +157,8 @@ export class EmployeeManager {
 
   private async processSearch(
     job: JobRequest,
-    vaultId: string,
+    employeeCollectionName: string,
+    tenantVaultId: string,
     issuerUrn: string,
   ): Promise<IDecodedDidcommPayload> {
     const body = job.content?.body as any;
@@ -168,7 +171,7 @@ export class EmployeeManager {
 
     for (const entry of entries) {
       try {
-        responseEntries.push(await this.processSearchEntry(vaultId, entry));
+        responseEntries.push(await this.processSearchEntry(employeeCollectionName, tenantVaultId, entry));
       } catch (error: any) {
         responseEntries.push(this.handleError(error, 'Employee-search-response-v1.0', entry?.meta));
       }
@@ -190,9 +193,13 @@ export class EmployeeManager {
     };
   }
 
-  private async processSearchEntry(vaultId: string, entry: any): Promise<BundleEntry> {
+  private async processSearchEntry(
+    employeeCollectionName: string,
+    tenantVaultId: string,
+    entry: any,
+  ): Promise<BundleEntry> {
     const filters = extractSearchFiltersFromEntry(entry, 'Employee');
-    const matches = await this.searchEmployees(vaultId, filters);
+    const matches = await this.searchEmployees(employeeCollectionName, tenantVaultId, filters);
 
     return {
       type: 'Employee-search-response-v1.0',
@@ -205,17 +212,18 @@ export class EmployeeManager {
   }
 
   private async searchEmployees(
-    vaultId: string,
+    employeeCollectionName: string,
+    tenantVaultId: string,
     filters: Record<string, string[]>,
   ): Promise<Array<Record<string, unknown>>> {
     const docs =
-      (await this.vaultRepository.getContainersInSection<any>(vaultId, EMPLOYEE_SECTION)) || [];
+      (await this.vaultRepository.getContainersInSection<any>(employeeCollectionName, EMPLOYEE_SECTION)) || [];
     const matches: Array<Record<string, unknown>> = [];
 
     for (const doc of docs) {
       if (!doc?.content && !doc?.jwe) continue;
       try {
-        const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(doc, vaultId);
+        const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(doc, tenantVaultId);
         if (!employee?.claims || employee.type !== EntityType.Person) continue;
         if (!this.matchesEmployeeFilters(employee, filters)) continue;
 
@@ -261,7 +269,8 @@ export class EmployeeManager {
   private async processEntry(
     entry: BundleEntry,
     action: string | undefined,
-    vaultId: string,
+    tenantVaultId: string,
+    employeeCollectionName: string,
     tenantId: string,
     tenantUrn: string,
     meta: IDecodedDidcommPayload['meta'],
@@ -286,14 +295,14 @@ export class EmployeeManager {
     switch (request.method) {
       case 'POST':
         if (action === ACTION_PURGE) {
-          return this.purgeEmployee(vaultId, employeeId, claims || {}, type);
+          return this.purgeEmployee(employeeCollectionName, tenantVaultId, employeeId, claims || {}, type);
         }
         if (!claims) {
           throw new ManagerError('Entry requires meta.claims.', IssueType.Required);
         }
-        return this.createEmployee(vaultId, tenantId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction);
+        return this.createEmployee(tenantVaultId, employeeCollectionName, tenantId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction);
       case 'DELETE':
-        return this.disableEmployee(vaultId, employeeId, type);
+        return this.disableEmployee(employeeCollectionName, tenantVaultId, employeeId, type);
       default:
         throw new ManagerError(`Unsupported request method: '${request.method}'`, IssueType.NotSupported);
     }
@@ -312,7 +321,8 @@ export class EmployeeManager {
   }
 
   private async createEmployee(
-    vaultId: string,
+    tenantVaultId: string,
+    employeeCollectionName: string,
     tenantId: string,
     tenantUrn: string,
     employeeId: string,
@@ -336,9 +346,9 @@ export class EmployeeManager {
       throw new ManagerError('Missing or invalid hasOccupation claim.', IssueType.Required);
     }
 
-    const existingEmployee = await this.findEmployeeByEmailAndRole(vaultId, email, roleCode);
+    const existingEmployee = await this.findEmployeeByEmailAndRole(employeeCollectionName, tenantVaultId, email, roleCode);
     if (existingEmployee) {
-      return this.upsertExistingEmployee(existingEmployee, vaultId, claims, entryType);
+      return this.upsertExistingEmployee(existingEmployee, employeeCollectionName, tenantVaultId, claims, entryType);
     }
 
     const parsedTenantUrn = parseTenantUrn(tenantUrn);
@@ -357,17 +367,6 @@ export class EmployeeManager {
       role: roleCode,
       instanceId: employeeId,
     });
-
-    const licenseOffer = await this.tryConsumeEmployeeSeatOrOffer({
-      vaultId,
-      tenantId,
-      employeeId,
-      email,
-      role: roleCode,
-      sector: sector || 'health-care',
-      jurisdiction: jurisdiction || 'us',
-    });
-    if (licenseOffer) return licenseOffer;
 
     // The flow for obtaining the employee's public keys depends on the request type.
     if (contentType?.includes('json')) {
@@ -430,8 +429,8 @@ export class EmployeeManager {
     
     // Also add these keys to the parent tenant's DID Document for resolution.
     // This allows others to find the employee's keys by querying the tenant's DID.
-    this.tenantDidRegistryMutator.addVerificationMethodToTenant(vaultId, verificationMethods[0]);
-    this.tenantDidRegistryMutator.addVerificationMethodToTenant(vaultId, verificationMethods[1]);
+    this.tenantDidRegistryMutator.addVerificationMethodToTenant(tenantVaultId, verificationMethods[0]);
+    this.tenantDidRegistryMutator.addVerificationMethodToTenant(tenantVaultId, verificationMethods[1]);
 
     const employeeConfig: EntityConfig = {
       id: employeeId,
@@ -478,7 +477,7 @@ export class EmployeeManager {
       { name: 'kid', value: encrypterJwk.kid, unique: false, type: 'string'},
     ];
     
-    const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(attributesToIndex, vaultId);
+    const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(attributesToIndex, tenantVaultId);
 
     const docToProtect: ConfidentialStorageDoc = {
       id: employeeConfig.id,
@@ -492,8 +491,8 @@ export class EmployeeManager {
     };
     
     // The tenant's vaultId is used for the security context.
-    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
-    await this.vaultRepository.put(vaultId, [secureDoc, occupationDoc], EMPLOYEE_SECTION);
+    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, tenantVaultId);
+    await this.vaultRepository.put(employeeCollectionName, [secureDoc, occupationDoc], EMPLOYEE_SECTION);
 
     return {
       type: entryType,
@@ -515,7 +514,8 @@ export class EmployeeManager {
    * business identity must not create duplicates for the same role assignment.
    */
   private async findEmployeeByEmailAndRole(
-    vaultId: string,
+    employeeCollectionName: string,
+    tenantVaultId: string,
     email: string,
     roleCode: string,
   ): Promise<ConfidentialStorageDoc | undefined> {
@@ -524,8 +524,8 @@ export class EmployeeManager {
       { name: 'role', value: normalizeCodeSystemAndValue(roleCode), unique: false, type: 'token' },
     ];
 
-    const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(queryAttributes, vaultId);
-    const results = await this.vaultRepository.query(vaultId, {
+    const protectedAttributes = await this.kmsService.protectAttributesNameAndValue(queryAttributes, tenantVaultId);
+    const results = await this.vaultRepository.query(employeeCollectionName, {
       sectionId: EMPLOYEE_SECTION,
       where: protectedAttributes.map((attribute) => ({
         name: attribute.name,
@@ -538,7 +538,7 @@ export class EmployeeManager {
     let inactiveMatch: ConfidentialStorageDoc | undefined;
     for (const doc of candidates) {
       try {
-        const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(doc, vaultId);
+        const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(doc, tenantVaultId);
         if (this.isPurgedEmployee(employee)) continue;
         if (employee.status === EntityLifecycleStatus.Active) return doc;
         if (!inactiveMatch) inactiveMatch = doc;
@@ -560,11 +560,12 @@ export class EmployeeManager {
    */
   private async upsertExistingEmployee(
     employeeDoc: ConfidentialStorageDoc,
-    vaultId: string,
+    employeeCollectionName: string,
+    tenantVaultId: string,
     claims: ClaimsRecord,
     entryType: string,
   ): Promise<BundleEntry> {
-    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
+    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, tenantVaultId);
     const isActive = employee.status === EntityLifecycleStatus.Active;
 
     if (!isActive) {
@@ -586,8 +587,8 @@ export class EmployeeManager {
           deactivated: false,
         } as any,
       };
-      const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
-      await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);
+      const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, tenantVaultId);
+      await this.vaultRepository.put(employeeCollectionName, [secureDoc], EMPLOYEE_SECTION);
     }
 
     return {
@@ -674,13 +675,13 @@ export class EmployeeManager {
     await this.vaultRepository.put(this.hostRuntime.hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
   }
 
-  private async disableEmployee(vaultId: string, employeeId: string, entryType: string): Promise<BundleEntry> {
-    const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(vaultId, employeeId, EMPLOYEE_SECTION);
+  private async disableEmployee(employeeCollectionName: string, tenantVaultId: string, employeeId: string, entryType: string): Promise<BundleEntry> {
+    const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(employeeCollectionName, employeeId, EMPLOYEE_SECTION);
     if (!employeeDoc) {
       throw new ManagerError(`Employee with ID '${employeeId}' not found.`, IssueType.NotFound);
     }
 
-    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
+    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, tenantVaultId);
     employee.status = EntityLifecycleStatus.Inactive;
 
     const docToProtect: ConfidentialStorageDoc = {
@@ -694,8 +695,8 @@ export class EmployeeManager {
         deactivated: true,
       } as any,
     };
-    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
-    await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);
+    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, tenantVaultId);
+    await this.vaultRepository.put(employeeCollectionName, [secureDoc], EMPLOYEE_SECTION);
 
     return {
       type: entryType,
@@ -705,22 +706,23 @@ export class EmployeeManager {
   }
 
   private async purgeEmployee(
-    vaultId: string,
+    employeeCollectionName: string,
+    tenantVaultId: string,
     employeeId: string,
     claims: ClaimsRecord,
     entryType: string,
   ): Promise<BundleEntry> {
-    const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(vaultId, employeeId, EMPLOYEE_SECTION);
+    const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(employeeCollectionName, employeeId, EMPLOYEE_SECTION);
     if (!employeeDoc) {
       throw new ManagerError(`Employee with ID '${employeeId}' not found.`, IssueType.NotFound);
     }
 
-    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
+    const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, tenantVaultId);
     if (employee.status !== EntityLifecycleStatus.Inactive) {
       throw new ManagerError('Employee must be disabled before purge.', IssueType.Conflict);
     }
 
-    await this.releaseEmployeeLicenses(vaultId, employeeId, employee, claims);
+    await this.releaseEmployeeLicenses(tenantVaultId, employeeId, employee, claims);
 
     employee.meta = {
       ...(employee.meta || {}),
@@ -742,8 +744,8 @@ export class EmployeeManager {
         disposition: 'purged',
       } as any,
     };
-    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, vaultId);
-    await this.vaultRepository.put(vaultId, [secureDoc], EMPLOYEE_SECTION);
+    const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, tenantVaultId);
+    await this.vaultRepository.put(employeeCollectionName, [secureDoc], EMPLOYEE_SECTION);
 
     return {
       type: entryType,

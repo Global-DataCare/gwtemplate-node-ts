@@ -38,6 +38,20 @@ claiming that a binding exists.
 - Keep later service-controller `_issue`, activation code, `Token/_exchange`
   and `Device/_dcr` as distinct steps.
 
+## Preserve employee-seat and device boundaries
+
+- Existing-tenant legacy re-registration reconciles only the missing part of
+  the default two-seat employee pool and issues or reuses the verified
+  representative seat without replacing a technical controller or its seat.
+- Employee creation persists the employee only. The following explicit
+  licence-issue operation reserves the seat and returns the activation
+  credential; never consume the same seat in both operations.
+- Employee records use the resolved physical tenant collection while
+  device-licence records remain in the logical tenant vault.
+- One actor seat supports five active channel/device bindings by default.
+  Revoking one binding requires explicit portal confirmation and never releases
+  the employee seat; only purging an already suspended employee releases it.
+
 ## Protect personal data
 
 Never add a clear email, portal username, full name or contact-derived hash to
