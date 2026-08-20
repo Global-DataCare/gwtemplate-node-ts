@@ -38,9 +38,22 @@ import { buildGaiaXServiceOfferingCredentialDraft } from 'gdc-common-utils-ts/co
 
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { ILogger } from '../loggers/ILogger';
+import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
+import { TenantStatusService } from '../services/TenantStatusService';
 const STATUS_LIST_BITS = 16384;
 const STATUS_LIST_PURPOSE = 'revocation' as const;
 const STATUS_LIST_INDEX = 0;
+
+/**
+ * Restores canonical casing for VAT-based tenant route identifiers produced by
+ * older DID normalizers. Opaque non-VAT identifiers remain unchanged.
+ */
+function canonicalizeHostedTenantRouteId(tenantId: string): string {
+  const normalized = String(tenantId || '').trim();
+  return /^vat[a-z]{2}[-a-z0-9._]+$/i.test(normalized)
+    ? normalized.toUpperCase()
+    : normalized;
+}
 
 /**
  * Creates the router for synchronous, public discovery endpoints.
@@ -55,8 +68,10 @@ export function createDiscoveryRouter(
   discoveryService: DiscoveryService,
   kmsService: IKmsService,
   logger: ILogger,
+  vaultRepository: IVaultRepository,
 ): express.Router {
   const router = express.Router();
+  const tenantStatusService = new TenantStatusService(tenantsCacheManager, vaultRepository, kmsService);
   const toDatasetId = (publisherDid: string): string => encodeURIComponent(publisherDid);
 
   type ProviderDataset = {
@@ -724,7 +739,8 @@ export function createDiscoveryRouter(
       return res.status(400).type('text').send('Bad Request: A valid CDS path is required.');
     }
 
-    const vaultId = getTenantVaultId(sector, tenantId);
+    const canonicalTenantId = canonicalizeHostedTenantRouteId(tenantId);
+    const vaultId = getTenantVaultId(sector, canonicalTenantId);
     
     // Use the public getDidDocument method to check for the tenant's existence.
     // This avoids exposing the entire internal EntityConfig in the middleware.
@@ -758,6 +774,25 @@ export function createDiscoveryRouter(
     const didDocument = await tenantsCacheManager.getDidDocument(res.locals.vaultId);
     // The existence check was already done in resolveTenant, so we can be confident it exists.
     res.json(didDocument);
+  });
+
+  /**
+   * @openapi
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/tenant-status.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Read the safe tenant and controller lifecycle status
+   *     responses:
+   *       200:
+   *         description: Tenant lifecycle, controller DIDs, public kids and DCR state
+   *       404:
+   *         description: Tenant is not registered
+   */
+  router.get(`${tenantWellKnownPrefix}/tenant-status.json`, resolveTenant, async (_req, res) => {
+    const status = await tenantStatusService.build(res.locals.vaultId);
+    if (!status) return res.status(404).type('text').send('Not Found');
+    res.set('Cache-Control', 'no-store');
+    return res.json(status);
   });
 
   /** Resolves a controller DID document from its normal employee record. */

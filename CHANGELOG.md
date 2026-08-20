@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+- Add the safe public `/.well-known/tenant-status.json` projection for tenant
+  lifecycle, controller DIDs, public key identifiers and DCR state.
+- Resolve legacy lowercase `did:web` requests for VAT-based tenant paths
+  against their canonical uppercase tenant identifiers, without changing
+  opaque tenant paths or the returned DID document.
+- Keep the legacy representative-controller skill, route documentation and
+  examples deployment-neutral and free of product-specific identifiers.
 - Let an authorized tenant controller complete a two-phase administrative
   shutdown: tenant disable cascades suspension to employees, individual
   organizations, and members; tenant purge then cascades cleanup of remaining

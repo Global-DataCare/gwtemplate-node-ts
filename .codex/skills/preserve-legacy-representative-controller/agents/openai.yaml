@@ -1,0 +1,4 @@
+interface:
+  display_name: "Preserve legacy representative controller"
+  short_description: "Keep the legacy first controller on tenant creation"
+  default_prompt: "Use $preserve-legacy-representative-controller to preserve or audit a scoped legacy first controller without exposing personal data."

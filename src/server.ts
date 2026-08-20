@@ -337,7 +337,7 @@ async function startServer(options?: StartServerOptions) {
   // This is the FHIR-specific AuthorizationManager, not our AppAuthorizationManager.
   const authManager: IAuthorizationManager = options?.authManager || new SmartAuthorizationManager();
 
-  const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService, kmsService, logger);
+  const discoveryRouter = createDiscoveryRouter(tenantManager, discoveryService, kmsService, logger, vaultRepository);
 
   const authorityArtifacts: Record<string, ReturnType<typeof loadAuthorityArtifacts>> = {};
   const roles = new Set(config.localServiceRoles || []);

@@ -1,14 +1,14 @@
 ---
-name: preserve-unid-legacy-controller
-description: Preserve or audit the UNID historical legal-representative first controller during legacy tenant creation, while keeping later ServiceControllerCredential onboarding independent. Use for legacy _activate, _transaction plus Order, tenant DID controller arrays, activation-code or DCR failures, or GlobalDataCare and UNID portal channel separation where personal data must not enter technical artifacts.
+name: preserve-legacy-representative-controller
+description: Preserve or audit a scoped historical legal-representative first controller during legacy tenant creation, while keeping later ServiceControllerCredential onboarding independent. Use for legacy _activate, _transaction plus Order, tenant DID controller arrays, activation-code or DCR failures, or independent enrollment-channel separation where personal data must not enter technical artifacts.
 ---
 
-# Preserve UNID legacy controller
+# Preserve a scoped legacy representative controller
 
 ## Read first
 
 Read repository `AGENTS.md` and
-`docs/03-IDENTITY-AND-TRUST/03.K-UNID-LEGACY-CONTROLLER-COMPATIBILITY.md`.
+`docs/03-IDENTITY-AND-TRUST/03.K-LEGACY-REPRESENTATIVE-CONTROLLER-COMPATIBILITY.md`.
 Inspect the live tenant DID and controller DID endpoints before changing code or
 claiming that a binding exists.
 
@@ -56,10 +56,8 @@ public policy.
 6. Update route JSDoc, generated OpenAPI, identity/trust docs and changelog.
 7. Run targeted unit and integration tests, typecheck, skill validation and a
    changed-file scan for personal data.
-8. After the GW UNID change is merged to `main`, compare GW UNID and GW Core in
-   both directions. Port generic controller lifecycle fixes separately from
-   this UNID-only scope. Validate the later GW VetChain derivative from GW UNID
-   before copying proven generic behavior to other gateway products.
+8. Keep the reusable lifecycle behavior in GW Core and configure deployment
+   scopes only in the environment that still needs the historical contract.
 
 ## Required verification
 
@@ -68,6 +66,8 @@ public policy.
 - `_transaction` plus Order finalization creates the same reference.
 - Existing-tenant `_activate` and `_transaction` re-registration return success
   with one unchanged controller reference and no new Offer.
+- The public `tenant-status.json` projection moves from `required` to
+  `credential_issued` and then `dcr_active` without exposing contact data.
 - A tenant or sector outside the configured scope fails before activation;
   credential and signer failures remain governed by normal trust validation.
 - Canonical service-controller tests remain green.

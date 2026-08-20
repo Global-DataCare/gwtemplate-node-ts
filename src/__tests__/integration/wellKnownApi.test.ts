@@ -13,6 +13,7 @@ import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { parseTenantUrn } from '../../utils/urn';
 import { ILogger } from '../../loggers/ILogger';
+import type { IVaultRepository } from '../../database/repositories/vault/vault.repository';
 import { invokeExpress } from './helpers/invokeExpress';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { HostNetworkTypes } from 'gdc-common-utils-ts/constants/network';
@@ -44,7 +45,12 @@ const mockTenantsCacheManager = {
   getTenantSector: jest.fn(async () => 'health-care'),
   listAutodiscoverableTenants: jest.fn(),
   listRegisteredTenants: jest.fn(),
+  getCollectionName: jest.fn(async () => testTenant1VaultId),
 } as unknown as jest.Mocked<TenantsCacheManager>;
+
+const mockVaultRepository = {
+  getContainersInSection: jest.fn(async () => []),
+} as unknown as jest.Mocked<IVaultRepository>;
 
 // Create a fully typed mock of the IKmsService to satisfy the interface
 const mockKmsService: jest.Mocked<IKmsService> = {
@@ -76,7 +82,13 @@ const mockLogger = {
 const app = express();
 const discoveryService = new DiscoveryService(mockTenantsCacheManager);
 // Pass the mocked kmsService and logger to the router
-const discoveryRouter = createDiscoveryRouter(mockTenantsCacheManager, discoveryService, mockKmsService, mockLogger);
+const discoveryRouter = createDiscoveryRouter(
+  mockTenantsCacheManager,
+  discoveryService,
+  mockKmsService,
+  mockLogger,
+  mockVaultRepository,
+);
 app.use('/', discoveryRouter);
 
 describe('Well-Known DID Discovery API', () => {
@@ -120,6 +132,50 @@ describe('Well-Known DID Discovery API', () => {
     expect(mockTenantsCacheManager.getDidDocument).toHaveBeenCalledWith(testTenant1VaultId);
     // It's called twice: once in the middleware to check existence, once in the handler to get the data.
     expect(mockTenantsCacheManager.getDidDocument).toHaveBeenCalledTimes(2);
+  });
+
+  it('resolves a lowercase hosted VAT DID path against the canonical tenant', async () => {
+    const canonicalTenantId = 'VATES-B00000000';
+    const sector = DataspaceSectors.HealthResearch;
+    const canonicalVaultId = `${sector}_${canonicalTenantId}`;
+    const expectedDidDoc = {
+      id: `did:web:gateway.example:${canonicalTenantId}:cds-ES:v1:${sector}`,
+    } as DidDocument;
+    mockTenantsCacheManager.getDidDocument.mockImplementation(async (vaultId: string) => (
+      vaultId === canonicalVaultId ? expectedDidDoc : undefined
+    ));
+
+    const response = await invokeExpress(app, {
+      method: 'GET',
+      url: `/vates-b00000000/cds-es/v1/${sector}/.well-known/did.json`,
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.text)).toEqual(expectedDidDoc);
+    expect(mockTenantsCacheManager.getDidDocument).toHaveBeenCalledWith(canonicalVaultId);
+  });
+
+  it('publishes safe tenant status separately from the DID document', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const tenantDid = `did:web:gateway.example:${testTenant1AlternateName}:cds-${urnParts.jurisdiction}:${urnParts.version}:${urnParts.sector}`;
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: tenantDid } as DidDocument);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({
+      status: 'active',
+      didDocument: { id: tenantDid, controller: null },
+    } as any);
+
+    const response = await invokeExpress(app, {
+      method: 'GET',
+      url: `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/tenant-status.json`,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(JSON.parse(response.text)).toEqual(expect.objectContaining({
+      resourceType: 'OrganizationTenantStatus',
+      tenant: expect.objectContaining({ controllerBindingStatus: 'required' }),
+      controllers: [],
+    }));
   });
 
   it('resolves the public multikey controller did:web document separately from the tenant DID', async () => {
