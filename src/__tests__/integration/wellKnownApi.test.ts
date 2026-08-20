@@ -193,8 +193,13 @@ describe('Well-Known DID Discovery API', () => {
         { id: `${controllerDid}#pqc`, type: 'JsonWebKey2020', controller: controllerDid, publicKeyJwk: { kid: 'pqc', kty: 'AKP', alg: 'ML-DSA-65', pub: 'public' } },
       ],
     };
-    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: tenantDid } as any);
-    mockTenantsCacheManager.getEmployeeDidDocument.mockResolvedValue(controllerDidDocument);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({
+      didDocument: { id: tenantDid, controller: [controllerDid] },
+    } as any);
+    mockVaultRepository.getContainersInSection.mockResolvedValueOnce([{
+      id: 'historical-controller-record',
+      content: { id: controllerDid, didDocument: controllerDidDocument },
+    }] as any);
 
     const response = await invokeExpress(app, {
       method: 'GET',
@@ -203,7 +208,7 @@ describe('Well-Known DID Discovery API', () => {
 
     expect(response.status).toBe(200);
     expect(JSON.parse(response.text)).toEqual(controllerDidDocument);
-    expect(mockTenantsCacheManager.getEmployeeDidDocument).toHaveBeenCalledWith(testTenant1VaultId, controllerDid);
+    expect(mockVaultRepository.getContainersInSection).toHaveBeenCalled();
   });
 
   it('returns tenant-specific FHIR metadata that instantiates the UNID profile', async () => {

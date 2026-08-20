@@ -79,6 +79,47 @@ describe('TenantStatusService', () => {
     }));
   });
 
+  it('resolves a legacy employee container by its embedded controller DID', async () => {
+    tenants.getTenant.mockResolvedValue({
+      status: 'active',
+      didDocument: { id: TENANT_DID, controller: [CONTROLLER_DID] },
+    });
+    const employeeDocument = {
+      id: 'legacy-representative-record-id',
+      status: 'active',
+      sequence: 0,
+      content: {
+        claims: { 'org.schema.Person.sameAs': ACTOR_IDENTIFIER },
+        didDocument: {
+          id: CONTROLLER_DID,
+          verificationMethod: [{
+            id: `${CONTROLLER_DID}#controller-key`,
+            type: 'JsonWebKey2020',
+            controller: CONTROLLER_DID,
+            publicKeyJwk: { kty: 'EC', crv: 'P-384', x: 'x', y: 'y', kid: CONTROLLER_KID, alg: 'ES384' },
+          }],
+          authentication: [`${CONTROLLER_DID}#controller-key`],
+        },
+      },
+    };
+    (vaultRepository.getContainersInSection as any).mockImplementation(async (_scope: string, section: string) => (
+      String(section).endsWith('employees') ? [employeeDocument] : []
+    ));
+
+    const status = await new TenantStatusService(tenants, vaultRepository, kmsService).build(TENANT_VAULT_ID);
+
+    expect(status?.tenant.controllerBindingStatus).toBe('credential_issued');
+    expect(status?.controllers[0]).toEqual(expect.objectContaining({
+      did: CONTROLLER_DID,
+      status: 'credential_issued',
+      kids: [expect.objectContaining({ kid: CONTROLLER_KID })],
+    }));
+
+    const resolved = await new TenantStatusService(tenants, vaultRepository, kmsService)
+      .resolveControllerDidDocument(TENANT_VAULT_ID, 'zExample', 'RESPRSN');
+    expect(resolved?.id).toBe(CONTROLLER_DID);
+  });
+
   it('reports dcr_active only for an active device binding owned by the controller actor', async () => {
     tenants.getTenant.mockResolvedValue({
       status: 'active',

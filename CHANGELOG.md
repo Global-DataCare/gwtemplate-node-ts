@@ -7,6 +7,14 @@
   opaque tenant paths or the returned DID document.
 - Keep the legacy representative-controller skill, route documentation and
   examples deployment-neutral and free of product-specific identifiers.
+- Build bootstrap controllers with the shared `buildProfessionalDidWeb(...)`
+  and `normalizeSameAsHash(...)` contracts. Internal `urn:gdc:*` identifiers
+  and portal-specific card/profile DIDs remain aliases; the tenant controller
+  reference, employee record and public DID document use one operational DID.
+- Resolve controller DID documents from their protected employee records,
+  including multiple controllers and historical containers whose storage id
+  differed from the embedded DID. Deduplicate the primary controller JWK when
+  forwarding additional JWKS to ICA DID registration.
 - Accept secure asynchronous polling requests with `thid` protected inside the
   form-encoded `request=<JWE>` envelope, matching the SDK submit-and-poll
   transport contract for every `*-response` endpoint.

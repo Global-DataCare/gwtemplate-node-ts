@@ -736,6 +736,7 @@ export class HostingManager {
   private async buildControllerEntityConfig(
     legalRep: IncludedResource,
     tenantUrn: string,
+    hostedTenantDid: string,
     vaultId: string,
     registrationKeys?: { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk },
     explicitBinding?: ActivationParticipantMaterial,
@@ -743,6 +744,7 @@ export class HostingManager {
     return buildControllerEntityConfigExternal({
       legalRep,
       tenantUrn,
+      hostedTenantDid,
       kmsService: this.kmsService,
       mergeActivationJwks: this.mergeActivationJwks.bind(this),
       findJwkByUse: this.findJwkByUse.bind(this),
@@ -945,9 +947,19 @@ export class HostingManager {
       idType: normalizedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
       idValue: normalizedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
     });
+    const hostedTenantDid = createHostedDidWeb(
+      composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain),
+      alternateName,
+      {
+        jurisdiction: normalizedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+        version: 'v1',
+        sector,
+      },
+    );
     const controllerConfig = await this.buildControllerEntityConfig(
       person,
       tenantUrn,
+      hostedTenantDid,
       vaultId,
       this.extractRegistrationKeys(input.jobMeta),
     );

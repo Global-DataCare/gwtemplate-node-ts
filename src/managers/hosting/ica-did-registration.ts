@@ -14,6 +14,30 @@ type ActivationParticipantMaterial = {
   jwks?: { keys: any[] };
 };
 
+function jwkIdentity(jwk: any): string {
+  try {
+    return toJwkThumbprintSha256Urn(jwk);
+  } catch {
+    return String(jwk?.kid || '').trim();
+  }
+}
+
+/** Keeps ICA `_create` additional JWKS distinct from the primary public JWK. */
+export function withoutDuplicatePrimaryJwk(
+  jwks: { keys: any[] } | undefined,
+  primaryJwk: any,
+): { keys: any[] } | undefined {
+  if (!Array.isArray(jwks?.keys)) return undefined;
+  const primaryIdentity = jwkIdentity(primaryJwk);
+  const primaryKid = String(primaryJwk?.kid || '').trim();
+  const keys = jwks.keys.filter((key) => {
+    const kid = String(key?.kid || '').trim();
+    if (primaryKid && kid === primaryKid) return false;
+    return !primaryIdentity || jwkIdentity(key) !== primaryIdentity;
+  }).map((key) => ({ ...key, kid: toJwkThumbprintSha256Urn(key) }));
+  return keys.length ? { keys } : undefined;
+}
+
 export function getIcaVerifyBaseUrl(config: any): string {
   const configuredBaseUrl = config.ica?.mode === 'internal'
     ? config.ica?.internalUrl
@@ -248,9 +272,14 @@ export async function registerDidDocumentWithIca(params: {
   if ((organizationSigningKey as any).kid && (organizationSigningKey as any).kid === (controllerSigningKey as any).kid) {
     throw new ManagerError('Organization and controller signing keys must be different for ICA DID registration.', IssueType.Conflict);
   }
-  const canonicalJwks = (jwks?: { keys: any[] }) => jwks
-    ? { keys: jwks.keys.map((key) => ({ ...key, kid: toJwkThumbprintSha256Urn(key) })) }
-    : undefined;
+  const organizationAdditionalJwks = withoutDuplicatePrimaryJwk(
+    params.organizationBinding?.jwks,
+    organizationSigningKey,
+  );
+  const controllerAdditionalJwks = withoutDuplicatePrimaryJwk(
+    params.controllerBinding?.jwks,
+    controllerSigningKey,
+  );
 
   const fetchImpl = params.fetchImpl || fetch;
   const res = await fetchImpl(url, {
@@ -273,7 +302,7 @@ export async function registerDidDocumentWithIca(params: {
               did: params.organizationDidDocument.id,
               didDocument: params.organizationDidDocument,
               publicKeyJwk: organizationSigningKey,
-              ...(params.organizationBinding?.jwks ? { jwks: canonicalJwks(params.organizationBinding.jwks) } : {}),
+              ...(organizationAdditionalJwks ? { jwks: organizationAdditionalJwks } : {}),
             },
             controller: {
               credential: params.representativeCredential,
@@ -281,7 +310,7 @@ export async function registerDidDocumentWithIca(params: {
               didDocument: params.controllerDidDocument,
               publicKeyJwk: controllerSigningKey,
               ...(params.controllerBinding?.sameAs ? { sameAs: params.controllerBinding.sameAs } : {}),
-              ...(params.controllerBinding?.jwks ? { jwks: canonicalJwks(params.controllerBinding.jwks) } : {}),
+              ...(controllerAdditionalJwks ? { jwks: controllerAdditionalJwks } : {}),
             },
           },
         }],

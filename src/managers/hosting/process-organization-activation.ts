@@ -26,7 +26,7 @@ import { parseServiceCapabilityTokens } from 'gdc-common-utils-ts/constants/serv
 import { validateActivationServiceAuthorizationPolicy } from 'gdc-common-utils-ts/utils/activation-policy';
 import type { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import type { NetworkName } from '../../gdc-backend-utils-node/models/enums';
-import { composeHostDidWebId } from '../../utils/did-backend';
+import { composeHostDidWebId, createHostedDidWeb } from '../../utils/did-backend';
 import {
   HOST_ACTIVATE_REQUIRED_INPUT_CLAIMS,
   HOST_ACTIVATE_REQUIRED_OUTPUT_CLAIMS,
@@ -96,6 +96,7 @@ type ActivationDeps = Readonly<{
   buildControllerEntityConfig: (
     legalRep: any,
     tenantUrn: string,
+    hostedTenantDid: string,
     vaultId: string,
     registrationKeys?: { signerJwk?: PublicJwk; encrypterJwk?: PublicJwk },
     explicitBinding?: ActivationParticipantMaterial,
@@ -297,9 +298,19 @@ async function processActivationEntry(
     idType: processedClaims[ClaimsOrganizationSchemaorg.identifierType] as string,
     idValue: processedClaims[ClaimsOrganizationSchemaorg.identifierValue] as string,
   });
+  const hostedTenantDid = createHostedDidWeb(
+    composeHostDidWebId(deps.config.apiBaseUrl, deps.config.hostExternalDomain),
+    alternateName,
+    {
+      jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+      version: 'v1',
+      sector: requestedSector,
+    },
+  );
   const controllerConfig = await deps.buildControllerEntityConfig(
     person,
     tenantUrn,
+    hostedTenantDid,
     vaultId,
     deps.extractRegistrationKeys(deps.jobMeta),
     activation.controllerBinding,
@@ -384,8 +395,8 @@ async function processActivationEntry(
       // The legacy two-credential flow does not submit an explicit controller
       // DID. In that case the controller builder derives it from the verified
       // representative and registration keys; the tenant DID must reference
-      // that derived DID instead of silently dropping the controller link.
-      controllerDid: activation.controllerBinding?.did || controllerConfig.didDocument?.id,
+      // that operational DID instead of adopting a portal-specific alias.
+      controllerDid: controllerConfig.didDocument?.id,
     },
   );
   if (activation.representativeCredential || activation.vpToken) {

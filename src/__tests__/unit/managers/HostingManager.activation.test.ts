@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
+import { buildOrganizationDidWeb, buildProfessionalDidWeb } from 'gdc-common-utils-ts/utils/did';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { IServerConfig } from '../../../config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
@@ -13,6 +14,7 @@ import {
   ClaimsOfferSchemaorg,
   ClaimsOrderSchemaorg,
   ClaimsOrganizationSchemaorg,
+  ClaimsPersonSchemaorg,
   ClaimsServiceSchemaorg,
 } from 'gdc-common-utils-ts/constants/schemaorg';
 import { LifecycleRequestType } from 'gdc-common-utils-ts/constants/lifecycle';
@@ -543,6 +545,11 @@ describe('HostingManager activation flow', () => {
     expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
   });
 
+  /**
+   * Legacy registration binds only the registering representative's portal
+   * keys. A separately designated technical controller is added later by its
+   * own sector `_issue`/DCR and must survive representative re-registration.
+   */
   it('keeps the scoped historical representative as the first controller without requiring legacy RESPRSN', async () => {
     const job = buildActivationJob();
     const credential = (job.content!.body as any).representativeCredential;
@@ -573,6 +580,17 @@ describe('HostingManager activation flow', () => {
       expect(tenantDoc.content?.didDocument?.controller).toHaveLength(1);
 
       const legacyControllerDid = tenantDoc.content?.didDocument?.controller?.[0];
+      const expectedLegacyControllerDid = buildProfessionalDidWeb({
+        organizationDidWeb: buildOrganizationDidWeb({
+          hostDidWeb: 'did:web:testhost.com',
+          tenantId: claims[ClaimsOrganizationSchemaorg.alternateName] as string,
+          jurisdiction: claims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+          sector: claims[ClaimsServiceSchemaorg.category] as string,
+        }),
+        email: claims[ClaimsPersonSchemaorg.email] as string,
+        role: 'RESPRSN',
+      });
+      expect(legacyControllerDid).toBe(expectedLegacyControllerDid);
       const serviceControllerDid = 'did:web:api.acme.org:controllers:service-controller';
       tenantDoc.content!.didDocument.controller = [legacyControllerDid, serviceControllerDid];
       await vaultRepository.put(hostCollectionName, [tenantDoc], getEnvSectionId('tenants'));
@@ -585,6 +603,7 @@ describe('HostingManager activation flow', () => {
         tenantCollectionName,
         getEnvSectionId('employees'),
       );
+      expect(beforeRotation[0]?.id).toBe(legacyControllerDid);
       const oldKids = ((beforeRotation[0] as any).content?.didDocument?.verificationMethod || [])
         .map((method: any) => method.publicKeyJwk?.kid);
 
@@ -893,8 +912,9 @@ describe('HostingManager activation flow', () => {
 
     const job = buildActivationJob();
     const controllerSameAs = 'urn:multibase:zControllerHash';
+    const portalCardDid = 'did:web:people.acme.org:controllers:primary';
     (job.content!.body as any).controller = {
-      did: 'did:web:people.acme.org:controllers:primary',
+      did: portalCardDid,
       sameAs: controllerSameAs,
       publicKeyJwk: {
         kid: 'explicit-controller-sig-kid',
@@ -946,6 +966,16 @@ describe('HostingManager activation flow', () => {
     expect(responsePayload.body.data[0].response.status).toBe('201');
 
     const claims = job.content!.body!.data[0]!.meta!.claims;
+    const operationalControllerDid = buildProfessionalDidWeb({
+      organizationDidWeb: buildOrganizationDidWeb({
+        hostDidWeb: 'did:web:testhost.com',
+        tenantId: claims[ClaimsOrganizationSchemaorg.alternateName] as string,
+        jurisdiction: claims[ClaimsOrganizationSchemaorg.addressCountry] as string,
+        sector: claims[ClaimsServiceSchemaorg.category] as string,
+      }),
+      email: claims[ClaimsPersonSchemaorg.email] as string,
+      role: 'RESPRSN',
+    });
     const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
       ...claims,
       [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
@@ -957,21 +987,22 @@ describe('HostingManager activation flow', () => {
     expect(employeeDocs.length).toBe(1);
 
     const controllerDidDocument = (employeeDocs[0] as any).content?.didDocument;
-    expect(controllerDidDocument.id).toBe('did:web:people.acme.org:controllers:primary');
+    expect(controllerDidDocument.id).toBe(operationalControllerDid);
     expect(controllerDidDocument.alsoKnownAs).toContain(controllerSameAs);
+    expect(controllerDidDocument.alsoKnownAs).toContain(portalCardDid);
     expect(controllerDidDocument.verificationMethod?.[0]?.publicKeyJwk?.kid).toBe(expectedControllerKids[0]);
     expect(controllerDidDocument.verificationMethod.map((method: any) => method.publicKeyJwk.kid)).toEqual(
       expect.arrayContaining(expectedControllerKids.slice(0, 3)),
     );
-    expect(controllerDidDocument.keyAgreement).toContain(`did:web:people.acme.org:controllers:primary#${expectedControllerKids[3]}`);
+    expect(controllerDidDocument.keyAgreement).toContain(`${operationalControllerDid}#${expectedControllerKids[3]}`);
 
     const icaRequestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
     const icaOrganization = icaRequestBody.body?.data?.[0]?.resource?.organization;
     const icaController = icaRequestBody.body?.data?.[0]?.resource?.controller;
-    expect(icaOrganization.didDocument.controller).toEqual(['did:web:people.acme.org:controllers:primary']);
+    expect(icaOrganization.didDocument.controller).toEqual([operationalControllerDid]);
     expect(icaController.publicKeyJwk.kid).toBe(expectedControllerKids[0]);
     expect(icaController.sameAs).toBe(controllerSameAs);
-    expect(icaController.did).toBe('did:web:people.acme.org:controllers:primary');
+    expect(icaController.did).toBe(operationalControllerDid);
     expect(icaController.jwks.keys.map((key: any) => key.kid)).toEqual(
       expect.arrayContaining(expectedControllerKids.slice(1)),
     );

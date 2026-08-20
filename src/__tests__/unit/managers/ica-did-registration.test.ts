@@ -1,4 +1,5 @@
-import { buildIcaVerifyUrl } from '../../../managers/hosting/ica-did-registration';
+import { buildIcaVerifyUrl, withoutDuplicatePrimaryJwk } from '../../../managers/hosting/ica-did-registration';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 
 const build = (networkMode?: string) => buildIcaVerifyUrl({
   jurisdiction: 'ES',
@@ -30,5 +31,17 @@ describe('ICA verification network-kind routing', () => {
     expect(build(networkMode)).toBe(
       'https://ica.globaldatacare.es/ica/cds-ES/v1/onehealth-research/terms/pdf/contract/_verify',
     );
+  });
+});
+
+describe('ICA DID registration key projection', () => {
+  it('removes the primary key from additional controller JWKS', () => {
+    const primary = { kty: 'EC', crv: 'P-384', x: 'primary-x', y: 'primary-y', kid: 'primary-key' };
+    const additional = { kty: 'EC', crv: 'P-384', x: 'additional-x', y: 'additional-y', kid: 'additional-key' };
+
+    expect(withoutDuplicatePrimaryJwk({ keys: [{ ...primary }, additional] }, primary)).toEqual({
+      keys: [{ ...additional, kid: toJwkThumbprintSha256Urn(additional) }],
+    });
+    expect(withoutDuplicatePrimaryJwk({ keys: [{ ...primary }] }, primary)).toBeUndefined();
   });
 });

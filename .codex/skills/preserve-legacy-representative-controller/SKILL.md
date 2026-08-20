@@ -16,6 +16,12 @@ claiming that a binding exists.
 
 - Treat the historical `LegalRepresentativeCredential` as legal evidence, not
   global `RESPRSN` authority.
+- In legacy portal registration, bind the submitted JWK only to the legal
+  representative who performs that registration. A different controller named
+  by signed evidence is a pending designation, not the owner of that JWK.
+- Do not require or synthesize a technical-controller JWK during legacy tenant
+  creation. That actor later supplies its own key through sector `_issue`,
+  activation, token exchange and DCR.
 - For historical `_activate` credentials without `RESPRSN` or embedded key
   material, require the exact tenant/sector scope in
   `HOST_LEGACY_CONTROLLER_SCOPES`.
@@ -68,6 +74,9 @@ public policy.
   with one unchanged controller reference and no new Offer.
 - The public `tenant-status.json` projection moves from `required` to
   `credential_issued` and then `dcr_active` without exposing contact data.
+- Re-verification that omits a previously signed technical-controller field
+  preserves its hashed pending designation and never copies the representative
+  JWK to that actor.
 - A tenant or sector outside the configured scope fails before activation;
   credential and signer failures remain governed by normal trust validation.
 - Canonical service-controller tests remain green.
