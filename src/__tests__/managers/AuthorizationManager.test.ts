@@ -213,7 +213,7 @@ describe('AppAuthorizationManager', () => {
           activationCode: 'used-code',
           issuedToEmail: 'professional@example.org',
           activatedBy: normalizeSameAsHash('professional@example.org'),
-          maxDevices: 2,
+          maxDevices: 5,
           deviceBindings: [{
             clientId: 'client-one', clientInstanceId: 'install-one', status: 'active',
             deviceInfo: { clientInstanceId: 'install-one' }, activatedAt: now,
@@ -250,7 +250,7 @@ describe('AppAuthorizationManager', () => {
 
         expect(mockLicense).toMatchObject({
           activatedBy: normalizeSameAsHash('professional@example.org'),
-          maxDevices: 2,
+          maxDevices: 5,
         });
         expect(mockVaultRepository.put).toHaveBeenCalled();
       });

@@ -1322,7 +1322,7 @@ export function createApiRouter(
    *       Tenant-admin / IT operation that reserves one `device-licenses` seat for a target email+role
    *       and returns the seat activation credential for subsequent `Token/_exchange`.
    *       The same credential can activate distinct installations up to `maxDevices`
-   *       (two by default); it does not consume another employee seat.
+   *       (five by default); it does not consume another employee seat.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'

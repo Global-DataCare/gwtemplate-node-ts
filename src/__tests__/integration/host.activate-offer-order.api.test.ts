@@ -272,7 +272,9 @@ describe('Host activation Offer/Order route story', () => {
     const orderResult = JSON.parse(orderPoll.text) as { data: Array<Record<string, any>> };
     const orderEntry = orderResult.data[0];
 
-    expect(orderEntry.response.status).toBe('201');
+    // DEV_SEED already contains this tenant, so legacy re-registration is an
+    // idempotent update and the Order reports the existing active resource.
+    expect(orderEntry.response.status).toBe('200');
     expect(orderEntry.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
   });
 

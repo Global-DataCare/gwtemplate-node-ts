@@ -11,6 +11,7 @@ import {
 import { getEnvSectionId } from './section-env';
 import { extractSearchFiltersFromEntry, type SearchFilters } from './search-request';
 import {
+  DEFAULT_LICENSE_DEVICE_ALLOWANCE,
   LICENSE_CATEGORY_INDIVIDUAL,
   LICENSE_CATEGORY_PROFESSIONAL,
   LICENSE_STATUS_ACTIVE,
@@ -116,7 +117,7 @@ export async function searchLicenseDocuments(
           ...(license.invitationId ? { invitationId: license.invitationId } : {}),
           maxDevices: Number.isInteger(Number(license.maxDevices)) && Number(license.maxDevices) > 0
             ? Number(license.maxDevices)
-            : 2,
+            : DEFAULT_LICENSE_DEVICE_ALLOWANCE,
           deviceBindings: Array.isArray(license.deviceBindings)
             ? license.deviceBindings.map((binding: any) => ({
                 clientId: String(binding.clientId || ''),

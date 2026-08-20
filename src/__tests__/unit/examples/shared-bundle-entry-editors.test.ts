@@ -115,7 +115,7 @@ describe('shared bundle entry editor surface in GW', () => {
       expect.objectContaining({
         'MedicationStatement.identifier': EXAMPLE_MEDICATION_STATEMENT_IDENTIFIER,
         'MedicationStatement.subject': EXAMPLE_SUBJECT_DID,
-        'MedicationStatement.medication-text': EXAMPLE_MEDICATION_STATEMENT_TEXT,
+        'MedicationStatement.code-text': EXAMPLE_MEDICATION_STATEMENT_TEXT,
       }),
     );
     expect(clinicalEntries[2]?.resource?.meta?.claims).toEqual(

@@ -15,6 +15,7 @@ import { getEnvSectionId } from '../utils/section-env';
 import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
 import { normalizeSameAsHash, normalizeTelephoneHash } from 'gdc-common-utils-ts/utils/same-as';
 import { normalizeIndexedEmail, normalizeIndexedPhone } from '../utils/indexed-contact';
+import { DEFAULT_LICENSE_DEVICE_ALLOWANCE } from '../constants/domain';
 
 type ActivationActor = Readonly<{
   subject: string;
@@ -207,7 +208,7 @@ export class AppAuthorizationManager {
 
   private readDeviceAllowance(license: DeviceLicense & Record<string, any>): number {
     const value = Number(license.maxDevices);
-    return Number.isInteger(value) && value > 0 ? value : 2;
+    return Number.isInteger(value) && value > 0 ? value : DEFAULT_LICENSE_DEVICE_ALLOWANCE;
   }
 
   private readActiveDeviceBindings(license: DeviceLicense & Record<string, any>): any[] {

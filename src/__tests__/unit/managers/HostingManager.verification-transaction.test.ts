@@ -326,6 +326,23 @@ describe('HostingManager legal organization verification transaction', () => {
     (mockKmsService as any).provisionKeys = jest.fn(async () => ({ keys: [] }));
     (mockTenantsCacheManager as any).getCollectionName = jest.fn(async () => tenantCollectionName);
     (mockTenantsCacheManager as any).refreshTenant = jest.fn(async () => storedTenant);
+    const licenseDocuments: any[] = [];
+    (mockVaultRepository.getContainersInSection as any).mockImplementation(
+      async (_vaultId: string, sectionId: string) =>
+        sectionId === getEnvSectionId('device-licenses') ? licenseDocuments : [],
+    );
+    (mockVaultRepository.put as any).mockImplementation(
+      async (_vaultId: string, documents: any[], sectionId: string) => {
+        if (sectionId === getEnvSectionId('device-licenses')) {
+          for (const document of documents) {
+            const index = licenseDocuments.findIndex(current => current.id === document.id);
+            if (index >= 0) licenseDocuments[index] = document;
+            else licenseDocuments.push(document);
+          }
+        }
+        return true;
+      },
+    );
     global.fetch = jest.fn()
       .mockResolvedValueOnce({
         ok: false,

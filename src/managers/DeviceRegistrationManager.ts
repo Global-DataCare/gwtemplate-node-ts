@@ -28,6 +28,7 @@ import {
   IdentityAuthResponseEntryTypes,
   IdentityAuthResponseTypes,
 } from 'gdc-common-utils-ts/constants/identity-auth';
+import { DEFAULT_LICENSE_DEVICE_ALLOWANCE } from '../constants/domain';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -200,6 +201,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
         license.status = 'active';
         license.activatedAt = license.activatedAt || now;
 
+        licenseDoc.status = 'active';
         licenseDoc.sequence = (licenseDoc.sequence || 0) + 1;
         await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
       }
@@ -341,7 +343,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
   private getDeviceAllowance(license: DeviceLicense & Record<string, any>): number {
     const value = Number(license.maxDevices);
-    return Number.isInteger(value) && value > 0 ? value : 2;
+    return Number.isInteger(value) && value > 0 ? value : DEFAULT_LICENSE_DEVICE_ALLOWANCE;
   }
 
   private getDeviceBindings(license: DeviceLicense & Record<string, any>): any[] {
