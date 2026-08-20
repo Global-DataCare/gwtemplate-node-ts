@@ -185,9 +185,8 @@ async function processActivationEntry(
     throw new ManagerError('Malformed activation entry: missing meta.claims', IssueType.Required);
   }
   const allowLegacyRepresentativeBootstrap = allowsLegacyRepresentativeBootstrap({
-    claims,
     representativeCredential: activation.representativeCredential,
-    configuredScopes: process.env.HOST_LEGACY_CONTROLLER_SCOPES,
+    enabled: process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER,
   });
   const trustResult = await deps.activationTrustAdapter.evaluate({
     networkMode: deps.config.networkMode,

@@ -1,9 +1,9 @@
 ---
 name: preserve-legacy-representative-controller
-description: Preserve or audit a scoped historical legal-representative first controller during legacy tenant creation, while keeping later ServiceControllerCredential onboarding independent. Use for legacy _activate, _transaction plus Order, tenant DID controller arrays, activation-code or DCR failures, or independent enrollment-channel separation where personal data must not enter technical artifacts.
+description: Preserve or audit a deployment-authorized historical legal-representative first controller during legacy tenant creation, while keeping later ServiceControllerCredential onboarding independent. Use for legacy _activate, _transaction plus Order, tenant DID controller arrays, activation-code or DCR failures, or independent enrollment-channel separation where personal data must not enter technical artifacts.
 ---
 
-# Preserve a scoped legacy representative controller
+# Preserve a legacy representative controller
 
 ## Read first
 
@@ -23,8 +23,8 @@ claiming that a binding exists.
   creation. That actor later supplies its own key through sector `_issue`,
   activation, token exchange and DCR.
 - For historical `_activate` credentials without `RESPRSN` or embedded key
-  material, require the exact tenant/sector scope in
-  `HOST_LEGACY_CONTROLLER_SCOPES`.
+  material, require deployment-wide
+  `HOST_LEGACY_REPRESENTATIVE_CONTROLLER=true` compatibility.
 - Never pin a credential id, issuer or `kid` in this compatibility switch. The
   normal VP, credential and trust-registry checks authenticate the submission;
   this permits credential renewal and controller-key rotation.
@@ -56,14 +56,17 @@ public policy.
    DID into tenant finalization.
 3. Ensure `process-order-entry.ts` builds the pending representative controller
    before finalizing the tenant and passes its DID into tenant finalization.
-4. Keep the historical activation exception fail-closed when its tenant/sector
-   deployment scope is absent, malformed or mismatched.
+4. Keep the historical activation exception fail-closed when deployment
+   compatibility is disabled or malformed.
 5. Do not add legacy representative handling to existing-tenant `_issue`.
 6. Update route JSDoc, generated OpenAPI, identity/trust docs and changelog.
 7. Run targeted unit and integration tests, typecheck, skill validation and a
    changed-file scan for personal data.
-8. Keep the reusable lifecycle behavior in GW Core and configure deployment
-   scopes only in the environment that still needs the historical contract.
+8. Verify the live pod environment contains the switch after rollout; a local
+   profile or documentation entry alone does not activate the policy.
+9. Keep the reusable lifecycle behavior in GW Core and enable it only in an
+   environment whose portal still uses the historical contract for all
+   organizations.
 
 ## Required verification
 
@@ -77,7 +80,7 @@ public policy.
 - Re-verification that omits a previously signed technical-controller field
   preserves its hashed pending designation and never copies the representative
   JWK to that actor.
-- A tenant or sector outside the configured scope fails before activation;
+- A deployment with compatibility disabled rejects the historical shape;
   credential and signer failures remain governed by normal trust validation.
 - Canonical service-controller tests remain green.
 - Generated OpenAPI keeps legacy creation separate from service-controller

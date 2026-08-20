@@ -911,7 +911,7 @@ export class HostingManager {
   }
 
   /**
-   * Idempotently re-applies a scoped historical representative
+   * Idempotently re-applies a deployment-authorized historical representative
    * controller after ICA verification. This is the existing-tenant branch of
    * `_transaction`; it is deliberately separate from service-controller
    * `_issue` and never replaces another controller DID.
@@ -927,7 +927,10 @@ export class HostingManager {
       return types.includes('LegalRepresentativeCredential');
     });
     const normalizedClaims = this.applyLegalOrganizationIdentityCompatibility(input.claims);
-    if (!representativeCredential) return undefined;
+    if (!allowsLegacyRepresentativeBootstrap({
+      representativeCredential,
+      enabled: process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER,
+    })) return undefined;
 
     validateNewOrganizationClaims(normalizedClaims);
     const alternateName = String(normalizedClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();

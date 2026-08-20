@@ -286,7 +286,7 @@ describe('HostingManager legal organization verification transaction', () => {
     );
   });
 
-  it('re-registers the scoped legacy representative controller through _transaction without a new Offer', async () => {
+  it('re-registers the deployment-authorized legacy representative through _transaction without a new Offer', async () => {
     const job = buildTransactionJob();
     (job.content!.meta as any).jws.protected.jwk = {
       kid: 'portal-runtime-signing-key-001',
@@ -307,7 +307,7 @@ describe('HostingManager legal organization verification transaction', () => {
         },
       },
     };
-    process.env.HOST_LEGACY_CONTROLLER_SCOPES = `${EXAMPLE_TENANT_ALTERNATE_NAME}|${EXAMPLE_SECTOR}`;
+    process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER = 'true';
     const tenantVaultId = `${EXAMPLE_SECTOR}_${EXAMPLE_TENANT_ALTERNATE_NAME}`;
     const tenantCollectionName = 'ES_VATES_B00112233_health-care';
     const storedTenant = {
@@ -370,7 +370,7 @@ describe('HostingManager legal organization verification transaction', () => {
         getEnvSectionId('employees'),
       );
     } finally {
-      delete process.env.HOST_LEGACY_CONTROLLER_SCOPES;
+      delete process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER;
       (mockVaultRepository.vaultExists as any).mockResolvedValue(false);
     }
   });

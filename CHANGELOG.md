@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.21.18] - 2026-08-20
+
+- Add deployment-wide `HOST_LEGACY_REPRESENTATIVE_CONTROLLER` compatibility
+  for portals that historically register every organization through the legal
+  representative. Propagate it into GKE after applying shared manifests and
+  verify the release contract in tests and the repository skill.
 - Add the safe public `/.well-known/tenant-status.json` projection for tenant
   lifecycle, controller DIDs, public key identifiers and DCR state.
 - Resolve legacy lowercase `did:web` requests for VAT-based tenant paths
@@ -35,7 +41,7 @@
   `_transaction` plus `Order/_batch` finalization now retain that controller;
   later `_issue` remains the independent `ServiceControllerCredential` path
   that appends, rather than replaces, the bootstrap controller.
-- Allow explicitly configured legacy tenant/sector scopes to accept historical
+- Allow an explicitly enabled legacy deployment to accept historical
   representative VCs that predate `RESPRSN` and embedded key material during
   `_activate`, while retaining normal VP, credential, and trust-registry
   verification without pinning a credential id, issuer, or portal signer `kid`.
