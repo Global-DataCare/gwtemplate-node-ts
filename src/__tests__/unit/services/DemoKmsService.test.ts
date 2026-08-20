@@ -54,6 +54,26 @@ describe('DemoKmsService', () => {
     });
 
     describe('decodeRequest', () => {
+        it('delegates a standards-based Compact JWE instead of decoding ciphertext as JSON', async () => {
+            const delegated: JobRequest = {
+              id: 'delegated-job', status: 'DRAFT' as any, sequence: 0, createdAtTimestamp: Date.now(),
+              content: {
+                thid: 'real-jwe-thread',
+                iss: 'did:web:sender.test',
+                aud: 'did:web:receiver.test',
+                jti: 'real-jwe-message',
+                type: 'api+json',
+                body: { data: [] },
+              },
+            };
+            const delegate = jest.spyOn(realKmsService, 'decodeRequest').mockResolvedValue(delegated);
+            const protectedHeader = Content.objectToRawBase64UrlSafe({ alg: 'ML-KEM-768', enc: 'A256GCM' });
+            const compactJwe = `${protectedHeader}.encrypted-key.iv.ciphertext.tag`;
+
+            await expect(devKmsService.decodeRequest(compactJwe)).resolves.toBe(delegated);
+            expect(delegate).toHaveBeenCalledWith(compactJwe);
+        });
+
         it('should decode a simulated Compact JWE string', async () => {
             // --- Arrange ---
             // 1. The innermost content (payload body).
@@ -101,6 +121,15 @@ describe('DemoKmsService', () => {
     });
 
     describe('encodeResponse', () => {
+        it('delegates response encryption for a standards-based recipient JWK', async () => {
+            const encrypted = 'real.encrypted.response.compact.jwe';
+            const delegate = jest.spyOn(realKmsService, 'encodeResponse').mockResolvedValue(encrypted);
+            const recipientJwk = { kid: 'recipient-kid', kty: 'OKP', crv: 'ML-KEM-768', pub: 'public-material' } as any;
+
+            await expect(devKmsService.encodeResponse({ success: true }, [recipientJwk], 'sender-id')).resolves.toBe(encrypted);
+            expect(delegate).toHaveBeenCalledWith({ success: true }, [recipientJwk], 'sender-id');
+        });
+
         it('should return a simulated Compact JWE string', async () => {
             // --- Arrange ---
             const payload = { success: true };

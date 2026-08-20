@@ -173,6 +173,15 @@ describe('Service Initialization Utilities', () => {
       );
       expect(employeeSearchService).toBeDefined();
 
+      const employeeLicenseSearchService = services.find(
+        (s: DidService) =>
+          (s as any).selector?.section === 'entity' &&
+          (s as any).selector?.format === 'org.schema' &&
+          s.serviceEndpoint === 'License' &&
+          (s.actions || []).includes('_search'),
+      );
+      expect(employeeLicenseSearchService).toBeDefined();
+
       const organizationCommercialSearchService = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'entity' &&

@@ -158,6 +158,14 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     ['_search']
   ));
 
+  // Controller administration reads employee seats independently from the
+  // employee directory so failed inventory requests never become false zeroes.
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'entity', format: 'org.schema' },
+    ['License'],
+    ['_search']
+  ));
+
   services.push(createDidEndpointConfigFromSelector(
     { sector, section: 'entity', format: 'org.schema' },
     ['Offer', 'Order'],
