@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+## [1.21.20] - 2026-08-20
+
+- Reserve the first two seats of newly registered professional organizations
+  for the verified representative and a contact-free technical-controller
+  binding, while preserving historical professional assignments exactly.
+- Never convert a historical professional seat or create an implicit third
+  controller seat. A later controller must wait for a newly added or purchased
+  licence when no seat is free.
+- Repair missing representative reservations at startup from protected tenant
+  claims and restore only controller DID references backed by active protected
+  employee records.
+- Add controller-authorized zero-cost professional `License/_add` for
+  non-production `test` (in-memory), `local-network`, and `test-network`;
+  `prod` or `network` keeps the signed payment and ledger-verifiable Order path.
+
 ## [1.21.19] - 2026-08-20
 
 - Read and persist employee records in the tenant's resolved physical

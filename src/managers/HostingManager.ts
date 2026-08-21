@@ -1032,10 +1032,9 @@ export class HostingManager {
    * Repairs the historical legal-organization onboarding invariant without
    * replacing any independently registered controller or assigned seat.
    *
-   * Legacy re-registration guarantees a two-seat employee pool: one seat may
-   * already belong to a technical controller and the verified representative
-   * receives the other. Replays reuse the representative's existing
-   * issued/active seat and never increase the pool beyond two.
+   * Replays reuse the representative's existing issued/active seat. If a
+   * historical inventory assigned every existing seat before reserving the
+   * representative, one repair seat may be added without evicting any actor.
    */
   private async reconcileLegacyRepresentativeEmployeeSeats(input: {
     tenantVaultId: string;
@@ -1051,8 +1050,24 @@ export class HostingManager {
       const license = doc.content as DeviceLicense | undefined;
       return license?.userClass === LICENSE_USER_CLASS_EMPLOYEE;
     });
+    const email = normalizeIndexedEmail(
+      String(input.claims[ClaimsPersonSchemaorg.email] || ''),
+    );
+    const role = getPersonOccupationClaim(input.claims);
+    const representativeSeat = email && role ? employeeSeats.find((doc) => {
+      const license = doc.content as DeviceLicense | undefined;
+      return normalizeIndexedEmail(String(license?.issuedToEmail || '')) === email
+        && normalizeCodeSystemAndValue(String(license?.issuedToRole || ''))
+          === normalizeCodeSystemAndValue(role)
+        && (license?.status === LICENSE_STATUS_ISSUED || license?.status === LICENSE_STATUS_ACTIVE);
+    }) : undefined;
+    const hasAvailableSeat = employeeSeats.some((doc) =>
+      (doc.content as DeviceLicense | undefined)?.status === LICENSE_STATUS_AVAILABLE);
+    const minimumTotal = !representativeSeat && !hasAvailableSeat
+      ? Math.max(2, employeeSeats.length + 1)
+      : Math.max(2, employeeSeats.length);
     const now = Math.floor(Date.now() / 1000);
-    const missing = Math.max(0, 2 - employeeSeats.length);
+    const missing = Math.max(0, minimumTotal - employeeSeats.length);
     const created: ConfidentialStorageDoc[] = [];
     for (let index = 0; index < missing; index += 1) {
       const id = uuidv4();
@@ -1076,31 +1091,104 @@ export class HostingManager {
       employeeSeats.push(...created);
     }
 
-    const email = normalizeIndexedEmail(
-      String(input.claims[ClaimsPersonSchemaorg.email] || ''),
-    );
-    const role = getPersonOccupationClaim(input.claims);
     if (!email || !role) return undefined;
-    const existing = employeeSeats.find((doc) => {
-      const license = doc.content as DeviceLicense | undefined;
-      return normalizeIndexedEmail(String(license?.issuedToEmail || '')) === email
-        && normalizeCodeSystemAndValue(String(license?.issuedToRole || ''))
-          === normalizeCodeSystemAndValue(role)
-        && (license?.status === LICENSE_STATUS_ISSUED || license?.status === LICENSE_STATUS_ACTIVE);
-    });
-    if (existing) {
-      return String((existing.content as DeviceLicense).activationCode || '').trim() || undefined;
-    }
-    const { activationCode } = await issueActivationCodeFromPool({
-      vaultRepository: this.vaultRepository,
-      kmsService: this.kmsService,
-      tenantVaultId: input.tenantVaultId,
-      userClass: LICENSE_USER_CLASS_EMPLOYEE,
-      type: LICENSE_TYPE_MOBILE,
-      email,
-      role,
-    });
+    const issued = representativeSeat
+      ? {
+          activationCode: String((representativeSeat.content as DeviceLicense).activationCode || '').trim() || undefined,
+        }
+      : await issueActivationCodeFromPool({
+          vaultRepository: this.vaultRepository,
+          kmsService: this.kmsService,
+          tenantVaultId: input.tenantVaultId,
+          userClass: LICENSE_USER_CLASS_EMPLOYEE,
+          type: LICENSE_TYPE_MOBILE,
+          email,
+          role,
+        });
+    const { activationCode } = issued;
     return activationCode;
+  }
+
+  /**
+   * Repairs the deployment-wide historical representative seat invariant from
+   * already verified protected tenant state. Existing member seats are never
+   * reassigned, and public controller references are restored only for active
+   * protected controller employee records.
+   */
+  public async reconcileLegacyRepresentativeSeatInventories(): Promise<number> {
+    const enabled = String(process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER || '').trim().toLowerCase();
+    if (!['true', '1', 'yes', 'on'].includes(enabled)) return 0;
+    const records = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+      this.hostRuntime.hostCollectionName,
+      getEnvSectionId('tenants'),
+    );
+    let reconciled = 0;
+    for (const record of records || []) {
+      if (!record?.id || record.id === 'host') continue;
+      try {
+        const tenant = await this.kmsService.unprotectConfidentialData<OrganizationConfig>(record, 'host');
+        const claims = tenant?.claims as ClaimsRecord | undefined;
+        const tenantId = String(claims?.[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+        const sector = String(claims?.[ClaimsServiceSchemaorg.category] || '').trim() as Sector;
+        if (!claims || !tenantId || !sector) continue;
+        const tenantVaultId = getTenantVaultId(sector, tenantId);
+        await this.reconcileLegacyRepresentativeEmployeeSeats({ tenantVaultId, tenantId, claims });
+        const tenantCollectionName = generateTenantCollectionNameFromClaims(claims);
+        const employeeDocuments = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+          tenantCollectionName,
+          getEnvSectionId('employees'),
+        );
+        const storedControllerDids: string[] = [];
+        for (const employeeDocument of employeeDocuments || []) {
+          try {
+            const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(
+              employeeDocument,
+              tenantVaultId,
+            );
+            const role = normalizeCodeSystemAndValue(String(
+              employee?.claims?.[ClaimsPersonSchemaorg.additionalType] || '',
+            ));
+            const did = String(employee?.didDocument?.id || '').trim();
+            if (
+              employee?.status === EntityLifecycleStatus.Active
+              && (role === 'resprsn' || role.endsWith(':resprsn'))
+              && did
+            ) storedControllerDids.push(did);
+          } catch {
+            // Unreadable employees cannot become public controllers.
+          }
+        }
+        const currentControllers = Array.isArray(tenant.didDocument?.controller)
+          ? tenant.didDocument.controller
+          : tenant.didDocument?.controller ? [tenant.didDocument.controller] : [];
+        const nextControllers = Array.from(new Set([...currentControllers, ...storedControllerDids]));
+        if (nextControllers.length !== currentControllers.length) {
+          const updatedTenant = {
+            ...tenant,
+            didDocument: { ...tenant.didDocument, controller: nextControllers },
+            meta: { ...(tenant.meta || {}), lastUpdated: new Date().toISOString() },
+          };
+          const updatedDocument = {
+            ...record,
+            sequence: Number(record.sequence || 0) + 1,
+            content: updatedTenant,
+          };
+          const protectedDocument = await this.kmsService.protectConfidentialData(updatedDocument, 'host');
+          await this.vaultRepository.put(
+            this.hostRuntime.hostCollectionName,
+            [protectedDocument],
+            getEnvSectionId('tenants'),
+          );
+          await this.tenantsCacheManager.refreshTenant(tenantVaultId);
+        }
+        reconciled += 1;
+      } catch (error) {
+        this.logger.warn?.(
+          `[HostingManager] Historical representative seat reconciliation skipped for tenant '${record.id}': ${String((error as Error)?.message || error)}`,
+        );
+      }
+    }
+    return reconciled;
   }
 
   private async processOrganizationIssue(job: JobRequest): Promise<IDecodedDidcommPayload> {
@@ -1415,7 +1503,7 @@ export class HostingManager {
       claims[ClaimsOrganizationSchemaorg.numberOfEmployees],
     );
     const employeeCount = Number.isInteger(requestedEmployeeCount) && requestedEmployeeCount > 0
-      ? requestedEmployeeCount
+      ? Math.max(2, requestedEmployeeCount)
       : 2;
     const offerClaims = generateLicenseOffer(
       employeeCount,

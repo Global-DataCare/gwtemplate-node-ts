@@ -286,6 +286,10 @@ async function startServer(options?: StartServerOptions) {
         console.log('[GW-API] Reconciled persisted host runtime service config.');
       }
     }
+    const reconciledRepresentativeInventories = await hostingManager.reconcileLegacyRepresentativeSeatInventories();
+    if (reconciledRepresentativeInventories > 0) {
+      console.log(`[GW-API] Reconciled ${reconciledRepresentativeInventories} historical representative seat inventories.`);
+    }
   } catch (error) {
     const allowStartupWithoutHostWarmup =
       String(process.env.STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR || '').trim().toLowerCase() === 'true';

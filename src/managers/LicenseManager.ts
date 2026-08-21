@@ -17,7 +17,10 @@ import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import type { BundleEntryResponse, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { createOperationOutcome } from '../utils/outcome';
 import { IssueLevel } from 'gdc-common-utils-ts/models/issue';
-import { issueActivationCodeFromPool } from '../utils/license-issuance';
+import {
+  issueActivationCodeFromPool,
+  materializeFreeProfessionalLicenses,
+} from '../utils/license-issuance';
 import { getEnvSectionId } from '../utils/section-env';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import {
@@ -79,6 +82,7 @@ export class LicenseManager implements IJobProcessor {
     }
     if (action === '_issue') return this.issueActivationCodes(job);
     if (action === '_search') return this.searchLicenses(job);
+    if (action === '_add') return this.addFreeProfessionalLicenses(job);
     // Keep legacy/internal semantics where the action might be `create`.
     const {
       targetTenantId,
@@ -184,6 +188,93 @@ export class LicenseManager implements IJobProcessor {
           }
         }]
       }
+    };
+  }
+
+  /**
+   * Adds available professional seats for an explicit zero-price Test Network
+   * simulation. This is not a production payment shortcut and never assigns
+   * or replaces a representative, controller or member.
+   */
+  private async addFreeProfessionalLicenses(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    if (!job.tenantId || !job.sector) {
+      throw new ManagerError('Missing tenantId or sector.', IssueType.Required);
+    }
+    const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
+    if (!(await this.tenantExists(tenantVaultId))) {
+      throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
+    }
+    const body = job.content?.body as any;
+    const entries: any[] = (Array.isArray(body?.data) && body.data)
+      || (Array.isArray(body?.entry) && body.entry)
+      || [];
+    const responseEntries: any[] = [];
+
+    for (const entry of entries) {
+      const rawClaims = entry?.meta?.claims as Record<string, unknown> | undefined;
+      try {
+        if (!rawClaims) throw new ManagerError('Missing meta.claims for License/_add entry.', IssueType.Required);
+        const claims = normalizeContextualizedClaims(rawClaims);
+        const category = getClaimValue<string>(claims, 'org.schema.IndividualProduct.category');
+        const quantity = Number(getClaimValue<unknown>(claims, 'org.schema.Offer.eligibleQuantity.value'));
+        const price = Number(getClaimValue<unknown>(claims, 'org.schema.Offer.price'));
+        if (category !== LICENSE_CATEGORY_PROFESSIONAL) {
+          throw new ManagerError('Professional License/_add requires professional category.', IssueType.Invalid);
+        }
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          throw new ManagerError('License/_add quantity must be a positive integer.', IssueType.Value);
+        }
+        if (price !== 0) throw new ManagerError('License/_add requires an explicit zero price.', IssueType.Value);
+        const networkMode = String(process.env.NETWORK_MODE || '').trim();
+        const deploymentEnvironment = String(process.env.DEPLOYMENT_ENV || '').trim().toLowerCase();
+        if (!['test', 'local-network', 'test-network'].includes(networkMode)
+          || ['prod', 'production'].includes(deploymentEnvironment)) {
+          throw new ManagerError(
+            'Zero-cost professional License/_add is restricted to non-production test, local-network, or test-network.',
+            IssueType.Forbidden,
+          );
+        }
+        const documents = await materializeFreeProfessionalLicenses({
+          vaultRepository: this.vaultRepository,
+          tenantVaultId,
+          tenantId: job.tenantId,
+          quantity,
+        });
+        responseEntries.push({
+          type: 'License:Added',
+          response: { status: '201' },
+          meta: { claims: rawClaims },
+          resource: {
+            resourceType: 'Bundle',
+            type: 'collection',
+            total: documents.length,
+            entry: documents.map((doc) => ({ resource: { resourceType: 'Device', id: doc.id } })),
+          },
+        });
+      } catch (error: any) {
+        const managerError = error instanceof ManagerError ? error : undefined;
+        responseEntries.push({
+          type: 'License:Added',
+          meta: { claims: rawClaims || {} },
+          response: {
+            status: managerError?.status || '400',
+            outcome: createOperationOutcome(
+              IssueLevel.Error,
+              managerError?.code || IssueType.Invalid,
+              error?.message || String(error),
+            ),
+          },
+        });
+      }
+    }
+
+    return {
+      jti: uuidv4(),
+      iss: String(job.requestUrl || ''),
+      aud: String(job.tenantId),
+      thid: job.id,
+      type: 'https://didcomm.org/license-management/1.0/add-response',
+      body: { resourceType: 'Bundle', type: 'batch-response', data: responseEntries },
     };
   }
 

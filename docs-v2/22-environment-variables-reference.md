@@ -86,6 +86,9 @@ If you need the planned separate research store later:
 - Selects the host/network segment behavior.
 - Allowed values: `test`, `local-network`, `test-network`, `network`.
 - If omitted, the server derives it from `NODE_ENV`.
+- Non-production `test` (in-memory ledger), `local-network`, and `test-network`
+  permit a controller-authorized, explicit zero-price professional
+  `License/_add`; `prod` or `network` requires the payment and Order flow.
 
 `FHIR_LEGACY`
 - Enables legacy-compatible FHIR behavior where the runtime still supports it.

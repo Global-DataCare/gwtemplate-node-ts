@@ -1,7 +1,7 @@
 // src/utils/license-issuance.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
@@ -25,28 +25,283 @@ export type IssueActivationCodeParams = {
   tenantVaultId: string;
   userClass: typeof LICENSE_USER_CLASS_EMPLOYEE | typeof LICENSE_USER_CLASS_INDIVIDUAL;
   type: typeof LICENSE_TYPE_MOBILE | typeof LICENSE_TYPE_WEB;
-  email: string;
+  email?: string;
+  phone?: string;
   role: string;
+  ownerOrganizationId?: string;
+  relatedPersonId?: string;
+  invitationId?: string;
+  /** DID of the represented person/animal, never the DID of a physical card or PETD. */
+  subjectDid?: string;
   /** Pre-verified code for a host-authorized postal licence; never log it. */
   activationCode?: string;
 };
+
+export type MaterializeFreeIndividualLicensesParams = {
+  vaultRepository: IVaultRepository;
+  tenantVaultId: string;
+  tenantId: string;
+  ownerOrganizationId: string;
+  quantity: number;
+  /** When true, quantity is the desired pool total rather than seats to add. */
+  ensureTotal?: boolean;
+  /** Assigns the first created seat to the individual controller. */
+  controllerSubjectId?: string;
+  /** DID of the represented person/animal authorized for this seat. */
+  controllerAuthorizedSubjectDid?: string;
+  /** Relationship carried by the controller's active subject grant. */
+  controllerRelationshipRole?: string;
+  controllerEmail?: string;
+  controllerPhone?: string;
+  nowEpochSeconds?: number;
+};
+
+export type MaterializeFreeProfessionalLicensesParams = {
+  vaultRepository: IVaultRepository;
+  tenantVaultId: string;
+  tenantId: string;
+  quantity: number;
+  nowEpochSeconds?: number;
+};
+
+export type ReserveTechnicalControllerSeatParams = {
+  vaultRepository: IVaultRepository;
+  tenantVaultId: string;
+  representativeLicenseId?: string;
+  nowEpochSeconds?: number;
+};
+
+function isServiceControllerRole(value: unknown): boolean {
+  const normalized = normalizeCodeSystemAndValue(String(value || ''));
+  return normalized === 'resprsn' || normalized.endsWith(':resprsn');
+}
+
+/**
+ * Reserves the second initial employee seat for a later technical controller.
+ *
+ * The reservation is intentionally contact-free until the service controller
+ * proves its own email/key binding through `Organization/_issue`. It therefore
+ * counts as assigned but exposes no invented person. Existing bound controller
+ * seats are reused. This operation never creates a third seat: an existing
+ * organization whose second seat belongs to a professional must purchase a
+ * new seat before another technical controller can bind.
+ */
+export async function reserveTechnicalControllerSeat(
+  params: ReserveTechnicalControllerSeatParams,
+): Promise<ConfidentialStorageDoc> {
+  const sectionId = getEnvSectionId('device-licenses');
+  const all = await params.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+    params.tenantVaultId,
+    sectionId,
+  );
+  const employeeSeats = all.filter((doc) =>
+    (doc.content as DeviceLicense | undefined)?.userClass === LICENSE_USER_CLASS_EMPLOYEE);
+  const existing = employeeSeats.find((doc) =>
+    doc.id !== params.representativeLicenseId
+      && isServiceControllerRole((doc.content as DeviceLicense | undefined)?.issuedToRole)
+      && [LICENSE_STATUS_ISSUED, LICENSE_STATUS_ACTIVE].includes(
+        (doc.content as DeviceLicense).status as typeof LICENSE_STATUS_ISSUED | typeof LICENSE_STATUS_ACTIVE,
+      ));
+  if (existing) return existing;
+
+  const now = params.nowEpochSeconds ?? Math.floor(Date.now() / 1000);
+  const document = employeeSeats.find((doc) =>
+    doc.id !== params.representativeLicenseId
+      && (doc.content as DeviceLicense | undefined)?.status === LICENSE_STATUS_AVAILABLE);
+  if (!document) {
+    throw new Error('No available initial seat remains for the technical controller reservation.');
+  }
+  const license = document.content as DeviceLicense & Record<string, unknown>;
+  license.status = LICENSE_STATUS_ISSUED;
+  license.issuedToRole = 'RESPRSN';
+  license.issuedAt = now;
+  delete license.issuedToEmail;
+  delete license.issuedToPhone;
+  delete license.activationCode;
+  document.status = LICENSE_STATUS_ISSUED;
+  document.sequence = Number(document.sequence || 0) + 1;
+  await params.vaultRepository.put(params.tenantVaultId, [document], sectionId);
+  return document;
+}
+
+/**
+ * Adds unassigned employee seats for a zero-cost test-network order.
+ *
+ * The caller owns the environment gate. This helper only materializes the
+ * already-authorized result and never assigns a controller, representative or
+ * employee implicitly. Each later `License/_issue` binds exactly one actor,
+ * while the same seat can hold up to five independently revocable devices.
+ */
+export async function materializeFreeProfessionalLicenses(
+  params: MaterializeFreeProfessionalLicensesParams,
+): Promise<ConfidentialStorageDoc[]> {
+  if (!Number.isInteger(params.quantity) || params.quantity <= 0) {
+    throw new Error('Professional license quantity must be a positive integer.');
+  }
+  const now = params.nowEpochSeconds ?? Math.floor(Date.now() / 1000);
+  const documents: ConfidentialStorageDoc[] = Array.from({ length: params.quantity }, () => {
+    const id = randomUUID();
+    const license: DeviceLicense = {
+      id,
+      tenantId: params.tenantId,
+      orderId: `professional-test-network-free:${params.tenantId}`,
+      userClass: LICENSE_USER_CLASS_EMPLOYEE,
+      userCategory: 'default',
+      type: LICENSE_TYPE_WEB,
+      status: LICENSE_STATUS_AVAILABLE,
+      plan: 'professional-test-network-free',
+      renewalCycle: null,
+      reactivationEnabled: true,
+      maxDevices: 5,
+      exp: now + 31_536_000,
+    };
+    return { id, status: LICENSE_STATUS_AVAILABLE, sequence: 0, content: license };
+  });
+  await params.vaultRepository.put(
+    params.tenantVaultId,
+    documents,
+    getEnvSectionId('device-licenses'),
+  );
+  return documents;
+}
+
+/**
+ * Materializes zero-cost seats for one hosted individual organization.
+ *
+ * This is deliberately scoped by `ownerOrganizationId`: several individual
+ * organizations can coexist in the same UNID tenant vault and must never
+ * borrow each other's member seats.
+ *
+ * Two call modes are supported:
+ * - onboarding uses `ensureTotal=true`, `quantity=2` and a controller id;
+ * - the portal's "Add licenses" action uses `ensureTotal=false` and adds the
+ *   requested number as available seats.
+ */
+export async function materializeFreeIndividualLicenses(
+  params: MaterializeFreeIndividualLicensesParams,
+): Promise<ConfidentialStorageDoc[]> {
+  if (!params.ownerOrganizationId.trim()) throw new Error('ownerOrganizationId is required.');
+  if (!Number.isInteger(params.quantity) || params.quantity <= 0) {
+    throw new Error('Individual license quantity must be a positive integer.');
+  }
+
+  const sectionId = getEnvSectionId('device-licenses');
+  const all = await params.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(params.tenantVaultId, sectionId);
+  const owned = all.filter((doc) => {
+    const license = doc?.content as DeviceLicense | undefined;
+    return license?.userClass === LICENSE_USER_CLASS_INDIVIDUAL
+      && license.ownerOrganizationId === params.ownerOrganizationId;
+  });
+  const now = params.nowEpochSeconds ?? Math.floor(Date.now() / 1000);
+  const expiry = now + 31_536_000;
+  const controllerDocument = owned.find((doc) => {
+    const license = doc.content as DeviceLicense | undefined;
+    return license?.subjectId === params.controllerSubjectId
+      && license?.status === LICENSE_STATUS_ACTIVE;
+  });
+  const controllerAlreadyAssigned = Boolean(controllerDocument);
+  const documents: ConfidentialStorageDoc[] = [];
+
+  // Registrations created before the authoritative subject-directory contract
+  // have an active controller seat but no card/subject binding. Repair that
+  // exact seat idempotently so portal and telephone lookup converge on GW.
+  if (controllerDocument) {
+    const current = controllerDocument.content as DeviceLicense & Record<string, unknown>;
+    const next = {
+      ...current,
+      ...(!current.authorizedSubjectDid && params.controllerAuthorizedSubjectDid
+        ? { authorizedSubjectDid: params.controllerAuthorizedSubjectDid }
+        : {}),
+      ...(!current.issuedToRole && params.controllerRelationshipRole
+        ? { issuedToRole: normalizeControllerRelationshipRole(params.controllerRelationshipRole) }
+        : {}),
+    };
+    if (JSON.stringify(next) !== JSON.stringify(current)) {
+      documents.push({
+        ...controllerDocument,
+        sequence: (controllerDocument.sequence || 0) + 1,
+        content: next as DeviceLicense,
+      });
+    }
+  }
+
+  const seatsToCreate = params.ensureTotal
+    ? Math.max(0, params.quantity - owned.length)
+    : params.quantity;
+
+  for (let index = 0; index < seatsToCreate; index += 1) {
+    const assignController = Boolean(params.controllerSubjectId)
+      && !controllerAlreadyAssigned
+      && index === 0;
+    const id = randomUUID();
+    const status = assignController ? LICENSE_STATUS_ACTIVE : LICENSE_STATUS_AVAILABLE;
+    const license: DeviceLicense = {
+      id,
+      tenantId: params.tenantId,
+      ownerOrganizationId: params.ownerOrganizationId,
+      orderId: `individual-default-free:${params.ownerOrganizationId}`,
+      userClass: LICENSE_USER_CLASS_INDIVIDUAL,
+      type: LICENSE_TYPE_WEB,
+      status,
+      plan: 'individual-default-free',
+      renewalCycle: null,
+      reactivationEnabled: true,
+      exp: expiry,
+      ...(assignController ? {
+        subjectId: params.controllerSubjectId,
+        ...(params.controllerAuthorizedSubjectDid ? { authorizedSubjectDid: params.controllerAuthorizedSubjectDid } : {}),
+        ...(params.controllerEmail ? { issuedToEmail: params.controllerEmail } : {}),
+        ...(params.controllerPhone ? { issuedToPhone: params.controllerPhone } : {}),
+        issuedToRole: normalizeControllerRelationshipRole(params.controllerRelationshipRole),
+        activatedAt: now,
+      } : {}),
+    };
+    documents.push({ id, status, sequence: 0, content: license });
+  }
+
+  if (documents.length > 0) {
+    await params.vaultRepository.put(params.tenantVaultId, documents, sectionId);
+  }
+  return documents;
+}
+
+function normalizeControllerRelationshipRole(role?: string): string {
+  const value = String(role || 'ONESELF').trim().split('|').at(-1)?.toUpperCase() || 'ONESELF';
+  return `v3-RoleCode|${value}`;
+}
 
 /**
  * Reserves one available license from the tenant pool (`device-licenses`) by generating an activation code.
  *
  * This performs the transition:
  * - `available` -> `issued`
- * - adds `activationCode` and invitation metadata (`issuedToEmail`, `issuedToRole`)
+ * - adds `activationCode` and invitation metadata
+ * - when `ownerOrganizationId` is present, never borrows a seat from another
+ *   individual organization hosted in the same UNID tenant
  * - optionally HMAC-indexes the activation code for safe lookups (if KMS is provided)
  */
 export async function issueActivationCodeFromPool(params: IssueActivationCodeParams): Promise<{
   activationCode: string;
   licenseId: string;
 }> {
-  const { vaultRepository, kmsService, tenantVaultId, userClass, type, email, role } = params;
+  const {
+    vaultRepository,
+    kmsService,
+    tenantVaultId,
+    userClass,
+    type,
+    email,
+    phone,
+    role,
+    ownerOrganizationId,
+    relatedPersonId,
+    invitationId,
+    subjectDid,
+  } = params;
 
   const all = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(tenantVaultId, getEnvSectionId('device-licenses'));
-  const normalizedEmail = normalizeIndexedEmail(email);
+  const normalizedEmail = normalizeIndexedEmail(email || '');
+  const normalizedPhone = String(phone || '').replace(/[\s()-]/g, '');
   const normalizedRole = normalizeCodeSystemAndValue(role);
   const now = Math.floor(Date.now() / 1000);
 
@@ -55,12 +310,17 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
     if (!license || license.userClass !== userClass) {
       return false;
     }
+    if (ownerOrganizationId && license.ownerOrganizationId !== ownerOrganizationId) return false;
     if (license.exp && Number(license.exp) < now) {
       return false;
     }
     const issuedEmail = normalizeIndexedEmail(String(license.issuedToEmail || ''));
+    const issuedPhone = String(license.issuedToPhone || '').replace(/[\s()-]/g, '');
     const issuedRole = normalizeCodeSystemAndValue(String(license.issuedToRole || ''));
-    return Boolean(issuedEmail && issuedRole && issuedEmail === normalizedEmail && issuedRole === normalizedRole);
+    const sameRecipient = normalizedEmail
+      ? issuedEmail === normalizedEmail
+      : Boolean(normalizedPhone && issuedPhone === normalizedPhone);
+    return Boolean(sameRecipient && issuedRole && issuedRole === normalizedRole);
   });
 
   const existingMatch = actorMatches
@@ -84,6 +344,7 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
     return (
       license &&
       license.userClass === userClass &&
+      (!ownerOrganizationId || license.ownerOrganizationId === ownerOrganizationId) &&
       license.type === type &&
       status === LICENSE_STATUS_AVAILABLE &&
       !license.activationCode
@@ -95,11 +356,24 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
     return (
       license &&
       license.userClass === userClass &&
+      (!ownerOrganizationId || license.ownerOrganizationId === ownerOrganizationId) &&
       status === LICENSE_STATUS_AVAILABLE &&
       !license.activationCode
     );
   });
-  const match = existingMatch || availableSameType || availableAnyType;
+  const reservedControllerSeat = userClass === LICENSE_USER_CLASS_EMPLOYEE
+    && isServiceControllerRole(normalizedRole)
+    ? all.find((doc) => {
+        const license = doc?.content as DeviceLicense & Record<string, unknown> | undefined;
+        return license?.userClass === LICENSE_USER_CLASS_EMPLOYEE
+          && license.status === LICENSE_STATUS_ISSUED
+          && !license.issuedToEmail
+          && !license.issuedToPhone
+          && !license.activationCode
+          && isServiceControllerRole(license.issuedToRole);
+      })
+    : undefined;
+  const match = existingMatch || reservedControllerSeat || availableSameType || availableAnyType;
 
   if (!match) {
     throw new Error(`No reusable or available license found for userClass='${userClass}'.`);
@@ -109,8 +383,15 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
 
   const license = match.content as DeviceLicense & Record<string, any>;
   license.activationCode = activationCode;
-  license.issuedToEmail = email;
+  if (email) license.issuedToEmail = email;
+  else delete license.issuedToEmail;
+  if (phone) license.issuedToPhone = phone;
+  else delete license.issuedToPhone;
   license.issuedToRole = role;
+  if (ownerOrganizationId) license.ownerOrganizationId = ownerOrganizationId;
+  if (relatedPersonId) license.relatedPersonId = relatedPersonId;
+  if (invitationId) license.invitationId = invitationId;
+  if (subjectDid) license.authorizedSubjectDid = subjectDid;
   license.issuedAt = now;
   license.status = LICENSE_STATUS_ISSUED;
   delete license.activatedAt;

@@ -535,6 +535,126 @@ describe('HostingManager activation flow', () => {
     ).toBe(offerId);
   });
 
+  it('re-registers an existing verified legal representative without an Offer or Order', async () => {
+    let generatedId = 0;
+    (uuidv4 as jest.Mock).mockImplementation(
+      () => `00000000-0000-4000-8000-${String(generatedId += 1).padStart(12, '0')}`,
+    );
+    const firstActivation = await hostingManager.process(buildActivationJob());
+    expect(firstActivation.body.data[0].response.status).toBe('201');
+
+    process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER = 'true';
+    try {
+      const replay = buildActivationJob();
+      (replay.content!.body as any).representativeCredential.type = [
+        'VerifiableCredential',
+        'LegalRepresentativeCredential',
+      ];
+      const replayResponse = await hostingManager.process(replay);
+
+      expect(replayResponse.body.data[0].response.status).toBe('200');
+      expect(replayResponse.body.data[0].meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeUndefined();
+      const claims = replay.content!.body!.data[0]!.meta!.claims;
+      const tenantVaultId = tenantUtils.getTenantVaultId(
+        claims[ClaimsServiceSchemaorg.category] as Sector,
+        claims[ClaimsOrganizationSchemaorg.alternateName] as string,
+      );
+      const employeeSeats = await vaultRepository.getContainersInSection(
+        tenantVaultId,
+        getEnvSectionId('device-licenses'),
+      );
+      expect(employeeSeats).toHaveLength(2);
+      expect(employeeSeats.filter((doc) =>
+        ((doc as ConfidentialStorageDoc).content as DeviceLicense)?.issuedToEmail
+          === claims[ClaimsPersonSchemaorg.email],
+      )).toHaveLength(1);
+    } finally {
+      delete process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER;
+    }
+  });
+
+  it('repairs the mandatory representative reservation before exposing free employee seats', async () => {
+    const job = buildActivationJob();
+    const claims = job.content!.body!.data[0]!.meta!.claims;
+    const tenantId = claims[ClaimsOrganizationSchemaorg.alternateName] as string;
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      claims[ClaimsServiceSchemaorg.category] as Sector,
+      tenantId,
+    );
+    await vaultRepository.createNewVault({ id: tenantVaultId });
+    const physicalTenantCollection = tenantUtils.generateTenantCollectionNameFromClaims(claims);
+    await vaultRepository.createNewVault({ id: physicalTenantCollection });
+    await vaultRepository.put(hostCollectionName, [{
+      id: tenantVaultId,
+      status: 'active',
+      sequence: 0,
+      content: {
+        claims,
+        status: 'active',
+        didDocument: { id: 'did:web:testhost.com:tenant:historical' },
+      },
+    } as ConfidentialStorageDoc], getEnvSectionId('tenants'));
+    await vaultRepository.put(tenantVaultId, [{
+      id: 'technical-controller-seat',
+      status: 'active',
+      sequence: 0,
+      content: {
+        id: 'technical-controller-seat',
+        tenantId,
+        orderId: 'historical-order',
+        userClass: 'employee',
+        userCategory: 'default',
+        type: 'mobile',
+        status: 'active',
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        issuedToEmail: 'technical-controller@example.test',
+        issuedToRole: 'RESPRSN',
+      } as DeviceLicense,
+    } as ConfidentialStorageDoc], getEnvSectionId('device-licenses'));
+    await vaultRepository.put(physicalTenantCollection, [{
+      id: 'stored-controller-employee',
+      status: 'active',
+      sequence: 0,
+      content: {
+        status: EntityLifecycleStatus.Active,
+        claims: {
+          [ClaimsPersonSchemaorg.additionalType]: 'v3-RoleCode|RESPRSN',
+        },
+        didDocument: { id: 'did:web:testhost.com:controller:stored' },
+      },
+    } as ConfidentialStorageDoc], getEnvSectionId('employees'));
+
+    process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER = 'true';
+    try {
+      expect(await hostingManager.reconcileLegacyRepresentativeSeatInventories()).toBe(1);
+      const seats = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+        tenantVaultId,
+        getEnvSectionId('device-licenses'),
+      );
+      expect(seats).toHaveLength(2);
+      expect(seats).toEqual(expect.arrayContaining([
+        expect.objectContaining({ content: expect.objectContaining({
+          issuedToEmail: claims[ClaimsPersonSchemaorg.email],
+          status: 'issued',
+        }) }),
+      ]));
+      expect(seats.filter((seat) => (seat.content as DeviceLicense).status === 'available')).toHaveLength(0);
+      const storedTenant = await vaultRepository.get<ConfidentialStorageDoc>(
+        hostCollectionName,
+        tenantVaultId,
+        getEnvSectionId('tenants'),
+      );
+      expect((storedTenant?.content as any)?.didDocument?.controller).toContain(
+        'did:web:testhost.com:controller:stored',
+      );
+    } finally {
+      delete process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER;
+    }
+  });
+
+
   it('should activate when the representative credential uses a non-did credentialSubject.id', async () => {
     const job = buildActivationJob();
     (job.content!.body as any).representativeCredential.credentialSubject.id = 'urn:person:identifier:controller-001';
