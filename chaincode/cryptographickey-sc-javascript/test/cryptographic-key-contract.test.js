@@ -162,4 +162,30 @@ describe("CryptographicKeyContract", () => {
     await expect(contract.UpdateKeyStatus(ctx, KEY_ID, "active", "nan"))
       .to.be.rejectedWith("Invalid timestamp");
   });
+
+  it("ensures an identical key idempotently and rejects incompatible existing material", async () => {
+    const createCtx = createContractContext({ txSeconds: 10, txId: "TX-ENSURE-CREATE" });
+    const created = await contract.EnsureKey(createCtx, KEY_ID, JSON.stringify(buildPayload()));
+    expect(created).to.deep.equal({ created: true, asset: createCtx.readJson(KEY_ID) });
+
+    const retryCtx = createContractContext({
+      txSeconds: 20,
+      txId: "TX-ENSURE-RETRY",
+      existingState: { [KEY_ID]: created.asset },
+    });
+    const retried = await contract.ensureKey(retryCtx, KEY_ID, JSON.stringify(buildPayload()));
+    expect(retried).to.deep.equal({ created: false, asset: created.asset });
+    expect(retryCtx.writes).to.have.length(0);
+
+    await expect(contract.EnsureKey(
+      createContractContext({ existingState: { [KEY_ID]: created.asset } }),
+      KEY_ID,
+      JSON.stringify(buildPayload({ orgId: "other-org" })),
+    )).to.be.rejectedWith(`CRYPTOGRAPHIC_KEY_CONFLICT:${KEY_ID}`);
+    await expect(contract.EnsureKey(
+      createContractContext({ existingState: { [KEY_ID]: created.asset } }),
+      KEY_ID,
+      JSON.stringify(buildPayload({ thumbprint: "different-thumbprint" })),
+    )).to.be.rejectedWith(`CRYPTOGRAPHIC_KEY_CONFLICT:${KEY_ID}`);
+  });
 });
