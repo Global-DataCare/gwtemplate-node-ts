@@ -317,8 +317,8 @@ describe('HostingManager', () => {
       chaincodeName: 'organization-sc',
       schemaUrl: 'https://schema.example.org/organization',
     };
-    const createOrganizationSpy = jest.spyOn(ManageAssetOrganization.prototype, 'createOrganization').mockResolvedValue({} as any);
-    const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
+    const createOrganizationSpy = jest.spyOn(ManageAssetOrganization.prototype, 'ensureOrganization').mockResolvedValue({ created: true, asset: {} });
+    const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'ensureKey').mockResolvedValue({ created: true, asset: {} });
     const upsertBindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
     const upsertArtifactSpy = jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
     const createArtifactEventSpy = jest.spyOn(ManageAssetArtifactEvent.prototype, 'createArtifactEvent').mockResolvedValue({} as any);
@@ -469,8 +469,8 @@ describe('HostingManager', () => {
       chaincodeName: 'organization-sc',
       schemaUrl: 'https://schema.example.org/organization',
     };
-    jest.spyOn(ManageAssetOrganization.prototype, 'createOrganization').mockResolvedValue({} as any);
-    const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetOrganization.prototype, 'ensureOrganization').mockResolvedValue({ created: true, asset: {} });
+    const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'ensureKey').mockResolvedValue({ created: true, asset: {} });
     const upsertBindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
     jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
     jest.spyOn(ManageAssetArtifactEvent.prototype, 'createArtifactEvent').mockResolvedValue({} as any);
@@ -549,6 +549,137 @@ describe('HostingManager', () => {
         }),
       }),
     }));
+  });
+
+  it('[ledger] registers one key and binding for aliased verification methods that share a JWK thumbprint', async () => {
+    mockConfig.networkMode = 'local-network';
+    mockConfig.ledger = {
+      enabled: true,
+      mspId: 'Org1MSP',
+      chaincodeName: 'organization-sc',
+      schemaUrl: 'https://schema.example.org/organization',
+    };
+    jest.spyOn(ManageAssetOrganization.prototype, 'ensureOrganization').mockResolvedValue({ created: true, asset: {} });
+    const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'ensureKey').mockResolvedValue({ created: true, asset: {} });
+    const upsertBindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
+    const sharedJwk = {
+      kid: 'shared-signing-key',
+      kty: 'EC',
+      crv: 'P-256',
+      x: 'f83OJ3D2xF4nA6J9x6fW3f0r0nD2wU6s5n4b3a2Z1YQ',
+      y: 'x_FEzRu9QkMNFcM8Qk4HkncNHNrF4Pjk6HoydxHDB6Q',
+      use: 'sig',
+      alg: 'ES256',
+    } as any;
+    const publicDid = 'did:web:globaldatacare.es:onehealth-research:organization:taxid:VATES-B42215152';
+    const hostedDid = 'did:web:uhc-gw.unid.online:VATES-B42215152:cds-ES:v1:onehealth-research';
+    const ledgerOrgId = 'urn:org:tax:VATES-B42215152';
+
+    await registerOrganizationOnLedger({
+      ledgerConfig: mockConfig.ledger,
+      hostJurisdiction: mockConfig.host.jurisdiction,
+      namespace: mockConfig.namespace,
+      hostExternalDomain: mockConfig.hostExternalDomain,
+      logger: mockLogger,
+      orgId: ledgerOrgId,
+      organization: {
+        id: ledgerOrgId,
+        type: 'Organization',
+        meta: {
+          claims: {
+            [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+            [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B42215152',
+          },
+        },
+      } as any,
+      config: {
+        governanceVc: { id: 'urn:vc:governance:aliased-did' } as any,
+        didDocument: {
+          id: publicDid,
+          alsoKnownAs: [hostedDid],
+          verificationMethod: [
+            { id: `${publicDid}#${sharedJwk.kid}`, publicKeyJwk: sharedJwk },
+            { id: `${hostedDid}#${sharedJwk.kid}`, publicKeyJwk: { ...sharedJwk } },
+          ],
+        },
+      } as any,
+      role: 'tenant',
+      sector: Sector.HEALTH_CARE,
+      jurisdiction: 'ES',
+    });
+
+    const keyId = toJwkThumbprintSha256Urn(sharedJwk);
+    expect(registerKeySpy).toHaveBeenCalledTimes(1);
+    expect(registerKeySpy).toHaveBeenCalledWith('Org1MSP', keyId, expect.objectContaining({
+      keyId,
+      orgId: ledgerOrgId,
+    }));
+    expect(upsertBindingSpy).toHaveBeenCalledTimes(1);
+    expect(upsertBindingSpy).toHaveBeenCalledWith(
+      'Org1MSP',
+      `organization_${ledgerOrgId}__${keyId}`,
+      expect.objectContaining({
+        keyId,
+        meta: {
+          attributes: expect.objectContaining({
+            verificationMethodId: `${publicDid}#${sharedJwk.kid}`,
+            verificationMethodIds: [
+              `${publicDid}#${sharedJwk.kid}`,
+              `${hostedDid}#${sharedJwk.kid}`,
+            ],
+          }),
+        },
+      }),
+    );
+  });
+
+  it('[ledger] maps a structured Fabric organization conflict detail to 409', async () => {
+    mockConfig.ledger = {
+      enabled: true,
+      mspId: 'Org1MSP',
+      chaincodeName: 'organization-sc',
+      schemaUrl: 'https://schema.example.org/organization',
+    };
+    const conflict = Object.assign(
+      new Error('10 ABORTED: failed to collect enough transaction endorsements'),
+      {
+        code: 10,
+        details: [{
+          address: 'peer0:7051',
+          mspId: 'Org1MSP',
+          message: 'chaincode response 500, ORGANIZATION_CONFLICT:urn:org:tax:VATES-B42215152',
+        }],
+      },
+    );
+    jest.spyOn(ManageAssetOrganization.prototype, 'ensureOrganization').mockRejectedValue(conflict);
+
+    await expect(registerOrganizationOnLedger({
+      ledgerConfig: mockConfig.ledger,
+      hostJurisdiction: mockConfig.host.jurisdiction,
+      namespace: mockConfig.namespace,
+      hostExternalDomain: mockConfig.hostExternalDomain,
+      logger: mockLogger,
+      orgId: 'urn:org:tax:VATES-B42215152',
+      organization: {
+        id: 'urn:org:tax:VATES-B42215152',
+        type: 'Organization',
+        meta: {
+          claims: {
+            [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+            [ClaimsOrganizationSchemaorg.identifierValue]: 'VATES-B42215152',
+          },
+        },
+      } as any,
+      config: {
+        governanceVc: { id: 'urn:vc:governance:conflicting-org' } as any,
+      } as any,
+      role: 'tenant',
+      sector: Sector.HEALTH_CARE,
+      jurisdiction: 'ES',
+    })).rejects.toMatchObject({
+      code: 'conflict',
+      status: '409',
+    });
   });
 
   it('[5.1 TENANT] derives alternateName from identifier.value for legal organizations when omitted', async () => {
