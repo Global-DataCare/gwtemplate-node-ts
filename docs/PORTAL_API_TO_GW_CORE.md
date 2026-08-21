@@ -3,6 +3,12 @@
 Status: Canonical cross-repository functional reference for portal-facing API
 design over GW CORE.
 
+This is the only maintained portal/API mapping in this repository. Versioned
+root tables such as `v1.5-tabla-portal-api-gw.md` are historical pointers and
+must not be used as a second contract. Product portals keep their exhaustive
+concrete route inventory beside their code and classify every route as a CORE
+facade, portal infrastructure, or a product/sector extension.
+
 Use this document when you need to define or review:
 
 - portal/BFF endpoint shape
@@ -58,7 +64,7 @@ CORE behind the scenes.
 | `/organizations/{uuid}/verification-transaction/{requestId}` | `GET` | retrieve the asynchronous legal-verification status/result | reads the portal-stored state or the projected `Organization/_transaction-response` result |
 | `/organizations/{uuid}/activate-tenant` | `POST` | activate a legal organization in GW from an ICA proof / `vp_token` | calls the GW host activation flow and waits for the result |
 | `/organizations/{uuid}/activate-tenant` | `GET` | retrieve activation status/result | reads the status persisted by the portal |
-| `/organizations/{uuid}/did-binding` | `POST` | replace the organization public DID aliases (`alsoKnownAs`) once the legal onboarding already exists | conceptually targets `entity/org.schema/Organization/_binding`; until GW publishes that converged route, the BFF must treat it as a pending capability/helper rather than an already-public contract |
+| `/organizations/{uuid}/did-binding` | `POST` | replace the organization public DID aliases (`alsoKnownAs`) once the legal onboarding already exists | calls the published tenant route `did/document/_binding` and polls `did/document/_binding-response` through the SDK |
 | `/organizations/{uuid}/did-binding` | `GET` | read the current public DID binding/aliases of the organization | resolves the current DID document view and its `alsoKnownAs` aliases from the hosted/provider projection |
 | `/organizations/{uuid}/license-offers` | `POST` | request an offer to buy/add more licenses | today the portal must orchestrate this as its own capability; GW does not yet expose one converged public route for this commercial offer flow |
 | `/organizations/{uuid}/license-offers` | `GET` | list license offers known by the portal | uses portal-side commercial/materialized history |
@@ -67,11 +73,12 @@ CORE behind the scenes.
 | `/organizations/{uuid}/license-orders` | `GET` | list license purchases launched from the portal | uses commercial/materialized history |
 | `/organizations/{uuid}/license-orders/{orderId}` | `GET` | get one purchase status | returns the status materialized by the portal |
 | `/organizations/{uuid}/license-orders/{orderId}/payment-confirmation` | `POST` | confirm payment for a license purchase so seats can be emitted | in portal-managed mode the BFF receives the Stripe or other provider confirmation, then submits one `Order`-style confirmation to GW CORE so seats are emitted from the accepted offer |
-| `/organizations/{uuid}/licenses` | `GET` | list visible organization seats/licenses | the org controller must be able to read this high-level view in web after payment confirmation; the portal can derive it from the `device-licenses` pool or one materialized read model |
+| `/organizations/{uuid}/licenses` | `GET` | list visible organization seats/licenses | calls the SDK organization-controller license reader, backed by tenant `entity/org.schema/License/_search`, and projects the returned seats/devices for the UI |
+| `/organizations/{uuid}/licenses/test-additions` | `POST` | add explicit zero-price seats in an allowed non-production network | calls the SDK organization-controller test helper backed by `entity/org.schema/License/_add`; GW independently rejects the shortcut outside `test`, `local-network`, or `test-network` |
 | `/organizations/{uuid}/orders` | `POST` | confirm the legal-organization offer/license | sends the organization order to GW |
 | `/organizations/{uuid}/orders` | `GET` | list orders launched from the portal | reads portal-stored order history |
 | `/organizations/{uuid}/orders/{orderId}` | `GET` | get one order detail | returns portal-materialized order state |
-| `/organizations/{uuid}/employees` | `POST` | create employees/professionals | sends `Employee/_batch` to GW |
+| `/organizations/{uuid}/employees` | `POST` | create employees/professionals | uses the organization-controller SDK to submit `Employee/_batch`, reserve the existing seat through the canonical identity issue operation, and return its activation credential |
 | `/organizations/{uuid}/employees` | `GET` | list employees/professionals visible to the portal | uses portal storage or a materialized read model |
 | `/organizations/{uuid}/employees/{employeeId}` | `GET` | get one employee/professional detail | returns the known employee detail |
 
@@ -122,7 +129,7 @@ What changes is the verification/preparation step before the start:
 | `/subject/orders` | `POST` | confirm the subject onboarding offer when the frontend already has `offerId` | sends the individual order flow to GW |
 | `/subject/orders` | `GET` | list subject orders known by the portal | uses portal-stored history |
 | `/subject/orders/{orderId}` | `GET` | get one individual order detail/status | returns the portal-materialized state |
-| `/subject/licenses` | `GET` | list visible licenses/seats for the individual/personal organization context | should be exposed as a real portal facade over `device-licenses`; no converged SDK method exists yet, but the source data exists in GW |
+| `/subject/licenses` | `GET` | list visible licenses/seats for the individual/personal organization context | uses the individual-controller SDK license reader backed by `individual/org.schema/License/_search` |
 
 ## IPS And Clinical Read
 
@@ -286,14 +293,18 @@ Use it as a backend concept when you need:
   - it is also useful to distinguish:
     - general individual-context seats/licenses
     - seats/licenses specifically intended to invite subject `members`
-- Do not assume there is already one converged SDK/GW public endpoint for
-  license listing:
-  - `licenses.listAvailable` is still a gap in the SDK layer
-  - but the real source data already exists in GW: the `device-licenses` pool
-  - therefore `GET /organizations/{uuid}/licenses` and `GET /subject/licenses`
-    are reasonable portal facades over an existing backend source
-  - likewise, `GET /subject/member-licenses` can be treated as a functional
-    specialization of that same source for the individual invitation UX
+- License listing is converged in the current Node actor facades:
+  - `OrganizationControllerSdk.listLicenses(...)` uses tenant
+    `entity/org.schema/License/_search`
+  - `IndividualControllerSdk.listLicenses(...)` uses tenant
+    `individual/org.schema/License/_search`
+  - `GET /subject/member-licenses` remains a functional specialization of the
+    same source for the individual invitation UX
+- Explicit zero-cost additions are also a current CORE test capability:
+  - `OrganizationControllerSdk.addFreeEmployeeLicenses(...)` uses
+    `entity/org.schema/License/_add`
+  - this is not a payment confirmation and must remain unavailable in
+    production/network mode
 - Always distinguish these two things:
   - `License/_issue`: does not buy or create new licenses; it reserves one
     existing seat from the `device-licenses` pool and returns an activation code
