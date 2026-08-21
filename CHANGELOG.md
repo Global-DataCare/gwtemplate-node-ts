@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [1.21.22] - 2026-08-20
+
+- Repair an exact two-seat initial professional inventory by converting its
+  free second seat into the contact-free technical-controller reservation.
+  Inventory therefore reports both initial licences as assigned before the
+  later binding/DCR, without replacing a historical professional seat.
+
 ## [1.21.21] - 2026-08-20
 
 - Resolve historical employee records through the authoritative tenant
