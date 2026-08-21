@@ -22,7 +22,7 @@ import { AllowedIndexableClaims } from '../../gdc-backend-utils-node/models/inde
 import { registerOrganizationOnLedger } from '../../utils/ledger-organization-registration';
 import type { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
-import { issueActivationCodeFromPool } from '../../utils/license-issuance';
+import { issueActivationCodeFromPool, reserveTechnicalControllerSeat } from '../../utils/license-issuance';
 import { getPersonOccupationClaim } from '../../utils/occupation';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../../utils/order-communication';
 import { buildGatewayInvoiceBundle } from '../../utils/invoice-bundle';
@@ -277,7 +277,7 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
     const legalRepRole = getPersonOccupationClaim(processedClaims as Record<string, any> | undefined);
     if (legalRepEmail && legalRepRole) {
       try {
-        const { activationCode } = await issueActivationCodeFromPool({
+        const { activationCode, licenseId } = await issueActivationCodeFromPool({
           vaultRepository: deps.vaultRepository,
           kmsService: deps.kmsService,
           tenantVaultId: vaultId,
@@ -289,6 +289,11 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
         });
         (processedClaims as any)['org.schema.IndividualProduct.serialNumber'] = activationCode;
         (processedClaims as any)['org.schema.IndividualProduct.category'] = 'professional';
+        await reserveTechnicalControllerSeat({
+          vaultRepository: deps.vaultRepository,
+          tenantVaultId: vaultId,
+          representativeLicenseId: licenseId,
+        });
       } catch (e: any) {
         deps.logger.warn?.(
           `[HostingManager] Failed to auto-issue legal rep activation code: ${String(e?.message || e)}`,
@@ -418,11 +423,12 @@ export async function processActivatedTenantOrderEntry(
   await deps.vaultRepository.put(tenantVaultId, licenseDocs, getEnvSectionId('device-licenses'));
 
   let activationCode: string | undefined;
+  let representativeLicenseId: string | undefined;
   const legalRepEmail = deps.matchedOfferClaims[ClaimsPersonSchemaorg.email] as string | undefined;
   const legalRepRole = getPersonOccupationClaim(deps.matchedOfferClaims as Record<string, any> | undefined);
   if (legalRepEmail && legalRepRole) {
     try {
-      ({ activationCode } = await issueActivationCodeFromPool({
+      ({ activationCode, licenseId: representativeLicenseId } = await issueActivationCodeFromPool({
         vaultRepository: deps.vaultRepository,
         kmsService: deps.kmsService,
         tenantVaultId,
@@ -431,6 +437,11 @@ export async function processActivatedTenantOrderEntry(
         email: legalRepEmail,
         role: legalRepRole,
       }));
+      await reserveTechnicalControllerSeat({
+        vaultRepository: deps.vaultRepository,
+        tenantVaultId,
+        representativeLicenseId,
+      });
     } catch (e: any) {
       deps.logger.warn?.(
         `[HostingManager] Failed to auto-issue legal rep activation code after activation order: ${String(e?.message || e)}`,

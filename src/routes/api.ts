@@ -1349,6 +1349,37 @@ export function createApiRouter(
    *     responses:
    *       '202': { description: Accepted. Poll the Location URL for the result. }
    *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/License/_add:
+   *   post:
+   *     tags:
+   *       - Organization Licences
+   *     summary: Add explicit zero-cost organization seats on non-production test networks
+   *     description: |
+   *       Controller-authorized simulation restricted to non-production
+   *       `NETWORK_MODE=test`, `local-network`, or `test-network`. The request must carry professional
+   *       licence category, an explicit zero price and a positive quantity.
+   *       It creates available seats only and never reassigns an existing
+   *       representative, technical controller or member. `prod` or `network` rejects
+   *       this shortcut and requires the signed payment plus Order lifecycle.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plain+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the result. }
+   *       '403': { description: Zero-cost professional additions are unavailable outside Test Network. }
+   *
  * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response:
  *   post:
    *     tags:

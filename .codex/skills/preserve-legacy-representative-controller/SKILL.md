@@ -40,9 +40,18 @@ claiming that a binding exists.
 
 ## Preserve employee-seat and device boundaries
 
-- Existing-tenant legacy re-registration reconciles only the missing part of
-  the default two-seat employee pool and issues or reuses the verified
-  representative seat without replacing a technical controller or its seat.
+- New professional organizations reserve their first two seats for the
+  verified representative and a contact-free technical-controller binding.
+  Promotions above two leave only the excess seats available.
+- Never apply the second reservation retroactively. Preserve a historical
+  professional second seat and require a newly added or purchased licence
+  before another controller can bind; never create an implicit third seat.
+- Startup repair may add only a missing mandatory representative seat from
+  protected verified tenant claims and may restore only controller DIDs backed
+  by active protected employee records.
+- Permit zero-price professional `License/_add` only in non-production `test`
+  (in-memory ledger), `local-network`, or `test-network`. `prod` or `network`
+  uses signed payment confirmation and the Order lifecycle.
 - Employee creation persists the employee only. The following explicit
   licence-issue operation reserves the seat and returns the activation
   credential; never consume the same seat in both operations.
