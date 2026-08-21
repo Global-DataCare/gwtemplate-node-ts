@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [1.21.21] - 2026-08-20
+
+- Resolve historical employee records through the authoritative tenant
+  registry/cache mapping during startup reconciliation, with deterministic and
+  logical collection names as read-only fallbacks. This restores missing
+  public controller references when the physical collection name predates the
+  current normalized naming scheme.
+
 ## [1.21.20] - 2026-08-20
 
 - Reserve the first two seats of newly registered professional organizations
