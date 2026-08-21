@@ -778,6 +778,13 @@ For a deterministic Fabric v3 devnet (DEMO single-host or multi-org), see:
 - `../fabric-multicloud/devnet/fabric-v3/README.md`
 - local audit/operator profile in this repo: `docs-v2/24-local-audit-fabric-runtime.md`
 
+Before a local-network image smoke, verify that its packaged organization/key
+chaincode mirror matches the canonical CCAAS source in `fabric-multicloud`:
+
+```bash
+npm run check:identity-chaincode-parity
+```
+
 For the multi-cloud Fabric deployment plan and scripts, see:
 - `../fabric-multicloud/README.md`
 - `docs/04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md`

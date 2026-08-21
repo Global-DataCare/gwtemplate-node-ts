@@ -11,6 +11,9 @@
   `ABORTED` response alike. Stable organization/key incompatibilities map to a
   nested activation conflict (`409`); transient endorsement failures remain
   server errors and can be retried.
+- Document `fabric-multicloud` as the canonical shared-chaincode owner and add
+  an executable parity gate so the GW local-network packaging mirror cannot
+  drift from the CCAAS contracts used in Kubernetes.
 
 - Enable `onehealth-research` by default for every GW sector-resolution path,
   including explicit `ALLOWED_SECTORS` catalogs. Removing it now requires the
