@@ -173,4 +173,38 @@ describe("OrganizationContract", () => {
     expect(asset.vc.id).to.equal("urn:vc:direct-evidence");
     expect(ctx.writes).to.have.length(1);
   });
+
+  it("ensures an identical organization idempotently and rejects a different VC", async () => {
+    const createCtx = createContractContext({ txSeconds: 10, txId: "TX-ORG-ENSURE-CREATE" });
+    const created = await contract.EnsureOrganization(createCtx, ORG_ID, JSON.stringify(buildPayload()));
+    expect(created).to.deep.equal({ created: true, asset: createCtx.readJson(ORG_ID) });
+
+    const retryCtx = createContractContext({
+      txSeconds: 20,
+      txId: "TX-ORG-ENSURE-RETRY",
+      existingState: {
+        [ORG_ID]: created.asset,
+        [`evidence\u0000${DOC_HASH}\u0000${SIGNED_HASH}`]: ORG_ID,
+      },
+    });
+    const retried = await contract.ensureOrganization(retryCtx, ORG_ID, JSON.stringify(buildPayload()));
+    expect(retried).to.deep.equal({ created: false, asset: created.asset });
+    expect(retryCtx.writes).to.have.length(0);
+
+    await expect(contract.EnsureOrganization(
+      createContractContext({ existingState: { [ORG_ID]: created.asset } }),
+      ORG_ID,
+      JSON.stringify(buildPayload({ vc: { id: "urn:vc:different" } })),
+    )).to.be.rejectedWith(`ORGANIZATION_CONFLICT:${ORG_ID}`);
+    await expect(contract.EnsureOrganization(
+      createContractContext(),
+      ORG_ID,
+      JSON.stringify(buildPayload({ orgId: "urn:other" })),
+    )).to.be.rejectedWith(`Payload orgId urn:other does not match ${ORG_ID}`);
+    await expect(contract.EnsureOrganization(
+      createContractContext(),
+      ORG_ID,
+      JSON.stringify({ orgId: ORG_ID, vc: [] }),
+    )).to.be.rejectedWith("vc is required");
+  });
 });

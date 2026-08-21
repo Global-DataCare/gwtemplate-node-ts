@@ -4,7 +4,9 @@
   transactions. GW now ensures compatible organization/key assets, groups
   aliased DID verification methods by JWK thumbprint, and writes one key and
   one subject binding per unique public key while retaining every DID method id
-  as binding metadata.
+  as binding metadata. The bundled local-network chaincode copies expose the
+  same `EnsureOrganization` and `EnsureKey` contract as the deployed CCAAS
+  services, so the documented Docker smoke exercises the production semantics.
 - Inspect Fabric Gateway endorsement details instead of treating every generic
   `ABORTED` response alike. Stable organization/key incompatibilities map to a
   nested activation conflict (`409`); transient endorsement failures remain

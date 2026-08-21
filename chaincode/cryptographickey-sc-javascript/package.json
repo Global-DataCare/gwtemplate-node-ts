@@ -1,6 +1,6 @@
 {
   "name": "cryptographickey-sc",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Smart contract for cryptographic key assets",
   "main": "index.js",
   "engines": {
@@ -26,6 +26,7 @@
   "nyc": {
     "exclude": [
       "coverage/**",
+      "eslint.config.js",
       "test/**"
     ],
     "reporter": [
