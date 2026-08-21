@@ -1133,11 +1133,32 @@ export class HostingManager {
         if (!claims || !tenantId || !sector) continue;
         const tenantVaultId = getTenantVaultId(sector, tenantId);
         await this.reconcileLegacyRepresentativeEmployeeSeats({ tenantVaultId, tenantId, claims });
-        const tenantCollectionName = generateTenantCollectionNameFromClaims(claims);
-        const employeeDocuments = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
-          tenantCollectionName,
-          getEnvSectionId('employees'),
-        );
+        // The logical tenant vault id is stable, but older deployments could
+        // persist employees in a different physical collection. Resolve the
+        // authoritative mapping first and retain the deterministic and logical
+        // names only as compatibility fallbacks. This is especially important
+        // during startup, before a portal can repair a missing public
+        // `didDocument.controller` through an authenticated request.
+        const employeeCollectionCandidates = Array.from(new Set([
+          await this.tenantsCacheManager.getCollectionName(tenantVaultId),
+          generateTenantCollectionNameFromClaims(claims),
+          tenantVaultId,
+        ].filter((value): value is string => Boolean(value))));
+        const employeeDocumentsById = new Map<string, ConfidentialStorageDoc>();
+        for (const collectionName of employeeCollectionCandidates) {
+          try {
+            const documents = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+              collectionName,
+              getEnvSectionId('employees'),
+            );
+            for (const document of documents || []) {
+              if (document?.id) employeeDocumentsById.set(document.id, document);
+            }
+          } catch {
+            // A compatibility candidate may not exist in historical storage.
+          }
+        }
+        const employeeDocuments = Array.from(employeeDocumentsById.values());
         const storedControllerDids: string[] = [];
         for (const employeeDocument of employeeDocuments || []) {
           try {

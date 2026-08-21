@@ -582,8 +582,12 @@ describe('HostingManager activation flow', () => {
       tenantId,
     );
     await vaultRepository.createNewVault({ id: tenantVaultId });
-    const physicalTenantCollection = tenantUtils.generateTenantCollectionNameFromClaims(claims);
+    // Historical registries may resolve to a physical collection whose name
+    // cannot be reconstructed from the normalized claims. Startup repair must
+    // honor the registry/cache mapping before considering compatibility names.
+    const physicalTenantCollection = 'historical-resolved-tenant-collection';
     await vaultRepository.createNewVault({ id: physicalTenantCollection });
+    jest.spyOn(mockTenantsCacheManager, 'getCollectionName').mockResolvedValue(physicalTenantCollection);
     await vaultRepository.put(hostCollectionName, [{
       id: tenantVaultId,
       status: 'active',
