@@ -7,6 +7,7 @@ const DEFAULT_MAX_HEADER_SIZE_BYTES = 128 * 1024;
 const MAIN_SECTORS = ['animal', 'health'] as const;
 const SUBSECTORS = ['research', 'care', 'index', 'tech', 'insurance'] as const;
 const COMPATIBILITY_SECTORS = ['onehealth-research', 'antifraud'] as const;
+const DEFAULT_ALLOWED_SECTORS = ['onehealth-research'] as const;
 
 export type NetworkMode = 'test' | 'local-network' | 'test-network' | 'network';
 export type ResearchStoreProvider = 'postgres' | 'supabase' | 'firestore';
@@ -197,22 +198,48 @@ export function buildSectorsFromMainAndSubsectors(main: MainSector, subsectors: 
   return subsectors.map((sub) => `${main}-${sub}` as Sector);
 }
 
+function applyDefaultAllowedSectors(sectors: Sector[], env: NodeJS.ProcessEnv): Sector[] {
+  const disabledDefaults = String(env.DISABLED_DEFAULT_SECTORS || '')
+    .split(',')
+    .map((sector) => sector.trim())
+    .filter(Boolean);
+  const unsupportedDisabledDefaults = disabledDefaults.filter(
+    (sector) => !DEFAULT_ALLOWED_SECTORS.includes(sector as typeof DEFAULT_ALLOWED_SECTORS[number]),
+  );
+  if (unsupportedDisabledDefaults.length > 0) {
+    throw new Error(
+      `Config Error: DISABLED_DEFAULT_SECTORS can only contain: ${DEFAULT_ALLOWED_SECTORS.join(', ')}.`,
+    );
+  }
+  if (disabledDefaults.length > 0 && !String(env.DISABLED_DEFAULT_SECTORS_REASON || '').trim()) {
+    throw new Error('Config Error: DISABLED_DEFAULT_SECTORS_REASON is required when disabling a default sector.');
+  }
+
+  const resolved = [...sectors];
+  for (const sector of DEFAULT_ALLOWED_SECTORS) {
+    if (!disabledDefaults.includes(sector) && !resolved.includes(sector as Sector)) {
+      resolved.push(sector as Sector);
+    }
+  }
+  return resolved;
+}
+
 export function resolveAllowedSectorsFromEnv(env: NodeJS.ProcessEnv): Sector[] {
   const canonicalCsv = String(env.ALLOWED_SECTORS || '').trim();
   if (canonicalCsv) {
-    return parseAndValidateSectors(canonicalCsv);
+    return applyDefaultAllowedSectors(parseAndValidateSectors(canonicalCsv), env);
   }
 
   const legacyCsv = String(env.SECTORS_ALLOWED || '').trim();
   if (legacyCsv) {
     console.warn('[Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.');
-    return parseAndValidateSectors(legacyCsv);
+    return applyDefaultAllowedSectors(parseAndValidateSectors(legacyCsv), env);
   }
 
   console.warn('[Config] MAINSECTOR + SUBSECTORSALLOWED are deprecated. Use ALLOWED_SECTORS.');
   const main = parseAndValidateMainSector(env.MAINSECTOR);
   const subsectors = parseAndValidateSubsectors(env.SUBSECTORSALLOWED);
-  return buildSectorsFromMainAndSubsectors(main, subsectors);
+  return applyDefaultAllowedSectors(buildSectorsFromMainAndSubsectors(main, subsectors), env);
 }
 
 function getHostEnv(key: string): string | undefined {
