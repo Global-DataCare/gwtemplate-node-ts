@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+- Consolidate the portal-to-GW mapping in
+  `docs/PORTAL_API_TO_GW_CORE.md`: document the published DID binding,
+  organization/individual license search and non-production `License/_add`
+  contracts, and mark the root v1.5 table as historical instead of a competing
+  source of truth.
+
 ## [1.21.22] - 2026-08-20
 
 - Repair an exact two-seat initial professional inventory by converting its
