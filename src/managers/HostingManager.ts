@@ -43,7 +43,7 @@ import { VerificationMethod } from 'gdc-common-utils-ts/models/did';
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import type { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
-import { issueActivationCodeFromPool } from '../utils/license-issuance';
+import { issueActivationCodeFromPool, reserveTechnicalControllerSeat } from '../utils/license-issuance';
 import {
   LICENSE_STATUS_ACTIVE,
   LICENSE_STATUS_AVAILABLE,
@@ -1032,9 +1032,9 @@ export class HostingManager {
    * Repairs the historical legal-organization onboarding invariant without
    * replacing any independently registered controller or assigned seat.
    *
-   * Replays reuse the representative's existing issued/active seat. If a
-   * historical inventory assigned every existing seat before reserving the
-   * representative, one repair seat may be added without evicting any actor.
+   * Replays reuse the representative's existing issued/active seat and reserve
+   * the exact free second initial seat for a later technical-controller
+   * binding. Historical assigned seats are never replaced.
    */
   private async reconcileLegacyRepresentativeEmployeeSeats(input: {
     tenantVaultId: string;
@@ -1095,6 +1095,7 @@ export class HostingManager {
     const issued = representativeSeat
       ? {
           activationCode: String((representativeSeat.content as DeviceLicense).activationCode || '').trim() || undefined,
+          licenseId: representativeSeat.id,
         }
       : await issueActivationCodeFromPool({
           vaultRepository: this.vaultRepository,
@@ -1105,6 +1106,16 @@ export class HostingManager {
           email,
           role,
         });
+    const hasFreeSecondInitialSeat = employeeSeats.length === 2
+      && employeeSeats.some((doc) => doc.id !== issued.licenseId
+        && (doc.content as DeviceLicense | undefined)?.status === LICENSE_STATUS_AVAILABLE);
+    if (hasFreeSecondInitialSeat) {
+      await reserveTechnicalControllerSeat({
+        vaultRepository: this.vaultRepository,
+        tenantVaultId: input.tenantVaultId,
+        representativeLicenseId: issued.licenseId,
+      });
+    }
     const { activationCode } = issued;
     return activationCode;
   }

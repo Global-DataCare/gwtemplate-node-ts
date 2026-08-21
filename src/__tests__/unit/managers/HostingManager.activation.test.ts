@@ -10,6 +10,7 @@ import { ILogger } from '../../../loggers/ILogger';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { LICENSE_STATUS_AVAILABLE, LICENSE_STATUS_ISSUED } from '../../../constants/domain';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import {
   ClaimsOfferSchemaorg,
@@ -568,6 +569,15 @@ describe('HostingManager activation flow', () => {
         ((doc as ConfidentialStorageDoc).content as DeviceLicense)?.issuedToEmail
           === claims[ClaimsPersonSchemaorg.email],
       )).toHaveLength(1);
+      expect(employeeSeats.filter((doc) =>
+        ((doc as ConfidentialStorageDoc).content as DeviceLicense)?.status === LICENSE_STATUS_AVAILABLE,
+      )).toHaveLength(0);
+      expect(employeeSeats.filter((doc) => {
+        const license = ((doc as ConfidentialStorageDoc).content as DeviceLicense);
+        return license.status === LICENSE_STATUS_ISSUED
+          && license.issuedToRole === 'RESPRSN'
+          && !license.issuedToEmail;
+      })).toHaveLength(1);
     } finally {
       delete process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER;
     }
