@@ -37,6 +37,8 @@ for command_name in docker curl node npm; do
   }
 done
 
+bash "${ROOT_DIR}/scripts/check-identity-chaincode-parity.sh"
+
 docker image inspect "$IMAGE_NAME" >/dev/null 2>&1 || {
   echo "ERROR: local image not found: ${IMAGE_NAME}" >&2
   exit 2

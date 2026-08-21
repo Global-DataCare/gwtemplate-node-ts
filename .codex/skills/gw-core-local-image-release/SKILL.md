@@ -25,6 +25,10 @@ image` commands.
 - Run `docker_build_local.sh`; its context must be this repository, never the
   workspace root. Sibling source repositories must not enter the image.
 - Keep `.env*`, credentials, generated output and chaincode outside the image.
+- Run `npm run check:identity-chaincode-parity` before the Docker smoke. Shared
+  identity chaincodes are canonical in sibling `fabric-multicloud`; the GW
+  `chaincode/*-javascript` copies are temporary local-network packaging mirrors
+  and must be byte-equivalent apart from generated dependency/coverage output.
 - Run `npm run docker:smoke:local-network` against the selected image.
 - Run `cloud_deploy.sh` in dry-run mode with the checked-in profiles.
 - Publish the already-tested image with `SKIP_BUILD=true`.
@@ -50,6 +54,8 @@ effective `ConfigMap`/`Secret` references and confirm the expected mode.
 release_tag="$(node -p "require('./package.json').version")-$(git rev-parse --short HEAD)"
 local_image="gw-core:${release_tag}"
 
+npm run check:identity-chaincode-parity
+
 DOCKER_PLATFORM=linux/amd64 LOCAL_IMAGE_NAME="${local_image}" \
   ./docker_build_local.sh
 
@@ -58,6 +64,9 @@ IMAGE_NAME="${local_image}" npm run docker:smoke:local-network
 
 Do not publish after a ping-only smoke. The release gate includes canonical
 ConsentAccess and SMART individual/research flows on Fabric local-network.
+If the parity guard fails, update and release the canonical CCAAS contract
+first, synchronize the GW packaging mirror, and rerun both chaincode suites;
+never fix only the mirror to make the smoke green.
 
 Research search fixtures must query claims preserved by the fail-closed
 digital-twin projection. Prefer exact token claims such as
