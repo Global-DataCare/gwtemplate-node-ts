@@ -26,7 +26,9 @@ describe('server-config sector resolution', () => {
       SUBSECTORSALLOWED: 'research,care,index,tech',
     } as NodeJS.ProcessEnv);
 
-    expect(sectors).toEqual(['animal-research', 'animal-care', 'animal-index', 'animal-tech']);
+    expect(sectors).toEqual([
+      'animal-research', 'animal-care', 'animal-index', 'animal-tech', 'onehealth-research',
+    ]);
   });
 
   it('should default subsectors when SUBSECTORSALLOWED is missing', () => {
@@ -34,7 +36,7 @@ describe('server-config sector resolution', () => {
       MAINSECTOR: 'health',
     } as NodeJS.ProcessEnv);
 
-    expect(sectors).toEqual(['health-research', 'health-care', 'health-index']);
+    expect(sectors).toEqual(['health-research', 'health-care', 'health-index', 'onehealth-research']);
   });
 
   it('should prioritize canonical ALLOWED_SECTORS over every legacy sector setting', () => {
@@ -55,7 +57,30 @@ describe('server-config sector resolution', () => {
       SECTORS_ALLOWED: 'health-care,research',
     } as NodeJS.ProcessEnv);
 
-    expect(sectors).toEqual(['health-care', 'research']);
+    expect(sectors).toEqual(['health-care', 'research', 'onehealth-research']);
+  });
+
+  it('should include onehealth-research even when an explicit catalog omits it', () => {
+    expect(resolveAllowedSectorsFromEnv({
+      ALLOWED_SECTORS: 'health-care,health-research',
+    } as NodeJS.ProcessEnv)).toEqual([
+      'health-care',
+      'health-research',
+      'onehealth-research',
+    ]);
+  });
+
+  it('should require an explicit reason to disable the default onehealth-research sector', () => {
+    expect(() => resolveAllowedSectorsFromEnv({
+      ALLOWED_SECTORS: 'health-care',
+      DISABLED_DEFAULT_SECTORS: 'onehealth-research',
+    } as NodeJS.ProcessEnv)).toThrow(/DISABLED_DEFAULT_SECTORS_REASON/);
+
+    expect(resolveAllowedSectorsFromEnv({
+      ALLOWED_SECTORS: 'health-care',
+      DISABLED_DEFAULT_SECTORS: 'onehealth-research',
+      DISABLED_DEFAULT_SECTORS_REASON: 'This host is contractually restricted to health-care.',
+    } as NodeJS.ProcessEnv)).toEqual(['health-care']);
   });
 
   it('should accept synthetic sectors in an explicit allowed-sector list', () => {

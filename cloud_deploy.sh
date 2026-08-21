@@ -59,6 +59,13 @@ source_env_file() {
   set +a
 }
 
+require_canonical_sector_catalog() {
+  if [[ -z "${ALLOWED_SECTORS:-}" ]]; then
+    echo "ERROR: ALLOWED_SECTORS is required for every gateway deployment." >&2
+    exit 1
+  fi
+}
+
 resolve_versioned_image() {
   local image_ref="$1"
   local explicit_tag="${2:-}"
@@ -203,6 +210,7 @@ deploy_cloud_run() {
   local env_file=".env.deploy.${env_name}"
 
   source_env_file "$env_file"
+  require_canonical_sector_catalog
 
   if [[ -z "${FIRESTORE_PROJECT_ID:-}" || -z "${DEPLOY_REGION:-}" || -z "${DEPLOY_SERVICE_NAME:-}" || -z "${ARTIFACT_REGISTRY_NAME:-}" ]]; then
     echo "ERROR: Missing FIRESTORE_PROJECT_ID, DEPLOY_REGION, DEPLOY_SERVICE_NAME, or ARTIFACT_REGISTRY_NAME."
@@ -249,7 +257,8 @@ deploy_cloud_run() {
     "SECURITY_MODE" "NETWORK_MODE" "FHIR_LEGACY" "JSON_LEGACY" "DIDCOMM_PLAIN" "DEMO_ALLOW_INSECURE_BEARER"
     "ICA_MODE" "ICA_URL_INTERNAL" "ICA_URL_EXTERNAL" "ICA_TLS_CA_PEM"
     "ICA_EXTERNAL_DOMAIN" "CA_EXTERNAL_DOMAIN"
-    "DEV_SEED" "SECTORS_ALLOWED"
+    "DEV_SEED" "ALLOWED_SECTORS" "SECTORS_ALLOWED"
+    "DISABLED_DEFAULT_SECTORS" "DISABLED_DEFAULT_SECTORS_REASON"
     "HOST_LEGAL_NAME" "HOST_JURISDICTION" "HOST_ID_TYPE" "HOST_ID_VALUE"
     "HOST_ADMIN_EMAIL" "HOST_ADMIN_UID" "HOST_ADMIN_ROLE" "HOST_TERMS_URL"
     "ORG_HOST_LEGAL_NAME" "ORG_HOST_JURISDICTION" "ORG_HOST_ID_TYPE" "ORG_HOST_ID_VALUE"
@@ -299,6 +308,7 @@ deploy_gke() {
   fi
 
   source_env_file "$config_file"
+  require_canonical_sector_catalog
 
   GDC_IMAGE="$(resolve_versioned_image "${GDC_IMAGE:-}" "${GDC_IMAGE_TAG:-}" "latest,demo")"
   export GDC_IMAGE
@@ -356,6 +366,13 @@ deploy_gke() {
   bash "$FABRIC_MULTICLOUD_DIR/scripts/05-k8s-deploy-gdc.sh"
 
   local resource_name="${GDC_RESOURCE_NAME:-gwtemplate}"
+  if [[ -n "${ALLOWED_SECTORS:-}" ]]; then
+    echo "⚙️  Applying canonical gateway sector catalog..."
+    kubectl -n "$K8S_NAMESPACE_GDC" set env "deployment/${resource_name}" \
+      ALLOWED_SECTORS="$ALLOWED_SECTORS" \
+      DISABLED_DEFAULT_SECTORS="${DISABLED_DEFAULT_SECTORS:-}" \
+      DISABLED_DEFAULT_SECTORS_REASON="${DISABLED_DEFAULT_SECTORS_REASON:-}"
+  fi
   if [[ -n "${HOST_LEGACY_REPRESENTATIVE_CONTROLLER:-}" ]]; then
     echo "⚙️  Applying legacy representative-controller compatibility policy..."
     kubectl -n "$K8S_NAMESPACE_GDC" set env "deployment/${resource_name}" \

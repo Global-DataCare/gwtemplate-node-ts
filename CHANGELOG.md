@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+- Enable `onehealth-research` by default for every GW sector-resolution path,
+  including explicit `ALLOWED_SECTORS` catalogs. Removing it now requires the
+  explicit `DISABLED_DEFAULT_SECTORS=onehealth-research` opt-out plus a
+  non-empty reason. GKE and Cloud Run release paths propagate the canonical
+  sector variables.
+
 - Consolidate the portal-to-GW mapping in
   `docs/PORTAL_API_TO_GW_CORE.md`: document the published DID binding,
   organization/individual license search and non-production `License/_add`

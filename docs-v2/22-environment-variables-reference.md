@@ -122,6 +122,16 @@ If you need the planned separate research store later:
 
 ## 4. Gateway And Sector Selection
 
+`ALLOWED_SECTORS`
+- Canonical comma-separated gateway sector catalog.
+- `onehealth-research` is enabled by default even if accidentally omitted.
+
+`DISABLED_DEFAULT_SECTORS`
+- Explicit opt-out for a default sector; currently only
+  `onehealth-research` may be listed.
+- Requires a non-empty `DISABLED_DEFAULT_SECTORS_REASON` so the exception is
+  intentional and auditable.
+
 `MAINSECTOR`
 - Main business vertical for the current host.
 - Expected values in this repo: `animal` or `health`.
