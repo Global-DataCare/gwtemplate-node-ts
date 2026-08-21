@@ -73,7 +73,9 @@ describe('Device DCR replacement route story', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     jest.spyOn(ManageAssetOrganization.prototype, 'createOrganization').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetOrganization.prototype, 'ensureOrganization').mockResolvedValue({ created: false, asset: {} } as any);
     jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetCryptographicKey.prototype, 'ensureKey').mockResolvedValue({ created: false, asset: {} } as any);
     jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
     jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
     jest.spyOn(ManageAssetArtifactEvent.prototype, 'createArtifactEvent').mockResolvedValue({} as any);

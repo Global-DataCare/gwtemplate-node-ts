@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+- Make organization activation retries safe across partially committed Fabric
+  transactions. GW now ensures compatible organization/key assets, groups
+  aliased DID verification methods by JWK thumbprint, and writes one key and
+  one subject binding per unique public key while retaining every DID method id
+  as binding metadata.
+- Inspect Fabric Gateway endorsement details instead of treating every generic
+  `ABORTED` response alike. Stable organization/key incompatibilities map to a
+  nested activation conflict (`409`); transient endorsement failures remain
+  server errors and can be retried.
+
 - Enable `onehealth-research` by default for every GW sector-resolution path,
   including explicit `ALLOWED_SECTORS` catalogs. Removing it now requires the
   explicit `DISABLED_DEFAULT_SECTORS=onehealth-research` opt-out plus a

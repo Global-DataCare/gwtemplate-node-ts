@@ -56,6 +56,19 @@ export class ManageAssetCryptographicKey extends ManageAsset {
   ): Promise<object> {
     return this.submit(mspId, 'RegisterKey', keyId, JSON.stringify(payload));
   }
+
+  /**
+   * Creates the key when absent and returns the existing asset when the
+   * on-chain immutable material is compatible. The chaincode rejects a
+   * conflicting owner or key payload with CRYPTOGRAPHIC_KEY_CONFLICT.
+   */
+  public async ensureKey(
+    mspId: string,
+    keyId: string,
+    payload: CryptographicKeyLedgerPayload,
+  ): Promise<{ created: boolean; asset: object }> {
+    return this.submit(mspId, 'EnsureKey', keyId, JSON.stringify(payload)) as Promise<{ created: boolean; asset: object }>;
+  }
 }
 
 export const manageAssetCryptographicKey = new ManageAssetCryptographicKey();

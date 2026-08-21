@@ -22,6 +22,18 @@ export class ManageAssetOrganization extends ManageAsset {
   public async createOrganization(mspId: string, orgId: string, payload: object): Promise<object> {
     return this.submit(mspId, 'CreateOrganization', orgId, JSON.stringify(payload));
   }
+
+  /**
+   * Creates the organization when absent and accepts an identical retry.
+   * A different VC under the same organization id is a domain conflict.
+   */
+  public async ensureOrganization(
+    mspId: string,
+    orgId: string,
+    payload: object,
+  ): Promise<{ created: boolean; asset: object }> {
+    return this.submit(mspId, 'EnsureOrganization', orgId, JSON.stringify(payload)) as Promise<{ created: boolean; asset: object }>;
+  }
 }
 
 export const manageAssetOrganization = new ManageAssetOrganization();

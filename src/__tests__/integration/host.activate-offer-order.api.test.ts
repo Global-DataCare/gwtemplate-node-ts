@@ -1,7 +1,7 @@
 process.env.DEV_SEED = 'true';
 process.env.NODE_ENV = 'test';
 process.env.SECURITY_MODE = 'demo';
-process.env.NETWORK_MODE = 'test';
+process.env.NETWORK_MODE = 'local-network';
 process.env.JSON_LEGACY = 'true';
 process.env.FHIR_LEGACY = 'true';
 process.env.DIDCOMM_PLAIN = 'true';
@@ -20,6 +20,8 @@ process.env.HOST_ADMIN_EMAIL = 'host-admin@example.com';
 process.env.HOST_ADMIN_UID = 'host-admin';
 process.env.HOST_ADMIN_ROLE = 'RESPRSN';
 process.env.HOST_TERMS_URL = 'https://host.example.com/terms';
+process.env.LEDGER_ENABLED = 'true';
+process.env.LEDGER_MSP_ID = 'TestMSP';
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import type * as express from 'express';
@@ -35,6 +37,9 @@ import {
 } from 'gdc-common-utils-ts/constants/schemaorg';
 import { testClaimsTenant1Registration } from '../data/end-to-end.data';
 import { ORGANIZATION_ORDER_REQUEST } from '../data/example-payloads';
+import { ManageAssetOrganization } from '../../blockchain/fabric/v3/manageAssetOrganization';
+import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAssetCryptographicKey';
+import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 
 function buildActivationPayload(): Record<string, unknown> {
   const vpTokenCompact = [
@@ -144,6 +149,7 @@ describe('Host activation Offer/Order route story', () => {
   let server: Server | undefined;
   let queueAdapter: QueueAdapterMem;
   const originalFetch = global.fetch;
+  let ensureKeySpy: ReturnType<typeof jest.spyOn>;
 
   beforeAll(async () => {
     resetServerConfig();
@@ -156,6 +162,15 @@ describe('Host activation Offer/Order route story', () => {
       json: async () => ({}),
       text: async () => '',
     })) as any;
+    jest.spyOn(ManageAssetOrganization.prototype, 'ensureOrganization').mockResolvedValue({
+      created: false,
+      asset: {},
+    } as any);
+    ensureKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'ensureKey').mockResolvedValue({
+      created: false,
+      asset: {},
+    } as any);
+    jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
     const serverInstance = await startServer({ listen: false });
     app = serverInstance.app;
     server = serverInstance.server;
@@ -197,7 +212,8 @@ describe('Host activation Offer/Order route story', () => {
    */
   it('legacy _activate-response exposes the canonical Offer identifier in meta.claims and Order reuses that exact value', async () => {
     const activationPayload = buildActivationPayload() as any;
-    const activationUrl = '/host/cds-es/v1/test/registry/org.schema/Organization/_activate';
+    const activationUrl = '/host/cds-es/v1/local-network/registry/org.schema/Organization/_activate';
+    const keyCallOffset = ensureKeySpy.mock.calls.length;
 
     const activationSubmit = await invokeExpress(app, {
       method: 'POST',
@@ -232,6 +248,11 @@ describe('Host activation Offer/Order route story', () => {
     expect(typeof canonicalOfferId).toBe('string');
     expect(offerId).toContain(':Offer:');
 
+    const activationKeyCalls = ensureKeySpy.mock.calls.slice(keyCallOffset);
+    const activationKeyIds = activationKeyCalls.map((call: any[]) => call[1]);
+    expect(activationKeyIds.length).toBeGreaterThan(0);
+    expect(new Set(activationKeyIds).size).toBe(activationKeyIds.length);
+
     const orderPayload = structuredClone(ORGANIZATION_ORDER_REQUEST) as any;
     orderPayload.thid = 'activation-route-order-thid';
     orderPayload.jti = 'activation-route-order-jti';
@@ -249,7 +270,7 @@ describe('Host activation Offer/Order route story', () => {
 
     const orderSubmit = await invokeExpress(app, {
       method: 'POST',
-      url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
+      url: '/host/cds-es/v1/local-network/registry/org.schema/Order/_batch',
       headers: { 'content-type': 'application/json' },
       body: orderPayload,
     });
@@ -298,7 +319,7 @@ describe('Host activation Offer/Order route story', () => {
 
     const activationSubmit = await invokeExpress(app, {
       method: 'POST',
-      url: '/host/cds-es/v1/test/registry/org.schema/Organization/_activate',
+      url: '/host/cds-es/v1/local-network/registry/org.schema/Organization/_activate',
       headers: { 'content-type': 'application/json' },
       body: activationPayload,
     });

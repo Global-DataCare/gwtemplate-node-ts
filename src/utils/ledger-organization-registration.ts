@@ -14,6 +14,7 @@ import { ManageAssetArtifactEvent } from '../blockchain/fabric/v3/manageAssetArt
 import { ManageAssetCryptographicKey } from '../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 import type { CryptographicKeyLedgerPayload } from '../blockchain/fabric/v3/manageAssetCryptographicKey';
+import { canonicalize } from './json-canon';
 import {
   resolveLedgerOrganizationId,
   hashLedgerString,
@@ -28,6 +29,18 @@ type LedgerConfig = {
   chaincodeName?: string;
   schemaUrl?: string;
 };
+
+function getFabricErrorMessages(error: any): string[] {
+  const details = Array.isArray(error?.details) ? error.details : [];
+  return [
+    String(error?.message || error || ''),
+    ...details.map((detail: any) => String(detail?.message || '')),
+  ].filter(Boolean);
+}
+
+function fabricErrorContains(error: any, token: string): boolean {
+  return getFabricErrorMessages(error).some((message) => message.includes(token));
+}
 
 export async function registerOrganizationOnLedger(params: {
   ledgerConfig?: LedgerConfig;
@@ -65,7 +78,7 @@ export async function registerOrganizationOnLedger(params: {
   }
 
   try {
-    await manager.createOrganization(mspId, ledgerOrgId, payload);
+    await manager.ensureOrganization(mspId, ledgerOrgId, payload);
     await registerOrganizationKeysOnLedger({
       logger: params.logger,
       mspId,
@@ -83,10 +96,16 @@ export async function registerOrganizationOnLedger(params: {
     });
   } catch (error: any) {
     const message = String(error?.message || error);
-    if (message.includes('EvidenceAlreadyRegistered')) {
+    if (fabricErrorContains(error, 'EvidenceAlreadyRegistered')) {
       throw new ManagerError('Evidence already registered for another organization.', IssueType.Conflict);
     }
-    if (message.includes('already exists')) {
+    if (fabricErrorContains(error, 'ORGANIZATION_CONFLICT:')) {
+      throw new ManagerError('Organization already exists on ledger with incompatible credential material.', IssueType.Conflict);
+    }
+    if (fabricErrorContains(error, 'CRYPTOGRAPHIC_KEY_CONFLICT:')) {
+      throw new ManagerError('Cryptographic key already exists on ledger with incompatible ownership or material.', IssueType.Conflict);
+    }
+    if (fabricErrorContains(error, 'already exists')) {
       throw new ManagerError('Organization already registered on ledger.', IssueType.Conflict);
     }
     throw new ManagerError(`Ledger registration failed: ${message}`, IssueType.Exception);
@@ -102,14 +121,50 @@ async function registerOrganizationKeysOnLedger(params: {
   verificationMethods?: Array<{ id?: string; publicKeyJwk?: PublicJwk }>;
 }): Promise<void> {
   const methods = Array.isArray(params.verificationMethods) ? params.verificationMethods : [];
+  const keyGroups = new Map<string, {
+    keyId: string;
+    publicKeyJwk: PublicJwk;
+    verificationMethodIds: string[];
+    thumbprint?: string;
+  }>();
+  for (const method of methods) {
+    const publicKeyJwk = method?.publicKeyJwk as PublicJwk | undefined;
+    if (!publicKeyJwk) continue;
+    const thumbprint = tryGetJwkThumbprint(publicKeyJwk);
+    const keyId = thumbprint
+      || String(method?.id || '').trim()
+      || String(publicKeyJwk.kid || '').trim()
+      || `key_${hashLedgerString(JSON.stringify(publicKeyJwk)).slice(0, 32)}`;
+    const methodId = String(method?.id || '').trim();
+    const existing = keyGroups.get(keyId);
+    if (existing) {
+      if (canonicalize(existing.publicKeyJwk) !== canonicalize(publicKeyJwk)) {
+        throw new ManagerError(
+          `Verification methods resolve to the same ledger key id '${keyId}' with different public material.`,
+          IssueType.Conflict,
+        );
+      }
+      if (methodId && !existing.verificationMethodIds.includes(methodId)) {
+        existing.verificationMethodIds.push(methodId);
+      }
+      continue;
+    }
+    keyGroups.set(keyId, {
+      keyId,
+      publicKeyJwk,
+      verificationMethodIds: methodId ? [methodId] : [],
+      ...(thumbprint ? { thumbprint } : {}),
+    });
+  }
   params.logger.debug('[HostingManager] ledger key registration start', {
     component: 'HostingManager.registerOrganizationKeysOnLedger',
     orgId: params.orgId,
     channelName: params.channelName,
     didDocumentId: params.didDocumentId,
     verificationMethodCount: methods.length,
+    uniqueKeyCount: keyGroups.size,
   });
-  if (methods.length === 0) return;
+  if (keyGroups.size === 0) return;
 
   const keyManager = new ManageAssetCryptographicKey({
     chaincodeName: process.env.LEDGER_CRYPTOGRAPHIC_KEY_CHAINCODE || 'cryptographickey-sc',
@@ -120,15 +175,8 @@ async function registerOrganizationKeysOnLedger(params: {
     channelName: params.channelName,
   });
 
-  for (const method of methods) {
-    const publicKeyJwk = method?.publicKeyJwk as PublicJwk | undefined;
-    if (!publicKeyJwk) continue;
-
-    const thumbprint = tryGetJwkThumbprint(publicKeyJwk);
-    const keyId = thumbprint
-      || String(method?.id || '').trim()
-      || String(publicKeyJwk.kid || '').trim()
-      || `key_${hashLedgerString(JSON.stringify(publicKeyJwk)).slice(0, 32)}`;
+  for (const group of keyGroups.values()) {
+    const { publicKeyJwk, keyId, thumbprint, verificationMethodIds } = group;
     const use = String((publicKeyJwk as any)?.use || '').trim() || inferLedgerJwkUse(publicKeyJwk);
     const relationship = use === 'enc' ? 'organization-encryption' : 'organization-signing';
 
@@ -146,25 +194,16 @@ async function registerOrganizationKeysOnLedger(params: {
       origin: 'did:web',
     };
 
-    try {
-      await keyManager.registerKey(params.mspId, keyId, keyPayload);
-      params.logger.debug('[HostingManager] ledger key registered', {
-        component: 'HostingManager.registerOrganizationKeysOnLedger',
-        orgId: params.orgId,
-        keyId,
-        kid: publicKeyJwk.kid,
-        thumbprintMissing: !thumbprint,
-      });
-    } catch (error: any) {
-      const message = String(error?.message || error);
-      if (!message.includes('already exists')) throw error;
-      params.logger.debug('[HostingManager] ledger key already exists', {
-        component: 'HostingManager.registerOrganizationKeysOnLedger',
-        orgId: params.orgId,
-        keyId,
-        kid: publicKeyJwk.kid,
-      });
-    }
+    const ensuredKey = await keyManager.ensureKey(params.mspId, keyId, keyPayload);
+    params.logger.debug('[HostingManager] ledger key ensured', {
+      component: 'HostingManager.registerOrganizationKeysOnLedger',
+      orgId: params.orgId,
+      keyId,
+      kid: publicKeyJwk.kid,
+      created: ensuredKey.created,
+      thumbprintMissing: !thumbprint,
+      verificationMethodCount: verificationMethodIds.length,
+    });
 
     const bindingId = `organization_${params.orgId}__${keyId}`;
     await bindingManager.upsertSubjectKeyBinding(params.mspId, bindingId, {
@@ -178,7 +217,8 @@ async function registerOrganizationKeysOnLedger(params: {
       meta: {
         attributes: {
           did: params.didDocumentId,
-          verificationMethodId: method?.id,
+          verificationMethodId: verificationMethodIds[0],
+          verificationMethodIds,
           kid: publicKeyJwk.kid,
           thumbprintMissing: !thumbprint,
         },
@@ -260,8 +300,7 @@ async function registerOrganizationArtifactsOnLedger(params: {
         },
       });
     } catch (error: any) {
-      const message = String(error?.message || error);
-      if (!message.includes('already exists')) throw error;
+      if (!fabricErrorContains(error, 'already exists')) throw error;
     }
   }
 }
