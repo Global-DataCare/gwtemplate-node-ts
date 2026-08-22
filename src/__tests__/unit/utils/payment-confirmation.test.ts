@@ -1,4 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach } from '@jest/globals';
+
+/**
+ * Flow contract: portal-managed seat Orders always carry auditable payment and
+ * invoice evidence, including zero-price Test Network orders verified by the
+ * configured mock provider.
+ */
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import {
   PAYMENT_METHOD_STRIPE,
@@ -39,23 +45,31 @@ describe('payment-confirmation', () => {
     expect(result.paymentMethod).toBe(PAYMENT_METHOD_STRIPE);
   });
 
-  it('accepts a zero-price test-network offer without pretending Stripe was exercised', async () => {
+  it('accepts a zero-price test-network offer only with an auditable mock payment proof', async () => {
     process.env.PAYMENT_ORCHESTRATION_MODE = PAYMENT_ORCHESTRATION_MODE_PORTAL_BFF;
-    process.env.PAYMENT_VERIFICATION_MODE = 'live';
+    process.env.PAYMENT_VERIFICATION_MODE = PAYMENT_VERIFICATION_MODE_MOCK;
+
+    await expect(verifyOrderPaymentConfirmation({
+      offerClaims: { [ClaimsOfferSchemaorg.price]: '0' },
+      orderClaims: {
+        [ClaimsOrderSchemaorg.paymentMethod]: PAYMENT_METHOD_STRIPE,
+        [ClaimsOrderSchemaorg.partOfInvoice]: 'in_test_zero_001',
+      },
+    })).resolves.toEqual({
+      verified: true,
+      paymentMethod: PAYMENT_METHOD_STRIPE,
+      invoiceId: 'in_test_zero_001',
+      paymentUrl: undefined,
+    });
+  });
+
+  it('rejects a zero-price portal order that skips payment and invoice evidence', async () => {
+    process.env.PAYMENT_ORCHESTRATION_MODE = PAYMENT_ORCHESTRATION_MODE_PORTAL_BFF;
 
     await expect(verifyOrderPaymentConfirmation({
       offerClaims: { [ClaimsOfferSchemaorg.price]: '0' },
       orderClaims: {},
-      stripeClient: {
-        checkout: { sessions: { retrieve: async () => { throw new Error('Stripe must not be called'); } } },
-        invoices: { retrieve: async () => { throw new Error('Stripe must not be called'); } },
-      } as any,
-    })).resolves.toEqual({
-      verified: true,
-      paymentMethod: undefined,
-      invoiceId: undefined,
-      paymentUrl: undefined,
-    });
+    })).rejects.toThrow('Portal-managed payment confirmation requires Order.paymentMethod');
   });
 
   it('rejects portal-bff paid orders without proof', async () => {

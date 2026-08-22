@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+- Restore configurable employee-seat gating without prematurely consuming the
+  seat. Signed interactive operations can require a license per request; when
+  none is free GW returns a persisted commercial Offer before creating the
+  employee. Legacy/batch imports remain available when neither the request nor
+  `MANDATORY_LICENSE_CREATING_MEMBERS` enables strict mode.
+- Require portal-managed zero-price orders to include payment method and
+  invoice/payment evidence. Test Network may verify that evidence through the
+  configured mock provider, but it no longer materializes seats by silently
+  bypassing the payment contract.
+
 - Make organization activation retries safe across partially committed Fabric
   transactions. GW now ensures compatible organization/key assets, groups
   aliased DID verification methods by JWK thumbprint, and writes one key and
