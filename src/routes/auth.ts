@@ -66,7 +66,7 @@ export function createAuthRouter(
         throw new ManagerError('Missing Bearer token.', IssueType.Security);
       }
       const verificationResult = await appAuthManager.verifyIdToken(idToken);
-      const { sub: userId, tenant_id: tenantId } = verificationResult.payload;
+      const { sub: userId, tenant_id: tenantId, sector } = verificationResult.payload;
 
       // 2. Verify and consume the activation code from the body.
       const activationCode = req.body.subject_token;
@@ -76,8 +76,10 @@ export function createAuthRouter(
       if (!tenantId) {
         throw new ManagerError('tenant_id claim missing from id_token.', IssueType.BusinessRule);
       }
-      // For now, assume a default sector. This could be a claim in the id_token in a real implementation.
-      await appAuthManager.verifyAndConsumeActivationCode(activationCode, tenantId, 'health-care');
+      if (typeof sector !== 'string' || !sector.trim()) {
+        throw new ManagerError('sector claim missing from id_token.', IssueType.BusinessRule);
+      }
+      await appAuthManager.verifyAndConsumeActivationCode(activationCode, tenantId, sector);
 
       // 3. If both are valid, create the initial access token.
       const tokenLifetime = 60; // seconds

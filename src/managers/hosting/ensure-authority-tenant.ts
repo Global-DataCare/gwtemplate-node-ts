@@ -41,6 +41,10 @@ export async function ensureAuthorityTenant(
   if (!hostCollectionName) {
     throw new ManagerError('Host collection not found in cache.', IssueType.NotFound);
   }
+  const hostJurisdiction = String(deps.config.host.jurisdiction || '').trim();
+  if (!hostJurisdiction) {
+    throw new ManagerError('Host jurisdiction is missing from server configuration.', IssueType.Required);
+  }
 
   const existing = await deps.vaultRepository.get<ConfidentialStorageDoc>(hostCollectionName, vaultId, getEnvSectionId('tenants'));
   if (existing) {
@@ -52,7 +56,7 @@ export async function ensureAuthorityTenant(
 
   const hostDid = composeHostDidWebId(deps.config.apiBaseUrl, deps.config.hostExternalDomain);
   const didId = createHostedDidWeb(hostDid, deps.alternateName, {
-    jurisdiction: deps.config.host.jurisdiction || 'es',
+    jurisdiction: hostJurisdiction,
     version: 'v1',
     sector,
   });
@@ -73,7 +77,7 @@ export async function ensureAuthorityTenant(
     deps.config.apiBaseUrl,
     didConfigServices,
     true,
-    { alternateName: deps.alternateName, jurisdiction: deps.config.host.jurisdiction || 'es', version: 'v1', sector },
+    { alternateName: deps.alternateName, jurisdiction: hostJurisdiction, version: 'v1', sector },
   );
   if (deps.externalDomain) {
     didDocument.alsoKnownAs = didDocument.alsoKnownAs || [];
@@ -87,7 +91,7 @@ export async function ensureAuthorityTenant(
   const claims: ClaimsRecord = {
     [ClaimsOrganizationSchemaorg.legalName]: deps.config.host.legalName || 'GW CORE Host',
     [ClaimsOrganizationSchemaorg.alternateName]: deps.alternateName,
-    [ClaimsOrganizationSchemaorg.addressCountry]: deps.config.host.jurisdiction || 'es',
+    [ClaimsOrganizationSchemaorg.addressCountry]: hostJurisdiction,
     [ClaimsOrganizationSchemaorg.identifierType]: idType,
     [ClaimsOrganizationSchemaorg.identifierValue]: idValue,
     [ClaimsServiceSchemaorg.category]: sector,

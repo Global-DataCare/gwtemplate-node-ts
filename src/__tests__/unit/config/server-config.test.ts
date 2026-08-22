@@ -4,6 +4,7 @@
  * every unrecognized value.
  */
 import {
+  DEFAULT_HOST_JURISDICTION,
   buildSectorsFromMainAndSubsectors,
   determineApiBaseUrl,
   getConfig,
@@ -20,6 +21,10 @@ import {
 } from '../../../config/server-config';
 
 describe('server-config sector resolution', () => {
+  it('centralizes the host jurisdiction default', () => {
+    expect(DEFAULT_HOST_JURISDICTION).toBe('es');
+  });
+
   it('should resolve synthetic sectors from MAINSECTOR + SUBSECTORSALLOWED', () => {
     const sectors = resolveAllowedSectorsFromEnv({
       MAINSECTOR: 'animal',

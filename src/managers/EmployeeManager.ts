@@ -35,6 +35,7 @@ import { extractSearchFiltersFromEntry } from '../utils/search-request';
 import type { ITenantsManager } from './ITenantsManager';
 import type { ITenantDidRegistryMutator } from './ITenantDidRegistryMutator';
 import type { IHostRuntime } from './IHostRuntime';
+import { buildOfferOrderIndexedAttributes } from '../utils/offer-order-read-model';
 import {
   ACTION_PURGE,
   LICENSE_STATUS_AVAILABLE,
@@ -43,18 +44,6 @@ import {
 
 const EMPLOYEE_SECTION = getEnvSectionId('employees');
 const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
-
-function isMandatoryLicenseCreatingMembersEnabled(): boolean {
-  return String(process.env.MANDATORY_LICENSE_CREATING_MEMBERS || '').trim().toLowerCase() === 'true';
-}
-
-const EMPLOYEE_LICENSE_REQUIRED_CLAIM = 'gdc.employee.licenseRequired';
-
-function requiresEmployeeLicenseBeforeCreation(claims: ClaimsRecord): boolean {
-  return isMandatoryLicenseCreatingMembersEnabled()
-    || claims[EMPLOYEE_LICENSE_REQUIRED_CLAIM] === true
-    || String(claims[EMPLOYEE_LICENSE_REQUIRED_CLAIM] || '').trim().toLowerCase() === 'true';
-}
 
 export class EmployeeManager {
   private vaultRepository: IVaultRepository;
@@ -310,7 +299,7 @@ export class EmployeeManager {
         if (!claims) {
           throw new ManagerError('Entry requires meta.claims.', IssueType.Required);
         }
-        return this.createEmployee(tenantVaultId, employeeCollectionName, tenantId, tenantUrn, employeeId, claims, type, meta, contentType, sector, jurisdiction);
+        return this.createEmployee(tenantVaultId, employeeCollectionName, tenantId, tenantUrn, employeeId, claims, type, meta, contentType);
       case 'DELETE':
         return this.disableEmployee(employeeCollectionName, tenantVaultId, employeeId, type);
       default:
@@ -340,8 +329,6 @@ export class EmployeeManager {
     entryType: string,
     jobMeta: IDecodedDidcommPayload['meta'],
     contentType?: string,
-    sector?: string,
-    jurisdiction?: string,
   ): Promise<BundleEntry> {
     let signerJwk: PublicJwk | undefined;
     let encrypterJwk: PublicJwk | undefined;
@@ -361,20 +348,22 @@ export class EmployeeManager {
       return this.upsertExistingEmployee(existingEmployee, employeeCollectionName, tenantVaultId, claims, entryType);
     }
 
-    if (requiresEmployeeLicenseBeforeCreation(claims)) {
-      const licenseOffer = await this.requireAvailableEmployeeSeatOrOffer({
-        vaultId: tenantVaultId,
-        tenantId,
-        sector: sector || 'health-care',
-        jurisdiction: jurisdiction || 'us',
-      });
-      if (licenseOffer) return licenseOffer;
-    }
-
     const parsedTenantUrn = parseTenantUrn(tenantUrn);
     if (!parsedTenantUrn) {
       throw new ManagerError(`Invalid tenant URN format: '${tenantUrn}'`, IssueType.Value);
     }
+
+    // Employee/_batch POST is the licensed interactive operation. A future
+    // bulk importer must have its own explicit operation contract; it must not
+    // hide import semantics in Person claims or bypass seat ordering here.
+    const licenseOffer = await this.requireAvailableEmployeeSeatOrOffer({
+      vaultId: tenantVaultId,
+      tenantId,
+      sector: parsedTenantUrn.sector,
+      jurisdiction: parsedTenantUrn.jurisdiction,
+    });
+    if (licenseOffer) return licenseOffer;
+
     const employeeUrnForKeys = createEmployeeUrn({
       namespace: parsedTenantUrn.namespace,
       network: parsedTenantUrn.network,
@@ -623,10 +612,9 @@ export class EmployeeManager {
   }
 
   /**
-   * Strict interactive mode gate. It never reserves the seat here: the
+   * Current employee-create seat gate. It never reserves the seat here: the
    * following `License/_issue` operation owns that mutation and credential
-   * issuance. Batch-import runtimes may disable the gate explicitly so they
-   * can stage unlicensed employee identities for later contracting.
+   * issuance. Future imports require a separate explicit operation.
    */
   private async requireAvailableEmployeeSeatOrOffer(params: {
     vaultId: string;
@@ -669,10 +657,15 @@ export class EmployeeManager {
     const offerId = String(claims[ClaimsOfferSchemaorg.identifier] || '').trim();
     if (!offerId) return;
 
-    const communicationDoc: ConfidentialStorageDoc = {
+    const communicationDoc: ConfidentialStorageDoc & { meta?: { claims: Record<string, unknown> } } = {
       id: offerId,
       status: EntityLifecycleStatus.Active,
       sequence: 0,
+      meta: { claims },
+      indexed: {
+        attributes: buildOfferOrderIndexedAttributes(claims),
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
       content: { claims },
     };
     const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, 'host');

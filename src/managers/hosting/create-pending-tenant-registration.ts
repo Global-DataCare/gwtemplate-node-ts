@@ -18,6 +18,7 @@ import { getEnvSectionId } from '../../utils/section-env';
 import { getTenantVaultId, isValidTenantAlternateName } from '../../utils/tenant';
 import { createOrganizationUrn } from '../../utils/urn';
 import type { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import type { PostalActivationCodeBinding } from 'gdc-common-utils-ts/utils/organization-test-network-credential';
 import {
   HOST_TRANSACTION_REQUIRED_INPUT_CLAIMS,
   HOST_TRANSACTION_REQUIRED_OUTPUT_CLAIMS,
@@ -29,7 +30,7 @@ type CreatePendingTenantRegistrationDeps = Readonly<{
   jobMeta?: DidCommDecodedMetadata;
   fallbackAlternateName?: string;
   primaryDid?: string;
-  postalActivationCodeBinding?: { algorithm: 'scrypt-v1'; salt: string; digest: string };
+  postalActivationCodeBinding?: PostalActivationCodeBinding;
   config: IServerConfig;
   vaultRepository: IVaultRepository;
   kmsService: IKmsService;

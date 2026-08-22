@@ -127,11 +127,7 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
   const { claims: processedClaims, contained } = decryptedContent as any;
   const postalActivationCodeBinding = (decryptedContent as any).postalActivationCodeBinding;
   const postalActivationCode = postalActivationCodeBinding
-    ? verifyBoundPostalActivationCode(claims, {
-        'gdc.activationLicense.codeAlgorithm': postalActivationCodeBinding.algorithm,
-        'gdc.activationLicense.codeSalt': postalActivationCodeBinding.salt,
-        'gdc.activationLicense.codeDigest': postalActivationCodeBinding.digest,
-      }, process.env.HOST_POSTAL_ACTIVATION_PEPPER)
+    ? verifyBoundPostalActivationCode(claims, postalActivationCodeBinding, process.env.HOST_POSTAL_ACTIVATION_PEPPER)
     : undefined;
   const alternateName = processedClaims[ClaimsOrganizationSchemaorg.alternateName] as string;
   const sector = processedClaims[ClaimsServiceSchemaorg.category] as Sector;

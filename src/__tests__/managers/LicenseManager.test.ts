@@ -9,6 +9,7 @@ import { LicenseManager } from '../../managers/LicenseManager';
 import { DeviceLicense, DeviceRestrictions } from 'gdc-common-utils-ts/models/device-license';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { getEnvSectionId } from '../../utils/section-env';
+import { EXAMPLE_SECTOR } from 'gdc-common-utils-ts/examples/shared';
 
 // --- Mocks ---
 
@@ -73,6 +74,7 @@ const createMockLicenseJob = (options: MockLicenseJobOptions): JobRequest => {
     sequence: 0,
     createdAtTimestamp: Date.now(),
     tenantId: 'host', // The job is initiated by the system/host
+    sector: EXAMPLE_SECTOR,
     section: 'system',
     format: 'org.schema',
     resourceType: 'License',
@@ -105,7 +107,7 @@ describe('LicenseManager', () => {
 
   describe('process', () => {
     const TEST_TENANT_ID = 'acme';
-    const TEST_VAULT_ID = 'health-care_acme';
+    const TEST_VAULT_ID = `${EXAMPLE_SECTOR}_acme`;
 
     it('should create licenses and put them in the target vault', async () => {
       // Arrange
@@ -193,6 +195,14 @@ describe('LicenseManager', () => {
       
       // Act & Assert
       await expect(manager.process(job)).rejects.toThrow('License quantity must be a positive number.');
+    });
+
+    it('rejects license persistence when the job has no authoritative sector', async () => {
+      const job = createMockLicenseJob({ targetTenantId: TEST_TENANT_ID, quantity: 1, orderId: 'inv_123', userClass: 'individual', type: 'web' });
+      delete job.sector;
+
+      await expect(manager.process(job)).rejects.toThrow('sector is required to resolve the tenant vault.');
+      expect(mockVaultRepository.put).not.toHaveBeenCalled();
     });
 
     it.each(['test', 'local-network', 'test-network'])(

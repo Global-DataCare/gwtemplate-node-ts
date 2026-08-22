@@ -2,6 +2,12 @@
 // File: src/__tests__/data/observation.data.ts
 
 import type { ConfidentialStorageDoc, MetaTagCoding } from 'gdc-common-utils-ts/models/confidential-storage';
+import { ObservationCategoryCodes } from 'gdc-common-utils-ts/constants/observation-category';
+import {
+  EXAMPLE_OBSERVATION_ANXIETY_CODING,
+  EXAMPLE_OBSERVATION_BODY_WEIGHT_CODING,
+  EXAMPLE_OBSERVATION_EVENT_TIMING_NIGHT_CODING,
+} from 'gdc-common-utils-ts/examples/shared';
 
 // import { ClaimsObservationContext } from 'gdc-sdk-client-ts/src/uhc-fhir-utils-ts/models/params/Observation.params.model.js';
 // Keep these keys local to avoid pulling gdc-sdk-client-ts into Docker builds for tests.
@@ -101,8 +107,8 @@ export const TEST_OBSERVATION_DATA_ENTRY_FROM_CLIENT = {
  * These tags are intentionally short and not meant to contain free text or direct identifiers.
  */
 export const TEST_OBSERVATION_RESEARCH_TAG: MetaTagCoding[] = [
-  { system: 'gdc.tag', code: 'Weight' },
-  { system: 'gdc.tag', code: 'VitalSigns' },
+  EXAMPLE_OBSERVATION_BODY_WEIGHT_CODING,
+  ObservationCategoryCodes.VitalSigns,
 ];
 
 /**
@@ -226,8 +232,8 @@ export const TEST_ANXIETY_OBSERVATION_DATA_ENTRY_FROM_CLIENT = {
 } as const;
 
 export const TEST_ANXIETY_OBSERVATION_RESEARCH_TAG: MetaTagCoding[] = [
-  { system: 'gdc.tag', code: 'Anxiety' },
-  { system: 'gdc.tag', code: 'Night' },
+  EXAMPLE_OBSERVATION_ANXIETY_CODING,
+  EXAMPLE_OBSERVATION_EVENT_TIMING_NIGHT_CODING,
 ];
 
 export const TEST_CONFIDENTIAL_ANXIETY_OBSERVATION_DOC_TO_PROTECT: ConfidentialStorageDoc = {

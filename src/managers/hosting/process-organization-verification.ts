@@ -29,6 +29,7 @@ import {
 } from './hosting-claim-contracts';
 import type { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
 import type { TestNetworkAdmissionVerificationResult } from './organization-test-network-credential';
+import type { PostalActivationCodeBinding } from 'gdc-common-utils-ts/utils/organization-test-network-credential';
 
 type LegalOrganizationVerificationTransactionResource = Readonly<{
   meta?: { claims?: ClaimsRecord };
@@ -86,7 +87,7 @@ type VerificationDeps = Readonly<{
     jobMeta?: DidCommDecodedMetadata;
     fallbackAlternateName?: string;
     primaryDid?: string;
-    postalActivationCodeBinding?: { algorithm: 'scrypt-v1'; salt: string; digest: string };
+    postalActivationCodeBinding?: PostalActivationCodeBinding;
   }) => Promise<ClaimsRecord>;
   createOrganizationIssueClaimsFromClaims: (input: {
     claims: ClaimsRecord;
