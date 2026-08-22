@@ -19,6 +19,7 @@ import { DidCommDecodedMetadata, IDecodedDidcommPayload } from 'gdc-common-utils
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ClaimsIndividualProductSchemaorg, ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import type { PostalActivationCodeBinding } from 'gdc-common-utils-ts/utils/organization-test-network-credential';
 import { getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { validateNewOrganizationClaims } from '../utils/claims-validator';
@@ -1312,7 +1313,7 @@ export class HostingManager {
     jobMeta?: DidCommDecodedMetadata;
     fallbackAlternateName?: string;
     primaryDid?: string;
-    postalActivationCodeBinding?: { algorithm: 'scrypt-v1'; salt: string; digest: string };
+    postalActivationCodeBinding?: PostalActivationCodeBinding;
   }): Promise<ClaimsRecord> {
     return createPendingTenantRegistration({
       claims: input.claims,

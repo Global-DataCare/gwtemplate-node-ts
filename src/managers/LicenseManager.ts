@@ -101,6 +101,9 @@ export class LicenseManager implements IJobProcessor {
     if (!targetTenantId) {
         throw new ManagerError('targetTenantId is a required field.', IssueType.Required);
     }
+    if (!job.sector) {
+      throw new ManagerError('sector is required to resolve the tenant vault.', IssueType.Required);
+    }
     if (!orderId) {
       throw new ManagerError('orderId is a required field.', IssueType.Required);
     }
@@ -160,7 +163,7 @@ export class LicenseManager implements IJobProcessor {
     }
 
     // 4. Persist to the repository
-    const vaultId = getTenantVaultId('health-care', targetTenantId); // Assume sector for now
+    const vaultId = getTenantVaultId(job.sector, targetTenantId);
     await this.vaultRepository.put(vaultId, licenseDocs, getEnvSectionId('device-licenses'));
 
     // 5. Return success response

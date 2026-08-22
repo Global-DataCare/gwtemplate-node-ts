@@ -1,14 +1,21 @@
 ## [Unreleased]
 
-- Restore configurable employee-seat gating without prematurely consuming the
-  seat. Signed interactive operations can require a license per request; when
-  none is free GW returns a persisted commercial Offer before creating the
-  employee. Legacy/batch imports remain available when neither the request nor
-  `MANDATORY_LICENSE_CREATING_MEMBERS` enables strict mode.
+- Require an available professional seat for every current `Employee/_batch`
+  create. When none is free, GW returns a persisted commercial Offer before
+  creating any employee; a future import workflow must use its own explicit
+  operation instead of a private claim or environment-controlled bypass.
+- Derive employee Offer jurisdiction and sector from the authoritative tenant
+  URN. License persistence uses the job sector, and the legacy activation
+  exchange requires a sector in its verified token; no runtime path silently
+  substitutes `us` or `health-care`. The host jurisdiction fallback is defined
+  once in server configuration as `es`.
 - Require portal-managed zero-price orders to include payment method and
   invoice/payment evidence. Test Network may verify that evidence through the
   configured mock provider, but it no longer materializes seats by silently
   bypassing the payment contract.
+- Persist employee-seat Offers with the shared Offer/Order searchable index so
+  the following `Order/_batch` resolves the exact Offer instead of returning a
+  nested 404.
 
 - Make organization activation retries safe across partially committed Fabric
   transactions. GW now ensures compatible organization/key assets, groups

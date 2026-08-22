@@ -1,23 +1,28 @@
 /** One-code contract: Order may issue only the code bound by the delivered postal VC. */
 import { scryptSync } from 'node:crypto';
+import { ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { POSTAL_ACTIVATION_CODE_BINDING_ALGORITHM, type PostalActivationCodeBinding } from 'gdc-common-utils-ts/utils/organization-test-network-credential';
 import {
-  POSTAL_CODE_ALGORITHM_CLAIM, POSTAL_CODE_DIGEST_CLAIM, POSTAL_CODE_INPUT_CLAIM,
-  POSTAL_CODE_SALT_CLAIM, verifyBoundPostalActivationCode,
-} from '../../../managers/hosting/postal-activation-code';
+  EXAMPLE_POSTAL_ACTIVATION_CODE,
+  EXAMPLE_POSTAL_ACTIVATION_CODE_INVALID,
+  EXAMPLE_POSTAL_ACTIVATION_PEPPER,
+  EXAMPLE_POSTAL_ACTIVATION_SALT,
+} from 'gdc-common-utils-ts/examples/shared';
+import { verifyBoundPostalActivationCode } from '../../../managers/hosting/postal-activation-code';
 
 describe('postal activation code binding', () => {
-  const code = 'UNID-ABC1234567';
-  const pepper = 'host-shared-secret';
-  const salt = 'base64url-salt';
-  const registration = {
-    [POSTAL_CODE_ALGORITHM_CLAIM]: 'scrypt-v1',
-    [POSTAL_CODE_SALT_CLAIM]: salt,
-    [POSTAL_CODE_DIGEST_CLAIM]: scryptSync(`${code}:${pepper}`, salt, 32).toString('base64url'),
+  const code = EXAMPLE_POSTAL_ACTIVATION_CODE;
+  const pepper = EXAMPLE_POSTAL_ACTIVATION_PEPPER;
+  const salt = EXAMPLE_POSTAL_ACTIVATION_SALT;
+  const binding: PostalActivationCodeBinding = {
+    algorithm: POSTAL_ACTIVATION_CODE_BINDING_ALGORITHM,
+    salt,
+    digest: scryptSync(`${code}:${pepper}`, salt, 32).toString('base64url'),
   };
 
   it('accepts only the exact delivered code and configured pepper', () => {
-    expect(verifyBoundPostalActivationCode({ [POSTAL_CODE_INPUT_CLAIM]: code }, registration, pepper)).toBe(code);
-    expect(() => verifyBoundPostalActivationCode({ [POSTAL_CODE_INPUT_CLAIM]: 'UNID-WRONG00000' }, registration, pepper))
+    expect(verifyBoundPostalActivationCode({ [ClaimsOrderSchemaorg.confirmationNumber]: code }, binding, pepper)).toBe(code);
+    expect(() => verifyBoundPostalActivationCode({ [ClaimsOrderSchemaorg.confirmationNumber]: EXAMPLE_POSTAL_ACTIVATION_CODE_INVALID }, binding, pepper))
       .toThrow('does not match');
   });
 });

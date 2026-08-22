@@ -5,7 +5,8 @@
  * Flow contract: interactive employee onboarding requires an available seat
  * before identity creation. With no seat it returns an Offer; after Order
  * materialization, creation proceeds without consuming the seat that the
- * explicit License/_issue step must reserve. Batch mode remains configurable.
+ * explicit License/_issue step must reserve. A future batch importer requires
+ * a separate operation contract rather than a hidden Person claim.
  */
 import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -28,6 +29,8 @@ import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
+import { EXAMPLE_DEVICE_LICENSE_AVAILABLE } from 'gdc-common-utils-ts/examples/license';
+import { EXAMPLE_JURISDICTION, EXAMPLE_SECTOR, EXAMPLE_TENANT_IDENTIFIER } from 'gdc-common-utils-ts/examples/shared';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -47,15 +50,14 @@ describe('EmployeeManager', () => {
 
   const mockJwkSet: JwkSet = { keys: [] };
   const MOCKED_OCCUPATION_UUID = 'mocked-occupation-uuid';
-  const TENANT_ALTERNATE_NAME = 'tenant-1';
-  const TENANT_SECTOR = 'health-care';
+  const TENANT_ALTERNATE_NAME = EXAMPLE_TENANT_IDENTIFIER;
+  const TENANT_SECTOR = EXAMPLE_SECTOR;
   const TENANT_VAULT_ID = `${TENANT_SECTOR}_${TENANT_ALTERNATE_NAME}`;
-  const TENANT_URN = `urn:antifraud:soschain-test:us:v1:${TENANT_SECTOR}:entity:tax:123456789`;
+  const TENANT_URN = `urn:antifraud:soschain-test:${EXAMPLE_JURISDICTION.toLowerCase()}:v1:${TENANT_SECTOR}:entity:tax:123456789`;
   const HOST_COLLECTION_NAME = 'host-collection';
   const HOST_DID = 'did:web:host.example.com';
 
   beforeEach(() => {
-    delete process.env.MANDATORY_LICENSE_CREATING_MEMBERS;
     mockVaultRepository = mock<IVaultRepository>();
     mockKmsService = mock<IKmsService>();
     mockTenantsCacheManager = mock<TenantsCacheManager>();
@@ -71,6 +73,11 @@ describe('EmployeeManager', () => {
     );
     (uuidv4 as jest.Mock).mockReturnValue(MOCKED_OCCUPATION_UUID);
     jest.clearAllMocks();
+
+    const availableLicense = structuredClone(EXAMPLE_DEVICE_LICENSE_AVAILABLE) as DeviceLicense;
+    mockVaultRepository.getContainersInSection.mockResolvedValue([
+      { id: availableLicense.id, sequence: 0, content: availableLicense } as unknown as ConfidentialStorageDoc,
+    ]);
 
     mockKmsService.protectConfidentialData.mockImplementation(
       async (doc: ConfidentialStorageDoc, entityId: string): Promise<ConfidentialStorageDoc> => {
@@ -99,8 +106,7 @@ describe('EmployeeManager', () => {
   });
 
   describe('Employee Creation (POST)', () => {
-    it('should return a commercial Offer without creating an employee when strict licensing has no seat', async () => {
-      process.env.MANDATORY_LICENSE_CREATING_MEMBERS = 'true';
+    it('should return a commercial Offer without creating an employee when no licensed seat exists', async () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
       mockVaultRepository.getContainersInSection.mockResolvedValue([]);
@@ -111,17 +117,22 @@ describe('EmployeeManager', () => {
       expect(entry.type).toBe('Employee-license-offer-v1.0');
       expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
       expect(entry.meta.claims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(1);
+      expect(entry.meta.claims[ClaimsOfferSchemaorg.category]).toBe(TENANT_SECTOR);
+      expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain(`:${EXAMPLE_JURISDICTION}:v1:${EXAMPLE_SECTOR}:`);
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
       expect(mockVaultRepository.put).toHaveBeenCalledWith(
         HOST_COLLECTION_NAME,
         expect.any(Array),
         getEnvSectionId('communications'),
       );
+      const persistedOffer = (mockVaultRepository.put as any).mock.calls[0][1][0] as ConfidentialStorageDoc;
+      expect(persistedOffer.indexed?.attributes?.find(
+        (attribute) => attribute.name === ClaimsOfferSchemaorg.identifier,
+      )?.value).toBe(entry.meta.claims[ClaimsOfferSchemaorg.identifier]);
       expect(mockKmsService.provisionKeys).not.toHaveBeenCalled();
     });
 
-    it('should create but not reserve the available seat before explicit License/_issue in strict mode', async () => {
-      process.env.MANDATORY_LICENSE_CREATING_MEMBERS = 'true';
+    it('should create but not reserve the available seat before explicit License/_issue', async () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
       const availableLicense: DeviceLicense = {
@@ -141,36 +152,6 @@ describe('EmployeeManager', () => {
       expect(mockVaultRepository.put).not.toHaveBeenCalledWith(
         TENANT_VAULT_ID,
         expect.any(Array),
-        getEnvSectionId('device-licenses'),
-      );
-    });
-
-    it('should enforce the signed per-operation portal licence requirement without enabling global strict mode', async () => {
-      process.env.MANDATORY_LICENSE_CREATING_MEMBERS = 'false';
-      const claims = {
-        ...testClaimsTenant1Receptionist1,
-        'gdc.employee.licenseRequired': true,
-      };
-      const job = testBaseJobForEmployeeClaims(claims, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
-      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
-      mockVaultRepository.getContainersInSection.mockResolvedValue([]);
-
-      const response = await employeeManager.process(job);
-
-      expect((response.body.data[0] as any).type).toBe('Employee-license-offer-v1.0');
-      expect(mockKmsService.provisionKeys).not.toHaveBeenCalled();
-    });
-
-    it('should preserve unlicensed batch import compatibility when strict licensing is disabled', async () => {
-      process.env.MANDATORY_LICENSE_CREATING_MEMBERS = 'false';
-      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
-      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
-
-      const response = await employeeManager.process(job);
-
-      expect(response.body.data[0].response.status).toBe('201');
-      expect(mockVaultRepository.getContainersInSection).not.toHaveBeenCalledWith(
-        TENANT_VAULT_ID,
         getEnvSectionId('device-licenses'),
       );
     });
@@ -238,27 +219,15 @@ describe('EmployeeManager', () => {
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
       mockTenantsCacheManager.getTenantDid.mockResolvedValue('did:web:host.example.com');
 
-      const issuedLicense: DeviceLicense = {
-        id: 'lic-1',
-        tenantId: TENANT_ALTERNATE_NAME,
-        orderId: 'order-1',
-        userClass: 'employee',
-        userCategory: 'default',
-        type: 'mobile',
-        status: 'issued',
-        plan: 'default',
-        renewalCycle: '12m',
-        reactivationEnabled: false,
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      };
+      const availableLicense = structuredClone(EXAMPLE_DEVICE_LICENSE_AVAILABLE) as DeviceLicense;
       mockVaultRepository.getContainersInSection.mockResolvedValueOnce([
-        { id: issuedLicense.id, sequence: 0, content: issuedLicense } as unknown as ConfidentialStorageDoc,
+        { id: availableLicense.id, sequence: 0, content: availableLicense } as unknown as ConfidentialStorageDoc,
       ]);
 
       const response = await employeeManager.process(job);
 
       expect((response.body.data[0] as any).response.status).toBe('201');
-      expect(mockVaultRepository.getContainersInSection).not.toHaveBeenCalledWith(
+      expect(mockVaultRepository.getContainersInSection).toHaveBeenCalledWith(
         TENANT_VAULT_ID,
         getEnvSectionId('device-licenses'),
       );
@@ -271,19 +240,7 @@ describe('EmployeeManager', () => {
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
       mockTenantsCacheManager.getEntityClaims.mockResolvedValue({});
 
-      const availableLicense: DeviceLicense = {
-        id: 'lic-available',
-        tenantId: TENANT_ALTERNATE_NAME,
-        orderId: 'order-1',
-        userClass: 'employee',
-        userCategory: 'default',
-        type: 'mobile',
-        status: 'available',
-        plan: 'default',
-        renewalCycle: '12m',
-        reactivationEnabled: false,
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      };
+      const availableLicense = structuredClone(EXAMPLE_DEVICE_LICENSE_AVAILABLE) as DeviceLicense;
       mockVaultRepository.getContainersInSection.mockResolvedValueOnce([
         { id: availableLicense.id, sequence: 0, content: availableLicense } as unknown as ConfidentialStorageDoc,
       ]);
@@ -291,7 +248,7 @@ describe('EmployeeManager', () => {
       const response = await employeeManager.process(job);
 
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
-      expect(mockVaultRepository.getContainersInSection).not.toHaveBeenCalledWith(
+      expect(mockVaultRepository.getContainersInSection).toHaveBeenCalledWith(
         TENANT_VAULT_ID,
         getEnvSectionId('device-licenses'),
       );

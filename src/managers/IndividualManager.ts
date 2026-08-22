@@ -163,8 +163,11 @@ export class IndividualManager {
   ): Promise<BundleEntry> {
     
     const parsedTenantUrn = parseTenantUrn(tenantUrn);
-    const sector = parsedTenantUrn?.sector as Sector;
-    const jurisdiction = parsedTenantUrn?.jurisdiction || 'us';
+    if (!parsedTenantUrn) {
+      throw new ManagerError(`Invalid tenant URN format: '${tenantUrn}'`, IssueType.Value);
+    }
+    const sector = parsedTenantUrn.sector as Sector;
+    const jurisdiction = parsedTenantUrn.jurisdiction;
 
     const aggregatedClaims = this._aggregateBatchClaims(entries);
     const { person, service } = this._extractResources(aggregatedClaims, environment);
@@ -175,7 +178,7 @@ export class IndividualManager {
       tenantVaultId,
       tenantId: String((aggregatedClaims as any)[ClaimsOrganizationSchemaorg.alternateName] || this.extractTenantIdFromVaultId(tenantVaultId)),
       individualId: internalId,
-      sector: sector || (aggregatedClaims as any)[ClaimsServiceSchemaorg.category] || 'health-care',
+      sector,
       jurisdiction,
     });
     if (licenseOffer) return licenseOffer;

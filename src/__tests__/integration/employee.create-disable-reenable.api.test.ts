@@ -9,11 +9,14 @@ import {
 } from './helpers/story-flow';
 import { invokeExpress } from './helpers/invokeExpress';
 import { EMPLOYEE_REGISTRATION_REQUEST } from '../data/example-payloads';
+import { ORGANIZATION_ORDER_REQUEST } from '../data/example-payloads';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { EXAMPLE_LICENSE_INVOICE_ID, EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE } from 'gdc-common-utils-ts/examples/shared';
 
 /**
- * Route flow contract: strict interactive creation must return a host Offer
- * rather than persist an unlicensed employee; legacy/batch creation remains a
- * separate compatibility path exercised by the lifecycle story below.
+ * Route flow contract: Employee/_batch POST must return a host Offer rather
+ * than persist an unlicensed employee. Order/_batch then materializes a seat;
+ * import is a future, separate operation and is not encoded in Person claims.
  */
 
 describe('Employee create/disable/re-enable route story', () => {
@@ -41,7 +44,6 @@ describe('Employee create/disable/re-enable route story', () => {
       meta: {
         claims: {
           ...(payload.body.data[0].meta?.claims || {}),
-          'gdc.employee.licenseRequired': true,
         },
       },
     };
@@ -58,8 +60,30 @@ describe('Employee create/disable/re-enable route story', () => {
     const poll = await pollJsonBody(harness.app, submit.headers.location, payload.thid);
     expect(poll.status).toBe(200);
     expect(poll.body.data[0].type).toBe('Employee-license-offer-v1.0');
-    expect(poll.body.data[0].meta?.claims?.['org.schema.Offer.identifier']).toBeTruthy();
+    expect(poll.body.data[0].meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeTruthy();
     expect(poll.body.data[0].resource?.id).toBeUndefined();
+
+    // Confirm the exact Offer through the same auditable zero-price Order path
+    // used by staging; the following lifecycle tests then consume that seat.
+    const offerId = poll.body.data[0].meta.claims[ClaimsOfferSchemaorg.identifier];
+    const orderPayload = structuredClone(ORGANIZATION_ORDER_REQUEST) as any;
+    orderPayload.body.data[0].meta = {};
+    orderPayload.body.data[0].resource = { meta: { claims: {
+      [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
+      [ClaimsOrderSchemaorg.paymentMethod]: EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE,
+      [ClaimsOrderSchemaorg.partOfInvoice]: EXAMPLE_LICENSE_INVOICE_ID,
+    } } };
+    const orderSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
+      headers: { 'content-type': 'application/json' },
+      body: orderPayload,
+    });
+    expect(orderSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+    const orderPoll = await pollJsonBody(harness.app, orderSubmit.headers.location, orderPayload.thid);
+    expect(orderPoll.status).toBe(200);
+    expect(orderPoll.body.data[0].response.status).toBe('201');
   });
 
   it('creates an employee, disables it, and re-enables the same business identity', async () => {

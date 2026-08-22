@@ -3,6 +3,7 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 
 let configInstance: IServerConfig;
 const DEFAULT_MAX_HEADER_SIZE_BYTES = 128 * 1024;
+export const DEFAULT_HOST_JURISDICTION = 'es';
 
 const MAIN_SECTORS = ['animal', 'health'] as const;
 const SUBSECTORS = ['research', 'care', 'index', 'tech', 'insurance'] as const;
@@ -414,7 +415,7 @@ export function getConfig(): IServerConfig {
       },
       host: {
         legalName: getHostEnv('LEGAL_NAME'),
-        jurisdiction: getHostEnv('JURISDICTION'),
+        jurisdiction: getHostEnv('JURISDICTION') || DEFAULT_HOST_JURISDICTION,
         coverageScope: process.env.HOST_COVERAGE_SCOPE || 'EU',
         idType: getHostEnv('ID_TYPE'),
         idValue: getHostEnv('ID_VALUE'),
