@@ -146,7 +146,7 @@ export async function verifyOrderPaymentConfirmation(input: {
 }): Promise<PaymentConfirmationResult> {
   const { orderClaims, offerClaims } = input;
   const amount = resolveOrderPrice(offerClaims);
-  if (amount <= 0) {
+  if (amount <= 0 && resolvePaymentOrchestrationMode() === PAYMENT_ORCHESTRATION_MODE_GW_CORE) {
     return {
       verified: true,
       paymentMethod: normalizeText(orderClaims[ClaimsOrderSchemaorg.paymentMethod]),

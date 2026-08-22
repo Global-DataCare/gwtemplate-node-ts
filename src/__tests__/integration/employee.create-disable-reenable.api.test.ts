@@ -10,6 +10,12 @@ import {
 import { invokeExpress } from './helpers/invokeExpress';
 import { EMPLOYEE_REGISTRATION_REQUEST } from '../data/example-payloads';
 
+/**
+ * Route flow contract: strict interactive creation must return a host Offer
+ * rather than persist an unlicensed employee; legacy/batch creation remains a
+ * separate compatibility path exercised by the lifecycle story below.
+ */
+
 describe('Employee create/disable/re-enable route story', () => {
   let harness: StoryHarness;
   let tenantId: string;
@@ -24,6 +30,36 @@ describe('Employee create/disable/re-enable route story', () => {
   afterAll(async () => {
     global.fetch = originalFetch;
     await stopStoryServer(harness);
+  });
+
+  it('returns a commercial Offer before creating an interactive employee when no seat is free', async () => {
+    const employeeUrl = `/${tenantId}/cds-es/v1/health-care/entity/org.schema/Employee/_batch`;
+    const payload = structuredClone(EMPLOYEE_REGISTRATION_REQUEST) as any;
+    payload.thid = 'employee-strict-license-offer-story-thid';
+    payload.jti = 'employee-strict-license-offer-story-jti';
+    payload.body.data[0].resource = {
+      meta: {
+        claims: {
+          ...(payload.body.data[0].meta?.claims || {}),
+          'gdc.employee.licenseRequired': true,
+        },
+      },
+    };
+    payload.body.data[0].meta = {};
+    payload.body.data[0].request = { method: 'POST' };
+
+    const submit = await invokeExpress(harness.app, {
+      method: 'POST', url: employeeUrl,
+      headers: { 'content-type': 'application/json' }, body: payload,
+    });
+    expect(submit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+
+    const poll = await pollJsonBody(harness.app, submit.headers.location, payload.thid);
+    expect(poll.status).toBe(200);
+    expect(poll.body.data[0].type).toBe('Employee-license-offer-v1.0');
+    expect(poll.body.data[0].meta?.claims?.['org.schema.Offer.identifier']).toBeTruthy();
+    expect(poll.body.data[0].resource?.id).toBeUndefined();
   });
 
   it('creates an employee, disables it, and re-enables the same business identity', async () => {

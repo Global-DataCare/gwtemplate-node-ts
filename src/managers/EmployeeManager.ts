@@ -38,13 +38,23 @@ import type { IHostRuntime } from './IHostRuntime';
 import {
   ACTION_PURGE,
   LICENSE_STATUS_AVAILABLE,
-  LICENSE_STATUS_ISSUED,
-  LICENSE_TYPE_MOBILE,
   LICENSE_USER_CLASS_EMPLOYEE,
 } from '../constants/domain';
 
 const EMPLOYEE_SECTION = getEnvSectionId('employees');
 const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
+
+function isMandatoryLicenseCreatingMembersEnabled(): boolean {
+  return String(process.env.MANDATORY_LICENSE_CREATING_MEMBERS || '').trim().toLowerCase() === 'true';
+}
+
+const EMPLOYEE_LICENSE_REQUIRED_CLAIM = 'gdc.employee.licenseRequired';
+
+function requiresEmployeeLicenseBeforeCreation(claims: ClaimsRecord): boolean {
+  return isMandatoryLicenseCreatingMembersEnabled()
+    || claims[EMPLOYEE_LICENSE_REQUIRED_CLAIM] === true
+    || String(claims[EMPLOYEE_LICENSE_REQUIRED_CLAIM] || '').trim().toLowerCase() === 'true';
+}
 
 export class EmployeeManager {
   private vaultRepository: IVaultRepository;
@@ -351,6 +361,16 @@ export class EmployeeManager {
       return this.upsertExistingEmployee(existingEmployee, employeeCollectionName, tenantVaultId, claims, entryType);
     }
 
+    if (requiresEmployeeLicenseBeforeCreation(claims)) {
+      const licenseOffer = await this.requireAvailableEmployeeSeatOrOffer({
+        vaultId: tenantVaultId,
+        tenantId,
+        sector: sector || 'health-care',
+        jurisdiction: jurisdiction || 'us',
+      });
+      if (licenseOffer) return licenseOffer;
+    }
+
     const parsedTenantUrn = parseTenantUrn(tenantUrn);
     if (!parsedTenantUrn) {
       throw new ManagerError(`Invalid tenant URN format: '${tenantUrn}'`, IssueType.Value);
@@ -602,12 +622,15 @@ export class EmployeeManager {
     };
   }
 
-  private async tryConsumeEmployeeSeatOrOffer(params: {
+  /**
+   * Strict interactive mode gate. It never reserves the seat here: the
+   * following `License/_issue` operation owns that mutation and credential
+   * issuance. Batch-import runtimes may disable the gate explicitly so they
+   * can stage unlicensed employee identities for later contracting.
+   */
+  private async requireAvailableEmployeeSeatOrOffer(params: {
     vaultId: string;
     tenantId: string;
-    employeeId: string;
-    email: string;
-    role: string;
     sector: string;
     jurisdiction: string;
   }): Promise<BundleEntry | undefined> {
@@ -618,11 +641,6 @@ export class EmployeeManager {
       )) || [];
 
     const employeeLicenseDocs = licenseDocs.filter((doc) => (doc.content as DeviceLicense | undefined)?.userClass === LICENSE_USER_CLASS_EMPLOYEE);
-    if (employeeLicenseDocs.length === 0) {
-      // No employee licenses in the vault => licensing not configured; do not gate.
-      return undefined;
-    }
-
     const availableDoc = employeeLicenseDocs.find((doc) => (doc.content as DeviceLicense).status === LICENSE_STATUS_AVAILABLE);
     if (!availableDoc) {
       const allowedPaymentMethods = (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(',').map(s => s.trim()).filter(Boolean);
@@ -644,20 +662,6 @@ export class EmployeeManager {
       };
     }
 
-    const nowSec = Math.floor(Date.now() / 1000);
-    const updatedLicense: DeviceLicense = {
-      ...(availableDoc.content as DeviceLicense),
-      status: LICENSE_STATUS_ISSUED,
-      subjectId: params.employeeId,
-      issuedToEmail: params.email,
-      issuedToRole: params.role,
-      issuedAt: nowSec,
-    };
-    await this.vaultRepository.put(
-      params.vaultId,
-      [{ ...availableDoc, content: updatedLicense }],
-      DEVICE_LICENSE_SECTION,
-    );
     return undefined;
   }
 

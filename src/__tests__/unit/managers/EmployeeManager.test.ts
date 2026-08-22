@@ -2,15 +2,16 @@
 // File: src/__tests__/unit/managers/EmployeeManager.test.ts
 
 /**
- * Flow contract: employee onboarding consumes one organization-owned seat,
- * binds it to the canonical employee identity and role, and only then permits
- * later issue, token and device-registration operations.
+ * Flow contract: interactive employee onboarding requires an available seat
+ * before identity creation. With no seat it returns an Offer; after Order
+ * materialization, creation proceeds without consuming the seat that the
+ * explicit License/_issue step must reserve. Batch mode remains configurable.
  */
 import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
-import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { RecordBase, ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { JwkSet } from '../../../gdc-backend-utils-node/models/jwk';
 import {
@@ -54,6 +55,7 @@ describe('EmployeeManager', () => {
   const HOST_DID = 'did:web:host.example.com';
 
   beforeEach(() => {
+    delete process.env.MANDATORY_LICENSE_CREATING_MEMBERS;
     mockVaultRepository = mock<IVaultRepository>();
     mockKmsService = mock<IKmsService>();
     mockTenantsCacheManager = mock<TenantsCacheManager>();
@@ -97,6 +99,82 @@ describe('EmployeeManager', () => {
   });
 
   describe('Employee Creation (POST)', () => {
+    it('should return a commercial Offer without creating an employee when strict licensing has no seat', async () => {
+      process.env.MANDATORY_LICENSE_CREATING_MEMBERS = 'true';
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockVaultRepository.getContainersInSection.mockResolvedValue([]);
+
+      const response = await employeeManager.process(job);
+
+      const entry = response.body.data[0] as any;
+      expect(entry.type).toBe('Employee-license-offer-v1.0');
+      expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
+      expect(entry.meta.claims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(1);
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+      expect(mockVaultRepository.put).toHaveBeenCalledWith(
+        HOST_COLLECTION_NAME,
+        expect.any(Array),
+        getEnvSectionId('communications'),
+      );
+      expect(mockKmsService.provisionKeys).not.toHaveBeenCalled();
+    });
+
+    it('should create but not reserve the available seat before explicit License/_issue in strict mode', async () => {
+      process.env.MANDATORY_LICENSE_CREATING_MEMBERS = 'true';
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      const availableLicense: DeviceLicense = {
+        id: 'strict-seat-1', tenantId: TENANT_ALTERNATE_NAME, orderId: 'order-1',
+        userClass: 'employee', userCategory: 'default', type: 'mobile', status: 'available',
+        plan: 'default', renewalCycle: '12m', reactivationEnabled: false,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      };
+      mockVaultRepository.getContainersInSection.mockResolvedValue([
+        { id: availableLicense.id, sequence: 0, content: availableLicense } as unknown as ConfidentialStorageDoc,
+      ]);
+
+      const response = await employeeManager.process(job);
+
+      expect(response.body.data[0].response.status).toBe('201');
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+      expect(mockVaultRepository.put).not.toHaveBeenCalledWith(
+        TENANT_VAULT_ID,
+        expect.any(Array),
+        getEnvSectionId('device-licenses'),
+      );
+    });
+
+    it('should enforce the signed per-operation portal licence requirement without enabling global strict mode', async () => {
+      process.env.MANDATORY_LICENSE_CREATING_MEMBERS = 'false';
+      const claims = {
+        ...testClaimsTenant1Receptionist1,
+        'gdc.employee.licenseRequired': true,
+      };
+      const job = testBaseJobForEmployeeClaims(claims, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockVaultRepository.getContainersInSection.mockResolvedValue([]);
+
+      const response = await employeeManager.process(job);
+
+      expect((response.body.data[0] as any).type).toBe('Employee-license-offer-v1.0');
+      expect(mockKmsService.provisionKeys).not.toHaveBeenCalled();
+    });
+
+    it('should preserve unlicensed batch import compatibility when strict licensing is disabled', async () => {
+      process.env.MANDATORY_LICENSE_CREATING_MEMBERS = 'false';
+      const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      const response = await employeeManager.process(job);
+
+      expect(response.body.data[0].response.status).toBe('201');
+      expect(mockVaultRepository.getContainersInSection).not.toHaveBeenCalledWith(
+        TENANT_VAULT_ID,
+        getEnvSectionId('device-licenses'),
+      );
+    });
+
     it('should create employee, index kids securely, and save protected documents', async () => {
       // ARRANGE
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
