@@ -39,8 +39,12 @@ run_gate() {
   local log_file="${EVIDENCE_DIR}/logs/${gate_id}.log"
   echo "[evidence] ${gate_id}"
   set +e
-  "$@" > >(tee "${log_file}") 2>&1
-  local status=$?
+  "$@" 2>&1 \
+    | sed -E \
+      -e 's/^Password: .+$/Password: [REDACTED]/' \
+      -e 's#(https?://[^:/[:space:]]+):[^@/[:space:]]+@#\1:[REDACTED]@#g' \
+    | tee "${log_file}"
+  local status="${PIPESTATUS[0]}"
   set -e
   if [[ ${status} -ne 0 ]]; then
     printf 'FAIL\n' > "${EVIDENCE_DIR}/gates/${gate_id}.status"
@@ -49,6 +53,19 @@ run_gate() {
   fi
   printf 'PASS\n' > "${EVIDENCE_DIR}/gates/${gate_id}.status"
   echo "[evidence] PASS ${gate_id}"
+}
+
+assert_public_evidence_contains_no_demo_secrets() {
+  local leaked_secret_pattern
+  leaked_secret_pattern='(adminpw|peer0org1pw|peer0org2pw|ordereradminpw|orderer0pw)'
+  if rg -n "${leaked_secret_pattern}" "${EVIDENCE_DIR}"; then
+    echo 'Public evidence contains a disposable devnet enrollment secret.' >&2
+    return 1
+  fi
+  if rg -n --pcre2 'Password: (?!\[REDACTED\])' "${EVIDENCE_DIR}"; then
+    echo 'Public evidence contains an unredacted password line.' >&2
+    return 1
+  fi
 }
 
 require_repository() {
@@ -256,6 +273,7 @@ run_gate 35-human-channel-taxonomy test_human_channel_taxonomy
 run_gate 36-employee-onboarding-contract test_employee_onboarding_contract
 run_gate 40-gw-postgres-ipfs-fabric-runtime prove_runtime_data_plane
 run_gate 50-evidence-summary write_summary
+run_gate 60-public-secret-scan assert_public_evidence_contains_no_demo_secrets
 
 node "${GW_ROOT}/scripts/build-open-source-evidence-manifest.mjs" \
   --evidence-dir "${EVIDENCE_DIR}" \

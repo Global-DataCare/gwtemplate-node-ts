@@ -13,6 +13,8 @@
   check with the employee onboarding/DCR integration contract so a provisional
   shared host can serve `entity` and `individual` routes without conflating
   their identity channels.
+- Redact disposable Fabric CA passwords from presentation logs and fail the
+  final public-evidence gate if a known devnet enrollment secret remains.
 
 - Keep one canonical tenant identity when one organization splits capabilities
   across operators. `TENANT_SERVICE_ROUTES_JSON` can now publish different DID

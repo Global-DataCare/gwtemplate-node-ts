@@ -74,6 +74,8 @@ grep -Fq 'SECRETARY_SMART_TOKEN_REQUEST_DENY' ./scripts/smoke-smart-access-local
 grep -Fq 'medical-secretary-consent-smart-bundle-search-allow' \
   ./scripts/smoke-smart-access-local-network.sh
 grep -Fq 'humanAccessProof' ./scripts/build-open-source-evidence-manifest.mjs
+grep -Fq 'Password: [REDACTED]' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq '60-public-secret-scan' ./scripts/collect-open-source-production-readiness-evidence.sh
 
 if grep -Fq '../../gdc-common-utils-ts/src/' ./scripts/render-demo-smart-access-payload.mts; then
   echo 'ERROR: release payload rendering must not import sibling workspace source.' >&2
