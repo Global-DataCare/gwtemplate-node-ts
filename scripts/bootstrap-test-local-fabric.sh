@@ -42,8 +42,8 @@ cat >> "${OUT_ENV}" <<EOF
 NETWORK_MODE=test-network
 LEDGER_PROVIDER_DEFAULT=fabric
 LEDGER_PROVIDER_MAP=test=mem,test-network=fabric,network=fabric
-LEDGER_MSP_ID=Org1MSP
-LEDGER_FABRIC_MSP_ID=Org1MSP
+LEDGER_MSP_ID=Host1MSP
+LEDGER_FABRIC_MSP_ID=Host1MSP
 EOF
 cat "${DEVNET_ENV}" >> "${OUT_ENV}"
 

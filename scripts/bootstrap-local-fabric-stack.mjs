@@ -37,6 +37,9 @@ const config = {
   startGw: args.startGw,
   restartGw: args.restartGw,
   prepareOnly: args.prepareOnly,
+  fabricCaSource: process.env.LOCAL_FABRIC_CA_SOURCE || 'dev',
+  dataspaceCaRootDir: process.env.DATASPACE_CA_ROOT_DIR,
+  dataspaceCaIssuerDir: process.env.DATASPACE_CA_ISSUER_DIR,
 };
 
 const envFileValues = existsSync(config.envFile) ? parseSimpleEnv(readFileSync(config.envFile, 'utf8')) : {};
@@ -48,6 +51,9 @@ if (!args.hostJurisdiction && envFileValues.HOST_JURISDICTION) {
 async function main() {
   requirePath(fabricDevnetRoot, 'Missing sibling Fabric devnet repo');
   requirePath(resolve(repoRoot, '.env.local-demo'), 'Missing .env.local-demo');
+  if (!['dev', 'dataspace-ca'].includes(config.fabricCaSource)) {
+    throw new Error('LOCAL_FABRIC_CA_SOURCE must be dev or dataspace-ca.');
+  }
 
   await runStep('fabric-reset-devnet', {
     cwd: fabricDevnetRoot,
@@ -62,11 +68,30 @@ async function main() {
     ],
   });
 
-  await runStep('fabric-copy-dev-cas', {
-    cwd: fabricDevnetRoot,
-    command: 'bash',
-    args: ['./scripts/00-copy-dev-cas.sh'],
-  });
+  if (config.fabricCaSource === 'dataspace-ca') {
+    if (!config.dataspaceCaRootDir || !config.dataspaceCaIssuerDir) {
+      throw new Error(
+        'LOCAL_FABRIC_CA_SOURCE=dataspace-ca requires DATASPACE_CA_ROOT_DIR and DATASPACE_CA_ISSUER_DIR.',
+      );
+    }
+    requirePath(resolve(config.dataspaceCaRootDir), 'Missing dataspace CA Root directory');
+    requirePath(resolve(config.dataspaceCaIssuerDir), 'Missing dataspace CA issuer directory');
+    await runStep('fabric-copy-dataspace-cas', {
+      cwd: fabricDevnetRoot,
+      command: 'bash',
+      args: [
+        './scripts/00-copy-dataspace-ca.sh',
+        resolve(config.dataspaceCaRootDir),
+        resolve(config.dataspaceCaIssuerDir),
+      ],
+    });
+  } else {
+    await runStep('fabric-copy-dev-cas', {
+      cwd: fabricDevnetRoot,
+      command: 'bash',
+      args: ['./scripts/00-copy-dev-cas.sh'],
+    });
+  }
   await runStep('fabric-up-cas', {
     cwd: fabricDevnetRoot,
     command: 'bash',
@@ -246,6 +271,8 @@ Options:
   --help, -h                 Show this help
 
 Notes:
+  - LOCAL_FABRIC_CA_SOURCE=dataspace-ca bridges a disposable offline CA tree
+    supplied through DATASPACE_CA_ROOT_DIR and DATASPACE_CA_ISSUER_DIR
   - the GW process is started detached and its PID is written to .local-fabric-gw.pid
   - logs are written under logs/local-fabric-stack-<timestamp>/
   - to stop GW later you can use: npm run local:close`);

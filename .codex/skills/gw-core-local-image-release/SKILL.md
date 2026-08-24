@@ -89,7 +89,7 @@ bootstrap through the configured KMS adapter. Firebase token verification,
 Firestore vault persistence and GCS object persistence are separate concerns;
 PostgreSQL and IPFS are alternative provider choices, not identity services.
 
-The final open-source project evidence has two mandatory, complementary gates:
+The final open-source project evidence has three mandatory, complementary gates:
 
 1. trust control plane: `dataspace-ca-ts` tests plus disposable local
    Root/issuer publication, followed by a local `dataspace-ica-ts` signed
@@ -99,6 +99,29 @@ The final open-source project evidence has two mandatory, complementary gates:
    confidential JWE blobs out of relational rows, verifies both persistence
    systems contain data, restarts GW with the same local KEK, and proves both
    host and tenant metadata recover.
+3. governed host plane: a signed host-form to `HostingServiceCredential`
+   contract, the signed governance/reconciler contract and a real local
+   two-peer topology. Name generic Fabric members `Host1MSP` and `Host2MSP`;
+   never use `Org1MSP`/`Org2MSP` in report evidence because VAT-addressed
+   tenant Organizations are hosted application data, not Fabric members.
+
+Generate the presentation bundle with
+`npm run evidence:open-source-production-readiness`. It must contain only
+public CA artifacts, logs, statuses, repository/image identities and hashes.
+Never copy private CA keys, Fabric enrollment secrets or the local KEK into the
+evidence directory. State explicitly that a two-host genesis/bootstrap proves
+multi-host topology but does not prove dynamic admission to an already-running
+channel; the real operator mutation driver needs a live E2E before production.
+
+For the human-only GDC report, keep production identity routing explicit:
+EU VAT Organizations and organization-scoped employees use `identity-eu`,
+while natural-person individuals use `identity-global`. Animal identity,
+veterinary services and `animal-*` channels are outside this evidence scope.
+When one provisional host serves both employee and individual routes for the
+same VAT tenant, require two complementary proofs: employee onboarding/DCR and
+a live SMART data-access smoke with explicit consent plus an unconsented
+employee denial. Sharing a runtime must not collapse `identity-eu` and
+`identity-global`.
 
 The ordinary in-memory smoke remains the faster developer gate but is not
 sufficient on its own for an open-source reproducibility report.

@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+- Add a presentation-grade, checksummed open-source production-readiness
+  evidence bundle covering the offline dataspace CA, dataspace ICA host VC,
+  governed Fabric admission contract, `Host1MSP`/`Host2MSP` topology and the
+  GW PostgreSQL/IPFS/Fabric restart lifecycle. The human-only report separates
+  VAT tenants from host MSPs, routes EU Organizations/employees to
+  `identity-eu`, keeps individuals on `identity-global`, excludes animal scope
+  and records dynamic host admission as a remaining live-production gate.
+- Extend the local SMART/Fabric acceptance path with a medical-secretary
+  employee: explicit consent permits the employee to read a person's IPS, and
+  a second employee without consent receives no access token. Pair that live
+  check with the employee onboarding/DCR integration contract so a provisional
+  shared host can serve `entity` and `individual` routes without conflating
+  their identity channels.
+
 - Keep one canonical tenant identity when one organization splits capabilities
   across operators. `TENANT_SERVICE_ROUTES_JSON` can now publish different DID
   `serviceEndpoint` bases per tenant and section (for example, `entity` on an

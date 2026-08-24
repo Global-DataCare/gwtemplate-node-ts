@@ -103,6 +103,36 @@ four trust/runtime layers:
 The dataspace Root private key remains offline. The dataspace ICA is the online
 onboarding issuer. Neither is interchangeable with the Fabric ICA.
 
+The presentation-grade aggregate gate is:
+
+```bash
+IMAGE_NAME="gw-core:<version>-<commit>" \
+  npm run evidence:open-source-production-readiness
+```
+
+It adds the governed host boundary to the trust and runtime gates. The local
+Fabric members are `Host1MSP` and `Host2MSP`; VAT-addressed tenant
+Organizations are not Fabric MSPs. The manifest records repository commits,
+the exact image ID, public CA artifacts, gate statuses and SHA-256 hashes
+without copying CA private keys, Fabric enrollment secrets or the local KEK.
+The human-only production projection routes EU Organizations/employees to
+`identity-eu` and individuals to `identity-global`; animal/veterinary channels
+are outside this evidence scope.
+
+The presentation-grade aggregate gate is:
+
+```bash
+IMAGE_NAME="gw-core:<version>-<commit>" \
+  npm run evidence:open-source-production-readiness
+```
+
+It adds the governed host boundary to the trust and runtime gates. The local
+Fabric members are `Host1MSP` and `Host2MSP`; VAT-addressed tenant
+Organizations are not Fabric MSPs. The resulting manifest records repository
+commits, the exact image ID, public CA artifacts, gate statuses and SHA-256
+hashes without copying CA private keys, Fabric enrollment secrets or the local
+runtime KEK.
+
 ### 5.1 Terminology That Must Not Be Mixed
 
 - `JURISDICTION`:

@@ -8,8 +8,10 @@ set -euo pipefail
 #
 # Covered live paths:
 # 1. individual consent -> SMART token -> individual Bundle/_search
-# 2. research contract + provider consent -> SMART token -> digitaltwin Composition/_search
-# 3. allowed and denied research employees by role and by direct email
+# 2. medical-secretary consent -> SMART token -> individual Bundle/_search
+# 3. unconsented medical secretary -> denied SMART token
+# 4. research contract + provider consent -> SMART token -> digitaltwin Composition/_search
+# 5. allowed and denied research employees by role and by direct email
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
@@ -23,7 +25,7 @@ CHANNEL_NAME="${CHANNEL_NAME:-health-care-local}"
 CHAINCODE_NAME="${CHAINCODE_NAME:-consentaccess-sc}"
 FABRIC_TOOLS_CONTAINER="${FABRIC_TOOLS_CONTAINER:-gdc-fabric-tools}"
 ORG1_DOMAIN="${ORG1_DOMAIN:-org1.example.com}"
-ORG1_MSP_ID="${ORG1_MSP_ID:-Org1MSP}"
+ORG1_MSP_ID="${ORG1_MSP_ID:-Host1MSP}"
 AUTH_BEARER="${AUTH_BEARER:-demo-token}"
 SUBJECT_ID="${SUBJECT_ID:-did:web:api.${TENANT_ID}.org:individual:subject-001}"
 BOOTSTRAP_INDIVIDUAL_AND_DATA="${BOOTSTRAP_INDIVIDUAL_AND_DATA:-true}"
@@ -185,8 +187,9 @@ request_smart_token() {
 
 run_individual_bundle_search_with_token() {
   local access_token="$1"
+  local payload_name="${2:-INDIVIDUAL_IPS_SEARCH_REQUEST}"
   local request_payload
-  request_payload="$(render_smart_payload INDIVIDUAL_IPS_SEARCH_REQUEST)"
+  request_payload="$(render_smart_payload "${payload_name}")"
   local thid
   thid="$(jq -r '.thid' <<<"${request_payload}")"
 
@@ -245,6 +248,13 @@ individual_token_payload="$(request_smart_token INDIVIDUAL_SMART_TOKEN_REQUEST t
 individual_access_token="$(jq -r '.access_token' <<<"${individual_token_payload}")"
 run_individual_bundle_search_with_token "${individual_access_token}"
 
+echo "[smart-access-smoke] verifying authorized medical-secretary access and negative control"
+submit_consent_batch_and_verify_asset SECRETARY_CONSENT_BATCH_REQUEST SECRETARY_RULE_ID_LIST
+secretary_token_payload="$(request_smart_token SECRETARY_SMART_TOKEN_REQUEST_ALLOW true)"
+secretary_access_token="$(jq -r '.access_token' <<<"${secretary_token_payload}")"
+run_individual_bundle_search_with_token "${secretary_access_token}" SECRETARY_IPS_SEARCH_REQUEST
+request_smart_token SECRETARY_SMART_TOKEN_REQUEST_DENY false >/dev/null
+
 if [[ "${RUN_RESEARCH_SMART_SMOKE}" != "true" ]]; then
   echo "[smart-access-smoke] cross-portal research flow skipped by release profile"
   exit 0
@@ -278,6 +288,8 @@ jq -n \
     chaincode: $chaincode,
     verifiedFlows: [
       "individual-consent-smart-bundle-search",
+      "medical-secretary-consent-smart-bundle-search-allow",
+      "medical-secretary-without-consent-smart-token-deny",
       "research-contract-consent-smart-digitaltwin-search-role-allow",
       "research-contract-consent-smart-digitaltwin-search-role-deny",
       "research-contract-consent-smart-digitaltwin-search-email-allow",

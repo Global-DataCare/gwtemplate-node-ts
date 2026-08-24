@@ -8,6 +8,9 @@ import {
   buildDemoResearchPermitByRoleConsent,
   buildDemoResearchRequesterMatrix,
   buildDemoResearchSmartTokenRequest,
+  buildDemoSecretaryIpsPermitConsent,
+  buildDemoSecretaryIpsSearchRequest,
+  buildDemoSecretarySmartTokenRequest,
 } from '../src/__tests__/data/demo-smart-access-local-network.data.ts';
 import { buildConsentRulePrimaryDocument } from '../src/utils/consent-access-blockchain.ts';
 import { getClaimValue, normalizeContextualizedClaims } from '../src/utils/claims.ts';
@@ -20,6 +23,11 @@ type PayloadName =
   | 'INDIVIDUAL_RULE_ID_LIST'
   | 'INDIVIDUAL_SMART_TOKEN_REQUEST'
   | 'INDIVIDUAL_IPS_SEARCH_REQUEST'
+  | 'SECRETARY_CONSENT_BATCH_REQUEST'
+  | 'SECRETARY_RULE_ID_LIST'
+  | 'SECRETARY_SMART_TOKEN_REQUEST_ALLOW'
+  | 'SECRETARY_SMART_TOKEN_REQUEST_DENY'
+  | 'SECRETARY_IPS_SEARCH_REQUEST'
   | 'RESEARCH_CONSENT_BATCH_REQUEST_ROLE'
   | 'RESEARCH_RULE_ID_LIST_ROLE'
   | 'RESEARCH_CONSENT_BATCH_REQUEST_EMAIL'
@@ -35,7 +43,7 @@ const payloadName = process.argv[2] as PayloadName | undefined;
 
 if (!payloadName) {
   throw new Error(
-    'Usage: render-demo-smart-access-payload.mts <INDIVIDUAL_CONSENT_BATCH_REQUEST|INDIVIDUAL_RULE_ID_LIST|INDIVIDUAL_SMART_TOKEN_REQUEST|INDIVIDUAL_IPS_SEARCH_REQUEST|RESEARCH_CONSENT_BATCH_REQUEST_ROLE|RESEARCH_RULE_ID_LIST_ROLE|RESEARCH_CONSENT_BATCH_REQUEST_EMAIL|RESEARCH_RULE_ID_LIST_EMAIL|RESEARCH_SMART_TOKEN_REQUEST_ROLE_ALLOW|RESEARCH_SMART_TOKEN_REQUEST_ROLE_DENY|RESEARCH_SMART_TOKEN_REQUEST_EMAIL_ALLOW|RESEARCH_SMART_TOKEN_REQUEST_EMAIL_DENY|DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST|RESEARCH_CONSUMER_ORGANIZATION_DID>',
+    'Usage: render-demo-smart-access-payload.mts <INDIVIDUAL_*|SECRETARY_*|RESEARCH_*|DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST|RESEARCH_CONSUMER_ORGANIZATION_DID>',
   );
 }
 
@@ -96,6 +104,24 @@ const rendered = await (async () => {
       return buildDemoIndividualSmartTokenRequest({ tenantId, subjectDid, clientAssertionAudience });
     case 'INDIVIDUAL_IPS_SEARCH_REQUEST':
       return buildDemoIndividualIpsSearchRequest({ subjectDid });
+    case 'SECRETARY_CONSENT_BATCH_REQUEST':
+      return buildConsentBatch(buildDemoSecretaryIpsPermitConsent({ tenantId, subjectDid }) as Record<string, unknown>);
+    case 'SECRETARY_RULE_ID_LIST': {
+      const entry = buildProjectedConsentEntry(
+        buildDemoSecretaryIpsPermitConsent({ tenantId, subjectDid }) as Record<string, unknown>,
+      );
+      return buildConsentRulePrimaryDocument([entry]).data.map((item) => item.id);
+    }
+    case 'SECRETARY_SMART_TOKEN_REQUEST_ALLOW':
+      return buildDemoSecretarySmartTokenRequest({
+        tenantId, subjectDid, allowed: true, clientAssertionAudience,
+      });
+    case 'SECRETARY_SMART_TOKEN_REQUEST_DENY':
+      return buildDemoSecretarySmartTokenRequest({
+        tenantId, subjectDid, allowed: false, clientAssertionAudience,
+      });
+    case 'SECRETARY_IPS_SEARCH_REQUEST':
+      return buildDemoSecretaryIpsSearchRequest({ subjectDid });
     case 'RESEARCH_CONSENT_BATCH_REQUEST_ROLE': {
       return buildConsentBatch(buildDemoResearchPermitByRoleConsent({ subjectDid }) as Record<string, unknown>);
     }

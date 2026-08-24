@@ -12,6 +12,7 @@ import {
   EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
   EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
   EXAMPLE_CONTROLLER_DID,
+  EXAMPLE_HEALTHCARE_ACTOR_ROLE_RECEPTIONIST,
   EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
   EXAMPLE_RESEARCH_CONTROLLER_DID,
   EXAMPLE_TENANT_IDENTIFIER,
@@ -39,6 +40,10 @@ export const DEMO_SMART_ACCESS_LOCAL_IDS = Object.freeze({
   individualSmartThreadId: 'local-network-individual-smart-token-001',
   individualBundleSearchThreadId: 'local-network-individual-bundle-search-001',
   individualConsentIdentifier: 'urn:uuid:local-network-individual-ips-consent-001',
+  secretarySmartThreadId: 'local-network-secretary-smart-token-001',
+  secretaryDeniedSmartThreadId: 'local-network-secretary-smart-token-denied-001',
+  secretaryBundleSearchThreadId: 'local-network-secretary-bundle-search-001',
+  secretaryConsentIdentifier: 'urn:uuid:local-network-secretary-ips-consent-001',
   researchRoleSmartThreadId: 'local-network-research-role-smart-token-001',
   researchRoleDeniedSmartThreadId: 'local-network-research-role-smart-token-denied-001',
   researchEmailSmartThreadId: 'local-network-research-email-smart-token-001',
@@ -51,6 +56,8 @@ export const DEMO_SMART_ACCESS_LOCAL_IDS = Object.freeze({
 
 export const DEMO_SMART_ACCESS_LOCAL_EMAILS = Object.freeze({
   individualProfessional: 'doctor1@acme.org',
+  medicalSecretary: 'secretary1@acme.org',
+  medicalSecretaryDenied: 'secretary2@acme.org',
   researchAllowed: 'researcher1@lab.org',
   researchDenied: 'researcher2@lab.org',
 } as const);
@@ -75,6 +82,14 @@ function buildIndividualProfessionalDid(tenantId: string): string {
 
 function buildIndividualClientId(tenantId: string): string {
   return `${buildProviderOrganizationDid(tenantId)}:employee:${DEMO_SMART_ACCESS_LOCAL_EMAILS.individualProfessional}:device:client-local-individual`;
+}
+
+function buildSecretaryProfessionalDid(tenantId: string, email: string): string {
+  return `${buildProviderOrganizationDid(tenantId)}:employee:${email}:${EXAMPLE_HEALTHCARE_ACTOR_ROLE_RECEPTIONIST}`;
+}
+
+function buildSecretaryClientId(tenantId: string, email: string): string {
+  return `${buildProviderOrganizationDid(tenantId)}:employee:${email}:device:client-local-secretary`;
 }
 
 function buildResearchProfessionalDid(role: string, email: string): string {
@@ -187,6 +202,91 @@ export function buildDemoIndividualIpsSearchRequest(input: Readonly<{
         },
       ],
     },
+  };
+}
+
+/**
+ * Builds the consent proving that an organization-scoped medical secretary
+ * may read the selected person's IPS. The employee identity remains separate
+ * from the natural-person subject even when both routes share one host.
+ */
+export function buildDemoSecretaryIpsPermitConsent(input: Readonly<{
+  tenantId: string;
+  subjectDid: string;
+}>): ConsentRule {
+  return {
+    '@context': 'org.hl7.fhir.api',
+    [ClaimConsent.identifier]: DEMO_SMART_ACCESS_LOCAL_IDS.secretaryConsentIdentifier,
+    [ClaimConsent.subject]: String(input.subjectDid || '').trim(),
+    [ClaimConsent.actorIdentifier]: buildSecretaryProfessionalDid(
+      input.tenantId,
+      DEMO_SMART_ACCESS_LOCAL_EMAILS.medicalSecretary,
+    ),
+    [ClaimConsent.actorRole]: EXAMPLE_HEALTHCARE_ACTOR_ROLE_RECEPTIONIST,
+    [ClaimConsent.decision]: ConsentDecisions.Permit,
+    [ClaimConsent.purpose]: HealthcareConsentPurposes.EmergencyTreatment,
+    [ClaimConsent.action]: HealthcareBasicSections.PatientSummaryDocument.claim,
+    [ClaimConsent.date]: '2026-08-01',
+    [ClaimConsent.attachmentContentType]: EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
+    [ClaimConsent.attachmentData]: EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
+  } as const;
+}
+
+/**
+ * Builds a SMART request for an allowed or deliberately unconsented medical
+ * secretary. The latter is the negative control for tenant-local employee
+ * access and must not receive an access token.
+ */
+export async function buildDemoSecretarySmartTokenRequest(input: Readonly<{
+  tenantId: string;
+  subjectDid: string;
+  allowed: boolean;
+  clientAssertionAudience?: string;
+}>): Promise<Record<string, unknown>> {
+  const email = input.allowed
+    ? DEMO_SMART_ACCESS_LOCAL_EMAILS.medicalSecretary
+    : DEMO_SMART_ACCESS_LOCAL_EMAILS.medicalSecretaryDenied;
+  const clientId = buildSecretaryClientId(input.tenantId, email);
+  const audience = buildProviderOrganizationDid(input.tenantId);
+  const actorDid = buildSecretaryProfessionalDid(input.tenantId, email);
+  return {
+    thid: input.allowed
+      ? DEMO_SMART_ACCESS_LOCAL_IDS.secretarySmartThreadId
+      : DEMO_SMART_ACCESS_LOCAL_IDS.secretaryDeniedSmartThreadId,
+    iss: clientId,
+    aud: audience,
+    body: {
+      client_id: clientId,
+      client_assertion: await buildClientAssertionJwt({
+        clientId,
+        audience: input.clientAssertionAudience || audience,
+      }),
+      client_assertion_type: 'private_key_jwt',
+      sub: actorDid,
+      purpose: HealthcareConsentPurposes.EmergencyTreatment,
+      scope:
+        `${ServiceCapability.IndexReader}?subject=${String(input.subjectDid || '').trim()}`
+        + `&section=${HealthcareBasicSections.PatientSummaryDocument.claim}`,
+      expires_in: 60,
+      vp_token: buildUnsignedProfessionalIdentityVpJwt({
+        clientId,
+        actorDid,
+        role: EXAMPLE_HEALTHCARE_ACTOR_ROLE_RECEPTIONIST,
+        email,
+      }),
+      acr_values: 'urn:antifraud:acr:openid4vp:employee',
+    },
+  };
+}
+
+/** Builds a replay-safe IPS search request for the secretary access proof. */
+export function buildDemoSecretaryIpsSearchRequest(input: Readonly<{
+  subjectDid: string;
+}>): Record<string, unknown> {
+  const request = buildDemoIndividualIpsSearchRequest(input);
+  return {
+    ...request,
+    thid: DEMO_SMART_ACCESS_LOCAL_IDS.secretaryBundleSearchThreadId,
   };
 }
 

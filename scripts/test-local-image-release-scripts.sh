@@ -5,7 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 bash -n ./docker_build_local.sh ./docker_run_local.sh ./cloud_deploy.sh \
-  ./scripts/smoke-docker-local-network.sh ./scripts/prepare-consentaccess-local-fabric-env.sh
+  ./scripts/smoke-docker-local-network.sh ./scripts/prepare-consentaccess-local-fabric-env.sh \
+  ./scripts/collect-open-source-production-readiness-evidence.sh
 
 grep -qx 'node_modules' .dockerignore
 grep -qx 'build' .dockerignore
@@ -40,6 +41,13 @@ grep -Fq 'ready_status_count' ./scripts/smoke-consentaccess-local-network.sh
 grep -Fq 'poll_async_until' ./scripts/bootstrap-single-tenant.sh
 docker compose -f ./docker-compose.open-source-local.yml config >/dev/null
 node ./scripts/bootstrap-local-fabric-stack.mjs --help | grep -q -- '--prepare-only'
+node ./scripts/bootstrap-local-fabric-stack.mjs --help | grep -q 'LOCAL_FABRIC_CA_SOURCE=dataspace-ca'
+node --check ./scripts/build-open-source-evidence-manifest.mjs
+grep -Fq 'Host1MSP' ./scripts/prepare-consentaccess-local-fabric-env.sh
+grep -Fq 'Host2MSP' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq 'identity-eu' ./scripts/build-open-source-evidence-manifest.mjs
+grep -Fq 'identity-global' ./scripts/build-open-source-evidence-manifest.mjs
+grep -Fq 'excludedScope' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq 'FABRIC_PEER_ENDPOINT_VALUE="${FABRIC_PEER_ENDPOINT_VALUE:-localhost:7051}"' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER=${LEGACY_REPRESENTATIVE_CONTROLLER_VALUE}' \
@@ -61,6 +69,11 @@ grep -Fq 'clientAssertionAudience = process.env.SMART_TOKEN_AUDIENCE' \
   ./scripts/render-demo-smart-access-payload.mts
 grep -Fq 'PROVIDER_ORGANIZATION_DID="${PROVIDER_ORGANIZATION_DID:-$(resolve_provider_organization_did)}"' \
   ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'SECRETARY_SMART_TOKEN_REQUEST_ALLOW' ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'SECRETARY_SMART_TOKEN_REQUEST_DENY' ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'medical-secretary-consent-smart-bundle-search-allow' \
+  ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'humanAccessProof' ./scripts/build-open-source-evidence-manifest.mjs
 
 if grep -Fq '../../gdc-common-utils-ts/src/' ./scripts/render-demo-smart-access-payload.mts; then
   echo 'ERROR: release payload rendering must not import sibling workspace source.' >&2
