@@ -15,6 +15,8 @@
   their identity channels.
 - Redact disposable Fabric CA passwords from presentation logs and fail the
   final public-evidence gate if a known devnet enrollment secret remains.
+- Warm every local identity chaincode before starting the GW image so a fresh
+  Fabric devnet cannot race lazy chaincode launch during host bootstrap.
 
 - Keep one canonical tenant identity when one organization splits capabilities
   across operators. `TENANT_SERVICE_ROUTES_JSON` can now publish different DID

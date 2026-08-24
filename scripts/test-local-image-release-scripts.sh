@@ -6,7 +6,8 @@ cd "$ROOT_DIR"
 
 bash -n ./docker_build_local.sh ./docker_run_local.sh ./cloud_deploy.sh \
   ./scripts/smoke-docker-local-network.sh ./scripts/prepare-consentaccess-local-fabric-env.sh \
-  ./scripts/collect-open-source-production-readiness-evidence.sh
+  ./scripts/collect-open-source-production-readiness-evidence.sh \
+  ./scripts/warm-local-fabric-chaincodes.sh
 
 grep -qx 'node_modules' .dockerignore
 grep -qx 'build' .dockerignore
@@ -36,6 +37,8 @@ done < <(git ls-files 'env*.example')
 bash ./scripts/smoke-docker-local-network.sh --help | grep -q 'Fabric local-network'
 grep -Fq 'PERSISTENCE_PROFILE=postgres-ipfs' package.json
 grep -Fq 'Open-source persistence validated' ./scripts/smoke-docker-local-network.sh
+grep -Fq 'warm-local-fabric-chaincodes.sh' ./scripts/smoke-docker-local-network.sh
+grep -Fq 'Host1MSP' ./scripts/warm-local-fabric-chaincodes.sh
 grep -Fq 'tenant_rehydration=ok' ./scripts/smoke-docker-local-network.sh
 grep -Fq 'ready_status_count' ./scripts/smoke-consentaccess-local-network.sh
 grep -Fq 'poll_async_until' ./scripts/bootstrap-single-tenant.sh

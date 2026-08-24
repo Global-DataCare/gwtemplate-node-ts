@@ -80,6 +80,8 @@ docker ps --format '{{.Names}}' | grep -qx 'gdc-fabric-tools' || {
   exit 2
 }
 
+bash "${ROOT_DIR}/scripts/warm-local-fabric-chaincodes.sh"
+
 FABRIC_PEER_ENDPOINT_VALUE=peer0-org1:7051 npm run prepare:local-fabric-env
 docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1 || {
   echo "ERROR: Fabric Docker network not found: ${DOCKER_NETWORK}" >&2
