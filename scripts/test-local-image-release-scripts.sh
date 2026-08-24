@@ -35,6 +35,9 @@ done < <(git ls-files 'env*.example')
 bash ./scripts/smoke-docker-local-network.sh --help | grep -q 'Fabric local-network'
 grep -Fq 'PERSISTENCE_PROFILE=postgres-ipfs' package.json
 grep -Fq 'Open-source persistence validated' ./scripts/smoke-docker-local-network.sh
+grep -Fq 'tenant_rehydration=ok' ./scripts/smoke-docker-local-network.sh
+grep -Fq 'ready_status_count' ./scripts/smoke-consentaccess-local-network.sh
+grep -Fq 'poll_async_until' ./scripts/bootstrap-single-tenant.sh
 docker compose -f ./docker-compose.open-source-local.yml config >/dev/null
 node ./scripts/bootstrap-local-fabric-stack.mjs --help | grep -q -- '--prepare-only'
 grep -Fq 'FABRIC_PEER_ENDPOINT_VALUE="${FABRIC_PEER_ENDPOINT_VALUE:-localhost:7051}"' \

@@ -154,7 +154,13 @@ if [[ "$PERSISTENCE_PROFILE" == "postgres-ipfs" ]]; then
     echo 'ERROR: GW did not recover from PostgreSQL/IPFS after restart.' >&2
     exit 1
   }
-  echo "Open-source persistence validated: postgres_documents=${postgres_documents} ipfs_jwe_blobs=${ipfs_blobs} restart=ok"
+  tenant_did_url="${BASE_URL}/acme-id/cds-ES/v1/health-care/.well-known/did.json"
+  curl --fail --silent --show-error --max-time 10 "$tenant_did_url" \
+    | jq -e '.id | startswith("did:web:")' >/dev/null || {
+      echo 'ERROR: persisted tenant DID did not rehydrate after GW restart.' >&2
+      exit 1
+    }
+  echo "Open-source persistence validated: postgres_documents=${postgres_documents} ipfs_jwe_blobs=${ipfs_blobs} restart=ok tenant_rehydration=ok"
 fi
 
 echo "Validated image: ${IMAGE_NAME}"

@@ -198,6 +198,31 @@ describe('PostgresVaultRepository (Integration)', () => {
     expectHydratedConfidentialDoc(results[0], testConfidentialDoc);
   });
 
+  it('stores one relational index when the same document projects an attribute twice', async () => {
+    const sectionId = getEnvSectionId('individuals');
+    const duplicatedIndexDoc = buildExampleConfidentialStorageDoc({
+      id: 'family-registration',
+      indexed: {
+        attributes: [
+          { name: 'hmac_for_email', value: 'same-controller-hmac' },
+          { name: 'hmac_for_email', value: 'same-controller-hmac', unique: true },
+        ],
+      },
+    });
+
+    await repository.put(TENANT_VAULT_ID, [duplicatedIndexDoc], sectionId);
+
+    const storedIndexes = await pool.query(
+      'SELECT attr_name, attr_value, is_unique FROM "vault_test"."vault_document_indexes" WHERE collection_name = $1 AND section_id = $2 AND document_id = $3',
+      [TENANT_VAULT_ID, sectionId, duplicatedIndexDoc.id],
+    );
+    expect(storedIndexes.rows).toEqual([{
+      attr_name: 'hmac_for_email',
+      attr_value: 'same-controller-hmac',
+      is_unique: true,
+    }]);
+  });
+
   it('finds a document by indexed attributes using the legacy equals query format', async () => {
     const sectionId = getEnvSectionId('employees');
     await repository.put(TENANT_VAULT_ID, [testConfidentialDoc], sectionId);

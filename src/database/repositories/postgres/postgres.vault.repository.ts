@@ -52,7 +52,7 @@ function extractIndexedAttributes(document: unknown): IndexedAttribute[] {
   }
 
   const groups = Array.isArray(indexed) ? indexed : [indexed];
-  return groups.flatMap((group) => {
+  const attributes = groups.flatMap((group) => {
     const attributes = (group as { attributes?: unknown })?.attributes;
     if (!Array.isArray(attributes)) {
       return [];
@@ -68,6 +68,24 @@ function extractIndexedAttributes(document: unknown): IndexedAttribute[] {
         unique: Boolean(attribute.unique),
       }));
   });
+
+  // One logical value can legitimately be projected by several claim paths in
+  // the same confidential document (for example, controller and owner email).
+  // The relational index primary key represents the resulting name/value once,
+  // so collapse exact duplicates while retaining the strictest uniqueness
+  // requirement. Firestore/memory tolerate duplicate array entries; PostgreSQL
+  // must provide the same repository-level behavior explicitly.
+  const deduplicated = new Map<string, IndexedAttribute>();
+  for (const attribute of attributes) {
+    const key = `${attribute.name}\u0000${attribute.value}`;
+    const existing = deduplicated.get(key);
+    deduplicated.set(key, {
+      name: attribute.name,
+      value: attribute.value,
+      unique: Boolean(existing?.unique || attribute.unique),
+    });
+  }
+  return [...deduplicated.values()];
 }
 
 function normalizeQuery(query: LegacyVaultQuery): { sectionId: string; conditions: Array<{ name: string; value: string }> } {

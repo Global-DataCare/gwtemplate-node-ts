@@ -57,8 +57,15 @@ Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-cl
     - The open-source acceptance profile is `npm run docker:smoke:open-source-local-network`.
       It runs the exact GW image with Fabric `local-network`, PostgreSQL and
       IPFS/Kubo in Docker, verifies persisted confidential JWE blobs and checks
-      recovery after a GW restart. The in-memory local-network smoke remains a
-      faster development check but is not the final reproducibility evidence.
+      host and tenant recovery after a GW restart. The in-memory local-network
+      smoke remains a faster development check but is not the final
+      reproducibility evidence.
+    - A project deliverable that claims governed participant onboarding must
+      also reproduce the trust control plane. Run the offline `dataspace-ca-ts`
+      tests and bootstrap/publish a disposable local Root/issuer trust tree,
+      then run `dataspace-ica-ts` locally and verify that signed onboarding
+      evidence produces the participant VC consumed by GW. This is a separate
+      gate from the Fabric Root CA/Fabric ICA that enroll MSP identities.
 
 ## 4. Authentication Clarity (Real vs Simulated)
 
@@ -83,6 +90,18 @@ host onboarding flow:
 These runs are driven from `gdc-sdk-node-ts/tests/live-gw-node-runtime.e2e.test.mjs`,
 but the operational setup belongs here because the most expensive failures were
 environment mistakes, not code regressions.
+
+For open-source audit evidence, preserve the terminology and artifacts for all
+four trust/runtime layers:
+
+1. offline dataspace Root CA and issuer publication from `dataspace-ca-ts`;
+2. local dataspace ICA evidence verification and VC issuance from
+   `dataspace-ica-ts`;
+3. Fabric Root CA/Fabric ICA plus the `local-network` MSP and channels;
+4. GW runtime with PostgreSQL metadata and encrypted JWE blobs in IPFS/Kubo.
+
+The dataspace Root private key remains offline. The dataspace ICA is the online
+onboarding issuer. Neither is interchangeable with the Fabric ICA.
 
 ### 5.1 Terminology That Must Not Be Mixed
 

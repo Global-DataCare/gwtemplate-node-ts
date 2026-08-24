@@ -113,7 +113,11 @@ echo "[smoke-consentaccess] polling ${POLL_ENDPOINT}"
 poll_result=''
 for _ in $(seq 1 15); do
   poll_result="$(curl -sS "${POLL_ENDPOINT}?thid=${THID}")"
-  if [[ -n "${poll_result}" ]] && [[ "$(jq -r '.status? // empty' <<<"${poll_result}")" != 'PENDING' ]]; then
+  # A persistent repository can make the worker slightly slower than the
+  # in-memory smoke. Treat the asynchronous store's initial not-found response
+  # as transient and stop only when every expected entry is materialized.
+  ready_status_count="$(jq '[.data[]?.response?.status == "201"] | map(select(. == true)) | length' <<<"${poll_result}")"
+  if [[ "${ready_status_count}" == "${expected_rule_count}" ]]; then
     break
   fi
   sleep 1
@@ -145,7 +149,8 @@ echo "[smoke-consentaccess] polling duplicate batch ${POLL_ENDPOINT}"
 duplicate_poll_result=''
 for _ in $(seq 1 15); do
   duplicate_poll_result="$(curl -sS "${POLL_ENDPOINT}?thid=${DUPLICATE_THID}")"
-  if [[ -n "${duplicate_poll_result}" ]] && [[ "$(jq -r '.status? // empty' <<<"${duplicate_poll_result}")" != 'PENDING' ]]; then
+  ready_duplicate_status_count="$(jq '[.data[]?.response?.status == "201"] | map(select(. == true)) | length' <<<"${duplicate_poll_result}")"
+  if [[ "${ready_duplicate_status_count}" == "${duplicate_rule_count}" ]]; then
     break
   fi
   sleep 1

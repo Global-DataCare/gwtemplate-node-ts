@@ -70,6 +70,30 @@ poll_async() {
   post_json "$url" "$(jq -n --arg thid "$thid" '{thid:$thid}')"
 }
 
+# PostgreSQL-backed workers can complete after the first polling request. Keep
+# the bootstrap honest: wait for the expected response shape instead of
+# printing "ready" while the tenant is still pending.
+poll_async_until() {
+  local url="$1"
+  local thid="$2"
+  local jq_filter="$3"
+  local operation_label="$4"
+  local result=''
+
+  for _ in $(seq 1 30); do
+    result="$(poll_async "$url" "$thid")"
+    if jq -e "$jq_filter" >/dev/null 2>&1 <<<"$result"; then
+      printf '%s' "$result"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "ERROR: timed out waiting for ${operation_label} (thid=${thid})" >&2
+  jq '.' <<<"$result" >&2 || printf '%s\n' "$result" >&2
+  return 1
+}
+
 echo "[bootstrap] ping: $BASE_URL/host/ping"
 HOST_PING_URL="${BASE_URL}/host/cds-${HOST_JURISDICTION_LOWER}/${VERSION}/${HOST_NETWORK}/.well-known/ping"
 echo "[bootstrap] ping: $HOST_PING_URL"
@@ -128,25 +152,33 @@ if [[ -n "$org_err" && "$org_err" != *"already exists"* ]]; then
 fi
 
 if [[ -z "$org_err" ]]; then
-  org_poll="$(poll_async "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch-response" "$thid_org")"
+  org_poll="$(poll_async_until \
+    "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch-response" \
+    "$thid_org" \
+    '(.body.data[0].meta.claims["org.schema.Offer.identifier"] // .data[0].meta.claims["org.schema.Offer.identifier"] // "") | length > 0' \
+    'organization Offer')"
   echo "$org_poll" | jq '.'
   offer_id="$(echo "$org_poll" | jq -r '.body.data[0].meta.claims["org.schema.Offer.identifier"] // .data[0].meta.claims["org.schema.Offer.identifier"] // empty')"
-  if [[ -n "$offer_id" ]]; then
-    thid_order="thid-order-${TAX_ID}-$(date +%s)"
-    order_payload_overrides="$(jq -n --arg thid "$thid_order" --arg offer "$offer_id" --arg iss "$ADMIN_EMAIL" '{
-      "/thid": $thid,
-      "/iss": $iss,
-      "/body/data/0/meta/claims/org.schema.Order.acceptedOffer.identifier": $offer,
-      "/body/data/0/meta/claims/Order.acceptedOffer.identifier": $offer
-    }')"
-    order_payload="$(render_example_payload ORGANIZATION_ORDER_REQUEST "$order_payload_overrides")"
+  [[ -n "$offer_id" ]] || { echo 'ERROR: organization registration completed without an Offer identifier.' >&2; exit 1; }
 
-    echo "[bootstrap] order confirmation"
-    order_create="$(post_json "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch" "$order_payload")"
-    echo "$order_create" | jq '.'
-    order_poll="$(poll_async "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch-response" "$thid_order")"
-    echo "$order_poll" | jq '.'
-  fi
+  thid_order="thid-order-${TAX_ID}-$(date +%s)"
+  order_payload_overrides="$(jq -n --arg thid "$thid_order" --arg offer "$offer_id" --arg iss "$ADMIN_EMAIL" '{
+    "/thid": $thid,
+    "/iss": $iss,
+    "/body/data/0/meta/claims/org.schema.Order.acceptedOffer.identifier": $offer,
+    "/body/data/0/meta/claims/Order.acceptedOffer.identifier": $offer
+  }')"
+  order_payload="$(render_example_payload ORGANIZATION_ORDER_REQUEST "$order_payload_overrides")"
+
+  echo "[bootstrap] order confirmation"
+  order_create="$(post_json "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch" "$order_payload")"
+  echo "$order_create" | jq '.'
+  order_poll="$(poll_async_until \
+    "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Order/_batch-response" \
+    "$thid_order" \
+    '[.body.data[]?.response?.status, .data[]?.response?.status] | any(. == "201" or . == 201)' \
+    'organization Order activation')"
+  echo "$order_poll" | jq '.'
 fi
 
 echo "OK: tenant taxId='$TAX_ID' ready for individual/org.schema and FHIR flows"

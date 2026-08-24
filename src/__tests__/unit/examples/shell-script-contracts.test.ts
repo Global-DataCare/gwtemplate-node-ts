@@ -42,4 +42,13 @@ describe('shell script payload contracts', () => {
     expect(portalScript).toContain('source "$(dirname "${BASH_SOURCE[0]}")/payload-helpers.sh"');
     expect(demoScript).toContain('source "$(dirname "${BASH_SOURCE[0]}")/payload-helpers.sh"');
   });
+
+  it('waits for the asynchronous Offer and Order before declaring a tenant ready', () => {
+    const bootstrapScript = readScript('scripts/bootstrap-single-tenant.sh');
+
+    expect(bootstrapScript).toContain('poll_async_until');
+    expect(bootstrapScript).toContain('organization Offer');
+    expect(bootstrapScript).toContain('organization Order activation');
+    expect(bootstrapScript).toContain('any(. == "201" or . == 201)');
+  });
 });

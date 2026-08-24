@@ -10,8 +10,15 @@
   internal or localhost origin in its public DID document.
 - Add a reproducible open-source Docker acceptance profile combining GW CORE,
   Fabric `local-network`, PostgreSQL and IPFS. The gate forces confidential JWE
-  blobs out of relational rows, checks both stores and verifies GW recovery
-  after restart with the same local KEK.
+  blobs out of relational rows, checks both stores and verifies host and tenant
+  recovery after restart with the same local KEK. Document the complementary
+  trust-control-plane gate: offline dataspace Root/issuer publication and local
+  dataspace ICA evidence verification/VC issuance, kept distinct from Fabric
+  CA enrollment.
+- Make PostgreSQL index projection match the memory/Firestore repository
+  behavior by collapsing duplicate name/value attributes within one document
+  while preserving the strictest `unique` flag. This unblocks individual/family
+  registration in the PostgreSQL+IPFS acceptance profile.
 - Require an available professional seat for every current `Employee/_batch`
   create. When none is free, GW returns a persisted commercial Offer before
   creating any employee; a future import workflow must use its own explicit
