@@ -41,12 +41,54 @@ image` commands.
 Treat the image as environment-neutral:
 
 - image smoke: `NETWORK_MODE=local-network`
-- current GDC staging/demo: `NETWORK_MODE=test`
+- governed staging: `NETWORK_MODE=test-network`
 - production: `NETWORK_MODE=network`
 
 These values and their Fabric channels come from the selected runtime profile.
 Never bake a profile into the image. Before and after rollout, inspect the
 effective `ConfigMap`/`Secret` references and confirm the expected mode.
+
+## Role and provider boundaries
+
+Keep reusable JSDoc, tests, comments, examples and architecture documents
+vendor-neutral. Describe the network promoter/governor, hosting provider,
+dataspace ICA provider, Fabric ICA, participant organization/tenant, identity
+provider, persistence provider and KMS provider by role. Real organization
+names, domains, project ids and regions belong only in target-specific
+deployment profiles, inventories and operational runbooks.
+
+Do not conflate the dataspace ICA with the Fabric ICA. The dataspace ICA
+verifies legal onboarding evidence and issues VCs; the Fabric ICA enrolls MSP,
+peer, orderer and client identities for the governed ledger network.
+
+## Promotion and persistence gates
+
+Promote in this order:
+
+1. Run the GW service locally with the local dataspace ICA, in-memory vault and
+   Fabric `local-network`.
+2. Run provider-focused persistence smokes separately. A Firestore/GCS profile
+   validates a cloud-hosted participant runtime; a PostgreSQL/IPFS profile
+   validates a portable host-provider runtime. Do not make either profile a
+   prerequisite for the basic in-memory local-network smoke.
+3. Deploy the same immutable image to Fabric `test-network` with the selected
+   staging profile.
+4. Deploy by digest to production only after strict token verification,
+   encrypted transport, persistent Confidential Storage and KMS bootstrap
+   checks pass.
+
+For production, the process-owned runtime KEK must be unwrapped once during
+bootstrap through the configured KMS adapter. Firebase token verification,
+Firestore vault persistence and GCS object persistence are separate concerns;
+PostgreSQL and IPFS are alternative provider choices, not identity services.
+
+The final open-source project evidence has an additional mandatory gate: run
+`npm run docker:smoke:open-source-local-network`. It must start PostgreSQL and
+IPFS in Docker on the local Fabric network, force confidential JWE blobs out of
+the relational rows, verify both persistence systems contain data, restart the
+GW container with the same local KEK, and prove the persisted host recovers.
+The ordinary in-memory smoke remains the faster developer gate but is not
+sufficient on its own for an open-source reproducibility report.
 
 ## Build and smoke
 

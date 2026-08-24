@@ -290,6 +290,10 @@ async function startServer(options?: StartServerOptions) {
     if (reconciledRepresentativeInventories > 0) {
       console.log(`[GW-API] Reconciled ${reconciledRepresentativeInventories} historical representative seat inventories.`);
     }
+    const reconciledTenantServiceRoutes = await hostingManager.reconcileTenantServiceRoutes();
+    if (reconciledTenantServiceRoutes > 0) {
+      console.log(`[GW-API] Reconciled split-runtime DID services for ${reconciledTenantServiceRoutes} tenants.`);
+    }
   } catch (error) {
     const allowStartupWithoutHostWarmup =
       String(process.env.STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR || '').trim().toLowerCase() === 'true';

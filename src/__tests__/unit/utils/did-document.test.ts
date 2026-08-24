@@ -126,4 +126,60 @@ describe('populateDidDocumentServices', () => {
       'https://34.175.78.233/acme-id/cds-es/v1/health-care/identity/openid/smart/token',
     );
   });
+
+  it('should route one canonical tenant DID to different operators by service section', () => {
+    // A participant keeps one tenant identity. The shared host-provider route
+    // owns discovery/identity while an independently operated runtime may own
+    // only the individual and digital-twin sections.
+    const did = 'did:web:public.participant.example';
+    const publicBaseUrl = 'https://public.participant.example';
+    const defaultOperationalBaseUrl = 'https://legacy-host.example';
+    const businessConfig = initializeTenantServicesConfig(Sector.HEALTH_CARE);
+    const tenantContext = {
+      alternateName: 'participant-tenant',
+      jurisdiction: 'ES',
+      version: 'v1',
+      sector: Sector.HEALTH_CARE,
+    };
+
+    const allServices = populateDidDocumentServices(
+      did,
+      publicBaseUrl,
+      businessConfig,
+      true,
+      tenantContext,
+      defaultOperationalBaseUrl,
+      {
+        default: 'https://shared-runtime.example',
+        individual: 'https://individual-runtime.example',
+        digitaltwin: 'https://individual-runtime.example',
+      },
+    );
+
+    const jwksService = allServices.find(s => s.id === `${did}#jwks`);
+    const employeeService = allServices.find(s => s.id.endsWith('#entity:org.schema:employee:_batch'));
+    const smartTokenService = allServices.find(s => s.id.endsWith('#identity:openid:smart:token'));
+    const dspService = allServices.find(s => s.id.endsWith('#dsp-data-service'));
+    const individualService = allServices.find(s => s.id.endsWith('#individual:org.hl7.fhir.r4:patient:_batch'));
+    const digitalTwinService = allServices.find(s => s.id.endsWith('#digitaltwin:org.hl7.fhir.r4:composition:_search'));
+
+    expect(jwksService?.serviceEndpoint).toBe(
+      'https://shared-runtime.example/participant-tenant/cds-ES/v1/health-care/jwks.json',
+    );
+    expect(employeeService?.serviceEndpoint).toBe(
+      'https://shared-runtime.example/participant-tenant/cds-ES/v1/health-care/entity/org.schema/Employee/_batch',
+    );
+    expect(smartTokenService?.serviceEndpoint).toBe(
+      'https://shared-runtime.example/participant-tenant/cds-ES/v1/health-care/identity/openid/smart/token',
+    );
+    expect(dspService?.serviceEndpoint).toBe(
+      'https://shared-runtime.example/participant-tenant/cds-ES/v1/health-care/.well-known/dspace-version',
+    );
+    expect(individualService?.serviceEndpoint).toBe(
+      'https://individual-runtime.example/participant-tenant/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Patient/_batch',
+    );
+    expect(digitalTwinService?.serviceEndpoint).toBe(
+      'https://individual-runtime.example/participant-tenant/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search',
+    );
+  });
 });

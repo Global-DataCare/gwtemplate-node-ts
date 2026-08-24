@@ -12,6 +12,9 @@ BASE_URL="http://127.0.0.1:${HOST_PORT}"
 RUN_FULL_SMOKE="${RUN_FULL_SMOKE:-true}"
 KEEP_CONTAINER="${KEEP_CONTAINER:-false}"
 SKIP_FABRIC_PREP="${SKIP_FABRIC_PREP:-false}"
+PERSISTENCE_PROFILE="${PERSISTENCE_PROFILE:-mem}"
+RESET_OPEN_SOURCE_PERSISTENCE="${RESET_OPEN_SOURCE_PERSISTENCE:-true}"
+OPEN_SOURCE_COMPOSE_FILE="${ROOT_DIR}/docker-compose.open-source-local.yml"
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   cat <<'EOF'
@@ -26,6 +29,8 @@ Environment:
   RUN_FULL_SMOKE   true runs consent and SMART smokes; false checks ping only
   SKIP_FABRIC_PREP true reuses an already prepared local Fabric devnet
   KEEP_CONTAINER   true leaves the temporary container running
+  PERSISTENCE_PROFILE mem (fast smoke) or postgres-ipfs (open-source evidence)
+  RESET_OPEN_SOURCE_PERSISTENCE true starts PostgreSQL/IPFS with empty volumes
 EOF
   exit 0
 fi
@@ -36,6 +41,11 @@ for command_name in docker curl node npm; do
     exit 2
   }
 done
+
+if [[ "$PERSISTENCE_PROFILE" == "postgres-ipfs" ]] && ! command -v openssl >/dev/null 2>&1; then
+  echo 'ERROR: missing command: openssl' >&2
+  exit 2
+fi
 
 bash "${ROOT_DIR}/scripts/check-identity-chaincode-parity.sh"
 
@@ -50,6 +60,11 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+if [[ "$PERSISTENCE_PROFILE" != "mem" && "$PERSISTENCE_PROFILE" != "postgres-ipfs" ]]; then
+  echo "ERROR: unsupported PERSISTENCE_PROFILE=${PERSISTENCE_PROFILE}" >&2
+  exit 2
+fi
 
 cd "$ROOT_DIR"
 if [[ "$SKIP_FABRIC_PREP" != "true" ]]; then
@@ -70,6 +85,33 @@ docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1 || {
   echo "ERROR: Fabric Docker network not found: ${DOCKER_NETWORK}" >&2
   exit 2
 }
+
+if [[ "$PERSISTENCE_PROFILE" == "postgres-ipfs" ]]; then
+  if [[ "$RESET_OPEN_SOURCE_PERSISTENCE" == "true" ]]; then
+    DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f "$OPEN_SOURCE_COMPOSE_FILE" down -v
+  fi
+  DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f "$OPEN_SOURCE_COMPOSE_FILE" up -d --wait
+  local_kek_secret="${OPEN_SOURCE_LOCAL_KEK_SECRET:-$(openssl rand -base64 32 | tr -d '\n')}"
+  cat >> "$ENV_FILE" <<EOF
+
+# Open-source acceptance profile: PostgreSQL vault + IPFS confidential blobs.
+DB_PROVIDER=postgres
+STORAGE_PROVIDER=ipfs
+POSTGRES_HOST=gw-open-source-postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=gwtemplate
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_SSL=false
+POSTGRES_SCHEMA=public
+IPFS_API_URL=http://gw-open-source-ipfs:5001
+IPFS_GATEWAY_URL=http://gw-open-source-ipfs:8080
+IPFS_MFS_ROOT=/gwtemplate/blobs
+ENVELOPE_PROVIDER=local
+KEK_SECRET=${local_kek_secret}
+CONFIDENTIAL_JWE_INLINE_MAX_BYTES=1
+EOF
+fi
 
 ENV_FILE="$ENV_FILE" IMAGE_NAME="$IMAGE_NAME" CONTAINER_NAME="$CONTAINER_NAME" \
 HOST_PORT="$HOST_PORT" CONTAINER_PORT="$CONTAINER_PORT" DOCKER_NETWORK="$DOCKER_NETWORK" \
@@ -93,6 +135,26 @@ if [[ "$RUN_FULL_SMOKE" == "true" ]]; then
   BASE_URL="$BASE_URL" npx dotenv -e "$ENV_FILE" -- ./scripts/bootstrap-single-tenant.sh
   BASE_URL="$BASE_URL" bash ./scripts/smoke-consentaccess-local-network.sh
   BASE_URL="$BASE_URL" bash ./scripts/smoke-smart-access-local-network.sh
+fi
+
+if [[ "$PERSISTENCE_PROFILE" == "postgres-ipfs" ]]; then
+  postgres_documents="$(docker exec gw-open-source-postgres psql -U postgres -d gwtemplate -Atc \
+    'SELECT count(*) FROM public.vault_documents WHERE deleted_at IS NULL')"
+  ipfs_blobs="$(docker exec gw-open-source-ipfs sh -lc \
+    'ipfs files ls /gwtemplate/blobs 2>/dev/null | wc -l | tr -d " "')"
+  [[ "$postgres_documents" -gt 0 ]] || { echo 'ERROR: PostgreSQL contains no persisted vault documents.' >&2; exit 1; }
+  [[ "$ipfs_blobs" -gt 0 ]] || { echo 'ERROR: IPFS contains no externalized confidential JWE blobs.' >&2; exit 1; }
+
+  docker restart "$CONTAINER_NAME" >/dev/null
+  for _ in $(seq 1 60); do
+    curl --fail --silent --max-time 2 "$PING_URL" >/dev/null 2>&1 && break
+    sleep 1
+  done
+  curl --fail --silent --show-error --max-time 5 "$PING_URL" >/dev/null || {
+    echo 'ERROR: GW did not recover from PostgreSQL/IPFS after restart.' >&2
+    exit 1
+  }
+  echo "Open-source persistence validated: postgres_documents=${postgres_documents} ipfs_jwe_blobs=${ipfs_blobs} restart=ok"
 fi
 
 echo "Validated image: ${IMAGE_NAME}"

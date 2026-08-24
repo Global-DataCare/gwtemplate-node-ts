@@ -3,6 +3,8 @@
 
 import { Sector } from "gdc-common-utils-ts/models/urlPath";
 
+export type TenantServiceRoutes = Readonly<Record<string, Readonly<Record<string, string>>>>;
+
 /**
  * Defines the shape of the application's configuration object.
  * This interface is exported so that different components can use it as a type
@@ -22,6 +24,14 @@ export interface IServerConfig {
   apiHostname: string;
   hostExternalDomain: string;
   apiBaseUrl: string;
+  /**
+   * Optional per-tenant DID service routing, keyed first by canonical tenantId
+   * and then by GW service section (for example `entity` or `individual`). The
+   * reserved `default` entry routes shared discovery/identity services and is
+   * the fallback for sections without an explicit override.
+   * It changes operational endpoints only; it never creates a second tenant.
+   */
+  tenantServiceRoutes?: TenantServiceRoutes;
   namespace: string;
   ica?: {
     mode?: 'internal' | 'external';

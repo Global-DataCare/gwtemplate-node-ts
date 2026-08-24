@@ -54,7 +54,11 @@ Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-cl
     - If you need a different profile, set `JEST_ENV_FILE=<filename>` before running the E2E suite.
     - Firestore E2E runs only when `FIRESTORE_E2E=true` and either `FIRESTORE_EMULATOR_HOST` or valid Google credentials are present.
     - GCS E2E runs only when `GCS_E2E=true` and `GCS_BUCKET_NAME` is set.
-    - IPFS E2E runs only when `IPFS_E2E=true`. Start Kubo with `npm run ipfs:local:up`.
+    - The open-source acceptance profile is `npm run docker:smoke:open-source-local-network`.
+      It runs the exact GW image with Fabric `local-network`, PostgreSQL and
+      IPFS/Kubo in Docker, verifies persisted confidential JWE blobs and checks
+      recovery after a GW restart. The in-memory local-network smoke remains a
+      faster development check but is not the final reproducibility evidence.
 
 ## 4. Authentication Clarity (Real vs Simulated)
 

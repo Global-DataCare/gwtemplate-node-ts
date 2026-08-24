@@ -1224,6 +1224,82 @@ export class HostingManager {
     return reconciled;
   }
 
+  /**
+   * Reprojects configured split-runtime service routes into existing tenant DID
+   * documents. Legal identity, VAT-backed tenantId, keys and controller state
+   * are preserved; only the public `service` array is updated.
+   */
+  public async reconcileTenantServiceRoutes(): Promise<number> {
+    const configuredRoutes = this.config.tenantServiceRoutes || {};
+    if (Object.keys(configuredRoutes).length === 0) return 0;
+
+    const records = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+      this.hostRuntime.hostCollectionName,
+      getEnvSectionId('tenants'),
+    );
+    let reconciled = 0;
+    for (const record of records || []) {
+      if (!record?.id || record.id === 'host') continue;
+      const tenant = await this.kmsService.unprotectConfidentialData<OrganizationConfig>(record, 'host');
+      const claims = tenant?.claims as ClaimsRecord | undefined;
+      const tenantId = String(claims?.[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+      const sectionRoutes = configuredRoutes[tenantId];
+      if (!claims || !tenantId || !sectionRoutes || !tenant.didDocument?.id) continue;
+
+      const sector = String(claims[ClaimsServiceSchemaorg.category] || '').trim() as Sector;
+      const jurisdiction = String(claims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim();
+      if (!sector || !jurisdiction) continue;
+      const publicTenantUrl = this.normalizeTenantPublicUrl(
+        claims[ClaimsOrganizationSchemaorg.url] as string | undefined,
+      );
+      const operationalTenantUrl = this.getOperationalServiceBaseUrl(claims);
+      const hostedByDefault = !publicTenantUrl?.startsWith('https://')
+        || (!!operationalTenantUrl && !!publicTenantUrl
+          && new URL(operationalTenantUrl).host !== new URL(publicTenantUrl).host);
+      const publicBaseUrl = hostedByDefault
+        ? this.config.apiBaseUrl
+        : (publicTenantUrl || this.config.apiBaseUrl);
+      const serviceBaseUrl = operationalTenantUrl || publicBaseUrl;
+      const didConfigServices = initializeTenantServicesConfig(
+        sector,
+        [],
+        claims[ClaimsServiceSchemaorg.serviceType] as string | undefined,
+        claims[SERVICE_ADDITIONAL_TYPE_CLAIM] as string | undefined,
+      );
+      const nextServices = populateDidDocumentServices(
+        tenant.didDocument.id,
+        publicBaseUrl,
+        didConfigServices,
+        true,
+        { alternateName: tenantId, jurisdiction, version: 'v1', sector },
+        serviceBaseUrl,
+        sectionRoutes,
+      );
+      if (JSON.stringify(tenant.didDocument.service || []) === JSON.stringify(nextServices)) continue;
+
+      const nextTenant: OrganizationConfig = {
+        ...tenant,
+        didConfig: { ...(tenant.didConfig || {}), service: didConfigServices },
+        didDocument: { ...tenant.didDocument, service: nextServices },
+        meta: { ...(tenant.meta || {}), lastUpdated: new Date().toISOString() },
+      };
+      const nextRecord = {
+        ...record,
+        sequence: Number(record.sequence || 0) + 1,
+        content: nextTenant,
+      };
+      const protectedRecord = await this.kmsService.protectConfidentialData(nextRecord, 'host');
+      await this.vaultRepository.put(
+        this.hostRuntime.hostCollectionName,
+        [protectedRecord],
+        getEnvSectionId('tenants'),
+      );
+      await this.tenantsCacheManager.refreshTenant(getTenantVaultId(sector, tenantId));
+      reconciled += 1;
+    }
+    return reconciled;
+  }
+
   private async processOrganizationIssue(job: JobRequest): Promise<IDecodedDidcommPayload> {
     return processOrganizationIssueExternal({
       job,

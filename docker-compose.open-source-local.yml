@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gw-open-source-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gwtemplate
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - gw-open-source-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gwtemplate"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [fabric-local]
+
+  ipfs:
+    image: ipfs/kubo:v0.32.1
+    container_name: gw-open-source-ipfs
+    restart: unless-stopped
+    volumes:
+      - gw-open-source-ipfs-data:/data/ipfs
+    healthcheck:
+      test: ["CMD-SHELL", "ipfs id >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [fabric-local]
+
+volumes:
+  gw-open-source-postgres-data:
+  gw-open-source-ipfs-data:
+
+networks:
+  fabric-local:
+    external: true
+    name: ${DOCKER_NETWORK:-gdc-fabric-v3-devnet}

@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+- Keep one canonical tenant identity when one organization splits capabilities
+  across operators. `TENANT_SERVICE_ROUTES_JSON` can now publish different DID
+  `serviceEndpoint` bases per tenant and section (for example, `entity` on an
+  institutional host and `individual`/`digitaltwin` on another runtime)
+  without changing the VAT-backed `tenantId` or duplicating the DID document.
+- Route shared well-known, JWKS, identity, messaging and DSP/DCP services with
+  the optional `default` tenant route so a moved tenant cannot retain an
+  internal or localhost origin in its public DID document.
+- Add a reproducible open-source Docker acceptance profile combining GW CORE,
+  Fabric `local-network`, PostgreSQL and IPFS. The gate forces confidential JWE
+  blobs out of relational rows, checks both stores and verifies GW recovery
+  after restart with the same local KEK.
 - Require an available professional seat for every current `Employee/_batch`
   create. When none is free, GW returns a persisted commercial Offer before
   creating any employee; a future import workflow must use its own explicit

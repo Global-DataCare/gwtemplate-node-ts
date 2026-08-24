@@ -103,6 +103,7 @@ export async function finalizeTenantConfig(
   );
   const publicBaseUrl = isHosted ? deps.config.apiBaseUrl : (publicTenantUrl || deps.config.apiBaseUrl);
   const serviceBaseUrl = operationalTenantUrl || publicBaseUrl;
+  const sectionServiceBaseUrls = deps.config.tenantServiceRoutes?.[deps.altName] || {};
   const didDocument = populateDidDocumentFromJwks(skeletonDidDoc, publicKeys);
   const tenantContext = {
     alternateName: deps.altName,
@@ -110,7 +111,15 @@ export async function finalizeTenantConfig(
     version: 'v1',
     sector: deps.sector,
   };
-  didDocument.service = populateDidDocumentServices(primaryDid, publicBaseUrl, didConfigServices, isHosted, tenantContext, serviceBaseUrl);
+  didDocument.service = populateDidDocumentServices(
+    primaryDid,
+    publicBaseUrl,
+    didConfigServices,
+    isHosted || Object.keys(sectionServiceBaseUrls).length > 0,
+    tenantContext,
+    serviceBaseUrl,
+    sectionServiceBaseUrls,
+  );
   const legacySignAlg = deps.config.legacySignAlg;
   const legacyX5u = legacySignAlg && deps.config.legacyX509DerBase64 ? `${publicBaseUrl}/.well-known/x509.der` : undefined;
   const legacyChain = deps.config.legacyX509DerBase64

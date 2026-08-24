@@ -58,6 +58,9 @@ function buildTenantContextPath(tenantContext: { alternateName: string; jurisdic
  * @param {DidService[]} businessServicesConfig The array of logical business services from `didConfig.service`.
  * @param {boolean} isHosted A flag indicating if the tenant's endpoints are hosted on the gateway.
  * @param {object} tenantContext Contains path components (`alternateName`, `jurisdiction`, etc.) for hosted tenants.
+ * @param {string} operationalBaseUrl Default callable runtime when it differs from the public DID origin.
+ * @param {Record<string, string>} operationalBaseUrlsBySection Deployment routing by GW section. The reserved
+ * `default` route also owns shared well-known/identity services and is the fallback for unspecified sections.
  * @returns {DidService[]} A complete and merged array of `DidService` objects for the public `didDocument`.
  */
 export function populateDidDocumentServices(
@@ -67,16 +70,25 @@ export function populateDidDocumentServices(
   isHosted: boolean,
   tenantContext: { alternateName: string; jurisdiction: string; version: string; sector: string; },
   operationalBaseUrl?: string,
+  operationalBaseUrlsBySection: Readonly<Record<string, string>> = {},
 ): DidService[] {
   const normalizedPublicBaseUrl = stripTrailingSlash(publicBaseUrl);
   const normalizedOperationalBaseUrl = stripTrailingSlash(operationalBaseUrl || publicBaseUrl);
+  // `default` prevents shared discovery/identity endpoints from retaining an
+  // internal origin when a participant tenant is moved between host runtimes.
+  const defaultRoutedBaseUrl = stripTrailingSlash(
+    operationalBaseUrlsBySection.default || normalizedOperationalBaseUrl,
+  );
   const contextualPath = isHosted ? buildTenantContextPath(tenantContext) : '';
 
   // For hosted tenants, the well-known endpoints are at the root of their full contextual path.
   // For own-domain tenants, they are at the root of their domain.
   const wellKnownBaseUrl = isHosted
-    ? ensureHostedContextBaseUrl(normalizedPublicBaseUrl, contextualPath)
-    : normalizedPublicBaseUrl;
+    ? ensureHostedContextBaseUrl(
+      operationalBaseUrlsBySection.default ? defaultRoutedBaseUrl : normalizedPublicBaseUrl,
+      contextualPath,
+    )
+    : operationalBaseUrlsBySection.default ? defaultRoutedBaseUrl : normalizedPublicBaseUrl;
 
   // 1. Create the standard, W3C-compliant well-known services.
   const wellKnownServices = createWellKnownDidServices(did, wellKnownBaseUrl);
@@ -109,6 +121,13 @@ export function populateDidDocumentServices(
       if (!/^https?:\/\//i.test(rawEndpoint)) {
         const relativePath = rawEndpoint.startsWith('/') ? rawEndpoint : `/${rawEndpoint}`;
         resolvedEndpoint = `${wellKnownBaseUrl}${relativePath}`;
+      } else if (operationalBaseUrlsBySection.default) {
+        const endpointUrl = new URL(rawEndpoint);
+        const publicUrl = new URL(normalizedPublicBaseUrl);
+        const operationalUrl = new URL(normalizedOperationalBaseUrl);
+        if (endpointUrl.origin === publicUrl.origin || endpointUrl.origin === operationalUrl.origin) {
+          resolvedEndpoint = `${new URL(defaultRoutedBaseUrl).origin}${endpointUrl.pathname}`;
+        }
       }
       const serviceId = String(configService.id || '').startsWith('#') ? `${did}${configService.id}` : String(configService.id || `${did}#service`);
       return [{
@@ -126,13 +145,16 @@ export function populateDidDocumentServices(
       return actions.map((action: string) => {
         const functionalPath = `${section}/${format}/${resourceType}/${action}`;
 
+        const sectionOperationalBaseUrl = stripTrailingSlash(
+          operationalBaseUrlsBySection[section] || defaultRoutedBaseUrl,
+        );
         let serviceEndpointUrl: string;
         if (isHosted) {
           // A hosted tenant's public DID may resolve on one domain while the callable API lives on another.
-          serviceEndpointUrl = `${ensureHostedContextBaseUrl(normalizedOperationalBaseUrl, contextualPath)}/${functionalPath}`;
+          serviceEndpointUrl = `${ensureHostedContextBaseUrl(sectionOperationalBaseUrl, contextualPath)}/${functionalPath}`;
         } else {
           // An own-domain tenant's URL is simple and functional.
-          serviceEndpointUrl = `${normalizedOperationalBaseUrl}/${functionalPath}`;
+          serviceEndpointUrl = `${sectionOperationalBaseUrl}/${functionalPath}`;
         }
 
         // Return the final, public service object.

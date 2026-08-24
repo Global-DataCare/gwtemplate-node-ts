@@ -1,4 +1,4 @@
-import { IServerConfig } from '../config';
+import { IServerConfig, TenantServiceRoutes } from '../config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 
 let configInstance: IServerConfig;
@@ -115,6 +115,50 @@ export function parseNetworkMode(value: string | undefined, nodeEnv?: string): N
     return normalized;
   }
   throw new Error("Config Error: Invalid NETWORK_MODE. Allowed: test, local-network, test-network, network");
+}
+
+/**
+ * Parses operational DID service routes without changing tenant identity.
+ *
+ * Shape: `{ "<tenantId>": { "<section>": "https://operator.example" } }`.
+ */
+export function parseTenantServiceRoutes(value: string | undefined): TenantServiceRoutes | undefined {
+  const raw = String(value || '').trim();
+  if (!raw) return undefined;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('Config Error: TENANT_SERVICE_ROUTES_JSON must be valid JSON.');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Config Error: TENANT_SERVICE_ROUTES_JSON must be an object keyed by tenantId.');
+  }
+
+  const routes: Record<string, Record<string, string>> = {};
+  for (const [tenantId, sectionRoutes] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!tenantId.trim() || !sectionRoutes || typeof sectionRoutes !== 'object' || Array.isArray(sectionRoutes)) {
+      throw new Error('Config Error: every TENANT_SERVICE_ROUTES_JSON tenant must contain a section-to-URL object.');
+    }
+    routes[tenantId] = {};
+    for (const [section, endpoint] of Object.entries(sectionRoutes as Record<string, unknown>)) {
+      if (!/^[a-z][a-z0-9-]*$/.test(section) || typeof endpoint !== 'string') {
+        throw new Error('Config Error: TENANT_SERVICE_ROUTES_JSON sections must map to HTTPS URLs.');
+      }
+      let url: URL;
+      try {
+        url = new URL(endpoint);
+      } catch {
+        throw new Error('Config Error: TENANT_SERVICE_ROUTES_JSON sections must map to HTTPS URLs.');
+      }
+      if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+        throw new Error('Config Error: TENANT_SERVICE_ROUTES_JSON sections must map to HTTPS URLs without credentials, query or fragment.');
+      }
+      routes[tenantId][section] = endpoint.replace(/\/$/, '');
+    }
+  }
+  return routes;
 }
 
 export function resetServerConfig(): void {
@@ -338,6 +382,7 @@ export function getConfig(): IServerConfig {
       apiHostname,
       hostExternalDomain: process.env.HOST_EXTERNAL_DOMAIN || new URL(apiBaseUrl).host,
       apiBaseUrl,
+      tenantServiceRoutes: parseTenantServiceRoutes(process.env.TENANT_SERVICE_ROUTES_JSON),
       namespace: process.env.URN_NAMESPACE || 'gdc',
       sectorsAllowed: resolveAllowedSectorsFromEnv(process.env),
       allowedPaymentMethods: (process.env.ALLOWED_PAYMENT_METHODS || 'Stripe').split(','),

@@ -76,6 +76,7 @@
     "update-deps": "node update-deps.js",
     "docker:build": "./docker_build_local.sh",
     "docker:smoke:local-network": "bash ./scripts/smoke-docker-local-network.sh",
+    "docker:smoke:open-source-local-network": "PERSISTENCE_PROFILE=postgres-ipfs bash ./scripts/smoke-docker-local-network.sh",
     "check:identity-chaincode-parity": "bash ./scripts/check-identity-chaincode-parity.sh",
     "test:release-scripts": "bash ./scripts/test-local-image-release-scripts.sh",
     "docker:run": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",

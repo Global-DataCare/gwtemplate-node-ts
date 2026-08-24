@@ -16,6 +16,7 @@ import {
   parseResearchStoreTextSearchMode,
   parseNetworkMode,
   parseSecurityMode,
+  parseTenantServiceRoutes,
   resetServerConfig,
   resolveAllowedSectorsFromEnv,
 } from '../../../config/server-config';
@@ -470,6 +471,32 @@ describe('server-config sector resolution', () => {
 
     process.env = previousEnv;
     resetServerConfig();
+  });
+
+  it('should parse per-section service routes for one canonical tenantId', () => {
+    expect(parseTenantServiceRoutes(JSON.stringify({
+      'VATES-G02793479': {
+        entity: 'https://host-accuro.globaldatacare.es/',
+        individual: 'https://individual-runtime.example',
+        digitaltwin: 'https://individual-runtime.example',
+      },
+    }))).toEqual({
+      'VATES-G02793479': {
+        entity: 'https://host-accuro.globaldatacare.es',
+        individual: 'https://individual-runtime.example',
+        digitaltwin: 'https://individual-runtime.example',
+      },
+    });
+  });
+
+  it('should reject insecure or malformed tenant service routes', () => {
+    expect(() => parseTenantServiceRoutes('{')).toThrow(/valid JSON/);
+    expect(() => parseTenantServiceRoutes(JSON.stringify({
+      'VATES-G02793479': { individual: 'http://individual-runtime.example' },
+    }))).toThrow(/HTTPS URLs/);
+    expect(() => parseTenantServiceRoutes(JSON.stringify({
+      'VATES-G02793479': { individual: 'https://user:secret@individual-runtime.example' },
+    }))).toThrow(/without credentials/);
   });
 
   it('should prefer HOST_PUBLIC_URL over HOST_DEPLOY_URL and local fallback', () => {

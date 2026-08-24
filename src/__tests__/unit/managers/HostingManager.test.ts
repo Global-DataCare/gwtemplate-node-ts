@@ -272,6 +272,58 @@ describe('HostingManager', () => {
     ).toBe(true);
   });
 
+  it('[1.2 TENANT] reconciles split-runtime DID services without changing tenant identity', async () => {
+    const tenantId = 'VATES-G02793479';
+    const sector = Sector.HEALTH_CARE;
+    const tenantVaultId = tenantUtils.getTenantVaultId(sector, tenantId);
+    const hostCollectionName = await mockTenantsCacheManager.getCollectionName('host') as string;
+    const claims: ClaimsRecord = {
+      [ClaimsOrganizationSchemaorg.alternateName]: tenantId,
+      [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+      [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+      [ClaimsOrganizationSchemaorg.identifierValue]: tenantId,
+      [ClaimsOrganizationSchemaorg.url]: 'https://uhc-gw.unid.online',
+      [ClaimsServiceSchemaorg.category]: sector,
+      [ClaimsServiceSchemaorg.url]: 'https://host-accuro.globaldatacare.es',
+    };
+    const did = `did:web:uhc-gw.unid.online:${tenantId}:cds-ES:v1:${sector}`;
+    const stored = await mockKmsService.protectConfidentialData({
+      id: tenantVaultId,
+      status: 'active',
+      sequence: 0,
+      content: {
+        status: 'active',
+        claims,
+        didConfig: { service: [] },
+        didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: did, service: [] },
+      },
+    } as ConfidentialStorageDoc, 'host');
+    await vaultRepository.put(hostCollectionName, [stored], getEnvSectionId('tenants'));
+    mockConfig.tenantServiceRoutes = {
+      [tenantId]: {
+        individual: 'https://individual-runtime.example',
+        digitaltwin: 'https://individual-runtime.example',
+      },
+    };
+
+    expect(await hostingManager.reconcileTenantServiceRoutes()).toBe(1);
+
+    const refreshed = await vaultRepository.get(
+      hostCollectionName,
+      tenantVaultId,
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc;
+    const tenant = refreshed.content as any;
+    expect(tenant.didDocument.id).toBe(did);
+    expect(tenant.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe(tenantId);
+    expect(tenant.didDocument.service.find((service: any) =>
+      service.id.endsWith('#entity:org.schema:employee:_batch'))?.serviceEndpoint,
+    ).toContain('https://host-accuro.globaldatacare.es/');
+    expect(tenant.didDocument.service.find((service: any) =>
+      service.id.endsWith('#individual:org.hl7.fhir.r4:patient:_batch'))?.serviceEndpoint,
+    ).toContain('https://individual-runtime.example/');
+  });
+
   it('[5 TENANT (Happy Path): should create full tenant config and protect it', async () => {
     // PRE-CONDITION: Ensure host vault exists before creating a tenant.
     await hostingManager.bootstrapHost(testClaimsHostInitialization);

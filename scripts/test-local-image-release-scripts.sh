@@ -4,7 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-bash -n ./docker_build_local.sh ./docker_run_local.sh ./cloud_deploy.sh ./scripts/smoke-docker-local-network.sh
+bash -n ./docker_build_local.sh ./docker_run_local.sh ./cloud_deploy.sh \
+  ./scripts/smoke-docker-local-network.sh ./scripts/prepare-consentaccess-local-fabric-env.sh
 
 grep -qx 'node_modules' .dockerignore
 grep -qx 'build' .dockerignore
@@ -17,6 +18,8 @@ grep -Fq '"$SCRIPT_DIR"' ./cloud_deploy.sh
 grep -Fq 'resolve_pushed_digest' ./cloud_deploy.sh
 grep -Fq 'DEPLOY_DRY_RUN' ./cloud_deploy.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER="$HOST_LEGACY_REPRESENTATIVE_CONTROLLER"' ./cloud_deploy.sh
+grep -Fq '"AUTH_TOKEN_VERIFIER" "TENANT_SERVICE_ROUTES_JSON"' ./cloud_deploy.sh
+grep -Fq '"GCP_KMS_RUNTIME_KEK_CIPHERTEXT" "GCP_KMS_RUNTIME_KEK_ID"' ./cloud_deploy.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER=false' ./env.example
 grep -Fq 'ALLOWED_SECTORS is required for every gateway deployment' ./cloud_deploy.sh
 grep -Fq 'ALLOWED_SECTORS=health-research,health-care,health-index,onehealth-research' ./env.example
@@ -30,8 +33,15 @@ while IFS= read -r env_example; do
   fi
 done < <(git ls-files 'env*.example')
 bash ./scripts/smoke-docker-local-network.sh --help | grep -q 'Fabric local-network'
+grep -Fq 'PERSISTENCE_PROFILE=postgres-ipfs' package.json
+grep -Fq 'Open-source persistence validated' ./scripts/smoke-docker-local-network.sh
+docker compose -f ./docker-compose.open-source-local.yml config >/dev/null
 node ./scripts/bootstrap-local-fabric-stack.mjs --help | grep -q -- '--prepare-only'
 grep -Fq 'FABRIC_PEER_ENDPOINT_VALUE="${FABRIC_PEER_ENDPOINT_VALUE:-localhost:7051}"' \
+  ./scripts/prepare-consentaccess-local-fabric-env.sh
+grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER=${LEGACY_REPRESENTATIVE_CONTROLLER_VALUE}' \
+  ./scripts/prepare-consentaccess-local-fabric-env.sh
+grep -Fq 'TENANT_SERVICE_ROUTES_JSON=${TENANT_SERVICE_ROUTES_JSON_VALUE}' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh
 grep -Fq 'org.schema.Order.acceptedOffer.identifier' \
   ./scripts/demo-create-individual-organization.sh
