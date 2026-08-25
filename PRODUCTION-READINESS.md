@@ -7,6 +7,10 @@ IMAGE_NAME="gw-core:<version>-<commit>" \
   npm run evidence:open-source-production-readiness
 ```
 
+When the Fabric checkout is not the default sibling directory, set
+`FABRIC_DEVNET_ROOT` to its `devnet/fabric-v3` directory. This keeps worktrees
+and independent clones reproducible without copying MSP private material.
+
 The command writes public execution evidence to
 `artifacts/open-source-production-readiness/<UTC>/`. The directory is ignored
 by Git because it contains generated execution results rather than source code.

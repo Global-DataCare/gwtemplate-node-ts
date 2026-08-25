@@ -8,7 +8,9 @@
   `peer0-host1`/`peer0-host2`, `Host1MSP`/`Host2MSP`, host-scoped crypto paths,
   generated environment keys, chaincode administration scripts, smokes and
   public evidence. Add a regression check that rejects the former numbered
-  organization placeholders in the local Fabric contract.
+  organization placeholders in the local Fabric contract. Allow an explicit
+  `FABRIC_DEVNET_ROOT` so clean worktrees and independent clones use their own
+  host-scoped MSP material without modifying another checkout.
 - Remove root-level `TEST*` and `TODO*` clutter by moving maintained testing
   guides to `docs/` and internal backlog/handoff material to `docs-internal/`;
   update repository navigation and repair the affected documentation links.

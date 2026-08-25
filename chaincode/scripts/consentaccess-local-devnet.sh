@@ -24,7 +24,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORKSPACE_ROOT="$(cd "${ROOT}/../.." && pwd)"
 CHAINCODE_DIR="${ROOT}/consentaccess-sc-javascript"
-DEVNET_ROOT="${WORKSPACE_ROOT}/fabric-multicloud/devnet/fabric-v3"
+DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${WORKSPACE_ROOT}/fabric-multicloud/devnet/fabric-v3}"
 ENSURE_DEVNET_ENV_SCRIPT="${WORKSPACE_ROOT}/gwtemplate-node-ts/scripts/ensure-fabric-devnet-env.sh"
 
 CHANNEL_NAME="${CHANNEL_NAME:-${HLF_DATA_CHANNEL_NAME:-health-care-local}}"

@@ -9,7 +9,9 @@ import https from 'node:https';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
-const fabricDevnetRoot = resolve(repoRoot, '../fabric-multicloud/devnet/fabric-v3');
+const fabricDevnetRoot = resolve(
+  process.env.FABRIC_DEVNET_ROOT || resolve(repoRoot, '../fabric-multicloud/devnet/fabric-v3'),
+);
 const defaultEnvFile = resolve(repoRoot, '.env.local-fabric');
 const logsRoot = resolve(repoRoot, 'logs');
 const runId = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
