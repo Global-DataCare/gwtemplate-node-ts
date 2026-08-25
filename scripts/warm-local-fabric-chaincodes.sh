@@ -10,8 +10,8 @@ set -euo pipefail
 FABRIC_TOOLS_CONTAINER="${FABRIC_TOOLS_CONTAINER:-gdc-fabric-tools}"
 CHANNEL_NAME="${IDENTITY_CHANNEL_NAME:-identity-local}"
 HOST_MSP_ID="${HOST_MSP_ID:-Host1MSP}"
-HOST_DOMAIN="${HOST_DOMAIN:-org1.example.com}"
-PEER_ADDRESS="${PEER_ADDRESS:-peer0-org1:7051}"
+HOST_DOMAIN="${HOST_DOMAIN:-host1.example.com}"
+PEER_ADDRESS="${PEER_ADDRESS:-peer0-host1:7051}"
 READINESS_FUNCTION="${READINESS_FUNCTION:-__readiness_probe__}"
 CHAINCODES=(
   organization-sc

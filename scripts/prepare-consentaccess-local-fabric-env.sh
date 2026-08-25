@@ -8,7 +8,7 @@ OUT_ENV="${ROOT}/.env.local-fabric"
 LEGACY_OUT_ENV="${ROOT}/.env.local-fabric-devnet"
 DEVNET_ENV="${DEVNET_ROOT}/.env.fabric-devnet"
 ENSURE_DEVNET_ENV_SCRIPT="${ROOT}/scripts/ensure-fabric-devnet-env.sh"
-ORG1_DOMAIN="${ORG1_DOMAIN:-org1.example.com}"
+HOST1_DOMAIN="${HOST1_DOMAIN:-host1.example.com}"
 
 CHANNEL_NAME="${CHANNEL_NAME:-health-care-local}"
 CONSENT_CHAINCODE_NAME="${CONSENT_CHAINCODE_NAME:-consentaccess-sc}"
@@ -39,13 +39,13 @@ function to_env_one_line_pem() {
 bash "${ENSURE_DEVNET_ENV_SCRIPT}"
 [[ -f "${DEVNET_ENV}" ]] || fail "Missing devnet env file after generation: ${DEVNET_ENV}"
 
-ORG1_ADMIN_CERT="${DEVNET_ROOT}/organizations/peerOrganizations/${ORG1_DOMAIN}/users/Admin@${ORG1_DOMAIN}/msp/signcerts/cert.pem"
-ORG1_ADMIN_KEY="$(ls -1 "${DEVNET_ROOT}/organizations/peerOrganizations/${ORG1_DOMAIN}/users/Admin@${ORG1_DOMAIN}/msp/keystore/"* | head -n 1)"
-ORG1_PEER_TLS_CA="${DEVNET_ROOT}/organizations/peerOrganizations/${ORG1_DOMAIN}/peers/peer0.${ORG1_DOMAIN}/tls/ca.crt"
+HOST1_ADMIN_CERT="${DEVNET_ROOT}/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp/signcerts/cert.pem"
+HOST1_ADMIN_KEY="$(ls -1 "${DEVNET_ROOT}/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp/keystore/"* | head -n 1)"
+HOST1_PEER_TLS_CA="${DEVNET_ROOT}/organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls/ca.crt"
 
-[[ -f "${ORG1_ADMIN_CERT}" ]] || fail "Missing Org1 admin certificate: ${ORG1_ADMIN_CERT}"
-[[ -f "${ORG1_ADMIN_KEY}" ]] || fail "Missing Org1 admin private key under keystore."
-[[ -f "${ORG1_PEER_TLS_CA}" ]] || fail "Missing Org1 peer TLS CA certificate: ${ORG1_PEER_TLS_CA}"
+[[ -f "${HOST1_ADMIN_CERT}" ]] || fail "Missing Host1 admin certificate: ${HOST1_ADMIN_CERT}"
+[[ -f "${HOST1_ADMIN_KEY}" ]] || fail "Missing Host1 admin private key under keystore."
+[[ -f "${HOST1_PEER_TLS_CA}" ]] || fail "Missing Host1 peer TLS CA certificate: ${HOST1_PEER_TLS_CA}"
 
 sed '/^HLF_[A-Za-z0-9_]*=/d' "${BASE_ENV}" > "${OUT_ENV}"
 awk '
@@ -84,11 +84,11 @@ AS_LOCAL_HOST=true
 HLF_DATA_CHANNEL_NAME=${CHANNEL_NAME}
 HLF_IDENTITY_CHANNEL_NAME=${IDENTITY_CHANNEL_NAME}
 HLF_BOOTSTRAP_CHANNELS=${BOOTSTRAP_CHANNELS_VALUE}
-HLF_MSP_ID_ORG1=${LEDGER_MSP_ID_VALUE}
+HLF_MSP_ID_HOST1=${LEDGER_MSP_ID_VALUE}
 HLF_CONNECTION_PEER=${FABRIC_PEER_ENDPOINT_VALUE}
-HLF_CONNECTION_PEM=$(to_env_one_line_pem "${ORG1_PEER_TLS_CA}")
-HLF_CERTIFICATE=$(to_env_one_line_pem "${ORG1_ADMIN_CERT}")
-HLF_PRIVATE_KEY=$(to_env_one_line_pem "${ORG1_ADMIN_KEY}")
+HLF_CONNECTION_PEM=$(to_env_one_line_pem "${HOST1_PEER_TLS_CA}")
+HLF_CERTIFICATE=$(to_env_one_line_pem "${HOST1_ADMIN_CERT}")
+HLF_PRIVATE_KEY=$(to_env_one_line_pem "${HOST1_ADMIN_KEY}")
 CONSENT_ACCESS_LEDGER_CHAINCODE=${CONSENT_CHAINCODE_NAME}
 FHIR_VERSION_LEDGER_CHAINCODE=fhir-versioning
 HLF_CHANNEL_NAME=${CHANNEL_NAME}

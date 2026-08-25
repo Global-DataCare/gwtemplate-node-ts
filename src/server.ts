@@ -197,7 +197,7 @@ async function startServer(options?: StartServerOptions) {
     const networkMode = String(process.env.NETWORK_MODE || '').trim().toLowerCase();
     assertLedgerGenesisVerificationMode({ deploymentEnv, networkMode, enabled: verifyGenesis });
     if (verifyGenesis) {
-      const ledgerMspId = String(process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_ORG1 || '').trim();
+      const ledgerMspId = String(process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_HOST1 || '').trim();
       if (!ledgerMspId) throw new Error('genesis verification requires LEDGER_MSP_ID.');
       const expected = parseExpectedChannelBindings(process.env.LEDGER_CHANNEL_GENESIS_SHA256);
       observedLedgerBindings = await verifyLedgerChannelGenesis({ mspId: ledgerMspId, expected });

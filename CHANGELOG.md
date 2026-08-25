@@ -1,5 +1,14 @@
+# Changelog
+
 ## [Unreleased]
 
+## [1.21.25] - 2026-08-25
+
+- Adopt the Fabric `0.3.0` local host vocabulary end to end: `host1`/`host2`,
+  `peer0-host1`/`peer0-host2`, `Host1MSP`/`Host2MSP`, host-scoped crypto paths,
+  generated environment keys, chaincode administration scripts, smokes and
+  public evidence. Add a regression check that rejects the former numbered
+  organization placeholders in the local Fabric contract.
 - Remove root-level `TEST*` and `TODO*` clutter by moving maintained testing
   guides to `docs/` and internal backlog/handoff material to `docs-internal/`;
   update repository navigation and repair the affected documentation links.
@@ -2747,7 +2756,7 @@
 -   **Integration Suite Hardening:** Updated Jest config and integration tests to avoid sandbox-incompatible e2e/firestore runs and to use in-memory Express invocation.
 -   **Docs:** Updated `docs/API_INTEGRATORS_GUIDE.md` with contextualized claims normalization rules and license gating notes.
 
-## [Unreleased]
+## Legacy notes: DocumentReference and onboarding
 
 ### Added
 - Integration coverage for `Bundle/_search` DocumentReference retrieval by canonical hash claim:
@@ -2776,7 +2785,7 @@
 - **Module Interoperability Issues**: Standardized the import and usage of CommonJS modules like `express` across the application (`server.ts`, `discovery.ts`) to use the `import * as name` and `name.default()` pattern, resolving persistent compilation and runtime errors.
 - **E2E Test Polling Logic**: Corrected the E2E test to use the secure `POST` method with the `thid` in the `body` for polling, aligning with the server's implementation.
 
-## [Unreleased]
+## Legacy notes: trust-bundle tooling
 
 ### Added
 - Added `npm run pki:bundle` plus `scripts/generate-trust-bundle.ts` and
@@ -2790,9 +2799,9 @@
   reproducible trust bundle, operator roles, and the ownership split between
   `gwtemplate-node-ts`, `dataspace-ica-ts`, and `gdc-sdk-node-ts`.
 
-# Changelog
+## Legacy change log fragments
 
-## Unreleased
+### Controller and compatibility work
 
 - Publish the organization-controller `License/_search` capability for new
   tenants and retain that exact read-only inventory operation for historical
@@ -2814,7 +2823,7 @@
   canonical `contract` resource type and derive the registration environment
   from authoritative host routing.
 
-## Unreleased
+### Existing-tenant controller promotion
 
 - Existing-tenant `Organization/_issue` now promotes an ICA-approved stable
   controller `did:web` and its complete public JWKS into the tenant registry,
@@ -2827,8 +2836,6 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
 
 ## [2025-10-15-0126]
 

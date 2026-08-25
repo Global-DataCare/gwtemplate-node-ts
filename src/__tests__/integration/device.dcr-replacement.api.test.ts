@@ -19,7 +19,7 @@ process.env.HOST_ADMIN_UID = 'host-admin';
 process.env.HOST_ADMIN_ROLE = 'RESPRSN';
 process.env.HOST_TERMS_URL = 'https://host.example.com/terms';
 process.env.LEDGER_ENABLED = 'true';
-process.env.LEDGER_MSP_ID = 'Org1MSP';
+process.env.LEDGER_MSP_ID = 'Host1MSP';
 
 import express from 'express';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
@@ -384,7 +384,7 @@ describe('Device DCR replacement route story', () => {
     );
 
     expect(registerKeySpy).toHaveBeenCalledTimes(2);
-    expect(keySubmitSpy).toHaveBeenCalledWith('Org1MSP', 'UpdateKeyStatus', expect.any(String), 'revoked', expect.any(String));
+    expect(keySubmitSpy).toHaveBeenCalledWith('Host1MSP', 'UpdateKeyStatus', expect.any(String), 'revoked', expect.any(String));
     expect(bindingSpy).toHaveBeenCalled();
   });
 });

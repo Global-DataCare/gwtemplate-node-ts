@@ -56,7 +56,7 @@ export async function registerOrganizationOnLedger(params: {
   sector: Sector;
   jurisdiction?: string;
 }): Promise<void> {
-  const mspId = params.ledgerConfig?.mspId || process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_ORG1;
+  const mspId = params.ledgerConfig?.mspId || process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_HOST1;
   if (!mspId) {
     throw new ManagerError('Ledger MSP ID is missing. Set LEDGER_MSP_ID.', IssueType.Exception);
   }

@@ -63,7 +63,7 @@ async function main() {
       [
         'docker compose down -v --remove-orphans || true',
         'docker rm -f consentaccess-sc >/dev/null 2>&1 || true',
-        'docker volume rm -f gdc-fabric-v3-devnet_orderer-data gdc-fabric-v3-devnet_peer0-org1-data gdc-fabric-v3-devnet_peer0-org2-data >/dev/null 2>&1 || true',
+        'docker volume rm -f gdc-fabric-v3-devnet_orderer-data gdc-fabric-v3-devnet_peer0-host1-data gdc-fabric-v3-devnet_peer0-host2-data >/dev/null 2>&1 || true',
       ].join('; '),
     ],
   });

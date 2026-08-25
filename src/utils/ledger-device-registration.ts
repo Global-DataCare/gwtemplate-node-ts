@@ -19,7 +19,7 @@ function shouldSyncIdentityLedger(): boolean {
 function getLedgerMspId(): string | undefined {
   return String(
     process.env.LEDGER_MSP_ID
-    || process.env.HLF_MSP_ID_ORG1
+    || process.env.HLF_MSP_ID_HOST1
     || '',
   ).trim() || undefined;
 }

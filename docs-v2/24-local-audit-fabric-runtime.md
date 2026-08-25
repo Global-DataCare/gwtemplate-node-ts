@@ -110,7 +110,7 @@ The minimum local stack for auditors/integrators is:
    - Root CA
    - Fabric ICA CA
    - orderer
-   - `peer0-org1`
+   - `peer0-host1`
 4. local channels:
    - `health-care-local`
    - `identity-local`

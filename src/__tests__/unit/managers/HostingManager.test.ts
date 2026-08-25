@@ -365,7 +365,7 @@ describe('HostingManager', () => {
     mockConfig.networkMode = 'local-network';
     mockConfig.ledger = {
       enabled: true,
-      mspId: 'Org1MSP',
+      mspId: 'Host1MSP',
       chaincodeName: 'organization-sc',
       schemaUrl: 'https://schema.example.org/organization',
     };
@@ -441,7 +441,7 @@ describe('HostingManager', () => {
     });
 
     expect(createOrganizationSpy).toHaveBeenCalledTimes(1);
-    expect(createOrganizationSpy).toHaveBeenCalledWith('Org1MSP', ledgerOrgId, expect.objectContaining({
+    expect(createOrganizationSpy).toHaveBeenCalledWith('Host1MSP', ledgerOrgId, expect.objectContaining({
       orgId: ledgerOrgId,
       vc: expect.objectContaining({
         id: 'urn:vc:governance:1',
@@ -452,14 +452,14 @@ describe('HostingManager', () => {
     const encryptionThumbprint = toJwkThumbprintSha256Urn(encryptionJwk as any);
 
     expect(registerKeySpy).toHaveBeenCalledTimes(2);
-    expect(registerKeySpy).toHaveBeenNthCalledWith(1, 'Org1MSP', signingThumbprint, expect.objectContaining({
+    expect(registerKeySpy).toHaveBeenNthCalledWith(1, 'Host1MSP', signingThumbprint, expect.objectContaining({
       keyId: signingThumbprint,
       orgId: ledgerOrgId,
       kid: 'sig-key-1',
       use: 'sig',
       purpose: 'organization-signing',
     }));
-    expect(registerKeySpy).toHaveBeenNthCalledWith(2, 'Org1MSP', encryptionThumbprint, expect.objectContaining({
+    expect(registerKeySpy).toHaveBeenNthCalledWith(2, 'Host1MSP', encryptionThumbprint, expect.objectContaining({
       keyId: encryptionThumbprint,
       orgId: ledgerOrgId,
       kid: 'enc-key-1',
@@ -468,14 +468,14 @@ describe('HostingManager', () => {
     }));
 
     expect(upsertBindingSpy).toHaveBeenCalledTimes(2);
-    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Org1MSP', `organization_${ledgerOrgId}__${signingThumbprint}`, expect.objectContaining({
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Host1MSP', `organization_${ledgerOrgId}__${signingThumbprint}`, expect.objectContaining({
       subjectType: 'organization',
       subjectId: ledgerOrgId,
       keyId: signingThumbprint,
       relationship: 'organization-signing',
       status: 'active',
     }));
-    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Org1MSP', `organization_${ledgerOrgId}__${encryptionThumbprint}`, expect.objectContaining({
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Host1MSP', `organization_${ledgerOrgId}__${encryptionThumbprint}`, expect.objectContaining({
       subjectType: 'organization',
       subjectId: ledgerOrgId,
       keyId: encryptionThumbprint,
@@ -484,7 +484,7 @@ describe('HostingManager', () => {
     }));
 
     expect(upsertArtifactSpy).toHaveBeenCalledTimes(1);
-    expect(upsertArtifactSpy).toHaveBeenCalledWith('Org1MSP', `artifact_sha256_${signedHash}`, expect.objectContaining({
+    expect(upsertArtifactSpy).toHaveBeenCalledWith('Host1MSP', `artifact_sha256_${signedHash}`, expect.objectContaining({
       artifactId: `artifact_sha256_${signedHash}`,
       hash: signedHash,
       hashAlg: 'sha256',
@@ -501,7 +501,7 @@ describe('HostingManager', () => {
     }));
 
     expect(createArtifactEventSpy).toHaveBeenCalledTimes(1);
-    expect(createArtifactEventSpy).toHaveBeenCalledWith('Org1MSP', expect.stringContaining(`artifact_sha256_${signedHash}__signature-observed-`), expect.objectContaining({
+    expect(createArtifactEventSpy).toHaveBeenCalledWith('Host1MSP', expect.stringContaining(`artifact_sha256_${signedHash}__signature-observed-`), expect.objectContaining({
       artifactId: `artifact_sha256_${signedHash}`,
       eventType: 'declaration',
       eventSubType: 'pdf-signature-observed',
@@ -517,7 +517,7 @@ describe('HostingManager', () => {
     mockConfig.networkMode = 'local-network';
     mockConfig.ledger = {
       enabled: true,
-      mspId: 'Org1MSP',
+      mspId: 'Host1MSP',
       chaincodeName: 'organization-sc',
       schemaUrl: 'https://schema.example.org/organization',
     };
@@ -573,17 +573,17 @@ describe('HostingManager', () => {
       jurisdiction: 'ES',
     });
 
-    expect(registerKeySpy).toHaveBeenNthCalledWith(1, 'Org1MSP', 'did:web:fallback.example.org#sig-akp', expect.objectContaining({
+    expect(registerKeySpy).toHaveBeenNthCalledWith(1, 'Host1MSP', 'did:web:fallback.example.org#sig-akp', expect.objectContaining({
       keyId: 'did:web:fallback.example.org#sig-akp',
       kid: 'sig-akp',
       thumbprint: undefined,
     }));
-    expect(registerKeySpy).toHaveBeenNthCalledWith(2, 'Org1MSP', 'did:web:fallback.example.org#enc-okp', expect.objectContaining({
+    expect(registerKeySpy).toHaveBeenNthCalledWith(2, 'Host1MSP', 'did:web:fallback.example.org#enc-okp', expect.objectContaining({
       keyId: 'did:web:fallback.example.org#enc-okp',
       kid: 'enc-okp',
       thumbprint: undefined,
     }));
-    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Org1MSP', `organization_${ledgerOrgId}__did:web:fallback.example.org#sig-akp`, expect.objectContaining({
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(1, 'Host1MSP', `organization_${ledgerOrgId}__did:web:fallback.example.org#sig-akp`, expect.objectContaining({
       subjectId: ledgerOrgId,
       keyId: 'did:web:fallback.example.org#sig-akp',
       meta: expect.objectContaining({
@@ -592,7 +592,7 @@ describe('HostingManager', () => {
         }),
       }),
     }));
-    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Org1MSP', `organization_${ledgerOrgId}__did:web:fallback.example.org#enc-okp`, expect.objectContaining({
+    expect(upsertBindingSpy).toHaveBeenNthCalledWith(2, 'Host1MSP', `organization_${ledgerOrgId}__did:web:fallback.example.org#enc-okp`, expect.objectContaining({
       subjectId: ledgerOrgId,
       keyId: 'did:web:fallback.example.org#enc-okp',
       meta: expect.objectContaining({
@@ -607,7 +607,7 @@ describe('HostingManager', () => {
     mockConfig.networkMode = 'local-network';
     mockConfig.ledger = {
       enabled: true,
-      mspId: 'Org1MSP',
+      mspId: 'Host1MSP',
       chaincodeName: 'organization-sc',
       schemaUrl: 'https://schema.example.org/organization',
     };
@@ -662,13 +662,13 @@ describe('HostingManager', () => {
 
     const keyId = toJwkThumbprintSha256Urn(sharedJwk);
     expect(registerKeySpy).toHaveBeenCalledTimes(1);
-    expect(registerKeySpy).toHaveBeenCalledWith('Org1MSP', keyId, expect.objectContaining({
+    expect(registerKeySpy).toHaveBeenCalledWith('Host1MSP', keyId, expect.objectContaining({
       keyId,
       orgId: ledgerOrgId,
     }));
     expect(upsertBindingSpy).toHaveBeenCalledTimes(1);
     expect(upsertBindingSpy).toHaveBeenCalledWith(
-      'Org1MSP',
+      'Host1MSP',
       `organization_${ledgerOrgId}__${keyId}`,
       expect.objectContaining({
         keyId,
@@ -688,7 +688,7 @@ describe('HostingManager', () => {
   it('[ledger] maps a structured Fabric organization conflict detail to 409', async () => {
     mockConfig.ledger = {
       enabled: true,
-      mspId: 'Org1MSP',
+      mspId: 'Host1MSP',
       chaincodeName: 'organization-sc',
       schemaUrl: 'https://schema.example.org/organization',
     };
@@ -698,7 +698,7 @@ describe('HostingManager', () => {
         code: 10,
         details: [{
           address: 'peer0:7051',
-          mspId: 'Org1MSP',
+          mspId: 'Host1MSP',
           message: 'chaincode response 500, ORGANIZATION_CONFLICT:urn:org:tax:VATES-B42215152',
         }],
       },

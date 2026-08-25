@@ -36,7 +36,7 @@ const FABRIC_LEDGER_TEST_ENV = {
   LEDGER_ENABLED: 'true',
   LEDGER_PROVIDER_DEFAULT: 'mem',
   LEDGER_PROVIDER_MAP: 'local-network=fabric',
-  LEDGER_MSP_ID: 'Org1MSP',
+  LEDGER_MSP_ID: 'Host1MSP',
 } as const;
 
 describe('DeviceRegistrationManager', () => {

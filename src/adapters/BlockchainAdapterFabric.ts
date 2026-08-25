@@ -10,7 +10,7 @@ type FabricBlockchainConfig = {
 };
 
 const DEFAULT_FABRIC_BLOCKCHAIN_CONFIG: FabricBlockchainConfig = {
-  mspId: 'Org1MSP',
+  mspId: 'Host1MSP',
 };
 
 function loadFabricBlockchainConfig(): FabricBlockchainConfig {
@@ -18,7 +18,7 @@ function loadFabricBlockchainConfig(): FabricBlockchainConfig {
     mspId:
       process.env.LEDGER_MSP_ID
       || process.env.LEDGER_FABRIC_MSP_ID
-      || process.env.HLF_MSP_ID_ORG1
+      || process.env.HLF_MSP_ID_HOST1
       || DEFAULT_FABRIC_BLOCKCHAIN_CONFIG.mspId,
   };
 }
