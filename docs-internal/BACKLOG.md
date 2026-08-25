@@ -1,9 +1,9 @@
-# TODO - gwtemplate-node-ts
+# GW CORE Backlog
 
 Roadmap references:
-- `TODO_ROADMAP.md`
-- `docs/TODO_SMART_EHR_COMPAT.md`
-- `docs/UC_CAPABILITY_MATRIX_SEDIA.md`
+- `ROADMAP.md`
+- `../docs/90.E-TODO_SMART_EHR_COMPAT.md`
+- `../docs/UC_CAPABILITY_MATRIX_SEDIA.md`
 
 ## NOW
 0. Support the additive MVP Bundle-change/readback contract documented in

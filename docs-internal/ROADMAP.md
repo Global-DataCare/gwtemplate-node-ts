@@ -1,4 +1,4 @@
-# TODO_ROADMAP (gwtemplate-node-ts)
+# GW CORE Roadmap
 
 Version:
 - 0.1.0

@@ -29,7 +29,7 @@ GW starts after upstream profile/runtime unlock and document/Communication autho
 ## Repository Navigation
 
 - Canonical local/GKE/live operations index:
-  - local demo/runtime: [TESTING.md](TESTING.md)
+  - local demo/runtime: [docs/TESTING.md](docs/TESTING.md)
   - deployment details and env split: [DEPLOY.md](DEPLOY.md)
   - API/docs index: [docs/README.md](docs/README.md)
   - current controller lifecycle contract: [docs-v2/18-organization-controller-lifecycle.md](docs-v2/18-organization-controller-lifecycle.md)
@@ -39,9 +39,9 @@ GW starts after upstream profile/runtime unlock and document/Communication autho
 - Local audit/runtime with Fabric: [docs-v2/24-local-audit-fabric-runtime.md](docs-v2/24-local-audit-fabric-runtime.md)
 - Reproducible open-source production-readiness evidence: [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md)
 - Portal/BFF to GW CORE reference: [portal-api-gw.md](portal-api-gw.md)
-- Internal project traceability and closeout status: [docs-internal/00-project-closeout-todo.md](docs-internal/00-project-closeout-todo.md)
+- Internal backlog and roadmap: [docs-internal/README.md](docs-internal/README.md)
 - Environment-variable reference: [docs-v2/22-environment-variables-reference.md](docs-v2/22-environment-variables-reference.md)
-- Testing and live E2E operations: [TESTING.md](TESTING.md)
+- Testing and live E2E operations: [docs/TESTING.md](docs/TESTING.md)
 - Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)
 - Shared controller/device lifecycle note:
   [gdc-sdk-core-ts/docs/ARCHITECTURE_CONTROLLER_DEVICE_LIFECYCLES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/ARCHITECTURE_CONTROLLER_DEVICE_LIFECYCLES.md)
@@ -49,7 +49,7 @@ GW starts after upstream profile/runtime unlock and document/Communication autho
 - Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
 - Employee bundle/lifecycle contract reference: [gdc-sdk-core-ts/docs/101-EMPLOYEES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-EMPLOYEES.md)
 - SDK live local reference before running cross-repo E2E: [gdc-sdk-node-ts/docs/101-LIVE_GW_LOCAL.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-LIVE_GW_LOCAL.md)
-- Repo roadmap: [TODO_ROADMAP.md](TODO_ROADMAP.md)
+- Repo roadmap: [docs-internal/ROADMAP.md](docs-internal/ROADMAP.md)
 - Repo briefing: [docs/BRIEFING_DATASPACE_EN.md](docs/BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
 - Local demo template: [env.local-demo.example](env.local-demo.example)
@@ -71,7 +71,7 @@ For the canonical ICA + GW + SDK Node live verification workflow, including:
 - staging checks
 - the exact env vars that avoid ICA URL / jurisdiction / host-network mistakes
 
-go first to [TESTING.md](TESTING.md).
+go first to [docs/TESTING.md](docs/TESTING.md).
 
 ## Canonical Operations
 
@@ -494,8 +494,8 @@ To ensure everything is working correctly, run the test suite:
 npm test
 ```
 For test tiers and E2E setup details, see:
-- `TESTING.md`
-- `TESTING-GUIDE.md`
+- [docs/TESTING.md](docs/TESTING.md)
+- [docs/TESTING-E2E.md](docs/TESTING-E2E.md)
 
 ## Next Steps: Exploring the API
 
@@ -796,10 +796,10 @@ Local (minikube/k3s) is test-only and documented in:
 
 ## Roadmap and Briefing
 - `docs/BRIEFING_DATASPACE_EN.md`
-- `TODO_ROADMAP.md`
+- `docs-internal/ROADMAP.md`
 
 ## Pending Compatibility TODO
-- See [SMART EHR compatibility TODO](docs/TODO_SMART_EHR_COMPAT.md).
+- See [SMART EHR compatibility TODO](docs/90.E-TODO_SMART_EHR_COMPAT.md).
 - See [Tenant identifier and vault migration TODO (v2.0)](docs/90.K-TODO_TENANT_IDENTIFIER_V2.md).
 
 ## Local Single-Tenant Bootstrap (acme-id)

@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+- Remove root-level `TEST*` and `TODO*` clutter by moving maintained testing
+  guides to `docs/` and internal backlog/handoff material to `docs-internal/`;
+  update repository navigation and repair the affected documentation links.
 - Move the public production-readiness guide to the repository root as
   `PRODUCTION-READINESS.md`, link it from the main README, and replace the
   versioned root portal/API snapshots with one `portal-api-gw.md` pointer to

@@ -9,7 +9,7 @@ Primary references:
 - `docs/02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md`
 - `docs/01-OVERVIEW-AND-GUIDES/01.G-TESTING-PATTERNS.md`
 - `docs/UC_CAPABILITY_MATRIX_SEDIA.md`
-- `TESTING.md` / `TESTING-GUIDE.md`
+- `docs/TESTING.md` / `docs/TESTING-E2E.md`
 
 ## Scope Governance
 1. Keep core GW scope explicit and testable.

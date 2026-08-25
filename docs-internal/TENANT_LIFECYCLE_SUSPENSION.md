@@ -1,4 +1,4 @@
-# Tenant Lifecycle Suspension / Reactivation
+# Tenant Lifecycle Suspension and Reactivation Plan
 
 ## Purpose
 
@@ -237,4 +237,4 @@ Those should remain future integration steps after the GW lifecycle contract is 
 
 Use this exact prompt in the next thread:
 
-`Implement tenant lifecycle suspension/reactivation in gwtemplate-node-ts. Read TODO_TENANT_LIFECYCLE_SUSPENSION.md first, follow its task order, and keep the first cut local/test-driven without depending on real ICA integration yet.`
+`Implement tenant lifecycle suspension/reactivation in gwtemplate-node-ts. Read docs-internal/TENANT_LIFECYCLE_SUSPENSION.md first, follow its task order, and keep the first cut local/test-driven without depending on real ICA integration yet.`

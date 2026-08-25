@@ -59,7 +59,8 @@ docs/
 - **GW clinical bundle reader v2**: [../docs-v2/17-clinical-bundle-readers.md](../docs-v2/17-clinical-bundle-readers.md) is the canonical integrator-facing contract for section-aware read/filter/count/pagination semantics.
 - **GW deactivation/purge lifecycle**: [../docs-v2/16-deactivation-and-purge-lifecycle.md](../docs-v2/16-deactivation-and-purge-lifecycle.md) explains the disable/purge hierarchy for individual, tenant, and host, including blob deletion and discovery unpublication.
 - **GW lifecycle current vs target**: [90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md) separates what is already implemented from the target normalized `PATCH`-based contract for SDK alignment.
-- **Core test summary**: `TEST_CORE.md` explains what must be considered proved for the GW core baseline across GW + SDK repositories.
+- **Testing guide**: [TESTING.md](TESTING.md) is the canonical test entry point; [TESTING-E2E.md](TESTING-E2E.md) covers live cloud integrations.
+- **Core test summary**: [TEST_CORE.md](TEST_CORE.md) explains what must be considered proved for the GW core baseline across GW + SDK repositories; [TEST_MATRIX.md](TEST_MATRIX.md) lists the test tiers.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
   - `docs/openapi-profiles/openapi-core.json`
   - `docs/openapi-profiles/openapi-compat.json`

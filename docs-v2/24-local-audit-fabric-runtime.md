@@ -235,7 +235,7 @@ For the local audit profile, adopt these rules:
 
 ### Next implementation backlog
 
-1. Add one `docs-v2` or `TESTING.md` walkthrough that starts ICA + GW + Fabric + SDK lifecycle tests in one sequence.
+1. Add one `docs-v2` or `docs/TESTING.md` walkthrough that starts ICA + GW + Fabric + SDK lifecycle tests in one sequence.
 2. Implement `registerCidVersionMappings(...)` in `BlockchainAdapterFabric` plus a dedicated chaincode.
 3. Define whether `DocumentReference` anchoring uses `contenthash` only or `identifier + contenthash`, and keep docs/tests aligned.
 4. Add one explicit local integration test that proves a stored `DocumentReference` or `Composition` produced one on-chain hash/version anchor.

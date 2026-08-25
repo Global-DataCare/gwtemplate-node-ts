@@ -1,7 +1,7 @@
 # End-to-End (E2E) Testing Guide
 
 This guide provides instructions for setting up and running the End-to-End (E2E) test suite, which validates the application's integration with live Google Cloud Platform (GCP) services.
-For general testing strategy and tiers, see `TESTING.md`.
+For general testing strategy and tiers, see [TESTING.md](TESTING.md).
 
 ## 1. Overview
 

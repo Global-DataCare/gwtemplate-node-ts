@@ -1,4 +1,4 @@
-# TEST_MATRIX - gwtemplate-node-ts
+# Test Matrix - GW CORE
 
 Core baseline summary lives in `TEST_CORE.md`.
 

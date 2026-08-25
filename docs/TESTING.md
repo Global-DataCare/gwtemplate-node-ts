@@ -1,7 +1,7 @@
 # Testing Guide
 
 This document outlines the testing strategies and procedures for this project.
-For E2E setup and GCP details, see `TESTING-GUIDE.md`.
+For E2E setup and GCP details, see `TESTING-E2E.md`.
 
 ## 1. Core Philosophy: The `IVaultRepository` Pattern
 
@@ -30,8 +30,8 @@ Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-cl
     This command runs all tests that do not require external services. It primarily uses the `VaultMemRepository`.
 
 -   **Firestore-Specific Tests:**
-    Testing against Firestore requires a specific setup, either with a local emulator or a live GCP project. For detailed instructions on this, please refer to the dedicated guide:
-    **[./TESTING-FIRESTORE.md](./TESTING-FIRESTORE.md)**
+    Testing against Firestore requires a specific setup, either with a local emulator or a live GCP project. See the
+    **[E2E testing guide](TESTING-E2E.md)**.
 
 -   **E2E Tests (explicit opt-in):**
     E2E suites that touch external services are disabled by default. To run them, set the flags below (typically in your shell before running `npm run test:e2e`):

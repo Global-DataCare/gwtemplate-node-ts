@@ -1,4 +1,4 @@
-# TEST_CORE - gwtemplate-node-ts
+# Core Test Evidence - GW CORE
 
 Purpose: define what the GW core profile must keep proving through tests and cross-repository live validation.
 
