@@ -29,6 +29,7 @@ describe('LicenseManager (_issue)', () => {
         userClass: 'employee',
         type: 'mobile',
         status: 'available',
+        maxDevices: 5,
         exp: Math.floor(Date.now() / 1000) + 3600,
       } as any,
     };
@@ -79,6 +80,10 @@ describe('LicenseManager (_issue)', () => {
     const code = (resp.body as any)?.data?.[0]?.id;
     expect(typeof code).toBe('string');
     expect(code).toMatch(/^lic-/);
+    expect((resp.body as any)?.data?.[0]?.meta).toMatchObject({
+      licenseId: 'license-available-1',
+      maxDevices: 5,
+    });
 
     expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
     const [, docs] = mockVaultRepository.put.mock.calls[0];

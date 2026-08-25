@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Return the persisted seat's effective `licenseId` and `maxDevices` in every
+  successful `License/_issue` entry so SDKs and portals do not substitute a
+  potentially different local installation allowance.
 - Synchronize the controller and commercial Order security contract with GW
   UNID: compat-mode DIDComm plain may project an optional public JWK, but
   tenant operations verify `iss + kid` with the key registered by DCR.

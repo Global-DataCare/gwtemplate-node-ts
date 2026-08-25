@@ -405,7 +405,7 @@ export class LicenseManager implements IJobProcessor {
         if (!inviteEmail) throw new Error('Missing required claim: org.schema.Person.email');
         if (!inviteRole) throw new Error('Missing required claim: org.schema.Person.hasOccupation');
 
-        const { activationCode } = await issueActivationCodeFromPool({
+        const { activationCode, licenseId, maxDevices } = await issueActivationCodeFromPool({
           vaultRepository: this.vaultRepository,
           kmsService: this.kmsService,
           tenantVaultId,
@@ -430,7 +430,7 @@ export class LicenseManager implements IJobProcessor {
         responseEntries.push({
           type: 'License:Issued',
           response: { status: '201' },
-          meta: { claims: responseClaims },
+          meta: { claims: responseClaims, licenseId, maxDevices },
           resource: {
             resourceType: 'OperationOutcome',
             issue: [

@@ -4,6 +4,7 @@
 import { randomBytes, randomUUID } from 'crypto';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { DEFAULT_LICENSE_DEVICE_ALLOWANCE } from 'gdc-common-utils-ts/utils/license';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { getEnvSectionId } from './section-env';
@@ -283,6 +284,7 @@ function normalizeControllerRelationshipRole(role?: string): string {
 export async function issueActivationCodeFromPool(params: IssueActivationCodeParams): Promise<{
   activationCode: string;
   licenseId: string;
+  maxDevices: number;
 }> {
   const {
     vaultRepository,
@@ -411,5 +413,9 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
 
   await vaultRepository.put(tenantVaultId, [match], getEnvSectionId('device-licenses'));
 
-  return { activationCode, licenseId: match.id };
+  const configuredAllowance = Number(license.maxDevices);
+  const maxDevices = Number.isInteger(configuredAllowance) && configuredAllowance > 0
+    ? configuredAllowance
+    : DEFAULT_LICENSE_DEVICE_ALLOWANCE;
+  return { activationCode, licenseId: match.id, maxDevices };
 }
