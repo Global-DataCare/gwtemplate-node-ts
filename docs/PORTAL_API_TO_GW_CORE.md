@@ -3,11 +3,11 @@
 Status: Canonical cross-repository functional reference for portal-facing API
 design over GW CORE.
 
-This is the only maintained portal/API mapping in this repository. Versioned
-root tables such as `v1.5-tabla-portal-api-gw.md` are historical pointers and
-must not be used as a second contract. Product portals keep their exhaustive
-concrete route inventory beside their code and classify every route as a CORE
-facade, portal infrastructure, or a product/sector extension.
+This is the only maintained portal/API mapping in this repository. The root
+[`portal-api-gw.md`](../portal-api-gw.md) file is a navigation pointer, not a
+second contract. Product portals keep their exhaustive concrete route
+inventory beside their code and classify every route as a CORE facade, portal
+infrastructure, or a product/sector extension.
 
 Use this document when you need to define or review:
 

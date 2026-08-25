@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+- Move the public production-readiness guide to the repository root as
+  `PRODUCTION-READINESS.md`, link it from the main README, and replace the
+  versioned root portal/API snapshots with one `portal-api-gw.md` pointer to
+  the maintained contract under `docs`.
 - Add a presentation-grade, checksummed open-source production-readiness
   evidence bundle covering the offline dataspace CA, dataspace ICA host VC,
   governed Fabric admission contract, `Host1MSP`/`Host2MSP` topology and the
@@ -78,7 +82,7 @@
 - Consolidate the portal-to-GW mapping in
   `docs/PORTAL_API_TO_GW_CORE.md`: document the published DID binding,
   organization/individual license search and non-production `License/_add`
-  contracts, and mark the root v1.5 table as historical instead of a competing
+  contracts, with one root navigation pointer instead of a competing versioned
   source of truth.
 
 ## [1.21.22] - 2026-08-20

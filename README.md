@@ -37,6 +37,8 @@ GW starts after upstream profile/runtime unlock and document/Communication autho
 - Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
 - Key custody and audit posture: [docs-v2/19-key-custody-and-audit-readiness.md](docs-v2/19-key-custody-and-audit-readiness.md)
 - Local audit/runtime with Fabric: [docs-v2/24-local-audit-fabric-runtime.md](docs-v2/24-local-audit-fabric-runtime.md)
+- Reproducible open-source production-readiness evidence: [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md)
+- Portal/BFF to GW CORE reference: [portal-api-gw.md](portal-api-gw.md)
 - Internal project traceability and closeout status: [docs-internal/00-project-closeout-todo.md](docs-internal/00-project-closeout-todo.md)
 - Environment-variable reference: [docs-v2/22-environment-variables-reference.md](docs-v2/22-environment-variables-reference.md)
 - Testing and live E2E operations: [TESTING.md](TESTING.md)

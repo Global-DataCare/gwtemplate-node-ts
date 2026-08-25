@@ -31,10 +31,10 @@ Purpose:
 The closeout package refers to one canonical route/mapping table that remains
 outside this folder because it is also reused as a standalone reference:
 
-- [v1.5-tabla-portal-api-gw.md](../v1.5-tabla-portal-api-gw.md)
+- [portal-api-gw.md](../portal-api-gw.md)
 
 Rule:
 
 - `docs-end` is the packaged closeout narrative,
-- `v1.5-tabla-portal-api-gw.md` is the canonical operation/mapping table,
+- `portal-api-gw.md` points to the canonical operation/mapping table in `docs`,
 - do not keep a second divergent copy of that table inside `docs-end`.
