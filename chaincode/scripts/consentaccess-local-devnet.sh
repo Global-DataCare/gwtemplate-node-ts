@@ -24,7 +24,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORKSPACE_ROOT="$(cd "${ROOT}/../.." && pwd)"
 CHAINCODE_DIR="${ROOT}/consentaccess-sc-javascript"
-DEVNET_ROOT="${WORKSPACE_ROOT}/fabric-multicloud/devnet/fabric-v3"
+DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${WORKSPACE_ROOT}/fabric-multicloud/devnet/fabric-v3}"
 ENSURE_DEVNET_ENV_SCRIPT="${WORKSPACE_ROOT}/gwtemplate-node-ts/scripts/ensure-fabric-devnet-env.sh"
 
 CHANNEL_NAME="${CHANNEL_NAME:-${HLF_DATA_CHANNEL_NAME:-health-care-local}}"
@@ -42,12 +42,12 @@ DEVNET_NETWORK="${DEVNET_NETWORK:-gdc-fabric-v3-devnet}"
 FABRIC_TOOLS_CONTAINER="${FABRIC_TOOLS_CONTAINER:-gdc-fabric-tools}"
 ORDERER_TLS_HOSTNAME="${ORDERER_TLS_HOSTNAME:-orderer}"
 ORDERER_ADDRESS="${ORDERER_ADDRESS:-orderer:7050}"
-ORG1_DOMAIN="${ORG1_DOMAIN:-org1.example.com}"
+HOST1_DOMAIN="${HOST1_DOMAIN:-host1.example.com}"
 ORDERER_DOMAIN="${ORDERER_DOMAIN:-example.com}"
-ORG1_MSP_ID="${ORG1_MSP_ID:-Host1MSP}"
+HOST1_MSP_ID="${HOST1_MSP_ID:-Host1MSP}"
 
-ORG1_ADMIN_MSP="/workspace/organizations/peerOrganizations/${ORG1_DOMAIN}/users/Admin@${ORG1_DOMAIN}/msp"
-ORG1_PEER_TLS="/workspace/organizations/peerOrganizations/${ORG1_DOMAIN}/peers/peer0.${ORG1_DOMAIN}/tls/ca.crt"
+HOST1_ADMIN_MSP="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp"
+HOST1_PEER_TLS="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls/ca.crt"
 ORDERER_TLS_CA="/workspace/organizations/ordererOrganizations/${ORDERER_DOMAIN}/orderers/orderer.${ORDERER_DOMAIN}/tls/ca.crt"
 
 function info() {
@@ -150,23 +150,23 @@ function copy_archive_to_devnet() {
 }
 
 function install_chaincode_package() {
-  info "Installing ${CHAINCODE_PACKAGE_ARCHIVE} on peer0-org1"
+  info "Installing ${CHAINCODE_PACKAGE_ARCHIVE} on peer0-host1"
   exec_tools env \
-    CORE_PEER_LOCALMSPID="${ORG1_MSP_ID}" \
-    CORE_PEER_ADDRESS="peer0-org1:7051" \
-    CORE_PEER_MSPCONFIGPATH="${ORG1_ADMIN_MSP}" \
+    CORE_PEER_LOCALMSPID="${HOST1_MSP_ID}" \
+    CORE_PEER_ADDRESS="peer0-host1:7051" \
+    CORE_PEER_MSPCONFIGPATH="${HOST1_ADMIN_MSP}" \
     CORE_PEER_TLS_ENABLED=true \
-    CORE_PEER_TLS_ROOTCERT_FILE="${ORG1_PEER_TLS}" \
+    CORE_PEER_TLS_ROOTCERT_FILE="${HOST1_PEER_TLS}" \
     peer lifecycle chaincode install "/workspace/channel-artifacts/${CHAINCODE_PACKAGE_ARCHIVE}"
 }
 
 function resolve_package_id() {
   exec_tools env \
-    CORE_PEER_LOCALMSPID="${ORG1_MSP_ID}" \
-    CORE_PEER_ADDRESS="peer0-org1:7051" \
-    CORE_PEER_MSPCONFIGPATH="${ORG1_ADMIN_MSP}" \
+    CORE_PEER_LOCALMSPID="${HOST1_MSP_ID}" \
+    CORE_PEER_ADDRESS="peer0-host1:7051" \
+    CORE_PEER_MSPCONFIGPATH="${HOST1_ADMIN_MSP}" \
     CORE_PEER_TLS_ENABLED=true \
-    CORE_PEER_TLS_ROOTCERT_FILE="${ORG1_PEER_TLS}" \
+    CORE_PEER_TLS_ROOTCERT_FILE="${HOST1_PEER_TLS}" \
     peer lifecycle chaincode queryinstalled \
     | awk -v label="${CHAINCODE_LABEL}" '$0 ~ label {gsub(/,/, "", $3); print $3}' \
     | tail -n 1
@@ -190,16 +190,16 @@ function restart_external_service() {
 function approve_chaincode_definition() {
   local package_id="$1"
 
-  info "Approving the chaincode definition for ${ORG1_MSP_ID}"
-  # The local Docker devnet only exposes Org1 for endorsement. An explicit
+  info "Approving the chaincode definition for ${HOST1_MSP_ID}"
+  # The local Docker devnet only exposes Host1 for endorsement. An explicit
   # one-org signature policy keeps the committed definition aligned with that
   # topology and avoids discovery trying to satisfy a broader default policy.
   exec_tools env \
-    CORE_PEER_LOCALMSPID="${ORG1_MSP_ID}" \
-    CORE_PEER_ADDRESS="peer0-org1:7051" \
-    CORE_PEER_MSPCONFIGPATH="${ORG1_ADMIN_MSP}" \
+    CORE_PEER_LOCALMSPID="${HOST1_MSP_ID}" \
+    CORE_PEER_ADDRESS="peer0-host1:7051" \
+    CORE_PEER_MSPCONFIGPATH="${HOST1_ADMIN_MSP}" \
     CORE_PEER_TLS_ENABLED=true \
-    CORE_PEER_TLS_ROOTCERT_FILE="${ORG1_PEER_TLS}" \
+    CORE_PEER_TLS_ROOTCERT_FILE="${HOST1_PEER_TLS}" \
     peer lifecycle chaincode approveformyorg \
     -o "${ORDERER_ADDRESS}" \
     --ordererTLSHostnameOverride "${ORDERER_TLS_HOSTNAME}" \
@@ -216,11 +216,11 @@ function approve_chaincode_definition() {
 function commit_chaincode_definition() {
   info "Committing the chaincode definition on ${CHANNEL_NAME}"
   exec_tools env \
-    CORE_PEER_LOCALMSPID="${ORG1_MSP_ID}" \
-    CORE_PEER_ADDRESS="peer0-org1:7051" \
-    CORE_PEER_MSPCONFIGPATH="${ORG1_ADMIN_MSP}" \
+    CORE_PEER_LOCALMSPID="${HOST1_MSP_ID}" \
+    CORE_PEER_ADDRESS="peer0-host1:7051" \
+    CORE_PEER_MSPCONFIGPATH="${HOST1_ADMIN_MSP}" \
     CORE_PEER_TLS_ENABLED=true \
-    CORE_PEER_TLS_ROOTCERT_FILE="${ORG1_PEER_TLS}" \
+    CORE_PEER_TLS_ROOTCERT_FILE="${HOST1_PEER_TLS}" \
     peer lifecycle chaincode commit \
     -o "${ORDERER_ADDRESS}" \
     --ordererTLSHostnameOverride "${ORDERER_TLS_HOSTNAME}" \
@@ -231,8 +231,8 @@ function commit_chaincode_definition() {
     --version "${CHAINCODE_VERSION}" \
     --sequence "${CHAINCODE_SEQUENCE}" \
     --signature-policy "${CHAINCODE_SIGNATURE_POLICY}" \
-    --peerAddresses peer0-org1:7051 \
-    --tlsRootCertFiles "${ORG1_PEER_TLS}"
+    --peerAddresses peer0-host1:7051 \
+    --tlsRootCertFiles "${HOST1_PEER_TLS}"
 }
 
 function print_summary() {
@@ -256,8 +256,8 @@ Image tag:      ${CHAINCODE_IMAGE_TAG}
 Recommended GW CORE env:
   LEDGER_ENABLED=true
   LEDGER_PROVIDER_DEFAULT=fabric
-  LEDGER_MSP_ID=${ORG1_MSP_ID}
-  LEDGER_FABRIC_MSP_ID=${ORG1_MSP_ID}
+  LEDGER_MSP_ID=${HOST1_MSP_ID}
+  LEDGER_FABRIC_MSP_ID=${HOST1_MSP_ID}
   CONSENT_ACCESS_LEDGER_CHAINCODE=${CHAINCODE_NAME}
 
 Remember:

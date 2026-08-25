@@ -24,8 +24,8 @@ SECTOR="${SECTOR:-health-care}"
 CHANNEL_NAME="${CHANNEL_NAME:-health-care-local}"
 CHAINCODE_NAME="${CHAINCODE_NAME:-consentaccess-sc}"
 FABRIC_TOOLS_CONTAINER="${FABRIC_TOOLS_CONTAINER:-gdc-fabric-tools}"
-ORG1_DOMAIN="${ORG1_DOMAIN:-org1.example.com}"
-ORG1_MSP_ID="${ORG1_MSP_ID:-Host1MSP}"
+HOST1_DOMAIN="${HOST1_DOMAIN:-host1.example.com}"
+HOST1_MSP_ID="${HOST1_MSP_ID:-Host1MSP}"
 AUTH_BEARER="${AUTH_BEARER:-demo-token}"
 SUBJECT_ID="${SUBJECT_ID:-did:web:api.${TENANT_ID}.org:individual:subject-001}"
 BOOTSTRAP_INDIVIDUAL_AND_DATA="${BOOTSTRAP_INDIVIDUAL_AND_DATA:-true}"
@@ -40,8 +40,8 @@ INDIVIDUAL_BUNDLE_SEARCH_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICT
 DIGITAL_TWIN_SEARCH_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/digitaltwin/org.hl7.fhir.r4/Composition/_search"
 DIGITAL_TWIN_SEARCH_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response"
 
-ORG1_ADMIN_MSP="/workspace/organizations/peerOrganizations/${ORG1_DOMAIN}/users/Admin@${ORG1_DOMAIN}/msp"
-ORG1_PEER_TLS="/workspace/organizations/peerOrganizations/${ORG1_DOMAIN}/peers/peer0.${ORG1_DOMAIN}/tls/ca.crt"
+HOST1_ADMIN_MSP="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp"
+HOST1_PEER_TLS="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls/ca.crt"
 
 for cmd in curl jq docker; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing $cmd"; exit 2; }
@@ -50,11 +50,11 @@ done
 query_rule_asset() {
   local rule_id="$1"
   docker exec "${FABRIC_TOOLS_CONTAINER}" bash -lc \
-    "CORE_PEER_LOCALMSPID=${ORG1_MSP_ID} \
-CORE_PEER_MSPCONFIGPATH=${ORG1_ADMIN_MSP} \
-CORE_PEER_ADDRESS=peer0-org1:7051 \
+    "CORE_PEER_LOCALMSPID=${HOST1_MSP_ID} \
+CORE_PEER_MSPCONFIGPATH=${HOST1_ADMIN_MSP} \
+CORE_PEER_ADDRESS=peer0-host1:7051 \
 CORE_PEER_TLS_ENABLED=true \
-CORE_PEER_TLS_ROOTCERT_FILE=${ORG1_PEER_TLS} \
+CORE_PEER_TLS_ROOTCERT_FILE=${HOST1_PEER_TLS} \
 peer chaincode query -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -c '{\"Args\":[\"ReadConsentAccess\",\"${rule_id}\"]}'"
 }
 

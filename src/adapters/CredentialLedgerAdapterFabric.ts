@@ -12,7 +12,7 @@ type FabricLedgerConfig = {
 };
 
 const DEFAULT_FABRIC_CONFIG: FabricLedgerConfig = {
-  mspId: 'Org1MSP',
+  mspId: 'Host1MSP',
   itemType: 'credential',
 };
 

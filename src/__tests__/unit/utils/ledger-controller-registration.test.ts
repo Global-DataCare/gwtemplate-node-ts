@@ -24,7 +24,7 @@ describe('controller key ledger registration', () => {
   it('records public key assets and legal-controller bindings without treating them as Pontus-X custody', async () => {
     process.env.NETWORK_MODE = 'test-network';
     process.env.LEDGER_ENABLED = 'true';
-    process.env.LEDGER_MSP_ID = 'Org1MSP';
+    process.env.LEDGER_MSP_ID = 'Host1MSP';
     process.env.LEDGER_PROVIDER_MAP = '{"test-network":"fabric"}';
     process.env.LEDGER_PROVIDER_DEFAULT = 'fabric';
     const registerKey = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
@@ -54,7 +54,7 @@ describe('controller key ledger registration', () => {
     });
 
     expect(registerKey).toHaveBeenCalledWith(
-      'Org1MSP',
+      'Host1MSP',
       expect.any(String),
       expect.objectContaining({
         alg: 'ES256K',
@@ -64,7 +64,7 @@ describe('controller key ledger registration', () => {
       }),
     );
     expect(upsertBinding).toHaveBeenCalledWith(
-      'Org1MSP',
+      'Host1MSP',
       expect.stringContaining(`employee_${actorIdentifier}__`),
       expect.objectContaining({
         subjectType: 'employee',
@@ -88,7 +88,7 @@ describe('controller key ledger registration', () => {
     process.env.LEDGER_PROVIDER_MAP = '{"test-network":"fabric"}';
     process.env.LEDGER_PROVIDER_DEFAULT = 'fabric';
     delete process.env.LEDGER_MSP_ID;
-    delete process.env.HLF_MSP_ID_ORG1;
+    delete process.env.HLF_MSP_ID_HOST1;
 
     await expect(registerControllerKeysOnLedger({
       organizationClaims: {},

@@ -71,8 +71,8 @@ if [[ "$SKIP_FABRIC_PREP" != "true" ]]; then
   node ./scripts/bootstrap-local-fabric-stack.mjs --prepare-only --no-bootstrap-tenant
 fi
 
-docker ps --format '{{.Names}}' | grep -qx 'gdc-peer0-org1' || {
-  echo 'ERROR: local Fabric peer is not running: gdc-peer0-org1' >&2
+docker ps --format '{{.Names}}' | grep -qx 'gdc-peer0-host1' || {
+  echo 'ERROR: local Fabric peer is not running: gdc-peer0-host1' >&2
   exit 2
 }
 docker ps --format '{{.Names}}' | grep -qx 'gdc-fabric-tools' || {
@@ -82,7 +82,7 @@ docker ps --format '{{.Names}}' | grep -qx 'gdc-fabric-tools' || {
 
 bash "${ROOT_DIR}/scripts/warm-local-fabric-chaincodes.sh"
 
-FABRIC_PEER_ENDPOINT_VALUE=peer0-org1:7051 npm run prepare:local-fabric-env
+FABRIC_PEER_ENDPOINT_VALUE=peer0-host1:7051 npm run prepare:local-fabric-env
 docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1 || {
   echo "ERROR: Fabric Docker network not found: ${DOCKER_NETWORK}" >&2
   exit 2

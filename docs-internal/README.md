@@ -7,6 +7,5 @@ not API contracts or production-readiness evidence.
 - [ROADMAP.md](ROADMAP.md): longer-term repository roadmap
 - [TENANT_LIFECYCLE_SUSPENSION.md](TENANT_LIFECYCLE_SUSPENSION.md): tenant
   suspension and reactivation handoff
-
 Public runtime, integration, and testing documentation remains under
 [`docs/`](../docs/README.md).

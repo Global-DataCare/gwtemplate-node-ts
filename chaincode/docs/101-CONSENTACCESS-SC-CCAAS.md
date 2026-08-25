@@ -237,7 +237,7 @@ The chaincode is now deployed locally on:
 - channel: `health-care-eu`
 - chaincode name: `consentaccess-sc`
 - runtime mode: external service / CCAAS
-- local endorsement policy: `OR('Org1MSP.member')`
+- local endorsement policy: `OR('Host1MSP.member')`
 
 ## What Was Also Required In GW CORE
 
@@ -274,7 +274,7 @@ available both:
 - at the top level for compatibility
 - under `content.body` for managers
 
-### 3. The Gateway Submit Path Had To Pin Endorsement To Org1
+### 3. The Gateway Submit Path Had To Pin Endorsement To Host1
 
 In the local devnet there is only one real endorsing org/peer combination for
 this chaincode.
@@ -547,7 +547,7 @@ What the first script now does in practice:
 3. regenerates `metadata.json`
 4. packages a CCAAS archive
 5. builds the external service image
-6. installs the package on `peer0-org1`
+6. installs the package on `peer0-host1`
 7. restarts the external service container with the resolved `PACKAGE_ID`
 8. approves the definition
 9. commits the definition
@@ -615,7 +615,7 @@ If the local network breaks again, check these first:
 3. `docker logs gdc-orderer`
    If the orderer admin endpoint lacks client root CAs, `osnadmin channel join`
    will fail in confusing ways.
-4. `docker logs gdc-peer0-org1`
+4. `docker logs gdc-peer0-host1`
    If blocks are rejected because of OU or policy mismatches, the problem is
    usually MSP/configtx alignment, not the chaincode.
 5. `docker logs consentaccess-sc`
@@ -689,11 +689,11 @@ Then install it:
 
 ```bash
 docker exec -w /workspace gdc-fabric-tools env \
-  CORE_PEER_LOCALMSPID=Org1MSP \
-  CORE_PEER_ADDRESS=peer0-org1:7051 \
-  CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp \
+  CORE_PEER_LOCALMSPID=Host1MSP \
+  CORE_PEER_ADDRESS=peer0-host1:7051 \
+  CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp \
   CORE_PEER_TLS_ENABLED=true \
-  CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt \
+  CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/ca.crt \
   peer lifecycle chaincode install /workspace/channel-artifacts/consentaccess-sc-caas.tgz
 ```
 
@@ -701,11 +701,11 @@ Resolve the package id:
 
 ```bash
 docker exec -w /workspace gdc-fabric-tools env \
-  CORE_PEER_LOCALMSPID=Org1MSP \
-  CORE_PEER_ADDRESS=peer0-org1:7051 \
-  CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp \
+  CORE_PEER_LOCALMSPID=Host1MSP \
+  CORE_PEER_ADDRESS=peer0-host1:7051 \
+  CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp \
   CORE_PEER_TLS_ENABLED=true \
-  CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt \
+  CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/ca.crt \
   peer lifecycle chaincode queryinstalled
 ```
 
@@ -740,11 +740,11 @@ Approve:
 
 ```bash
 docker exec -w /workspace gdc-fabric-tools env \
-  CORE_PEER_LOCALMSPID=Org1MSP \
-  CORE_PEER_ADDRESS=peer0-org1:7051 \
-  CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp \
+  CORE_PEER_LOCALMSPID=Host1MSP \
+  CORE_PEER_ADDRESS=peer0-host1:7051 \
+  CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp \
   CORE_PEER_TLS_ENABLED=true \
-  CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt \
+  CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/ca.crt \
   peer lifecycle chaincode approveformyorg \
   -o orderer:7050 \
   --ordererTLSHostnameOverride orderer \
@@ -761,11 +761,11 @@ Commit:
 
 ```bash
 docker exec -w /workspace gdc-fabric-tools env \
-  CORE_PEER_LOCALMSPID=Org1MSP \
-  CORE_PEER_ADDRESS=peer0-org1:7051 \
-  CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp \
+  CORE_PEER_LOCALMSPID=Host1MSP \
+  CORE_PEER_ADDRESS=peer0-host1:7051 \
+  CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp \
   CORE_PEER_TLS_ENABLED=true \
-  CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt \
+  CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/ca.crt \
   peer lifecycle chaincode commit \
   -o orderer:7050 \
   --ordererTLSHostnameOverride orderer \
@@ -775,8 +775,8 @@ docker exec -w /workspace gdc-fabric-tools env \
   --name consentaccess-sc \
   --version 1.0 \
   --sequence 1 \
-  --peerAddresses peer0-org1:7051 \
-  --tlsRootCertFiles /workspace/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+  --peerAddresses peer0-host1:7051 \
+  --tlsRootCertFiles /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/ca.crt
 ```
 
 ### 6. Configure GW CORE To Use Fabric Writes
@@ -786,8 +786,8 @@ In the GW CORE environment:
 ```bash
 export LEDGER_ENABLED=true
 export LEDGER_PROVIDER_DEFAULT=fabric
-export LEDGER_MSP_ID=Org1MSP
-export LEDGER_FABRIC_MSP_ID=Org1MSP
+export LEDGER_MSP_ID=Host1MSP
+export LEDGER_FABRIC_MSP_ID=Host1MSP
 export CONSENT_ACCESS_LEDGER_CHAINCODE=consentaccess-sc
 export FHIR_VERSION_LEDGER_CHAINCODE=fhir-versioning
 export HOST_JURISDICTION=au-nsw

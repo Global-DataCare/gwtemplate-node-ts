@@ -9,7 +9,9 @@ import https from 'node:https';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
-const fabricDevnetRoot = resolve(repoRoot, '../fabric-multicloud/devnet/fabric-v3');
+const fabricDevnetRoot = resolve(
+  process.env.FABRIC_DEVNET_ROOT || resolve(repoRoot, '../fabric-multicloud/devnet/fabric-v3'),
+);
 const defaultEnvFile = resolve(repoRoot, '.env.local-fabric');
 const logsRoot = resolve(repoRoot, 'logs');
 const runId = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
@@ -63,7 +65,7 @@ async function main() {
       [
         'docker compose down -v --remove-orphans || true',
         'docker rm -f consentaccess-sc >/dev/null 2>&1 || true',
-        'docker volume rm -f gdc-fabric-v3-devnet_orderer-data gdc-fabric-v3-devnet_peer0-org1-data gdc-fabric-v3-devnet_peer0-org2-data >/dev/null 2>&1 || true',
+        'docker volume rm -f gdc-fabric-v3-devnet_orderer-data gdc-fabric-v3-devnet_peer0-host1-data gdc-fabric-v3-devnet_peer0-host2-data >/dev/null 2>&1 || true',
       ].join('; '),
     ],
   });

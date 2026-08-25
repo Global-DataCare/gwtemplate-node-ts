@@ -1,6 +1,6 @@
 {
   "name": "gwtemplate-node-ts",
-  "version": "1.21.24",
+  "version": "1.21.25",
   "private": true,
   "license": "Apache-2.0",
   "main": "src/server.ts",
@@ -79,6 +79,7 @@
     "docker:smoke:open-source-local-network": "PERSISTENCE_PROFILE=postgres-ipfs bash ./scripts/smoke-docker-local-network.sh",
     "evidence:open-source-production-readiness": "bash ./scripts/collect-open-source-production-readiness-evidence.sh",
     "test:evidence-manifest": "node --test ./scripts/tests/open-source-evidence-manifest.test.mjs",
+    "check:local-fabric-host-names": "bash ./scripts/tests/local-fabric-host-names.test.sh",
     "check:identity-chaincode-parity": "bash ./scripts/check-identity-chaincode-parity.sh",
     "test:release-scripts": "bash ./scripts/test-local-image-release-scripts.sh",
     "docker:run": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",

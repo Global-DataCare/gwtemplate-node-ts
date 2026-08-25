@@ -57,7 +57,7 @@ run_gate() {
 
 assert_public_evidence_contains_no_demo_secrets() {
   local leaked_secret_pattern
-  leaked_secret_pattern='(adminpw|peer0org1pw|peer0org2pw|ordereradminpw|orderer0pw)'
+  leaked_secret_pattern='(adminpw|peer0host1pw|peer0host2pw|ordereradminpw|orderer0pw)'
   if rg -n "${leaked_secret_pattern}" "${EVIDENCE_DIR}"; then
     echo 'Public evidence contains a disposable devnet enrollment secret.' >&2
     return 1
@@ -143,6 +143,8 @@ test_dataspace_ica_host_activation() {
 }
 
 test_fabric_governance_contract() {
+  cd "${GW_ROOT}"
+  bash ./scripts/tests/local-fabric-host-names.test.sh
   cd "${FABRIC_ROOT}"
   node --test scripts/governance/tests/*.test.mjs scripts/onboarding/tests/*.test.mjs
   bash ./scripts/tests/local-host-msp-names.test.sh
@@ -169,8 +171,8 @@ reset_fabric_devnet() {
   local volume
   for volume in \
     gdc-fabric-v3-devnet_orderer-data \
-    gdc-fabric-v3-devnet_peer0-org1-data \
-    gdc-fabric-v3-devnet_peer0-org2-data; do
+    gdc-fabric-v3-devnet_peer0-host1-data \
+    gdc-fabric-v3-devnet_peer0-host2-data; do
     if docker volume inspect "${volume}" >/dev/null 2>&1; then
       docker volume rm "${volume}"
     fi
@@ -209,8 +211,8 @@ prove_multi_host_topology() {
     bash ./scripts/04-generate-backend-env.sh
 
   local host1_channels host2_channels
-  host1_channels="$(peer_channels Host1MSP peer0-org1:7051 org1.example.com)"
-  host2_channels="$(peer_channels Host2MSP peer0-org2:7051 org2.example.com)"
+  host1_channels="$(peer_channels Host1MSP peer0-host1:7051 host1.example.com)"
+  host2_channels="$(peer_channels Host2MSP peer0-host2:7051 host2.example.com)"
   printf '%s\n' "${host1_channels}"
   printf '%s\n' "${host2_channels}"
   for channel in identity-local health-care-local; do
@@ -219,8 +221,8 @@ prove_multi_host_topology() {
   done
   grep -Fq 'HLF_MSP_ID_HOST1=Host1MSP' .env.fabric-devnet
   grep -Fq 'HLF_MSP_ID_HOST2=Host2MSP' .env.fabric-devnet
-  docker inspect gdc-peer0-org1 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host1MSP'
-  docker inspect gdc-peer0-org2 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host2MSP'
+  docker inspect gdc-peer0-host1 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host1MSP'
+  docker inspect gdc-peer0-host2 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host2MSP'
 }
 
 prove_runtime_data_plane() {

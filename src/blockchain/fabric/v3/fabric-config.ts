@@ -16,8 +16,8 @@
 
 import * as env from 'env-var';
 
-export const DefaultMspORG1 = 'Org1MSP';
-export const DefaultMspORG2 = 'Org2MSP';
+export const DefaultMspHOST1 = 'Host1MSP';
+export const DefaultMspHOST2 = 'Host2MSP';
 
 export const JOB_QUEUE_NAME = 'submit';
 
@@ -114,20 +114,20 @@ export const asLocalhost = env
   .asBoolStrict();
 
 /**
- * The Org1 MSP ID
+ * The Host1 MSP ID
  */
-export const mspIdOrg1 = env
-  .get('HLF_MSP_ID_ORG1')
-  .default(`${DefaultMspORG1}`) // Org1MSP by default in the test-network (case sentitive)
+export const mspIdHost1 = env
+  .get('HLF_MSP_ID_HOST1')
+  .default(`${DefaultMspHOST1}`) // Host1MSP by default in the test-network (case sentitive)
   .example(`ORGMSP1`)
   .asString();
 
 /**
- * The Org2 MSP ID
+ * The Host2 MSP ID
  */
-export const mspIdOrg2 = env
-  .get('HLF_MSP_ID_ORG2')
-  .default(`${DefaultMspORG2}`) // Org2MSP by default in the test-network (case sentitive)
+export const mspIdHost2 = env
+  .get('HLF_MSP_ID_HOST2')
+  .default(`${DefaultMspHOST2}`) // Host2MSP by default in the test-network (case sentitive)
   .example(`ORGMSP2`)
   .asString();
 
@@ -177,59 +177,59 @@ export const queryTimeout = env
   .asIntPositive();
 
 /**
- * The Org1 connection profile JSON
+ * The Host1 connection profile JSON
  */
-export const connectionProfileOrg1 = env
-  .get(`HLF_CONNECTION_PROFILE_${DefaultMspORG1}`)
+export const connectionProfileHost1 = env
+  .get(`HLF_CONNECTION_PROFILE_${DefaultMspHOST1}`)
   .required()
   .example(
-    '{"name":"test-network-org1","version":"1.0.0","client":{"organization":"Org1" ... }'
+    '{"name":"test-network-host1","version":"1.0.0","client":{"organization":"Host1" ... }'
   )
   .asJsonObject() as Record<string, unknown>;
 
 /**
- * Certificate for an Org1 identity to evaluate and submit transactions
+ * Certificate for an Host1 identity to evaluate and submit transactions
  */
-export const certificateOrg1 = env
-  .get(`HLF_CERTIFICATE_${DefaultMspORG1}`)
+export const certificateHost1 = env
+  .get(`HLF_CERTIFICATE_${DefaultMspHOST1}`)
   .required()
   .example('"-----BEGIN CERTIFICATE-----\\n...\\n-----END CERTIFICATE-----\\n"')
   .asString();
 
 /**
- * Private key for an Org1 identity to evaluate and submit transactions
+ * Private key for an Host1 identity to evaluate and submit transactions
  */
-export const privateKeyOrg1 = env
-  .get(`HLF_PRIVATE_KEY_${DefaultMspORG1}`)
+export const privateKeyHost1 = env
+  .get(`HLF_PRIVATE_KEY_${DefaultMspHOST1}`)
   .required()
   .example('"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"')
   .asString();
 
 /**
- * The Org2 connection profile JSON
+ * The Host2 connection profile JSON
  */
-export const connectionProfileOrg2 = env
-  .get(`HLF_CONNECTION_PROFILE_${DefaultMspORG2}`)
+export const connectionProfileHost2 = env
+  .get(`HLF_CONNECTION_PROFILE_${DefaultMspHOST2}`)
   .required()
   .example(
-    '{"name":"test-network-org2","version":"1.0.0","client":{"organization":"Org2" ... }'
+    '{"name":"test-network-host2","version":"1.0.0","client":{"organization":"Host2" ... }'
   )
   .asJsonObject() as Record<string, unknown>;
 
 /**
- * Certificate for an Org2 identity to evaluate and submit transactions
+ * Certificate for an Host2 identity to evaluate and submit transactions
  */
-export const certificateOrg2 = env
-  .get(`HLF_CERTIFICATE_${DefaultMspORG2}`)
+export const certificateHost2 = env
+  .get(`HLF_CERTIFICATE_${DefaultMspHOST2}`)
   .required()
   .example('"-----BEGIN CERTIFICATE-----\\n...\\n-----END CERTIFICATE-----\\n"')
   .asString();
 
 /**
- * Private key for an Org2 identity to evaluate and submit transactions
+ * Private key for an Host2 identity to evaluate and submit transactions
  */
-export const privateKeyOrg2 = env
-  .get(`HLF_PRIVATE_KEY_${DefaultMspORG2}`)
+export const privateKeyHost2 = env
+  .get(`HLF_PRIVATE_KEY_${DefaultMspHOST2}`)
   .required()
   .example('"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"')
   .asString();
@@ -266,13 +266,13 @@ export const redisUsername = env
 export const redisPassword = env.get('REDIS_PASSWORD').asString();
 
 /**
- * API key for Org1
- * Specify this API key with the X-Api-Key header to use the Org1 connection profile and credentials
+ * API key for Host1
+ * Specify this API key with the X-Api-Key header to use the Host1 connection profile and credentials
  */
-export function org1ApiKey() {
-  console.log(`--> org1ApiKey`);
+export function host1ApiKey() {
+  console.log(`--> host1ApiKey`);
   const result = env
-    .get(`APIKEY_${DefaultMspORG1}`)
+    .get(`APIKEY_${DefaultMspHOST1}`)
     .required()
     .example('123')
     .asString();
@@ -281,13 +281,13 @@ export function org1ApiKey() {
 }
 
 /**
- * API key for Org2
- * Specify this API key with the X-Api-Key header to use the Org2 connection profile and credentials
+ * API key for Host2
+ * Specify this API key with the X-Api-Key header to use the Host2 connection profile and credentials
  */
-export function org2ApiKey() {
-  console.log(`--> org2ApiKey`);
+export function host2ApiKey() {
+  console.log(`--> host2ApiKey`);
   const result = env
-    .get(`APIKEY_${DefaultMspORG2}`)
+    .get(`APIKEY_${DefaultMspHOST2}`)
     .required()
     .example('456')
     .asString();

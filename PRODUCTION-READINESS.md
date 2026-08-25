@@ -7,6 +7,10 @@ IMAGE_NAME="gw-core:<version>-<commit>" \
   npm run evidence:open-source-production-readiness
 ```
 
+When the Fabric checkout is not the default sibling directory, set
+`FABRIC_DEVNET_ROOT` to its `devnet/fabric-v3` directory. This keeps worktrees
+and independent clones reproducible without copying MSP private material.
+
 The command writes public execution evidence to
 `artifacts/open-source-production-readiness/<UTC>/`. The directory is ignored
 by Git because it contains generated execution results rather than source code.
@@ -46,13 +50,13 @@ The local topology contains two Fabric members:
 
 ```text
 Fabric local-network
-├── Host1MSP -> peer0-org1
-└── Host2MSP -> peer0-org2
+├── Host1MSP -> peer0-host1
+└── Host2MSP -> peer0-host2
 ```
 
-Historical development container and path names (`org1` and `org2`) remain for
-devnet compatibility. The Fabric identities exposed by the peers are
-`Host1MSP` and `Host2MSP`.
+The corresponding peer DNS names, containers, Fabric CA affiliations and
+cryptographic paths use `host1` and `host2`; the Fabric membership identities
+are `Host1MSP` and `Host2MSP`.
 
 A VAT-addressed tenant `Organization` is business data hosted by a GW. Hosting
 an organization does not assign that tenant an MSP or peer. One operator may

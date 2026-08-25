@@ -24,8 +24,8 @@ ACTION="${ACTION:-_batch}"
 CHANNEL_NAME="${CHANNEL_NAME:-health-care-local}"
 CHAINCODE_NAME="${CHAINCODE_NAME:-consentaccess-sc}"
 FABRIC_TOOLS_CONTAINER="${FABRIC_TOOLS_CONTAINER:-gdc-fabric-tools}"
-ORG1_DOMAIN="${ORG1_DOMAIN:-org1.example.com}"
-ORG1_MSP_ID="${ORG1_MSP_ID:-Host1MSP}"
+HOST1_DOMAIN="${HOST1_DOMAIN:-host1.example.com}"
+HOST1_MSP_ID="${HOST1_MSP_ID:-Host1MSP}"
 SUBJECT_ID="${SUBJECT_ID:-did:web:api.acme-id.org:individual:subject-001}"
 THID="${THID:-consentaccess-local-network-three-consents}"
 DUPLICATE_THID="${DUPLICATE_THID:-consentaccess-local-network-three-consents-duplicate}"
@@ -37,28 +37,28 @@ done
 CONSENT_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/${SECTION}/${FORMAT}/${RESOURCE_TYPE}/${ACTION}"
 POLL_ENDPOINT="${CONSENT_ENDPOINT}-response"
 
-ORG1_ADMIN_MSP="/workspace/organizations/peerOrganizations/${ORG1_DOMAIN}/users/Admin@${ORG1_DOMAIN}/msp"
-ORG1_PEER_TLS="/workspace/organizations/peerOrganizations/${ORG1_DOMAIN}/peers/peer0.${ORG1_DOMAIN}/tls/ca.crt"
+HOST1_ADMIN_MSP="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp"
+HOST1_PEER_TLS="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls/ca.crt"
 
 function query_rule_asset() {
   local rule_id="$1"
   docker exec "${FABRIC_TOOLS_CONTAINER}" bash -lc \
-    "CORE_PEER_LOCALMSPID=${ORG1_MSP_ID} \
-CORE_PEER_MSPCONFIGPATH=${ORG1_ADMIN_MSP} \
-CORE_PEER_ADDRESS=peer0-org1:7051 \
+    "CORE_PEER_LOCALMSPID=${HOST1_MSP_ID} \
+CORE_PEER_MSPCONFIGPATH=${HOST1_ADMIN_MSP} \
+CORE_PEER_ADDRESS=peer0-host1:7051 \
 CORE_PEER_TLS_ENABLED=true \
-CORE_PEER_TLS_ROOTCERT_FILE=${ORG1_PEER_TLS} \
+CORE_PEER_TLS_ROOTCERT_FILE=${HOST1_PEER_TLS} \
 peer chaincode query -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -c '{\"Args\":[\"ReadConsentAccess\",\"${rule_id}\"]}'"
 }
 
 function query_rule_history() {
   local rule_id="$1"
   docker exec "${FABRIC_TOOLS_CONTAINER}" bash -lc \
-    "CORE_PEER_LOCALMSPID=${ORG1_MSP_ID} \
-CORE_PEER_MSPCONFIGPATH=${ORG1_ADMIN_MSP} \
-CORE_PEER_ADDRESS=peer0-org1:7051 \
+    "CORE_PEER_LOCALMSPID=${HOST1_MSP_ID} \
+CORE_PEER_MSPCONFIGPATH=${HOST1_ADMIN_MSP} \
+CORE_PEER_ADDRESS=peer0-host1:7051 \
 CORE_PEER_TLS_ENABLED=true \
-CORE_PEER_TLS_ROOTCERT_FILE=${ORG1_PEER_TLS} \
+CORE_PEER_TLS_ROOTCERT_FILE=${HOST1_PEER_TLS} \
 peer chaincode query -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -c '{\"Args\":[\"GetConsentAccessHistory\",\"${rule_id}\"]}'"
 }
 

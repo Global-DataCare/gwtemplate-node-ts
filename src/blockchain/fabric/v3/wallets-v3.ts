@@ -7,7 +7,7 @@ import { WalletsInMemory } from './walletsInMemory-v3';
 let walletsInMemory: WalletsInMemory<any>;
 
 /**
- * Creates an in-memory wallet to hold credentials for Org1 and Org2 users
+ * Creates an in-memory wallet to hold credentials for Host1 and Host2 users
  * and initializes the walletsInMemory instance.
  *
  * In this sample, there is a single user for each MSP ID to demonstrate how
@@ -19,33 +19,33 @@ export const createWalletInMemory = async (): Promise<any> => {
     walletsInMemory = new WalletsInMemory();
   }
 
-  // Create Org1 identity
-  const org1Identity = {
+  // Create Host1 identity
+  const host1Identity = {
     credentials: {
-      certificate: config.certificateOrg1,
-      privateKey: config.privateKeyOrg1,
+      certificate: config.certificateHost1,
+      privateKey: config.privateKeyHost1,
     },
-    mspId: config.mspIdOrg1,
+    mspId: config.mspIdHost1,
     type: 'X.509',
   };
   console.log(
-    `---> createWalletInMemory: org1Identity=${JSON.stringify(org1Identity)}`
+    `---> createWalletInMemory: host1Identity=${JSON.stringify(host1Identity)}`
   );
-  await walletsInMemory.put(config.mspIdOrg1, org1Identity);
+  await walletsInMemory.put(config.mspIdHost1, host1Identity);
 
-  // Create Org2 identity
-  const org2Identity = {
+  // Create Host2 identity
+  const host2Identity = {
     credentials: {
-      certificate: config.certificateOrg2,
-      privateKey: config.privateKeyOrg2,
+      certificate: config.certificateHost2,
+      privateKey: config.privateKeyHost2,
     },
-    mspId: config.mspIdOrg2,
+    mspId: config.mspIdHost2,
     type: 'X.509',
   };
   console.log(
-    `---> createWalletInMemory: org2Identity=${JSON.stringify(org2Identity)}`
+    `---> createWalletInMemory: host2Identity=${JSON.stringify(host2Identity)}`
   );
-  await walletsInMemory.put(config.mspIdOrg2, org2Identity);
+  await walletsInMemory.put(config.mspIdHost2, host2Identity);
 };
 
 /**
