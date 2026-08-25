@@ -8,6 +8,11 @@ import {
   DeterministicJwtTokenVerifier,
 } from '../utils/deterministic-jwt-fixtures';
 
+/**
+ * Transport security contract: encrypted post-DCR traffic resolves keys by
+ * issuer and kid, while only compat-mode plaintext may project a public JWK.
+ */
+
 function buildTestApp(options?: { appAuthManager?: any; tenantsCacheManager?: any; kmsService?: any }) {
   const app = express();
   app.use(express.json({ type: ['application/json', 'application/didcomm-plain+json', 'application/fhir+json'] }));
@@ -57,7 +62,7 @@ function buildTestApp(options?: { appAuthManager?: any; tenantsCacheManager?: an
       options?.appAuthManager,
     ),
   );
-  return { app, queueAdapter, tenantsCacheManager };
+  return { app, queueAdapter, tenantsCacheManager, kmsService, vaultRepository, cryptographyService };
 }
 
 describe('SECURITY_MODE content-type gates', () => {
@@ -140,6 +145,86 @@ describe('SECURITY_MODE content-type gates', () => {
       .send({});
 
     expect(response.status).toBe(400);
+  });
+
++  /**
+   * A professional-seat Offer belongs to the tenant, but its commercial Order
+   * is submitted through the host registry. The host path must keep routing the
+   * Order to the host while resolving post-DCR sender keys from the issuer
+   * tenant. The restricted catalog reproduces the historical staging state.
+   */
+  it('resolves encrypted host Order sender keys despite a historical host catalog', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'false',
+      DIDCOMM_PLAIN: 'false',
+    };
+
+    const tenantId = 'example-tenant';
+    const tenantVaultId = `onehealth-research_${tenantId}`;
+    const tenantCollection = 'tenant-physical-collection';
+    const issuerDid = `did:web:gateway.example:${tenantId}:cds-es:v1:onehealth-research:employee:controller`;
+    const signingKid = 'registered-signing-kid';
+    const encryptionKid = 'registered-encryption-kid';
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async (vaultId: string) => vaultId === tenantVaultId),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getCollectionName: jest.fn(async (vaultId: string) => vaultId === tenantVaultId ? tenantCollection : 'host'),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#registry:org.schema',
+        selector: { section: 'registry', format: 'org.schema' },
+        serviceEndpoint: 'Organization',
+        actions: ['_batch', '_activate'],
+      }]),
+      getTenant: jest.fn(),
+    };
+    const kmsService = {
+      decodeRequest: jest.fn(async () => ({
+        content: {
+          thid: 'professional-order-thid',
+          iss: issuerDid,
+          jti: 'professional-order-jti',
+          meta: {
+            jws: { protected: { alg: 'ES384', kid: signingKid }, signature: 'signature' },
+            jwe: { header: { skid: encryptionKid } },
+          },
+          body: { data: [] },
+        },
+      })),
+      getHmacBase64Url: jest.fn(async (value: string, vaultId: string) => `${vaultId}:${value}`),
+      unprotectConfidentialData: jest.fn(async () => ({
+        didDocument: {
+          verificationMethod: [
+            { id: `${issuerDid}#${signingKid}`, publicKeyJwk: { kty: 'EC', crv: 'P-384', x: 'x', y: 'y' } },
+            { id: `${issuerDid}#${encryptionKid}`, publicKeyJwk: { kty: 'OKP', crv: 'ML-KEM-768', x: 'enc' } },
+          ],
+        },
+      })),
+    };
+    const appAuthManager = { verifyBearerToken: jest.fn(async () => ({ sub: 'portal-session' })) };
+    const harness = buildTestApp({ appAuthManager, tenantsCacheManager, kmsService });
+    harness.vaultRepository.query.mockImplementation(async (vaultId: string) =>
+      vaultId === tenantCollection ? [{ protected: 'employee-document' }] : []);
+    harness.cryptographyService.verifyDetachedJws.mockResolvedValue(true);
+
+    const response = await request(harness.app)
+      .post('/host/cds-es/v1/test/registry/org.schema/Order/_batch')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .set('Authorization', 'Bearer portal-token')
+      .send({ request: 'compact-jwe' });
+
+    expect(response.status).toBe(202);
+    expect(harness.vaultRepository.query).toHaveBeenCalledWith(
+      tenantCollection,
+      expect.objectContaining({ sectionId: expect.any(String) }),
+    );
+    expect(harness.queueAdapter.addJob).toHaveBeenCalledWith(
+      expect.stringContaining('host:Order:_batch'),
+      expect.any(Object),
+    );
   });
 
   it('allows host organization _activate without bearer in demo mode', async () => {
@@ -293,7 +378,7 @@ describe('SECURITY_MODE content-type gates', () => {
       .send({ request: 'opaque-jwe' });
 
     expect(response.status).toBe(202);
-    expect(appAuthManager.verifyBearerToken).toHaveBeenCalledWith('valid-token');
+    expect(appAuthManager.verifyBearerToken).toHaveBeenCalledWith('valid-token', undefined, undefined);
     expect(queueAdapter.addJob).toHaveBeenCalledTimes(1);
     const queuedJob = queueAdapter.addJob.mock.calls[0][1];
     expect(queuedJob.content.meta.bearer.jwt.payload).toEqual({
@@ -540,5 +625,82 @@ describe('SECURITY_MODE content-type gates', () => {
     const queuedJob = queueAdapter.addJob.mock.calls[0][1];
     expect(queuedJob.content.meta.bearer.jwt.payload.iss).toBe('did:web:controller.demo.example');
     expect(queuedJob.content.meta.bearer.jwt.payload.vp).toBeDefined();
+  });
+
+  it('passes the plain-DIDComm meta JWK into controller bearer verification', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'compat',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      DIDCOMM_PLAIN: 'true',
+    };
+    const publicJwk = { kty: 'EC', crv: 'P-384', kid: 'controller-key', x: 'x', y: 'y' };
+    const appAuthManager = {
+      verifyBearerToken: jest.fn(async () => ({ valid: true, payload: { iss: 'did:web:controller.example' } })),
+    };
+    const tenantsCacheManager = {
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#registry:org.schema',
+        selector: { section: 'registry', format: 'org.schema' },
+        serviceEndpoint: 'organization',
+        actions: ['_batch'],
+      }]),
+      getTenant: jest.fn(),
+      getCollectionName: jest.fn(),
+    };
+    const { app, queueAdapter } = buildTestApp({ appAuthManager, tenantsCacheManager });
+
+    const response = await request(app)
+      .post('/host/cds-es/v1/test-network/registry/org.schema/Organization/_batch')
+      .set('Authorization', 'Bearer controller.proof.jwt')
+      .set('Content-Type', 'application/didcomm-plain+json')
+      .send({ thid: 'plain-controller-submit', meta: { jws: { protected: { jwk: publicJwk } } } });
+
+    expect(response.status).toBe(202);
+    expect(appAuthManager.verifyBearerToken).toHaveBeenCalledWith('controller.proof.jwt', publicJwk, undefined);
+    expect(queueAdapter.addJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('binds tenant plain-DIDComm verification to the post-DCR storage scope', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'compat',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      DIDCOMM_PLAIN: 'true',
+    };
+    const publicJwk = { kty: 'EC', crv: 'P-384', kid: 'controller-key', x: 'x', y: 'y' };
+    const appAuthManager = {
+      verifyBearerToken: jest.fn(async () => ({ valid: true, payload: { iss: 'did:web:controller.example' } })),
+    };
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async () => true),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#entity:org.schema:employee:_batch',
+        selector: { section: 'entity', format: 'org.schema' },
+        serviceEndpoint: 'employee',
+        actions: ['_batch'],
+      }]),
+      getTenant: jest.fn(async () => ({ status: 'active' })),
+      getCollectionName: jest.fn(async () => 'tenant-physical-collection'),
+    };
+    const { app, queueAdapter } = buildTestApp({ appAuthManager, tenantsCacheManager });
+
+    const response = await request(app)
+      .post('/VATES-B42215152/cds-eu/v1/onehealth-research/entity/org.schema/Employee/_batch')
+      .set('Authorization', 'Bearer controller.proof.jwt')
+      .set('Content-Type', 'application/didcomm-plain+json')
+      .send({ thid: 'plain-employee-submit', meta: { jws: { protected: { jwk: publicJwk } } } });
+
+    expect(response.status).toBe(202);
+    expect(appAuthManager.verifyBearerToken).toHaveBeenCalledWith(
+      'controller.proof.jwt',
+      publicJwk,
+      {
+        vaultId: 'onehealth-research_VATES-B42215152',
+        collectionName: 'tenant-physical-collection',
+      },
+    );
+    expect(queueAdapter.addJob).toHaveBeenCalledTimes(1);
   });
 });

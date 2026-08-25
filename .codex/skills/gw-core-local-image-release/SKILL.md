@@ -169,3 +169,15 @@ LOCAL_IMAGE_NAME="${local_image}" DEPLOY_CONFIRM=true \
 Use task-isolated GCloud and kube configurations. Record the local image ID,
 registry digest, commit, target tuple, effective network mode, rollout and
 endpoint results. A build or push alone is not a deployment.
+
+## Controller and commercial Order regression gate
+
+- Treat `Offer -> Order/_batch -> seat inventory -> Employee/_batch` as one
+  shared GW contract; payment providers such as Stripe are deployment adapters,
+  not product-specific licence semantics.
+- After DCR, verify controller `iss + kid` against the stored tenant key.
+  A JWT-header or DIDComm-plain public JWK is optional compatibility data.
+- Keep professional `Order/_batch` routed through `host`, while resolving
+  its sender keys from the issuer tenant.
+- The targeted integration test must use a historical host catalog that does
+  not advertise `Order`; advertising it in the fixture hides the real 404.

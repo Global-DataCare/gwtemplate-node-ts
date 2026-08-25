@@ -152,6 +152,97 @@ describe('AppAuthorizationManager', () => {
       });
       expect((result.payload as any).vp).toBeDefined();
     });
+    it('keeps projected public JWK verification only outside tenant DCR scope', async () => {
+      const fixture = await buildDeterministicVpTokenFixture({
+        seed: 'gw-controller-proof-request-meta-seed-001',
+        issuerDid: 'did:web:controller.demo.example',
+        audience: 'did:web:gw.demo.example',
+        includePublicJwkInHeader: false,
+        credentials: [{ credential: {
+          '@context': ['https://www.w3.org/2018/credentials/v1'],
+          type: ['VerifiableCredential', 'LegalParticipantCredential'],
+          issuer: 'did:web:ica.demo.example',
+          issuanceDate: '2040-01-01T00:00:00.000Z',
+          credentialSubject: { id: 'did:web:controller.demo.example' },
+        } }],
+      });
+      mockTokenVerifier.verify.mockResolvedValue({ valid: false, error: 'not an id token' });
+
+      const result = await manager.verifyBearerToken(fixture.compactToken, fixture.publicJwk);
+
+      expect(result.valid).toBe(true);
+      expect(result.payload).toMatchObject({ iss: 'did:web:controller.demo.example' });
+    });
+
+    it('verifies a post-DCR controller proof with the registered key', async () => {
+      const fixture = await buildDeterministicVpTokenFixture({
+        seed: 'gw-controller-proof-registered-seed-001',
+        issuerDid: 'did:web:controller.registered.example',
+        audience: 'did:web:gw.demo.example',
+        includePublicJwkInHeader: false,
+        credentials: [{ credential: {
+          '@context': ['https://www.w3.org/2018/credentials/v1'],
+          type: ['VerifiableCredential', 'LegalParticipantCredential'],
+          issuer: 'did:web:ica.demo.example',
+          issuanceDate: '2040-01-01T00:00:00.000Z',
+          credentialSubject: { id: 'did:web:controller.registered.example' },
+        } }],
+      });
+      mockTokenVerifier.verify.mockResolvedValue({ valid: false, error: 'not an id token' });
+      mockKmsService.getHmacBase64Url
+        .mockResolvedValueOnce('protected-kid-name')
+        .mockResolvedValueOnce('protected-kid-value');
+      mockVaultRepository.query.mockResolvedValue([{ id: 'controller-record' }] as any);
+      mockKmsService.unprotectConfidentialData.mockResolvedValue({
+        didDocument: {
+          id: 'did:web:controller.registered.example',
+          verificationMethod: [{
+            id: `did:web:controller.registered.example#${fixture.publicJwk.kid}`,
+            type: 'JsonWebKey2020',
+            controller: 'did:web:controller.registered.example',
+            publicKeyJwk: fixture.publicJwk,
+          }],
+        },
+      } as any);
+
+      const result = await manager.verifyBearerToken(
+        fixture.compactToken,
+        undefined,
+        { vaultId: 'onehealth-research_registered', collectionName: 'registered_collection' },
+      );
+
+      expect(result.valid).toBe(true);
+      expect(mockVaultRepository.query).toHaveBeenCalledWith('registered_collection', {
+        sectionId: getEnvSectionId('employees'),
+        where: [{ name: 'protected-kid-name', value: 'protected-kid-value' }],
+      });
+    });
+
+    it('rejects a tenant-scoped proof when its kid is not registered by DCR', async () => {
+      const fixture = await buildDeterministicVpTokenFixture({
+        seed: 'gw-controller-proof-unregistered-seed-001',
+        issuerDid: 'did:web:controller.unregistered.example',
+        audience: 'did:web:gw.demo.example',
+        credentials: [{ credential: {
+          '@context': ['https://www.w3.org/2018/credentials/v1'],
+          type: ['VerifiableCredential', 'LegalParticipantCredential'],
+          issuer: 'did:web:ica.demo.example',
+          issuanceDate: '2040-01-01T00:00:00.000Z',
+          credentialSubject: { id: 'did:web:controller.unregistered.example' },
+        } }],
+      });
+      mockTokenVerifier.verify.mockResolvedValue({ valid: false, error: 'not an id token' });
+      mockKmsService.getHmacBase64Url
+        .mockResolvedValueOnce('protected-kid-name')
+        .mockResolvedValueOnce('protected-kid-value');
+      mockVaultRepository.query.mockResolvedValue([]);
+
+      await expect(manager.verifyBearerToken(
+        fixture.compactToken,
+        fixture.publicJwk,
+        { vaultId: 'onehealth-research_registered', collectionName: 'registered_collection' },
+      )).rejects.toThrow('kid is not registered for this tenant');
+    });
   });
   
   describe('verifyAndConsumeActivationCode', () => {

@@ -16,6 +16,12 @@ import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose'
 import { normalizeSameAsHash, normalizeTelephoneHash } from 'gdc-common-utils-ts/utils/same-as';
 import { normalizeIndexedEmail, normalizeIndexedPhone } from '../utils/indexed-contact';
 import { DEFAULT_LICENSE_DEVICE_ALLOWANCE } from '../constants/domain';
+import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
+
+export type ControllerProofRegistrationContext = Readonly<{
+  vaultId: string;
+  collectionName?: string;
+}>;
 
 type ActivationActor = Readonly<{
   subject: string;
@@ -73,12 +79,18 @@ export class AppAuthorizationManager {
    * SMART access tokens while avoiding a dependency on email-login proof when
    * the controller already presents ICA-backed wallet proof.
    */
-  public async verifyBearerToken(token: string): Promise<VerificationResult> {
+  public async verifyBearerToken(
+    token: string,
+    /** Compat-only public key projected from a legacy DIDComm plain envelope. */
+    projectedPublicJwk?: JWK,
+    /** Tenant scope used to resolve the authoritative post-DCR signing key. */
+    registrationContext?: ControllerProofRegistrationContext,
+  ): Promise<VerificationResult> {
     try {
       return await this.verifyIdToken(token);
     } catch (idTokenError: any) {
       try {
-        return await this.verifyControllerProofBearer(token);
+        return await this.verifyControllerProofBearer(token, projectedPublicJwk, registrationContext);
       } catch (vpError: any) {
         const idMessage = idTokenError instanceof Error ? idTokenError.message : String(idTokenError || 'verification failed');
         const vpMessage = vpError instanceof Error ? vpError.message : String(vpError || 'verification failed');
@@ -258,7 +270,11 @@ export class AppAuthorizationManager {
     return claims;
   }
 
-  private async verifyControllerProofBearer(token: string): Promise<VerificationResult> {
+  private async verifyControllerProofBearer(
+    token: string,
+    projectedPublicJwk?: JWK,
+    registrationContext?: ControllerProofRegistrationContext,
+  ): Promise<VerificationResult> {
     const compact = String(token || '').trim();
     const parts = compact.split('.');
     if (parts.length !== 3) {
@@ -289,18 +305,81 @@ export class AppAuthorizationManager {
       throw new ManagerError('Controller proof bearer is not active yet.', IssueType.Security);
     }
 
-    if ((alg === 'ES256K' || alg === 'ES384') && header.jwk && typeof header.jwk === 'object') {
+    const suppliedPublicJwk = header.jwk && typeof header.jwk === 'object'
+      ? header.jwk as JWK
+      : projectedPublicJwk;
+    const registeredPublicJwk = registrationContext
+      ? await this.resolveRegisteredControllerProofJwk(
+        String(payload.iss || '').trim(),
+        String(header.kid || '').trim(),
+        registrationContext,
+      )
+      : undefined;
+    if (registrationContext && !registeredPublicJwk) {
+      throw new ManagerError(
+        'Controller proof bearer kid is not registered for this tenant.',
+        IssueType.Security,
+      );
+    }
+    // Post-DCR verification is always performed with the stored key. A JWK
+    // carried by the JWT or DIDComm envelope is optional compatibility data;
+    // it never becomes an authority source for a tenant-scoped operation.
+    const verificationJwk = registeredPublicJwk || suppliedPublicJwk;
+    if (verificationJwk && this.hasPrivateJwkMaterial(verificationJwk)) {
+      throw new ManagerError('Controller proof bearer verification JWK must be public.', IssueType.Security);
+    }
+    if (header.kid && verificationJwk?.kid && header.kid !== verificationJwk.kid) {
+      throw new ManagerError('Controller proof bearer kid does not match the projected verification JWK.', IssueType.Security);
+    }
+
+    if ((alg === 'ES256K' || alg === 'ES384') && verificationJwk) {
       try {
-        const keyLike = await importJWK(header.jwk as JWK, alg);
+        const keyLike = await importJWK(verificationJwk, alg);
         await compactVerify(compact, keyLike);
       } catch (error: any) {
         const message = error instanceof Error ? error.message : String(error);
         throw new ManagerError(`Invalid controller proof bearer signature: ${message}`, IssueType.Security);
       }
     } else if (alg === 'ES256K' || alg === 'ES384') {
-      throw new ManagerError('Controller proof bearer must embed one public JWK for ES256K/ES384 verification.', IssueType.Security);
+      throw new ManagerError('Controller proof bearer requires one public JWK in its header or decoded request meta for ES256K/ES384 verification.', IssueType.Security);
     }
 
     return { valid: true, payload };
+  }
+
+  private async resolveRegisteredControllerProofJwk(
+    issuerDid: string,
+    kid: string,
+    context: ControllerProofRegistrationContext,
+  ): Promise<JWK | undefined> {
+    if (!issuerDid || !kid || !context.vaultId) return undefined;
+    const protectedAttrName = await this.kmsService.getHmacBase64Url('kid', context.vaultId);
+    const protectedAttrValue = await this.kmsService.getHmacBase64Url(kid, context.vaultId);
+    const scopes = Array.from(new Set(
+      [context.collectionName, context.vaultId].filter((value): value is string => Boolean(value)),
+    ));
+
+    for (const scope of scopes) {
+      const documents = await this.vaultRepository.query(scope, {
+        sectionId: getEnvSectionId('employees'),
+        where: [{ name: protectedAttrName, value: protectedAttrValue }],
+      });
+      for (const document of documents || []) {
+        const employee = await this.kmsService.unprotectConfidentialData<EntityConfig>(document, context.vaultId);
+        if (String(employee?.didDocument?.id || '').trim() !== issuerDid) continue;
+        const method = employee.didDocument?.verificationMethod?.find((candidate) => {
+          const methodKid = String((candidate.publicKeyJwk as JWK | undefined)?.kid || '').trim();
+          return methodKid === kid || String(candidate.id || '').endsWith(`#${kid}`);
+        });
+        if (method?.publicKeyJwk) return method.publicKeyJwk as JWK;
+      }
+    }
+    return undefined;
+  }
+
+  private hasPrivateJwkMaterial(jwk: JWK): boolean {
+    const value = jwk as Record<string, unknown>;
+    return ['d', 'dBytes', 'k', 'p', 'q', 'dp', 'dq', 'qi', 'oth']
+      .some((name) => value[name] !== undefined);
   }
 }
