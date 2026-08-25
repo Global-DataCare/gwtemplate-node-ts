@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Resume organization activation after a partial Fabric commit when a newly
+  detached-signed VC preserves its canonical issuer, type/schema,
+  `credentialSubject` and evidence. Reissued envelope metadata no longer
+  causes a false organization conflict; changed signed identity still returns
+  409.
 - Build host-authored onboarding Offer URNs with the host's legal jurisdiction
   instead of the applicant country. Keep pending registration authoritative
   until mandatory ledger writes succeed, and retain the Offer index on the

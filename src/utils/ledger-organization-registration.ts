@@ -42,6 +42,72 @@ function fabricErrorContains(error: any, token: string): boolean {
   return getFabricErrorMessages(error).some((message) => message.includes(token));
 }
 
+type VerifiableCredential = Record<string, unknown>;
+
+/**
+ * Builds the stable, signed meaning of an organization credential.
+ *
+ * The VC is authenticated by the detached JWS before this registration step.
+ * A retry may therefore issue a new envelope (`id`, validity timestamps,
+ * `credentialStatus` and `proof`) without changing the legal organization.
+ * Those envelope fields must not turn a partial Fabric commit into a conflict.
+ */
+export function projectOrganizationCredentialIdentity(vc: VerifiableCredential): object {
+  return {
+    '@context': vc['@context'],
+    type: Array.isArray(vc.type) ? [...vc.type].map(String).sort() : vc.type,
+    issuer: vc.issuer,
+    credentialSchema: vc.credentialSchema,
+    credentialSubject: vc.credentialSubject,
+    evidence: vc.evidence,
+  };
+}
+
+export function isSameOrganizationCredentialIdentity(
+  existingVc: VerifiableCredential,
+  requestedVc: VerifiableCredential,
+): boolean {
+  return canonicalize(projectOrganizationCredentialIdentity(existingVc))
+    === canonicalize(projectOrganizationCredentialIdentity(requestedVc));
+}
+
+async function ensureOrganizationRegistration(params: {
+  manager: ManageAssetOrganization;
+  logger: ILogger;
+  mspId: string;
+  ledgerOrgId: string;
+  payload: { orgId: string; vc: VerifiableCredential };
+}): Promise<void> {
+  try {
+    await params.manager.ensureOrganization(params.mspId, params.ledgerOrgId, params.payload);
+  } catch (error: any) {
+    if (!fabricErrorContains(error, 'ORGANIZATION_CONFLICT:')) throw error;
+
+    let existing: any;
+    try {
+      existing = await params.manager.read(params.mspId, params.ledgerOrgId);
+    } catch (readError: any) {
+      params.logger.warn('[HostingManager] unable to inspect conflicting organization retry', {
+        component: 'HostingManager.ensureOrganizationRegistration',
+        orgId: params.ledgerOrgId,
+        error: String(readError?.message || readError),
+      });
+      throw error;
+    }
+
+    if (!existing?.vc || !isSameOrganizationCredentialIdentity(existing.vc, params.payload.vc)) {
+      throw error;
+    }
+
+    params.logger.warn('[HostingManager] resumed semantically identical organization ledger registration', {
+      component: 'HostingManager.ensureOrganizationRegistration',
+      orgId: params.ledgerOrgId,
+      existingCredentialId: existing.vc?.id,
+      requestedCredentialId: params.payload.vc?.id,
+    });
+  }
+}
+
 export async function registerOrganizationOnLedger(params: {
   ledgerConfig?: LedgerConfig;
   hostJurisdiction?: string;
@@ -68,17 +134,23 @@ export async function registerOrganizationOnLedger(params: {
   const organizationClaims = (params.organization?.meta as any)?.claims || (params.config as any)?.claims;
   const ledgerOrgId = resolveLedgerOrganizationId(organizationClaims, params.orgId);
 
-  const payload = {
-    orgId: ledgerOrgId,
-    vc: params.config.governanceVc || params.config.selfDescriptionVc,
-  };
-
-  if (!payload.vc) {
+  const organizationVc = params.config.governanceVc || params.config.selfDescriptionVc;
+  if (!organizationVc) {
     throw new ManagerError('Organization VC is missing for ledger registration.', IssueType.Exception);
   }
+  const payload: { orgId: string; vc: VerifiableCredential } = {
+    orgId: ledgerOrgId,
+    vc: organizationVc as unknown as VerifiableCredential,
+  };
 
   try {
-    await manager.ensureOrganization(mspId, ledgerOrgId, payload);
+    await ensureOrganizationRegistration({
+      manager,
+      logger: params.logger,
+      mspId,
+      ledgerOrgId,
+      payload,
+    });
     await registerOrganizationKeysOnLedger({
       logger: params.logger,
       mspId,
