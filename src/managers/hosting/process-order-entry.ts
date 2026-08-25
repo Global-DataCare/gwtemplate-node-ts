@@ -65,6 +65,7 @@ type ProcessHostOrderEntryDeps = Readonly<{
   ) => Promise<any>;
   storeControllerEntityConfig: (employeeConfig: any, tenantCollectionName: string, vaultId: string) => Promise<void>;
   getCurrentUrnNetwork: () => string;
+  registerOrganizationOnLedger?: typeof registerOrganizationOnLedger;
 }>;
 
 export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Promise<BundleEntry> {
@@ -194,6 +195,10 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
       ...(claimKey === ClaimsOrganizationSchemaorg.alternateName && { unique: true }),
     }))
     .filter((attr: { value: string }) => attr.value !== 'undefined' && attr.value !== 'null');
+  attributes.push({
+    name: ClaimsOfferSchemaorg.identifier,
+    value: offerId,
+  });
 
   const finalTenantRegistrationDoc: ConfidentialStorageDoc = {
     id: vaultId,
@@ -204,11 +209,10 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
   };
 
   const secureFinalDoc = await deps.kmsService.protectConfidentialData(finalTenantRegistrationDoc, 'host');
-  await deps.vaultRepository.put(hostCollectionName!, [secureFinalDoc], getEnvSectionId('tenants'));
 
   if (deps.isLedgerRegistrationEnabled()) {
     const serviceEvidence = deps.extractServiceEvidence(containedService || service);
-    await registerOrganizationOnLedger({
+    await (deps.registerOrganizationOnLedger || registerOrganizationOnLedger)({
       ledgerConfig: deps.config.ledger,
       hostJurisdiction: deps.config.host.jurisdiction,
       namespace: deps.config.namespace,
@@ -223,6 +227,12 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
       jurisdiction: processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
     });
   }
+
+  // Keep the Offer-resolvable pending record authoritative until every
+  // mandatory ledger write succeeds. This makes Order retries safe after a
+  // ledger timeout and prevents a partially active tenant from losing the
+  // commercial continuation that created it.
+  await deps.vaultRepository.put(hostCollectionName!, [secureFinalDoc], getEnvSectionId('tenants'));
 
   const legalParticipantDoc: ConfidentialStorageDoc = { id: 'legal-participant.vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };
   const legacyVcDoc: ConfidentialStorageDoc = { id: 'vc.json', status: 'active', sequence: 0, content: finalTenantConfig.governanceVc };

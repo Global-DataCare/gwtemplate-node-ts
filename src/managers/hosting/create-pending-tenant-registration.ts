@@ -41,7 +41,6 @@ type CreatePendingTenantRegistrationDeps = Readonly<{
   withHostedOrganizationOfferClaims: (
     claims: ClaimsRecord,
     requestedSector: Sector,
-    jurisdiction: string,
   ) => ClaimsRecord;
   extractRegistrationKeys: (
     meta?: DidCommDecodedMetadata,
@@ -119,7 +118,6 @@ export async function createPendingTenantRegistration(
   processedClaims = deps.withHostedOrganizationOfferClaims(
     processedClaims,
     requestedSector,
-    jurisdiction,
   );
   if (!String(processedClaims[HOST_TRANSACTION_REQUIRED_OUTPUT_CLAIMS[0]] || '').trim()) {
     throw new ManagerError(

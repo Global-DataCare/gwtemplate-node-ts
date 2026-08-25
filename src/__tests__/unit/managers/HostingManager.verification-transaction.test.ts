@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE } from 'gdc-common-utils-ts/utils/didcomm-submit';
 import {
@@ -239,7 +239,11 @@ describe('HostingManager legal organization verification transaction', () => {
       mockHostRuntime,
     );
 
-    const response = await manager.process(buildTransactionJob(), 'test', false);
+    const job = buildTransactionJob();
+    // The applicant country does not change the legal jurisdiction of an
+    // Offer authored by the host.
+    (job.content!.body!.data[0]!.resource as any).meta.claims[ClaimsOrganizationSchemaorg.addressCountry] = 'US';
+    const response = await manager.process(job, 'test', false);
 
     expect(fetchCalls[0]?.url).toBe(
       `${EXAMPLE_ICA_BASE_URL}/ica/cds-ES/v1/${EXAMPLE_SECTOR}/terms/pdf/${EXAMPLE_VERIFY_RESOURCE_TYPE}/_verify`,
@@ -272,7 +276,7 @@ describe('HostingManager legal organization verification transaction', () => {
       (response.body.data[0]?.resource as any)?.meta?.claims?.[ClaimsServiceSchemaorg.category],
     ).toBe(EXAMPLE_SECTOR);
     const offerId = String((response.body.data[0]?.resource as any)?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
-    expect(offerId).toContain(':Offer:');
+    expect(offerId).toMatch(/^urn:cds:ES:v1:health-care:product:org\.schema:Offer:/);
     expect(response.body.data[0]?.resource?.next).toEqual({
       action: EXAMPLE_NEXT_ACTION,
       acceptedOffer: {

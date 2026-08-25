@@ -1605,7 +1605,6 @@ export class HostingManager {
   private withHostedOrganizationOfferClaims(
     claims: ClaimsRecord,
     requestedSector: Sector,
-    jurisdiction: string,
   ): ClaimsRecord {
     const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
     const requestedEmployeeCount = Number(
@@ -1617,7 +1616,7 @@ export class HostingManager {
     const offerClaims = generateLicenseOffer(
       employeeCount,
       hostDid,
-      jurisdiction,
+      this.config.host.jurisdiction || '',
       requestedSector,
       this.config.allowedPaymentMethods,
     );

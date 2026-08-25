@@ -22,7 +22,7 @@ function determineLicenseTier(employeeCount: number): { name: string; price: str
  *
  * @param {number} employeeCount The value from the 'org.schema.Organization.numberOfEmployees.value' claim.
  * @param {string} hostDid The DID of the host issuing the offer.
- * @param {string} jurisdiction The jurisdiction for the offer URN.
+ * @param {string} jurisdiction The legal jurisdiction of the host issuing the Offer.
  * @param {string} sector The sector for the offer URN.
  * @returns {Record<string, any>} A record of claims compliant with `ClaimsOfferSchemaorg`.
  */
