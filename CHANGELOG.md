@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Synchronize the controller and commercial Order security contract with GW
+  UNID: compat-mode DIDComm plain may project an optional public JWK, but
+  tenant operations verify `iss + kid` with the key registered by DCR.
+  Encrypted host `Order/_batch` remains host-routed while resolving sender
+  keys from the issuer tenant, and its exact static route is not rejected by a
+  historical host service catalog that predates the commercial capability.
+
 ## [1.21.25] - 2026-08-25
 
 - Adopt the Fabric `0.3.0` local host vocabulary end to end: `host1`/`host2`,

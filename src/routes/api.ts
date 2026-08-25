@@ -124,6 +124,20 @@ function normalizeLegacyPlaintextContent<T extends Record<string, any>>(content:
   };
 }
 
+/**
+ * Reads the optional public verification key carried by a legacy plaintext
+ * DIDComm envelope. Post-DCR encrypted requests resolve their registered key
+ * from `iss` and `kid`; this projection is only a compat-mode bridge and never
+ * replaces a key registered by DCR.
+ */
+function projectedControllerProofJwk(body: unknown): JWK | undefined {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return undefined;
+  const candidate = (body as any)?.meta?.jws?.protected?.jwk;
+  return candidate && typeof candidate === 'object' && !Array.isArray(candidate)
+    ? candidate as JWK
+    : undefined;
+}
+
 function isContentTypeAllowedBySecurityPolicy(contentType: ParsedContentType): boolean {
   const securityMode = resolveSecurityModeFromEnv();
   if (contentType === 'secure-form') return true;
@@ -173,6 +187,25 @@ function isHostTenantLifecycleRoute(
     && String(format || '').toLowerCase() === 'org.schema'
     && String(resourceType || '').toLowerCase() === 'organization'
     && (action === ACTION_DISABLE || action === ACTION_ENABLE || action === ACTION_PURGE);
+}
+
+/**
+ * Host commercial Orders continue a tenant-authored Offer through the shared
+ * registry endpoint. They are host-routed jobs, but their post-DCR sender proof
+ * still belongs to the tenant controller identified by the signed `iss`.
+ */
+function isHostControllerCommercialOrderRoute(
+  tenantId: string,
+  section: string,
+  format: string,
+  resourceType: string,
+  action: string,
+): boolean {
+  return tenantId === 'host'
+    && section === 'registry'
+    && String(format || '').toLowerCase() === 'org.schema'
+    && String(resourceType || '').toLowerCase() === 'order'
+    && action === '_batch';
 }
 
 function requiresActiveTenantAuthorization(
@@ -356,6 +389,46 @@ export function createApiRouter(
     const canonicalVaultId = await tenantsCacheManager.findTenantVaultIdByIdentifierValue(tenantId);
     if (canonicalVaultId) return canonicalVaultId;
     return directVaultId;
+  };
+
+  /**
+   * Resolves the storage scope used to bind controller proof `iss + kid` to
+   * the signing key registered by DCR. The rule is transport- and
+   * sector-agnostic; host bootstrap remains outside post-DCR tenant scope.
+   */
+  const controllerProofRegistrationContext = async (tenantId: string, sector: string) => {
+    if (tenantId === 'host') return undefined;
+    const vaultId = await resolveVaultId(tenantId, sector);
+    const collectionName = await tenantsCacheManager.getCollectionName(vaultId);
+    return { vaultId, ...(collectionName ? { collectionName } : {}) };
+  };
+
+  /**
+   * Separates job routing from controller-key custody. Most requests use the
+   * path tenant for both. A host `Order/_batch` remains queued in `host`, while
+   * its encrypted sender keys are resolved from the tenant encoded in the
+   * already-signed controller DID. An unknown or legacy DID falls back to the
+   * host scope and therefore fails closed unless that key is actually hosted.
+   */
+  const resolveRegisteredSenderVaultId = async (
+    tenantId: string,
+    sector: string,
+    section: string,
+    format: string,
+    resourceType: string,
+    action: string,
+    senderDid: string,
+  ): Promise<string> => {
+    const pathVaultId = await resolveVaultId(tenantId, sector);
+    if (!isHostControllerCommercialOrderRoute(tenantId, section, format, resourceType, action)) {
+      return pathVaultId;
+    }
+    try {
+      const issuerVaultId = getTenantVaultIdFromIss(senderDid);
+      return await tenantsCacheManager.tenantExists(issuerVaultId) ? issuerVaultId : pathVaultId;
+    } catch {
+      return pathVaultId;
+    }
   };
 
   const getReplayTtlSeconds = (payload: any): number => {
@@ -2938,7 +3011,11 @@ export function createApiRouter(
         }
         try {
           const bearerToken = authToken?.split(' ')[1] || '';
-          const verificationResult = await appAuthManager.verifyBearerToken(bearerToken);
+          const verificationResult = await appAuthManager.verifyBearerToken(
+            bearerToken,
+            undefined,
+            await controllerProofRegistrationContext(tenantId, sector),
+          );
           verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
         } catch (error: any) {
           return sendDidcommEarlyError(
@@ -3124,7 +3201,11 @@ export function createApiRouter(
           }
           try {
             const bearerToken = authToken?.split(' ')[1] || '';
-            const verificationResult = await appAuthManager.verifyBearerToken(bearerToken);
+            const verificationResult = await appAuthManager.verifyBearerToken(
+              bearerToken,
+              undefined,
+              await controllerProofRegistrationContext(tenantId, sector),
+            );
             verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
           } catch (error: any) {
             return sendDidcommEarlyError(
@@ -3165,17 +3246,18 @@ export function createApiRouter(
             throw new Error("Secure request is missing 'skid' in the JWE protected header.");
           }
 
-          // 1. Determine the tenant vault from the request path (authoritative).
-          // Some legacy hosted DIDs do not encode `cds-XX/v1/{sector}` segments, so parsing the DID is not reliable.
-          const vaultId = await resolveVaultId(tenantId, sector);
-          try {
-            const vaultIdFromDid = getTenantVaultIdFromIss(senderDid);
-            if (vaultIdFromDid !== vaultId) {
-              throw new Error(`Issuer DID does not belong to tenant. did=${senderDid} pathVault=${vaultId} didVault=${vaultIdFromDid}`);
-            }
-          } catch {
-            // Ignore: legacy DID formats are validated by path-based routing instead.
-          }
+          // 1. Resolve registered sender-key custody independently from job
+          // routing. Host commercial Orders are queued in `host` but signed by
+          // the tenant controller that authored the accepted Offer.
+          const vaultId = await resolveRegisteredSenderVaultId(
+            tenantId,
+            sector,
+            section,
+            req.params.format,
+            resourceType,
+            action,
+            senderDid,
+          );
           const collectionName = await tenantsCacheManager.getCollectionName(vaultId);
           if (!collectionName) {
             throw new Error(`Could not resolve collectionName for vaultId '${vaultId}'`);
@@ -3292,7 +3374,11 @@ export function createApiRouter(
           }
           try {
             const bearerToken = authToken?.split(' ')[1] || '';
-            const verificationResult = await appAuthManager.verifyBearerToken(bearerToken);
+            const verificationResult = await appAuthManager.verifyBearerToken(
+              bearerToken,
+              projectedControllerProofJwk(req.body),
+              await controllerProofRegistrationContext(tenantId, sector),
+            );
             verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
           } catch (error: any) {
             return sendDidcommEarlyError(
@@ -3391,7 +3477,18 @@ export function createApiRouter(
     const vaultId = await resolveVaultId(tenantId, sector);
     const tenantServices = await tenantsCacheManager.getDidServiceConfig(vaultId);
 
-    if (!isRequestValid(tenantServices, { ...req.params, action })) {
+    // A controller-authored professional Order is the deliberate split route:
+    // the host owns the commercial endpoint, while the issuer tenant owns DCR
+    // key custody. Historical host catalogs may predate this exact capability.
+    // Every other route remains behind the persisted service policy.
+    const usesHostCommercialOrderContract = isHostControllerCommercialOrderRoute(
+      tenantId,
+      section,
+      req.params.format,
+      resourceType,
+      action,
+    );
+    if (!usesHostCommercialOrderContract && !isRequestValid(tenantServices, { ...req.params, action })) {
       console.error(`[API] Path/Role validation failed for ${req.originalUrl}. Tenant services found: ${!!tenantServices}.`);
       return sendDidcommEarlyError(
         req,

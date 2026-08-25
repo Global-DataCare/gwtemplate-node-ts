@@ -181,6 +181,7 @@ export async function buildDeterministicVpTokenFixture(input: {
   subjectDid?: string;
   credentials: VpCredentialInput[];
   alg?: DeterministicJwtAlgorithm;
+  includePublicJwkInHeader?: boolean;
   extraPayload?: Partial<VpTokenPayload>;
 }): Promise<DeterministicSignedJwtFixture<Record<string, unknown>>> {
   const now = 2_208_988_800;
@@ -200,7 +201,7 @@ export async function buildDeterministicVpTokenFixture(input: {
     seed: input.seed,
     purpose: 'demo-controller-vp-token',
     alg: input.alg ?? 'ES384',
-    includePublicJwkInHeader: true,
+    includePublicJwkInHeader: input.includePublicJwkInHeader ?? true,
     payload: vpPayload as Record<string, unknown>,
   });
 }

@@ -571,6 +571,14 @@ Current status (important):
   - `/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/...`
 - `gwtemplate-node-ts` now accepts both patterns for identity auth (new unified + legacy) and normalizes internally.
 
+Controller authentication has one transport-independent authority rule:
+after DCR, the registered key selected by signed `iss + kid` is authoritative.
+A public JWK in a JWT header or legacy DIDComm plain `meta.jws.protected` is
+optional compatibility data, not a replacement for the stored key. Commercial
+`Order/_batch` is routed through `host`, but its controller keys remain in
+the issuer tenant; this exact static endpoint also remains valid when an older
+persisted host service catalog does not yet advertise `Order`.
+
 The list below mixes current portal routes and legacy compatibility routes. The canonical legal-organization onboarding flow starts with `/_transaction` for verification forwarding to ICA `_verify`, and that flow is complete without requiring `/_activate` as a follow-up step. `Organization/_activate` remains published only as a legacy compatibility route for callers that already start from an ICA-issued proof. The older `Organization/_batch` / `Order/_batch` family remains only for backward compatibility and portal regression checks.
 Compatibility aliases are also enabled for older callers: `Organization/_verify` behaves as `Organization/_batch`, and `Organization/_verify-response` behaves as `Organization/_batch-response`.
 
