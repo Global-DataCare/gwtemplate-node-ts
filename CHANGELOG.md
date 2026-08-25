@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Build host-authored onboarding Offer URNs with the host's legal jurisdiction
+  instead of the applicant country. Keep pending registration authoritative
+  until mandatory ledger writes succeed, and retain the Offer index on the
+  active tenant for deterministic Order replay.
 - Return the persisted seat's effective `licenseId` and `maxDevices` in every
   successful `License/_issue` entry so SDKs and portals do not substitute a
   potentially different local installation allowance.

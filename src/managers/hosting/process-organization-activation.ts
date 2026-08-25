@@ -74,7 +74,7 @@ type ActivationDeps = Readonly<{
   logActivationIdentityDiagnostics: (stage: string, claims: ClaimsRecord, routeJurisdiction?: string) => void;
   normalizeTenantPublicUrl: (urlOrDomain?: string) => string | undefined;
   createOrganizationUrnSafely: (claims: ClaimsRecord, requestedSector: Sector) => string;
-  withHostedOrganizationOfferClaims: (claims: ClaimsRecord, requestedSector: Sector, jurisdiction: string) => ClaimsRecord;
+  withHostedOrganizationOfferClaims: (claims: ClaimsRecord, requestedSector: Sector) => ClaimsRecord;
   mapHostRegistrySectorToNetworkName: (hostSector?: string) => NetworkName;
   extractResources: (claims: ClaimsRecord, environment?: string) => { organization: any; person?: any; service: any };
   handleServiceAttachment: (service?: any) => Promise<any>;
@@ -277,7 +277,6 @@ async function processActivationEntry(
       deps.withHostedOrganizationOfferClaims(
         processedClaims,
         requestedSector,
-        processedClaims[ClaimsOrganizationSchemaorg.addressCountry] as string,
       ),
     );
     if (!String(processedClaims[HOST_ACTIVATE_REQUIRED_OUTPUT_CLAIMS[0]] || '').trim()) {
