@@ -16,6 +16,8 @@ import { getDigitalTwinSubjectAliasSectionId } from '../../utils/digital-twin-re
 import { buildOrganizationDidWeb, buildProfessionalDidWeb } from 'gdc-common-utils-ts/utils/did';
 import { EXAMPLE_HOST_PUBLIC_HOSTNAME, EXAMPLE_ROUTE_VERSION } from 'gdc-common-utils-ts/examples/shared';
 import { ExampleEmployeeEmails, ExampleEmployeeRoles } from 'gdc-common-utils-ts/examples/employee';
+import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
+import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 
 describe('Composition Bundle _search API (integration)', () => {
   function loadIpsAllSectionsFixture(subjectDid: string): any {
@@ -711,13 +713,82 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(medicationRecords.length).toBeGreaterThan(0);
       expect(observationRecords.length).toBeGreaterThan(0);
       expect(JSON.stringify([...medicationRecords, ...observationRecords, ...compositionRecords])).not.toContain(subjectDid);
-      expect(compositionRecords.some((record: any) =>
-        record['Composition.section'] === HealthcareBasicSections.HistoryOfMedicationUse.attributeValue
-        || record['org.hl7.fhir.r4.Composition.section'] === HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-      )).toBe(true);
-      expect(compositionRecords.some((record: any) =>
-        record['Composition.section'] === HealthcareBasicSections.VitalSigns.attributeValue
-        || record['org.hl7.fhir.r4.Composition.section'] === HealthcareBasicSections.VitalSigns.attributeValue,
+      expect(compositionRecords).toHaveLength(1);
+      const indexedCompositionSections = String(
+        compositionRecords[0]['Composition.section']
+        || compositionRecords[0]['org.hl7.fhir.r4.Composition.section']
+        || '',
+      ).split(',');
+      expect(indexedCompositionSections).toEqual(expect.arrayContaining([
+        HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+        HealthcareBasicSections.VitalSigns.attributeValue,
+      ]));
+
+      const setResearchDecision = async (decision: 'permit' | 'deny', suffix: string) => {
+        const thid = `ips-secondary-use-${suffix}`;
+        const claims = {
+          '@context': 'org.hl7.fhir.r4',
+          [ClaimConsent.identifier]: 'urn:uuid:ips-secondary-use-consent-001',
+          [ClaimConsent.subject]: subjectDid,
+          [ClaimConsent.actorIdentifier]: 'did:web:research.example.org',
+          [ClaimConsent.actorRole]: 'ISCO-08|221',
+          [ClaimConsent.decision]: decision,
+          [ClaimConsent.date]: '2026-08-26',
+          [ClaimConsent.purpose]: 'RESEARCH',
+          [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
+          [ClaimConsent.attachmentContentType]: 'application/odrl+json',
+          [ClaimConsent.attachmentData]: Buffer.from(JSON.stringify({ permission: 'research' })).toString('base64'),
+        };
+        const submit = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch`,
+          headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+          body: {
+            thid,
+            body: {
+              resourceType: 'Bundle',
+              type: 'batch',
+              entry: [{
+                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Consent' },
+                resource: { resourceType: 'Consent', meta: { claims } },
+              }],
+            },
+          },
+        });
+        expect(submit.status).toBe(202);
+        for (let attempt = 0; attempt < 50; attempt++) {
+          const poll = await invokeExpress(app, {
+            method: 'POST',
+            url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response`,
+            headers: { 'content-type': 'application/json' },
+            body: { thid },
+          });
+          if (poll.status === 200) {
+            expect(JSON.parse(poll.text).data[0].response.status).toBe('201');
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        throw new Error(`Consent ${decision} polling did not complete.`);
+      };
+
+      await setResearchDecision('deny', 'deny');
+      expect(await vaultRepository.getContainersInSection(tenantVaultId, digitalTwinCompositionSection)).toHaveLength(0);
+      expect(await vaultRepository.getContainersInSection(tenantVaultId, digitalTwinMedicationsSection)).toHaveLength(0);
+
+      await setResearchDecision('permit', 'permit');
+      const rebuiltCompositions = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinCompositionSection);
+      const rebuiltMedications = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinMedicationsSection);
+      expect(rebuiltCompositions).toHaveLength(1);
+      expect(String(rebuiltCompositions[0]['Composition.section'] || '')).toContain(
+        HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+      );
+      expect(rebuiltMedications.length).toBeGreaterThan(0);
+      expect(rebuiltMedications.some((record) =>
+        (record['MedicationStatement.code']
+          || record['org.hl7.fhir.api.MedicationStatement.code']
+          || record['org.hl7.fhir.r4.MedicationStatement.code'])
+          === 'http://snomed.info/sct|108575001',
       )).toBe(true);
 
       // Step: read the complete fixture back through the authoritative public

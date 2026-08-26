@@ -17,6 +17,7 @@ import {
   getOrCreateDigitalTwinSubjectId,
   projectClaimsForDigitalTwin,
 } from '../utils/digital-twin-research-projection';
+import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -192,7 +193,14 @@ export class MedicationStatementManager implements IJobProcessor {
           } as any;
           const sectionId = getSubjectScopedSectionId(subject, scope, 'medications');
           await this.vaultRepository.put(tenantVaultId, [record], sectionId);
-          if (scope === SUBJECT_SECTION_INDIVIDUAL) {
+          if (
+            scope === SUBJECT_SECTION_INDIVIDUAL
+            && await isDigitalTwinSecondaryUseEnabled({
+              vaultRepository: this.vaultRepository,
+              tenantVaultId,
+              sourceSubject: subject,
+            })
+          ) {
             const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
               vaultRepository: this.vaultRepository,
               tenantVaultId,

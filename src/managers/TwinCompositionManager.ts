@@ -119,12 +119,12 @@ export class TwinCompositionManager {
       authenticatedActorDid,
       filterMatchesBySectionsAndTypes: (records, required, excluded) =>
         records.filter((record) => {
-          const sectionToken = String(
+          const sectionTokens = String(
             getFirstClaimValueByKeys(record, buildFhirClaimKeys('Composition.section')) || '',
-          ).trim();
-          if (!sectionToken) return false;
-          if (excluded.includes(sectionToken)) return false;
-          if (required.length > 0 && !required.includes(sectionToken)) return false;
+          ).split(',').map((value) => value.trim()).filter(Boolean);
+          if (sectionTokens.length === 0) return false;
+          if (excluded.some((value) => sectionTokens.includes(value))) return false;
+          if (required.length > 0 && !required.some((value) => sectionTokens.includes(value))) return false;
           return true;
         }),
     });

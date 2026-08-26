@@ -1,0 +1,189 @@
+import { createHash } from 'crypto';
+import { FhirResourceTypeDataCollections } from 'gdc-common-utils-ts/constants/index';
+import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
+import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
+import type { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
+import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
+import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
+import { getClaimValue } from './claims';
+import {
+  getOrCreateDigitalTwinSubjectId,
+  isDigitalTwinResearchResourceType,
+  projectClaimsForDigitalTwin,
+} from './digital-twin-research-projection';
+import { getEnvSectionId } from './section-env';
+import { getSubjectScopedSectionId } from './individual-sections';
+
+const SECONDARY_USE_STATUS_SECTION = 'digitaltwin_secondary_use_status';
+
+export type DigitalTwinSecondaryUseStatus = RecordBase & {
+  type: 'digital-twin-secondary-use-status';
+  sourceSubjectHash: string;
+  status: 'enabled' | 'disabled';
+  changedAt: string;
+};
+
+function subjectHash(subject: string): string {
+  return createHash('sha256').update(String(subject || '').trim(), 'utf8').digest('hex');
+}
+
+function statusSectionId(): string {
+  return getEnvSectionId(SECONDARY_USE_STATUS_SECTION);
+}
+
+function splitValues(value: unknown): string[] {
+  return String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function isResearchSecondaryUseRule(claims: Record<string, any>): boolean {
+  const purpose = String(getClaimValue(claims, ClaimConsent.purpose) || '').trim().toUpperCase();
+  const actions = splitValues(getClaimValue(claims, ClaimConsent.action));
+  return purpose === 'RESEARCH' && actions.some((action) =>
+    action === ServiceCapability.DigitalTwinReader || action === ServiceCapability.DigitalTwinProvider,
+  );
+}
+
+function cleanStoredClaims(record: Record<string, any>): Record<string, any> {
+  const claims = { ...record };
+  delete claims.id;
+  delete claims.indexed;
+  delete claims.meta;
+  delete claims.tag;
+  return claims;
+}
+
+function projectedRecordId(resourceType: string, claims: Record<string, any>, sourceRecordId?: string): string {
+  const identifier = String(
+    getClaimValue(claims, `${resourceType}.identifier`)
+    || getClaimValue(claims, `${resourceType}.identifier.value`)
+    || '',
+  ).trim();
+  const seed = String(sourceRecordId || '').trim() || identifier || JSON.stringify(claims, Object.keys(claims).sort());
+  return createHash('sha256').update(`${resourceType}|${seed}`, 'utf8').digest('hex');
+}
+
+async function clearSubjectProjection(
+  vaultRepository: IVaultRepository,
+  tenantVaultId: string,
+  subject: string,
+): Promise<void> {
+  const suffix = `_${subjectHash(subject)}`;
+  const prefix = getEnvSectionId(`${SUBJECT_SECTION_DIGITAL_TWIN}_`);
+  const sectionIds = (await vaultRepository.getAllSections(tenantVaultId))
+    .filter((sectionId) => String(sectionId || '').startsWith(prefix) && String(sectionId).endsWith(suffix));
+  for (const sectionId of sectionIds) {
+    const records = await vaultRepository.listContainersInSection<RecordBase>(tenantVaultId, sectionId);
+    for (const record of records) {
+      await vaultRepository.delete(tenantVaultId, String(record.id), sectionId);
+    }
+  }
+}
+
+async function rebuildProjection(
+  vaultRepository: IVaultRepository,
+  tenantVaultId: string,
+  sourceSubject: string,
+): Promise<void> {
+  const twinSubjectId = await getOrCreateDigitalTwinSubjectId({ vaultRepository, tenantVaultId, sourceSubject });
+  await clearSubjectProjection(vaultRepository, tenantVaultId, sourceSubject);
+  await clearSubjectProjection(vaultRepository, tenantVaultId, twinSubjectId);
+
+  const resourceCollections = Object.entries(FhirResourceTypeDataCollections) as Array<[string, string]>;
+  for (const [resourceType, collectionId] of resourceCollections) {
+    if (!isDigitalTwinResearchResourceType(resourceType)) continue;
+    const sourceSectionId = getSubjectScopedSectionId(sourceSubject, SUBJECT_SECTION_INDIVIDUAL, collectionId);
+    const sourceRecords = await vaultRepository.listContainersInSection<RecordBase>(tenantVaultId, sourceSectionId);
+    for (const sourceRecord of sourceRecords) {
+      const projectedClaims = projectClaimsForDigitalTwin({
+        claims: cleanStoredClaims(sourceRecord as Record<string, any>),
+        resourceType,
+        twinSubjectId,
+      });
+      const targetSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, collectionId);
+      await vaultRepository.put(tenantVaultId, [{
+        id: projectedRecordId(resourceType, projectedClaims, String(sourceRecord.id)),
+        ...projectedClaims,
+      }], targetSectionId);
+    }
+  }
+
+  const sourceCompositionSection = getSubjectScopedSectionId(sourceSubject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
+  const sourceCompositions = await vaultRepository.listContainersInSection<RecordBase>(tenantVaultId, sourceCompositionSection);
+  const grouped = new Map<string, Record<string, any>>();
+  for (const sourceRecord of sourceCompositions) {
+    const claims = cleanStoredClaims(sourceRecord as Record<string, any>);
+    const identifier = String(getClaimValue(claims, 'Composition.identifier') || sourceRecord.id).trim();
+    const previous = grouped.get(identifier);
+    const sections = new Set([
+      ...splitValues(previous && getClaimValue(previous, 'Composition.section')),
+      ...splitValues(getClaimValue(claims, 'Composition.section')),
+    ]);
+    grouped.set(identifier, { ...(previous || {}), ...claims, 'Composition.section': Array.from(sections).join(',') });
+  }
+  const targetCompositionSection = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, 'composition');
+  for (const claims of grouped.values()) {
+    const projectedClaims = projectClaimsForDigitalTwin({ claims, resourceType: 'Composition', twinSubjectId });
+    await vaultRepository.put(tenantVaultId, [{
+      id: projectedRecordId('Composition', projectedClaims),
+      ...projectedClaims,
+    }], targetCompositionSection);
+  }
+}
+
+/** Returns false only after an explicit secondary-use withdrawal. */
+export async function isDigitalTwinSecondaryUseEnabled(input: {
+  vaultRepository: IVaultRepository;
+  tenantVaultId: string;
+  sourceSubject: string;
+}): Promise<boolean> {
+  const id = subjectHash(input.sourceSubject);
+  const status = await input.vaultRepository.get<DigitalTwinSecondaryUseStatus>(
+    input.tenantVaultId,
+    id,
+    statusSectionId(),
+  );
+  return status?.status !== 'disabled';
+}
+
+/**
+ * Applies one subject-level research-use decision.
+ *
+ * A denial deindexes the current projection and pauses future synchronization.
+ * A later permit preserves the stable alias and rebuilds the projection from
+ * the current operational records. This is intentionally a reversible disable,
+ * not a destructive purge of the operational record or audit history.
+ */
+export async function applyDigitalTwinSecondaryUseDecision(input: {
+  vaultRepository: IVaultRepository;
+  tenantVaultId: string;
+  claims: Record<string, any>;
+}): Promise<boolean> {
+  if (!isResearchSecondaryUseRule(input.claims)) return false;
+  const sourceSubject = String(getClaimValue(input.claims, ClaimConsent.subject) || '').trim();
+  const decision = String(getClaimValue(input.claims, ClaimConsent.decision) || '').trim().toLowerCase();
+  if (!sourceSubject || (decision !== 'permit' && decision !== 'deny')) return false;
+
+  const status: DigitalTwinSecondaryUseStatus = {
+    id: subjectHash(sourceSubject),
+    type: 'digital-twin-secondary-use-status',
+    sourceSubjectHash: subjectHash(sourceSubject),
+    status: decision === 'permit' ? 'enabled' : 'disabled',
+    changedAt: new Date().toISOString(),
+  };
+  await input.vaultRepository.put(input.tenantVaultId, [status], statusSectionId());
+
+  if (decision === 'deny') {
+    await clearSubjectProjection(input.vaultRepository, input.tenantVaultId, sourceSubject);
+    const alias = await input.vaultRepository.get<any>(
+      input.tenantVaultId,
+      subjectHash(sourceSubject),
+      getEnvSectionId('digitaltwin_subject_aliases'),
+    );
+    if (alias?.twinSubjectId) {
+      await clearSubjectProjection(input.vaultRepository, input.tenantVaultId, alias.twinSubjectId);
+    }
+  } else {
+    await rebuildProjection(input.vaultRepository, input.tenantVaultId, sourceSubject);
+  }
+  return true;
+}

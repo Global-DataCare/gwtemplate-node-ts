@@ -1134,20 +1134,20 @@ describe('CommunicationManager Unit Tests', () => {
           && (args[2] === individualCompositionSectionId || args[2] === digitalTwinCompositionSectionId),
       );
 
-      expect(compositionPuts).toHaveLength(4);
+      expect(compositionPuts).toHaveLength(2);
       const projectedSections = compositionPuts.flatMap((args) =>
         ((args[1] as any[]) || []).map((record) =>
           record['Composition.section'] || record['org.hl7.fhir.r4.Composition.section'],
         ),
       );
-      expect(projectedSections).toEqual(expect.arrayContaining([
-        'LOINC|10160-0',
-        'LOINC|8716-3',
-      ]));
+      expect(projectedSections).toEqual([
+        'LOINC|10160-0,LOINC|8716-3',
+        'LOINC|10160-0,LOINC|8716-3',
+      ]);
       const researchRecords = compositionPuts
         .filter((args) => args[2] === digitalTwinCompositionSectionId)
         .flatMap((args) => (args[1] as any[]) || []);
-      expect(researchRecords).toHaveLength(2);
+      expect(researchRecords).toHaveLength(1);
       for (const record of researchRecords) {
         const subjectKey = Object.keys(record).find((key) => key.endsWith('Composition.subject'));
         expect(record[subjectKey as string]).toBe(twinSubjectId);

@@ -126,6 +126,36 @@ Important:
 - the public artifact is `Composition`,
 - and that `Composition` is the twin index/descriptor used to identify one
   matched `ResearchSubject` / digital twin.
+- one source IPS document/version is represented by one indexed Composition;
+  all of its IPS section tokens are retained as a multi-valued
+  `Composition.section` claim. Search by section returns that same Composition
+  once rather than one synthesized Composition per matching section.
+
+## Secondary-use withdrawal and reactivation
+
+The subject-level research rule uses:
+
+- `Consent.purpose = RESEARCH`
+- `Consent.action = organization/ResearchSubject.rs`
+- `Consent.decision = permit | deny`
+
+`deny` is a reversible disable:
+
+- remove the current subject projection from the searchable digital-twin
+  index
+- reject/skip subsequent synchronization into that projection
+- retain the source clinical record, confidential pseudonymous alias, consent
+  decision, and audit history
+- do not attempt to recall copies or derived results already lawfully exported
+  to an external research environment; those remain governed by the applicable
+  contract, permit, retention, and deletion obligations
+
+A later `permit` reuses the stable private alias and performs a complete
+rebuild from the current operational record. This incorporates changes made
+while publication was disabled and avoids replaying a stale snapshot.
+
+`purge` is intentionally not used for ordinary withdrawal. It is a distinct,
+irreversible erasure operation that requires its own legal and retention gate.
 
 ## Search, Working Selection, and Materialization
 
@@ -278,7 +308,8 @@ The tested flow is:
 2. attach a `DocumentReference` or IPS document bundle
 3. project supported clinical resources into `individual`
 4. mirror those projected resources into `digitaltwin`
-5. project one `Composition` index per IPS section into `digitaltwin`
+5. project one multi-section `Composition` index per IPS document/version into
+   `digitaltwin`
 6. call `digitaltwin/.../Composition/_search` with:
    - `section`
    - one or more resource-scoped coded filters for the same family
