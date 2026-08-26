@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Align the high-level Digital Twin lifecycle, SEDIA matrix, adapter guidance
+  and repository-local governance skill: patient portals own only the FHIR
+  secondary-use toggle and normal IPS Communication flow; GW owns registered
+  `urn:uuid` projection, while direct Composition ingestion remains restricted
+  adapter compatibility plumbing.
 - Make the local Fabric smoke pass explicit Linux/amd64 CCAAS build arguments,
   so Docker's classic builder does not resolve the `tini` download with an
   empty `TARGETARCH` when BuildKit is unavailable.

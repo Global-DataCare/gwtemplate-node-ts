@@ -1,0 +1,4 @@
+interface:
+  display_name: "Govern Digital Twin Consent"
+  short_description: "Keep twin consent and projection contracts aligned"
+  default_prompt: "Use $govern-digital-twin-consent to implement or audit the Digital Twin consent and projection lifecycle."
