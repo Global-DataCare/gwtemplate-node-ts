@@ -37,6 +37,10 @@ claiming that a binding exists.
   and recreate a missing tenant collection without creating another Offer.
 - Keep later service-controller `_issue`, activation code, `Token/_exchange`
   and `Device/_dcr` as distinct steps.
+- When an accepted organization Order is replayed before `Token/_exchange`,
+  recover and return the representative seat's existing activation code. Do
+  not rotate the code, consume another seat or return a successful response
+  that omits the continuation material.
 
 ## Preserve employee-seat and device boundaries
 

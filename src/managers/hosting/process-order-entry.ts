@@ -112,13 +112,40 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
       decryptedContent?.status === EntityLifecycleStatus.Active
       && String(projectedClaims[ClaimsOfferSchemaorg.identifier] || '').trim() === offerId
     ) {
+      const replayClaims: ClaimsRecord = {
+        ...projectedClaims,
+        [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
+      };
+      const tenantId = String(projectedClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+      const sector = String(projectedClaims[ClaimsServiceSchemaorg.category] || '').trim() as Sector;
+      const representativeEmail = projectedClaims[ClaimsPersonSchemaorg.email] as string | undefined;
+      const representativeRole = getPersonOccupationClaim(projectedClaims);
+      if (tenantId && sector && representativeEmail && representativeRole) {
+        try {
+          const { activationCode } = await issueActivationCodeFromPool({
+            vaultRepository: deps.vaultRepository,
+            kmsService: deps.kmsService,
+            tenantVaultId: getTenantVaultId(sector, tenantId),
+            userClass: 'employee',
+            type: 'mobile',
+            email: representativeEmail,
+            role: representativeRole,
+          });
+          replayClaims['org.schema.IndividualProduct.serialNumber'] = activationCode;
+          replayClaims['org.schema.IndividualProduct.category'] = 'professional';
+        } catch (error: any) {
+          deps.logger.warn?.(
+            `[HostingManager] Accepted organization Order replay could not recover representative access: ${String(error?.message || error)}`,
+          );
+        }
+      }
       return {
         type: 'Organization-order-response-v1.0',
-        meta: { claims: {
-          ...projectedClaims,
-          [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
-        } },
-        resource: { resourceType: 'Organization', id: String(decryptedContent.id || '') },
+        resource: {
+          resourceType: 'Organization',
+          id: String(decryptedContent.id || ''),
+          meta: { claims: replayClaims },
+        },
         response: { status: '200' },
       };
     }
@@ -365,8 +392,10 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
 
   return {
     type: 'Organization-order-response-v1.0',
-    meta: { claims: paymentCommunication.claims },
-    resource: invoiceBundle as any,
+    resource: {
+      ...(invoiceBundle as any),
+      meta: { ...((invoiceBundle as any).meta || {}), claims: paymentCommunication.claims },
+    },
     response: { status: '201' },
   };
 }
@@ -514,8 +543,10 @@ export async function processActivatedTenantOrderEntry(
 
   return {
     type: 'Organization-order-response-v1.0',
-    meta: { claims: paymentCommunication.claims },
-    resource: invoiceBundle as any,
+    resource: {
+      ...(invoiceBundle as any),
+      meta: { ...((invoiceBundle as any).meta || {}), claims: paymentCommunication.claims },
+    },
     response: { status: '201' },
   };
 }

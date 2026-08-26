@@ -1,6 +1,6 @@
 /** Host Order replay remains recoverable across mandatory ledger failures. */
 import { describe, expect, it, jest } from '@jest/globals';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { processHostOrderEntry } from '../../../managers/hosting/process-order-entry';
 
 describe('processHostOrderEntry active offer idempotency', () => {
@@ -62,8 +62,9 @@ describe('processHostOrderEntry active offer idempotency', () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  it('does not issue licenses or require another payment when replaying an accepted organization offer', async () => {
+  it('returns the already issued automatic access when replaying an accepted organization offer', async () => {
     const offerId = 'urn:cds:ES:v1:health-care:product:org.schema:Offer:existing';
+    const put = jest.fn();
     const response = await processHostOrderEntry({
       entry: { meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } } } as any,
       vaultRepository: {
@@ -72,10 +73,26 @@ describe('processHostOrderEntry active offer idempotency', () => {
           content: { status: 'active', claims: {
             [ClaimsOfferSchemaorg.identifier]: offerId,
             [ClaimsOrganizationSchemaorg.alternateName]: 'example-tenant',
+            [ClaimsPersonSchemaorg.email]: 'representative@example.org',
+            [ClaimsPersonSchemaorg.hasOccupation]: 'ISCO-08|1120',
             [ClaimsServiceSchemaorg.category]: 'health-care',
           } },
         }]),
-        put: jest.fn(),
+        getContainersInSection: jest.fn(async () => [{
+          id: 'representative-seat',
+          status: 'issued',
+          sequence: 1,
+          content: {
+            status: 'issued',
+            userClass: 'employee',
+            type: 'mobile',
+            issuedToEmail: 'representative@example.org',
+            issuedToRole: 'ISCO-08|1120',
+            activationCode: 'lic-existing-automatic-access',
+            maxDevices: 5,
+          },
+        }]),
+        put,
       } as any,
       kmsService: { unprotectConfidentialData: jest.fn(async (doc: any) => doc.content) } as any,
       logger: { error: jest.fn() } as any,
@@ -93,6 +110,10 @@ describe('processHostOrderEntry active offer idempotency', () => {
     });
 
     expect(response.response?.status).toBe('200');
-    expect(response.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect((response.resource as any)?.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect((response.resource as any)?.meta?.claims?.['org.schema.IndividualProduct.serialNumber']).toBe('lic-existing-automatic-access');
+    // A retry returns the same one-time access material; it must not rotate the
+    // code, consume another seat or require another commercial transaction.
+    expect(put).not.toHaveBeenCalled();
   });
 });

@@ -113,7 +113,8 @@ describe('Host transaction Offer/Order route story', () => {
 
     const orderEntry = orderPoll.body.data[0];
     expect(orderEntry.response.status).toBe('201');
-    expect(orderEntry.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect(orderEntry.resource?.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect(orderEntry.meta?.claims).toBeUndefined();
     expect(JSON.stringify(orderEntry.resource)).toContain(
       transactionPayload.body.data[0].resource.organization.did,
     );
