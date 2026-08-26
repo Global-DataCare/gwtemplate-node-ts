@@ -10,9 +10,12 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
-import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
+import { HealthcareBasicSections, HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/index';
 import { testTenant1TenantId } from '../data/organization.data';
-import { getDigitalTwinSubjectAliasSectionId } from '../../utils/digital-twin-research-projection';
+import {
+  getDigitalTwinSubjectAliasSectionId,
+  getOrCreateDigitalTwinSubjectId,
+} from '../../utils/digital-twin-research-projection';
 import { buildOrganizationDidWeb, buildProfessionalDidWeb } from 'gdc-common-utils-ts/utils/did';
 import { EXAMPLE_HOST_PUBLIC_HOSTNAME, EXAMPLE_ROUTE_VERSION } from 'gdc-common-utils-ts/examples/shared';
 import { ExampleEmployeeEmails, ExampleEmployeeRoles } from 'gdc-common-utils-ts/examples/employee';
@@ -734,7 +737,7 @@ describe('Composition Bundle _search API (integration)', () => {
           [ClaimConsent.actorRole]: 'ISCO-08|221',
           [ClaimConsent.decision]: decision,
           [ClaimConsent.date]: '2026-08-26',
-          [ClaimConsent.purpose]: 'RESEARCH',
+          [ClaimConsent.purpose]: HealthcareConsentPurposes.Research,
           [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
           [ClaimConsent.attachmentContentType]: 'application/odrl+json',
           [ClaimConsent.attachmentData]: Buffer.from(JSON.stringify({ permission: 'research' })).toString('base64'),
@@ -773,8 +776,8 @@ describe('Composition Bundle _search API (integration)', () => {
       };
 
       await setResearchDecision('deny', 'deny');
-      expect(await vaultRepository.getContainersInSection(tenantVaultId, digitalTwinCompositionSection)).toHaveLength(0);
-      expect(await vaultRepository.getContainersInSection(tenantVaultId, digitalTwinMedicationsSection)).toHaveLength(0);
+      expect(await vaultRepository.getContainersInSection(tenantVaultId, digitalTwinCompositionSection)).toHaveLength(1);
+      expect((await vaultRepository.getContainersInSection(tenantVaultId, digitalTwinMedicationsSection)).length).toBeGreaterThan(0);
 
       await setResearchDecision('permit', 'permit');
       const rebuiltCompositions = await vaultRepository.getContainersInSection<any>(tenantVaultId, digitalTwinCompositionSection);
@@ -1120,6 +1123,47 @@ describe('Composition Bundle _search API (integration)', () => {
           || firstMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'],
         ).toBe(searchCase.expectedSubject);
       }
+
+      const purgeThid = 'ips-index-provider-offboarding-001';
+      const purgeSubmit = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/ResearchSubject/_purge`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: purgeThid,
+          body: {
+            resourceType: 'Parameters',
+            parameter: [{ name: 'subject', valueString: subjectDid }],
+          },
+        },
+      });
+      expect(purgeSubmit.status).toBe(202);
+      let purgePayload: any;
+      for (let i = 0; i < 50; i++) {
+        const poll = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/ResearchSubject/_purge-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: purgeThid },
+        });
+        if (poll.status === 200) {
+          purgePayload = JSON.parse(poll.text);
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      expect(purgePayload?.parameter).toEqual([{ name: 'purged', valueBoolean: true }]);
+      expect(await vaultRepository.getContainersInSection(tenantVaultId, digitalTwinCompositionSection)).toHaveLength(1);
+      const aliasesAfterPurge = await vaultRepository.getContainersInSection<any>(tenantVaultId, getDigitalTwinSubjectAliasSectionId());
+      expect(aliasesAfterPurge.some((alias: any) => alias.twinSubjectId === twinSubjectId)).toBe(false);
+
+      await setResearchDecision('permit', 'permit-after-provider-return');
+      const aliasesAfterReturn = await vaultRepository.getContainersInSection<any>(tenantVaultId, getDigitalTwinSubjectAliasSectionId());
+      const replacementTwinSubjectId = aliasesAfterReturn.find((alias: any) =>
+        alias.id === createHash('sha256').update(subjectDid).digest('hex'))?.twinSubjectId;
+      expect(replacementTwinSubjectId).toMatch(/^urn:uuid:/);
+      expect(replacementTwinSubjectId).not.toBe(twinSubjectId);
+      expect(await vaultRepository.getContainersInSection(tenantVaultId, digitalTwinCompositionSection)).toHaveLength(1);
     } finally {
       queueAdapter.stop();
     }
@@ -1170,7 +1214,11 @@ describe('Composition Bundle _search API (integration)', () => {
       await vaultRepository.put(hostCollectionName, [secureTenantRecord as any], getEnvSectionId('tenants'));
       await tenantManager.getTenant(tenantVaultId);
 
-      const subjectDid = 'urn:uuid:00000000-0000-4000-8000-000000000101';
+      const subjectDid = await getOrCreateDigitalTwinSubjectId({
+        vaultRepository,
+        tenantVaultId,
+        sourceSubject: 'did:web:api.acme.org:individual:research-selection-subject-001',
+      });
       const hostedOrganizationDid = buildOrganizationDidWeb({
         hostDidWeb: `did:web:${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
         tenantId: testTenant1TenantId,

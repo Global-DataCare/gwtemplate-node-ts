@@ -4767,8 +4767,8 @@
         "tags": [
           "9. Research Digital Twin"
         ],
-        "summary": "Ingest pre-converted research claims (digital twin)",
-        "description": "Submits an async research ingestion job for digital twin indexing.\nThis endpoint is intended for research sectors (e.g., `animal-research`, `health-research`).\n\nClaims container note:\n- `resource.meta.claims` is a project-specific non-standard claims container\n- it is not part of base FHIR\n- the resource remains FHIR-shaped, but business semantics are claims-first\n- claims may be contextualized with `@context` such as `org.hl7.fhir.api`\n  or authored in a less-qualified form when that context already disambiguates them\n\nExpected payload shape (adapter-ingestion-py output):\n- DIDComm plaintext message\n- `body.data[]` array\n- each item is a Composition resource object with:\n  - `resource.meta.claims` for Composition claims\n  - optional `resource.contained[].meta.claims` for source resources\n    (`DocumentReference`, and future `Encounter` / `Patient`)\n\nCurrent gateway behavior:\n- validates/stores Composition-level claims (`Composition.*`)\n- does not yet persist contained `Encounter`/`Patient` claims as independent resources.\n",
+        "summary": "Save a researcher-owned working selection",
+        "description": "Persists only `@type = Composition:ResearcherWorkingSelection` for an\nexisting tenant-registered `urn:uuid` twin subject. Canonical twins\nare projected by GW from subject data after secondary-use consent;\nthey cannot be submitted through this endpoint.\n\nClaims container note:\n- `resource.meta.claims` is a project-specific non-standard claims container\n- it is not part of base FHIR\n- the resource remains FHIR-shaped, but business semantics are claims-first\n- claims may be contextualized with `@context` such as `org.hl7.fhir.api`\n  or authored in a less-qualified form when that context already disambiguates them\n\nExpected payload shape:\n- DIDComm plaintext message\n- `body.data[]` array\n- each item is a Composition resource object with:\n  - `resource.meta.claims` for Composition claims\n  - optional `resource.contained[].meta.claims` for source resources\n    (`DocumentReference`, and future `Encounter` / `Patient`)\n\nCurrent gateway behavior rejects operational subject DIDs, invented\nUUID URNs absent from the private alias registry, and canonical twin\nCompositions.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -4950,8 +4950,8 @@
         "tags": [
           "9. Research Digital Twin"
         ],
-        "summary": "Ingest research digital twin payload in strict FHIR R4 mode",
-        "description": "Same research ingestion flow as `org.hl7.fhir.api`, but with version-aware validation.\nEach item must include `resource.resourceType = \"Composition\"`.\n",
+        "summary": "Save a researcher-owned working selection in strict FHIR R4 mode",
+        "description": "Same working-selection flow as `org.hl7.fhir.api`, but with version-aware validation.\nEach item must include `resource.resourceType = \"Composition\"`.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

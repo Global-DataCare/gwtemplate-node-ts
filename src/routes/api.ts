@@ -1790,14 +1790,54 @@ export function createApiRouter(
    *       '404': { description: thid not found. }
    *       '500': { description: Job failed or response decode failed. }
    *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/ResearchSubject/_purge:
+   *   post:
+   *     tags:
+   *       - 9. Research Digital Twin
+   *     summary: Offboard a subject from the current digital-twin index provider
+   *     description: |
+   *       Deletes only the tenant-private correspondence between the operational
+   *       subject DID and its registered twin UUID. The anonymous twin is not
+   *       deleted. This operation is for account deletion or index-provider
+   *       migration, never for an ordinary secondary-use consent toggle.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [thid, body]
+   *             properties:
+   *               thid: { type: string }
+   *               body:
+   *                 type: object
+   *                 required: [resourceType, parameter]
+   *                 properties:
+   *                   resourceType: { type: string, enum: [Parameters] }
+   *                   parameter:
+   *                     type: array
+   *                     items: { type: object }
+   *     security:
+   *       - BearerAuth: []
+   *     responses:
+   *       '202': { description: Accepted. Poll the matching `_purge-response` path. }
+   *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch:
    *   post:
    *     tags:
    *       - 9. Research Digital Twin
-  *     summary: Ingest pre-converted research claims (digital twin)
+  *     summary: Save a researcher-owned working selection
   *     description: |
-  *       Submits an async research ingestion job for digital twin indexing.
-  *       This endpoint is intended for research sectors (e.g., `animal-research`, `health-research`).
+  *       Persists only `@type = Composition:ResearcherWorkingSelection` for an
+  *       existing tenant-registered `urn:uuid` twin subject. Canonical twins
+  *       are projected by GW from subject data after secondary-use consent;
+  *       they cannot be submitted through this endpoint.
   *
   *       Claims container note:
   *       - `resource.meta.claims` is a project-specific non-standard claims container
@@ -1806,7 +1846,7 @@ export function createApiRouter(
   *       - claims may be contextualized with `@context` such as `org.hl7.fhir.api`
   *         or authored in a less-qualified form when that context already disambiguates them
   *
-  *       Expected payload shape (adapter-ingestion-py output):
+  *       Expected payload shape:
   *       - DIDComm plaintext message
   *       - `body.data[]` array
   *       - each item is a Composition resource object with:
@@ -1814,9 +1854,9 @@ export function createApiRouter(
    *         - optional `resource.contained[].meta.claims` for source resources
    *           (`DocumentReference`, and future `Encounter` / `Patient`)
    *
-   *       Current gateway behavior:
-   *       - validates/stores Composition-level claims (`Composition.*`)
-   *       - does not yet persist contained `Encounter`/`Patient` claims as independent resources.
+  *       Current gateway behavior rejects operational subject DIDs, invented
+  *       UUID URNs absent from the private alias registry, and canonical twin
+  *       Compositions.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1843,9 +1883,9 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 9. Research Digital Twin
-   *     summary: Ingest research digital twin payload in strict FHIR R4 mode
+   *     summary: Save a researcher-owned working selection in strict FHIR R4 mode
    *     description: |
-   *       Same research ingestion flow as `org.hl7.fhir.api`, but with version-aware validation.
+   *       Same working-selection flow as `org.hl7.fhir.api`, but with version-aware validation.
    *       Each item must include `resource.resourceType = "Composition"`.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
