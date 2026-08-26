@@ -20,6 +20,9 @@
 - Restrict direct digital-twin `Composition/_batch` to researcher working
   selections whose subject is a tenant-registered UUID URN. Canonical writes,
   operational DIDs, and invented UUIDs are rejected.
+- Document the portal/index-provider consent as an idempotent rule selected by
+  its stable `Consent.identifier`, so future study-specific research consents
+  cannot be mistaken for the portal toggle.
 
 ## [1.22.0] - 2026-08-26
 

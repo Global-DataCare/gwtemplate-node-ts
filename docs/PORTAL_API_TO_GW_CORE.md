@@ -185,6 +185,13 @@ After `deny` then `permit`, GW reuses the same registered UUID and rebuilds it
 from current operational data. After provider purge and later enrollment, GW
 allocates a new UUID; the detached anonymous twin remains frozen.
 
+The index-provider agreement has one stable `Consent.identifier`, created at
+service enrollment and reused for GET/PUT. This makes the toggle an idempotent
+upsert. Future research studies must use different consent identifiers even if
+they share `HRESCH`, `organization/ResearchSubject.rs`, and the same research
+organization; the BFF reads the exact portal identifier and never treats a
+study consent as the portal consent.
+
 ## Related Persons
 
 This block models subject contacts and relationships, not invited access
