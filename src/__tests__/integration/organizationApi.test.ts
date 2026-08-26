@@ -593,6 +593,26 @@ describe('Organization Registration API', () => {
       });
     });
 
+    it('should route signed organization lifecycle preflight through the host registry queue', async () => {
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: '/host/cds-es/v1/test/registry/org.schema/Organization/_status',
+        headers: {
+          'Content-Type': 'application/json',
+          'App-ID': 'test-app',
+          'App-Version': '1.0.0',
+        },
+        body: {
+          thid: 'lifecycle-status-thid',
+          body: { data: [{ type: 'Organization-lifecycle-status-request-v1.0', meta: { claims: {
+            [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
+          } } }] },
+        },
+      });
+      expect(response.status).toBe(202);
+      expect((mockQueueAdapter.addJob as jest.Mock).mock.calls[0][1].action).toBe('_status');
+    });
+
     it('should block tenant onboarding flows while disabled and allow them again after enable', async () => {
       const tenant = await activateTenantDirectly();
 

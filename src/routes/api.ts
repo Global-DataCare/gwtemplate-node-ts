@@ -24,7 +24,14 @@ import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 import { getEnvSectionId } from '../utils/section-env';
 import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/replay-protection-store';
 import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
-import { ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE } from '../constants/domain';
+import {
+  ACTION_DISABLE,
+  ACTION_DISABLE_DESCENDANTS,
+  ACTION_ENABLE,
+  ACTION_PURGE,
+  ACTION_PURGE_DESCENDANTS,
+  ACTION_STATUS,
+} from '../constants/domain';
 import { getTenantAuthorizationStatus as readTenantAuthorizationStatusFromConfig } from '../utils/tenant-lifecycle';
 import { enforceSmartScopeRouteCompatibility } from '../utils/smart-scope-route-authorization';
 import { IdentityAuthActions } from 'gdc-common-utils-ts/constants/identity-auth';
@@ -187,7 +194,14 @@ function isHostTenantLifecycleRoute(
     && section === 'registry'
     && String(format || '').toLowerCase() === 'org.schema'
     && String(resourceType || '').toLowerCase() === 'organization'
-    && (action === ACTION_DISABLE || action === ACTION_ENABLE || action === ACTION_PURGE);
+    && (
+      action === ACTION_DISABLE
+      || action === ACTION_ENABLE
+      || action === ACTION_PURGE
+      || action === ACTION_STATUS
+      || action === ACTION_DISABLE_DESCENDANTS
+      || action === ACTION_PURGE_DESCENDANTS
+    );
 }
 
 /**
@@ -3582,7 +3596,14 @@ export function createApiRouter(
       resourceType,
       action,
     );
-    if (!usesHostCommercialOrderContract && !isRequestValid(tenantServices, { ...req.params, action })) {
+    const usesHostTenantLifecycleContract = isHostTenantLifecycleRoute(
+      String(tenantId || ''),
+      String(section || ''),
+      format,
+      String(resourceType || ''),
+      normalizedAction,
+    );
+    if (!usesHostCommercialOrderContract && !usesHostTenantLifecycleContract && !isRequestValid(tenantServices, { ...req.params, action })) {
       console.error(`[API] Path/Role validation failed for ${req.originalUrl}. Tenant services found: ${!!tenantServices}.`);
       return sendDidcommEarlyError(
         req,

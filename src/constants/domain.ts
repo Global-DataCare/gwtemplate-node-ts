@@ -6,6 +6,9 @@ export const SUBJECT_SECTION_DIGITAL_TWIN = 'digitaltwin';
 export const ACTION_DISABLE = '_disable';
 export const ACTION_ENABLE = '_enable';
 export const ACTION_PURGE = '_purge';
+export const ACTION_STATUS = '_status';
+export const ACTION_DISABLE_DESCENDANTS = '_disable-descendants';
+export const ACTION_PURGE_DESCENDANTS = '_purge-descendants';
 
 export const LICENSE_USER_CLASS_EMPLOYEE = 'employee';
 export const LICENSE_USER_CLASS_INDIVIDUAL = 'individual';
