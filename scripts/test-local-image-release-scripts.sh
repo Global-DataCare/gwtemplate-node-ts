@@ -84,6 +84,10 @@ if grep -Fq '../../gdc-common-utils-ts/src/' ./scripts/render-demo-smart-access-
   echo 'ERROR: release payload rendering must not import sibling workspace source.' >&2
   exit 1
 fi
+if grep -Fq '../../gdc-common-utils-ts/src/' ./scripts/render-demo-consentaccess-payload.mts; then
+  echo 'ERROR: Consent release payload rendering must use the installed common-utils contract.' >&2
+  exit 1
+fi
 
 if grep -Fq '"$WORKSPACE_ROOT"' ./docker_build_local.sh; then
   echo 'ERROR: the local Docker build must not send the workspace root.' >&2

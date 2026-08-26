@@ -52,6 +52,7 @@ export const DEMO_SMART_ACCESS_LOCAL_IDS = Object.freeze({
   researchContractIdentifier: 'urn:uuid:local-network-inter-tenant-contract-001',
   researchRoleConsentIdentifier: 'urn:uuid:local-network-research-role-consent-001',
   researchDirectEmailConsentIdentifier: 'urn:uuid:local-network-research-email-consent-001',
+  researchUseReference: 'https://portal.example.org/research/local-network-study-001',
 } as const);
 
 export const DEMO_SMART_ACCESS_LOCAL_EMAILS = Object.freeze({
@@ -306,6 +307,7 @@ export function buildDemoResearchPermitByRoleConsent(input: Readonly<{
     [ClaimConsent.decision]: ConsentDecisions.Permit,
     [ClaimConsent.purpose]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
     [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
+    [ClaimConsent.sourceReference]: DEMO_SMART_ACCESS_LOCAL_IDS.researchUseReference,
     [ClaimConsent.date]: '2026-06-30',
     [ClaimConsent.attachmentContentType]: EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
     [ClaimConsent.attachmentData]: EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
@@ -328,6 +330,7 @@ export function buildDemoResearchPermitByEmailConsent(input: Readonly<{
     [ClaimConsent.decision]: ConsentDecisions.Permit,
     [ClaimConsent.purpose]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
     [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
+    [ClaimConsent.sourceReference]: DEMO_SMART_ACCESS_LOCAL_IDS.researchUseReference,
     [ClaimConsent.date]: '2026-06-30',
     [ClaimConsent.attachmentContentType]: EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
     [ClaimConsent.attachmentData]: EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
