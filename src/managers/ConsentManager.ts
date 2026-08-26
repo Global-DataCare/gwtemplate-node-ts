@@ -21,7 +21,7 @@ import { IJobProcessor } from './registry';
 import { determineResourceId } from '../utils/resource';
 import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
-import { persistConsentRuleAndAttachment, requiredConsentClaims } from '../utils/consent-storage';
+import { persistConsentRuleAndAttachment, requiredConsentClaimsFor } from '../utils/consent-storage';
 import {
   buildConsentRulePrimaryDocument,
   deriveConsentRuleBlockchainStatus as deriveConsentAccessBlockchainStatus,
@@ -104,7 +104,7 @@ export class ConsentManager implements IJobProcessor {
               resourceId: fallbackId,
             });
 
-            for (const claimKey of requiredConsentClaims) {
+            for (const claimKey of requiredConsentClaimsFor(claims)) {
                 if (!getClaimValue(claims, claimKey)) {
                     throw new Error(`Missing required claim: ${claimKey}`);
                 }

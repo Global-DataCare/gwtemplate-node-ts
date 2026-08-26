@@ -733,14 +733,12 @@ describe('Composition Bundle _search API (integration)', () => {
           '@context': 'org.hl7.fhir.r4',
           [ClaimConsent.identifier]: 'urn:uuid:ips-secondary-use-consent-001',
           [ClaimConsent.subject]: subjectDid,
-          [ClaimConsent.actorIdentifier]: 'did:web:research.example.org',
-          [ClaimConsent.actorRole]: 'ISCO-08|221',
+          [ClaimConsent.actorIdentifier]: 'did:web:index-provider.example.org',
+          [ClaimConsent.actorRole]: '*',
           [ClaimConsent.decision]: decision,
           [ClaimConsent.date]: '2026-08-26',
           [ClaimConsent.purpose]: HealthcareConsentPurposes.Research,
           [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
-          [ClaimConsent.attachmentContentType]: 'application/odrl+json',
-          [ClaimConsent.attachmentData]: Buffer.from(JSON.stringify({ permission: 'research' })).toString('base64'),
         };
         const submit = await invokeExpress(app, {
           method: 'POST',

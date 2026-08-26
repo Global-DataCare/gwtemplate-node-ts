@@ -21,6 +21,27 @@ export const requiredConsentClaims = [
   ClaimConsent.attachmentData,
 ];
 
+const requiredConsentRuleClaims = requiredConsentClaims.filter((claim) => (
+  claim !== ClaimConsent.attachmentContentType && claim !== ClaimConsent.attachmentData
+));
+
+export function isDigitalTwinSecondaryUseConsent(claims: Record<string, any>): boolean {
+  const purpose = String(getClaimValue(claims, ClaimConsent.purpose) || '').trim().toUpperCase();
+  const actions = String(getClaimValue(claims, ClaimConsent.action) || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return (
+    purpose === HealthcareConsentPurposes.Research || purpose === 'RESEARCH'
+  ) && actions.some((action) => (
+    action === ServiceCapability.DigitalTwinReader || action === ServiceCapability.DigitalTwinProvider
+  ));
+}
+
+export function requiredConsentClaimsFor(claims: Record<string, any>): readonly ClaimConsent[] {
+  return isDigitalTwinSecondaryUseConsent(claims) ? requiredConsentRuleClaims : requiredConsentClaims;
+}
+
 export type PersistConsentRuleInput = {
   vaultRepository: IVaultRepository;
   tenantVaultId: string;
@@ -31,7 +52,7 @@ export type PersistConsentRuleInput = {
 
 export async function persistConsentRuleAndAttachment(
   input: PersistConsentRuleInput,
-): Promise<{ subjectId: string; attachmentHash: string; ruleId: string }> {
+): Promise<{ subjectId: string; attachmentHash?: string; ruleId: string }> {
   const { vaultRepository, tenantVaultId, sector, claims, researchTags } = input;
 
   const actorIdentifier =
@@ -50,7 +71,7 @@ export async function persistConsentRuleAndAttachment(
     }
   }
 
-  for (const claimKey of requiredConsentClaims) {
+  for (const claimKey of requiredConsentClaimsFor(claims)) {
     if (!getClaimValue(claims, claimKey)) {
       throw new Error(`Missing required claim: ${claimKey}`);
     }
@@ -63,21 +84,25 @@ export async function persistConsentRuleAndAttachment(
   if (!subjectId) throw new Error(`Missing required claim: ${ClaimConsent.subject}`);
 
   const attachmentDataBase64 = getClaimValue<string>(claims, ClaimConsent.attachmentData);
-  if (!attachmentDataBase64) throw new Error('Attachment data is missing.');
-  const decodedData = Buffer.from(attachmentDataBase64, 'base64');
-  const attachmentHash = createHash('sha3-384').update(decodedData).digest('hex');
-
-  const attachmentRecord: RecordBase & { data: string; contentType: string } = {
-    id: attachmentHash,
-    data: attachmentDataBase64,
-    contentType: getClaimValue<string>(claims, ClaimConsent.attachmentContentType) as string,
-  };
-
-  await vaultRepository.put(
-    tenantVaultId,
-    [attachmentRecord],
-    getIndividualSectionId(subjectId, 'attachments'),
-  );
+  const attachmentContentType = getClaimValue<string>(claims, ClaimConsent.attachmentContentType);
+  let attachmentHash: string | undefined;
+  if (attachmentDataBase64 || attachmentContentType) {
+    if (!attachmentDataBase64 || !attachmentContentType) {
+      throw new Error('Consent attachment content type and data must be provided together.');
+    }
+    const decodedData = Buffer.from(attachmentDataBase64, 'base64');
+    attachmentHash = createHash('sha3-384').update(decodedData).digest('hex');
+    const attachmentRecord: RecordBase & { data: string; contentType: string } = {
+      id: attachmentHash,
+      data: attachmentDataBase64,
+      contentType: attachmentContentType,
+    };
+    await vaultRepository.put(
+      tenantVaultId,
+      [attachmentRecord],
+      getIndividualSectionId(subjectId, 'attachments'),
+    );
+  }
 
   const baseRuleKey = buildConsentRuleStorageKey({
     subjectId,
@@ -87,16 +112,7 @@ export async function persistConsentRuleAndAttachment(
     purpose: getClaimValue<string>(claims, ClaimConsent.purpose) as string,
   });
   const consentIdentifier = String(getClaimValue(claims, ClaimConsent.identifier) || '').trim();
-  const purpose = String(getClaimValue(claims, ClaimConsent.purpose) || '').trim().toUpperCase();
-  const actions = String(getClaimValue(claims, ClaimConsent.action) || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const isDigitalTwinResearchConsent = (
-    purpose === HealthcareConsentPurposes.Research || purpose === 'RESEARCH'
-  ) && actions.some((action) => (
-    action === ServiceCapability.DigitalTwinReader || action === ServiceCapability.DigitalTwinProvider
-  ));
+  const isDigitalTwinResearchConsent = isDigitalTwinSecondaryUseConsent(claims);
   const ruleKey = isDigitalTwinResearchConsent
     ? `${baseRuleKey}|${consentIdentifier}`
     : baseRuleKey;
@@ -108,11 +124,11 @@ export async function persistConsentRuleAndAttachment(
     const prefix = context.endsWith('.') ? context : `${context}.`;
     delete ruleToStore[`${prefix}${ClaimConsent.attachmentData}`];
     delete ruleToStore[`${prefix}Consent.actor-reference`];
-    ruleToStore[`${prefix}${ClaimConsent.attachmentId}`] = attachmentHash;
+    if (attachmentHash) ruleToStore[`${prefix}${ClaimConsent.attachmentId}`] = attachmentHash;
   }
   delete ruleToStore[ClaimConsent.attachmentData];
   delete ruleToStore['Consent.actor-reference'];
-  ruleToStore[ClaimConsent.attachmentId] = attachmentHash;
+  if (attachmentHash) ruleToStore[ClaimConsent.attachmentId] = attachmentHash;
 
   const consentRule: ConsentRule & RecordBase = {
     ...(ruleToStore as any),

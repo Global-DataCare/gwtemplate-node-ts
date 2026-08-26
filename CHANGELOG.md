@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Accept the provider-level digital-twin secondary-use decision as a FHIR
+  `Consent.meta.claims` rule without the legacy ODRL attachment. Other consent
+  flows retain their attachment evidence requirement.
+
 - Keep Google Cloud client authentication on the direct
   `google-auth-library` dependency across transitive Storage and Firestore
   clients. This preserves GKE Workload Identity metadata handling when the
