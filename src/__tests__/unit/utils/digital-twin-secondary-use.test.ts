@@ -1,6 +1,6 @@
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
-import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants';
+import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import {
   applyDigitalTwinSecondaryUseDecision,
