@@ -204,6 +204,30 @@ This means:
 
 That sequence is intentional and conservative.
 
+### Authoritative preflight and explicit cleanup
+
+Controllers must not infer descendant state from portal counters. The host
+registry exposes these controller-authorized operations:
+
+- `Organization/_status`: returns tenant state plus active and unpurged counts
+  for employees and individuals.
+- `Organization/_disable-descendants` and
+  `Organization/_purge-descendants`: explicitly clean up `individuals` and
+  their referenced confidential blobs when selected through
+  `resource.lifecycle.descendantKind`.
+- Employees are disabled or purged one by one through the dedicated Employee
+  lifecycle. That path decrypts the protected record, releases the assigned
+  license during purge and writes employee-specific audit metadata. The
+  generic descendant endpoint rejects `employees` with `501`.
+
+`Organization/_disable` and `Organization/_purge` never cascade. They return
+`409 Conflict` with authoritative blocking counts until the explicit cleanup
+operations have completed. Retained communications are outside the descendant
+cleanup selection and remain governed by the retention policy above.
+
+Lifecycle authorization compares both the legal identifier type and its full
+value. Punctuation such as hyphens is significant and must never be truncated.
+
 ## 3. Host Lifecycle
 
 Scope:

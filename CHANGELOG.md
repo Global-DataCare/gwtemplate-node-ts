@@ -11,6 +11,14 @@
   clients. This preserves GKE Workload Identity metadata handling when the
   security-pinned `gaxios` override is active.
 
+- Replace implicit tenant lifecycle cascades with controller-authorized
+  preflight counts, dedicated Employee cleanup and explicit individual cleanup. Tenant
+  disable and purge now fail with `409` while descendants remain, preserve
+  retained communications, and bind controller proof using the complete typed
+  legal identifier without truncating punctuation. Generic descendant cleanup
+  rejects employees so it cannot bypass encrypted employee handling, license
+  release or lifecycle audit metadata.
+
 - Preserve one digital-twin `Composition` per source IPS document/version with
   all indexed IPS section tokens in the same `Composition.section` claim.
   Section-first search now treats that claim as multi-valued instead of

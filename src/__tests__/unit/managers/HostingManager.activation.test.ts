@@ -10,7 +10,7 @@ import { ILogger } from '../../../loggers/ILogger';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
-import { LICENSE_STATUS_AVAILABLE, LICENSE_STATUS_ISSUED } from '../../../constants/domain';
+import { LICENSE_STATUS_AVAILABLE, LICENSE_STATUS_ISSUED, SUBJECT_SECTION_INDIVIDUAL } from '../../../constants/domain';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import {
   ClaimsOfferSchemaorg,
@@ -280,7 +280,7 @@ describe('HostingManager activation flow', () => {
     };
   }
 
-  function buildLifecycleJob(action: '_disable' | '_enable' | '_purge'): JobRequest {
+  function buildLifecycleJob(action: '_disable' | '_enable' | '_purge' | '_status' | '_disable-descendants' | '_purge-descendants', descendantKind: 'employees' | 'individuals' = 'individuals'): JobRequest {
     return {
       id: `${action}-job-id`,
       status: JobStatus.DRAFT,
@@ -306,14 +306,18 @@ describe('HostingManager activation flow', () => {
                 ? LifecycleRequestType.TenantDisable
                 : action === '_enable'
                   ? LifecycleRequestType.TenantEnable
-                  : LifecycleRequestType.TenantPurge,
+                  : action === '_purge'
+                    ? LifecycleRequestType.TenantPurge
+                    : 'Organization-lifecycle-status-request-v1.0',
               meta: {
                 claims: {
                   [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
                 },
               },
               request: { method: 'POST' },
-              resource: {},
+              resource: action.endsWith('-descendants')
+                ? { lifecycle: { descendantKind } }
+                : {},
             },
           ],
         },
@@ -420,6 +424,23 @@ describe('HostingManager activation flow', () => {
         },
       } as ConfidentialStorageDoc],
       getEnvSectionId('employees'),
+    );
+  }
+
+  async function putIndividualLifecycleDoc(
+    tenantCollectionName: string,
+    individualId: string,
+    status: EntityLifecycleStatus,
+  ): Promise<void> {
+    await vaultRepository.put(
+      tenantCollectionName,
+      [{
+        id: individualId,
+        status,
+        sequence: 0,
+        content: { id: individualId, status, resourceType: 'Individual' },
+      } as ConfidentialStorageDoc],
+      getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
     );
   }
 
@@ -531,8 +552,9 @@ describe('HostingManager activation flow', () => {
     const orderResponse = await hostingManager.process(orderJob);
 
     expect(orderResponse.body.data[0].response.status).toBe('200');
+    // Response claims are canonical only inside data[].resource.meta.claims.
     expect(
-      orderResponse.body.data[0].meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier],
+      (orderResponse.body.data[0].resource as any)?.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier],
     ).toBe(offerId);
   });
 
@@ -1278,7 +1300,7 @@ describe('HostingManager activation flow', () => {
     expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('only be enabled from disabled');
   });
 
-  it('should disable active employee descendants with the tenant', async () => {
+  it('should reject tenant disable while employees remain and require the Employee lifecycle for cleanup', async () => {
     const activationJob = buildActivationJob();
     await hostingManager.process(activationJob);
 
@@ -1293,11 +1315,16 @@ describe('HostingManager activation flow', () => {
       EntityLifecycleStatus.Active,
     );
 
-    const response = await hostingManager.process(buildLifecycleJob('_disable'));
-    expect(response.body.data[0].response.status).toBe('200');
+    const blocked = await hostingManager.process(buildLifecycleJob('_disable'));
+    expect(blocked.body.data[0].response.status).toBe('409');
+    expect(blocked.body.data[0].response.outcome.issue[0].diagnostics).toContain('1 employee(s)');
+
+    const cleanup = await hostingManager.process(buildLifecycleJob('_disable-descendants', 'employees'));
+    expect(cleanup.body.data[0].response.status).toBe('501');
+    expect(cleanup.body.data[0].response.outcome.issue[0].diagnostics).toContain('Employee lifecycle');
   });
 
-  it('should purge disabled descendants with the tenant', async () => {
+  it('should expose authoritative counts and reject tenant purge until descendants are explicitly purged', async () => {
     const activationJob = buildActivationJob();
     await hostingManager.process(activationJob);
 
@@ -1306,17 +1333,48 @@ describe('HostingManager activation flow', () => {
       claims[ClaimsServiceSchemaorg.category] as Sector,
       claims[ClaimsOrganizationSchemaorg.alternateName],
     );
-    const disableResponse = await hostingManager.process(buildLifecycleJob('_disable'));
-    expect(disableResponse.body.data[0].response.status).toBe('200');
-
-    await putEmployeeLifecycleDoc(
+    await putIndividualLifecycleDoc(
       tenantVaultId,
-      'inactive-employee-1',
+      'inactive-individual-1',
       EntityLifecycleStatus.Inactive,
     );
 
+    const status = await hostingManager.process(buildLifecycleJob('_status'));
+    expect(status.body.data[0].resource.lifecycle.descendants).toMatchObject({
+      activeEmployees: 0,
+      unpurgedIndividuals: 1,
+    });
+
+    const disableResponse = await hostingManager.process(buildLifecycleJob('_disable'));
+    expect(disableResponse.body.data[0].response.status).toBe('200');
+    const blocked = await hostingManager.process(buildLifecycleJob('_purge'));
+    expect(blocked.body.data[0].response.status).toBe('409');
+
+    const cleanup = await hostingManager.process(buildLifecycleJob('_purge-descendants', 'individuals'));
+    expect(cleanup.body.data[0].resource.lifecycle.descendants.unpurgedIndividuals).toBe(0);
+
     const response = await hostingManager.process(buildLifecycleJob('_purge'));
     expect(response.body.data[0].response.status).toBe('200');
+  });
+
+  it('should keep retained communications outside descendant counts and cleanup', async () => {
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+    const claims = activationJob.content!.body!.data[0]!.meta!.claims;
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      claims[ClaimsServiceSchemaorg.category] as Sector,
+      claims[ClaimsOrganizationSchemaorg.alternateName],
+    );
+    const sectionId = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_subject`);
+    await vaultRepository.put(tenantVaultId, [{
+      id: 'retained-communication', status: EntityLifecycleStatus.Active, sequence: 0,
+      type: 'Communication', content: { resourceType: 'Communication' },
+    } as ConfidentialStorageDoc], sectionId);
+
+    const status = await hostingManager.process(buildLifecycleJob('_status'));
+    expect(status.body.data[0].resource.lifecycle.descendants.activeIndividuals).toBe(0);
+    await hostingManager.process(buildLifecycleJob('_disable-descendants', 'individuals'));
+    expect(await vaultRepository.get(tenantVaultId, 'retained-communication', sectionId)).toBeDefined();
   });
 
   it('should reject tenant disable when controller proof bearer memberOf.taxID does not match the target tenant', async () => {
@@ -1338,7 +1396,7 @@ describe('HostingManager activation flow', () => {
     const response = await hostingManager.process(disableJob);
     const errorEntry = response.body.data[0];
     expect(errorEntry.response.status).toBe('403');
-    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('memberOf.taxID');
+    expect(errorEntry.response.outcome.issue[0].diagnostics).toContain('identifier type and complete value');
   });
 
   it('should reject host disable while hosted tenant registrations remain', async () => {

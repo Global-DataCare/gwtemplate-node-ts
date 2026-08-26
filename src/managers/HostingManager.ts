@@ -181,8 +181,11 @@ import {
 } from '../utils/tenant-lifecycle';
 import {
   ACTION_DISABLE,
+  ACTION_DISABLE_DESCENDANTS,
   ACTION_ENABLE,
   ACTION_PURGE,
+  ACTION_PURGE_DESCENDANTS,
+  ACTION_STATUS,
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
@@ -806,7 +809,14 @@ export class HostingManager {
           if (job.action === '_activate') {
             return await this.processOrganizationActivation(job, environment);
           }
-          if (job.action === ACTION_DISABLE || job.action === ACTION_ENABLE || job.action === ACTION_PURGE) {
+          if (
+            job.action === ACTION_DISABLE
+            || job.action === ACTION_ENABLE
+            || job.action === ACTION_PURGE
+            || job.action === ACTION_STATUS
+            || job.action === ACTION_DISABLE_DESCENDANTS
+            || job.action === ACTION_PURGE_DESCENDANTS
+          ) {
             return await this.processOrganizationLifecycle(job);
           }
           return await this.processOrganizationRegistration(job, environment, isBootstrap);

@@ -5,8 +5,8 @@ import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schem
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import {
-  extractRepresentativeMemberOfTaxId,
-  normalizeTaxIdentifier,
+  extractRepresentativeMemberOfLegalIdentifier,
+  legalOrganizationIdentifiersMatch,
 } from 'gdc-common-utils-ts/utils/activation-policy';
 import { OrganizationConfig } from '../../gdc-backend-utils-node/models/entity';
 import { EntityLifecycleStatus } from '../../gdc-backend-utils-node/models/enums';
@@ -27,12 +27,22 @@ import {
 } from '../../utils/tenant-lifecycle';
 import {
   ACTION_DISABLE,
+  ACTION_DISABLE_DESCENDANTS,
   ACTION_ENABLE,
   ACTION_PURGE,
+  ACTION_PURGE_DESCENDANTS,
+  ACTION_STATUS,
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../../constants/domain';
 
-type TenantLifecycleAction = typeof ACTION_DISABLE | typeof ACTION_ENABLE | typeof ACTION_PURGE;
+type TenantLifecycleAction =
+  | typeof ACTION_DISABLE
+  | typeof ACTION_ENABLE
+  | typeof ACTION_PURGE
+  | typeof ACTION_STATUS
+  | typeof ACTION_DISABLE_DESCENDANTS
+  | typeof ACTION_PURGE_DESCENDANTS;
+type TenantDescendantKind = 'individuals';
 type TenantDescendantLifecycleSummary = {
   activeEmployees: number;
   activeIndividuals: number;
@@ -146,11 +156,27 @@ export class HostingLifecycleService {
     }
     const currentStatus = getTenantAuthorizationStatus(tenantConfig);
     const isHostLifecycle = vaultId === 'host';
-    if (!isHostLifecycle && (action === ACTION_DISABLE || action === ACTION_PURGE)) {
+    if (!isHostLifecycle) {
       this.assertControllerProofBearerTenantBinding(
         authorization.bearerPayload,
-        identifierValue,
+        tenantConfig,
       );
+    }
+    const descendants = isHostLifecycle
+      ? undefined
+      : await this.inspectTenantDescendants(vaultId);
+    if (action === ACTION_STATUS) {
+      return this.buildLifecycleStatusResponse(entry, tenantConfig, identifierValue, currentStatus, descendants!);
+    }
+    if (action === ACTION_DISABLE_DESCENDANTS || action === ACTION_PURGE_DESCENDANTS) {
+      const descendantKind = this.readDescendantKind(entry);
+      await this.changeTenantDescendants(
+        vaultId,
+        descendantKind,
+        action === ACTION_PURGE_DESCENDANTS ? 'purge' : 'disable',
+      );
+      const updatedSummary = await this.inspectTenantDescendants(vaultId);
+      return this.buildLifecycleStatusResponse(entry, tenantConfig, identifierValue, currentStatus, updatedSummary);
     }
     if (action === ACTION_PURGE) {
       if (isHostLifecycle) {
@@ -180,7 +206,7 @@ export class HostingLifecycleService {
         };
       }
       await this.assertTenantPurgeAllowed(currentStatus);
-      await this.purgeTenantDescendants(vaultId);
+      this.assertNoUnpurgedTenantDescendants(descendants!);
       const tenantRegistryDeleted = await this.vaultRepository.delete(hostCollectionName, vaultId, getEnvSectionId('tenants'));
       if (!tenantRegistryDeleted) {
         throw new ManagerError(`Tenant registry purge failed for '${vaultId}'.`, IssueType.Exception);
@@ -209,8 +235,8 @@ export class HostingLifecycleService {
     const nextStatus = this.getNextTenantLifecycleStatus(action, currentStatus);
     if (isHostLifecycle) {
       await this.assertHostLifecycleAllowed(action, hostCollectionName);
-    } else {
-      if (action === ACTION_DISABLE) await this.disableTenantDescendants(vaultId);
+    } else if (action === ACTION_DISABLE) {
+      this.assertNoActiveTenantDescendants(descendants!);
     }
     const updatedConfig = applyTenantAuthorizationStatus(tenantConfig, nextStatus, authorization.actorDid);
     const existing = isHostLifecycle
@@ -268,7 +294,7 @@ export class HostingLifecycleService {
 
   private assertControllerProofBearerTenantBinding(
     bearerPayload: Record<string, unknown> | undefined,
-    identifierValue: string,
+    tenantConfig: OrganizationConfig,
   ): void {
     if (!bearerPayload || !bearerPayload.vp || typeof bearerPayload.vp !== 'object') {
       return;
@@ -278,23 +304,25 @@ export class HostingLifecycleService {
       ? (bearerPayload.vp as any).verifiableCredential
       : [];
     const representativeCredential = verifiableCredentials.find((credential: any) => {
-      const memberOfTaxId = extractRepresentativeMemberOfTaxId(credential);
-      return !!String(memberOfTaxId || '').trim();
+      return Boolean(extractRepresentativeMemberOfLegalIdentifier(credential));
     });
     if (!representativeCredential) {
       throw new ManagerError(
-        'Controller proof bearer must include one legal representative credential with memberOf.taxID for tenant lifecycle.',
+        'Controller proof bearer must include one legal representative credential with a typed memberOf identifier for tenant lifecycle.',
         IssueType.Forbidden,
       );
     }
 
-    const representativeTaxId = normalizeTaxIdentifier(
-      String(extractRepresentativeMemberOfTaxId(representativeCredential) || '').trim(),
-    );
-    const targetIdentifier = normalizeTaxIdentifier(String(identifierValue || '').trim());
-    if (!representativeTaxId || representativeTaxId !== targetIdentifier) {
+    const targetIdentifier = {
+      type: tenantConfig.claims?.[ClaimsOrganizationSchemaorg.identifierType],
+      value: tenantConfig.claims?.[ClaimsOrganizationSchemaorg.identifierValue],
+    };
+    if (!legalOrganizationIdentifiersMatch(
+      extractRepresentativeMemberOfLegalIdentifier(representativeCredential),
+      targetIdentifier,
+    )) {
       throw new ManagerError(
-        'Controller proof bearer representative memberOf.taxID must match the Organization.identifier.value being changed.',
+        'Controller proof bearer representative memberOf identifier type and complete value must match the tenant legal identifier.',
         IssueType.Forbidden,
       );
     }
@@ -347,38 +375,103 @@ export class HostingLifecycleService {
     }
   }
 
+  private assertNoActiveTenantDescendants(summary: TenantDescendantLifecycleSummary): void {
+    if (summary.activeEmployees > 0 || summary.activeIndividuals > 0) {
+      throw new ManagerError(
+        `Tenant cannot be disabled while active descendants remain: ${summary.activeEmployees} employee(s), ${summary.activeIndividuals} individual(s).`,
+        IssueType.Conflict,
+      );
+    }
+  }
+
+  private assertNoUnpurgedTenantDescendants(summary: TenantDescendantLifecycleSummary): void {
+    if (summary.unpurgedEmployees > 0 || summary.unpurgedIndividuals > 0) {
+      throw new ManagerError(
+        `Tenant cannot be purged while descendants remain: ${summary.unpurgedEmployees} employee(s), ${summary.unpurgedIndividuals} individual(s).`,
+        IssueType.Conflict,
+      );
+    }
+  }
+
+  private readDescendantKind(entry: BundleEntry): TenantDescendantKind {
+    const rawClaims = entry.meta?.claims || entry.resource?.meta?.claims || {};
+    const kind = String(
+      (entry.resource as any)?.lifecycle?.descendantKind
+      || (rawClaims as any)['org.schema.Action.lifecycle.descendantKind']
+      || '',
+    ).trim().toLowerCase();
+    if (kind === 'employees') {
+      throw new ManagerError(
+        'Employee cleanup must use each Employee lifecycle operation so encrypted records and assigned licenses are handled correctly.',
+        IssueType.NotSupported,
+      );
+    }
+    if (kind !== 'individuals') {
+      throw new ManagerError("Organization descendant lifecycle requires resource.lifecycle.descendantKind to be 'individuals'.", IssueType.Required);
+    }
+    return kind;
+  }
+
+  private buildLifecycleStatusResponse(
+    entry: BundleEntry,
+    tenantConfig: OrganizationConfig,
+    identifierValue: string,
+    status: TenantAuthorizationLifecycleStatus,
+    descendants: TenantDescendantLifecycleSummary,
+  ): BundleEntry {
+    return {
+      type: 'Organization-lifecycle-status-response-v1.0',
+      meta: { claims: entry.meta?.claims || entry.resource?.meta?.claims || {} },
+      resource: {
+        resourceType: 'Organization',
+        id: tenantConfig.id,
+        lifecycle: {
+          identifierValue,
+          status,
+          descendants,
+          canDisable: descendants.activeEmployees === 0 && descendants.activeIndividuals === 0,
+          canPurge: status === 'suspended'
+            && descendants.unpurgedEmployees === 0
+            && descendants.unpurgedIndividuals === 0,
+        },
+      } as any,
+      response: { status: '200' },
+    };
+  }
+
   private async tenantCollectionNames(vaultId: string): Promise<string[]> {
     const collectionName = await this.tenantsCacheManager.getCollectionName(vaultId);
     return [...new Set([vaultId, collectionName].filter(Boolean) as string[])];
   }
 
-  private async disableTenantDescendants(vaultId: string): Promise<void> {
+  private async changeTenantDescendants(
+    vaultId: string,
+    kind: TenantDescendantKind,
+    operation: 'disable' | 'purge',
+  ): Promise<void> {
+    const individualSectionId = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
+    const individualPrefix = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_`);
     for (const collectionName of await this.tenantCollectionNames(vaultId)) {
       for (const sectionId of await this.vaultRepository.getAllSections(collectionName)) {
-        const records = await this.vaultRepository.getContainersInSection<any>(collectionName, sectionId);
-        const inactive = records.map((record) => ({
-          ...record,
-          status: EntityLifecycleStatus.Inactive,
-          content: record.content && typeof record.content === 'object'
-            ? { ...record.content, status: EntityLifecycleStatus.Inactive }
-            : record.content,
-        }));
-        if (inactive.length > 0) await this.vaultRepository.put(collectionName, inactive, sectionId);
-      }
-    }
-  }
-
-  private async purgeTenantDescendants(vaultId: string): Promise<void> {
-    for (const collectionName of await this.tenantCollectionNames(vaultId)) {
-      for (const sectionId of await this.vaultRepository.getAllSections(collectionName)) {
+        const matchesKind = sectionId === individualSectionId || sectionId.startsWith(individualPrefix);
+        if (!matchesKind) continue;
         const records = await this.vaultRepository.getContainersInSection<any>(collectionName, sectionId);
         for (const record of records) {
-          await this.deleteBlobReferences(record);
-          await this.vaultRepository.delete(collectionName, String(record.id), sectionId);
+          if (this.isRetainedCommunicationRecord(record)) continue;
+          if (operation === 'purge') {
+            await this.deleteBlobReferences(record);
+            await this.vaultRepository.delete(collectionName, String(record.id), sectionId);
+          } else {
+            const inactive = {
+              ...record,
+              status: EntityLifecycleStatus.Inactive,
+              content: record.content && typeof record.content === 'object'
+                ? { ...record.content, status: EntityLifecycleStatus.Inactive }
+                : record.content,
+            };
+            await this.vaultRepository.put(collectionName, [inactive], sectionId);
+          }
         }
-      }
-      if (!await this.vaultRepository.purge(collectionName)) {
-        throw new ManagerError(`Tenant data purge failed for '${collectionName}'.`, IssueType.Exception);
       }
     }
   }
@@ -446,6 +539,9 @@ export class HostingLifecycleService {
           if (!lifecycleRecord) {
             continue;
           }
+          if (!isEmployeeSection && this.isRetainedCommunicationRecord(lifecycleRecord)) {
+            continue;
+          }
           if (isEmployeeSection && this.isAuxiliaryEmployeeSectionRecord(lifecycleRecord)) {
             continue;
           }
@@ -482,6 +578,13 @@ export class HostingLifecycleService {
   private isPurgedTenantLifecycleRecord(record: Record<string, any>): boolean {
     const audit = (record.audit || {}) as Record<string, any>;
     return String(audit.disposition || '').trim().toLowerCase() === PURGED_LIFECYCLE_DISPOSITION;
+  }
+
+  /** Retained communications are governed separately and never block tenant cleanup. */
+  private isRetainedCommunicationRecord(record: Record<string, any>): boolean {
+    const content = record.content && typeof record.content === 'object' ? record.content : {};
+    return [record.type, record.resourceType, content.type, content.resourceType]
+      .some((value) => String(value || '').trim().toLowerCase() === 'communication');
   }
 
   /**
