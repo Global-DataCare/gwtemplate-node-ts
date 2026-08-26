@@ -43,6 +43,11 @@ claiming that a binding exists.
   controllers and services, and re-sign an obsolete tenant self-description.
 - Keep later service-controller `_issue`, activation code, `Token/_exchange`
   and `Device/_dcr` as distinct steps.
+- When DCR changes an employee DID document, rebuild the protected `kid`
+  indexes from every currently active verification method. For records written
+  before this rule, an indexed miss may scan only the resolved tenant scopes
+  and authenticate only an exact `iss` plus signing `kid` plus encryption
+  `skid` match; an envelope-supplied JWK is never authority.
 - In canonical `Token/_exchange`, use the validated request-route tenant.
   Firebase proves actor/contact identity and does not need a custom
   `tenant_id`; when present, that claim must match and must never reroute the
@@ -115,6 +120,9 @@ public policy.
   with one unchanged controller reference and no new Offer.
 - The public `tenant-status.json` projection moves from `required` to
   `credential_issued` and then `dcr_active` without exposing contact data.
+- A DCR-updated employee is queryable by each active signing/encryption `kid`,
+  and a historical stale-index fixture still verifies only against keys found
+  inside the protected employee DID document.
 - A restart followed by activation/Order replay leaves the tenant encryption
   `kid` unchanged; a deliberately stale DID projection is repaired without
   generating keys or changing controllers and encrypted inventory is accepted.

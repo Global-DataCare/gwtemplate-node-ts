@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [1.21.34] - 2026-08-25
+
+- Rebuild an employee's blind `kid` indexes whenever DCR adds or replaces
+  device keys. Encrypted requests now retain a fail-closed compatibility
+  lookup for historical records whose protected DID document contains the
+  registered sender keys but whose bootstrap indexes were left stale.
+
+## [1.21.33] - 2026-08-25
+
 - Make tenant key provisioning idempotent across process restarts so an
   activation or Order replay cannot overwrite the private key behind an
   already published DID. Startup now repairs stale tenant DID key projections

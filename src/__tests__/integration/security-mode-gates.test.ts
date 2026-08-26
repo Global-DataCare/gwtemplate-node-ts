@@ -53,6 +53,7 @@ function buildTestApp(options?: { appAuthManager?: any; tenantsCacheManager?: an
 
   const vaultRepository = {
     query: jest.fn(),
+    getContainersInSection: jest.fn(),
   } as any;
 
   const cryptographyService = {
@@ -221,7 +222,7 @@ describe('SECURITY_MODE content-type gates', () => {
     );
   });
 
-+  /**
+  /**
    * A professional-seat Offer belongs to the tenant, but its commercial Order
    * is submitted through the host registry. The host path must keep routing the
    * Order to the host while resolving post-DCR sender keys from the issuer
@@ -299,6 +300,79 @@ describe('SECURITY_MODE content-type gates', () => {
       expect.stringContaining('host:Order:_batch'),
       expect.any(Object),
     );
+  });
+
+  /**
+   * Historical DCR updated the encrypted controller DID keys but left the
+   * bootstrap kid blind indexes in place. An indexed miss may scan only the
+   * resolved tenant scopes and must still match issuer plus both channel keys.
+   */
+  it('resolves encrypted tenant traffic with historical stale DCR kid indexes', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'false',
+      DIDCOMM_PLAIN: 'false',
+    };
+    const tenantId = 'historical-tenant';
+    const tenantVaultId = `onehealth-research_${tenantId}`;
+    const tenantCollection = 'tenant-physical-collection';
+    const issuerDid = `did:web:gateway.example:${tenantId}:cds-us:v1:onehealth-research:employee:controller`;
+    const signingKid = 'current-dcr-signing-kid';
+    const encryptionKid = 'current-dcr-encryption-kid';
+    const employeeDocument = { id: 'controller-employee', jwe: { ciphertext: 'protected' } };
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async (vaultId: string) => vaultId === tenantVaultId),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getCollectionName: jest.fn(async () => tenantCollection),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#entity:org.schema:employee:_search',
+        selector: { section: 'entity', format: 'org.schema' },
+        serviceEndpoint: 'employee',
+        actions: ['_search'],
+      }]),
+      getTenant: jest.fn(async () => ({ status: 'active' })),
+    };
+    const kmsService = {
+      decodeRequest: jest.fn(async () => ({ content: {
+        thid: 'inventory-thid', iss: issuerDid, jti: 'inventory-jti',
+        meta: {
+          jws: { protected: { alg: 'ML-DSA-44', kid: signingKid }, signature: 'signature' },
+          jwe: { header: { skid: encryptionKid } },
+        },
+        body: { data: [] },
+      } })),
+      getHmacBase64Url: jest.fn(async (value: string, vaultId: string) => `${vaultId}:${value}`),
+      unprotectConfidentialData: jest.fn(async () => ({ didDocument: {
+        id: issuerDid,
+        verificationMethod: [
+          { id: `${issuerDid}#${signingKid}`, publicKeyJwk: { kid: signingKid, kty: 'AKP', alg: 'ML-DSA-44' } },
+          { id: `${issuerDid}#${encryptionKid}`, publicKeyJwk: { kid: encryptionKid, kty: 'OKP', crv: 'ML-KEM-768' } },
+        ],
+      } })),
+    };
+    const appAuthManager = { verifyBearerToken: jest.fn(async () => ({ sub: 'portal-session' })) };
+    const harness = buildTestApp({ appAuthManager, tenantsCacheManager, kmsService });
+    harness.vaultRepository.query.mockResolvedValue([]);
+    harness.vaultRepository.getContainersInSection.mockImplementation(async (scope: string) => (
+      scope === tenantCollection ? [employeeDocument] : []
+    ));
+    harness.cryptographyService.verifyDetachedJws.mockResolvedValue(true);
+
+    const response = await request(harness.app)
+      .post(`/${tenantId}/cds-us/v1/onehealth-research/entity/org.schema/Employee/_search`)
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .set('Authorization', 'Bearer portal-token')
+      .send({ request: 'compact-jwe' });
+
+    expect(response.status).toBe(202);
+    expect(harness.vaultRepository.getContainersInSection).toHaveBeenCalledWith(
+      tenantCollection,
+      expect.any(String),
+    );
+    expect(harness.cryptographyService.verifyDetachedJws).toHaveBeenCalled();
   });
 
   it('allows host organization _activate without bearer in demo mode', async () => {
