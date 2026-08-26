@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-08-26
+
+- Add product-neutral, opt-in break-glass authorization to GW CORE SMART token
+  issuance. Human emergency reads require the exact `health-care` route and a
+  ledger-verified physician credential; animal emergency reads require the
+  exact `animal-care` route and a ledger-verified veterinarian credential.
+  Research, One Health research, cross-kind and write access remain fail-closed.
+- Persist only coded and hashed exceptional-access evidence to Fabric, require
+  controller-notification acknowledgement before token issuance and cap the
+  resulting token lifetime at 15 minutes. Free-text justification remains
+  outside the ledger and is delivered only to the controller notifier.
+
 ## [1.21.34] - 2026-08-25
 
 - Rebuild an employee's blind `kid` indexes whenever DCR adds or replaces

@@ -49,6 +49,7 @@ import type { IHostingTenantRegistry } from '../managers/IHostingTenantRegistry'
 import type { IDiscoveryTenantRegistry } from '../managers/IDiscoveryTenantRegistry';
 import type { IApiTenantRegistry } from '../managers/IApiTenantRegistry';
 import type { ILedgerTenantRegistry } from '../managers/ILedgerTenantRegistry';
+import { buildBreakGlassAuthorizer } from '../security/break-glass';
 
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
 
@@ -176,7 +177,13 @@ export function buildManagers(options: {
   );
   const tokenManager = new TokenManager(kmsService, tenantManager);
   const identityTokenManager = new IdentityTokenManager(appAuthManager, tokenManager);
-  const openIdAuthManager = new OpenIdAuthManager(kmsService, tenantManager, vaultRepository, clearingHouseService);
+  const openIdAuthManager = new OpenIdAuthManager(
+    kmsService,
+    tenantManager,
+    vaultRepository,
+    clearingHouseService,
+    buildBreakGlassAuthorizer(blockchainAdapter),
+  );
   const observationManager = new ObservationManager(vaultRepository, blockchainAdapter, tenantManager);
   const medicationStatementManager = new MedicationStatementManager(vaultRepository, tenantManager);
   const relatedPersonManager = new RelatedPersonManager(vaultRepository, blockchainAdapter, tenantManager);
