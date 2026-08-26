@@ -48,6 +48,20 @@ claiming that a binding exists.
   run `Token/_exchange` or `Device/_dcr` afterwards. Those steps belong to a
   separately designated service controller, an employee device, or an explicit
   later device replacement/recovery.
+- Do not interpret that legacy DCR exception as “no communication wallet”. Keep
+  the professional-role signing JWK in `controller.publicKeyJwk` and the
+  controller runtime's separate DIDComm signing/encryption public keys in
+  `controller.jwks`. The portal must initialize and durably retain the wallet
+  that owns those private communication keys; only the public JWKS reaches ICA
+  or GW during `_activate`. Recreating the wallet afterwards changes its `kid`
+  values and must fail as an unregistered controller proof.
+- In the Node 101, use the high-level
+  `NodeManagedWallet.initializeCommunicationJsonWebKeySet(...)` (or
+  `getCommunicationJsonWebKeySet(...)` for an already initialized wallet) and
+  pass its result through `buildControllerBindingInput({ publicKeys })`. Explain
+  that a PIN protects/unlocks persisted wallet seed material when the portal
+  chooses that design; neither PIN, seed nor private JWK belongs in ICA/GW
+  payloads.
 - Keep the two proofs used around that continuation distinct. The controller
   `vp_token` proves credential/role authority but does not prove control of an
   email address. `Token/_exchange` requires a separately signed OIDC
@@ -150,6 +164,9 @@ public policy.
   credential and signer failures remain governed by normal trust validation.
 - `_exchange` receives a signed trusted `id_token` whose verified email matches
   the reserved seat; a controller VP alone fails this checkpoint.
+- Legacy `_activate` publishes the historical representative's role-signing
+  JWK and the same controller wallet's public DIDComm signing/encryption JWKS;
+  a subsequent message signed by a newly generated `kid` is rejected.
 - A self-hosted OpenID issuer's discovery `issuer`, token `iss`, configured GW
   audience, token `aud`, header `kid` and published JWKS all agree.
 - Canonical service-controller tests remain green.

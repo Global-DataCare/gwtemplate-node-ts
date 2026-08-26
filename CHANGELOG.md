@@ -5,6 +5,10 @@
 - Make the local Fabric smoke pass explicit Linux/amd64 CCAAS build arguments,
   so Docker's classic builder does not resolve the `tini` download with an
   empty `TARGETARCH` when BuildKit is unavailable.
+- Clarify the reusable legacy-controller skill: `_activate` avoids a second DCR
+  but still registers the representative role-signing key and the controller
+  wallet's separate public DIDComm signing/encryption JWKS. PIN, seed and
+  private keys remain under portal wallet custody.
 
 ## [1.22.2] - 2026-08-26
 
