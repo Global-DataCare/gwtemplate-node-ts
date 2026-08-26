@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+- Preserve one digital-twin `Composition` per source IPS document/version with
+  all indexed IPS section tokens in the same `Composition.section` claim.
+  Section-first search now treats that claim as multi-valued instead of
+  synthesizing one Composition per section.
+- Make subject-level secondary-use withdrawal a reversible digital-twin
+  disable. `Consent.purpose=RESEARCH`,
+  `Consent.action=organization/ResearchSubject.rs`, and
+  `Consent.decision=deny` deindex the current research projection and pause
+  future synchronization without deleting operational clinical data, the
+  stable private subject alias, or consent audit evidence. A later `permit`
+  rebuilds the complete research projection from current operational records.
+
 ## [1.22.0] - 2026-08-26
 
 - Add product-neutral, opt-in break-glass authorization to GW CORE SMART token

@@ -43,6 +43,7 @@ import {
   isDigitalTwinResearchResourceType,
   projectClaimsForDigitalTwin,
 } from '../utils/digital-twin-research-projection';
+import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -672,67 +673,68 @@ export class CommunicationManager implements IJobProcessor {
       this.normalizeOptionalString(payloadComposition?.id)
       || determineResourceId(compositionIdentifier, process.env.NODE_ENV);
 
-    for (const sectionCode of sectionCodes) {
-      const claims = normalizeContextualizedClaims({
-        '@context': 'org.hl7.fhir.r4',
-        'Composition.identifier': compositionIdentifier,
-        'Composition.subject': subject,
-        'Composition.section': sectionCode,
-        'Composition.author': serverDid,
-        'Composition.date': sent,
-        'Composition.type': typeCode,
-        'Composition.source': 'Communication',
-      });
-      if (embeddedClaims) {
-        Object.assign(claims, embeddedClaims, { 'Composition.section': sectionCode });
-      }
-      applyFhirCidVersioningToEntry({
-        entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: 'Composition', id: fallbackId } },
-        claims,
-        resourceType: 'Composition',
-        resourceId: fallbackId,
-      });
-      const contentVersionId = claimsToContentCid(claims).cid;
-      claims['Composition.meta.versionId'] = contentVersionId;
-      claims['org.hl7.fhir.r4.Composition.meta.versionId'] = contentVersionId;
-
-      const individualSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
-      const versionId = this.normalizeOptionalString(
-        claims['Composition.meta.versionId']
-        || claims['org.hl7.fhir.r4.Composition.meta.versionId'],
-      );
-      if (versionId) {
-        const exists = await this.hasSectionRecordWithClaims(tenantVaultId, individualSectionId, [
-          { name: 'Composition.meta.versionId', value: versionId },
-        ]);
-        if (exists) continue;
-      }
-      const recordId = this.buildStableProjectionRecordId(
-        'composition-from-communication',
-        `${compositionIdentifier}|${sectionCode}`,
-      );
-      const record = { id: recordId, ...claims } as any;
-      await this.vaultRepository.put(tenantVaultId, [record], individualSectionId);
-      const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
-        vaultRepository: this.vaultRepository,
-        tenantVaultId,
-        sourceSubject: subject,
-      });
-      const researchClaims = projectClaimsForDigitalTwin({
-        claims,
-        resourceType: 'Composition',
-        twinSubjectId,
-      });
-      const researchVersionId = claimsToContentCid(researchClaims).cid;
-      researchClaims['Composition.meta.versionId'] = researchVersionId;
-      researchClaims['org.hl7.fhir.r4.Composition.meta.versionId'] = researchVersionId;
-      const researchRecordId = this.buildStableProjectionRecordId(
-        'digital-twin-composition',
-        `${String(researchClaims['Composition.identifier'] || researchClaims['org.hl7.fhir.r4.Composition.identifier'] || researchVersionId)}|${sectionCode}`,
-      );
-      const digitalTwinSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, 'composition');
-      await this.vaultRepository.put(tenantVaultId, [{ id: researchRecordId, ...researchClaims } as any], digitalTwinSectionId);
+    const sectionValue = sectionCodes.join(',');
+    const claims = normalizeContextualizedClaims({
+      '@context': 'org.hl7.fhir.r4',
+      'Composition.identifier': compositionIdentifier,
+      'Composition.subject': subject,
+      'Composition.section': sectionValue,
+      'Composition.author': serverDid,
+      'Composition.date': sent,
+      'Composition.type': typeCode,
+      'Composition.source': 'Communication',
+    });
+    if (embeddedClaims) {
+      Object.assign(claims, embeddedClaims, { 'Composition.section': sectionValue });
     }
+    applyFhirCidVersioningToEntry({
+      entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: 'Composition', id: fallbackId } },
+      claims,
+      resourceType: 'Composition',
+      resourceId: fallbackId,
+    });
+    const contentVersionId = claimsToContentCid(claims).cid;
+    claims['Composition.meta.versionId'] = contentVersionId;
+    claims['org.hl7.fhir.r4.Composition.meta.versionId'] = contentVersionId;
+
+    const individualSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
+    const versionId = this.normalizeOptionalString(
+      claims['Composition.meta.versionId']
+      || claims['org.hl7.fhir.r4.Composition.meta.versionId'],
+    );
+    if (versionId) {
+      const exists = await this.hasSectionRecordWithClaims(tenantVaultId, individualSectionId, [
+        { name: 'Composition.meta.versionId', value: versionId },
+      ]);
+      if (exists) return;
+    }
+    const recordId = this.buildStableProjectionRecordId('composition-from-communication', compositionIdentifier);
+    const record = { id: recordId, ...claims } as any;
+    await this.vaultRepository.put(tenantVaultId, [record], individualSectionId);
+    if (!await isDigitalTwinSecondaryUseEnabled({
+      vaultRepository: this.vaultRepository,
+      tenantVaultId,
+      sourceSubject: subject,
+    })) return;
+    const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
+      vaultRepository: this.vaultRepository,
+      tenantVaultId,
+      sourceSubject: subject,
+    });
+    const researchClaims = projectClaimsForDigitalTwin({
+      claims,
+      resourceType: 'Composition',
+      twinSubjectId,
+    });
+    const researchVersionId = claimsToContentCid(researchClaims).cid;
+    researchClaims['Composition.meta.versionId'] = researchVersionId;
+    researchClaims['org.hl7.fhir.r4.Composition.meta.versionId'] = researchVersionId;
+    const researchRecordId = this.buildStableProjectionRecordId(
+      'digital-twin-composition',
+      String(researchClaims['Composition.identifier'] || researchClaims['org.hl7.fhir.r4.Composition.identifier'] || researchVersionId),
+    );
+    const digitalTwinSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, 'composition');
+    await this.vaultRepository.put(tenantVaultId, [{ id: researchRecordId, ...researchClaims } as any], digitalTwinSectionId);
   }
 
   private async persistCommunicationChannelRecord(
@@ -1073,7 +1075,14 @@ export class CommunicationManager implements IJobProcessor {
           indexed: { attributes: this.buildIndexedAttributesFromClaims(claims) },
         };
         await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
-        if (isDigitalTwinResearchResourceType(resourceType)) {
+        if (
+          isDigitalTwinResearchResourceType(resourceType)
+          && await isDigitalTwinSecondaryUseEnabled({
+            vaultRepository: this.vaultRepository,
+            tenantVaultId,
+            sourceSubject: subjectRef,
+          })
+        ) {
           const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
             vaultRepository: this.vaultRepository,
             tenantVaultId,

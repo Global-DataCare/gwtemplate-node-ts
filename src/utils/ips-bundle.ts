@@ -81,15 +81,15 @@ export async function buildConsolidatedIpsBundleDocument(
     ).trim();
     if (!matchesRequiredTypes(compositionType, params.requiredTypes)) continue;
 
-    const sectionToken = String(
+    const sectionTokens = String(
       getClaimValue<string>(compositionRecord, 'Composition.section') || '',
-    ).trim();
-    if (!sectionToken) continue;
-    if (params.excludedSections.includes(sectionToken)) continue;
-    if (params.requiredSections.length > 0 && !params.requiredSections.includes(sectionToken)) continue;
-
-    includedSectionTokens.add(sectionToken);
-    ensureSection(sectionRefs, sectionToken);
+    ).split(',').map((value) => value.trim()).filter(Boolean);
+    for (const sectionToken of sectionTokens) {
+      if (params.excludedSections.includes(sectionToken)) continue;
+      if (params.requiredSections.length > 0 && !params.requiredSections.includes(sectionToken)) continue;
+      includedSectionTokens.add(sectionToken);
+      ensureSection(sectionRefs, sectionToken);
+    }
 
     const authorReference = normalizeReference(getClaimValue<string>(compositionRecord, 'Composition.author'));
     if (authorReference) authorRefs.add(authorReference);

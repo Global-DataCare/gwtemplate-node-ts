@@ -19,6 +19,7 @@ import {
   deriveConsentRuleBlockchainStatus,
 } from '../../utils/consent-access-blockchain';
 import { getJurisdictionGroup } from '../../utils/jurisdiction';
+import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 
 /**
  * @fileoverview This test suite verifies the functionality of the ConsentManager.
@@ -105,8 +106,34 @@ describe('ConsentManager', () => {
     // Create a type-safe mock of the repository
     mockVaultRepository = mock<IVaultRepository>();
     mockBlockchainAdapter = mock<IBlockchainAdapter>();
+    mockVaultRepository.getAllSections.mockResolvedValue([]);
+    mockVaultRepository.listContainersInSection.mockResolvedValue([]);
+    mockVaultRepository.get.mockResolvedValue(undefined);
+    mockVaultRepository.delete.mockResolvedValue(true);
     // Inject the mock into the manager
     consentManager = new ConsentManager({vaultRepository: mockVaultRepository, blockchainAdapter: mockBlockchainAdapter});
+  });
+
+  it('disables the subject digital-twin projection when research use is withdrawn', async () => {
+    mockVaultRepository.vaultExists.mockResolvedValue(true);
+    mockVaultRepository.put.mockResolvedValue(true);
+    const request = structuredClone(mockJobRequest);
+    const claims = (request.content!.body as any).data[0].meta.claims;
+    claims[ClaimConsent.decision] = 'deny';
+    claims[ClaimConsent.purpose] = 'RESEARCH';
+    claims[ClaimConsent.action] = ServiceCapability.DigitalTwinReader;
+
+    const response = await consentManager.process(request);
+
+    expect((response.body as any).data[0].response.status).toBe('201');
+    expect(mockVaultRepository.put).toHaveBeenCalledWith(
+      getTenantVaultId(mockSector, mockTenantId),
+      [expect.objectContaining({
+        type: 'digital-twin-secondary-use-status',
+        status: 'disabled',
+      })],
+      expect.stringContaining('digitaltwin_secondary_use_status'),
+    );
   });
 
   it('should save attachment and rule to the correct sections in the vault', async () => {

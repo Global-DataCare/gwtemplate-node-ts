@@ -5,6 +5,7 @@ import { IVaultRepository } from '../database/repositories/vault/vault.repositor
 import { getClaimValue } from './claims';
 import { buildConsentRuleStorageKey, hashConsentRuleId } from './consent';
 import { getIndividualSectionId } from './individual-sections';
+import { applyDigitalTwinSecondaryUseDecision } from './digital-twin-secondary-use';
 
 export const requiredConsentClaims = [
   ClaimConsent.decision,
@@ -107,5 +108,6 @@ export async function persistConsentRuleAndAttachment(
   }
 
   await vaultRepository.put(tenantVaultId, [consentRule], getIndividualSectionId(subjectId, 'rules'));
+  await applyDigitalTwinSecondaryUseDecision({ vaultRepository, tenantVaultId, claims });
   return { subjectId, attachmentHash, ruleId };
 }

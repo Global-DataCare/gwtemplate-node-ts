@@ -70,6 +70,20 @@ Practical rule:
   `Observation.code-display`, or `Observation.code-text`.
   The backend may fan out across the section's supported resource families,
   but the public result remains `Composition`, not leaf resources.
+- one source IPS document/version produces one twin `Composition`; its
+  `Composition.section` index is multi-valued. IPS sections are search facets,
+  not separate synthesized Composition resources.
+
+Secondary-use lifecycle rule:
+
+- withdrawal is a reversible `disable`, not a `purge`
+- disable removes the active research projection from discovery and pauses
+  subsequent synchronization, while retaining operational clinical data, the
+  confidential stable alias, and audit evidence
+- re-enabling secondary use rebuilds the projection from the current
+  operational source, so changes made while disabled are included
+- purge is reserved for a separate irreversible erasure workflow when legally
+  applicable; it is not the meaning of ordinary permission withdrawal
 
 Materialization rule:
 
