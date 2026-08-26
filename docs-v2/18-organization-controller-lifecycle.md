@@ -128,10 +128,15 @@ Input rule:
 
 - use the controller `id_token`,
 - use the activation code returned by `_issue`.
+- The validated route owns `tenantId`. Firebase proves the actor and verified
+  contact; it does not need a custom `tenant_id` claim. If the claim is
+  present, it must match the route and cannot redirect the exchange.
 
 Expected result:
 
 - `initial_access_token`
+- A failed asynchronous poll returns its `OperationOutcome`; SDKs must surface
+  that diagnostic before checking for the success token.
 
 ### C. Register the current device/app again
 

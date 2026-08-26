@@ -7,6 +7,15 @@ import {
   buildDeterministicVpTokenFixture,
   DeterministicJwtTokenVerifier,
 } from '../utils/deterministic-jwt-fixtures';
+import {
+  EXAMPLE_ACCOUNT_OWNER_ID,
+  EXAMPLE_DEMO_PORTAL_ID_TOKEN,
+  EXAMPLE_EMAIL_CONTROLLER_ORG,
+  EXAMPLE_EMPLOYEE_ACTIVATION_CODE,
+  EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY,
+  EXAMPLE_SECTOR,
+  EXAMPLE_TENANT_IDENTIFIER,
+} from 'gdc-common-utils-ts/examples/shared';
 
 /**
  * Transport security contract: encrypted post-DCR traffic resolves keys by
@@ -145,6 +154,71 @@ describe('SECURITY_MODE content-type gates', () => {
       .send({});
 
     expect(response.status).toBe(400);
+  });
+
+  /**
+   * Firebase ID tokens do not need product-specific tenant claims. The
+   * canonical identity route is validated first and its tenant is preserved in
+   * the queued exchange job consumed by IdentityTokenManager.
+   */
+  it('queues Token/_exchange with the validated route tenant when Firebase has no tenant_id', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'compat',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'false',
+      DIDCOMM_PLAIN: 'true',
+    };
+    const vaultId = `${EXAMPLE_SECTOR}_${EXAMPLE_TENANT_IDENTIFIER}`;
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async (candidate: string) => candidate === vaultId),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getCollectionName: jest.fn(async () => 'tenant-collection'),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#identity:openid',
+        selector: { sector: EXAMPLE_SECTOR, section: 'identity', format: 'openid' },
+        serviceEndpoint: 'Token',
+        actions: ['_exchange'],
+      }]),
+      getTenant: jest.fn(async () => ({})),
+    };
+    const appAuthManager = {
+      verifyBearerToken: jest.fn(async () => ({ payload: {
+        sub: EXAMPLE_ACCOUNT_OWNER_ID,
+        email: EXAMPLE_EMAIL_CONTROLLER_ORG,
+        email_verified: true,
+      } })),
+    };
+    const harness = buildTestApp({ appAuthManager, tenantsCacheManager });
+
+    const response = await request(harness.app)
+      .post(`/host/cds-ES/v1/${EXAMPLE_SECTOR}/${EXAMPLE_TENANT_IDENTIFIER}/identity/auth/_exchange`)
+      .set('Content-Type', 'application/didcomm-plain+json')
+      .set('Authorization', `Bearer ${EXAMPLE_DEMO_PORTAL_ID_TOKEN}`)
+      .send({
+        thid: 'exchange-route-tenant',
+        subject_token: EXAMPLE_EMPLOYEE_ACTIVATION_CODE,
+        client_instance_id: EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY,
+      });
+
+    expect(response.status).toBe(202);
+    expect(harness.queueAdapter.addJob).toHaveBeenCalledWith(
+      expect.stringContaining(`${vaultId}:Token:_exchange`),
+      expect.objectContaining({
+        tenantId: EXAMPLE_TENANT_IDENTIFIER,
+        sector: EXAMPLE_SECTOR,
+        content: expect.objectContaining({
+          meta: expect.objectContaining({
+            bearer: expect.objectContaining({
+              jwt: expect.objectContaining({
+                payload: expect.not.objectContaining({ tenant_id: expect.anything() }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    );
   });
 
 +  /**

@@ -37,6 +37,11 @@ claiming that a binding exists.
   and recreate a missing tenant collection without creating another Offer.
 - Keep later service-controller `_issue`, activation code, `Token/_exchange`
   and `Device/_dcr` as distinct steps.
+- In canonical `Token/_exchange`, use the validated request-route tenant.
+  Firebase proves actor/contact identity and does not need a custom
+  `tenant_id`; when present, that claim must match and must never reroute the
+  exchange. Preserve a failed poll `OperationOutcome` before checking for
+  `initial_access_token`.
 - When an accepted organization Order is replayed before `Token/_exchange`,
   recover and return the representative seat's existing activation code. Do
   not rotate the code, consume another seat or return a successful response
