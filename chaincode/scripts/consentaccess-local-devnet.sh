@@ -141,7 +141,10 @@ function build_chaincode_artifacts() {
   require_file "${CHAINCODE_DIR}/${CHAINCODE_PACKAGE_ARCHIVE}"
 
   info "Building the external service image"
-  (cd "${CHAINCODE_DIR}" && docker build --target ccaas -f ./Dockerfile -t "${CHAINCODE_IMAGE_TAG}" .)
+  (cd "${CHAINCODE_DIR}" && docker build \
+    --build-arg TARGETOS="${CHAINCODE_TARGET_OS:-linux}" \
+    --build-arg TARGETARCH="${CHAINCODE_TARGET_ARCH:-amd64}" \
+    --target ccaas -f ./Dockerfile -t "${CHAINCODE_IMAGE_TAG}" .)
 }
 
 function copy_archive_to_devnet() {

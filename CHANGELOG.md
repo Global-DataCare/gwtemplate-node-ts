@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Make the local Fabric smoke pass explicit Linux/amd64 CCAAS build arguments,
+  so Docker's classic builder does not resolve the `tini` download with an
+  empty `TARGETARCH` when BuildKit is unavailable.
+
 ## [1.22.2] - 2026-08-26
 
 - Clarify and test the controller bootstrap split: legacy
