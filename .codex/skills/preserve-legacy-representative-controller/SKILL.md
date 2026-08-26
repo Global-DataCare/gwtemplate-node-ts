@@ -43,6 +43,23 @@ claiming that a binding exists.
   controllers and services, and re-sign an obsolete tenant self-description.
 - Keep later service-controller `_issue`, activation code, `Token/_exchange`
   and `Device/_dcr` as distinct steps.
+- Treat the historical representative JWK submitted in legacy `_activate` as
+  the completed bootstrap binding. Do not require that same representative to
+  run `Token/_exchange` or `Device/_dcr` afterwards. Those steps belong to a
+  separately designated service controller, an employee device, or an explicit
+  later device replacement/recovery.
+- Keep the two proofs used around that continuation distinct. The controller
+  `vp_token` proves credential/role authority but does not prove control of an
+  email address. `Token/_exchange` requires a separately signed OIDC
+  `id_token` from a GW-trusted issuer, carrying the verified account/email
+  binding; never pass the VP as that Bearer token.
+- A managed wallet is only the issuer's cryptographic signing component. It
+  does not make a portal an OpenID Provider by itself. A self-hosted portal
+  issuer must verify the email, publish standards-aligned
+  `/.well-known/openid-configuration` and public JWKS with the signing `kid`,
+  and arrange GW trust for the exact issuer, audience and JWKS. Keep that
+  issuer key independent from the representative role key and every registered
+  device/channel key.
 - When DCR changes an employee DID document, rebuild the protected `kid`
   indexes from every currently active verification method. For records written
   before this rule, an indexed miss may scan only the resolved tenant scopes
@@ -131,6 +148,10 @@ public policy.
   JWK to that actor.
 - A deployment with compatibility disabled rejects the historical shape;
   credential and signer failures remain governed by normal trust validation.
+- `_exchange` receives a signed trusted `id_token` whose verified email matches
+  the reserved seat; a controller VP alone fails this checkpoint.
+- A self-hosted OpenID issuer's discovery `issuer`, token `iss`, configured GW
+  audience, token `aud`, header `kid` and published JWKS all agree.
 - Canonical service-controller tests remain green.
 - Generated OpenAPI keeps legacy creation separate from service-controller
   `_issue`.
