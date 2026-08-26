@@ -112,6 +112,7 @@ function deriveRuleEntriesFromConsentEntry(
     for (const purpose of purposes) {
       for (const role of normalizedRoles) {
         const logicalRuleId = buildConsentAtomicRuleId({
+          sourceConsentIdentifier,
           subject,
           decision,
           actorIdentifier,
@@ -222,6 +223,7 @@ function sanitizeConsentReferenceForBlockchain(value: unknown): string | undefin
 }
 
 function buildConsentAtomicRuleId(input: Readonly<{
+  sourceConsentIdentifier?: string;
   subject?: string;
   decision?: string;
   actorIdentifier: string;
@@ -229,6 +231,7 @@ function buildConsentAtomicRuleId(input: Readonly<{
   role?: string;
 }>): string {
   return [
+    normalizeRuleKeyPart(input.sourceConsentIdentifier),
     normalizeRuleKeyPart(input.subject),
     normalizeDecision(input.decision).toLowerCase(),
     normalizeRuleKeyPart(input.actorIdentifier),
