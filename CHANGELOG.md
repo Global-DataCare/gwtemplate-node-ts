@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Let canonical `Token/_exchange` use the already validated route tenant when
+  Firebase proves the controller without a custom `tenant_id` claim. An
+  optional token claim must still match the route and can never redirect the
+  exchange to another tenant.
 - Make accepted organization Order replay work with real encrypted repository
   documents. The exact Offer is now matched against claims obtained after KMS
   unprotect, allowing an already active registration to continue without a

@@ -61,8 +61,15 @@ export class IdentityTokenManager implements IJobProcessor {
     if (!userId) {
       throw new ManagerError('Missing sub claim in id_token.', IssueType.Security);
     }
-    if (!tenantIdFromToken) {
-      throw new ManagerError('tenant_id claim missing from id_token.', IssueType.BusinessRule);
+    const tenantIdFromRoute = String(job.tenantId || '').trim();
+    if (!tenantIdFromRoute) {
+      throw new ManagerError('Tenant id missing from validated request route.', IssueType.BusinessRule);
+    }
+    // Firebase proves the actor/contact, while the already validated request
+    // route selects the tenant vault. A custom tenant_id claim is optional and
+    // may only narrow that authority; it must never redirect the exchange.
+    if (tenantIdFromToken && String(tenantIdFromToken).trim() !== tenantIdFromRoute) {
+      throw new ManagerError('id_token tenant_id does not match the validated route tenant.', IssueType.Security);
     }
 
     const body = (job.content?.body || {}) as TokenExchangeBody;
@@ -73,7 +80,7 @@ export class IdentityTokenManager implements IJobProcessor {
 
     await this.appAuthManager.verifyAndConsumeActivationCode(
       activationCode,
-      tenantIdFromToken,
+      tenantIdFromRoute,
       job.sector as string,
       { subject: userId, email, emailVerified, phone },
       body.client_instance_id,
@@ -84,7 +91,7 @@ export class IdentityTokenManager implements IJobProcessor {
       sub: userId,
       jti: randomUUID(),
       act_code: activationCode,
-      tenant_id: tenantIdFromToken,
+      tenant_id: tenantIdFromRoute,
       scope: 'dcr:register',
     };
     const accessToken = await this.tokenManager.createInitialAccessToken(claims, tokenLifetime);

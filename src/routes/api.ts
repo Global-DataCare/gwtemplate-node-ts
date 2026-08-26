@@ -1350,6 +1350,8 @@ export function createApiRouter(
    *       - Authorization Bearer token: Firebase `id_token` (JWT format), and
    *       - request body `subject_token`: single-use activation code (opaque string, not JWT).
    *       for an `initial_access_token`.
+   *       The validated route selects the tenant. Firebase `tenant_id` is optional; when
+   *       present it must match the route and cannot redirect the exchange.
    *
    *       Submit-time errors are returned immediately if the request cannot be accepted/enqueued.
    *       Processing/business errors are returned when polling.

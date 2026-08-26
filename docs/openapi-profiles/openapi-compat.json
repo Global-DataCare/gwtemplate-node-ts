@@ -4125,7 +4125,7 @@
           "2.1.2 Initial Access Token Exchange"
         ],
         "summary": "Exchange activation code for initial_access_token (async)",
-        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_exchange`.\nThis `identity/openid` route is maintained as a temporary compatibility alias.\n\nSubmits an async job that exchanges:\n- Authorization Bearer token: Firebase `id_token` (JWT format), and\n- request body `subject_token`: single-use activation code (opaque string, not JWT).\nfor an `initial_access_token`.\n\nSubmit-time errors are returned immediately if the request cannot be accepted/enqueued.\nProcessing/business errors are returned when polling.\n",
+        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_exchange`.\nThis `identity/openid` route is maintained as a temporary compatibility alias.\n\nSubmits an async job that exchanges:\n- Authorization Bearer token: Firebase `id_token` (JWT format), and\n- request body `subject_token`: single-use activation code (opaque string, not JWT).\nfor an `initial_access_token`.\nThe validated route selects the tenant. Firebase `tenant_id` is optional; when\npresent it must match the route and cannot redirect the exchange.\n\nSubmit-time errors are returned immediately if the request cannot be accepted/enqueued.\nProcessing/business errors are returned when polling.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
