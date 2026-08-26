@@ -135,17 +135,15 @@ Important:
 
 The subject-level research rule uses:
 
-- `Consent.purpose = RESEARCH`
+- `Consent.purpose = HRESCH` (`HealthcareConsentPurposes.Research`)
 - `Consent.action = organization/ResearchSubject.rs`
 - `Consent.decision = permit | deny`
 
 `deny` is a reversible disable:
 
-- remove the current subject projection from the searchable digital-twin
-  index
-- reject/skip subsequent synchronization into that projection
+- stop subsequent synchronization into that projection
 - retain the source clinical record, confidential pseudonymous alias, consent
-  decision, and audit history
+  decision, already published anonymous twin, and audit history
 - do not attempt to recall copies or derived results already lawfully exported
   to an external research environment; those remain governed by the applicable
   contract, permit, retention, and deletion obligations
@@ -154,8 +152,15 @@ A later `permit` reuses the stable private alias and performs a complete
 rebuild from the current operational record. This incorporates changes made
 while publication was disabled and avoids replaying a stale snapshot.
 
-`purge` is intentionally not used for ordinary withdrawal. It is a distinct,
-irreversible erasure operation that requires its own legal and retention gate.
+`purge` is intentionally not used for ordinary withdrawal. It is the index
+provider offboarding operation for account deletion or provider migration. It
+deletes only the provider-private operational-subject ↔ twin UUID
+correspondence. It does not delete the anonymous twin. A later enrollment
+allocates a new `urn:uuid` and cannot reconnect or update the detached twin.
+
+The subject BFF invokes this through
+`individual/org.hl7.fhir.r4/ResearchSubject/_purge`; the request is a FHIR
+`Parameters` resource containing the operational `subject` DID.
 
 ## Search, Working Selection, and Materialization
 
@@ -173,6 +178,8 @@ This contract intentionally separates:
 - the canonical twin is not modified and no clinical data is copied
 - a workset is reopened through `Composition/_search` with
   `Composition.meta-tag = system|code`
+- direct batch rejects canonical twin writes, operational subject DIDs, and
+  invented UUID URNs absent from the tenant-private alias registry
 
 3. materialization
 - happens after the researcher chooses or reopens one or more matched twins
@@ -208,7 +215,7 @@ Example working-selection metadata:
 ```json
 {
   "claims": {
-    "Composition.subject": "urn:uuid:pseudonymous-twin-subject",
+    "Composition.subject": "urn:uuid:00000000-0000-4000-8000-000000000101",
     "Composition.author": "did:web:api.acme.org:employee:researcher-1:ISCO-08|2211",
     "Composition.section": "LOINC|10160-0"
   },

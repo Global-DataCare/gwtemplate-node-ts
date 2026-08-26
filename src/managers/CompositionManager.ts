@@ -59,6 +59,13 @@ import type { ITenantsManager } from './ITenantsManager';
 import { TwinCompositionManager } from './TwinCompositionManager';
 import { buildSearchMatchesResponse, buildTransactionResponse } from '../utils/didcomm-response';
 import { buildConsolidatedIpsBundleDocument, projectSummaryBundleByFormat } from '../utils/ips-bundle';
+import {
+  isDigitalTwinSubjectId,
+  isRegisteredDigitalTwinSubjectId,
+} from '../utils/digital-twin-research-projection';
+import { purgeDigitalTwinSubjectLink } from '../utils/digital-twin-secondary-use';
+
+const RESEARCHER_WORKING_SELECTION_TYPE = 'Composition:ResearcherWorkingSelection';
 
 /**
  * Canonical HL7 IPS "all sections" example used to validate the current
@@ -170,6 +177,9 @@ export class CompositionManager implements IJobProcessor {
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const context = this.normalizeJobContext(job);
 
+    if (context.normalizedAction === '_purge') {
+      return this.handleDigitalTwinSubjectLinkPurge(job, context);
+    }
     if (context.normalizedAction === '_search' || context.isSummaryOperation) {
       return this.handleSearch(job, context);
     }
@@ -201,7 +211,10 @@ export class CompositionManager implements IJobProcessor {
     if (!normalizedAction) {
       throw new Error('Missing required job.action.');
     }
-    if (normalizedAction !== '_batch' && normalizedAction !== '_search' && !isSummaryOperation) {
+    const isDigitalTwinLinkPurge = normalizedAction === '_purge'
+      && normalizedSection === SUBJECT_SECTION_INDIVIDUAL
+      && normalizedResourceType === SUMMARY_OPERATION_RESEARCHSUBJECT_RESOURCE_TYPE;
+    if (normalizedAction !== '_batch' && normalizedAction !== '_search' && !isSummaryOperation && !isDigitalTwinLinkPurge) {
       throw new Error(`Unsupported action '${normalizedAction}' for CompositionManager.`);
     }
     if (
@@ -241,11 +254,45 @@ export class CompositionManager implements IJobProcessor {
     };
   }
 
+  private async handleDigitalTwinSubjectLinkPurge(
+    job: JobRequest,
+    context: NormalizedCompositionJobContext,
+  ): Promise<IDecodedDidcommPayload> {
+    const sourceSubject = extractCompositionSearchSubject(context.body);
+    if (!sourceSubject) throw new Error('Missing required parameter: subject.');
+
+    const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+    if (!await this.tenantExists(tenantVaultId)) {
+      throw new Error(`Tenant vault not found: ${tenantVaultId}`);
+    }
+    const result = await purgeDigitalTwinSubjectLink({
+      vaultRepository: this.vaultRepository,
+      tenantVaultId,
+      sourceSubject,
+    });
+    return buildTransactionResponse(job, {
+      resourceType: 'Parameters',
+      parameter: [{ name: 'purged', valueBoolean: result.purged }],
+    } as any);
+  }
+
   private async handleSearch(
     job: JobRequest,
     context: NormalizedCompositionJobContext,
   ): Promise<IDecodedDidcommPayload> {
     const search = await this.buildSearchContext(job, context);
+
+    if (
+      context.normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN
+      && search.searchSubject
+      && !await isRegisteredDigitalTwinSubjectId({
+        vaultRepository: this.vaultRepository,
+        tenantVaultId: search.tenantVaultId,
+        twinSubjectId: search.searchSubject,
+      })
+    ) {
+      throw new Error('Digital twin subject must be a tenant-registered urn:uuid identifier.');
+    }
 
     if (this.isIpsBundleDocumentRequest(search.searchResourceType, search.requestedBundleType, search.searchTypes)) {
       const consolidatedBundle = await buildConsolidatedIpsBundleDocument({
@@ -400,6 +447,29 @@ export class CompositionManager implements IJobProcessor {
         const section = getClaimValue<string>(claims, 'Composition.section');
         if (!section) throw new Error('Missing required claim: Composition.section');
 
+        const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+        const tenantExists = await this.tenantExists(tenantVaultId);
+        if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
+
+        if (context.normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN) {
+          const compositionType = String(claims['@type'] || '').trim();
+          if (compositionType !== RESEARCHER_WORKING_SELECTION_TYPE) {
+            throw new Error(
+              `Direct digital twin Composition writes only accept @type=${RESEARCHER_WORKING_SELECTION_TYPE}.`,
+            );
+          }
+          if (!isDigitalTwinSubjectId(subject)) {
+            throw new Error('Digital twin subject must be a valid urn:uuid identifier.');
+          }
+          if (!await isRegisteredDigitalTwinSubjectId({
+            vaultRepository: this.vaultRepository,
+            tenantVaultId,
+            twinSubjectId: subject,
+          })) {
+            throw new Error('Digital twin subject is not registered for this tenant.');
+          }
+        }
+
         const submittedAuthor = getClaimValue<string>(claims, 'Composition.author');
         const authenticatedAuthor = context.normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN
           ? getAuthenticatedJobActorDid(job)
@@ -414,10 +484,6 @@ export class CompositionManager implements IJobProcessor {
         const date = getClaimValue<string>(claims, 'Composition.date') || new Date().toISOString();
         const entryRefs = getClaimValue<string>(claims, 'Composition.entry') || '';
         const type = getClaimValue<string>(claims, 'Composition.type') || 'LOINC|60591-5';
-
-        const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
-        const tenantExists = await this.tenantExists(tenantVaultId);
-        if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
         const identifierClaim =
           getClaimValue<string>(claims, 'Composition.identifier') ||

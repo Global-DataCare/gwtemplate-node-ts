@@ -7,12 +7,19 @@
   Section-first search now treats that claim as multi-valued instead of
   synthesizing one Composition per section.
 - Make subject-level secondary-use withdrawal a reversible digital-twin
-  disable. `Consent.purpose=RESEARCH`,
+  disable. `Consent.purpose=HRESCH`,
   `Consent.action=organization/ResearchSubject.rs`, and
-  `Consent.decision=deny` deindex the current research projection and pause
-  future synchronization without deleting operational clinical data, the
-  stable private subject alias, or consent audit evidence. A later `permit`
-  rebuilds the complete research projection from current operational records.
+  `Consent.decision=deny` pauses future synchronization without deleting the
+  already published anonymous twin, operational clinical data, stable private
+  subject alias, or consent audit evidence. A later `permit` rebuilds the same
+  twin from current operational records.
+- Add index-provider offboarding through
+  `individual/.../ResearchSubject/_purge`. It deletes only the private
+  individual-to-twin correspondence; the detached anonymous twin remains
+  intact, and later enrollment allocates a new UUID.
+- Restrict direct digital-twin `Composition/_batch` to researcher working
+  selections whose subject is a tenant-registered UUID URN. Canonical writes,
+  operational DIDs, and invented UUIDs are rejected.
 
 ## [1.22.0] - 2026-08-26
 

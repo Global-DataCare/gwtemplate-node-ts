@@ -29,6 +29,7 @@ import {
   ExampleEmployeeEmails,
   ExampleEmployeeRoles,
 } from 'gdc-common-utils-ts/examples/employee';
+import { getDigitalTwinSubjectAliasSectionId } from '../../../utils/digital-twin-research-projection';
 
 const HOSTED_ORGANIZATION_DID = buildOrganizationDidWeb({
   hostDidWeb: `did:web:${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
@@ -42,6 +43,7 @@ const OPERATIONAL_EMPLOYEE_DID = buildProfessionalDidWeb({
   email: ExampleEmployeeEmails.SharedProfessional,
   role: ExampleEmployeeRoles.Doctor,
 });
+const REGISTERED_TWIN_SUBJECT = 'urn:uuid:00000000-0000-4000-8000-000000000101';
 
 describe('CompositionManager', () => {
   const mockVaultRepository = {
@@ -51,6 +53,8 @@ describe('CompositionManager', () => {
     getContainersInSection: jest.fn(),
     listContainersInSection: jest.fn(),
     getAllSections: jest.fn(),
+    get: jest.fn(),
+    delete: jest.fn(),
   } as unknown as jest.Mocked<IVaultRepository>;
 
   const manager = new CompositionManager(mockVaultRepository);
@@ -60,9 +64,15 @@ describe('CompositionManager', () => {
     mockVaultRepository.vaultExists.mockResolvedValue(true as any);
     mockVaultRepository.put.mockResolvedValue(true as any);
     mockVaultRepository.query.mockResolvedValue([] as any);
-    mockVaultRepository.getContainersInSection.mockResolvedValue([] as any);
+    mockVaultRepository.getContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => (
+      sectionId === getDigitalTwinSubjectAliasSectionId()
+        ? [{ id: 'source-subject-hash', twinSubjectId: REGISTERED_TWIN_SUBJECT }]
+        : []
+    ) as any);
     mockVaultRepository.listContainersInSection.mockResolvedValue([] as any);
     mockVaultRepository.getAllSections.mockResolvedValue([] as any);
+    mockVaultRepository.get.mockResolvedValue({ twinSubjectId: REGISTERED_TWIN_SUBJECT } as any);
+    mockVaultRepository.delete.mockResolvedValue(true as any);
   });
 
   const createJob = (overrides: Partial<JobRequest> = {}): JobRequest => ({
@@ -88,7 +98,17 @@ describe('CompositionManager', () => {
         resourceType: 'Bundle',
         type: 'batch',
         entry: [
-          { ...COMPOSITION_BATCH_ENTRY_EXAMPLE },
+          {
+            ...COMPOSITION_BATCH_ENTRY_EXAMPLE,
+            meta: {
+              ...(COMPOSITION_BATCH_ENTRY_EXAMPLE as any).meta,
+              claims: {
+                ...(COMPOSITION_BATCH_ENTRY_EXAMPLE as any).meta.claims,
+                '@type': 'Composition:ResearcherWorkingSelection',
+                'Composition.subject': REGISTERED_TWIN_SUBJECT,
+              },
+            },
+          },
         ],
       } as any,
     } as any,
@@ -111,7 +131,7 @@ describe('CompositionManager', () => {
     expect(data[0].response.location).not.toMatch(/\/Composition\/[0-9a-f]{8,}/i);
 
     const expectedSectionId = getSubjectScopedSectionId(
-      'did:web:connector.example.com:animal:chip:z123',
+      REGISTERED_TWIN_SUBJECT,
       'digitaltwin',
       'composition',
     );
@@ -122,7 +142,7 @@ describe('CompositionManager', () => {
   });
 
   it('rejects a digital-twin working selection whose author differs from the authenticated employee', async () => {
-    const entry = structuredClone(COMPOSITION_BATCH_ENTRY_EXAMPLE) as any;
+    const entry = structuredClone((createJob().content as any).body.entry[0]);
     entry.meta.claims['Composition.author'] = `${OPERATIONAL_EMPLOYEE_DID}:another`;
     const response = await manager.process(createJob({
       content: {
@@ -135,6 +155,76 @@ describe('CompositionManager', () => {
     const data = (response.body as any).data;
     expect(data[0].response.status).toBe('400');
     expect(JSON.stringify(data[0])).toContain('author must match the authenticated employee');
+    expect(mockVaultRepository.put).not.toHaveBeenCalled();
+  });
+
+  it('rejects a direct canonical digital-twin Composition write', async () => {
+    const entry = structuredClone((createJob().content as any).body.entry[0]);
+    delete entry.meta.claims['@type'];
+    const response = await manager.process(createJob({
+      content: {
+        ...(createJob().content as any),
+        body: { resourceType: 'Bundle', type: 'batch', entry: [entry] },
+      } as any,
+    }));
+
+    const data = (response.body as any).data;
+    expect(data[0].response.status).toBe('400');
+    expect(JSON.stringify(data[0])).toContain('ResearcherWorkingSelection');
+    expect(mockVaultRepository.put).not.toHaveBeenCalled();
+  });
+
+  it('purges only the private individual-to-twin link during index-provider offboarding', async () => {
+    const sourceSubject = 'did:web:patient.example.org:individual:real-subject';
+    const response = await manager.process(createJob({
+      section: 'individual',
+      resourceType: 'ResearchSubject',
+      action: '_purge',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [{ name: 'subject', valueString: sourceSubject }],
+        },
+      } as any,
+    }));
+
+    expect((response.body as any).resourceType).toBe('Parameters');
+    expect((response.body as any).parameter).toEqual([{ name: 'purged', valueBoolean: true }]);
+    expect(mockVaultRepository.delete).toHaveBeenCalledTimes(1);
+    expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a working selection whose subject is an operational DID', async () => {
+    const entry = structuredClone((createJob().content as any).body.entry[0]);
+    entry.meta.claims['Composition.subject'] = 'did:web:patient.example.org:individual:real-subject';
+    const response = await manager.process(createJob({
+      content: {
+        ...(createJob().content as any),
+        body: { resourceType: 'Bundle', type: 'batch', entry: [entry] },
+      } as any,
+    }));
+
+    const data = (response.body as any).data;
+    expect(data[0].response.status).toBe('400');
+    expect(JSON.stringify(data[0])).toContain('valid urn:uuid');
+    expect(mockVaultRepository.put).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invented UUID URN that is absent from the private alias registry', async () => {
+    mockVaultRepository.getContainersInSection.mockResolvedValue([] as any);
+    const entry = structuredClone((createJob().content as any).body.entry[0]);
+    entry.meta.claims['Composition.subject'] = 'urn:uuid:00000000-0000-4000-8000-000000000999';
+    const response = await manager.process(createJob({
+      content: {
+        ...(createJob().content as any),
+        body: { resourceType: 'Bundle', type: 'batch', entry: [entry] },
+      } as any,
+    }));
+
+    const data = (response.body as any).data;
+    expect(data[0].response.status).toBe('400');
+    expect(JSON.stringify(data[0])).toContain('not registered for this tenant');
     expect(mockVaultRepository.put).not.toHaveBeenCalled();
   });
 
@@ -175,6 +265,7 @@ describe('CompositionManager', () => {
     mockVaultRepository.listContainersInSection.mockResolvedValue([{ id: 'comp-1' }] as any);
     const job = createJob({
       action: '_search',
+      section: 'individual',
       content: {
         ...(createJob().content as any),
         body: COMPOSITION_SEARCH_BUNDLE_EXAMPLE as any,
@@ -192,6 +283,7 @@ describe('CompositionManager', () => {
     mockVaultRepository.listContainersInSection.mockResolvedValue([{ id: 'comp-1' }, { id: 'comp-2' }] as any);
     const job = createJob({
       action: '_search',
+      section: 'individual',
       content: {
         ...(createJob().content as any),
         body: COMPOSITION_SEARCH_PARAMETERS_EXAMPLE as any,
@@ -209,6 +301,7 @@ describe('CompositionManager', () => {
     mockVaultRepository.listContainersInSection.mockResolvedValue([{ id: 'comp-1' }] as any);
     const job = createJob({
       action: '_search',
+      section: 'individual',
       content: {
         ...(createJob().content as any),
         body: {
@@ -282,8 +375,28 @@ describe('CompositionManager', () => {
     expect(data[0].resource.type).toBe('document');
   });
 
+  it('rejects digitaltwin materialization for an operational subject DID', async () => {
+    const operationalSubjectDid = 'did:web:api.acme.org:individual:summary-subject-001';
+    const job = createJob({
+      sector: 'health-care',
+      section: 'digitaltwin',
+      format: 'org.hl7.fhir.r4',
+      resourceType: 'ResearchSubject',
+      action: '$summary',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [{ name: 'subject', valueString: operationalSubjectDid }],
+        },
+      } as any,
+    });
+
+    await expect(manager.process(job)).rejects.toThrow('tenant-registered urn:uuid');
+  });
+
   it('supports digitaltwin ResearchSubject/$summary with org.hl7.fhir.r4 materialization', async () => {
-    const subjectDid = 'did:web:api.acme.org:research-subject:twin-summary-r4-001';
+    const subjectDid = REGISTERED_TWIN_SUBJECT;
     mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
       if (sectionId === getSubjectScopedSectionId(subjectDid, 'digitaltwin', DataCollectionIds.composition)) {
         return [
@@ -405,7 +518,7 @@ describe('CompositionManager', () => {
   });
 
   it('supports digitaltwin ResearchSubject/$summary with org.hl7.fhir.api claims-first materialization', async () => {
-    const subjectDid = 'did:web:api.acme.org:research-subject:twin-summary-api-001';
+    const subjectDid = REGISTERED_TWIN_SUBJECT;
     mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
       if (sectionId === getSubjectScopedSectionId(subjectDid, 'digitaltwin', DataCollectionIds.composition)) {
         return [

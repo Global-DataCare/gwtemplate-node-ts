@@ -77,7 +77,9 @@ export class Worker {
           manager = job.action === '$summary' ? this.managers.compositionManager : undefined;
           break;
         case 'ResearchSubject':
-          manager = job.action === '$summary'
+          manager = job.action === '_purge' && job.section === SUBJECT_SECTION_INDIVIDUAL
+            ? this.managers.compositionManager
+            : job.action === '$summary'
             ? (job.section === 'digitaltwin'
               ? this.managers.twinCompositionManager || this.managers.compositionManager
               : this.managers.compositionManager)

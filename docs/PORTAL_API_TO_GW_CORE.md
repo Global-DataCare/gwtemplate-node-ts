@@ -169,6 +169,22 @@ Important:
 | `/subject/access-consents` | `GET` | list consents with associated evidence | reconstructs a portal-side aggregate from storage/audit |
 | `/subject/access-consents/{consentId}` | `GET` | get one consent detail with original evidence | returns the consent aggregate plus evidence/references |
 
+## Secondary Research Use and Digital Twin Provider Lifecycle
+
+The Next.js BFF owns the product routes below and calls the typed Node actor
+facade. Browser code never posts a canonical twin Composition and never
+selects a twin UUID.
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/subject/secondary-use-consent` | `GET` | show whether research synchronization is enabled for the configured research organization | calls `getDigitalTwinSecondaryUseConsentStatus(...)` |
+| `/subject/secondary-use-consent` | `PUT` | enable or disable future synchronization | maps `enabled` to canonical `Consent.decision = permit \| deny` through `setDigitalTwinSecondaryUseConsent(...)`; deny preserves the private alias and published anonymous twin |
+| `/subject/digital-twin-provider` | `DELETE` | delete the index account or migrate away from this index provider | calls `purgeDigitalTwinSubjectLink(...)`; deletes only the private subject↔twin correspondence and never the anonymous twin |
+
+After `deny` then `permit`, GW reuses the same registered UUID and rebuilds it
+from current operational data. After provider purge and later enrollment, GW
+allocates a new UUID; the detached anonymous twin remains frozen.
+
 ## Related Persons
 
 This block models subject contacts and relationships, not invited access

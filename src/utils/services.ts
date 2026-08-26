@@ -293,6 +293,13 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
         [ACTION_PURGE],
       ),
     );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.r4' },
+        ['ResearchSubject'],
+        [ACTION_PURGE],
+      ),
+    );
     // Personal (non-clinical) data collection endpoints use the versionless `org.hl7.fhir.api` context.
     services.push(
       createDidEndpointConfigFromSelector(
@@ -305,6 +312,13 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
       createDidEndpointConfigFromSelector(
         { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
         ['RelatedPerson'],
+        [ACTION_PURGE],
+      ),
+    );
+    services.push(
+      createDidEndpointConfigFromSelector(
+        { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
+        ['ResearchSubject'],
         [ACTION_PURGE],
       ),
     );

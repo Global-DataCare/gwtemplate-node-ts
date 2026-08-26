@@ -4,7 +4,7 @@ import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { getClaimValue } from './claims';
 import { buildConsentRuleStorageKey, hashConsentRuleId } from './consent';
-import { getIndividualSectionId } from './individual-sections';
+import { getIndividualSectionId, getSubjectScopedSectionId } from './individual-sections';
 import { applyDigitalTwinSecondaryUseDecision } from './digital-twin-secondary-use';
 
 export const requiredConsentClaims = [
@@ -108,6 +108,11 @@ export async function persistConsentRuleAndAttachment(
   }
 
   await vaultRepository.put(tenantVaultId, [consentRule], getIndividualSectionId(subjectId, 'rules'));
+  await vaultRepository.put(
+    tenantVaultId,
+    [consentRule],
+    getSubjectScopedSectionId(subjectId, 'individual', 'consents'),
+  );
   await applyDigitalTwinSecondaryUseDecision({ vaultRepository, tenantVaultId, claims });
   return { subjectId, attachmentHash, ruleId };
 }

@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { FhirResourceTypeDataCollections } from 'gdc-common-utils-ts/constants/index';
+import { FhirResourceTypeDataCollections, HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/index';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import type { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
@@ -38,7 +38,7 @@ function splitValues(value: unknown): string[] {
 function isResearchSecondaryUseRule(claims: Record<string, any>): boolean {
   const purpose = String(getClaimValue(claims, ClaimConsent.purpose) || '').trim().toUpperCase();
   const actions = splitValues(getClaimValue(claims, ClaimConsent.action));
-  return purpose === 'RESEARCH' && actions.some((action) =>
+  return (purpose === HealthcareConsentPurposes.Research || purpose === 'RESEARCH') && actions.some((action) =>
     action === ServiceCapability.DigitalTwinReader || action === ServiceCapability.DigitalTwinProvider,
   );
 }
@@ -148,10 +148,10 @@ export async function isDigitalTwinSecondaryUseEnabled(input: {
 /**
  * Applies one subject-level research-use decision.
  *
- * A denial deindexes the current projection and pauses future synchronization.
- * A later permit preserves the stable alias and rebuilds the projection from
- * the current operational records. This is intentionally a reversible disable,
- * not a destructive purge of the operational record or audit history.
+ * A denial pauses future synchronization while preserving both the stable
+ * alias and the already lawfully published anonymous twin. A later permit
+ * rebuilds that same twin from the current operational records. This is a
+ * reversible disable, not provider offboarding and not a purge.
  */
 export async function applyDigitalTwinSecondaryUseDecision(input: {
   vaultRepository: IVaultRepository;
@@ -172,18 +172,40 @@ export async function applyDigitalTwinSecondaryUseDecision(input: {
   };
   await input.vaultRepository.put(input.tenantVaultId, [status], statusSectionId());
 
-  if (decision === 'deny') {
-    await clearSubjectProjection(input.vaultRepository, input.tenantVaultId, sourceSubject);
-    const alias = await input.vaultRepository.get<any>(
-      input.tenantVaultId,
-      subjectHash(sourceSubject),
-      getEnvSectionId('digitaltwin_subject_aliases'),
-    );
-    if (alias?.twinSubjectId) {
-      await clearSubjectProjection(input.vaultRepository, input.tenantVaultId, alias.twinSubjectId);
-    }
-  } else {
+  if (decision === 'permit') {
     await rebuildProjection(input.vaultRepository, input.tenantVaultId, sourceSubject);
   }
   return true;
+}
+
+/**
+ * Provider offboarding irreversibly destroys only the tenant-private
+ * individual-to-twin binding (account deletion or index-provider migration).
+ *
+ * The already projected twin remains searchable as anonymous, immutable
+ * research data. Synchronization is disabled first. A later permit creates a
+ * new UUID URN and cannot reconnect the old anonymous twin to the individual.
+ */
+export async function purgeDigitalTwinSubjectLink(input: {
+  vaultRepository: IVaultRepository;
+  tenantVaultId: string;
+  sourceSubject: string;
+}): Promise<{ purged: boolean; detachedTwinSubjectId?: string }> {
+  const sourceSubject = String(input.sourceSubject || '').trim();
+  if (!sourceSubject) throw new Error('sourceSubject is required');
+  const id = subjectHash(sourceSubject);
+  const aliasSectionId = getEnvSectionId('digitaltwin_subject_aliases');
+  const alias = await input.vaultRepository.get<any>(input.tenantVaultId, id, aliasSectionId);
+
+  await input.vaultRepository.put(input.tenantVaultId, [{
+    id,
+    type: 'digital-twin-secondary-use-status',
+    sourceSubjectHash: id,
+    status: 'disabled',
+    changedAt: new Date().toISOString(),
+  }], statusSectionId());
+
+  if (!alias?.twinSubjectId) return { purged: false };
+  await input.vaultRepository.delete(input.tenantVaultId, id, aliasSectionId);
+  return { purged: true, detachedTwinSubjectId: alias.twinSubjectId };
 }
