@@ -10,6 +10,24 @@ image, and deploy only its immutable registry digest. Do not replace the
 checked-in scripts with ad-hoc `docker build`, `docker push` or `kubectl set
 image` commands.
 
+## Product identity boundary
+
+Never infer the product from a historical GCP project, cluster, context, or
+repository name. Resolve the workload tuple first and keep these products
+strictly separate:
+
+- GW CORE staging: public `34.175.78.233`, namespace `test-gdc-v1`, Deployment
+  and Service `gwtemplate`. The historical cluster name
+  `gdc-unid-southwest` does not make this GW UNID.
+- GW UNID: the separately deployed `uhc-gw` workload/domain.
+- GW SOSCHAIN: the separately deployed `soschain-gw` workload/domain.
+
+This skill deploys GW CORE only. It must never describe, mutate, validate, or
+report `uhc-gw` or `soschain-gw` as part of a CORE release. Before any
+`kubectl` mutation, select the CORE cluster credentials explicitly and verify
+that the resolved namespace, Deployment, Service and public address all match
+the CORE tuple above. A currently active context is not evidence of the target.
+
 ## Read before acting
 
 1. Read the repository `AGENTS.md`.
