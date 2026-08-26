@@ -20,6 +20,7 @@ import {
 } from '../../utils/consent-access-blockchain';
 import { getJurisdictionGroup } from '../../utils/jurisdiction';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
+import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 
 /**
  * @fileoverview This test suite verifies the functionality of the ConsentManager.
@@ -136,6 +137,31 @@ describe('ConsentManager', () => {
     );
   });
 
+  it('upserts one portal consent by identifier while keeping study consents distinct', async () => {
+    mockVaultRepository.vaultExists.mockResolvedValue(true);
+    mockVaultRepository.put.mockResolvedValue(true);
+    const buildRequest = (identifier: string, decision: 'permit' | 'deny') => {
+      const request = structuredClone(mockJobRequest);
+      const claims = (request.content!.body as any).data[0].meta.claims;
+      claims[ClaimConsent.identifier] = identifier;
+      claims[ClaimConsent.decision] = decision;
+      claims[ClaimConsent.purpose] = HealthcareConsentPurposes.Research;
+      claims[ClaimConsent.action] = ServiceCapability.DigitalTwinReader;
+      return request;
+    };
+
+    await consentManager.process(buildRequest('urn:uuid:00000000-0000-4000-8000-000000000201', 'permit'));
+    await consentManager.process(buildRequest('urn:uuid:00000000-0000-4000-8000-000000000202', 'permit'));
+    await consentManager.process(buildRequest('urn:uuid:00000000-0000-4000-8000-000000000201', 'deny'));
+
+    const storedRules = mockVaultRepository.put.mock.calls
+      .filter((call) => String(call[2]).includes('rules'))
+      .map((call) => call[1][0] as Record<string, any>);
+    expect(storedRules).toHaveLength(3);
+    expect(storedRules[0].id).not.toBe(storedRules[1].id);
+    expect(storedRules[2].id).toBe(storedRules[0].id);
+  });
+
   it('should save attachment and rule to the correct sections in the vault', async () => {
     // Arrange: Define the behavior of the mocked repository for this specific test
     mockVaultRepository.vaultExists.mockResolvedValue(true);
@@ -156,7 +182,7 @@ describe('ConsentManager', () => {
 
     const tenantVaultId = getTenantVaultId(mockSector, mockTenantId);
     expect(mockVaultRepository.vaultExists).toHaveBeenCalledWith(tenantVaultId);
-    expect(mockVaultRepository.put).toHaveBeenCalledTimes(2);
+    expect(mockVaultRepository.put).toHaveBeenCalledTimes(3);
 
     // Assert the attachment was stored correctly
     const [attachmentVaultId, attachmentDocs, attachmentSection] = mockVaultRepository.put.mock.calls[0];
@@ -180,6 +206,10 @@ describe('ConsentManager', () => {
     expect(ruleVaultId).toEqual(tenantVaultId);
     expect(ruleSection).toEqual(getIndividualSectionId(mockSubjectId, 'rules'));
     expect(storedRule.id).toEqual(expectedRuleId);
+    const [subjectRuleVaultId, subjectRuleDocs, subjectRuleSection] = mockVaultRepository.put.mock.calls[2];
+    expect(subjectRuleVaultId).toEqual(tenantVaultId);
+    expect(subjectRuleDocs[0]).toEqual(storedRule);
+    expect(subjectRuleSection).toContain('individual_consents_');
     expect(getClaimValue(storedRule, ClaimConsent.attachmentId)).toEqual(mockAttachmentHash);
     expect(getClaimValue(storedRule, ClaimConsent.attachmentData)).toBeUndefined();
   });
