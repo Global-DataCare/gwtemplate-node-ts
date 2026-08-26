@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Keep Google Cloud client authentication on the direct
+  `google-auth-library` dependency across transitive Storage and Firestore
+  clients. This preserves GKE Workload Identity metadata handling when the
+  security-pinned `gaxios` override is active.
+
 - Preserve one digital-twin `Composition` per source IPS document/version with
   all indexed IPS section tokens in the same `Composition.section` claim.
   Section-first search now treats that claim as multi-valued instead of
