@@ -177,7 +177,7 @@ selects a twin UUID.
 
 | Portal API | Method | Frontend purpose | Portal backend behavior |
 |---|---|---|---|
-| `/subject/secondary-use-consent` | `GET` | show whether research synchronization is enabled for the configured research organization | calls `getDigitalTwinSecondaryUseConsentStatus(...)` |
+| `/subject/secondary-use-consent` | `GET` | show whether research synchronization is enabled for this portal/software/study | calls `getDigitalTwinSecondaryUseConsentStatus(...)` with the BFF-configured `researchUseReference` |
 | `/subject/secondary-use-consent` | `PUT` | enable or disable future synchronization | maps `enabled` to canonical `Consent.decision = permit \| deny` through `setDigitalTwinSecondaryUseConsent(...)`; deny preserves the private alias and published anonymous twin |
 | `/subject/digital-twin-provider` | `DELETE` | delete the index account or migrate away from this index provider | calls `purgeDigitalTwinSubjectLink(...)`; deletes only the private subject↔twin correspondence and never the anonymous twin |
 
@@ -185,12 +185,13 @@ After `deny` then `permit`, GW reuses the same registered UUID and rebuilds it
 from current operational data. After provider purge and later enrollment, GW
 allocates a new UUID; the detached anonymous twin remains frozen.
 
-The index-provider agreement has one stable `Consent.identifier`, created at
-service enrollment and reused for GET/PUT. This makes the toggle an idempotent
-upsert. Future research studies must use different consent identifiers even if
-they share `HRESCH`, `organization/ResearchSubject.rs`, and the same research
-organization; the BFF reads the exact portal identifier and never treats a
-study consent as the portal consent.
+The BFF configures one stable `researchUseReference` URL or URI for its portal,
+software product or study and reuses it for GET/PUT. GW maps it to
+`Consent.source-reference`, resolves or creates the private
+`Consent.identifier`, and performs an idempotent upsert. The BFF never stores
+that internal identifier. Future studies use different source references even
+when they share the same subject, index provider, `HRESCH` and Digital Twin
+reader action.
 
 ## Related Persons
 

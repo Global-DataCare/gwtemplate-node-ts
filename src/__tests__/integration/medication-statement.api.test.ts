@@ -1,7 +1,12 @@
 import { invokeExpress } from './helpers/invokeExpress';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
-import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
+import {
+  HealthcareBasicSections,
+  HealthcareConsentPurposes,
+  ServiceCapability,
+} from 'gdc-common-utils-ts/constants/index';
+import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import {
   buildDemoCommunicationBatchSubmitRequest,
   demoCommunicationMedicationIpsDefaults,
@@ -14,6 +19,7 @@ import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { testTenant1TenantId } from '../data/organization.data';
 import { getDigitalTwinSubjectAliasSectionId } from '../../utils/digital-twin-research-projection';
+import { applyDigitalTwinSecondaryUseDecision } from '../../utils/digital-twin-secondary-use';
 
 describe('MedicationStatement API (integration)', () => {
   afterEach(() => {
@@ -731,6 +737,17 @@ describe('MedicationStatement API (integration)', () => {
       await tenantManager.getTenant(tenantVaultId);
 
       const subjectDid = 'did:web:api.acme.org:individual:twin-subject-001';
+      await applyDigitalTwinSecondaryUseDecision({
+        vaultRepository,
+        tenantVaultId,
+        claims: {
+          [ClaimConsent.subject]: subjectDid,
+          [ClaimConsent.purpose]: HealthcareConsentPurposes.Research,
+          [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
+          [ClaimConsent.sourceReference]: 'https://portal.example/research',
+          [ClaimConsent.decision]: 'permit',
+        },
+      });
       const communicationThid = 'communication-digitaltwin-medication-001';
       const medicationCode = 'http://www.nlm.nih.gov/research/umls/rxnorm|161';
       const embeddedMedicationBundle = {

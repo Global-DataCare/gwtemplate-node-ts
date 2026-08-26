@@ -1011,6 +1011,7 @@ describe('CommunicationManager Unit Tests', () => {
     it('projects one Composition index per IPS section into individual and digitaltwin scopes', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+      mockVaultRepository.get.mockResolvedValue({ status: 'enabled' } as any);
 
       const documentBundle = {
         resourceType: 'Bundle',

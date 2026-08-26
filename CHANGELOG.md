@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Make `Consent.source-reference` the public stable key for each Digital Twin
+  portal/software/study permission. GW now owns the internal
+  `Consent.identifier`, reuses one rule per semantic reference, keeps distinct
+  studies separate and aggregates permit/deny decisions without requiring BFF
+  consent-id persistence.
 - Align the high-level Digital Twin lifecycle, SEDIA matrix, adapter guidance
   and repository-local governance skill: patient portals own only the FHIR
   secondary-use toggle and normal IPS Communication flow; GW owns registered
@@ -60,7 +65,7 @@
   selections whose subject is a tenant-registered UUID URN. Canonical writes,
   operational DIDs, and invented UUIDs are rejected.
 - Document the portal/index-provider consent as an idempotent rule selected by
-  its stable `Consent.identifier`, so future study-specific research consents
+  its stable `Consent.source-reference`, so future study-specific research consents
   cannot be mistaken for the portal toggle.
 
 ## [1.22.0] - 2026-08-26

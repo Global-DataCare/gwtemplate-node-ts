@@ -25,6 +25,11 @@ describe('digital twin secondary-use lifecycle', () => {
     [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
   };
 
+  it('does not project before an explicit secondary-use permit', async () => {
+    const vaultRepository = new VaultMemRepository();
+    expect(await isDigitalTwinSecondaryUseEnabled({ vaultRepository, tenantVaultId, sourceSubject })).toBe(false);
+  });
+
   it('accepts only UUID URNs registered by the tenant alias vault', async () => {
     const vaultRepository = new VaultMemRepository();
     const twinSubjectId = await getOrCreateDigitalTwinSubjectId({ vaultRepository, tenantVaultId, sourceSubject });
@@ -149,5 +154,40 @@ describe('digital twin secondary-use lifecycle', () => {
       tenantVaultId,
       getSubjectScopedSectionId(newTwinSubjectId, 'digitaltwin', 'composition'),
     )).toHaveLength(1);
+  });
+
+  it('keeps projection enabled while another portal or study still permits use', async () => {
+    const vaultRepository = new VaultMemRepository();
+    const consentSection = getSubjectScopedSectionId(sourceSubject, 'individual', 'consents');
+    await vaultRepository.put(tenantVaultId, [{
+      id: 'study-b',
+      ...baseClaims,
+      [ClaimConsent.sourceReference]: 'urn:study:b',
+      [ClaimConsent.decision]: 'permit',
+    }], consentSection);
+
+    await applyDigitalTwinSecondaryUseDecision({
+      vaultRepository,
+      tenantVaultId,
+      claims: {
+        ...baseClaims,
+        [ClaimConsent.sourceReference]: 'https://portal.example/research',
+        [ClaimConsent.decision]: 'deny',
+      },
+    });
+
+    expect(await isDigitalTwinSecondaryUseEnabled({ vaultRepository, tenantVaultId, sourceSubject })).toBe(true);
+
+    await applyDigitalTwinSecondaryUseDecision({
+      vaultRepository,
+      tenantVaultId,
+      claims: {
+        ...baseClaims,
+        [ClaimConsent.sourceReference]: 'urn:study:b',
+        [ClaimConsent.decision]: 'deny',
+      },
+    });
+
+    expect(await isDigitalTwinSecondaryUseEnabled({ vaultRepository, tenantVaultId, sourceSubject })).toBe(false);
   });
 });

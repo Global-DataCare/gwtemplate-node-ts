@@ -21,7 +21,11 @@ import { IJobProcessor } from './registry';
 import { determineResourceId } from '../utils/resource';
 import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMappings } from '../utils/fhir-versioning';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
-import { persistConsentRuleAndAttachment, requiredConsentClaimsFor } from '../utils/consent-storage';
+import {
+  ensureDigitalTwinSecondaryUseConsentIdentifier,
+  persistConsentRuleAndAttachment,
+  requiredConsentClaimsFor,
+} from '../utils/consent-storage';
 import {
   buildConsentRulePrimaryDocument,
   deriveConsentRuleBlockchainStatus as deriveConsentAccessBlockchainStatus,
@@ -92,6 +96,20 @@ export class ConsentManager implements IJobProcessor {
             // - If `@context` is set (e.g. `org.hl7.fhir.r4`) and keys are sent without that prefix,
             //   prepend `${@context}.` and sort keys alphabetically (canonical form).
             const claims = normalizeContextualizedClaims(rawClaims) as Record<string, any>;
+            const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+            const tenantExists = await this.tenantExists(tenantVaultId);
+            if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
+
+            ensureDigitalTwinSecondaryUseConsentIdentifier({
+              tenantVaultId,
+              sector: job.sector as string,
+              claims,
+            });
+            for (const claimKey of requiredConsentClaimsFor(claims)) {
+              if (!getClaimValue(claims, claimKey)) {
+                throw new Error(`Missing required claim: ${claimKey}`);
+              }
+            }
             const researchTags = extractLedgerSafeResearchTags(entry);
             const identifierClaim =
               getClaimValue<string>(claims, 'Consent.identifier') ||
@@ -103,16 +121,6 @@ export class ConsentManager implements IJobProcessor {
               resourceType: 'Consent',
               resourceId: fallbackId,
             });
-
-            for (const claimKey of requiredConsentClaimsFor(claims)) {
-                if (!getClaimValue(claims, claimKey)) {
-                    throw new Error(`Missing required claim: ${claimKey}`);
-                }
-            }
-            const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
-
-            const tenantExists = await this.tenantExists(tenantVaultId);
-            if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
             await persistConsentRuleAndAttachment({
               vaultRepository: this.vaultRepository,

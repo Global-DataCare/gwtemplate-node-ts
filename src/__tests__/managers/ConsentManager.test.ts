@@ -123,6 +123,8 @@ describe('ConsentManager', () => {
     claims[ClaimConsent.decision] = 'deny';
     claims[ClaimConsent.purpose] = 'RESEARCH';
     claims[ClaimConsent.action] = ServiceCapability.DigitalTwinReader;
+    claims[ClaimConsent.sourceReference] = 'https://portal.example/research';
+    delete claims[ClaimConsent.identifier];
 
     const response = await consentManager.process(request);
 
@@ -144,6 +146,8 @@ describe('ConsentManager', () => {
     const claims = (request.content!.body as any).data[0].meta.claims;
     claims[ClaimConsent.purpose] = HealthcareConsentPurposes.Research;
     claims[ClaimConsent.action] = ServiceCapability.DigitalTwinReader;
+    claims[ClaimConsent.sourceReference] = 'https://portal.example/research';
+    delete claims[ClaimConsent.identifier];
     delete claims[ClaimConsent.attachmentContentType];
     delete claims[ClaimConsent.attachmentData];
 
@@ -158,25 +162,27 @@ describe('ConsentManager', () => {
     expect(getClaimValue(storedRule, ClaimConsent.attachmentContentType)).toBeUndefined();
     expect(getClaimValue(storedRule, ClaimConsent.attachmentData)).toBeUndefined();
     expect(getClaimValue(storedRule, ClaimConsent.attachmentId)).toBeUndefined();
+    expect(getClaimValue(storedRule, ClaimConsent.identifier)).toMatch(/^urn:uuid:/);
   });
 
-  it('upserts one portal consent by identifier while keeping study consents distinct', async () => {
+  it('upserts by application/study source reference while keeping the internal identifier out of the caller contract', async () => {
     mockVaultRepository.vaultExists.mockResolvedValue(true);
     mockVaultRepository.put.mockResolvedValue(true);
     mockBlockchainAdapter.registerConsentAccessBundle.mockResolvedValue({ accepted: 1, txId: 'tx-consent-id-isolation' });
-    const buildRequest = (identifier: string, decision: 'permit' | 'deny') => {
+    const buildRequest = (sourceReference: string, decision: 'permit' | 'deny') => {
       const request = structuredClone(mockJobRequest);
       const claims = (request.content!.body as any).data[0].meta.claims;
-      claims[ClaimConsent.identifier] = identifier;
+      claims[ClaimConsent.identifier] = `urn:uuid:caller-owned-${decision}-${sourceReference}`;
+      claims[ClaimConsent.sourceReference] = sourceReference;
       claims[ClaimConsent.decision] = decision;
       claims[ClaimConsent.purpose] = HealthcareConsentPurposes.Research;
       claims[ClaimConsent.action] = ServiceCapability.DigitalTwinReader;
       return request;
     };
 
-    await consentManager.process(buildRequest('urn:uuid:00000000-0000-4000-8000-000000000201', 'permit'));
-    await consentManager.process(buildRequest('urn:uuid:00000000-0000-4000-8000-000000000202', 'permit'));
-    await consentManager.process(buildRequest('urn:uuid:00000000-0000-4000-8000-000000000201', 'deny'));
+    await consentManager.process(buildRequest('https://portal.example/research', 'permit'));
+    await consentManager.process(buildRequest('urn:study:future-trial-42', 'permit'));
+    await consentManager.process(buildRequest('https://portal.example/research', 'deny'));
 
     const storedRules = mockVaultRepository.put.mock.calls
       .filter((call) => String(call[2]).includes('rules'))
@@ -184,6 +190,10 @@ describe('ConsentManager', () => {
     expect(storedRules).toHaveLength(3);
     expect(storedRules[0].id).not.toBe(storedRules[1].id);
     expect(storedRules[2].id).toBe(storedRules[0].id);
+    expect(getClaimValue(storedRules[2], ClaimConsent.identifier)).toBe(
+      getClaimValue(storedRules[0], ClaimConsent.identifier),
+    );
+    expect(getClaimValue(storedRules[0], ClaimConsent.identifier)).not.toContain('caller-owned');
     const ledgerAssetIds = mockBlockchainAdapter.registerConsentAccessBundle.mock.calls
       .map((call) => call[0].assetId);
     expect(ledgerAssetIds[0]).not.toBe(ledgerAssetIds[1]);
