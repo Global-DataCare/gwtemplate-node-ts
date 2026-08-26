@@ -35,6 +35,12 @@ claiming that a binding exists.
 - Treat the same exact `_activate` or `_transaction` submission for an existing
   tenant as an idempotent re-registration: upsert the controller, append its DID
   and recreate a missing tenant collection without creating another Offer.
+- Treat tenant key provisioning as idempotent too. After restart, recover and
+  return the persisted signing, encryption, storage and HMAC keys; never use an
+  activation or Order replay as implicit key rotation.
+- Before serving tenant traffic, reconcile a stale public tenant DID only from
+  the public counterparts of recoverable KMS keys. Preserve the DID id, aliases,
+  controllers and services, and re-sign an obsolete tenant self-description.
 - Keep later service-controller `_issue`, activation code, `Token/_exchange`
   and `Device/_dcr` as distinct steps.
 - In canonical `Token/_exchange`, use the validated request-route tenant.
@@ -109,6 +115,9 @@ public policy.
   with one unchanged controller reference and no new Offer.
 - The public `tenant-status.json` projection moves from `required` to
   `credential_issued` and then `dcr_active` without exposing contact data.
+- A restart followed by activation/Order replay leaves the tenant encryption
+  `kid` unchanged; a deliberately stale DID projection is repaired without
+  generating keys or changing controllers and encrypted inventory is accepted.
 - Re-verification that omits a previously signed technical-controller field
   preserves its hashed pending designation and never copies the representative
   JWK to that actor.

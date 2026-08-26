@@ -324,6 +324,69 @@ describe('HostingManager', () => {
     ).toContain('https://individual-runtime.example/');
   });
 
+  it('[1.3 TENANT] republishes recoverable tenant keys without changing identity, controllers or services', async () => {
+    const tenantId = 'VATES-B42215152';
+    const sector = Sector.HEALTH_CARE;
+    const tenantVaultId = tenantUtils.getTenantVaultId(sector, tenantId);
+    const hostCollectionName = await mockTenantsCacheManager.getCollectionName('host') as string;
+    const did = `did:web:uhc-gw.unid.online:${tenantId}:cds-ES:v1:${sector}`;
+    const controller = 'did:web:controller.antifraud.services';
+    const service = [{ id: `${did}#employee`, type: 'DataService', serviceEndpoint: 'https://uhc-gw.unid.online/employee' }];
+    const staleKey = { kid: 'stale-encryption-kid', kty: 'OKP', crv: 'ML-KEM-768', x: 'stale', use: 'enc' };
+    const claims: ClaimsRecord = {
+      [ClaimsOrganizationSchemaorg.alternateName]: tenantId,
+      [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+      [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+      [ClaimsOrganizationSchemaorg.identifierValue]: tenantId,
+      [ClaimsServiceSchemaorg.category]: sector,
+    };
+    const stored = await mockKmsService.protectConfidentialData({
+      id: tenantVaultId,
+      status: 'active',
+      sequence: 4,
+      content: {
+        id: tenantVaultId,
+        type: 'organization',
+        status: 'active',
+        networkStatus: [],
+        claims,
+        didDocument: {
+          '@context': 'https://www.w3.org/ns/did/v1',
+          id: did,
+          controller: [controller],
+          service,
+          verificationMethod: [{
+            id: `${did}#${staleKey.kid}`,
+            controller: did,
+            type: 'JsonWebKey2020',
+            publicKeyJwk: staleKey,
+          }],
+          keyAgreement: [`${did}#${staleKey.kid}`],
+        },
+        meta: { lastUpdated: '2026-08-25T00:00:00.000Z' },
+      },
+    } as ConfidentialStorageDoc, 'host');
+    await vaultRepository.put(hostCollectionName, [stored], getEnvSectionId('tenants'));
+
+    expect(await hostingManager.reconcileTenantDidKeyMaterial()).toBe(1);
+
+    const refreshed = await vaultRepository.get(
+      hostCollectionName,
+      tenantVaultId,
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc;
+    const tenant = refreshed.content as any;
+    expect(tenant.didDocument.id).toBe(did);
+    expect(tenant.didDocument.controller).toEqual([controller]);
+    expect(tenant.didDocument.service).toEqual(service);
+    expect(tenant.didDocument.verificationMethod.map((method: any) => method.publicKeyJwk.kid))
+      .toEqual(expect.arrayContaining(['key-1', 'key-2']));
+    expect(tenant.didDocument.verificationMethod.some((method: any) => method.publicKeyJwk.kid === staleKey.kid))
+      .toBe(false);
+    expect(tenant.sequence).toBeUndefined();
+    expect(refreshed.sequence).toBe(5);
+  });
+
   it('[5 TENANT (Happy Path): should create full tenant config and protect it', async () => {
     // PRE-CONDITION: Ensure host vault exists before creating a tenant.
     await hostingManager.bootstrapHost(testClaimsHostInitialization);

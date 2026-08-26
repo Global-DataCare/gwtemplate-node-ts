@@ -80,6 +80,22 @@ describe('KmsService', () => {
       const storedKeys = await kmsService.getPublicJwks('tenant-123');
       expect(storedKeys).toEqual(jwks);
     });
+
+    it('reuses persisted entity keys after restart instead of overwriting the published key set', async () => {
+      const initialJwks = await kmsService.provisionKeys('tenant-existing');
+      const publishedEncryptionKid = initialJwks.keys.find((key) => key.use === 'enc')?.kid;
+      jest.clearAllMocks();
+
+      const restartedKmsService = new KmsService(mockCryptoService, mockTenantsCacheManager, {
+        wrappedKeyRepository,
+        envelopeAdapter: new InMemoryEnvelopeAdapter(),
+      });
+      const replayedJwks = await restartedKmsService.provisionKeys('tenant-existing');
+
+      expect(mockCryptoService.generateKeyPairMlDsa).not.toHaveBeenCalled();
+      expect(mockCryptoService.generateKeyPairMlKem).not.toHaveBeenCalled();
+      expect(replayedJwks.keys.find((key) => key.use === 'enc')?.kid).toBe(publishedEncryptionKid);
+    });
   });
 
   describe('init', () => {
