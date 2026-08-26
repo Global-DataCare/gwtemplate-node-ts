@@ -150,8 +150,8 @@ Teaching rule:
 - Poll: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response`
 - Output includes first activation code in `org.schema.IndividualProduct.serialNumber`
 
-3. Employee device identity bootstrap
-- After `Order/_batch`, the controller uses the activation code (`org.schema.IndividualProduct.serialNumber`) to run:
+3. Modern controller/employee device identity bootstrap
+- After canonical `Order/_batch`, the modern controller uses the activation code (`org.schema.IndividualProduct.serialNumber`) to run:
 `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange` (+ poll),
 exchanging the email-proof `id_token` for the `initial_access_token` required by DCR.
 - Then the controller runs:
@@ -163,8 +163,12 @@ binding wallet public key(s) to that license serial number and controller email 
     lifecycle
   - `Token/_exchange` + `Device/_dcr` registers the technical client/device/BFF
     identity that will operate afterwards
-  - controller binding material such as `credentialSubject.hasCredential.material`
-    does not replace DCR
+  - controller binding material does not replace DCR for a modern service
+    controller or employee device
+  - explicit legacy exception: historical `Organization/_activate` receives
+    the representative `controllerBinding` and binds that submitted public key
+    during tenant bootstrap; that same representative key does not repeat
+    `Token/_exchange` or `Device/_dcr`
 - DCR semantics in CORE:
   - registers the technical client/device/app identity
   - does not by itself publish or replace the human controller/professional DID document

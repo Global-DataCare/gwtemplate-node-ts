@@ -21,6 +21,15 @@ type FirebaseCustomTokenBody = {
   id_token?: string;
 };
 
+/**
+ * Owns activation-code exchange for modern controller/employee devices.
+ *
+ * `_exchange` deliberately calls `verifyIdToken`, not the broader
+ * controller-route Bearer verifier: a controller VP proves role authority but
+ * does not prove the account/email binding consumed with the activation code.
+ * The historical representative already bound by legacy Organization
+ * `_activate` does not enter this exchange/DCR continuation for that same key.
+ */
 export class IdentityTokenManager implements IJobProcessor {
   constructor(
     private readonly appAuthManager: AppAuthorizationManager,

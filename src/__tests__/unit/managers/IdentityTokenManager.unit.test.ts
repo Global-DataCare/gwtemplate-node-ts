@@ -15,9 +15,11 @@ jest.mock('../../../auth/OidcFederationService', () => ({
 }));
 
 /**
- * Token/_exchange trust contract: Firebase proves the user/contact while the
- * already validated request route selects the tenant. A custom tenant_id claim
- * is optional and, when present, may only narrow that route selection.
+ * Token/_exchange trust contract: a trusted OIDC/Firebase id_token proves the
+ * user/contact while the already validated request route selects the tenant.
+ * A controller VP proves role authority but is not accepted as a substitute.
+ * A custom tenant_id claim is optional and, when present, may only narrow that
+ * route selection.
  */
 describe('IdentityTokenManager route-owned tenant exchange', () => {
   function buildHarness(tokenPayload: Record<string, unknown>) {
@@ -79,5 +81,30 @@ describe('IdentityTokenManager route-owned tenant exchange', () => {
 
     await expect(harness.manager.process(harness.job)).rejects.toThrow(/tenant_id.*route tenant/i);
     expect(harness.verifyAndConsumeActivationCode).not.toHaveBeenCalled();
+  });
+
+  it('does not fall back to controller VP verification for device token exchange', async () => {
+    const verifyIdToken = jest.fn(async () => {
+      throw new Error('OIDC id_token rejected');
+    });
+    const verifyBearerToken = jest.fn(async () => ({ payload: { sub: EXAMPLE_ACCOUNT_OWNER_ID } }));
+    const manager = new IdentityTokenManager(
+      { verifyIdToken, verifyBearerToken } as any,
+      { createInitialAccessToken: jest.fn() } as any,
+    );
+    const job = {
+      action: '_exchange',
+      tenantId: EXAMPLE_TENANT_IDENTIFIER,
+      sector: EXAMPLE_SECTOR,
+      content: {
+        thid: 'exchange-vp-is-not-email-proof',
+        meta: { bearer: { token: 'Bearer signed-controller-vp' } },
+        body: { subject_token: EXAMPLE_EMPLOYEE_ACTIVATION_CODE },
+      },
+    } as any;
+
+    await expect(manager.process(job)).rejects.toThrow(/OIDC id_token rejected/);
+    expect(verifyIdToken).toHaveBeenCalledWith('signed-controller-vp');
+    expect(verifyBearerToken).not.toHaveBeenCalled();
   });
 });

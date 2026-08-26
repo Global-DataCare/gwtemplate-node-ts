@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [1.22.2] - 2026-08-26
+
+- Clarify and test the controller bootstrap split: legacy
+  `Organization/_activate` binds the submitted historical representative key
+  without a second DCR, while modern service-controller and employee device
+  exchange requires a separately signed trusted OIDC `id_token` for the
+  account/email binding. A controller VP proves role authority and cannot be
+  used as the `_exchange` email proof.
+
 - Accept the provider-level digital-twin secondary-use decision as a FHIR
   `Consent.meta.claims` rule without the legacy ODRL attachment. Other consent
   flows retain their attachment evidence requirement.

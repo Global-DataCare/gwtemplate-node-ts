@@ -78,6 +78,10 @@ export class AppAuthorizationManager {
    * The latter intentionally keeps lifecycle/control-plane calls separate from
    * SMART access tokens while avoiding a dependency on email-login proof when
    * the controller already presents ICA-backed wallet proof.
+   *
+   * This broader verifier is not the `Token/_exchange` verifier. Device token
+   * exchange calls `verifyIdToken(...)` directly because the VP cannot replace
+   * the trusted account/email proof required to bind an activation code.
    */
   public async verifyBearerToken(
     token: string,
