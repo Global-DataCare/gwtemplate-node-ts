@@ -65,18 +65,22 @@ describe('processHostOrderEntry active offer idempotency', () => {
   it('returns the already issued automatic access when replaying an accepted organization offer', async () => {
     const offerId = 'urn:cds:ES:v1:health-care:product:org.schema:Offer:existing';
     const put = jest.fn();
+    const decryptedRegistration = {
+      status: 'active',
+      claims: {
+        [ClaimsOrganizationSchemaorg.alternateName]: 'example-tenant',
+        [ClaimsPersonSchemaorg.email]: 'representative@example.org',
+        [ClaimsPersonSchemaorg.hasOccupation]: 'ISCO-08|1120',
+        [ClaimsServiceSchemaorg.category]: 'health-care',
+      },
+    };
     const response = await processHostOrderEntry({
       entry: { meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } } } as any,
       vaultRepository: {
         query: jest.fn(async () => [{
           status: 'active',
-          content: { status: 'active', claims: {
-            [ClaimsOfferSchemaorg.identifier]: offerId,
-            [ClaimsOrganizationSchemaorg.alternateName]: 'example-tenant',
-            [ClaimsPersonSchemaorg.email]: 'representative@example.org',
-            [ClaimsPersonSchemaorg.hasOccupation]: 'ISCO-08|1120',
-            [ClaimsServiceSchemaorg.category]: 'health-care',
-          } },
+          indexed: { attributes: [{ name: ClaimsOfferSchemaorg.identifier, value: offerId }] },
+          jwe: { ciphertext: 'encrypted-registration' },
         }]),
         getContainersInSection: jest.fn(async () => [{
           id: 'representative-seat',
@@ -94,7 +98,10 @@ describe('processHostOrderEntry active offer idempotency', () => {
         }]),
         put,
       } as any,
-      kmsService: { unprotectConfidentialData: jest.fn(async (doc: any) => doc.content) } as any,
+      kmsService: {
+        unprotectConfidentialData: jest.fn(async (doc: any) =>
+          doc?.jwe?.ciphertext === 'encrypted-registration' ? decryptedRegistration : doc.content),
+      } as any,
       logger: { error: jest.fn() } as any,
       config: {} as any,
       hostRuntime: { hostCollectionName: 'system_host' } as any,

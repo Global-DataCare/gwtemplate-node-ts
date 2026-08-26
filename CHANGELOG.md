@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Make accepted organization Order replay work with real encrypted repository
+  documents. The exact Offer is now matched against claims obtained after KMS
+  unprotect, allowing an already active registration to continue without a
+  false `409 not in pending state` response.
 - Preserve the automatically issued representative access credential across
   accepted organization Order retries. An active-Offer replay now returns the
   original `IndividualProduct.serialNumber` without rotating the code,
