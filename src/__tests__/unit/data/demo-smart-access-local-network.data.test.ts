@@ -64,6 +64,7 @@ describe('demo smart access local-network builders', () => {
       'Consent.actor-role': HealthcareActorRoles.Physician,
       'Consent.purpose': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
       'Consent.action': ServiceCapability.DigitalTwinReader,
+      'Consent.source-reference': DEMO_SMART_ACCESS_LOCAL_IDS.researchUseReference,
     });
   });
 
@@ -74,6 +75,7 @@ describe('demo smart access local-network builders', () => {
       'Consent.actor-role': HealthcareActorRoles.NursingProfessional,
       'Consent.purpose': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
       'Consent.action': ServiceCapability.DigitalTwinReader,
+      'Consent.source-reference': DEMO_SMART_ACCESS_LOCAL_IDS.researchUseReference,
     });
   });
 

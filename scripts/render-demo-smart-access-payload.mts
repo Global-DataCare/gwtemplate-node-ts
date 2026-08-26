@@ -17,6 +17,8 @@ import { getClaimValue, normalizeContextualizedClaims } from '../src/utils/claim
 import { expandConsentActorRoles } from '../src/utils/consent.ts';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import type { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
+import { ensureDigitalTwinSecondaryUseConsentIdentifier } from '../src/utils/consent-storage.ts';
+import { getTenantVaultId } from '../src/utils/tenant.ts';
 
 type PayloadName =
   | 'INDIVIDUAL_CONSENT_BATCH_REQUEST'
@@ -68,6 +70,11 @@ function buildConsentEntry(resourceClaims: Record<string, unknown>): BundleEntry
 
 function buildProjectedConsentEntry(resourceClaims: Record<string, unknown>): BundleEntry {
   const claims = normalizeContextualizedClaims(resourceClaims);
+  ensureDigitalTwinSecondaryUseConsentIdentifier({
+    tenantVaultId: getTenantVaultId(process.env.SECTOR || 'health-care', tenantId),
+    sector: process.env.SECTOR || 'health-care',
+    claims,
+  });
   const actorRoles = getClaimValue<string>(claims, ClaimConsent.actorRole);
   if (actorRoles) {
     const context = String(claims['@context'] || '').replace(/\.$/, '');

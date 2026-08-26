@@ -1,14 +1,14 @@
 import {
   EXAMPLE_CONSENT_ACCESS_RULES,
-} from '../../gdc-common-utils-ts/src/examples/consent-access.ts';
+} from 'gdc-common-utils-ts/examples/consent-access';
 import {
   EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
   EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
   EXAMPLE_SUBJECT_DID,
-} from '../../gdc-common-utils-ts/src/examples/shared.ts';
-import { ClaimConsent, type ConsentRule } from '../../gdc-common-utils-ts/src/models/consent-rule.ts';
-import { buildConsentRulePrimaryDocument } from '../../gdc-common-utils-ts/src/utils/permission-templates.ts';
-import type { BundleEntry } from '../../gdc-common-utils-ts/src/models/bundle.ts';
+} from 'gdc-common-utils-ts/examples/shared';
+import { ClaimConsent, type ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
+import { buildConsentRulePrimaryDocument } from 'gdc-common-utils-ts/utils/permission-templates';
+import type { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 
 type RenderMode =
   | 'CONSENT_BATCH_REQUEST'
