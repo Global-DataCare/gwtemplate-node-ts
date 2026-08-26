@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Preserve the automatically issued representative access credential across
+  accepted organization Order retries. An active-Offer replay now returns the
+  original `IndividualProduct.serialNumber` without rotating the code,
+  consuming another seat or requiring another payment. New Order responses
+  expose claims only at canonical `data[].resource.meta.claims`.
 - Resume organization activation after a partial Fabric commit when a newly
   detached-signed VC preserves its canonical issuer, type/schema,
   `credentialSubject` and evidence. Reissued envelope metadata no longer

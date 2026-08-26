@@ -340,6 +340,26 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
       return Number(right.sequence || 0) - Number(left.sequence || 0);
     })[0];
 
+  // Order polling and browser retries may ask for the same representative
+  // access after the tenant is already active. Return the original material
+  // without rotating it or mutating the seat; the following Token exchange is
+  // the operation that consumes it.
+  const existingActivationCode = String(
+    (existingMatch?.content as DeviceLicense & Record<string, unknown> | undefined)?.activationCode || '',
+  ).trim();
+  if (existingMatch && existingActivationCode) {
+    const configuredAllowance = Number(
+      (existingMatch.content as DeviceLicense & Record<string, unknown>).maxDevices,
+    );
+    return {
+      activationCode: existingActivationCode,
+      licenseId: existingMatch.id,
+      maxDevices: Number.isInteger(configuredAllowance) && configuredAllowance > 0
+        ? configuredAllowance
+        : DEFAULT_LICENSE_DEVICE_ALLOWANCE,
+    };
+  }
+
   const availableSameType = all.find((doc) => {
     const license = doc?.content as any;
     const status = String((license && license.status) || doc.status || '');
