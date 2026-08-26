@@ -6,6 +6,8 @@ import { getClaimValue } from './claims';
 import { buildConsentRuleStorageKey, hashConsentRuleId } from './consent';
 import { getIndividualSectionId, getSubjectScopedSectionId } from './individual-sections';
 import { applyDigitalTwinSecondaryUseDecision } from './digital-twin-secondary-use';
+import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
+import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 
 export const requiredConsentClaims = [
   ClaimConsent.decision,
@@ -77,13 +79,27 @@ export async function persistConsentRuleAndAttachment(
     getIndividualSectionId(subjectId, 'attachments'),
   );
 
-  const ruleKey = buildConsentRuleStorageKey({
+  const baseRuleKey = buildConsentRuleStorageKey({
     subjectId,
     sector,
     target: actorIdentifier,
     decision: getClaimValue<string>(claims, ClaimConsent.decision) as string,
     purpose: getClaimValue<string>(claims, ClaimConsent.purpose) as string,
   });
+  const consentIdentifier = String(getClaimValue(claims, ClaimConsent.identifier) || '').trim();
+  const purpose = String(getClaimValue(claims, ClaimConsent.purpose) || '').trim().toUpperCase();
+  const actions = String(getClaimValue(claims, ClaimConsent.action) || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const isDigitalTwinResearchConsent = (
+    purpose === HealthcareConsentPurposes.Research || purpose === 'RESEARCH'
+  ) && actions.some((action) => (
+    action === ServiceCapability.DigitalTwinReader || action === ServiceCapability.DigitalTwinProvider
+  ));
+  const ruleKey = isDigitalTwinResearchConsent
+    ? `${baseRuleKey}|${consentIdentifier}`
+    : baseRuleKey;
   const ruleId = hashConsentRuleId(ruleKey);
 
   const ruleToStore: Record<string, any> = { ...claims };
