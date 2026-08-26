@@ -1300,6 +1300,97 @@ export class HostingManager {
     return reconciled;
   }
 
+  /**
+   * Repairs tenant DID key projections that no longer match the recoverable
+   * private key set. This is a compatibility repair for deployments where an
+   * idempotent activation replay accidentally reprovisioned an existing tenant.
+   *
+   * The operation does not generate or rotate keys. It republishes only the
+   * public counterparts of the tenant keys already held by KMS, preserving the
+   * DID identifier, aliases, controllers, services and all organization data.
+   * A self-description signed by an obsolete tenant key is re-signed with the
+   * current VC signing key.
+   */
+  public async reconcileTenantDidKeyMaterial(): Promise<number> {
+    const records = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+      this.hostRuntime.hostCollectionName,
+      getEnvSectionId('tenants'),
+    );
+    let reconciled = 0;
+    for (const record of records || []) {
+      if (!record?.id || record.id === 'host') continue;
+      try {
+      const tenant = await this.kmsService.unprotectConfidentialData<OrganizationConfig>(record, 'host');
+      const claims = tenant?.claims as ClaimsRecord | undefined;
+      const tenantId = String(claims?.[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+      const sector = String(claims?.[ClaimsServiceSchemaorg.category] || '').trim() as Sector;
+      if (!tenantId || !sector || !tenant.didDocument?.id) continue;
+
+      const tenantVaultId = getTenantVaultId(sector, tenantId);
+      const publicKeys = await this.kmsService.getPublicJwks(tenantVaultId);
+      const managedKids = new Set(publicKeys.keys.map((key) => String(key.kid || '')).filter(Boolean));
+      const publishedKids = new Set((tenant.didDocument.verificationMethod || [])
+        .map((method) => String(method.publicKeyJwk?.kid || ''))
+        .filter(Boolean));
+      if (
+        managedKids.size === publishedKids.size
+        && Array.from(managedKids).every((kid) => publishedKids.has(kid))
+      ) {
+        continue;
+      }
+
+      const didDocument = populateDidDocumentFromJwks({ ...tenant.didDocument }, publicKeys);
+      let selfDescriptionVc = tenant.selfDescriptionVc;
+      const tenantSignerKid = publicKeys.keys.find((key: any) => key.use === 'sig' && key.purpose === 'vc_sign')?.kid
+        || publicKeys.keys.find((key: any) => key.use === 'sig')?.kid;
+      if (selfDescriptionVc && tenantSignerKid) {
+        const { proof: _obsoleteProof, ...selfDescriptionPayload } = selfDescriptionVc;
+        const jws = await this.kmsService.createDetachedJws(
+          selfDescriptionPayload,
+          tenantSignerKid,
+          tenantVaultId,
+          'vc_sign',
+        );
+        selfDescriptionVc = {
+          ...selfDescriptionPayload,
+          proof: [{
+            type: 'JsonWebSignature2020',
+            created: new Date().toISOString(),
+            proofPurpose: 'assertionMethod',
+            verificationMethod: `${didDocument.id}#${tenantSignerKid}`,
+            jws,
+          }],
+        } as VerifiableCredentialV2;
+      }
+
+      const nextTenant: OrganizationConfig = {
+        ...tenant,
+        didDocument,
+        selfDescriptionVc,
+        meta: { ...(tenant.meta || {}), lastUpdated: new Date().toISOString() },
+      };
+      const nextRecord = {
+        ...record,
+        sequence: Number(record.sequence || 0) + 1,
+        content: nextTenant,
+      };
+      const protectedRecord = await this.kmsService.protectConfidentialData(nextRecord, 'host');
+      await this.vaultRepository.put(
+        this.hostRuntime.hostCollectionName,
+        [protectedRecord],
+        getEnvSectionId('tenants'),
+      );
+      await this.tenantsCacheManager.refreshTenant(tenantVaultId);
+      reconciled += 1;
+      } catch (error) {
+        this.logger.warn?.(
+          `[HostingManager] Tenant DID key reconciliation skipped for '${record.id}': ${String((error as Error)?.message || error)}`,
+        );
+      }
+    }
+    return reconciled;
+  }
+
   private async processOrganizationIssue(job: JobRequest): Promise<IDecodedDidcommPayload> {
     return processOrganizationIssueExternal({
       job,

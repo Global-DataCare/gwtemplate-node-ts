@@ -45,7 +45,9 @@ export interface IKmsService {
   // --- Key Lifecycle Management ---
 
   /**
-   * Generates and securely stores a new set of cryptographic keys for an entity.
+   * Ensures that an entity has a securely stored cryptographic key set.
+   * Existing persisted keys MUST be returned unchanged; rotation is a separate
+   * lifecycle operation because callers may already publish these keys in a DID.
    * @param entityId The entity's unique identifier (e.g., a tenant URN).
    * @returns The public parts of the generated keys (JWKSet).
    */

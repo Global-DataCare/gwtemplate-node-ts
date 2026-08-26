@@ -290,6 +290,10 @@ async function startServer(options?: StartServerOptions) {
     if (reconciledRepresentativeInventories > 0) {
       console.log(`[GW-API] Reconciled ${reconciledRepresentativeInventories} historical representative seat inventories.`);
     }
+    const reconciledTenantDidKeySets = await hostingManager.reconcileTenantDidKeyMaterial();
+    if (reconciledTenantDidKeySets > 0) {
+      console.log(`[GW-API] Reconciled DID key material for ${reconciledTenantDidKeySets} tenants.`);
+    }
     const reconciledTenantServiceRoutes = await hostingManager.reconcileTenantServiceRoutes();
     if (reconciledTenantServiceRoutes > 0) {
       console.log(`[GW-API] Reconciled split-runtime DID services for ${reconciledTenantServiceRoutes} tenants.`);

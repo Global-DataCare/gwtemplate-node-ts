@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Make tenant key provisioning idempotent across process restarts so an
+  activation or Order replay cannot overwrite the private key behind an
+  already published DID. Startup now repairs stale tenant DID key projections
+  from recoverable KMS material, preserves identity/controllers/services and
+  re-signs the tenant self-description.
+
 - Let canonical `Token/_exchange` use the already validated route tenant when
   Firebase proves the controller without a custom `tenant_id` claim. An
   optional token claim must still match the route and can never redirect the

@@ -142,8 +142,13 @@ export class KmsService implements IKmsService {
   // --- Key Lifecycle Management ---
 
   /**
-   * Generates a full set of cryptographic keys (signing, encryption, DEK) for a given entity
-   * and stores them in the internal vault, associated with the entity's ID.
+   * Ensures that a full cryptographic key set exists for an entity.
+   *
+   * Provisioning is deliberately idempotent: persisted keys are rehydrated and
+   * returned unchanged. Replaying tenant activation after a process restart
+   * must never overwrite the private key corresponding to an already published
+   * DID document. Key rotation is a separate lifecycle operation and must not
+   * be implemented by calling this method again.
    *
    * In development/testing environments, if `NODE_ENV` is 'development' AND the `DEV_SEED` 
    * environment variable is set to 'true', this method will generate keys deterministically 
@@ -154,6 +159,21 @@ export class KmsService implements IKmsService {
    * @returns A JWKSet containing the public keys (signing and encryption).
    */
   async provisionKeys(entityVaultId: string): Promise<JwkSet> {
+    try {
+      const existingKeys = await this.getEntityKeys(entityVaultId, 'all');
+      return this.toPublicJwkSet(existingKeys);
+    } catch (error) {
+      // A configured durable repository distinguishes a genuinely absent set
+      // from an unwrap/custody failure. Never replace keys when persisted
+      // material exists but cannot be recovered.
+      if (
+        this.wrappedKeyRepository
+        && !(error instanceof Error && error.message === `Keys not found for entity: ${entityVaultId}`)
+      ) {
+        throw error;
+      }
+    }
+
     let commDsaSeed: Uint8Array;
     let vcDsaSeed: Uint8Array;
     let kemSeed: Uint8Array;
@@ -204,18 +224,22 @@ export class KmsService implements IKmsService {
     await this.persistWrappedKeys(entityVaultId, keyVersion, entityKeys);
     this.keyMaterialProvider.invalidate(entityVaultId, 'all');
     
-    const publicJwkSet = {
-      keys: [
-        commSigningKeyPair.publicJWKey as JWK,
-        vcSigningKeyPair.publicJWKey as JWK,
-        ...(legacySigningKeyPair ? [legacySigningKeyPair.publicJWKey as JWK] : []),
-        encryptionKeyPair.publicJWKey as JWK,
-      ],
-    };
+    const publicJwkSet = this.toPublicJwkSet(entityKeys);
 
     //     // console.log(`[KmsService] Provisioned new JWKSet for entity: ${entityVaultId}`, publicJwkSet);
 
     return publicJwkSet;
+  }
+
+  private toPublicJwkSet(entityKeys: EntityKeysSet): JwkSet {
+    return {
+      keys: [
+        entityKeys.commSigningKeyPair.publicJWKey as JWK,
+        entityKeys.vcSigningKeyPair.publicJWKey as JWK,
+        ...(entityKeys.legacySigningKeyPair ? [entityKeys.legacySigningKeyPair.publicJWKey as JWK] : []),
+        entityKeys.encryptionKeyPair.publicJWKey as JWK,
+      ],
+    };
   }
 
   /**
