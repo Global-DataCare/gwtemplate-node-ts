@@ -118,6 +118,27 @@ describe('Host transaction Offer/Order route story', () => {
     expect(JSON.stringify(orderEntry.resource)).toContain(
       transactionPayload.body.data[0].resource.organization.did,
     );
+
+    // A real repository record is encrypted after the first Order. Replaying
+    // the same accepted Offer must therefore read the claims obtained after
+    // KMS unprotect and return the existing continuation instead of a 409.
+    const replayPayload = structuredClone(orderPayload);
+    replayPayload.thid = 'host-transaction-order-replay-thid';
+    replayPayload.jti = 'host-transaction-order-replay-jti';
+    const replaySubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
+      headers: { 'content-type': 'application/json' },
+      body: replayPayload,
+    });
+    expect(replaySubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+
+    const replayPoll = await pollJsonBody(harness.app, replaySubmit.headers.location, replayPayload.thid);
+    const replayEntry = replayPoll.body.data[0];
+    expect(replayEntry.response.status).toBe('200');
+    expect(replayEntry.resource?.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect(replayEntry.resource?.meta?.claims?.['org.schema.IndividualProduct.serialNumber']).toBeTruthy();
   });
 
   /**

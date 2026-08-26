@@ -108,18 +108,30 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
 
   if (decryptedContent?.status !== EntityLifecycleStatus.Pending) {
     const projectedClaims = readProjectedOfferOrderClaims(secureDoc);
+    const decryptedClaims = (decryptedContent as any)?.claims
+      ? normalizeContextualizedClaims((decryptedContent as any).claims)
+      : {};
+    // Firestore returns the searchable envelope with encrypted content. The
+    // accepted registration claims become available only after KMS unprotect,
+    // so an Order retry must merge that authoritative content before deciding
+    // whether the exact Offer is an idempotent active replay.
+    const replayClaims: ClaimsRecord = {
+      ...projectedClaims,
+      ...decryptedClaims,
+      [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
+    };
+    const indexedOfferMatches = Boolean(secureDoc.indexed?.attributes?.some((attribute) =>
+      attribute.name === ClaimsOfferSchemaorg.identifier && String(attribute.value).trim() === offerId));
+    const protectedOfferMatches = String(replayClaims[ClaimsOfferSchemaorg.identifier] || '').trim() === offerId;
     if (
       decryptedContent?.status === EntityLifecycleStatus.Active
-      && String(projectedClaims[ClaimsOfferSchemaorg.identifier] || '').trim() === offerId
+      && (indexedOfferMatches || protectedOfferMatches)
     ) {
-      const replayClaims: ClaimsRecord = {
-        ...projectedClaims,
-        [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
-      };
-      const tenantId = String(projectedClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
-      const sector = String(projectedClaims[ClaimsServiceSchemaorg.category] || '').trim() as Sector;
-      const representativeEmail = projectedClaims[ClaimsPersonSchemaorg.email] as string | undefined;
-      const representativeRole = getPersonOccupationClaim(projectedClaims);
+      replayClaims[ClaimsOfferSchemaorg.identifier] = offerId;
+      const tenantId = String(replayClaims[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
+      const sector = String(replayClaims[ClaimsServiceSchemaorg.category] || '').trim() as Sector;
+      const representativeEmail = replayClaims[ClaimsPersonSchemaorg.email] as string | undefined;
+      const representativeRole = getPersonOccupationClaim(replayClaims);
       if (tenantId && sector && representativeEmail && representativeRole) {
         try {
           const { activationCode } = await issueActivationCodeFromPool({
