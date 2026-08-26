@@ -137,6 +137,29 @@ describe('ConsentManager', () => {
     );
   });
 
+  it('accepts digital-twin secondary-use FHIR Consent claims without an ODRL attachment', async () => {
+    mockVaultRepository.vaultExists.mockResolvedValue(true);
+    mockVaultRepository.put.mockResolvedValue(true);
+    const request = structuredClone(mockJobRequest);
+    const claims = (request.content!.body as any).data[0].meta.claims;
+    claims[ClaimConsent.purpose] = HealthcareConsentPurposes.Research;
+    claims[ClaimConsent.action] = ServiceCapability.DigitalTwinReader;
+    delete claims[ClaimConsent.attachmentContentType];
+    delete claims[ClaimConsent.attachmentData];
+
+    const response = await consentManager.process(request);
+
+    expect((response.body as any).data[0].response.status).toBe('201');
+    const attachmentWrites = mockVaultRepository.put.mock.calls
+      .filter((call) => String(call[2]).includes('attachments'));
+    expect(attachmentWrites).toHaveLength(0);
+    const storedRule = mockVaultRepository.put.mock.calls
+      .find((call) => String(call[2]).includes('rules'))?.[1][0] as Record<string, any>;
+    expect(getClaimValue(storedRule, ClaimConsent.attachmentContentType)).toBeUndefined();
+    expect(getClaimValue(storedRule, ClaimConsent.attachmentData)).toBeUndefined();
+    expect(getClaimValue(storedRule, ClaimConsent.attachmentId)).toBeUndefined();
+  });
+
   it('upserts one portal consent by identifier while keeping study consents distinct', async () => {
     mockVaultRepository.vaultExists.mockResolvedValue(true);
     mockVaultRepository.put.mockResolvedValue(true);
