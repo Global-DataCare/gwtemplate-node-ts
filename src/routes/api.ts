@@ -2822,6 +2822,14 @@ export function createApiRouter(
    *       `acr_values`.
    *
    *       The worker will validate the target subject exists and that at least one consent rule matches the actor.
+   *
+   *       Optional `body.break_glass` is a disabled-by-default GW CORE extension for exceptional,
+   *       short-lived emergency reads. Human access is confined to `health-care` with a
+   *       ledger-verified physician credential; animal access is confined to `animal-care` with
+   *       a ledger-verified veterinarian credential. Research and One Health research routes,
+   *       write scopes, employment alone and cross-subject-kind requests fail closed. The worker
+   *       records a hash-minimized ledger event and requires controller-notification acknowledgement
+   *       before issuing a token for at most 15 minutes.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'

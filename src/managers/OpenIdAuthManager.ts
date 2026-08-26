@@ -29,6 +29,11 @@ import { getMatchingIndividualMemberCredentialFromVpToken } from 'gdc-common-uti
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getOrCreateDigitalTwinSubjectId } from '../utils/digital-twin-research-projection';
 import { getMatchingProfessionalCredentialFromVpToken } from 'gdc-common-utils-ts/utils/professional-smart';
+import type {
+  BreakGlassAuthorization,
+  BreakGlassAuthorizer,
+  BreakGlassRequest,
+} from '../security/break-glass';
 
 type TokenRequestBody = {
   client_id?: string;
@@ -42,6 +47,7 @@ type TokenRequestBody = {
   vp_token?: string;
   presentation_submission?: any;
   acr_values?: string | string[];
+  break_glass?: BreakGlassRequest;
 };
 
 type AccessProofResult = {
@@ -65,6 +71,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     private readonly tenantsCacheManager: ITenantsManager,
     private readonly vaultRepository: IVaultRepository,
     private readonly clearingHouseService: IClearingHouseService,
+    private readonly breakGlassAuthorizer?: BreakGlassAuthorizer,
   ) {}
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
@@ -284,7 +291,37 @@ export class OpenIdAuthManager implements IJobProcessor {
           actorSubjectAliases,
         });
 
-    if (!evaluation.allowed) {
+    let breakGlassAuthorization: BreakGlassAuthorization | undefined;
+    if (body.break_glass) {
+      if (!this.breakGlassAuthorizer) {
+        throw new ManagerError('Break-glass is not enabled.', IssueType.Forbidden);
+      }
+      if (accessProof.mode !== 'vp_token' || !professionalCredential || !actor.role) {
+        throw new ManagerError('A verified professional credential is required for break-glass.', IssueType.Forbidden);
+      }
+      try {
+        breakGlassAuthorization = await this.breakGlassAuthorizer.authorize({
+          tenantId: job.tenantId,
+          jurisdiction: job.jurisdiction,
+          routeSector: job.sector,
+          actorDid: actor.sub,
+          professionalRole: actor.role,
+          subjectDid: subject,
+          requestedScope: scope,
+          request: body.break_glass,
+          professionalCredentialVerified: true,
+          ledgerVerified: accessProof.ledgerVerified,
+          requestedLifetimeSeconds: Math.max(1, Math.min(900, body.expires_in || 300)),
+        });
+      } catch (error) {
+        throw new ManagerError(
+          `Break-glass authorization denied: ${error instanceof Error ? error.message : 'unknown_error'}`,
+          IssueType.Forbidden,
+        );
+      }
+    }
+
+    if (!evaluation.allowed && !breakGlassAuthorization) {
       const missingSections = evaluation.missingSections.map((value) => normalizeCodeSystemAndValue(value)).filter(Boolean);
       const detail = [
         missingSections.length ? `missing sections=${missingSections.join(',')}` : '',
@@ -297,7 +334,7 @@ export class OpenIdAuthManager implements IJobProcessor {
         IssueType.Forbidden,
       );
     }
-    if (sharedProjection) {
+    if (sharedProjection && !breakGlassAuthorization) {
       grantedScope = sharedProjection.grantedScopes.join(' ');
     }
     let accessSubject = subject;
@@ -315,7 +352,8 @@ export class OpenIdAuthManager implements IJobProcessor {
       }).join(' ');
     }
 
-    const requestedLifetimeSeconds = Math.max(1, Math.min(3600, body.expires_in || 300));
+    const requestedLifetimeSeconds = breakGlassAuthorization?.lifetimeSeconds
+      ?? Math.max(1, Math.min(3600, body.expires_in || 300));
     const tokenType = body.token_type || 'Bearer';
 
     const issuerVaultId = job.tenantId === 'host' ? 'host' : getTenantVaultId(job.sector, job.tenantId);
@@ -337,9 +375,12 @@ export class OpenIdAuthManager implements IJobProcessor {
 
     const now = Math.floor(Date.now() / 1000);
     const consentPeriodEnd = this.resolveEarliestPeriodEnd(evaluation.applicableRules);
-    const tokenExpiration = consentPeriodEnd === undefined
+    const ordinaryTokenExpiration = consentPeriodEnd === undefined
       ? now + requestedLifetimeSeconds
       : Math.min(now + requestedLifetimeSeconds, Math.floor(consentPeriodEnd / 1000));
+    const tokenExpiration = breakGlassAuthorization
+      ? Math.min(ordinaryTokenExpiration, Math.floor(Date.parse(breakGlassAuthorization.expiresAt) / 1000))
+      : ordinaryTokenExpiration;
     if (tokenExpiration <= now) {
       throw new ManagerError('The matching consent rule expired before the access token could be issued.', IssueType.Forbidden);
     }
@@ -358,6 +399,9 @@ export class OpenIdAuthManager implements IJobProcessor {
       amr: accessProof.amr,
       vp_hash: accessProof.vpHash,
       ledger_verified: accessProof.ledgerVerified,
+      emergency: breakGlassAuthorization ? true : undefined,
+      break_glass_authorization_id: breakGlassAuthorization?.authorizationId,
+      break_glass_incident_id: breakGlassAuthorization ? body.break_glass?.incidentId : undefined,
     };
 
     const encodedHeader = Content.stringToBase64Url(JSON.stringify(jwtHeader));
@@ -385,6 +429,8 @@ export class OpenIdAuthManager implements IJobProcessor {
         scope: grantedScope,
         subject: accessSubject,
         ledger_verified: accessProof.ledgerVerified,
+        emergency: breakGlassAuthorization ? true : undefined,
+        break_glass_authorization_id: breakGlassAuthorization?.authorizationId,
       },
     };
   }
