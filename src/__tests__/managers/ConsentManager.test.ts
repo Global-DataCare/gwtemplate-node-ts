@@ -140,6 +140,7 @@ describe('ConsentManager', () => {
   it('upserts one portal consent by identifier while keeping study consents distinct', async () => {
     mockVaultRepository.vaultExists.mockResolvedValue(true);
     mockVaultRepository.put.mockResolvedValue(true);
+    mockBlockchainAdapter.registerConsentAccessBundle.mockResolvedValue({ accepted: 1, txId: 'tx-consent-id-isolation' });
     const buildRequest = (identifier: string, decision: 'permit' | 'deny') => {
       const request = structuredClone(mockJobRequest);
       const claims = (request.content!.body as any).data[0].meta.claims;
@@ -160,6 +161,9 @@ describe('ConsentManager', () => {
     expect(storedRules).toHaveLength(3);
     expect(storedRules[0].id).not.toBe(storedRules[1].id);
     expect(storedRules[2].id).toBe(storedRules[0].id);
+    const ledgerAssetIds = mockBlockchainAdapter.registerConsentAccessBundle.mock.calls
+      .map((call) => call[0].assetId);
+    expect(ledgerAssetIds[0]).not.toBe(ledgerAssetIds[1]);
   });
 
   it('should save attachment and rule to the correct sections in the vault', async () => {
