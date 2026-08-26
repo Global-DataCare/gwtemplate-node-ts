@@ -222,6 +222,7 @@ describe('DeviceRegistrationManager', () => {
         status: employeeConfig.status,
         sequence: 0,
         content: employeeConfig,
+        indexed: { attributes: [{ name: 'protected-kid', value: 'protected-old-kid' }] },
       } as ConfidentialStorageDoc, vaultId);
       await vaultRepository.put(vaultId, [protectedEmployeeDoc], getEnvSectionId('employees'));
 
@@ -267,6 +268,9 @@ describe('DeviceRegistrationManager', () => {
         content: license,
       };
       await vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+      mockKmsService.protectAttributesNameAndValue.mockImplementation(async (attributes) => (
+        attributes.map((attribute) => ({ ...attribute, name: 'protected-kid', value: `protected-${attribute.value}` }))
+      ));
 
       const result = await manager.process(job);
       const responseEntry = (result.body as BundleJsonApi).data[0] as BundleEntryResponse;
@@ -294,6 +298,15 @@ describe('DeviceRegistrationManager', () => {
       );
       expect(updatedEmployee.didDocument?.verificationMethod?.map((method) => method.id)).toEqual(
         expect.arrayContaining([`${employeeDid}#sig-old`, `${employeeDid}#enc-old`]),
+      );
+      expect(updatedEmployeeDoc?.indexed?.attributes).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'protected-kid', value: 'protected-sig-old' }),
+        expect.objectContaining({ name: 'protected-kid', value: 'protected-enc-old' }),
+        expect.objectContaining({ name: 'protected-kid', value: 'protected-sig-new' }),
+        expect.objectContaining({ name: 'protected-kid', value: 'protected-enc-new' }),
+      ]));
+      expect(updatedEmployeeDoc?.indexed?.attributes).not.toContainEqual(
+        expect.objectContaining({ value: 'protected-old-kid' }),
       );
 
       const updatedLicense = await vaultRepository.get<ConfidentialStorageDoc>(

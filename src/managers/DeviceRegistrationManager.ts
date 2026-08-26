@@ -483,11 +483,30 @@ export class DeviceRegistrationManager implements IJobProcessor {
       },
     };
 
+    const currentKids = Array.from(new Set((updatedDidDocument.verificationMethod || [])
+      .map((method) => String(method.publicKeyJwk?.kid || method.id?.split('#').at(-1) || '').trim())
+      .filter(Boolean)));
+    const protectedKidAttributes = this.kmsService
+      ? await this.kmsService.protectAttributesNameAndValue(currentKids.map((kid) => ({
+        name: 'kid',
+        value: kid,
+        unique: false,
+        type: 'string',
+      })), params.vaultId)
+      : currentKids.map((kid) => ({ name: 'kid', value: kid, unique: false, type: 'string' }));
+    const protectedKidName = protectedKidAttributes[0]?.name;
+    const retainedAttributes = (employeeDoc.indexed?.attributes || [])
+      .filter((attribute) => !protectedKidName || attribute.name !== protectedKidName);
+
     const updatedEmployeeDoc: ConfidentialStorageDoc = {
       ...employeeDoc,
       status: updatedEmployeeContent.status,
       sequence: (employeeDoc.sequence || 0) + 1,
       content: updatedEmployeeContent,
+      indexed: {
+        ...(employeeDoc.indexed || {}),
+        attributes: [...retainedAttributes, ...protectedKidAttributes],
+      },
     };
     const protectedEmployeeDoc = this.kmsService
       ? await this.kmsService.protectConfidentialData(updatedEmployeeDoc, params.vaultId)

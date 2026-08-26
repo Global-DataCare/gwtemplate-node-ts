@@ -9,6 +9,7 @@ import { IAsyncResponseStore } from '../adapters/async-response-store.mem';
 import { createJobName } from '../utils/naming';
 import { isRequestValid } from '../utils/request-validator';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
+import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
@@ -3281,13 +3282,56 @@ export function createApiRouter(
               where: [{ name: protectedAttrName, value: protectedAttrValue }],
             });
           }
+          let employeeConfig: EntityConfig | undefined;
+          if (!queryResult || queryResult.length === 0) {
+            // DCR versions deployed before the key-index repair updated the
+            // protected employee DID document but retained its bootstrap kid
+            // indexes. Scan only the already-resolved tenant scopes on an
+            // indexed miss and still require an exact issuer + signing kid +
+            // encryption kid match. This is a fail-closed compatibility path,
+            // not authority derived from the incoming envelope.
+            const scopes = Array.from(new Set([collectionName, vaultId]));
+            for (const scope of scopes) {
+              let employeeDocs: ConfidentialStorageDoc[] = [];
+              try {
+                employeeDocs = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+                  scope,
+                  getEnvSectionId('employees'),
+                );
+              } catch {
+                continue;
+              }
+              for (const candidate of employeeDocs) {
+                try {
+                  const config = await kmsService.unprotectConfidentialData<EntityConfig>(candidate, vaultId);
+                  const methods = config.didDocument?.verificationMethod || [];
+                  const hasSigningKid = methods.some((method) => (
+                    String(method.publicKeyJwk?.kid || '').trim() === senderSigningKeyId
+                    || String(method.id || '').endsWith(`#${senderSigningKeyId}`)
+                  ));
+                  const hasEncryptionKid = methods.some((method) => (
+                    String(method.publicKeyJwk?.kid || '').trim() === senderEncryptionKeyId
+                    || String(method.id || '').endsWith(`#${senderEncryptionKeyId}`)
+                  ));
+                  if (String(config.didDocument?.id || '').trim() === senderDid && hasSigningKid && hasEncryptionKid) {
+                    queryResult = [candidate];
+                    employeeConfig = config;
+                    break;
+                  }
+                } catch {
+                  // An inaccessible employee cannot authenticate a request.
+                }
+              }
+              if (employeeConfig) break;
+            }
+          }
           if (!queryResult || queryResult.length === 0) {
             throw new Error(`Could not find an entity with key ID '${senderSigningKeyId}' in vault '${vaultId}'.`);
           }
 
           // 4. Unprotect the document to get the sender's full config.
           const employeeDoc = queryResult[0];
-          const employeeConfig = await kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
+          employeeConfig ||= await kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
 
           // 5. Find the specific public keys that match the key IDs.
           const signingVerificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
