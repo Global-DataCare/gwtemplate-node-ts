@@ -16,11 +16,13 @@ Never infer the product from a historical GCP project, cluster, context, or
 repository name. Resolve the workload tuple first and keep these products
 strictly separate:
 
-- GW CORE staging: public `34.175.78.233`, namespace `test-gdc-v1`, Deployment
+- GW CORE development: public `34.175.78.233`, namespace `test-gdc-v1`, Deployment
   and Service `gwtemplate`. The historical cluster name
   `gdc-unid-southwest` does not make this GW UNID.
-- GW UNID: the separately deployed `uhc-gw` workload/domain.
-- GW SOSCHAIN: the separately deployed `soschain-gw` workload/domain.
+- GW UNID test-network: repository `custom/uhc-unid-gw-node`, public workload
+  `uhc-gw`, canonical host `https://uhc-gw.unid.online`.
+- GW SOSCHAIN: separate public workload `soschain-gw`, canonical host
+  `https://soschain-gw.unid.online`. It is not an alias for CORE or `uhc-gw`.
 
 This skill deploys GW CORE only. It must never describe, mutate, validate, or
 report `uhc-gw` or `soschain-gw` as part of a CORE release. Before any
@@ -31,7 +33,7 @@ the CORE tuple above. A currently active context is not evidence of the target.
 ## Read before acting
 
 1. Read the repository `AGENTS.md`.
-2. Read [references/gdc-staging.md](references/gdc-staging.md).
+2. Read [references/gdc-development.md](references/gdc-development.md).
 3. Inspect `git status`, `origin/main`, `package.json`, `Dockerfile`,
    `.dockerignore`, `docker_build_local.sh`, `docker_run_local.sh`,
    `cloud_deploy.sh` and the selected runtime/deployment profiles.
@@ -59,7 +61,7 @@ the CORE tuple above. A currently active context is not evidence of the target.
 Treat the image as environment-neutral:
 
 - image smoke: `NETWORK_MODE=local-network`
-- governed staging: `NETWORK_MODE=test-network`
+- governed integration/staging profiles: `NETWORK_MODE=test-network`
 - production: `NETWORK_MODE=network`
 
 These values and their Fabric channels come from the selected runtime profile.
