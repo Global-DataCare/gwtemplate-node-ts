@@ -22,7 +22,9 @@ export const requiredConsentClaims = [
 ];
 
 const requiredConsentRuleClaims = requiredConsentClaims.filter((claim) => (
-  claim !== ClaimConsent.attachmentContentType && claim !== ClaimConsent.attachmentData
+  claim !== ClaimConsent.identifier
+  && claim !== ClaimConsent.attachmentContentType
+  && claim !== ClaimConsent.attachmentData
 ));
 
 export function isDigitalTwinSecondaryUseConsent(claims: Record<string, any>): boolean {
@@ -39,7 +41,64 @@ export function isDigitalTwinSecondaryUseConsent(claims: Record<string, any>): b
 }
 
 export function requiredConsentClaimsFor(claims: Record<string, any>): readonly ClaimConsent[] {
-  return isDigitalTwinSecondaryUseConsent(claims) ? requiredConsentRuleClaims : requiredConsentClaims;
+  return isDigitalTwinSecondaryUseConsent(claims)
+    ? [...requiredConsentRuleClaims, ClaimConsent.sourceReference]
+    : requiredConsentClaims;
+}
+
+function setClaimValue(claims: Record<string, any>, key: ClaimConsent, value: string): void {
+  const context = String(claims['@context'] || '').trim();
+  if (context) {
+    const prefix = context.endsWith('.') ? context : `${context}.`;
+    claims[`${prefix}${key}`] = value;
+    delete claims[key];
+    return;
+  }
+  claims[key] = value;
+}
+
+function uuidFromHash(seed: string): string {
+  const bytes = createHash('sha256').update(seed, 'utf8').digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * Assigns GW's internal Consent identifier for one application/study rule.
+ * Callers identify the rule with Consent.source-reference and never own this id.
+ */
+export function ensureDigitalTwinSecondaryUseConsentIdentifier(input: {
+  tenantVaultId: string;
+  sector: string;
+  claims: Record<string, any>;
+}): string | undefined {
+  if (!isDigitalTwinSecondaryUseConsent(input.claims)) return undefined;
+  const subjectId = String(getClaimValue(input.claims, ClaimConsent.subject) || '').trim();
+  const actorIdentifier = String(
+    getClaimValue(input.claims, ClaimConsent.actorIdentifier)
+    || getClaimValue(input.claims, 'Consent.actor-reference')
+    || '',
+  ).trim();
+  const purpose = String(getClaimValue(input.claims, ClaimConsent.purpose) || '').trim().toUpperCase();
+  const sourceReference = String(getClaimValue(input.claims, ClaimConsent.sourceReference) || '').trim();
+  if (!sourceReference) throw new Error(`Missing required claim: ${ClaimConsent.sourceReference}`);
+  if (!subjectId) throw new Error(`Missing required claim: ${ClaimConsent.subject}`);
+  if (!actorIdentifier) throw new Error(`Missing required claim: ${ClaimConsent.actorIdentifier}`);
+
+  const semanticKey = [
+    input.tenantVaultId.trim(),
+    input.sector.trim(),
+    subjectId,
+    actorIdentifier,
+    purpose,
+    ServiceCapability.DigitalTwinReader,
+    sourceReference,
+  ].join('|');
+  const identifier = `urn:uuid:${uuidFromHash(semanticKey)}`;
+  setClaimValue(input.claims, ClaimConsent.identifier, identifier);
+  return identifier;
 }
 
 export type PersistConsentRuleInput = {
@@ -111,10 +170,10 @@ export async function persistConsentRuleAndAttachment(
     decision: getClaimValue<string>(claims, ClaimConsent.decision) as string,
     purpose: getClaimValue<string>(claims, ClaimConsent.purpose) as string,
   });
-  const consentIdentifier = String(getClaimValue(claims, ClaimConsent.identifier) || '').trim();
   const isDigitalTwinResearchConsent = isDigitalTwinSecondaryUseConsent(claims);
+  const sourceReference = String(getClaimValue(claims, ClaimConsent.sourceReference) || '').trim();
   const ruleKey = isDigitalTwinResearchConsent
-    ? `${baseRuleKey}|${consentIdentifier}`
+    ? `${baseRuleKey}|${sourceReference}`
     : baseRuleKey;
   const ruleId = hashConsentRuleId(ruleKey);
 

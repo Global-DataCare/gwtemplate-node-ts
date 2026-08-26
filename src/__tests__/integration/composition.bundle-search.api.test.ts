@@ -21,6 +21,7 @@ import { EXAMPLE_HOST_PUBLIC_HOSTNAME, EXAMPLE_ROUTE_VERSION } from 'gdc-common-
 import { ExampleEmployeeEmails, ExampleEmployeeRoles } from 'gdc-common-utils-ts/examples/employee';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
+import { applyDigitalTwinSecondaryUseDecision } from '../../utils/digital-twin-secondary-use';
 
 describe('Composition Bundle _search API (integration)', () => {
   function loadIpsAllSectionsFixture(subjectDid: string): any {
@@ -653,6 +654,54 @@ describe('Composition Bundle _search API (integration)', () => {
         ],
       };
 
+      const setResearchDecision = async (decision: 'permit' | 'deny', suffix: string) => {
+        const thid = `ips-secondary-use-${suffix}`;
+        const claims = {
+          '@context': 'org.hl7.fhir.r4',
+          [ClaimConsent.subject]: subjectDid,
+          [ClaimConsent.actorIdentifier]: 'did:web:index-provider.example.org',
+          [ClaimConsent.actorRole]: '*',
+          [ClaimConsent.decision]: decision,
+          [ClaimConsent.date]: '2026-08-26',
+          [ClaimConsent.purpose]: HealthcareConsentPurposes.Research,
+          [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
+          [ClaimConsent.sourceReference]: 'https://portal.example/research',
+        };
+        const submit = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch`,
+          headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+          body: {
+            thid,
+            body: {
+              resourceType: 'Bundle',
+              type: 'batch',
+              entry: [{
+                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Consent' },
+                resource: { resourceType: 'Consent', meta: { claims } },
+              }],
+            },
+          },
+        });
+        expect(submit.status).toBe(202);
+        for (let attempt = 0; attempt < 50; attempt++) {
+          const poll = await invokeExpress(app, {
+            method: 'POST',
+            url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response`,
+            headers: { 'content-type': 'application/json' },
+            body: { thid },
+          });
+          if (poll.status === 200) {
+            expect(JSON.parse(poll.text).data[0].response.status).toBe('201');
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        throw new Error(`Consent ${decision} polling did not complete.`);
+      };
+
+      await setResearchDecision('permit', 'initial-permit');
+
       const submitResp = await invokeExpress(app, {
         method: 'POST',
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
@@ -726,52 +775,6 @@ describe('Composition Bundle _search API (integration)', () => {
         HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
         HealthcareBasicSections.VitalSigns.attributeValue,
       ]));
-
-      const setResearchDecision = async (decision: 'permit' | 'deny', suffix: string) => {
-        const thid = `ips-secondary-use-${suffix}`;
-        const claims = {
-          '@context': 'org.hl7.fhir.r4',
-          [ClaimConsent.identifier]: 'urn:uuid:ips-secondary-use-consent-001',
-          [ClaimConsent.subject]: subjectDid,
-          [ClaimConsent.actorIdentifier]: 'did:web:index-provider.example.org',
-          [ClaimConsent.actorRole]: '*',
-          [ClaimConsent.decision]: decision,
-          [ClaimConsent.date]: '2026-08-26',
-          [ClaimConsent.purpose]: HealthcareConsentPurposes.Research,
-          [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
-        };
-        const submit = await invokeExpress(app, {
-          method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch`,
-          headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
-          body: {
-            thid,
-            body: {
-              resourceType: 'Bundle',
-              type: 'batch',
-              entry: [{
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Consent' },
-                resource: { resourceType: 'Consent', meta: { claims } },
-              }],
-            },
-          },
-        });
-        expect(submit.status).toBe(202);
-        for (let attempt = 0; attempt < 50; attempt++) {
-          const poll = await invokeExpress(app, {
-            method: 'POST',
-            url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response`,
-            headers: { 'content-type': 'application/json' },
-            body: { thid },
-          });
-          if (poll.status === 200) {
-            expect(JSON.parse(poll.text).data[0].response.status).toBe('201');
-            return;
-          }
-          await new Promise((resolve) => setTimeout(resolve, 25));
-        }
-        throw new Error(`Consent ${decision} polling did not complete.`);
-      };
 
       await setResearchDecision('deny', 'deny');
       expect(await vaultRepository.getContainersInSection(tenantVaultId, digitalTwinCompositionSection)).toHaveLength(1);
@@ -888,6 +891,17 @@ describe('Composition Bundle _search API (integration)', () => {
 
       const allergiesSection = 'LOINC|48765-2';
       const sectionSubjectDid = 'did:web:api.acme.org:individual:section-only-allergy-001';
+      await applyDigitalTwinSecondaryUseDecision({
+        vaultRepository,
+        tenantVaultId,
+        claims: {
+          [ClaimConsent.subject]: sectionSubjectDid,
+          [ClaimConsent.purpose]: HealthcareConsentPurposes.Research,
+          [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
+          [ClaimConsent.sourceReference]: 'urn:study:section-update',
+          [ClaimConsent.decision]: 'permit',
+        },
+      });
       const allergySectionBundle = {
         resourceType: 'Bundle',
         type: 'batch',
@@ -1379,6 +1393,17 @@ describe('Composition Bundle _search API (integration)', () => {
       await tenantManager.getTenant(tenantVaultId);
 
       const subjectDid = 'did:web:api.acme.org:individual:twin-materialization-001';
+      await applyDigitalTwinSecondaryUseDecision({
+        vaultRepository,
+        tenantVaultId,
+        claims: {
+          [ClaimConsent.subject]: subjectDid,
+          [ClaimConsent.purpose]: HealthcareConsentPurposes.Research,
+          [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
+          [ClaimConsent.sourceReference]: 'urn:study:materialization',
+          [ClaimConsent.decision]: 'permit',
+        },
+      });
       const ipsBundle = loadIpsAllSectionsFixture(subjectDid);
       const documentReference = {
         resourceType: 'DocumentReference',

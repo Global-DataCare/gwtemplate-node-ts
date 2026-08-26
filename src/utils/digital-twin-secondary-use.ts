@@ -130,7 +130,7 @@ async function rebuildProjection(
   }
 }
 
-/** Returns false only after an explicit secondary-use withdrawal. */
+/** Returns true only after at least one explicit secondary-use permit. */
 export async function isDigitalTwinSecondaryUseEnabled(input: {
   vaultRepository: IVaultRepository;
   tenantVaultId: string;
@@ -142,7 +142,7 @@ export async function isDigitalTwinSecondaryUseEnabled(input: {
     id,
     statusSectionId(),
   );
-  return status?.status !== 'disabled';
+  return status?.status === 'enabled';
 }
 
 /**
@@ -163,16 +163,40 @@ export async function applyDigitalTwinSecondaryUseDecision(input: {
   const decision = String(getClaimValue(input.claims, ClaimConsent.decision) || '').trim().toLowerCase();
   if (!sourceSubject || (decision !== 'permit' && decision !== 'deny')) return false;
 
+  const consentSectionId = getSubjectScopedSectionId(sourceSubject, SUBJECT_SECTION_INDIVIDUAL, 'consents');
+  const storedRules = await input.vaultRepository.listContainersInSection<RecordBase>(
+    input.tenantVaultId,
+    consentSectionId,
+  );
+  const currentReference = String(
+    getClaimValue(input.claims, ClaimConsent.sourceReference)
+    || getClaimValue(input.claims, ClaimConsent.identifier)
+    || '',
+  ).trim();
+  const decisionsByReference = new Map<string, string>();
+  for (const storedRule of storedRules) {
+    const storedClaims = storedRule as Record<string, any>;
+    if (!isResearchSecondaryUseRule(storedClaims)) continue;
+    if (String(getClaimValue(storedClaims, ClaimConsent.subject) || '').trim() !== sourceSubject) continue;
+    const reference = String(
+      getClaimValue(storedClaims, ClaimConsent.sourceReference)
+      || getClaimValue(storedClaims, ClaimConsent.identifier)
+      || storedRule.id,
+    ).trim();
+    decisionsByReference.set(reference, String(getClaimValue(storedClaims, ClaimConsent.decision) || '').trim().toLowerCase());
+  }
+  decisionsByReference.set(currentReference, decision);
+  const enabled = Array.from(decisionsByReference.values()).some((value) => value === 'permit');
   const status: DigitalTwinSecondaryUseStatus = {
     id: subjectHash(sourceSubject),
     type: 'digital-twin-secondary-use-status',
     sourceSubjectHash: subjectHash(sourceSubject),
-    status: decision === 'permit' ? 'enabled' : 'disabled',
+    status: enabled ? 'enabled' : 'disabled',
     changedAt: new Date().toISOString(),
   };
   await input.vaultRepository.put(input.tenantVaultId, [status], statusSectionId());
 
-  if (decision === 'permit') {
+  if (enabled) {
     await rebuildProjection(input.vaultRepository, input.tenantVaultId, sourceSubject);
   }
   return true;

@@ -36,22 +36,24 @@ Verify current branches, versions and published npm state before release claims.
   - `Consent.actor-role`: `*`
   - `Consent.purpose`: `HRESCH`
   - `Consent.action`: canonical `ServiceCapability.DigitalTwinReader`
-  - `Consent.decision`: `permit` or `deny`
+- `Consent.decision`: `permit` or `deny`
+- `Consent.source-reference`: stable portal/software/study URL or URI
 - Do not add an ODRL attachment to this provider-level secondary-use Consent.
-- Do not introduce `researchOrganizationDid` into the patient toggle. A future portal or study uses another FHIR Consent with its own identifier and actual research actor.
+- Do not introduce `researchOrganizationDid` into the patient toggle. Distinguish each portal, software product or study with its own `Consent.source-reference`.
 
-## Own the stable Consent identifier server-side
+## Resolve the Consent from its application/study reference
 
-- Call `createDigitalTwinSecondaryUseConsentIdentifier()` exactly once in the server-side index-enrollment transaction.
-- Persist the resulting random `urn:uuid` with that enrollment and reuse it for status, permit and deny.
-- Never derive it from the subject DID, tenant DID, email or another personal identifier.
-- Never return it to the browser or regenerate it per request.
-- Backfill an existing enrollment once under an idempotent transaction; do not create duplicate portal rules.
+- The BFF passes `researchUseReference`, a stable URL or URI identifying its portal, software product or study.
+- GW resolves the rule by subject, index provider, HRESCH, DigitalTwinReader and `Consent.source-reference`.
+- GW alone assigns and reuses the internal `Consent.identifier`; the BFF never generates, stores, sends or receives it.
+- Reusing the same source reference updates one rule. A different source reference creates a separate FHIR Consent.
+- Status lookup must include active deny rules; "active" is validity/period state and must not be confused with `decision=permit`.
 
 ## Keep projection separate from consent
 
 - Ingest the operational IPS through the existing individual `Communication/_batch` flow, normally via `ingestCommunicationAndUpdateIndex(...)`.
 - Let GW create or refresh the research projection when consent is `permit`.
+- Absence of an explicit permit is disabled; never project by default.
 - Create one canonical Composition per IPS document/version with all IPS sections. Never create one Composition per section.
 - Assign the twin subject only inside GW from its tenant-private alias as a registered `urn:uuid:<uuid>`.
 - Reject operational DIDs, caller-invented UUIDs and unregistered UUIDs on canonical research records.
@@ -72,7 +74,7 @@ For any contract change, update together:
 
 - manager/utility tests and route integration tests in GW CORE;
 - SDK JSDoc and exported types/functions;
-- executable `tests/101-digital-twin-sdk.test.mjs` with comments that explain one-time server persistence;
+- executable `tests/101-digital-twin-sdk.test.mjs` showing that the BFF stores only its stable research-use reference;
 - copyable snippets in `docs/101-DIGITAL_TWIN_SDK.md`;
 - GW high-level lifecycle and SEDIA capability matrix;
 - README public-surface inventory and changelogs;
@@ -85,6 +87,6 @@ Search for stale claims before finishing, especially `researchOrganizationDid`, 
 - Run targeted GW consent, projection and Composition route tests plus typecheck/build/Swagger when the GW contract changes.
 - Run SDK build, product-neutrality, typecheck, executable 101 and full tests when the SDK surface changes.
 - Confirm branch, commit, push and merge state in each changed repository.
-- For npm, verify `npm view <package>@<version>`, `dist.integrity`, `latest`, a clean install and the exported helper before declaring publication.
-- For deployed cleanup or behavior, verify the actual CORE workload tuple; never confuse CORE development with GW UNID or SOSCHAIN.
-
+- For npm, verify `npm view <package>@<version>`, `dist.integrity`, `latest`, a clean install and the exported public surface before declaring publication.
+- For deployed cleanup or behavior, verify the exact target runtime tuple and
+  never infer product identity from a legacy project, cluster or workload name.
