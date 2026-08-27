@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Allow one GW deployment/network to trust several OIDC identity providers
+  through exact `iss` + `aud` entries. Provider keys are obtained through
+  standard OpenID discovery, and an unverified issuer is used only to route to
+  the verifier that then validates signature, issuer, audience and time claims.
+- Sign PDF-free ICA host-verification requests with the GW host communication
+  key so a server-preauthorized `local-network` host can reproduce onboarding
+  without weakening ordinary PDF-based organization adhesion.
+
 - Type the canonical `composition` embedded in every public Digital Twin
   `ResearchSubject/_search` result as FHIR `resourceType: "Composition"`.
 

@@ -291,6 +291,63 @@ describe('HostingManager legal organization verification transaction', () => {
     );
   });
 
+  it('signs a PDF-free ICA request as the governed host for local-network reproducibility', async () => {
+    const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+    global.fetch = jest.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      fetchCalls.push({ url: typeof url === 'string' ? url : String(url), init });
+      return {
+        ok: true,
+        status: Number(EXAMPLE_RESPONSE_STATUS_OK),
+        headers: { get: () => EXAMPLE_ICA_RESPONSE_CONTENT_TYPE },
+        json: async () => buildIcaVerifyCredentialResponse(),
+      } as any;
+    }) as any;
+    const kms = {
+      ...mockKmsService,
+      getPublicVerificationKey: jest.fn(async () => ({ kid: 'host-signing-es384-001', alg: 'ES384' })),
+      createCompactJws: jest.fn(async () => 'protected.resource.signature'),
+    } as unknown as IKmsService;
+    const config = buildConfig();
+    config.networkMode = 'local-network';
+    config.hostExternalDomain = 'globaldatacare.es';
+    config.apiBaseUrl = 'https://globaldatacare.es';
+    const manager = new HostingManager(
+      mockVaultRepository,
+      kms,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      config,
+      mockHostRuntime,
+    );
+    const job = buildTransactionJob();
+    job.sector = 'local-network';
+    delete (job.content as any).attachments;
+    const resource = (job.content!.body!.data[0]!.resource as any);
+    resource.organization.did = 'did:web:globaldatacare.es';
+    resource.meta.claims[ClaimsServiceSchemaorg.url] = 'https://globaldatacare.es/host/cds-ES/v1/health-care';
+
+    await manager.process(job, 'test', false);
+
+    const sentBody = JSON.parse(String(fetchCalls[0]?.init?.body || '{}'));
+    expect(sentBody.iss).toBe('did:web:globaldatacare.es');
+    expect(sentBody.attachments).toBeUndefined();
+    expect(sentBody.body.hostAuthorizationProof.jws).toBe('protected.resource.signature');
+    expect(kms.createCompactJws).toHaveBeenCalledWith(
+      {
+        jurisdiction: 'ES',
+        sector: 'health-care',
+        networkKind: 'local-network',
+        resourceType: 'contract',
+        resource: sentBody.body.data[0].resource,
+      },
+      'host-signing-es384-001',
+      'host',
+      'comm_sig',
+      expect.objectContaining({ kid: 'did:web:globaldatacare.es#host-signing-es384-001' }),
+    );
+  });
+
   it('re-registers the deployment-authorized legacy representative through _transaction without a new Offer', async () => {
     const job = buildTransactionJob();
     (job.content!.meta as any).jws.protected.jwk = {

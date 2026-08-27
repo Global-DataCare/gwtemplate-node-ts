@@ -10,6 +10,8 @@ import {
 } from '../../../auth/token-verifier-registry';
 import { DemoTokenVerifier } from '../../../auth/DemoTokenVerifier';
 import { FirebaseTokenVerifier } from '../../../auth/FirebaseTokenVerifier';
+import { GenericOidcTokenVerifier } from '../../../auth/GenericOidcTokenVerifier';
+import { TrustedOidcTokenVerifier } from '../../../auth/TrustedOidcTokenVerifier';
 import { ITokenVerifier } from '../../../auth/ITokenVerifier';
 
 class CustomVerifier implements ITokenVerifier {
@@ -26,6 +28,10 @@ describe('token-verifier-registry', () => {
     clearTokenVerifierAdapters();
     process.env = { ...originalEnv };
     delete process.env.AUTH_TOKEN_VERIFIER;
+    delete process.env.OIDC_ISSUER;
+    delete process.env.OIDC_AUDIENCE;
+    delete process.env.OIDC_JWKS_URI;
+    delete process.env.OIDC_TRUSTED_PROVIDERS_JSON;
   });
 
   afterAll(() => {
@@ -54,5 +60,46 @@ describe('token-verifier-registry', () => {
     process.env.AUTH_TOKEN_VERIFIER = 'unsupported-idp';
     expect(() => resolveTokenVerifierFromEnv(false)).toThrow("Unsupported AUTH_TOKEN_VERIFIER='unsupported-idp'");
   });
-});
 
+  it('builds one trusted OIDC verifier that routes several configured issuers inside the same GW deployment', () => {
+    process.env.AUTH_TOKEN_VERIFIER = 'trusted-oidc';
+    process.env.OIDC_TRUSTED_PROVIDERS_JSON = JSON.stringify([
+      {
+        issuer: 'globaldatacare.es',
+        audience: 'globaldatacare.es',
+      },
+      {
+        issuer: 'https://securetoken.google.com/unid-production',
+        audience: 'unid-production',
+      },
+    ]);
+
+    const verifier = resolveTokenVerifierFromEnv(false);
+
+    expect(verifier).toBeInstanceOf(TrustedOidcTokenVerifier);
+  });
+
+  it('builds the single-provider OIDC verifier without duplicating the discoverable jwks_uri', () => {
+    process.env.AUTH_TOKEN_VERIFIER = 'oidc';
+    process.env.OIDC_ISSUER = 'globaldatacare.es';
+    process.env.OIDC_AUDIENCE = 'globaldatacare.es';
+
+    const verifier = resolveTokenVerifierFromEnv(false);
+
+    expect(verifier).toBeInstanceOf(GenericOidcTokenVerifier);
+  });
+
+  it('fails startup when a trusted OIDC provider omits its exact audience', () => {
+    process.env.AUTH_TOKEN_VERIFIER = 'trusted-oidc';
+    process.env.OIDC_TRUSTED_PROVIDERS_JSON = JSON.stringify([
+      {
+        issuer: 'globaldatacare.es',
+        jwksUri: 'https://globaldatacare.es/.well-known/jwks.json',
+      },
+    ]);
+
+    expect(() => resolveTokenVerifierFromEnv(false)).toThrow(
+      'OIDC_TRUSTED_PROVIDERS_JSON[0].audience is required',
+    );
+  });
+});

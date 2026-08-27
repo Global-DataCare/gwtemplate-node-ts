@@ -7,6 +7,7 @@ import { FirebaseTokenVerifier } from './FirebaseTokenVerifier';
 import { GoogleTokenVerifier } from './GoogleTokenVerifier';
 import { AppleTokenVerifier } from './AppleTokenVerifier';
 import { GenericOidcTokenVerifier } from './GenericOidcTokenVerifier';
+import { TrustedOidcProvider, TrustedOidcTokenVerifier } from './TrustedOidcTokenVerifier';
 
 export type TokenVerifierAdapterFactory = () => ITokenVerifier;
 
@@ -18,6 +19,37 @@ function requireEnv(name: string): string {
     throw new Error(`Missing required env var: ${name}`);
   }
   return value;
+}
+
+function parseTrustedOidcProviders(): TrustedOidcProvider[] {
+  const name = 'OIDC_TRUSTED_PROVIDERS_JSON';
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(requireEnv(name));
+  } catch (error: any) {
+    if (String(error?.message || '').startsWith('Missing required env var:')) throw error;
+    throw new Error(`${name} must be a valid JSON array.`);
+  }
+  if (!Array.isArray(parsed) || !parsed.length) {
+    throw new Error(`${name} must contain at least one provider.`);
+  }
+  const seenIssuers = new Set<string>();
+  return parsed.map((raw, index) => {
+    const provider = raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? raw as Record<string, unknown>
+      : {};
+    const required = (field: 'issuer' | 'audience'): string => {
+      const value = typeof provider[field] === 'string' ? provider[field].trim() : '';
+      if (!value) throw new Error(`${name}[${index}].${field} is required.`);
+      return value;
+    };
+    const issuer = required('issuer');
+    const audience = required('audience');
+    if (seenIssuers.has(issuer)) throw new Error(`${name} contains duplicate issuer '${issuer}'.`);
+    seenIssuers.add(issuer);
+    const jwksUri = typeof provider.jwksUri === 'string' ? provider.jwksUri.trim() : '';
+    return { issuer, audience, ...(jwksUri ? { jwksUri } : {}) };
+  });
 }
 
 export function registerTokenVerifierAdapter(name: string, factory: TokenVerifierAdapterFactory): void {
@@ -49,15 +81,18 @@ export function resolveTokenVerifierFromEnv(isTestEnv: boolean): ITokenVerifier 
   if (key === 'google') return new GoogleTokenVerifier(requireEnv('GOOGLE_CLIENT_ID'));
   if (key === 'apple') return new AppleTokenVerifier();
   if (key === 'oidc') {
+    const jwksUri = String(process.env.OIDC_JWKS_URI || '').trim();
     return new GenericOidcTokenVerifier({
       issuer: requireEnv('OIDC_ISSUER'),
       audience: requireEnv('OIDC_AUDIENCE'),
-      jwksUri: requireEnv('OIDC_JWKS_URI'),
+      ...(jwksUri ? { jwksUri } : {}),
     });
+  }
+  if (key === 'trusted-oidc') {
+    return new TrustedOidcTokenVerifier(parseTrustedOidcProviders());
   }
 
   throw new Error(
-    `Unsupported AUTH_TOKEN_VERIFIER='${key}'. Allowed built-ins: demo,firebase,google,apple,oidc.`
+    `Unsupported AUTH_TOKEN_VERIFIER='${key}'. Allowed built-ins: demo,firebase,google,apple,oidc,trusted-oidc.`
   );
 }
-
