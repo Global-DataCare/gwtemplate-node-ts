@@ -101,5 +101,14 @@ if grep -Eq 'COPY .*\.env' ./Dockerfile; then
   echo 'ERROR: runtime profiles must be injected, never copied into the image.' >&2
   exit 1
 fi
+if rg -n 'git\+(ssh|https)|git@github\.com|github\.com/.+\.git|github:.+#|file:vendor|file:workspace' \
+  ./package.json ./package-lock.json ./Dockerfile; then
+  echo 'ERROR: release images must consume immutable npm registry dependencies, never Git, workspace or vendor package sources.' >&2
+  exit 1
+fi
+if [[ "$(grep -Ec '^RUN npm ci($| )' ./Dockerfile)" -ne 2 ]]; then
+  echo 'ERROR: both Docker stages must install the exact lockfile with npm ci.' >&2
+  exit 1
+fi
 
 echo 'Local image release scripts validated.'

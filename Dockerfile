@@ -13,7 +13,7 @@ WORKDIR /usr/src/gwtemplate-node-ts
 COPY package*.json ./
 
 # Install all dependencies (including devDependencies needed for building)
-RUN npm install
+RUN npm ci
 
 # Copy the source code
 COPY . ./
@@ -33,7 +33,7 @@ WORKDIR /usr/src/gwtemplate-node-ts
 COPY package*.json ./
 
 # Install ONLY production dependencies
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
 # Copy the compiled code from the builder stage
 COPY --from=builder /usr/src/gwtemplate-node-ts/build ./build
