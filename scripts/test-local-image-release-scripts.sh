@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Flow contract: a clean checkout contains every JavaScript chaincode runtime
+# entrypoint required by the mandatory local-Fabric image smoke.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,6 +28,17 @@ grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER=false' ./env.example
 grep -Fq 'ALLOWED_SECTORS is required for every gateway deployment' ./cloud_deploy.sh
 grep -Fq 'ALLOWED_SECTORS=health-research,health-care,health-index,onehealth-research' ./env.example
 grep -Fq 'LOCAL_IMAGE_NAME="${LOCAL_IMAGE_NAME:-gwtemplate}"' ./demo-deploy.config.example
+
+for chaincode_entrypoint in chaincode/*-javascript/index.js; do
+  chaincode_dir="${chaincode_entrypoint%/index.js}"
+  while IFS= read -r runtime_import; do
+    runtime_file="${chaincode_dir}/${runtime_import#./}.js"
+    git ls-files --error-unmatch "$runtime_file" >/dev/null 2>&1 || {
+      echo "ERROR: chaincode runtime source is absent from a clean checkout: ${runtime_file}" >&2
+      exit 1
+    }
+  done < <(rg -o "\./lib/[^\"']+" "$chaincode_entrypoint")
+done
 
 while IFS= read -r env_example; do
   if grep -q '^MAINSECTOR=' "$env_example" \
