@@ -54,6 +54,10 @@ the CORE tuple above. A currently active context is not evidence of the target.
 - Run `docker_build_local.sh`; its context must be this repository, never the
   workspace root. Sibling source repositories must not enter the image.
 - Keep `.env*`, credentials, generated output and chaincode outside the image.
+- A clean checkout must nevertheless contain every authored JavaScript
+  chaincode runtime imported by `chaincode/*-javascript/index.js`. Those
+  `lib/*.js` files are source, not generated output; the release-script test
+  must fail before Fabric bootstrap if any imported runtime file is untracked.
 - Run `npm run check:identity-chaincode-parity` before the Docker smoke. Shared
   identity chaincodes are canonical in sibling `fabric-multicloud`; the GW
   `chaincode/*-javascript` copies are temporary local-network packaging mirrors

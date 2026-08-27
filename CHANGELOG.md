@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Make local-Fabric validation reproducible from a clean checkout by tracking
+  every authored `chaincode/*-javascript/lib` runtime source and by failing the
+  release-script contract test when an `index.js` import is absent from Git.
 - Keep legacy tenants functional after the public Digital Twin aggregate moved
   from `Composition` to `ResearchSubject`: an existing read-only
   `Composition/_search` declaration now authorizes `ResearchSubject/_search`
