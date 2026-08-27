@@ -46,6 +46,12 @@ const OPERATIONAL_EMPLOYEE_DID = buildProfessionalDidWeb({
 });
 const REGISTERED_TWIN_SUBJECT = 'urn:uuid:00000000-0000-4000-8000-000000000101';
 
+/**
+ * Flow contract: authorized callers search one tenant's pseudonymous twins;
+ * basic discovery applies OR across requested IPS sections and AND across
+ * text and clinical-date constraints on the same resource, then returns each
+ * twin Composition once without exposing the internal search document.
+ */
 describe('CompositionManager', () => {
   const mockVaultRepository = {
     vaultExists: jest.fn(),
@@ -613,6 +619,79 @@ describe('CompositionManager', () => {
     expect(TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG[HealthcareSummarySections.PregnancyHistory.attributeValue]).toEqual([
       { collectionIds: [DataCollectionIds.observations], resourceType: 'Observation' },
     ]);
+  });
+
+  it('searches text across several sections and resource types inside an inclusive date range', async () => {
+    const subjectDid = REGISTERED_TWIN_SUBJECT;
+    const medicationSection = HealthcareBasicSections.HistoryOfMedicationUse.attributeValue;
+    const resultSection = HealthcareBasicSections.Results.attributeValue;
+    const medicationSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'medications');
+    const observationSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'observations');
+    const compositionSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
+    mockVaultRepository.getAllSections.mockResolvedValue([
+      medicationSectionId,
+      observationSectionId,
+      compositionSectionId,
+    ] as any);
+    mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
+      if (sectionId === medicationSectionId) return [{
+        id: 'medication-search-document',
+        'MedicationStatement.subject': subjectDid,
+        '__digitalTwinSearch.text': 'Tratamiento antiinflamatorio\u001fIbuprofen',
+        '__digitalTwinSearch.date': '2026-04-10T12:00:00.000Z',
+      }] as any;
+      if (sectionId === observationSectionId) return [{
+        id: 'observation-outside-range',
+        'Observation.subject': subjectDid,
+        '__digitalTwinSearch.text': 'Ibuprofen plasma level',
+        '__digitalTwinSearch.date': '2024-04-10T12:00:00.000Z',
+      }] as any;
+      if (sectionId === compositionSectionId) return [{
+        id: 'composition-basic-search',
+        'Composition.subject': subjectDid,
+        'Composition.section': `${medicationSection},${resultSection}`,
+      }] as any;
+      return [] as any;
+    });
+
+    const response = await manager.process(createJob({
+      action: '_search',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [
+            { name: 'section', valueString: medicationSection },
+            { name: 'section', valueString: resultSection },
+            { name: 'date-from', valueDate: '2026-01-01' },
+            { name: 'text', valueString: 'IBUPROFEN' },
+          ],
+        },
+      } as any,
+    }));
+
+    const result = (response.body as any).data[0].resource;
+    expect(result.total).toBe(1);
+    expect(result.data).toEqual([expect.objectContaining({ id: 'composition-basic-search' })]);
+    expect(JSON.stringify(result.data)).not.toContain('__digitalTwinSearch');
+  });
+
+  it('rejects a basic search whose end date precedes its start date', async () => {
+    await expect(manager.process(createJob({
+      action: '_search',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [
+            { name: 'section', valueString: HealthcareBasicSections.Results.attributeValue },
+            { name: 'date-from', valueDate: '2026-08-20' },
+            { name: 'date-to', valueDate: '2026-08-01' },
+            { name: 'text', valueString: 'pressure' },
+          ],
+        },
+      } as any,
+    }))).rejects.toThrow('date-to must be on or after date-from');
   });
 
   const searchableSectionFixtures = [

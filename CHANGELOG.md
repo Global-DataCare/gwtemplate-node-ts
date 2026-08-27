@@ -11,6 +11,13 @@
 - Keep provider secondary-use consent explicit in research integration flows,
   avoid duplicate individual Consent projections during Communication
   ingestion, and align medication projection tests with the consent gate.
+- Add MVP digital-twin discovery across one or more IPS sections using an
+  inclusive clinical date range and resource-agnostic text. GW resolves an
+  omitted end date to request time, derives private text/date/language search
+  fields, deduplicates subjects and excludes those fields from materialization.
+- Require bilateral inter-tenant Contract VCs to use authorized-signatory
+  roles and two verified `contractAgreement` proofs; technical `RESPRSN`
+  remains transport/controller authority rather than implicit legal authority.
 - Make `Consent.source-reference` the public stable key for each Digital Twin
   portal/software/study permission. GW now owns the internal
   `Consent.identifier`, reuses one rule per semantic reference, keeps distinct

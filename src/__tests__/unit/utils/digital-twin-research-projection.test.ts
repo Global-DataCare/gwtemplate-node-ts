@@ -1,11 +1,19 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 import {
+  DIGITAL_TWIN_SEARCH_DATE_CLAIM,
+  DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM,
+  DIGITAL_TWIN_SEARCH_TEXT_CLAIM,
   getDigitalTwinSubjectAliasSectionId,
   getOrCreateDigitalTwinSubjectId,
   isDigitalTwinResearchResourceType,
   projectClaimsForDigitalTwin,
 } from '../../../utils/digital-twin-research-projection';
 
+/**
+ * Flow contract: GW pseudonymizes one operational resource, removes its
+ * identifying/free-text claims and creates a private derived search document
+ * containing only normalized searchable text, clinical date and language.
+ */
 describe('digital twin research projection', () => {
   it('creates one private stable twin subject alias without persisting the operational DID', async () => {
     const records = new Map<string, any>();
@@ -42,6 +50,8 @@ describe('digital twin research projection', () => {
         'MedicationStatement.code-text': 'Ibuprofen',
         'MedicationStatement.dosage-instruction': 'Take after dinner',
         'MedicationStatement.code-display': 'Ibuprofen prescribed to Alice',
+        'MedicationStatement.effective-dateTime': '2026-08-20T10:30:00.000Z',
+        'MedicationStatement.language': 'es',
         'MedicationStatement.medication-text': 'Alice takes ibuprofen',
         'MedicationStatement.note': 'Call Alice on 555-0100',
       },
@@ -59,6 +69,9 @@ describe('digital twin research projection', () => {
     expect(projected).not.toHaveProperty('MedicationStatement.dosage-instruction');
     expect(projected).not.toHaveProperty('MedicationStatement.medication-text');
     expect(projected).not.toHaveProperty('MedicationStatement.note');
+    expect(projected[DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toBe('Ibuprofen\u001fIbuprofen prescribed to Alice');
+    expect(projected[DIGITAL_TWIN_SEARCH_DATE_CLAIM]).toBe('2026-08-20T10:30:00.000Z');
+    expect(projected[DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM]).toBe('es');
   });
 
   it('rejects identity-bearing resource families from the research plane', () => {

@@ -7,6 +7,12 @@ const DIGITAL_TWIN_SUBJECT_ALIAS_SECTION = 'digitaltwin_subject_aliases';
 const RESEARCH_PROJECTION_AUTHOR = 'urn:gdc:research-projection';
 const DIGITAL_TWIN_SUBJECT_URN_UUID = /^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Private derived search fields. They are never returned in a materialized FHIR resource. */
+export const DIGITAL_TWIN_SEARCH_TEXT_CLAIM = '__digitalTwinSearch.text';
+export const DIGITAL_TWIN_SEARCH_DATE_CLAIM = '__digitalTwinSearch.date';
+export const DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM = '__digitalTwinSearch.language';
+export const DIGITAL_TWIN_SEARCH_CLAIM_PREFIX = '__digitalTwinSearch.';
+
 export type DigitalTwinSubjectAlias = RecordBase & {
   type: 'digital-twin-subject-alias';
   sourceSubjectHash: string;
@@ -129,6 +135,17 @@ export function projectClaimsForDigitalTwin(input: {
   }
   if (!twinSubjectId) throw new Error('twinSubjectId is required');
 
+  const searchableText = Array.from(new Set(Object.entries(input.claims || {})
+    .filter(([key]) => /\.code-(?:display|text)$/i.test(String(key || '').trim()))
+    .map(([, value]) => String(value || '').trim())
+    .filter(Boolean)));
+  const searchableDate = Object.entries(input.claims || {})
+    .filter(([key]) => /\.(?:effective(?:-?datetime)?|issued|recorded(?:date|on)?|occurrence-?datetime|onset-?datetime|performed-?datetime|date|datetime|period-start)$/i.test(String(key || '').trim()))
+    .map(([, value]) => String(value || '').trim())
+    .find((value) => Boolean(value) && !Number.isNaN(Date.parse(value)));
+  const searchableLanguage = Object.entries(input.claims || {})
+    .find(([key]) => /\.language$/i.test(String(key || '').trim()))?.[1];
+
   const projected: Record<string, unknown> = {};
   for (const [key, rawValue] of Object.entries(input.claims || {})) {
     const normalizedKey = String(key || '').trim();
@@ -153,5 +170,8 @@ export function projectClaimsForDigitalTwin(input: {
     }
     projected[normalizedKey] = rawValue;
   }
+  if (searchableText.length > 0) projected[DIGITAL_TWIN_SEARCH_TEXT_CLAIM] = searchableText.join('\u001f');
+  if (searchableDate) projected[DIGITAL_TWIN_SEARCH_DATE_CLAIM] = searchableDate;
+  if (searchableLanguage) projected[DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM] = String(searchableLanguage).trim();
   return projected;
 }

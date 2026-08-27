@@ -1070,6 +1070,18 @@ describe('Composition Bundle _search API (integration)', () => {
         alias.id === createHash('sha256').update(source).digest('hex'))?.twinSubjectId;
       const searchCases = [
         {
+          // Basic portal search: sections are repeated, text is
+          // resource-agnostic and an omitted date-to is resolved by GW.
+          thid: 'ips-all-sections-basic-text-date-search-001',
+          expectedSubject: twinFor(subjectDid),
+          parameters: [
+            { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
+            { name: 'section', valueString: HealthcareBasicSections.Results.attributeValue },
+            { name: 'date-from', valueDate: '2024-01-01' },
+            { name: 'text', valueString: 'lisinopril' },
+          ],
+        },
+        {
           thid: 'ips-all-sections-med-search-001',
           expectedSubject: twinFor(subjectDid),
           parameters: [
