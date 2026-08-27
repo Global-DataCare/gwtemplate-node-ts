@@ -887,10 +887,10 @@ describe('MedicationStatement API (integration)', () => {
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.subject']).toBe(twinSubjectId);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.identifier']).not.toBe('urn:uuid:medication-digitaltwin-001');
-      // The projected medication record may retain private derived search
-      // fields. They are not a separate collection and are never materialized
-      // as clinical claims or returned by search; the check below continues to
-      // reject source text/display/note fields.
+      // The same projected resource record may retain private derived search
+      // fields beside its coded MedicationStatement claims. This is not a
+      // separate collection: search/materialization strips the private fields,
+      // and the check below continues to reject source text/display/note claims.
       expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toContain('Paracetamol');
       expect(Object.keys(digitalTwinRecords[0]).some((key) =>
         key !== '@context'

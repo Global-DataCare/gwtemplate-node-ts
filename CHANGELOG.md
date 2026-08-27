@@ -14,7 +14,9 @@
 - Align the medication projection integration invariant with the private
   derived `__digitalTwinSearch.*` fields stored on each projected resource
   record, while continuing to reject exposed clinical text, display and note
-  claims. These fields do not represent a separate collection or public index.
+  claims. They coexist on the same projected resource record, not a separate
+  collection or public index, and Composition-wide discovery strips them from
+  every returned or materialized FHIR resource.
 - Make protected device licences readable through their HMAC activation-code
   index before employee exchange and DCR validation, while preserving encrypted
   persistence and synchronizing the active envelope status. Add manager
