@@ -112,6 +112,24 @@ describe('isRequestValid', () => {
       action: '_batch',
     })).toBe(true);
   });
+
+  it('keeps ResearchSubject discovery available to tenants that published the legacy Composition search route', () => {
+    const legacyDigitalTwinServices: DidService[] = [{
+      id: '#digitaltwin:org.hl7.fhir.r4:composition:_search',
+      type: 'ApiService',
+      serviceEndpoint: 'Composition',
+      actions: ['_search'],
+      selector: { section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
+    }];
+
+    expect(isRequestValid(legacyDigitalTwinServices, {
+      sector: Sector.HEALTH_CARE,
+      section: 'digitaltwin',
+      format: 'org.hl7.fhir.r4',
+      resourceType: 'ResearchSubject',
+      action: '_search',
+    })).toBe(true);
+  });
   
   it('should return TRUE for a request where resourceType has different casing', () => {
     const params = {

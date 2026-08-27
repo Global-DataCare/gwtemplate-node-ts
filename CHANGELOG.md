@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Keep legacy tenants functional after the public Digital Twin aggregate moved
+  from `Composition` to `ResearchSubject`: an existing read-only
+  `Composition/_search` declaration now authorizes `ResearchSubject/_search`
+  without tenant reactivation or DCR. Startup also republishes the current
+  canonical tenant service catalog, removes obsolete resource-specific twin
+  searches and preserves non-GW custom DID services. Subject Consent lookup
+  also filters contextualized HRESCH rules by provider, action and source
+  reference.
 - Resolve same-tenant Digital Twin employment from extracted identity rather
   than whole-DID alias equality: parse the VAT/tax tenant id, email-derived
   `z...` and role from internal hosted or public organization DIDs, then require

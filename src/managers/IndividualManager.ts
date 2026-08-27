@@ -46,6 +46,8 @@ import {
 } from '../constants/domain';
 import type { ITenantsManager } from './ITenantsManager';
 import type { IHostRuntime } from './IHostRuntime';
+import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
+import { getClaimValue } from '../utils/claims';
 
 
 const INDIVIDUAL_SECTION = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
@@ -359,17 +361,31 @@ export class IndividualManager {
     const actorIdentifiers = new Set(filters['actor-identifier'] || filters.actorIdentifier || []);
     const purposes = new Set(filters.purpose || []);
     const actorRoles = new Set(filters['actor-role'] || filters.actorRole || []);
+    const actions = new Set(filters.action || []);
+    const sourceReferences = new Set(filters['source-reference'] || filters.sourceReference || []);
 
     return matches.filter((record: any) => {
-      const identifier = String(record?.['Consent.identifier'] || '').trim();
-      const actorIdentifier = String(record?.['Consent.actorIdentifier'] || '').trim();
-      const purpose = String(record?.['Consent.purpose'] || '').trim();
-      const actorRole = String(record?.['Consent.actorRole'] || '').trim();
+      const identifier = String(getClaimValue(record, ClaimConsent.identifier) || '').trim();
+      const actorIdentifier = String(
+        getClaimValue(record, ClaimConsent.actorIdentifier)
+        || record?.['Consent.actorIdentifier']
+        || '',
+      ).trim();
+      const purpose = String(getClaimValue(record, ClaimConsent.purpose) || '').trim();
+      const actorRole = String(
+        getClaimValue(record, ClaimConsent.actorRole)
+        || record?.['Consent.actorRole']
+        || '',
+      ).trim();
+      const action = String(getClaimValue(record, ClaimConsent.action) || '').trim();
+      const sourceReference = String(getClaimValue(record, ClaimConsent.sourceReference) || '').trim();
 
       if (identifiers.size > 0 && !identifiers.has(identifier)) return false;
       if (actorIdentifiers.size > 0 && !actorIdentifiers.has(actorIdentifier)) return false;
       if (purposes.size > 0 && !purposes.has(purpose)) return false;
       if (actorRoles.size > 0 && !actorRoles.has(actorRole)) return false;
+      if (actions.size > 0 && !actions.has(action)) return false;
+      if (sourceReferences.size > 0 && !sourceReferences.has(sourceReference)) return false;
       return true;
     });
   }

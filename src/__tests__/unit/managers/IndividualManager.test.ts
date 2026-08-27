@@ -376,5 +376,74 @@ describe('IndividualManager', () => {
       expect(responseEntry.resource.total).toBe(2);
       expect(responseEntry.resource.data).toHaveLength(2);
     });
+
+    it('filters one contextualized HRESCH rule by provider, action and source reference', async () => {
+      const subjectDid = 'did:web:globaldatacare.es:health-care:organization:taxid:VATES-B42215152:individual:multibase:zSubject';
+      const providerDid = 'did:web:globaldatacare.es:health-care:organization:taxid:VATES-B42215152';
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockVaultRepository.vaultExists.mockResolvedValue(true);
+      mockVaultRepository.listContainersInSection.mockResolvedValue([
+        {
+          id: 'permit-globaldatacare',
+          '@context': 'org.hl7.fhir.api',
+          'org.hl7.fhir.api.Consent.subject': subjectDid,
+          'org.hl7.fhir.api.Consent.identifier': 'urn:uuid:permit-globaldatacare',
+          'org.hl7.fhir.api.Consent.actor-identifier': providerDid,
+          'org.hl7.fhir.api.Consent.actor-role': '*',
+          'org.hl7.fhir.api.Consent.purpose': 'HRESCH',
+          'org.hl7.fhir.api.Consent.action': 'organization/ResearchSubject.rs',
+          'org.hl7.fhir.api.Consent.source-reference': 'https://globaldatacare.es',
+          'org.hl7.fhir.api.Consent.decision': 'permit',
+        },
+        {
+          id: 'other-study',
+          '@context': 'org.hl7.fhir.api',
+          'org.hl7.fhir.api.Consent.subject': subjectDid,
+          'org.hl7.fhir.api.Consent.identifier': 'urn:uuid:other-study',
+          'org.hl7.fhir.api.Consent.actor-identifier': providerDid,
+          'org.hl7.fhir.api.Consent.actor-role': '*',
+          'org.hl7.fhir.api.Consent.purpose': 'HRESCH',
+          'org.hl7.fhir.api.Consent.action': 'organization/ResearchSubject.rs',
+          'org.hl7.fhir.api.Consent.source-reference': 'urn:study:other',
+          'org.hl7.fhir.api.Consent.decision': 'deny',
+        },
+      ] as any);
+
+      const response = await individualManager.process({
+        id: 'subject-search-job-hresch',
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.api' as any,
+        resourceType: 'Subject',
+        action: '_search',
+        content: {
+          jti: 'subject-search-jti-hresch',
+          thid: 'subject-search-thid-hresch',
+          iss: 'did:web:sender.example',
+          aud: 'did:web:receiver.example',
+          exp: Math.floor(Date.now() / 1000) + 300,
+          type: 'api+json',
+          body: {
+            resourceType: 'Parameters',
+            parameter: [
+              { name: 'subject', valueString: subjectDid },
+              { name: 'actor-identifier', valueString: providerDid },
+              { name: 'purpose', valueString: 'HRESCH' },
+              { name: 'action', valueString: 'organization/ResearchSubject.rs' },
+              { name: 'source-reference', valueString: 'https://globaldatacare.es' },
+            ],
+          },
+        } as any,
+      });
+
+      const responseEntry = response.body.data[0] as any;
+      expect(responseEntry.resource.total).toBe(1);
+      expect(responseEntry.resource.data[0].id).toBe('permit-globaldatacare');
+    });
   });
 });
