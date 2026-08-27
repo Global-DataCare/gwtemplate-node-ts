@@ -34,8 +34,13 @@ import {
 } from 'gdc-common-utils-ts/constants/healthcare';
 import { buildSmartCompositionReadScope } from 'gdc-common-utils-ts/utils/smart-scope';
 import { buildUnsignedIndividualMemberIdentityVpJwt } from 'gdc-common-utils-ts/utils/individual-smart';
-import { buildUnsignedProfessionalIdentityVpJwt } from 'gdc-common-utils-ts/utils/professional-smart';
+import {
+  buildUnsignedProfessionalIdentityVpJwt,
+  getProfessionalIdentityVC,
+} from 'gdc-common-utils-ts/utils/professional-smart';
+import { buildStableActorIdentifier, StableActorContactKinds } from 'gdc-common-utils-ts/utils/actor-identifier';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
+import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import {
   EXAMPLE_ALTERNATE_PORTAL_INDIVIDUAL_DID,
   EXAMPLE_PORTAL_INDIVIDUAL_DID,
@@ -50,6 +55,15 @@ import {
 
 const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_SCOPE =
   `${ServiceCapability.DigitalTwinReader}?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
+
+const SAME_TENANT_EMPLOYEE_STABLE_ID = buildStableActorIdentifier({
+  contactKind: StableActorContactKinds.Email,
+  contact: 'doctor@example.org',
+});
+const SAME_TENANT_EMPLOYEE_DID_ID = SAME_TENANT_EMPLOYEE_STABLE_ID.replace('urn:multibase:', '');
+const SAME_TENANT_ID = 'VATES-B00112233';
+const SAME_TENANT_INTERNAL_DID = `did:web:api.internal.example:${SAME_TENANT_ID}:cds-ES:v1:health-care`;
+const SAME_TENANT_PUBLIC_DID = `did:web:globaldatacare.es:health-care:organization:taxid:${SAME_TENANT_ID}`;
 
 const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_CONTRACT_CREDENTIAL =
   buildInterTenantAccessContractCredential({
@@ -131,8 +145,8 @@ function buildAliasedIndividualSelfReadJob(vpToken: string): JobRequest {
 }
 
 function buildSameTenantDigitalTwinManager(
-  issuerDid = 'did:web:api.acme.org',
-  issuerAliases: string[] = [],
+  issuerDid = SAME_TENANT_INTERNAL_DID,
+  employeeStatus = 'active',
 ): OpenIdAuthManager {
   const kmsService = {
     getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' }),
@@ -140,13 +154,27 @@ function buildSameTenantDigitalTwinManager(
       payload: '',
       signatures: [{ protected: 'p', signature: 'sig' }],
     }),
+    unprotectConfidentialData: jest.fn().mockImplementation(async (document: any) => document.content),
   } as unknown as jest.Mocked<IKmsService>;
   const tenants = {
-    getDidDocument: jest.fn().mockResolvedValue({ id: issuerDid, alsoKnownAs: issuerAliases }),
+    getDidDocument: jest.fn().mockResolvedValue({ id: issuerDid }),
     tenantExists: jest.fn().mockResolvedValue(true),
+    getCollectionName: jest.fn().mockResolvedValue('ES_TAX_VATES-B00112233_health-care'),
+    getTenantIdentifierUrn: jest.fn().mockResolvedValue('urn:gdc:organization:test-network:ES:v1:health-care:taxid:VATES-B00112233'),
   } as unknown as jest.Mocked<TenantsCacheManager>;
   const vault = {
-    getContainersInSection: jest.fn().mockResolvedValue([]),
+    getContainersInSection: jest.fn().mockImplementation(async (_collection: string, section: string) =>
+      section.includes('employees')
+        ? [{
+            content: {
+              status: employeeStatus,
+              claims: {
+                [ClaimsPersonSchemaorg.email]: 'doctor@example.org',
+                [ClaimsPersonSchemaorg.hasOccupation]: 'ISCO-08|2211',
+              },
+            },
+          }]
+        : []),
   } as unknown as jest.Mocked<IVaultRepository>;
   const clearingHouse = {
     verifyVpToken: jest.fn().mockResolvedValue({
@@ -161,7 +189,7 @@ function buildSameTenantDigitalTwinManager(
 
 function buildSameTenantDigitalTwinJob(actorDid: string, vpToken: string): JobRequest {
   return {
-    tenantId: 'acme',
+    tenantId: SAME_TENANT_ID,
     jurisdiction: 'ES',
     sector: 'health-care',
     section: 'identity',
@@ -175,16 +203,35 @@ function buildSameTenantDigitalTwinJob(actorDid: string, vpToken: string): JobRe
     content: {
       thid: 'same-tenant-digital-twin',
       iss: 'did:web:device.example',
-      aud: 'did:web:api.acme.org',
+      aud: SAME_TENANT_INTERNAL_DID,
       body: {
         sub: actorDid,
-        scope: `${ServiceCapability.DigitalTwinReader}?subject=did:web:api.acme.org:research-subject:any`,
+        scope: `${ServiceCapability.DigitalTwinReader}?subject=${SAME_TENANT_INTERNAL_DID}:research-subject:any`,
         purpose: HealthcareConsentPurposes.Research,
         vp_token: vpToken,
         acr_values: 'urn:antifraud:acr:openid4vp:employee',
       },
     } as any,
   } as JobRequest;
+}
+
+function buildSameTenantEmployeeVp(input: {
+  actorDid: string;
+  issuerDid: string;
+  sameAs: string;
+}): string {
+  const role = 'ISCO-08|2211';
+  return buildUnsignedProfessionalIdentityVpJwt({
+    clientId: input.actorDid,
+    actorDid: input.actorDid,
+    role,
+    verifiableCredential: getProfessionalIdentityVC({
+      actorDid: input.actorDid,
+      role,
+      sameAs: input.sameAs,
+      additionalCredential: { issuer: input.issuerDid },
+    }),
+  });
 }
 
 describe('OpenIdAuthManager', () => {
@@ -1376,12 +1423,12 @@ describe('OpenIdAuthManager', () => {
   it.each(['employee', 'member'])(
     'issues DigitalTwinReader to a verified same-tenant %s DID without a research contract',
     async (membershipMarker) => {
-      const organizationDid = 'did:web:api.acme.org:acme:cds-ES:v1:health-care';
-      const actorDid = `${organizationDid}:${membershipMarker}:zDoctorEmailHash:ISCO-08|2211`;
-      const vpToken = buildUnsignedProfessionalIdentityVpJwt({
-        clientId: actorDid,
+      const organizationDid = SAME_TENANT_INTERNAL_DID;
+      const actorDid = `${organizationDid}:${membershipMarker}:${SAME_TENANT_EMPLOYEE_DID_ID}:ISCO-08|2211`;
+      const vpToken = buildSameTenantEmployeeVp({
         actorDid,
-        role: 'ISCO-08|2211',
+        sameAs: SAME_TENANT_EMPLOYEE_STABLE_ID,
+        issuerDid: organizationDid,
       });
 
       const response = await buildSameTenantDigitalTwinManager(organizationDid).process(
@@ -1393,27 +1440,55 @@ describe('OpenIdAuthManager', () => {
     },
   );
 
-  it('resolves a registered external organization alias before deciding access is inter-tenant', async () => {
-    const canonicalOrganizationDid = 'did:web:api.internal.example:acme:cds-ES:v1:health-care';
-    const externalOrganizationAlias = 'did:web:globaldatacare.es';
-    const actorDid = `${externalOrganizationAlias}:employee:zDoctorEmailHash:ISCO-08|2211`;
-    const vpToken = buildUnsignedProfessionalIdentityVpJwt({
-      clientId: actorDid,
+  it('extracts the same VAT tenant from a public organization DID without comparing host aliases', async () => {
+    const actorDid = `${SAME_TENANT_PUBLIC_DID}:employee:${SAME_TENANT_EMPLOYEE_DID_ID}:ISCO-08|2211`;
+    const vpToken = buildSameTenantEmployeeVp({
       actorDid,
-      role: 'ISCO-08|2211',
+      sameAs: SAME_TENANT_EMPLOYEE_STABLE_ID,
+      issuerDid: SAME_TENANT_PUBLIC_DID,
     });
 
-    const response = await buildSameTenantDigitalTwinManager(
-      canonicalOrganizationDid,
-      [externalOrganizationAlias],
-    ).process(buildSameTenantDigitalTwinJob(actorDid, vpToken));
+    const response = await buildSameTenantDigitalTwinManager().process(
+      buildSameTenantDigitalTwinJob(actorDid, vpToken),
+    );
 
     expect(response.body.access_token).toBeDefined();
   });
 
+  it('denies same-tenant DigitalTwinReader when the extracted employee does not exist as active in the tenant', async () => {
+    const organizationDid = SAME_TENANT_INTERNAL_DID;
+    const actorDid = `${organizationDid}:employee:${SAME_TENANT_EMPLOYEE_DID_ID}:ISCO-08|2211`;
+    const vpToken = buildSameTenantEmployeeVp({
+      actorDid,
+      sameAs: SAME_TENANT_EMPLOYEE_STABLE_ID,
+      issuerDid: organizationDid,
+    });
+
+    await expect(buildSameTenantDigitalTwinManager(organizationDid, 'inactive').process(
+      buildSameTenantDigitalTwinJob(actorDid, vpToken),
+    )).rejects.toThrow('No matching consent rule found');
+  });
+
+  it('denies same-tenant DigitalTwinReader when the employee DID hash is not a credential sameAs alias', async () => {
+    const organizationDid = SAME_TENANT_INTERNAL_DID;
+    const actorDid = `${organizationDid}:member:${SAME_TENANT_EMPLOYEE_DID_ID}:ISCO-08|2211`;
+    const vpToken = buildSameTenantEmployeeVp({
+      actorDid,
+      sameAs: buildStableActorIdentifier({
+        contactKind: StableActorContactKinds.Email,
+        contact: 'different@example.org',
+      }),
+      issuerDid: organizationDid,
+    });
+
+    await expect(buildSameTenantDigitalTwinManager(organizationDid).process(
+      buildSameTenantDigitalTwinJob(actorDid, vpToken),
+    )).rejects.toThrow('No matching consent rule found');
+  });
+
   it('denies same-tenant DigitalTwinReader when the verified VP does not identify the requesting employee', async () => {
-    const actorDid = 'did:web:api.acme.org:employee:zDoctorEmailHash:ISCO-08|2211';
-    const otherActorDid = 'did:web:api.acme.org:employee:zOtherHash:ISCO-08|2211';
+    const actorDid = `${SAME_TENANT_INTERNAL_DID}:employee:${SAME_TENANT_EMPLOYEE_DID_ID}:ISCO-08|2211`;
+    const otherActorDid = `${SAME_TENANT_INTERNAL_DID}:employee:z4ZNQ3Qq3r24k3wkgqB4DUa:ISCO-08|2211`;
     const vpToken = buildUnsignedProfessionalIdentityVpJwt({
       clientId: otherActorDid,
       actorDid: otherActorDid,

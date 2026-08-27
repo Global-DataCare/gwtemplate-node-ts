@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Resolve same-tenant Digital Twin employment from extracted identity rather
+  than whole-DID alias equality: parse the VAT/tax tenant id, email-derived
+  `z...` and role from internal hosted or public organization DIDs, then require
+  an active encrypted employee record in that tenant whose normalized email
+  recomputes to the same `urn:multibase:z...`. The verified
+  `EmployeeCredential` must bind that actor, role and `sameAs`; a crafted DID
+  string alone cannot obtain the no-contract path.
 - Align the immutable-image SMART/Fabric smoke with the public Digital Twin
   contract: it now searches `ResearchSubject/_search` and proves that every
   returned ResearchSubject carries its canonical Composition index.

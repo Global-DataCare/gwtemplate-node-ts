@@ -100,6 +100,14 @@ Verify current branches, versions and published npm state before release claims.
 - Recover the full hosted organization DID from both `:employee:` and
   `:member:` actor DIDs. A root `did:web` domain is only an alias/discovery
   identity and must not turn a same-tenant employee into a foreign consumer.
+- Treat DID parsing only as routing evidence. Extract the VAT/tax tenant id,
+  employee email-derived `z...` identifier and role from either the internal
+  hosted form or the public `organization:(taxid|vatid):<VAT>` form; never use
+  the hostname as organization authority or compare whole DID aliases.
+- Same-tenant access additionally requires an active employee in the extracted
+  tenant vault. Recompute `urn:multibase:z...` from that encrypted employee's
+  normalized email, match the extracted role, and require the verified
+  `EmployeeCredential.sameAs` to carry the same stable identifier.
 - Emit signer roles `provider-authorized-signatory` and
   `consumer-authorized-signatory`; accept `provider-controller` and
   `consumer-controller` only as deprecated read aliases.

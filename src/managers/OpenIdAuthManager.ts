@@ -30,6 +30,12 @@ import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getOrCreateDigitalTwinSubjectId } from '../utils/digital-twin-research-projection';
 import { getMatchingProfessionalCredentialFromVpToken } from 'gdc-common-utils-ts/utils/professional-smart';
 import { getOrganizationDidFromIndividualDid } from 'gdc-common-utils-ts/utils/did-resolution';
+import { buildStableActorIdentifier, StableActorContactKinds } from 'gdc-common-utils-ts/utils/actor-identifier';
+import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { normalizeIndexedEmail } from '../utils/indexed-contact';
+import { getPersonOccupationClaim } from '../utils/occupation';
+import { parseTenantUrn } from '../utils/urn';
+import { parseProfessionalDidIdentity } from '../utils/professional-did-identity';
 import type {
   BreakGlassAuthorization,
   BreakGlassAuthorizer,
@@ -135,19 +141,19 @@ export class OpenIdAuthManager implements IJobProcessor {
     // - apply deny-overrides and purpose logic.
     const parsedActor = parseActorFromSub(sub);
     const actorOrganizationDid = getOrganizationDidFromIndividualDid(parsedActor.sub);
-    const issuerOrganizationDids = new Set([
-      issuerDid,
-      ...(Array.isArray(issuerDidDoc?.alsoKnownAs) ? issuerDidDoc.alsoKnownAs : []),
-    ].map((value) => String(value || '').trim()).filter((value) => value.startsWith('did:web:')));
     const actor = {
       ...parsedActor,
-      // Hosted professional DIDs may use either :employee: or :member:.
-      // Resolve a registered public did:web alias back to the canonical issuer
-      // before deciding that the organization is foreign.
-      organization: actorOrganizationDid && issuerOrganizationDids.has(actorOrganizationDid)
-        ? issuerDid
-        : actorOrganizationDid,
+      organization: actorOrganizationDid,
     };
+    const professionalDidIdentity = parseProfessionalDidIdentity(actor.sub);
+    const tenantIdentifierUrn = await this.tenantsCacheManager.getTenantIdentifierUrn?.(tenantVaultId);
+    const routeTenantIdentifiers = new Set([
+      job.tenantId,
+      parseTenantUrn(String(tenantIdentifierUrn || ''))?.idValue,
+    ].map((value) => String(value || '').trim().toUpperCase()).filter(Boolean));
+    const isSameTenantProfessional = actor.memberKind !== 'individual'
+      && Boolean(professionalDidIdentity)
+      && routeTenantIdentifiers.has(String(professionalDidIdentity?.organizationIdentifier || '').toUpperCase());
     const purpose = body.purpose?.trim();
     const requestedCapabilities = this.extractRequestedCapabilities(scope);
     const isInterTenantResearchAccess = requestedCapabilities.some((capability) =>
@@ -168,11 +174,12 @@ export class OpenIdAuthManager implements IJobProcessor {
 
     // Inter-tenant research contract gate:
     // - issuerDid = tenant that is about to issue the SMART token
-    // - actor.organization = organization of the requesting professional/researcher
+    // - professional DID parsing yields the VAT/tax tenant identifier; the
+    //   hostname and whole organization DID are not membership authority
     // - only DigitalTwin/ResearchSubject capabilities represent the research
     //   contract boundary; individual Composition self-read remains governed
     //   by its subject-scoped consent rules
-    // - when research actor and issuer differ, the VP must carry one contract
+    // - when the extracted tenant differs, the VP must carry one contract
     //   VC proving:
     //   1. provider organization = issuer tenant (`acme`)
     //   2. consumer organization = foreign requester tenant (`lab`)
@@ -180,7 +187,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     //      example: `organization/ResearchSubject.rs`
     //   4. purpose allows the requested business reason
     //      example: `HRESCH` (HL7 v3 ActReason)
-    if (isInterTenantResearchAccess && actor.organization && actor.organization !== issuerDid) {
+    if (isInterTenantResearchAccess && actor.organization && !isSameTenantProfessional) {
       if (accessProof.mode === 'vp_token') {
         const matchingContract = getMatchingInterTenantAccessContractFromVpToken(vpToken!, {
           providerOrganizationDid: issuerDid,
@@ -247,8 +254,13 @@ export class OpenIdAuthManager implements IJobProcessor {
         })
       : undefined;
     const sameTenantEmployeeResearchAccess = isInterTenantResearchAccess
-      && actor.organization === issuerDid
-      && Boolean(professionalCredential);
+      && isSameTenantProfessional
+      && Boolean(professionalCredential)
+      && Boolean(professionalCredential?.sameAs.includes(professionalDidIdentity!.stableActorIdentifier))
+      && await this.hasActiveEmployeeIdentity({
+        tenantVaultId,
+        identity: professionalDidIdentity!,
+      });
     if (memberCredential || professionalCredential) {
       this.addPortableMemberRuleAliases(rules, actor, actorSubjectAliases);
     }
@@ -509,6 +521,41 @@ export class OpenIdAuthManager implements IJobProcessor {
         && String(license.authorizedSubjectDid || '').trim() === input.subject
         && String(license.issuedToRole || '').trim().toLowerCase() === actorRole;
     });
+  }
+
+  /**
+   * Resolves employment from tenant-owned data rather than DID hostname or
+   * alias equality. The professional DID contributes only the extracted VAT,
+   * one-way email identifier and role; GW recomputes the same identifier from
+   * each active encrypted employee record in that tenant's physical vault.
+   */
+  private async hasActiveEmployeeIdentity(input: {
+    tenantVaultId: string;
+    identity: Readonly<{ stableActorIdentifier: string; role: string }>;
+  }): Promise<boolean> {
+    const employeeCollectionName = await this.tenantsCacheManager.getCollectionName?.(input.tenantVaultId)
+      || input.tenantVaultId;
+    const documents = await this.vaultRepository.getContainersInSection<any>(
+      employeeCollectionName,
+      getEnvSectionId('employees'),
+    );
+    for (const document of documents || []) {
+      try {
+        const employee = await this.kmsService.unprotectConfidentialData<any>(document, input.tenantVaultId);
+        if (String(employee?.status || '').trim().toLowerCase() !== 'active') continue;
+        const email = normalizeIndexedEmail(employee?.claims?.[ClaimsPersonSchemaorg.email]);
+        const role = getPersonOccupationClaim(employee?.claims || {});
+        if (!email || !role || role.toLowerCase() !== input.identity.role.toLowerCase()) continue;
+        const stableIdentifier = buildStableActorIdentifier({
+          contactKind: StableActorContactKinds.Email,
+          contact: email,
+        });
+        if (stableIdentifier === input.identity.stableActorIdentifier) return true;
+      } catch {
+        continue;
+      }
+    }
+    return false;
   }
 
   private async validateClientAssertion(params: {
