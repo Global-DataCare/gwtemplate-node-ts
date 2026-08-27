@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Type the canonical `composition` embedded in every public Digital Twin
+  `ResearchSubject/_search` result as FHIR `resourceType: "Composition"`.
+
 - Make local-Fabric validation reproducible from a clean checkout by tracking
   every authored `chaincode/*-javascript/lib` runtime source and by failing the
   release-script contract test when an `index.js` import is absent from Git.

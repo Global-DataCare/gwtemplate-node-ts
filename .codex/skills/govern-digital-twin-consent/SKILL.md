@@ -73,8 +73,8 @@ Verify current branches, versions and published npm state before release claims.
 
 - Use one public search contract for discovery and saved selections:
   `digitaltwin/.../ResearchSubject/_search` with a FHIR `Parameters` body.
-- A ResearchSubject is the public twin aggregate. Its `composition` is the
-  canonical Composition GW uses internally to index it and connect its
+- A ResearchSubject is the public twin aggregate. Its `composition` declares
+  `resourceType: "Composition"` and is the canonical Composition GW uses to index it and connect its
   projected resources; do not expose `Composition/_search` as the app contract.
 - `saveSelection(...)` selects a ResearchSubject. Its private persistence may
   use a researcher-owned Composition, but `searchSelections(...)` reopens it
