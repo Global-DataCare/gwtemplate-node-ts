@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Align the immutable-image SMART/Fabric smoke with the public Digital Twin
+  contract: it now searches `ResearchSubject/_search` and proves that every
+  returned ResearchSubject carries its canonical Composition index.
 - Add employee wallet replacement at `identity/auth/_recover`. A fresh
   email-OTP-marked Firebase token and the existing installation id must match
   one active employee seat. GW rotates the protected activation credential for

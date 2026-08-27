@@ -11,7 +11,7 @@ import {
   DEMO_SMART_ACCESS_LOCAL_DIDS,
   DEMO_SMART_ACCESS_LOCAL_EMAILS,
   DEMO_SMART_ACCESS_LOCAL_IDS,
-  buildDemoDigitalTwinCompositionSearchRequest,
+  buildDemoDigitalTwinResearchSubjectSearchRequest,
   buildDemoIndividualIpsSearchRequest,
   buildDemoIndividualSmartTokenRequest,
   buildDemoResearchPermitByEmailConsent,
@@ -129,8 +129,8 @@ describe('demo smart access local-network builders', () => {
     expect(String((payload as any).body.vp_token || '')).toContain('verifiableCredential');
   });
 
-  it('builds one coded digital-twin Composition search without relying on redacted free text', () => {
-    expect(buildDemoDigitalTwinCompositionSearchRequest()).toEqual({
+  it('builds one coded ResearchSubject search over its canonical Composition index', () => {
+    expect(buildDemoDigitalTwinResearchSubjectSearchRequest()).toEqual({
       thid: DEMO_SMART_ACCESS_LOCAL_IDS.digitalTwinSearchThreadId,
       body: {
         resourceType: 'Parameters',

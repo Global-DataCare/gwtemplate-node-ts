@@ -10,7 +10,7 @@ set -euo pipefail
 # 1. individual consent -> SMART token -> individual Bundle/_search
 # 2. medical-secretary consent -> SMART token -> individual Bundle/_search
 # 3. unconsented medical secretary -> denied SMART token
-# 4. research contract + provider consent -> SMART token -> digitaltwin Composition/_search
+# 4. research contract + provider consent -> SMART token -> public digitaltwin ResearchSubject/_search
 # 5. allowed and denied research employees by role and by direct email
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -37,8 +37,8 @@ SMART_TOKEN_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/
 SMART_TOKEN_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/identity/openid/smart/_batch-response"
 INDIVIDUAL_BUNDLE_SEARCH_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.hl7.fhir.r4/Bundle/_search"
 INDIVIDUAL_BUNDLE_SEARCH_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.hl7.fhir.r4/Bundle/_search-response"
-DIGITAL_TWIN_SEARCH_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/digitaltwin/org.hl7.fhir.r4/Composition/_search"
-DIGITAL_TWIN_SEARCH_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response"
+DIGITAL_TWIN_SEARCH_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search"
+DIGITAL_TWIN_SEARCH_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response"
 
 HOST1_ADMIN_MSP="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp"
 HOST1_PEER_TLS="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls/ca.crt"
@@ -206,11 +206,11 @@ run_individual_bundle_search_with_token() {
 run_digital_twin_search_with_token() {
   local access_token="$1"
   local request_payload
-  request_payload="$(render_smart_payload DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST)"
+  request_payload="$(render_smart_payload DIGITAL_TWIN_RESEARCH_SUBJECT_SEARCH_REQUEST)"
   local thid
   thid="$(jq -r '.thid' <<<"${request_payload}")"
 
-  echo "[smart-access-smoke] POST digitaltwin Composition/_search"
+  echo "[smart-access-smoke] POST digitaltwin ResearchSubject/_search"
   post_json "${DIGITAL_TWIN_SEARCH_ENDPOINT}" "${access_token}" "${request_payload}" >/dev/null
 
   local search_payload
@@ -220,12 +220,12 @@ run_digital_twin_search_with_token() {
     echo "${search_payload}" >&2
     return 1
   fi
-  if ! jq -e '.data[0].type == "Composition-search-response-v1.0" and (.data[0].resource.total // 0) >= 1' <<<"${search_payload}" >/dev/null; then
-    echo "ERROR: digital-twin search returned no matching Composition" >&2
+  if ! jq -e '.data[0].type == "ResearchSubject-search-response-v1.0" and (.data[0].resource.total // 0) >= 1 and .data[0].resource.data[0].resourceType == "ResearchSubject" and (.data[0].resource.data[0].composition | type) == "object"' <<<"${search_payload}" >/dev/null; then
+    echo "ERROR: digital-twin search returned no ResearchSubject with its canonical Composition index" >&2
     echo "${search_payload}" >&2
     return 1
   fi
-  echo "[smart-access-smoke] verified digitaltwin Composition/_search through SMART token"
+  echo "[smart-access-smoke] verified digitaltwin ResearchSubject/_search through SMART token"
 }
 
 if [[ "${BOOTSTRAP_INDIVIDUAL_AND_DATA}" == "true" ]]; then

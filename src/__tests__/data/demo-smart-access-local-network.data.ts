@@ -451,10 +451,11 @@ export async function buildDemoResearchSmartTokenRequest(input: Readonly<{
 }
 
 /**
- * Builds the canonical digital-twin `Composition/_search` request used by the
- * local research smoke.
+ * Builds the canonical public `ResearchSubject/_search` request used by the
+ * local research smoke. GW applies the coded filters to each ResearchSubject's
+ * canonical Composition index internally.
  */
-export function buildDemoDigitalTwinCompositionSearchRequest(): Record<string, unknown> {
+export function buildDemoDigitalTwinResearchSubjectSearchRequest(): Record<string, unknown> {
   const ibuprofenCode = demoCommunicationMedicationIpsDefaults.demoMedicationCases[0].demoMedicationCode;
   return {
     thid: DEMO_SMART_ACCESS_LOCAL_IDS.digitalTwinSearchThreadId,

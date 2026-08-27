@@ -74,6 +74,12 @@ grep -Fq 'PROVIDER_ORGANIZATION_DID="${PROVIDER_ORGANIZATION_DID:-$(resolve_prov
   ./scripts/smoke-smart-access-local-network.sh
 grep -Fq 'SECRETARY_SMART_TOKEN_REQUEST_ALLOW' ./scripts/smoke-smart-access-local-network.sh
 grep -Fq 'SECRETARY_SMART_TOKEN_REQUEST_DENY' ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search' ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'ResearchSubject-search-response-v1.0' ./scripts/smoke-smart-access-local-network.sh
+if grep -Fq 'digitaltwin/org.hl7.fhir.r4/Composition/_search' ./scripts/smoke-smart-access-local-network.sh; then
+  echo 'ERROR: the public research smoke must not use Composition/_search.' >&2
+  exit 1
+fi
 grep -Fq 'medical-secretary-consent-smart-bundle-search-allow' \
   ./scripts/smoke-smart-access-local-network.sh
 grep -Fq 'humanAccessProof' ./scripts/build-open-source-evidence-manifest.mjs

@@ -1,6 +1,6 @@
 import {
   DEMO_SMART_ACCESS_LOCAL_DIDS,
-  buildDemoDigitalTwinCompositionSearchRequest,
+  buildDemoDigitalTwinResearchSubjectSearchRequest,
   buildDemoIndividualIpsPermitConsent,
   buildDemoIndividualIpsSearchRequest,
   buildDemoIndividualSmartTokenRequest,
@@ -38,14 +38,14 @@ type PayloadName =
   | 'RESEARCH_SMART_TOKEN_REQUEST_ROLE_DENY'
   | 'RESEARCH_SMART_TOKEN_REQUEST_EMAIL_ALLOW'
   | 'RESEARCH_SMART_TOKEN_REQUEST_EMAIL_DENY'
-  | 'DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST'
+  | 'DIGITAL_TWIN_RESEARCH_SUBJECT_SEARCH_REQUEST'
   | 'RESEARCH_CONSUMER_ORGANIZATION_DID';
 
 const payloadName = process.argv[2] as PayloadName | undefined;
 
 if (!payloadName) {
   throw new Error(
-    'Usage: render-demo-smart-access-payload.mts <INDIVIDUAL_*|SECRETARY_*|RESEARCH_*|DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST|RESEARCH_CONSUMER_ORGANIZATION_DID>',
+    'Usage: render-demo-smart-access-payload.mts <INDIVIDUAL_*|SECRETARY_*|RESEARCH_*|DIGITAL_TWIN_RESEARCH_SUBJECT_SEARCH_REQUEST|RESEARCH_CONSUMER_ORGANIZATION_DID>',
   );
 }
 
@@ -163,8 +163,8 @@ const rendered = await (async () => {
       return buildDemoResearchSmartTokenRequest({
         tenantId, subjectDid, clientAssertionAudience, providerOrganizationDid, ...matrix.denyByEmail,
       });
-    case 'DIGITAL_TWIN_COMPOSITION_SEARCH_REQUEST':
-      return buildDemoDigitalTwinCompositionSearchRequest();
+    case 'DIGITAL_TWIN_RESEARCH_SUBJECT_SEARCH_REQUEST':
+      return buildDemoDigitalTwinResearchSubjectSearchRequest();
     case 'RESEARCH_CONSUMER_ORGANIZATION_DID':
       return DEMO_SMART_ACCESS_LOCAL_DIDS.consumerOrganizationDid;
     default:
