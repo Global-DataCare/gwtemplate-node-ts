@@ -19,7 +19,7 @@ function createDemoBearer(payload: Record<string, unknown>): string {
 }
 
 describe('SMART scope route gates (integration)', () => {
-  async function bootstrapTenant() {
+  async function bootstrapTenant(options: { legacyDigitalTwinServices?: boolean } = {}) {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -55,9 +55,22 @@ describe('SMART scope route gates (integration)', () => {
       tenantClaims['org.schema.Organization.alternateName'],
     );
 
+    const currentTenantServices = initializeTenantServicesConfig(Sector.HEALTH_CARE);
+    const tenantServices = options.legacyDigitalTwinServices
+      ? [
+        ...currentTenantServices.filter((service: any) => service.selector?.section !== 'digitaltwin'),
+        {
+          id: '#digitaltwin:org.hl7.fhir.r4',
+          type: 'ApiService',
+          serviceEndpoint: 'Composition',
+          actions: ['_search'],
+          selector: { sector: Sector.HEALTH_CARE, section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
+        },
+      ]
+      : currentTenantServices;
     const tenantConfig = {
       claims: tenantClaims,
-      didConfig: { service: initializeTenantServicesConfig(Sector.HEALTH_CARE) },
+      didConfig: { service: tenantServices },
       didDocument: { id: 'did:web:api.acme.org', '@context': 'https://www.w3.org/ns/did/v1' },
     };
 
@@ -117,6 +130,36 @@ describe('SMART scope route gates (integration)', () => {
 
       expect(response.status).toBe(403);
       expect(response.text).toContain('digitaltwin endpoints require one SMART scope rooted at organization/ResearchSubject.');
+    } finally {
+      queueAdapter.stop();
+    }
+  });
+
+  it('accepts ResearchSubject search for a legacy tenant that published only Composition search', async () => {
+    const { app, queueAdapter } = await bootstrapTenant({ legacyDigitalTwinServices: true });
+    try {
+      const bearer = createDemoBearer({
+        iss: 'did:web:api.acme.org',
+        scope: 'organization/ResearchSubject.rs?subject=*',
+      });
+      const response = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search`,
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
+        body: {
+          thid: 'legacy-tenant-researchsubject-search-001',
+          body: {
+            resourceType: 'Parameters',
+            parameter: [
+              { name: 'section', valueString: 'http://loinc.org|10160-0' },
+              { name: 'date-from', valueDate: '2024-01-01' },
+              { name: 'text', valueString: 'lisinopril' },
+            ],
+          },
+        },
+      });
+
+      expect(response.status).toBe(202);
     } finally {
       queueAdapter.stop();
     }

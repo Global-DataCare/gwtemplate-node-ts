@@ -53,7 +53,9 @@ Verify current branches, versions and published npm state before release claims.
 - Reusing the same source reference updates one rule. A different source reference creates a separate FHIR Consent.
 - Status lookup must include active deny rules; "active" is validity/period state and must not be confused with `decision=permit`.
 - Read status through an individual `Communication` carrying
-  `Subject/_search` FHIR Parameters. Consent is not part of clinical
+  `Subject/_search` FHIR Parameters for subject, index provider, HRESCH,
+  DigitalTwinReader and source reference. Match canonical or contextualized
+  FHIR claim keys. Consent is not part of clinical
   `Bundle/_search`, and the individual Subject is not a twin ResearchSubject.
 
 ## Keep projection separate from consent
@@ -95,6 +97,14 @@ Verify current branches, versions and published npm state before release claims.
   Consume those properties only for Composition-wide matching and strip them
   from search matches and materialized resources.
 - Keep age range and host-wide aggregation out of the MVP.
+- For a tenant DID created before ResearchSubject became the public aggregate,
+  accept its existing read-only digitaltwin Composition `_search` declaration
+  as authorization for replacement `ResearchSubject/_search`; do not require
+  tenant reactivation or DCR and do not widen mutation authority.
+- Reconcile every persisted tenant's canonical sector service catalog at
+  startup even without split-runtime overrides. Remove obsolete
+  resource-specific twin search declarations and preserve unrelated custom DID
+  services.
 - Same-tenant access uses verified employee proof. Foreign access also needs a
   matching FHIR Contract VC and provider authorization.
 - Recover the full hosted organization DID from both `:employee:` and

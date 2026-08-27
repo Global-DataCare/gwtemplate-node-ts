@@ -81,11 +81,21 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
       normalizedAction === '_search' &&
       configuredResources.includes('employee') &&
       actions.includes('_search');
+    const legacyDigitalTwinResearchSubjectDiscovery =
+      normalizedSection === 'digitaltwin' &&
+      normalizedResourceType === 'researchsubject' &&
+      normalizedAction === '_search' &&
+      configuredResources.includes('composition') &&
+      actions.includes('_search');
     // Historical tenants published Employee/_search before the associated
     // controller licence inventory endpoint was added. Keep that exact read
     // available without widening any mutation capability.
     const resourceAllowed = configuredResources.includes(normalizedResourceType)
-      || legacyEmployeeLicenseInventorySelection;
+      || legacyEmployeeLicenseInventorySelection
+      // ResearchSubject replaced Composition as the public twin aggregate.
+      // Treat the old read declaration as authorization for that read-only
+      // replacement so existing tenants do not need reactivation or DCR.
+      || legacyDigitalTwinResearchSubjectDiscovery;
     if (!resourceAllowed) return false;
 
     const legacyDigitalTwinWorkingSelection =
