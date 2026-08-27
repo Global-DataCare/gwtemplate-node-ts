@@ -325,6 +325,63 @@ describe('HostingManager', () => {
     ).toContain('https://individual-runtime.example/');
   });
 
+  it('[1.2a TENANT] migrates stale canonical twin routes without requiring split-runtime configuration', async () => {
+    const tenantId = 'VATES-G02793480';
+    const sector = Sector.HEALTH_CARE;
+    const tenantVaultId = tenantUtils.getTenantVaultId(sector, tenantId);
+    const hostCollectionName = await mockTenantsCacheManager.getCollectionName('host') as string;
+    const claims: ClaimsRecord = {
+      [ClaimsOrganizationSchemaorg.alternateName]: tenantId,
+      [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+      [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+      [ClaimsOrganizationSchemaorg.identifierValue]: tenantId,
+      [ClaimsOrganizationSchemaorg.url]: 'https://tenant.example',
+      [ClaimsServiceSchemaorg.category]: sector,
+    };
+    const did = `did:web:tenant.example:${tenantId}`;
+    const customService = {
+      id: `${did}#custom-audit`,
+      type: 'AuditService',
+      serviceEndpoint: 'https://audit.tenant.example/events',
+    };
+    const obsoleteCompositionSearch = {
+      id: `${did}#digitaltwin:org.hl7.fhir.r4:composition:_search`,
+      type: 'ApiService',
+      serviceEndpoint: `https://tenant.example/${tenantId}/cds-ES/v1/${sector}/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
+    };
+    const stored = await mockKmsService.protectConfidentialData({
+      id: tenantVaultId,
+      status: 'active',
+      sequence: 0,
+      content: {
+        status: 'active',
+        claims,
+        didConfig: { service: [] },
+        didDocument: {
+          '@context': 'https://www.w3.org/ns/did/v1',
+          id: did,
+          service: [obsoleteCompositionSearch, customService],
+        },
+      },
+    } as ConfidentialStorageDoc, 'host');
+    await vaultRepository.put(hostCollectionName, [stored], getEnvSectionId('tenants'));
+    mockConfig.tenantServiceRoutes = {};
+
+    expect(await hostingManager.reconcileTenantServiceRoutes()).toBe(1);
+
+    const refreshed = await vaultRepository.get(
+      hostCollectionName,
+      tenantVaultId,
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc;
+    const services = (refreshed.content as any).didDocument.service as any[];
+    expect(services.some(service =>
+      service.id.endsWith('#digitaltwin:org.hl7.fhir.r4:researchsubject:_search'))).toBe(true);
+    expect(services.some(service =>
+      service.id.endsWith('#digitaltwin:org.hl7.fhir.r4:composition:_search'))).toBe(false);
+    expect(services).toContainEqual(customService);
+  });
+
   it('[1.3 TENANT] republishes recoverable tenant keys without changing identity, controllers or services', async () => {
     const tenantId = 'VATES-B42215152';
     const sector = Sector.HEALTH_CARE;
