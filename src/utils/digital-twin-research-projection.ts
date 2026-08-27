@@ -7,7 +7,11 @@ const DIGITAL_TWIN_SUBJECT_ALIAS_SECTION = 'digitaltwin_subject_aliases';
 const RESEARCH_PROJECTION_AUTHOR = 'urn:gdc:research-projection';
 const DIGITAL_TWIN_SUBJECT_URN_UUID = /^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** Private derived search fields. They are never returned in a materialized FHIR resource. */
+/**
+ * Private derived search properties appended to the same projected resource record.
+ * They are not a separate collection or public index, are never public FHIR claims,
+ * and must be removed from search matches and materialized resources.
+ */
 export const DIGITAL_TWIN_SEARCH_TEXT_CLAIM = '__digitalTwinSearch.text';
 export const DIGITAL_TWIN_SEARCH_DATE_CLAIM = '__digitalTwinSearch.date';
 export const DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM = '__digitalTwinSearch.language';
@@ -122,6 +126,11 @@ export function isDigitalTwinResearchResourceType(resourceType: string): boolean
  * integrated. Free text and identifying claims are removed; resource and
  * business identifiers are replaced deterministically within the twin, and
  * every patient/subject reference is rebound to the research subject.
+ *
+ * The returned object also carries optional `__digitalTwinSearch.text`,
+ * `.date` and `.language` properties on that same projected resource record.
+ * Composition-wide discovery consumes them privately; they are not a separate
+ * collection and never become clinical claims in a response.
  */
 export function projectClaimsForDigitalTwin(input: {
   claims: Record<string, unknown>;

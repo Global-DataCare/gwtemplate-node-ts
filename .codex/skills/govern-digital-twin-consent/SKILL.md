@@ -72,8 +72,11 @@ Verify current branches, versions and published npm state before release claims.
   resource. Resolve an omitted end date to GW current time.
 - A section may map to several resource families. Never require the BFF to
   choose or know a resource type for basic search.
-- Build private derived text/date/language search fields during projection;
-  never expose them in search matches or materialized resources.
+- Append private derived text/date/language properties to the same projected resource record
+  during projection. They are not a separate collection or a
+  second index, and `__digitalTwinSearch.*` is never a public FHIR claim family.
+  Consume those properties only for Composition-wide matching and strip them
+  from search matches and materialized resources.
 - Keep age range and host-wide aggregation out of the MVP.
 - Same-tenant access uses verified employee proof. Foreign access also needs a
   matching FHIR Contract VC and provider authorization.

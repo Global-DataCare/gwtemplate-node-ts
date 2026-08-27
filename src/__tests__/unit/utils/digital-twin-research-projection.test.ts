@@ -11,8 +11,10 @@ import {
 
 /**
  * Flow contract: GW pseudonymizes one operational resource, removes its
- * identifying/free-text claims and creates a private derived search document
- * containing only normalized searchable text, clinical date and language.
+ * identifying/free-text claims and appends normalized searchable text,
+ * clinical date and language to the same projected resource record. This is
+ * not a separate collection, and those private properties never become FHIR
+ * claims returned to a researcher.
  */
 describe('digital twin research projection', () => {
   it('creates one private stable twin subject alias without persisting the operational DID', async () => {
@@ -72,6 +74,15 @@ describe('digital twin research projection', () => {
     expect(projected[DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toBe('Ibuprofen\u001fIbuprofen prescribed to Alice');
     expect(projected[DIGITAL_TWIN_SEARCH_DATE_CLAIM]).toBe('2026-08-20T10:30:00.000Z');
     expect(projected[DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM]).toBe('es');
+    // These three private properties coexist with the preserved coded claims
+    // on the same projected resource record. The projection does not write a
+    // second search document or a separate collection.
+    expect(Object.keys(projected)).toEqual(expect.arrayContaining([
+      'MedicationStatement.code',
+      DIGITAL_TWIN_SEARCH_TEXT_CLAIM,
+      DIGITAL_TWIN_SEARCH_DATE_CLAIM,
+      DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM,
+    ]));
   });
 
   it('rejects identity-bearing resource families from the research plane', () => {
