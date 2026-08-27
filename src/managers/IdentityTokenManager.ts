@@ -16,6 +16,10 @@ type TokenExchangeBody = {
   client_instance_id?: string;
 };
 
+type EmployeeRecoveryBody = {
+  client_instance_id?: string;
+};
+
 type FirebaseCustomTokenBody = {
   provider?: string;
   id_token?: string;
@@ -45,9 +49,63 @@ export class IdentityTokenManager implements IJobProcessor {
       throw new ManagerError('Missing action.', IssueType.Required);
     }
     if (action === '_exchange') return this.processInitialAccessTokenExchange(job);
+    if (action === '_recover') return this.processEmployeeWalletRecovery(job);
     if (action === '_custom') return this.processFirebaseCustomToken(job);
 
     throw new ManagerError(`Unsupported action for Token: ${action}`, IssueType.NotSupported);
+  }
+
+  /**
+   * Issues a replacement credential for the exact employee installation after
+   * a fresh marked email-OTP login. The credential stays inside the BFF/SDK
+   * continuation and is never a browser-facing recovery secret.
+   */
+  private async processEmployeeWalletRecovery(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const thid = job.content!.thid!;
+    const bearer = (job.content as any)?.meta?.bearer?.token as string | undefined;
+    const idToken = bearer?.startsWith('Bearer ') ? bearer.slice('Bearer '.length) : undefined;
+    if (!idToken) throw new ManagerError('Missing Bearer token.', IssueType.Security);
+
+    const verificationResult = await this.appAuthManager.verifyIdToken(idToken);
+    const payload = (verificationResult.payload || {}) as any;
+    const email = String(payload.email || '').trim();
+    const authTime = Number(payload.auth_time);
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload.sub
+      || !email
+      || payload.email_verified !== true
+      || payload.professional_auth_method !== 'email_otp'
+      || !Number.isFinite(authTime)
+      || authTime > now + 30
+      || now - authTime > 300) {
+      throw new ManagerError('Recovery requires a fresh verified email OTP session.', IssueType.Security);
+    }
+    const tenantId = String(job.tenantId || '').trim();
+    const sector = String(job.sector || '').trim();
+    if (!tenantId || !sector) throw new ManagerError('Recovery route scope is incomplete.', IssueType.Required);
+    const body = (job.content?.body || {}) as EmployeeRecoveryBody;
+    const clientInstanceId = String(body.client_instance_id || '').trim();
+    if (!clientInstanceId) throw new ManagerError('Missing client_instance_id.', IssueType.Required);
+
+    const rotated = await this.appAuthManager.rotateEmployeeActivationCodeForOwnedDevice(
+      tenantId,
+      sector,
+      { subject: payload.sub, email, emailVerified: true },
+      clientInstanceId,
+    );
+    return {
+      jti: job.content?.jti || thid,
+      thid,
+      iss: job.content?.aud as string,
+      aud: job.content?.iss as string,
+      type: 'application/json',
+      body: {
+        activation_code: rotated.activationCode,
+        license_id: rotated.licenseId,
+        employee_role: rotated.employeeRole,
+        employee_same_as: rotated.employeeActorIdentifier,
+      },
+    };
   }
 
   private async processInitialAccessTokenExchange(job: JobRequest): Promise<IDecodedDidcommPayload> {

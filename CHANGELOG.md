@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Add employee wallet replacement at `identity/auth/_recover`. A fresh
+  email-OTP-marked Firebase token and the existing installation id must match
+  one active employee seat. GW rotates the protected activation credential for
+  server-side SDK consumption while preserving the employee identity/role;
+  stale OTPs, wrong emails and unknown installations fail closed.
+
 - Replace the Git/SSH-pinned `gdc-common-utils-ts` source with the exact
   published `2.5.20` npm artifact. Both Docker stages now use `npm ci`, and the
   release test rejects Git, workspace and vendored dependency sources.

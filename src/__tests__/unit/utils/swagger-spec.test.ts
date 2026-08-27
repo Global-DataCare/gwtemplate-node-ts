@@ -9,6 +9,10 @@ describe('Swagger Spec Generation', () => {
 
     expect(spec.paths).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_recover']).toBeDefined();
+    expect(
+      spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_recover']?.post?.description,
+    ).toContain('returned to the browser');
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_exchange-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/firebase/Token/_custom-response']).toBeDefined();

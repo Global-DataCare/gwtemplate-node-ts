@@ -85,7 +85,7 @@ describe('IdentityTokenManager route-owned tenant exchange', () => {
   });
 
   it('does not fall back to controller VP verification for device token exchange', async () => {
-    const verifyIdToken = jest.fn(async () => {
+    const verifyIdToken = jest.fn(async (_token: string) => {
       throw new Error('OIDC id_token rejected');
     });
     const verifyBearerToken = jest.fn(async () => ({ payload: { sub: EXAMPLE_ACCOUNT_OWNER_ID } }));
@@ -107,5 +107,85 @@ describe('IdentityTokenManager route-owned tenant exchange', () => {
     await expect(manager.process(job)).rejects.toThrow(/OIDC id_token rejected/);
     expect(verifyIdToken).toHaveBeenCalledWith('signed-controller-vp');
     expect(verifyBearerToken).not.toHaveBeenCalled();
+  });
+
+  it('issues a replacement credential only from a marked, verified email OTP session', async () => {
+    const verifyIdToken = jest.fn(async () => ({ payload: {
+      sub: EXAMPLE_ACCOUNT_OWNER_ID,
+      email: 'professional@example.org',
+      email_verified: true,
+      professional_auth_method: 'email_otp',
+      auth_time: Math.floor(Date.now() / 1000),
+    } }));
+    const rotateEmployeeActivationCodeForOwnedDevice = jest.fn(async (
+      _tenantId: string,
+      _sector: string,
+      _identity: unknown,
+      _clientInstanceId: string,
+    ) => ({
+      activationCode: 'lic-replacement',
+      licenseId: 'license-existing',
+      employeeRole: 'medical-secretary',
+      employeeActorIdentifier: 'urn:multibase:zProfessional',
+    }));
+    const manager = new IdentityTokenManager(
+      { verifyIdToken, rotateEmployeeActivationCodeForOwnedDevice } as any,
+      { createInitialAccessToken: jest.fn() } as any,
+    );
+    const response = await manager.process({
+      action: '_recover',
+      tenantId: EXAMPLE_TENANT_IDENTIFIER,
+      sector: EXAMPLE_SECTOR,
+      content: {
+        thid: 'recover-employee-wallet',
+        meta: { bearer: { token: `Bearer ${EXAMPLE_DEMO_PORTAL_ID_TOKEN}` } },
+        body: { client_instance_id: EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY },
+      },
+    } as any);
+
+    expect(rotateEmployeeActivationCodeForOwnedDevice).toHaveBeenCalledWith(
+      EXAMPLE_TENANT_IDENTIFIER,
+      EXAMPLE_SECTOR,
+      expect.objectContaining({
+        email: 'professional@example.org',
+        emailVerified: true,
+      }),
+      EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY,
+    );
+    expect(response.body).toEqual({
+      activation_code: 'lic-replacement',
+      license_id: 'license-existing',
+      employee_role: 'medical-secretary',
+      employee_same_as: 'urn:multibase:zProfessional',
+    });
+  });
+
+  it.each([
+    { professional_auth_method: 'webauthn', email_verified: true },
+    { professional_auth_method: 'email_otp', email_verified: false },
+  ])('rejects recovery without a fresh verified OTP marker: %o', async claims => {
+    const rotateEmployeeActivationCodeForOwnedDevice = jest.fn();
+    const manager = new IdentityTokenManager(
+      {
+        verifyIdToken: jest.fn(async () => ({ payload: {
+          sub: EXAMPLE_ACCOUNT_OWNER_ID,
+          email: 'professional@example.org',
+          auth_time: Math.floor(Date.now() / 1000),
+          ...claims,
+        } })),
+        rotateEmployeeActivationCodeForOwnedDevice,
+      } as any,
+      { createInitialAccessToken: jest.fn() } as any,
+    );
+
+    await expect(manager.process({
+      action: '_recover', tenantId: EXAMPLE_TENANT_IDENTIFIER, sector: EXAMPLE_SECTOR,
+      content: {
+        thid: 'recover-without-otp',
+        meta: { bearer: { token: `Bearer ${EXAMPLE_DEMO_PORTAL_ID_TOKEN}` } },
+        body: { client_instance_id: EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY },
+      },
+    } as any)).rejects.toThrow(/verified email OTP/i);
+    expect(rotateEmployeeActivationCodeForOwnedDevice).not.toHaveBeenCalled();
   });
 });

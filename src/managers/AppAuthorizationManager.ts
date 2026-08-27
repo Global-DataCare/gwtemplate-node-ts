@@ -12,13 +12,16 @@ import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-
 import { getTenantVaultId } from '../utils/tenant';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { getEnvSectionId } from '../utils/section-env';
+import { randomBytes } from 'node:crypto';
 import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
 import { normalizeSameAsHash, normalizeTelephoneHash } from 'gdc-common-utils-ts/utils/same-as';
 import { normalizeIndexedEmail, normalizeIndexedPhone } from '../utils/indexed-contact';
 import { DEFAULT_LICENSE_DEVICE_ALLOWANCE } from '../constants/domain';
+import { LICENSE_STATUS_ACTIVE, LICENSE_USER_CLASS_EMPLOYEE } from '../constants/domain';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
 import {
   findDeviceLicensesByActivationCode,
+  openDeviceLicenseDocument,
   prepareDeviceLicenseDocumentForWrite,
 } from '../utils/device-license-storage';
 
@@ -216,6 +219,89 @@ export class AppAuthorizationManager {
     }
 
     return { valid: true, license };
+  }
+
+  /**
+   * Rotates the activation credential for one existing employee installation.
+   *
+   * The caller must already have verified a fresh email OTP token. This method
+   * independently binds that email to the active seat and installation before
+   * changing any credential. Existing device bindings remain in place until
+   * the following DCR atomically replaces the matching installation.
+   */
+  public async rotateEmployeeActivationCodeForOwnedDevice(
+    tenantId: string,
+    sector: string,
+    authenticatedIdentity: ActivationActor,
+    clientInstanceId: string,
+  ): Promise<{ activationCode: string; licenseId: string; employeeRole: string; employeeActorIdentifier: string }> {
+    const email = normalizeIndexedEmail(String(authenticatedIdentity.email || ''));
+    if (!email || authenticatedIdentity.emailVerified !== true) {
+      throw new ManagerError('Recovery requires a verified licensed email.', IssueType.Forbidden);
+    }
+    const installation = String(clientInstanceId || '').trim();
+    if (!installation) throw new ManagerError('Recovery requires client_instance_id.', IssueType.Required);
+
+    const vaultId = getTenantVaultId(sector, tenantId);
+    const sectionId = getEnvSectionId('device-licenses');
+    const documents = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(vaultId, sectionId);
+    const matches: Array<{ document: ConfidentialStorageDoc; license: DeviceLicense & Record<string, any> }> = [];
+    for (const document of documents) {
+      try {
+        const opened = await openDeviceLicenseDocument(document, vaultId, this.kmsService);
+        const licenseEmail = normalizeIndexedEmail(String(opened.license.issuedToEmail || ''));
+        const ownsInstallation = this.readActiveDeviceBindings(opened.license)
+          .some(binding => String(binding.clientInstanceId || '') === installation);
+        if (opened.license.userClass === LICENSE_USER_CLASS_EMPLOYEE
+          && opened.license.status === LICENSE_STATUS_ACTIVE
+          && ownsInstallation
+          && licenseEmail === email) {
+          matches.push(opened);
+        }
+      } catch {
+        // Unrelated malformed or unreadable records cannot authorize recovery.
+      }
+    }
+    if (matches.length === 0) {
+      throw new ManagerError(
+        'No active device matches the authenticated licensed email and installation.',
+        IssueType.Forbidden,
+      );
+    }
+    if (matches.length > 1) {
+      throw new ManagerError('Multiple active seats match the same installation.', IssueType.Conflict);
+    }
+
+    const { document, license } = matches[0];
+    const employeeRole = String(license.issuedToRole || license.userCategory || '').trim();
+    if (!employeeRole) {
+      throw new ManagerError('Active employee seat has no assigned role.', IssueType.BusinessRule);
+    }
+    const employeeActorIdentifier = String(license.activatedBy || '').trim();
+    if (!employeeActorIdentifier) {
+      throw new ManagerError('Active employee seat has no actor binding.', IssueType.BusinessRule);
+    }
+    const activationCode = `lic-${randomBytes(9).toString('base64url')}`;
+    license.activationCode = activationCode;
+    document.status = LICENSE_STATUS_ACTIVE;
+    document.sequence = Number(document.sequence || 0) + 1;
+    if (this.kmsService?.protectAttributesNameAndValue) {
+      document.indexed = {
+        ...(document.indexed || {}),
+        attributes: await this.kmsService.protectAttributesNameAndValue(
+          [{ name: 'activationCode', value: activationCode, unique: true, type: 'string' }],
+          vaultId,
+        ),
+      };
+    }
+    const updated = await prepareDeviceLicenseDocumentForWrite({
+      document,
+      license,
+      vaultId,
+      kmsService: this.kmsService,
+    });
+    await this.vaultRepository.put(vaultId, [updated], sectionId);
+    return { activationCode, licenseId: license.id || document.id, employeeRole, employeeActorIdentifier };
   }
 
   private readDeviceAllowance(license: DeviceLicense & Record<string, any>): number {

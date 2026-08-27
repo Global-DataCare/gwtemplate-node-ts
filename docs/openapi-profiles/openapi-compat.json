@@ -4194,6 +4194,76 @@
         "x-profile": "core"
       }
     },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_recover": {
+      "post": {
+        "tags": [
+          "2.1.2 Initial Access Token Exchange"
+        ],
+        "summary": "Replace an employee wallet after fresh email OTP (async)",
+        "description": "Canonical route for new integrations is:\n`/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_recover`.\n\nThis employee-only recovery action requires a Firebase `id_token`\nminted by a fresh email OTP ceremony (maximum age five minutes) and\nthe already registered `client_instance_id`. GW requires exact\nverified-email ownership of the active employee seat, rotates its\nactivation credential and returns it only to the trusted BFF/SDK so\nDCR can replace the installation keys. The credential is never\nreturned to the browser. This flow does not decrypt or recover the\nold wallet seed and does not require the old PIN.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plain+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the replacement credential."
+          },
+          "400": {
+            "description": "Bad request or missing installation id."
+          },
+          "401": {
+            "description": "Missing",
+            "invalid or stale email-OTP identity proof.": null
+          },
+          "403": {
+            "description": "Verified email does not own the employee installation."
+          },
+          "404": {
+            "description": "Active employee installation not found."
+          }
+        },
+        "x-profile": "compat"
+      }
+    },
     "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/License/_issue": {
       "post": {
         "tags": [

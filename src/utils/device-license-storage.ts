@@ -8,7 +8,7 @@ export type OpenedDeviceLicenseDocument = Readonly<{
   license: DeviceLicense & Record<string, any>;
 }>;
 
-async function openDeviceLicenseDocument(
+export async function openDeviceLicenseDocument(
   document: ConfidentialStorageDoc,
   vaultId: string,
   kmsService?: IKmsService,

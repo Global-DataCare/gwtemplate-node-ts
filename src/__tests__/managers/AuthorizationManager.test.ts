@@ -400,5 +400,72 @@ describe('AppAuthorizationManager', () => {
       });
   });
 
+  describe('rotateEmployeeActivationCodeForOwnedDevice', () => {
+    it('rotates only the active seat bound to the OTP-authenticated email and installation', async () => {
+      const license = {
+        id: 'license-rotation', tenantId: 'acme', status: 'active', plan: 'annual',
+        orderId: 'order-rotation', userClass: 'employee', type: 'web',
+        renewalCycle: null, reactivationEnabled: true, exp: now + 3600,
+        activationCode: 'lic-old-code', issuedToEmail: 'professional@example.org',
+        issuedToRole: 'medical-secretary',
+        activatedBy: normalizeSameAsHash('professional@example.org'),
+        maxDevices: 5,
+        deviceBindings: [{
+          clientId: 'old-client', clientInstanceId: 'browser-installation', status: 'active',
+        }],
+      } as DeviceLicense & Record<string, any>;
+      mockVaultRepository.getContainersInSection.mockResolvedValue([{
+        id: license.id, status: 'active', sequence: 4, content: license,
+      } as any]);
+      mockKmsService.protectAttributesNameAndValue.mockResolvedValue([
+        { name: 'protected-name', value: 'protected-value', unique: true, type: 'string' },
+      ] as any);
+
+      const result = await manager.rotateEmployeeActivationCodeForOwnedDevice(
+        'acme',
+        'health-care',
+        { subject: 'portal-owner', email: 'professional@example.org', emailVerified: true },
+        'browser-installation',
+      );
+
+      expect(result.activationCode).toMatch(/^lic-[A-Za-z0-9_-]+$/);
+      expect(result.activationCode).not.toBe('lic-old-code');
+      expect(result.licenseId).toBe('license-rotation');
+      expect(result.employeeRole).toBe('medical-secretary');
+      expect(result.employeeActorIdentifier).toBe(normalizeSameAsHash('professional@example.org'));
+      expect(mockVaultRepository.put).toHaveBeenCalledWith(
+        getTenantVaultId('health-care', 'acme'),
+        [expect.objectContaining({
+          status: 'active',
+          sequence: 5,
+          content: expect.objectContaining({
+            activationCode: result.activationCode,
+            deviceBindings: license.deviceBindings,
+          }),
+        })],
+        getEnvSectionId('device-licenses'),
+      );
+    });
+
+    it('rejects a different email even when it knows the installation id', async () => {
+      mockVaultRepository.getContainersInSection.mockResolvedValue([{
+        id: 'license-other-owner', status: 'active', sequence: 1, content: {
+          id: 'license-other-owner', tenantId: 'acme', status: 'active',
+          userClass: 'employee', type: 'web', exp: now + 3600,
+          issuedToEmail: 'owner@example.org', activationCode: 'lic-owner',
+          deviceBindings: [{ clientId: 'client-owner', clientInstanceId: 'known-installation', status: 'active' }],
+        },
+      } as any]);
+
+      await expect(manager.rotateEmployeeActivationCodeForOwnedDevice(
+        'acme',
+        'health-care',
+        { subject: 'attacker', email: 'attacker@example.org', emailVerified: true },
+        'known-installation',
+      )).rejects.toThrow(/licensed email/i);
+      expect(mockVaultRepository.put).not.toHaveBeenCalled();
+    });
+  });
+
   // Future tests for `verifyInitialAccessToken` will be added here
 });

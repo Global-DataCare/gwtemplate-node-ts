@@ -352,7 +352,7 @@ function normalizeUnifiedIdentityAuthRouteParams(raw: RouteParams): RouteParams 
     || actionBase === IdentityAuthActions.Search) {
     mappedFormat = 'openid';
     mappedResourceType = 'Device';
-  } else if (actionBase === '_code' || actionBase === '_token' || actionBase === '_exchange') {
+  } else if (actionBase === '_code' || actionBase === '_token' || actionBase === '_exchange' || actionBase === '_recover') {
     mappedFormat = 'openid';
     mappedResourceType = 'Token';
   } else if (actionBase === IdentityAuthActions.Issue) {
@@ -1398,6 +1398,47 @@ export function createApiRouter(
    *       '401': { description: Missing/invalid Firebase id_token. }
    *       '404': { description: Activation code not found. }
    *       '409': { description: Activation code already used. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Token/_recover:
+   *   post:
+   *     tags:
+   *       - 2.1.2 Initial Access Token Exchange
+   *     summary: Replace an employee wallet after fresh email OTP (async)
+   *     description: |
+   *       Canonical route for new integrations is:
+   *       `/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_recover`.
+   *
+   *       This employee-only recovery action requires a Firebase `id_token`
+   *       minted by a fresh email OTP ceremony (maximum age five minutes) and
+   *       the already registered `client_instance_id`. GW requires exact
+   *       verified-email ownership of the active employee seat, rotates its
+   *       activation credential and returns it only to the trusted BFF/SDK so
+   *       DCR can replace the installation keys. The credential is never
+   *       returned to the browser. This flow does not decrypt or recover the
+   *       old wallet seed and does not require the old PIN.
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     security:
+   *       - BearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/didcomm-plain+json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+   *         application/x-www-form-urlencoded:
+   *           schema: { $ref: '#/components/schemas/SecureRequest' }
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL for the replacement credential. }
+   *       '400': { description: Bad request or missing installation id. }
+   *       '401': { description: Missing, invalid or stale email-OTP identity proof. }
+   *       '403': { description: Verified email does not own the employee installation. }
+   *       '404': { description: Active employee installation not found. }
    *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/License/_issue:
    *   post:

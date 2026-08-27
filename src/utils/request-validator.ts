@@ -93,12 +93,19 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
       normalizedResourceType === 'composition' &&
       normalizedAction === '_batch' &&
       actions.includes('_search');
+    const employeeWalletRecoverySelection =
+      normalizedSection === 'identity' &&
+      normalizedFormat === 'openid' &&
+      normalizedResourceType === 'token' &&
+      normalizedAction === '_recover' &&
+      actions.includes('_exchange');
     // Existing tenants may predate the explicit Composition/_batch service
     // declaration. A tenant that already exposes digital-twin Composition
     // search also exposes the researcher working-selection persistence step.
     const actionAllowed = actions.includes(normalizedAction)
       || legacyDigitalTwinWorkingSelection
-      || legacyEmployeeLicenseInventorySelection;
+      || legacyEmployeeLicenseInventorySelection
+      || employeeWalletRecoverySelection;
     return actionAllowed;
   });
 }

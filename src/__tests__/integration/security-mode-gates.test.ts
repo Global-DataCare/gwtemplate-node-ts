@@ -223,6 +223,63 @@ describe('SECURITY_MODE content-type gates', () => {
     );
   });
 
+  it('queues OTP wallet recovery for the exact routed tenant and installation', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'compat',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'false',
+      DIDCOMM_PLAIN: 'true',
+    };
+    const vaultId = `${EXAMPLE_SECTOR}_${EXAMPLE_TENANT_IDENTIFIER}`;
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async (candidate: string) => candidate === vaultId),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getCollectionName: jest.fn(async () => 'tenant-collection'),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#identity:openid',
+        selector: { sector: EXAMPLE_SECTOR, section: 'identity', format: 'openid' },
+        serviceEndpoint: 'Token',
+        actions: ['_exchange', '_recover'],
+      }]),
+      getTenant: jest.fn(async () => ({})),
+    };
+    const appAuthManager = {
+      verifyBearerToken: jest.fn(async () => ({ payload: {
+        sub: EXAMPLE_ACCOUNT_OWNER_ID,
+        email: EXAMPLE_EMAIL_CONTROLLER_ORG,
+        email_verified: true,
+        professional_auth_method: 'email_otp',
+      } })),
+    };
+    const harness = buildTestApp({ appAuthManager, tenantsCacheManager });
+
+    const response = await request(harness.app)
+      .post(`/host/cds-ES/v1/${EXAMPLE_SECTOR}/${EXAMPLE_TENANT_IDENTIFIER}/identity/auth/_recover`)
+      .set('Content-Type', 'application/didcomm-plain+json')
+      .set('Authorization', `Bearer ${EXAMPLE_DEMO_PORTAL_ID_TOKEN}`)
+      .send({
+        thid: 'recover-routed-installation',
+        client_instance_id: EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY,
+      });
+
+    expect(response.status).toBe(202);
+    expect(harness.queueAdapter.addJob).toHaveBeenCalledWith(
+      expect.stringContaining(`${vaultId}:Token:_recover`),
+      expect.objectContaining({
+        action: '_recover',
+        tenantId: EXAMPLE_TENANT_IDENTIFIER,
+        sector: EXAMPLE_SECTOR,
+        content: expect.objectContaining({
+          body: expect.objectContaining({
+            client_instance_id: EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY,
+          }),
+        }),
+      }),
+    );
+  });
+
   /**
    * A professional-seat Offer belongs to the tenant, but its commercial Order
    * is submitted through the host registry. The host path must keep routing the
