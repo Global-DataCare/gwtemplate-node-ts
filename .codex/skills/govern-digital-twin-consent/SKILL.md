@@ -100,7 +100,9 @@ Verify current branches, versions and published npm state before release claims.
 - For a tenant DID created before ResearchSubject became the public aggregate,
   accept its existing read-only digitaltwin Composition `_search` declaration
   as authorization for replacement `ResearchSubject/_search`; do not require
-  tenant reactivation or DCR and do not widen mutation authority.
+  tenant reactivation or DCR and do not widen mutation authority. Startup
+  reconciliation must publish the canonical route, remove obsolete
+  resource-specific twin search routes and preserve unrelated custom services.
 - Reconcile every persisted tenant's canonical sector service catalog at
   startup even without split-runtime overrides. Remove obsolete
   resource-specific twin search declarations and preserve unrelated custom DID

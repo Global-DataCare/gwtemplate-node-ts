@@ -9,7 +9,7 @@ import { IVaultRepository } from '../database/repositories/vault/vault.repositor
 import { IStorageAdapter } from '../database/storage/IStorageAdapter';
 import { BundleJsonApi, BundleEntry, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
-import { DidDocument } from 'gdc-common-utils-ts/models/did';
+import { DidDocument, DidService } from 'gdc-common-utils-ts/models/did';
 import { OrganizationConfig } from '../gdc-backend-utils-node/models/entity';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
@@ -1235,13 +1235,14 @@ export class HostingManager {
   }
 
   /**
-   * Reprojects configured split-runtime service routes into existing tenant DID
-   * documents. Legal identity, VAT-backed tenantId, keys and controller state
-   * are preserved; only the public `service` array is updated.
+   * Reprojects the current canonical service catalog and any configured
+   * split-runtime routes into existing tenant DID documents. Legal identity,
+   * VAT-backed tenantId, keys, controller state and non-GW custom services are
+   * preserved; obsolete resource-specific Digital Twin search routes are
+   * removed because ResearchSubject is the single public twin aggregate.
    */
   public async reconcileTenantServiceRoutes(): Promise<number> {
     const configuredRoutes = this.config.tenantServiceRoutes || {};
-    if (Object.keys(configuredRoutes).length === 0) return 0;
 
     const records = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
       this.hostRuntime.hostCollectionName,
@@ -1254,7 +1255,7 @@ export class HostingManager {
       const claims = tenant?.claims as ClaimsRecord | undefined;
       const tenantId = String(claims?.[ClaimsOrganizationSchemaorg.alternateName] || '').trim();
       const sectionRoutes = configuredRoutes[tenantId];
-      if (!claims || !tenantId || !sectionRoutes || !tenant.didDocument?.id) continue;
+      if (!claims || !tenantId || !tenant.didDocument?.id) continue;
 
       const sector = String(claims[ClaimsServiceSchemaorg.category] || '').trim() as Sector;
       const jurisdiction = String(claims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim();
@@ -1276,7 +1277,7 @@ export class HostingManager {
         claims[ClaimsServiceSchemaorg.serviceType] as string | undefined,
         claims[SERVICE_ADDITIONAL_TYPE_CLAIM] as string | undefined,
       );
-      const nextServices = populateDidDocumentServices(
+      const canonicalServices = populateDidDocumentServices(
         tenant.didDocument.id,
         publicBaseUrl,
         didConfigServices,
@@ -1285,6 +1286,12 @@ export class HostingManager {
         serviceBaseUrl,
         sectionRoutes,
       );
+      const canonicalIds = new Set(canonicalServices.map((service) => service.id));
+      const retainedCustomServices = (tenant.didDocument.service || []).filter((service) => (
+        !canonicalIds.has(service.id)
+        && !this.isObsoleteDigitalTwinSearchService(tenant.didDocument!.id, service)
+      ));
+      const nextServices = [...canonicalServices, ...retainedCustomServices];
       if (JSON.stringify(tenant.didDocument.service || []) === JSON.stringify(nextServices)) continue;
 
       const nextTenant: OrganizationConfig = {
@@ -1308,6 +1315,15 @@ export class HostingManager {
       reconciled += 1;
     }
     return reconciled;
+  }
+
+  /** Identifies pre-ResearchSubject public twin search routes. */
+  private isObsoleteDigitalTwinSearchService(tenantDid: string, service: DidService): boolean {
+    const id = String(service?.id || '').trim().toLowerCase();
+    const prefix = `${String(tenantDid || '').trim().toLowerCase()}#digitaltwin:`;
+    if (!id.startsWith(prefix) || !id.endsWith(':_search')) return false;
+    const resourceType = id.slice(prefix.length, -':_search'.length).split(':').at(-1);
+    return resourceType !== 'researchsubject';
   }
 
   /**
