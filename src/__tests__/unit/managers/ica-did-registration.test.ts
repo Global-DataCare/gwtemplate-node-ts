@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { buildIcaVerifyUrl, withoutDuplicatePrimaryJwk } from '../../../managers/hosting/ica-did-registration';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 

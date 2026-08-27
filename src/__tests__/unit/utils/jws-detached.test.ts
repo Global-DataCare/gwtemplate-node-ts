@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { externalClientSignerJwk } from '../../data/external-client.data';
 import * as mlDsa from '@noble/post-quantum/ml-dsa';
 import { withKid } from '../../../gdc-backend-utils-node/jwk-thumbprint';

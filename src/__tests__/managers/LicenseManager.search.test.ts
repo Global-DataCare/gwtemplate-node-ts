@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import type { IVaultRepository } from '../../database/repositories/vault/vault.repository';

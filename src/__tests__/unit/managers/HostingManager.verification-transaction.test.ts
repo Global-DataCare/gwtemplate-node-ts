@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getEnvSectionId } from '../../../utils/section-env';
@@ -921,18 +922,19 @@ describe('HostingManager legal organization verification transaction', () => {
       `${EXAMPLE_ICA_BASE_URL}/ica/cds-ES/v1/${EXAMPLE_SECTOR}/terms/pdf/${EXAMPLE_VERIFY_RESOURCE_TYPE}/_verify`,
     );
     expect(claims['org.schema.IndividualProduct.serialNumber']).toEqual(expect.any(String));
-    expect(mockVaultRepository.put).toHaveBeenCalledWith(
+    expect(mockVaultRepository.put).not.toHaveBeenCalledWith(
       `${EXAMPLE_SECTOR}_${EXAMPLE_TENANT_ALTERNATE_NAME}`,
-      [expect.objectContaining({
-        id: 'license-seat-reuse-001',
-        content: expect.objectContaining({
-          status: 'issued',
-          issuedToEmail: 'controller@example.org',
-          issuedToRole: 'RESPRSN',
-        }),
-      })],
+      expect.any(Array),
       getEnvSectionId('device-licenses'),
     );
+    expect(assignedControllerLicenseDoc).toMatchObject({
+      status: 'active',
+      sequence: 4,
+      content: {
+        status: 'active',
+        activationCode: 'lic-old-code-001',
+      },
+    });
   });
 
   it('returns the canonical Offer identifier only for first-time legal _transaction onboarding', async () => {

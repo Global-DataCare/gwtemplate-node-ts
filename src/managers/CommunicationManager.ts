@@ -1068,6 +1068,18 @@ export class CommunicationManager implements IJobProcessor {
           if (alreadyIndexed) continue;
         }
 
+        const isConsentRule = resourceType === 'Consent'
+          && Boolean(this.getFirstClaimValue(claims, ['Consent.decision', 'org.hl7.fhir.api.Consent.decision']));
+        if (isConsentRule) {
+          await persistConsentRuleAndAttachment({
+            vaultRepository: this.vaultRepository,
+            tenantVaultId,
+            sector: String(job.sector || ''),
+            claims,
+          });
+          continue;
+        }
+
         const recordId = String(resource?.id || versionId || fallbackId);
         const record: Record<string, any> = {
           id: recordId,
@@ -1103,14 +1115,6 @@ export class CommunicationManager implements IJobProcessor {
             ...researchClaims,
             indexed: { attributes: this.buildIndexedAttributesFromClaims(researchClaims) },
           } as any], digitalTwinSectionId);
-        }
-        if (resourceType === 'Consent' && this.getFirstClaimValue(claims, ['Consent.decision', 'org.hl7.fhir.api.Consent.decision'])) {
-          await persistConsentRuleAndAttachment({
-            vaultRepository: this.vaultRepository,
-            tenantVaultId,
-            sector: String(job.sector || ''),
-            claims,
-          });
         }
       }
     }

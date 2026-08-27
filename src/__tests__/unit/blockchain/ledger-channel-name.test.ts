@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * Flow contract: Core constructs only canonical region-final channel names;
  * product adapters remain responsible for selecting a permitted family.

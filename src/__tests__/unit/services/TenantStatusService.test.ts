@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { jest } from '@jest/globals';
 import { TenantStatusService } from '../../../services/TenantStatusService';
 import type { IDiscoveryTenantRegistry } from '../../../managers/IDiscoveryTenantRegistry';

@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * TEST SECTOR USAGE: This integration test covers both network (infra) and business (functional) sectors.
  *

@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 export const demoCommunicationMedicationIpsDefaults = {
   subjectId: 'did:web:api.acme.org:individual:subject-001',
   fhirContextR4: 'org.hl7.fhir.r4',

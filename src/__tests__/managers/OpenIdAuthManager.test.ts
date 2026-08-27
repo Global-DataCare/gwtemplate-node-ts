@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/managers/OpenIdAuthManager.test.ts
 
 import { OpenIdAuthManager } from '../../managers/OpenIdAuthManager';

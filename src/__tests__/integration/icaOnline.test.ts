@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { IcaManager } from '../../managers/IcaManager';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 

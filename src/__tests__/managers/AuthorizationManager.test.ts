@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/managers/AuthorizationManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -280,6 +281,7 @@ describe('AppAuthorizationManager', () => {
         // Verify it updated the license status to 'active'
         const [updatedVaultId, updatedDocs] = (mockVaultRepository.put as jest.Mock).mock.calls[0];
         expect(updatedVaultId).toBe(vaultId);
+        expect(updatedDocs[0].status).toBe('active');
         expect(updatedDocs[0].content.status).toBe('active');
         expect(updatedDocs[0].sequence).toBe(1);
       });
@@ -310,7 +312,9 @@ describe('AppAuthorizationManager', () => {
             deviceInfo: { clientInstanceId: 'install-one' }, activatedAt: now,
           }],
         } as DeviceLicense & Record<string, any>;
-        mockKmsService.getHmacBase64Url.mockResolvedValueOnce('hmac-name').mockResolvedValueOnce('hmac-value');
+        mockKmsService.getHmacBase64Url
+          .mockResolvedValueOnce('hmac-name').mockResolvedValueOnce('hmac-value')
+          .mockResolvedValueOnce('hmac-name').mockResolvedValueOnce('hmac-value');
         mockVaultRepository.query.mockResolvedValue([{ id: 'used-code', content: mockLicense, sequence: 0 }]);
 
         await expect(manager.verifyAndConsumeActivationCode(
@@ -321,6 +325,55 @@ describe('AppAuthorizationManager', () => {
           'used-code', 'acme', 'health-care',
           { subject: 'portal-b-sub', email: 'other@example.org', emailVerified: true }, 'install-two',
         )).rejects.toThrow('does not match the licensed email');
+      });
+
+      it('decrypts an indexed protected seat before reusing its activation credential', async () => {
+        const protectedLicenseDoc = {
+          id: 'protected-license',
+          status: 'active',
+          sequence: 3,
+          indexed: { attributes: [{ name: 'protected-name', value: 'protected-value' }] },
+          jwe: { ciphertext: 'protected-license-ciphertext' },
+        } as unknown as ConfidentialStorageDoc;
+        const decryptedLicense = {
+          id: protectedLicenseDoc.id,
+          tenantId: 'acme',
+          status: 'active',
+          plan: 'annual',
+          orderId: 'order-protected',
+          userClass: 'employee',
+          type: 'web',
+          renewalCycle: null,
+          reactivationEnabled: false,
+          exp: now + 3600,
+          activationCode: 'protected-code',
+          issuedToEmail: 'professional@example.org',
+          activatedBy: normalizeSameAsHash('professional@example.org'),
+          maxDevices: 5,
+          deviceBindings: [{
+            clientId: 'client-one',
+            clientInstanceId: 'install-one',
+            status: 'active',
+          }],
+        } as DeviceLicense & Record<string, any>;
+        mockKmsService.getHmacBase64Url
+          .mockResolvedValueOnce('protected-name')
+          .mockResolvedValueOnce('protected-value');
+        mockVaultRepository.query.mockResolvedValue([protectedLicenseDoc]);
+        mockKmsService.unprotectConfidentialData.mockResolvedValue(decryptedLicense as any);
+
+        await expect(manager.verifyAndConsumeActivationCode(
+          'protected-code',
+          'acme',
+          'health-care',
+          { subject: 'portal-subject', email: 'professional@example.org', emailVerified: true },
+          'install-one',
+        )).resolves.toMatchObject({ valid: true, license: decryptedLicense });
+
+        expect(mockKmsService.unprotectConfidentialData).toHaveBeenCalledWith(
+          protectedLicenseDoc,
+          getTenantVaultId('health-care', 'acme'),
+        );
       });
 
       it('should bind a legacy active seat to its first authenticated reuse', async () => {

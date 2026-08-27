@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/data/ping.data.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 

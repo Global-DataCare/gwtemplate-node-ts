@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { describe, expect, it } from '@jest/globals';
 import type { LLMProvider } from '../../../services/llm/LLMProvider';
 import { UserInputDerivationService } from '../../../services/ai/UserInputDerivationService';

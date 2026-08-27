@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManageAssetCryptographicKey } from '../../../blockchain/fabric/v3/manageAssetCryptographicKey';

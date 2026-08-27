@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { enforceSmartScopeRouteCompatibility } from '../../../utils/smart-scope-route-authorization';
 
 describe('smart scope route authorization', () => {

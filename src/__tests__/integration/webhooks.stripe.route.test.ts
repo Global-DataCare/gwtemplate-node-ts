@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import request from 'supertest';
 import { startServer, resetServerConfig } from '../../server';
 import { QueueAdapterMem } from '../../adapters/queue-mem';

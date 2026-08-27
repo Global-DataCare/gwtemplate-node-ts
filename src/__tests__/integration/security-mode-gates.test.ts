@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import express from 'express';
 import request from 'supertest';
 import { createApiRouter } from '../../routes/api';

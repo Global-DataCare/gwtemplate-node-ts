@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { createHash, randomUUID } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
@@ -168,7 +169,10 @@ describe('ConsentManager', () => {
   it('upserts by application/study source reference while keeping the internal identifier out of the caller contract', async () => {
     mockVaultRepository.vaultExists.mockResolvedValue(true);
     mockVaultRepository.put.mockResolvedValue(true);
-    mockBlockchainAdapter.registerConsentAccessBundle.mockResolvedValue({ accepted: 1, txId: 'tx-consent-id-isolation' });
+    const registerConsentAccessBundle = mockBlockchainAdapter.registerConsentAccessBundle as jest.MockedFunction<
+      NonNullable<IBlockchainAdapter['registerConsentAccessBundle']>
+    >;
+    registerConsentAccessBundle.mockResolvedValue({ accepted: 1, txId: 'tx-consent-id-isolation' });
     const buildRequest = (sourceReference: string, decision: 'permit' | 'deny') => {
       const request = structuredClone(mockJobRequest);
       const claims = (request.content!.body as any).data[0].meta.claims;
@@ -194,7 +198,7 @@ describe('ConsentManager', () => {
       getClaimValue(storedRules[0], ClaimConsent.identifier),
     );
     expect(getClaimValue(storedRules[0], ClaimConsent.identifier)).not.toContain('caller-owned');
-    const ledgerAssetIds = mockBlockchainAdapter.registerConsentAccessBundle.mock.calls
+    const ledgerAssetIds = registerConsentAccessBundle.mock.calls
       .map((call) => call[0].assetId);
     expect(ledgerAssetIds[0]).not.toBe(ledgerAssetIds[1]);
   });

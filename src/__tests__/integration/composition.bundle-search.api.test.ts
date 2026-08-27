@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { invokeExpress } from './helpers/invokeExpress';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'fs';

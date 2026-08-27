@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 
 import * as mlKem from '@noble/post-quantum/ml-kem';
 import { testMockRandom64Bytes } from '../../data/crypto.data';

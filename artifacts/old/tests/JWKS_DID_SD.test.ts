@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { createGaiaXLegalParticipantCredential } from '../../../src/utils/credential-generators';
 import { writeFileSync } from 'fs';
 import { randomBytes } from '@noble/hashes/utils.js';

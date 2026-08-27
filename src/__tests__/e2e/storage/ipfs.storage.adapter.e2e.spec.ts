@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { IpfsStorageAdapter } from '../../../database/storage/ipfs.storage.adapter';
 
 const apiUrl = process.env.IPFS_API_URL || 'http://127.0.0.1:5001';

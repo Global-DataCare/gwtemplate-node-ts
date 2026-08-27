@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import admin from 'firebase-admin';
 import { RulesTestEnvironment, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { buildExampleConfidentialStorageDoc, buildExampleConfidentialJwe } from 'gdc-common-utils-ts';

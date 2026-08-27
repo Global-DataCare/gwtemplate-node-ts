@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * Flow contract: natural persons route to the global human plane while legal
  * organizations and organization-scoped employee records route to an explicit

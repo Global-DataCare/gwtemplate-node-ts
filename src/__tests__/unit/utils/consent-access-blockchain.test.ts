@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import type { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import { buildConsentRulePrimaryDocument } from '../../../utils/consent-access-blockchain';

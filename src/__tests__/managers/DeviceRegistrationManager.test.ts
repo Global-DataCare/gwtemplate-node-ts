@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/managers/DeviceRegistrationManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -138,6 +139,59 @@ describe('DeviceRegistrationManager', () => {
       expect((updatedContent as any).deviceBindings).toHaveLength(1);
       expect(updatedContent.status).toBe('active');
       expect(updatedLicense?.status).toBe('active');
+    });
+
+    it('decrypts and updates the protected seat selected by its activation-code index', async () => {
+      const job = cloneDeep(DCR_REGISTRATION_JOB);
+      (job.content?.body as any).application_type = 'web';
+      const activationCode = (job.content?.body as any).code as string;
+      const clientInstanceId = (job.content?.body as any).ext_device_info.device_id as string;
+      const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+      const license = {
+        id: 'protected-license',
+        tenantId: job.tenantId as string,
+        orderId: 'protected-order',
+        activationCode,
+        userClass: 'employee',
+        type: 'web',
+        status: 'active',
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        activatedBy: normalizeSameAsHash('employee@example.org'),
+        maxDevices: 5,
+      } as DeviceLicense & Record<string, any>;
+      const protectedLicense = await mockKmsService.protectConfidentialData({
+        id: license.id,
+        status: license.status,
+        sequence: 3,
+        indexed: { attributes: [{ name: 'protected-name', value: 'protected-value' }] },
+        content: license,
+      } as ConfidentialStorageDoc, vaultId);
+      await vaultRepository.put(vaultId, [protectedLicense], getEnvSectionId('device-licenses'));
+      mockKmsService.getHmacBase64Url
+        .mockResolvedValueOnce('protected-name')
+        .mockResolvedValueOnce('protected-value');
+
+      const result = await manager.process(job);
+
+      const responseEntry = (result.body as BundleJsonApi).data[0] as BundleEntryResponse;
+      expect(responseEntry.response.status).toBe('201');
+      const updatedDocument = await vaultRepository.get<ConfidentialStorageDoc>(
+        vaultId,
+        license.id,
+        getEnvSectionId('device-licenses'),
+      );
+      expect(updatedDocument?.content).toBeUndefined();
+      expect(updatedDocument?.jwe).toBeDefined();
+      const updatedLicense = await mockKmsService.unprotectConfidentialData<DeviceLicense & Record<string, any>>(
+        updatedDocument!,
+        vaultId,
+      );
+      expect(updatedLicense.deviceBindings).toEqual(expect.arrayContaining([
+        expect.objectContaining({ clientInstanceId, status: DeviceBindingStatuses.Active }),
+      ]));
     });
 
     it('should keep two devices and both key sets active for the same employee seat', async () => {

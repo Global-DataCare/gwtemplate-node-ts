@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * This template represents a homogeneous group, a collection of members who share
  * a common type, such as employees in a department or members of a family.

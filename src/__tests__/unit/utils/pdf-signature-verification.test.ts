@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // pdf-signature-verification.test.ts
 // TDD: PDF signature verification for patient/representative consent
 import { PdfSignatureVerificationManager, BasicPdfSignatureVerifierAdapter, PdfVerifySubmission } from '../../../utils/pdf-signature-verification';

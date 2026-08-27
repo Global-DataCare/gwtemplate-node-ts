@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 import express from 'express';
 import { createApiRouter } from '../../../routes/api';

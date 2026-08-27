@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/utils/urn-hash.test.ts
 import { generateUrnHash } from '../../utils/urn-hash';
 import { testExamplesIndividualUrn } from '../data/identity.data';

@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import express from 'express';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -25,6 +26,8 @@ describe('break-glass SMART route contract (integration)', () => {
       selector: { section: 'identity', format: 'openid' },
     }];
     const tenants = {
+      tenantExists: jest.fn().mockResolvedValue(true),
+      findTenantVaultIdByIdentifierValue: jest.fn().mockResolvedValue(undefined),
       getDidServiceConfig: jest.fn().mockResolvedValue(services),
       getTenant: jest.fn().mockResolvedValue({ authorizationStatus: 'active', didConfig: { service: services } }),
       getCollectionName: jest.fn().mockResolvedValue('tenant-collection'),

@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { ReplayProtectionStoreMem } from '../../../adapters/replay-protection-store';
 
 describe('ReplayProtectionStoreMem', () => {

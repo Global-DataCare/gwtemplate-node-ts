@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import * as express from 'express';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';

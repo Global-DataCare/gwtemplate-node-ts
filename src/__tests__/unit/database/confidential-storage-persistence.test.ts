@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import {
   buildExampleConfidentialStorageDoc,
   CONFIDENTIAL_JWE_BLOB_CONTENT_TYPE,

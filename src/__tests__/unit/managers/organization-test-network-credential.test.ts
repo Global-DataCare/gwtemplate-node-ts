@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * Flow contract: Test Network bypasses ICA only when the attached VC is bound
  * to the same reviewed application, organization and controller key, and a

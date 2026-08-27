@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/integration/identity/smart-token.test.ts
 
 import { invokeExpress } from '../helpers/invokeExpress';

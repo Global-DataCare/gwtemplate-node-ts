@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 export const TEST_PARTICIPANT = {
   WEB_DOMAIN: 'example.com',
   OFFICIAL_NAME: 'Example Company',

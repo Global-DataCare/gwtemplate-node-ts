@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * Flow contract: legacy deployments retain their exact physical paths, while
  * scoped deployments require explicit environment, ledger mode and anonymous

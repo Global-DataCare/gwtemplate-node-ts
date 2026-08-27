@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // File: src/__tests__/unit/managers/PingManager.test.ts
 
 import { PingManager } from '../../../managers/PingManager';

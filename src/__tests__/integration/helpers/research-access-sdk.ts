@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { readFileSync } from 'fs';
 import path from 'path';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
@@ -19,6 +20,7 @@ import {
 import { initializeTenantServicesConfig } from '../../../utils/services';
 import { getIndividualSectionId } from '../../../utils/individual-sections';
 import { getEnvSectionId } from '../../../utils/section-env';
+import { persistConsentRuleAndAttachment } from '../../../utils/consent-storage';
 import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../../utils/tenant';
 import { invokeExpress } from './invokeExpress';
 import { testPayloadCreateTenant1 } from '../../data/end-to-end.data';
@@ -234,6 +236,22 @@ export class TestResearchOrgControllerSdk {
       EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerTenantId,
     );
     await Promise.all(subjectDids.map(async (subjectDid, index) => {
+      await persistConsentRuleAndAttachment({
+        vaultRepository: this.deps.vaultRepository,
+        tenantVaultId: providerVaultId,
+        sector: String(Sector.HEALTH_CARE),
+        claims: {
+          '@context': 'org.hl7.fhir.api',
+          [ClaimConsent.subject]: subjectDid,
+          [ClaimConsent.actorIdentifier]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerOrganizationDid,
+          [ClaimConsent.actorRole]: 'provider',
+          [ClaimConsent.decision]: ConsentDecisions.Permit,
+          [ClaimConsent.purpose]: 'RESEARCH',
+          [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
+          [ClaimConsent.date]: '2026-06-29',
+          [ClaimConsent.sourceReference]: `https://portal.example/secondary-use/${index + 1}`,
+        },
+      });
       await this.deps.vaultRepository.put(
         providerVaultId,
         [{

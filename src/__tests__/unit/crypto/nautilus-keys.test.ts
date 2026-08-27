@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { deriveKeyPair } from '../../../utils/pki';
 
 describe('Nautilus (Pontus-X) secp256k1 keys', () => {

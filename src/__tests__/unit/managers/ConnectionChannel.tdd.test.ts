@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { ConnectionChannelRecord } from '../../../types/connection-channel';
 
 describe('Connection Channel Root Model (TDD blueprint)', () => {

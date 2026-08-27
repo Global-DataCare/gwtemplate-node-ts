@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * Online smoke for ConsentAccess on the shared Fabric-backed `test-network`.
  *

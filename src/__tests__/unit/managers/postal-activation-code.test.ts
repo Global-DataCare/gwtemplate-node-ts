@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /** One-code contract: Order may issue only the code bound by the delivered postal VC. */
 import { scryptSync } from 'node:crypto';
 import { ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';

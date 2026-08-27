@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { describe, expect, it, jest } from '@jest/globals';
 import { OllamaProvider } from '../../../services/llm/OllamaProvider';
 

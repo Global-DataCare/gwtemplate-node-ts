@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * Flow contract: deployment configuration accepts canonical sectors plus
  * explicitly named signed-identity compatibility sectors and fails closed for

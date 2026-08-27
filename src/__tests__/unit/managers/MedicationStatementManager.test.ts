@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { MedicationStatementManager } from '../../../managers/MedicationStatementManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
@@ -133,7 +134,8 @@ describe('MedicationStatementManager', () => {
     expect(mockVaultRepository.query).toHaveBeenCalled();
   });
 
-  it('mirrors individual medication updates into the digitaltwin scope', async () => {
+  it('mirrors individual medication updates only after explicit secondary-use consent', async () => {
+    mockVaultRepository.get.mockResolvedValueOnce({ status: 'enabled' } as any);
     const job = createBatchJob();
     await manager.process(job);
 

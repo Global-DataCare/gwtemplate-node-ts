@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- Make protected device licences readable through their HMAC activation-code
+  index before employee exchange and DCR validation, while preserving encrypted
+  persistence and synchronizing the active envelope status. Add manager
+  regressions for both exchange and device registration.
+- Require red-green-refactor flow contracts across unit, integration and E2E
+  suites in the repository instructions and owning local skills.
+- Keep provider secondary-use consent explicit in research integration flows,
+  avoid duplicate individual Consent projections during Communication
+  ingestion, and align medication projection tests with the consent gate.
 - Make `Consent.source-reference` the public stable key for each Digital Twin
   portal/software/study permission. GW now owns the internal
   `Consent.identifier`, reuses one rule per semantic reference, keeps distinct

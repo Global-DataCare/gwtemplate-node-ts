@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { StoryHarness } from './helpers/story-flow';
 import {

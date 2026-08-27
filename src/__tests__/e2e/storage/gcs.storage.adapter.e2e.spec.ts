@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/e2e/storage/gcs.storage.adapter.e2e.spec.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 

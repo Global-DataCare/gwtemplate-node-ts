@@ -29,6 +29,11 @@ import {
   IdentityAuthResponseTypes,
 } from 'gdc-common-utils-ts/constants/identity-auth';
 import { DEFAULT_LICENSE_DEVICE_ALLOWANCE } from '../constants/domain';
+import {
+  findDeviceLicensesByActivationCode,
+  prepareDeviceLicenseDocumentForWrite,
+  type OpenedDeviceLicenseDocument,
+} from '../utils/device-license-storage';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -131,19 +136,21 @@ export class DeviceRegistrationManager implements IJobProcessor {
       }
 
       const vaultId = getTenantVaultId(sector as any, tenantId);
-      const licenseDoc = await this.resolveLicenseByActivationCode(code as string, vaultId);
+      const openedLicense = await this.resolveLicenseByActivationCode(code as string, vaultId);
+      const licenseDoc = openedLicense?.document;
+      const license = openedLicense?.license;
       const fingerprint: DeviceInfo = {
         clientInstanceId: deviceInfo?.device_id || clientId,
         os: deviceInfo?.os,
         osVersion: deviceInfo?.os_version,
         model: deviceInfo?.device_name,
       };
-      if (licenseDoc) this.assertDeviceCapacity(licenseDoc.content as DeviceLicense, fingerprint.clientInstanceId);
+      if (license) this.assertDeviceCapacity(license, fingerprint.clientInstanceId);
       const deviceIdentityContext = await this.prepareEmployeeDeviceIdentityContext({
         job,
         vaultId,
         registrationRequest,
-        licenseDoc,
+        licenseDoc: licenseDoc && license ? { ...licenseDoc, content: license } : undefined,
         clientId,
       });
       const deviceProfile = {
@@ -181,8 +188,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
       await this.vaultRepository.put(vaultId, [protectedDeviceProfile], getEnvSectionId('device-profiles'));
 
       // Bind the activated license seat to this client_id and capture a minimal device fingerprint.
-      if (licenseDoc) {
-        const license = licenseDoc.content as DeviceLicense & Record<string, any>;
+      if (licenseDoc && license) {
         const now = Math.floor(Date.now() / 1000);
         const existingBindings = this.getDeviceBindings(license);
         const replacedBinding = existingBindings.find((binding) =>
@@ -203,7 +209,13 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
         licenseDoc.status = 'active';
         licenseDoc.sequence = (licenseDoc.sequence || 0) + 1;
-        await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+        const updatedDocument = await prepareDeviceLicenseDocumentForWrite({
+          document: licenseDoc,
+          license,
+          vaultId,
+          kmsService: this.kmsService,
+        });
+        await this.vaultRepository.put(vaultId, [updatedDocument], getEnvSectionId('device-licenses'));
       }
 
       if (deviceIdentityContext) {
@@ -310,35 +322,20 @@ export class DeviceRegistrationManager implements IJobProcessor {
   private async resolveLicenseByActivationCode(
     code: string,
     vaultId: string,
-  ): Promise<ConfidentialStorageDoc | undefined> {
+  ): Promise<OpenedDeviceLicenseDocument | undefined> {
     if (!code) return undefined;
-
-    let licenseDocs: ConfidentialStorageDoc[] = [];
-    if (this.kmsService?.getHmacBase64Url) {
-      const protectedName = await this.kmsService.getHmacBase64Url('activationCode', vaultId);
-      const protectedValue = await this.kmsService.getHmacBase64Url(code, vaultId);
-      if (protectedName && protectedValue) {
-        try {
-          licenseDocs = (await this.vaultRepository.query(vaultId, {
-            sectionId: getEnvSectionId('device-licenses'),
-            where: [{ name: protectedName, value: protectedValue }],
-          })) as unknown as ConfidentialStorageDoc[];
-        } catch {
-          licenseDocs = [];
-        }
-      }
-    }
-
-    if (!licenseDocs || licenseDocs.length === 0) {
-      const all = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(vaultId, getEnvSectionId('device-licenses'));
-      licenseDocs = all.filter((doc) => (doc.content as any)?.activationCode === code);
-    }
-
-    if (!licenseDocs || licenseDocs.length === 0) return undefined;
-    if (licenseDocs.length > 1) {
+    const openedLicenses = await findDeviceLicensesByActivationCode({
+      activationCode: code,
+      vaultId,
+      sectionId: getEnvSectionId('device-licenses'),
+      vaultRepository: this.vaultRepository,
+      kmsService: this.kmsService,
+    });
+    if (openedLicenses.length === 0) return undefined;
+    if (openedLicenses.length > 1) {
       throw new ManagerError('Multiple licenses found for the same activation code.', IssueType.Exception);
     }
-    return licenseDocs[0];
+    return openedLicenses[0];
   }
 
   private getDeviceAllowance(license: DeviceLicense & Record<string, any>): number {

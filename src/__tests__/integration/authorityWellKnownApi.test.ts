@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import express from 'express';
 import { createAuthorityRouter } from '../../routes/authority';
 import { AsyncResponseStoreMem } from '../../adapters/async-response-store.mem';

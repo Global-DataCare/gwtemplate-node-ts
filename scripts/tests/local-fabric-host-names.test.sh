@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# TDD contract: write this test red first; make it green only with the complete real behavior.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

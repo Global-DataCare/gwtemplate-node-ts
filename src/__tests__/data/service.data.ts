@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { ClaimsServiceSchemaorg } from "gdc-common-utils-ts/constants/schemaorg";
 import { testConfigDataHost, testConfigTenant1 } from "./organization.data";
 

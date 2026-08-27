@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/data/example-jobs.ts
 
 import { v4 as uuidv4 } from 'uuid';

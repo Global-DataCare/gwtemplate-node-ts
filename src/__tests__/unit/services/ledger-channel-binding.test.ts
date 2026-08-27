@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * Flow contract: scoped GW startup verifies every configured channel's real
  * genesis block before persisting or accepting an immutable ledger binding.

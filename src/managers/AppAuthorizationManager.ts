@@ -17,6 +17,10 @@ import { normalizeSameAsHash, normalizeTelephoneHash } from 'gdc-common-utils-ts
 import { normalizeIndexedEmail, normalizeIndexedPhone } from '../utils/indexed-contact';
 import { DEFAULT_LICENSE_DEVICE_ALLOWANCE } from '../constants/domain';
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
+import {
+  findDeviceLicensesByActivationCode,
+  prepareDeviceLicenseDocumentForWrite,
+} from '../utils/device-license-storage';
 
 export type ControllerProofRegistrationContext = Readonly<{
   vaultId: string;
@@ -126,37 +130,21 @@ export class AppAuthorizationManager {
     const now = Math.floor(Date.now() / 1000);
     const vaultId = getTenantVaultId(sector, tenantId);
 
-    // Activation codes are not the primary ID of the license document.
-    // Prefer a secure indexed lookup (HMAC-protected) and fall back to a scan in memory/dev.
-    const protectedName = await this.kmsService.getHmacBase64Url('activationCode', vaultId);
-    const protectedValue = await this.kmsService.getHmacBase64Url(code, vaultId);
-
-    let licenseDocs: ConfidentialStorageDoc[] = [];
-    try {
-      licenseDocs = (await this.vaultRepository.query(vaultId, {
-        sectionId: getEnvSectionId('device-licenses'),
-        where: [{ name: protectedName, value: protectedValue }],
-      })) as unknown as ConfidentialStorageDoc[];
-    } catch {
-      // Ignore: some repository implementations may not support query for this use case yet.
-      licenseDocs = [];
-    }
-
-    if (!licenseDocs || licenseDocs.length === 0) {
-      // Fallback scan (works for in-memory/dev repositories).
-      const all = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(vaultId, getEnvSectionId('device-licenses'));
-      licenseDocs = all.filter((doc) => (doc.content as any)?.activationCode === code);
-    }
-
-    if (!licenseDocs || licenseDocs.length === 0) {
+    const openedLicenses = await findDeviceLicensesByActivationCode({
+      activationCode: code,
+      vaultId,
+      sectionId: getEnvSectionId('device-licenses'),
+      vaultRepository: this.vaultRepository,
+      kmsService: this.kmsService,
+    });
+    if (openedLicenses.length === 0) {
       throw new ManagerError('Activation code not found or invalid.', IssueType.NotFound);
     }
-    if (licenseDocs.length > 1) {
+    if (openedLicenses.length > 1) {
       throw new ManagerError('Multiple licenses found for the same activation code.', IssueType.Exception);
     }
 
-    const licenseDoc = licenseDocs[0];
-    const license = licenseDoc.content as DeviceLicense & Record<string, any>;
+    const { document: licenseDoc, license } = openedLicenses[0];
 
     if (license.status !== 'issued' && license.status !== 'active') {
       throw new ManagerError('License is not in an activatable or active multi-device state.', IssueType.Conflict);
@@ -207,16 +195,24 @@ export class AppAuthorizationManager {
       if (!license.activatedBy || canMigrateLegacyActor) {
         license.activatedBy = actor;
         license.maxDevices = allowance;
+        licenseDoc.status = 'active';
         licenseDoc.sequence++;
-        await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+        const updatedDocument = await prepareDeviceLicenseDocumentForWrite({
+          document: licenseDoc, license, vaultId, kmsService: this.kmsService,
+        });
+        await this.vaultRepository.put(vaultId, [updatedDocument], getEnvSectionId('device-licenses'));
       }
     } else {
       license.status = 'active';
+      licenseDoc.status = 'active';
       license.activatedAt = now;
       license.activatedBy = actor;
       license.maxDevices = this.readDeviceAllowance(license);
       licenseDoc.sequence++;
-      await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+      const updatedDocument = await prepareDeviceLicenseDocumentForWrite({
+        document: licenseDoc, license, vaultId, kmsService: this.kmsService,
+      });
+      await this.vaultRepository.put(vaultId, [updatedDocument], getEnvSectionId('device-licenses'));
     }
 
     return { valid: true, license };

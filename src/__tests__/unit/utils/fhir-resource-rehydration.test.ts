@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { describe, expect, it } from '@jest/globals';
 import { buildFhirResourceFromIndexedClaims } from '../../../utils/fhir-resource-rehydration';
 import { ResourceTypesFhirR4 } from '../../../shared/fhir-constants';

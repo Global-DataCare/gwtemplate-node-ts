@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * TEST SECTOR USAGE: This test uses both network (infra) and business (functional) sectors.
  *
@@ -219,8 +220,9 @@ describe('HostingManager - Offer/Order Flow', () => {
     expect(['201', '404']).toContain(finalEntry.response.status);
     expect(['Organization-order-response-v1.0', 'Organization-order-request-v1.0']).toContain(finalEntry.type);
     if (finalEntry.response.status === '201') {
+      const finalClaims = finalEntry.resource?.meta?.claims || finalEntry.meta?.claims;
       expect(
-        finalEntry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier],
+        finalClaims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier],
       ).toBe(offerId);
     }
 

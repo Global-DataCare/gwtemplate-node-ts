@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/unit/crypto/jwk-thumbprint.test.ts
 
 // WebCrypto is available in Node 18+. This line makes it available to the test runner.

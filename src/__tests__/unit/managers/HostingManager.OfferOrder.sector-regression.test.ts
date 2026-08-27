@@ -1,3 +1,4 @@
+// TDD contract: write this test red first; make it green only with the complete real behavior.
 import { beforeEach } from '@jest/globals';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
@@ -8,7 +9,24 @@ import { ORGANIZATION_REGISTRATION_JOB } from '../../data/example-jobs';
 import { testClaimsHostInitialization } from '../../data/end-to-end.data';
 import { ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import * as tenantUtils from '../../../utils/tenant';
-import { mockKmsService, mockStorageAdapter, mockLogger } from './HostingManager.OfferOrder.test';
+
+const mockKmsService = {
+  init: jest.fn(async () => undefined),
+  provisionKeys: jest.fn(),
+  getPublicJwks: jest.fn(),
+  protectConfidentialData: jest.fn(async (document: any) => ({
+    ...document,
+    jwe: { ciphertext: 'encrypted-content' },
+  })),
+  unprotectConfidentialData: jest.fn(async (document: any) => document.content),
+  createDetachedJws: jest.fn(async () => 'detached-jws'),
+  getHmacBase64Url: jest.fn(),
+  protectAttributesNameAndValue: jest.fn(),
+} as any;
+const mockStorageAdapter = { upload: jest.fn() } as any;
+const mockLogger = {
+  info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(),
+} as any;
 
 let hostingManager: InstanceType<typeof HostingManager>;
 
