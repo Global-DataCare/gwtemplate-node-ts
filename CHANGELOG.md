@@ -6,8 +6,9 @@
   published `2.5.20` npm artifact. Both Docker stages now use `npm ci`, and the
   release test rejects Git, workspace and vendored dependency sources.
 - Align the medication projection integration invariant with the private
-  `__digitalTwinSearch.*` index while continuing to reject exposed clinical
-  text, display and note claims.
+  derived `__digitalTwinSearch.*` fields stored on each projected resource
+  record, while continuing to reject exposed clinical text, display and note
+  claims. These fields do not represent a separate collection or public index.
 - Make protected device licences readable through their HMAC activation-code
   index before employee exchange and DCR validation, while preserving encrypted
   persistence and synchronizing the active envelope status. Add manager
