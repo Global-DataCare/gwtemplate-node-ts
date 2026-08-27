@@ -1927,17 +1927,19 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 9. Research Digital Twin
-   *     summary: Search digital twin Composition indexes by IPS section and coded claims
+   *     summary: Search digital twins by IPS sections, clinical date range and text
    *     description: |
    *       Submits an async section-first digital twin search request.
    *
    *       Public search intent:
    *       - the result artifact is `Composition`
-   *       - the client filters by IPS `section` first
-   *       - the client then adds resource-scoped coded filters such as
-   *         `MedicationStatement.code`, `Observation.code`, or
-   *         `AllergyIntolerance.clinical-status`
-   *       - free-text and display claims are absent from the research projection
+   *       - repeated `section` parameters use OR semantics and each section may
+   *         span several resource families
+   *       - inclusive `date-from` and non-empty `text` are required
+   *       - inclusive `date-to` is optional; GW resolves an omitted value to
+   *         its current time for that request
+   *       - text is matched case/accent-insensitively against a private derived
+   *         search document, not exposed clinical free text
    *       - internal matching may fan out to indexed resource families for the
    *         requested section, but the response returns matched `Composition`
    *         projections rather than leaf resources
@@ -1945,8 +1947,10 @@ export function createApiRouter(
    *       Current runtime rules:
    *       - request body should carry a FHIR `Parameters` resource
    *       - `section` is required
-   *       - at least one resource-scoped claim filter is required
-   *       - one resource family per request is supported today
+   *       - section OR, text and date constraints are combined with AND and
+   *         text/date must match the same clinical resource
+   *       - matched subjects are deduplicated before returning Compositions
+   *       - advanced resource-scoped filters remain compatibility input
    *       - poll completion on the existing `_batch-response` path with the
    *         same `thid`
    *     parameters:
@@ -1975,7 +1979,7 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 9. Research Digital Twin
-   *     summary: Search strict FHIR R4 digital twin Composition indexes by IPS section and textual claims
+   *     summary: Search strict FHIR R4 digital twins by sections, date range and text
    *     description: |
    *       Same section-first digital twin search contract as
    *       `org.hl7.fhir.api/Composition/_search`, but with the versioned

@@ -11,13 +11,15 @@ import {
   EXAMPLE_API_ORGANIZATION_DID,
   EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
   EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
-  EXAMPLE_CONTROLLER_DID,
   EXAMPLE_HEALTHCARE_ACTOR_ROLE_RECEPTIONIST,
   EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
-  EXAMPLE_RESEARCH_CONTROLLER_DID,
   EXAMPLE_TENANT_IDENTIFIER,
 } from 'gdc-common-utils-ts/examples/shared';
-import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import {
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_AUTHORIZED_SIGNATORY_DID,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_AUTHORIZED_SIGNATORY_DID,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
+} from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import { ClaimConsent, ConsentDecisions, type ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
 import { ClaimInterTenantAccessContract } from 'gdc-common-utils-ts/models/inter-tenant-access-contract';
 import { MedicationStatementClaim } from 'gdc-common-utils-ts/models/interoperable-claims';
@@ -65,8 +67,8 @@ export const DEMO_SMART_ACCESS_LOCAL_EMAILS = Object.freeze({
 
 export const DEMO_SMART_ACCESS_LOCAL_DIDS = Object.freeze({
   consumerOrganizationDid: 'did:web:api.lab.org',
-  providerControllerDid: EXAMPLE_CONTROLLER_DID,
-  consumerControllerDid: EXAMPLE_RESEARCH_CONTROLLER_DID,
+  providerAuthorizedSignatoryDid: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_AUTHORIZED_SIGNATORY_DID,
+  consumerAuthorizedSignatoryDid: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONSUMER_AUTHORIZED_SIGNATORY_DID,
   consumerDeviceDid: 'did:web:device.lab.org',
 } as const);
 
@@ -344,11 +346,25 @@ function buildDemoResearchContractCredential(input: Readonly<{
 }>): Record<string, unknown> {
   const providerOrganizationDid = input.providerOrganizationDid || buildProviderOrganizationDid(input.tenantId);
   return buildInterTenantAccessContractCredential({
-    issuer: DEMO_SMART_ACCESS_LOCAL_DIDS.consumerControllerDid,
+    issuer: DEMO_SMART_ACCESS_LOCAL_DIDS.consumerAuthorizedSignatoryDid,
     validFrom: '2026-06-30T00:00:00.000Z',
     validUntil: '2027-06-30T00:00:00.000Z',
     additionalCredential: {
       id: DEMO_SMART_ACCESS_LOCAL_IDS.researchContractIdentifier,
+      proof: [
+        {
+          type: 'JsonWebSignature2020',
+          proofPurpose: 'contractAgreement',
+          verificationMethod: `${DEMO_SMART_ACCESS_LOCAL_DIDS.providerAuthorizedSignatoryDid}#contract-agreement`,
+          jws: 'provider-authorized-signatory-proof',
+        },
+        {
+          type: 'JsonWebSignature2020',
+          proofPurpose: 'contractAgreement',
+          verificationMethod: `${DEMO_SMART_ACCESS_LOCAL_DIDS.consumerAuthorizedSignatoryDid}#contract-agreement`,
+          jws: 'consumer-authorized-signatory-proof',
+        },
+      ],
     },
     claims: {
       [ClaimInterTenantAccessContract.identifier]: DEMO_SMART_ACCESS_LOCAL_IDS.researchContractIdentifier,
@@ -358,8 +374,8 @@ function buildDemoResearchContractCredential(input: Readonly<{
       [ClaimInterTenantAccessContract.appliesEnd]: '2027-06-30T00:00:00.000Z',
       [ClaimInterTenantAccessContract.providerOrganization]: providerOrganizationDid,
       [ClaimInterTenantAccessContract.consumerOrganization]: DEMO_SMART_ACCESS_LOCAL_DIDS.consumerOrganizationDid,
-      [ClaimInterTenantAccessContract.providerController]: DEMO_SMART_ACCESS_LOCAL_DIDS.providerControllerDid,
-      [ClaimInterTenantAccessContract.consumerController]: DEMO_SMART_ACCESS_LOCAL_DIDS.consumerControllerDid,
+      [ClaimInterTenantAccessContract.providerAuthorizedSignatory]: DEMO_SMART_ACCESS_LOCAL_DIDS.providerAuthorizedSignatoryDid,
+      [ClaimInterTenantAccessContract.consumerAuthorizedSignatory]: DEMO_SMART_ACCESS_LOCAL_DIDS.consumerAuthorizedSignatoryDid,
       [ClaimInterTenantAccessContract.capability]: ServiceCapability.DigitalTwinReader,
       [ClaimInterTenantAccessContract.purpose]: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PURPOSE,
       [ClaimInterTenantAccessContract.instantiatesUri]: 'https://portal.example.org/contracts/local-network-research-access-001.pdf',

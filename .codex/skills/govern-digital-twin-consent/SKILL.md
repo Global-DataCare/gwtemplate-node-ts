@@ -60,6 +60,26 @@ Verify current branches, versions and published npm state before release claims.
 - Never teach a patient portal to submit an IPS Bundle or canonical Composition to `digitaltwin/.../Composition/_batch`.
 - Treat the direct Composition batch only as explicitly scoped adapter/compatibility plumbing for a pre-authorized registered twin; keep it outside the portal 101.
 
+## Preserve MVP discovery and organization authorization
+
+- Basic search accepts one or more IPS section tokens, inclusive `date-from`,
+  optional inclusive `date-to`, and non-empty `text`.
+- Sections use OR. Text and date use AND and must match the same clinical
+  resource. Resolve an omitted end date to GW current time.
+- A section may map to several resource families. Never require the BFF to
+  choose or know a resource type for basic search.
+- Build private derived text/date/language search fields during projection;
+  never expose them in search matches or materialized resources.
+- Keep age range and host-wide aggregation out of the MVP.
+- Same-tenant access uses verified employee proof. Foreign access also needs a
+  matching FHIR Contract VC and provider authorization.
+- Emit signer roles `provider-authorized-signatory` and
+  `consumer-authorized-signatory`; accept `provider-controller` and
+  `consumer-controller` only as deprecated read aliases.
+- Require two already-verified `contractAgreement` proofs over the same
+  immutable Contract VC. `RESPRSN` proves technical tenant control, not legal
+  authority to sign, unless a separate verified delegation explicitly grants it.
+
 ## Preserve lifecycle semantics
 
 - `deny` is reversible disable: pause later synchronization, retain the private alias and freeze published anonymous data.

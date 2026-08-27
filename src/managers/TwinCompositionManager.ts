@@ -22,6 +22,10 @@ import { getAuthenticatedJobActorDid } from '../utils/authenticated-job-actor';
 import { GatewayEnvelopeTypes, GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { BundleType } from '../utils/bundle';
 import type { IJobProcessor } from './registry';
+import {
+  DIGITAL_TWIN_SEARCH_DATE_CLAIM,
+  DIGITAL_TWIN_SEARCH_TEXT_CLAIM,
+} from '../utils/digital-twin-research-projection';
 
 export type TwinCompositionProjectionConfig = {
   collectionIds: string[];
@@ -171,6 +175,7 @@ export class TwinCompositionManager {
     }
 
     const filters = this.collectSearchFilters(params.body);
+    const basicSearch = this.parseBasicSearch(filters);
     const searchesPrivateTags = Object.keys(filters).some((key) => {
       const normalized = stripKnownFhirClaimContextPrefix(String(key || '').trim()).toLowerCase();
       return normalized === 'composition.meta-tag' || normalized === 'composition.meta.tag';
@@ -183,11 +188,18 @@ export class TwinCompositionManager {
       const match = /^([A-Za-z][A-Za-z0-9]*)\./.exec(String(key || '').trim());
       if (match?.[1]) requestedResourceTypes.add(match[1]);
     }
-    if (requestedResourceTypes.size === 0) {
+    if (requestedResourceTypes.size === 0 && !basicSearch) {
       throw new Error('digitaltwin Composition/_search requires at least one resource-scoped claim filter.');
     }
     if (requestedResourceTypes.size > 1) {
       throw new Error('digitaltwin Composition/_search currently supports one resource type per request.');
+    }
+
+    if (basicSearch) {
+      return this.searchBasicAcrossSections({
+        ...params,
+        basicSearch,
+      });
     }
 
     const requestedResourceType = Array.from(requestedResourceTypes)[0]!;
@@ -248,6 +260,76 @@ export class TwinCompositionManager {
     }
 
     return compositionMatches;
+  }
+
+  private parseBasicSearch(filters: SearchFilters): { text: string; fromMs: number; toMs: number } | undefined {
+    const text = String(filters.text?.[0] || '').trim();
+    const from = String(filters['date-from']?.[0] || '').trim();
+    const to = String(filters['date-to']?.[0] || '').trim();
+    if (!text && !from && !to) return undefined;
+    if (!text) throw new Error('digitaltwin basic search requires text.');
+    if (!from) throw new Error('digitaltwin basic search requires date-from.');
+    const fromMs = this.parseBoundaryDate(from, false, 'date-from');
+    const toMs = to ? this.parseBoundaryDate(to, true, 'date-to') : Date.now();
+    if (toMs < fromMs) throw new Error('digitaltwin basic search date-to must be on or after date-from.');
+    return { text: this.normalizeSearchText(text), fromMs, toMs };
+  }
+
+  private parseBoundaryDate(value: string, endOfDay: boolean, name: string): number {
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const normalized = dateOnly
+      ? `${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`
+      : value;
+    const timestamp = Date.parse(normalized);
+    if (Number.isNaN(timestamp)) throw new Error(`digitaltwin basic search ${name} must be an ISO date or dateTime.`);
+    return timestamp;
+  }
+
+  private normalizeSearchText(value: string): string {
+    return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+
+  private async searchBasicAcrossSections(params: {
+    tenantVaultId: string;
+    requiredSections: string[];
+    excludedSections: string[];
+    basicSearch: { text: string; fromMs: number; toMs: number };
+    filterMatchesBySectionsAndTypes: (matches: any[], requiredSections: string[], excludedSections: string[], requiredTypes: string[]) => any[];
+  }): Promise<any[]> {
+    const allSections = await this.vaultRepository.getAllSections(params.tenantVaultId);
+    const matchedSubjects = new Set<string>();
+    for (const sectionToken of params.requiredSections) {
+      if (params.excludedSections.includes(sectionToken)) continue;
+      for (const config of TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG[sectionToken] || []) {
+        for (const collectionId of config.collectionIds) {
+          const normalizedCollectionId = String(collectionId || '').trim().toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+          const prefix = getEnvSectionId(`${SUBJECT_SECTION_DIGITAL_TWIN}_${normalizedCollectionId}_`);
+          for (const sectionId of allSections.filter((candidate) => String(candidate || '').startsWith(prefix))) {
+            const records = await this.vaultRepository.listContainersInSection<any>(params.tenantVaultId, sectionId);
+            for (const record of records) {
+              const searchText = this.normalizeSearchText(String(record?.[DIGITAL_TWIN_SEARCH_TEXT_CLAIM] || ''));
+              const dateMs = Date.parse(String(record?.[DIGITAL_TWIN_SEARCH_DATE_CLAIM] || ''));
+              if (!searchText.includes(params.basicSearch.text)) continue;
+              if (Number.isNaN(dateMs) || dateMs < params.basicSearch.fromMs || dateMs > params.basicSearch.toMs) continue;
+              const subject = this.normalizeReference(
+                getClaimValue<string>(record, `${config.resourceType}.subject`)
+                || getClaimValue<string>(record, `${config.resourceType}.patient`),
+              );
+              if (subject) matchedSubjects.add(subject);
+            }
+          }
+        }
+      }
+    }
+
+    const matches: any[] = [];
+    for (const subject of matchedSubjects) {
+      const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_DIGITAL_TWIN, DataCollectionIds.composition);
+      const records = await this.vaultRepository.listContainersInSection<any>(params.tenantVaultId, sectionId);
+      matches.push(...params.filterMatchesBySectionsAndTypes(records, params.requiredSections, params.excludedSections, []));
+    }
+    return Array.from(new Map(matches.map((match) => [String(match?.id || JSON.stringify(match)), match])).values());
   }
 
   private async searchCompositionRecordsByDirectFilters(params: {

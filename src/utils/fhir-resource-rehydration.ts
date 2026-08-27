@@ -3,6 +3,7 @@ import { canonicalizeFhirClaims, getClaimValue } from './claims';
 import { normalizeReference, tokenToCoding } from './fhir-data-utils';
 import { determineResourceId } from './resource';
 import { GatewayLocalFhirResourceTypes, ResourceTypesFhirR4 } from '../shared/fhir-constants';
+import { DIGITAL_TWIN_SEARCH_CLAIM_PREFIX } from './digital-twin-research-projection';
 import { convertClaimsToFhirResource } from 'gdc-common-utils-ts/utils/bundle-document-builder';
 
 const PATIENT_REFERENCE_RESOURCE_TYPES = new Set<string>([
@@ -47,7 +48,9 @@ export function buildFhirResourceFromIndexedClaims(
   // Historical indexes may still carry version-specific FHIR prefixes. Read
   // them for migration compatibility, but expose and persist only the stable
   // FHIR API search-parameter namespace.
-  const claims = canonicalizeFhirClaims(record || {});
+  const claims = canonicalizeFhirClaims(Object.fromEntries(
+    Object.entries(record || {}).filter(([key]) => !String(key).startsWith(DIGITAL_TWIN_SEARCH_CLAIM_PREFIX)),
+  ));
   const subject =
     normalizeReference(getClaimValue<string>(claims, `${resourceType}.subject`))
     || normalizeReference(getClaimValue<string>(claims, `${resourceType}.patient`));
