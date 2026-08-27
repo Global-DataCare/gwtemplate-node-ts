@@ -90,16 +90,16 @@ describe('Service Initialization Utilities', () => {
       expect(digitalTwinService).toBeDefined();
       expect(digitalTwinService!.serviceEndpoint).toBe('Communication');
 
-      // Communication is the converged auditable ingestion envelope. Composition
-      // remains the searchable clinical-document projection after indexing.
-      const digitalTwinCompositionSearch = services.find(
+      // Communication is the converged ingestion envelope. ResearchSubject is
+      // the public twin aggregate; its canonical Composition stays internal.
+      const digitalTwinResearchSubjectSearch = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
           (s as any).selector?.format === 'org.hl7.fhir.api' &&
-          s.serviceEndpoint === 'Composition' &&
+          s.serviceEndpoint === 'ResearchSubject' &&
           s.actions?.includes('_search'),
       );
-      expect(digitalTwinCompositionSearch).toBeDefined();
+      expect(digitalTwinResearchSubjectSearch).toBeDefined();
 
       const digitalTwinR4Service = services.find(
         (s: DidService) =>
@@ -107,7 +107,7 @@ describe('Service Initialization Utilities', () => {
           (s as any).selector?.format === 'org.hl7.fhir.r4',
       );
       expect(digitalTwinR4Service).toBeDefined();
-      expect(digitalTwinR4Service!.serviceEndpoint).toContain('Composition');
+      expect(digitalTwinR4Service!.serviceEndpoint).toContain('ResearchSubject');
 
       const messagingService = services.find(
         (s: DidService) =>
@@ -228,14 +228,14 @@ describe('Service Initialization Utilities', () => {
       );
       expect(subjectSearchService).toBeDefined();
 
-      const digitalTwinCompositionSearchService = services.find(
+      const digitalTwinResearchSubjectSearchService = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
           (s as any).selector?.format === 'org.hl7.fhir.r4' &&
-          s.serviceEndpoint === 'Composition' &&
+          s.serviceEndpoint === 'ResearchSubject' &&
           (s.actions || []).includes('_search'),
       );
-      expect(digitalTwinCompositionSearchService).toBeDefined();
+      expect(digitalTwinResearchSubjectSearchService).toBeDefined();
 
       const individualPdfDraftService = services.find(
         (s: DidService) =>
@@ -326,32 +326,23 @@ describe('Service Initialization Utilities', () => {
       );
       expect(legacyCompositionR4Batch).toBeDefined();
 
-      const digitalTwinMedicationSearchService = services.find(
+      const digitalTwinResearchSubjectSearchService = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
           (s as any).selector?.format === 'org.hl7.fhir.api' &&
           s.actions?.includes('_search') &&
-          String(s.serviceEndpoint || '').includes('MedicationStatement'),
+          String(s.serviceEndpoint || '') === 'ResearchSubject',
       );
-      expect(digitalTwinMedicationSearchService).toBeDefined();
+      expect(digitalTwinResearchSubjectSearchService).toBeDefined();
 
-      const digitalTwinCompositionSearchService = services.find(
-        (s: DidService) =>
-          (s as any).selector?.section === 'digitaltwin' &&
-          (s as any).selector?.format === 'org.hl7.fhir.api' &&
-          s.actions?.includes('_search') &&
-          String(s.serviceEndpoint || '') === 'Composition',
-      );
-      expect(digitalTwinCompositionSearchService).toBeDefined();
-
-      const digitalTwinCompositionR4SearchService = services.find(
+      const digitalTwinResearchSubjectR4SearchService = services.find(
         (s: DidService) =>
           (s as any).selector?.section === 'digitaltwin' &&
           (s as any).selector?.format === 'org.hl7.fhir.r4' &&
           s.actions?.includes('_search') &&
-          String(s.serviceEndpoint || '') === 'Composition',
+          String(s.serviceEndpoint || '') === 'ResearchSubject',
       );
-      expect(digitalTwinCompositionR4SearchService).toBeDefined();
+      expect(digitalTwinResearchSubjectR4SearchService).toBeDefined();
     });
 
     it('should filter tenant discovery endpoints to indexing-only capabilities when serviceType excludes digital twin', () => {

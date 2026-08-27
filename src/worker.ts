@@ -68,6 +68,10 @@ export class Worker {
       this.normalizeClaimsPlacement(jobName, job);
 
       const { resourceType } = jobInfo;
+      // The queue name is the worker's authoritative route contract. Preserve
+      // it on the job passed to managers so ResearchSubject is never collapsed
+      // into its internal canonical Composition representation.
+      job.resourceType = resourceType;
       let manager: IJobProcessor | undefined;
 
       // 1. Route to the appropriate manager based on the parsed job name
@@ -79,6 +83,8 @@ export class Worker {
         case 'ResearchSubject':
           manager = job.action === '_purge' && job.section === SUBJECT_SECTION_INDIVIDUAL
             ? this.managers.compositionManager
+            : job.action === '_search' && job.section === 'digitaltwin'
+            ? this.managers.twinCompositionManager || this.managers.compositionManager
             : job.action === '$summary'
             ? (job.section === 'digitaltwin'
               ? this.managers.twinCompositionManager || this.managers.compositionManager

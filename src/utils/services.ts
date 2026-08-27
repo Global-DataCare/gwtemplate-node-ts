@@ -352,27 +352,20 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     );
   }
 
-  // Digital twin ingestion for research sectors uses flat interoperable claims (`org.hl7.fhir.api`)
-  // wrapped in Composition resources.
+  // The public twin aggregate is ResearchSubject. Its canonical Composition is
+  // the internal index document used to connect the projected FHIR resources.
   if (isFhir || isResearch) {
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
-        ['MedicationStatement'],
-        ['_search'],
-      ),
-    );
-    services.push(
-      createDidEndpointConfigFromSelector(
-        { sector, section: 'digitaltwin', format: 'org.hl7.fhir.api' },
-        ['Composition'],
+        ['ResearchSubject'],
         ['_search'],
       ),
     );
     services.push(
       createDidEndpointConfigFromSelector(
         { sector, section: 'digitaltwin', format: 'org.hl7.fhir.r4' },
-        ['Composition'],
+        ['ResearchSubject'],
         ['_search'],
       ),
     );

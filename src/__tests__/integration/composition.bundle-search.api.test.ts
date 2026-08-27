@@ -27,7 +27,8 @@ import { applyDigitalTwinSecondaryUseDecision } from '../../utils/digital-twin-s
 describe('Composition Bundle _search API (integration)', () => {
   function loadIpsAllSectionsFixture(subjectDid: string): any {
     // Official HL7 IPS fixture used to feed individual, mirror into digitaltwin,
-    // and verify section-first `Composition/_search` behavior end to end:
+    // and verify section-first `ResearchSubject/_search` behavior end to end.
+    // The returned ResearchSubject exposes its canonical Composition index:
     // https://build.fhir.org/ig/HL7/fhir-ips/en/Bundle-bundle-ips-all-sections.json.html
     const fixturePath = path.join(process.cwd(), 'node_modules', 'gdc-common-utils-ts', 'fixtures', 'fhir-ips-bundle-all-sections.json');
     const bundle = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -590,7 +591,7 @@ describe('Composition Bundle _search API (integration)', () => {
     }
   });
 
-  it('ingests the IPS all-sections fixture and supports coded digitaltwin Composition/_search', async () => {
+  it('ingests the IPS fixture and searches ResearchSubject through its canonical Composition index', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
@@ -1110,7 +1111,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (const searchCase of searchCases) {
         const searchResp = await invokeExpress(app, {
           method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search`,
           headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
           body: {
             thid: searchCase.thid,
@@ -1126,7 +1127,7 @@ describe('Composition Bundle _search API (integration)', () => {
         for (let i = 0; i < 50; i++) {
           const pollResp = await invokeExpress(app, {
             method: 'POST',
-            url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
+            url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response`,
             headers: { 'content-type': 'application/json' },
             body: { thid: searchCase.thid },
           });
@@ -1138,7 +1139,7 @@ describe('Composition Bundle _search API (integration)', () => {
         }
 
         expect(searchPayload?.resourceType).toBe('Bundle');
-        expect(searchPayload?.data?.[0]?.type).toBe('Composition-search-response-v1.0');
+        expect(searchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
         expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
         const firstMatch = searchPayload?.data?.[0]?.resource?.data?.[0];
         expect(
@@ -1319,7 +1320,7 @@ describe('Composition Bundle _search API (integration)', () => {
 
       const searchResp = await invokeExpress(app, {
         method: 'POST',
-        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'researcher-selection-composition-search-001',
@@ -1338,7 +1339,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'researcher-selection-composition-search-001' },
         });
@@ -1350,11 +1351,14 @@ describe('Composition Bundle _search API (integration)', () => {
       }
 
       expect(searchPayload?.resourceType).toBe('Bundle');
-      expect(searchPayload?.data?.[0]?.type).toBe('Composition-search-response-v1.0');
+      expect(searchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
       expect(searchPayload?.data?.[0]?.resource?.total).toBe(1);
-      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.id).toBe(selectionCompositionId);
-      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.tag?.[0]?.system).toBe('urn:research:tag:score');
-      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.tag?.[0]?.code).toBe('10');
+      const savedResearchSubject = searchPayload?.data?.[0]?.resource?.data?.[0];
+      expect(savedResearchSubject?.resourceType).toBe('ResearchSubject');
+      expect(savedResearchSubject?.['ResearchSubject.identifier']).toBe(subjectDid);
+      expect(savedResearchSubject?.composition?.id).toBe(selectionCompositionId);
+      expect(savedResearchSubject?.meta?.tag?.[0]?.system).toBe('urn:research:tag:score');
+      expect(savedResearchSubject?.meta?.tag?.[0]?.code).toBe('10');
     } finally {
       queueAdapter.stop();
     }
@@ -1488,7 +1492,7 @@ describe('Composition Bundle _search API (integration)', () => {
 
       const searchResp = await invokeExpress(app, {
         method: 'POST',
-        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search`,
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'ips-twin-materialization-search-001',
@@ -1507,7 +1511,7 @@ describe('Composition Bundle _search API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'ips-twin-materialization-search-001' },
         });

@@ -8,6 +8,14 @@
   server-side SDK consumption while preserving the employee identity/role;
   stale OTPs, wrong emails and unknown installations fail closed.
 
+- Make `ResearchSubject` the single public Digital Twin aggregate: search and
+  saved-selection lookup use FHIR `Parameters` at
+  `digitaltwin/.../ResearchSubject/_search`, while each result exposes the
+  canonical internal `Composition` index document. Preserve full hosted
+  organization DIDs for `:employee:` and `:member:` SMART actors so same-tenant
+  access does not incorrectly require an inter-tenant contract, and resolve a
+  registered external `did:web` organization alias back to the canonical
+  issuer tenant before making that decision.
 - Replace the Git/SSH-pinned `gdc-common-utils-ts` source with the exact
   published `2.5.20` npm artifact. Both Docker stages now use `npm ci`, and the
   release test rejects Git, workspace and vendored dependency sources.

@@ -29,6 +29,7 @@ import { getMatchingIndividualMemberCredentialFromVpToken } from 'gdc-common-uti
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getOrCreateDigitalTwinSubjectId } from '../utils/digital-twin-research-projection';
 import { getMatchingProfessionalCredentialFromVpToken } from 'gdc-common-utils-ts/utils/professional-smart';
+import { getOrganizationDidFromIndividualDid } from 'gdc-common-utils-ts/utils/did-resolution';
 import type {
   BreakGlassAuthorization,
   BreakGlassAuthorizer,
@@ -132,7 +133,21 @@ export class OpenIdAuthManager implements IJobProcessor {
     // - verify the request signature and bind `sub` to a registered employee/practitioner identity,
     // - parse all scope items and map to rule semantics (resource-level + section-level),
     // - apply deny-overrides and purpose logic.
-    const actor = parseActorFromSub(sub);
+    const parsedActor = parseActorFromSub(sub);
+    const actorOrganizationDid = getOrganizationDidFromIndividualDid(parsedActor.sub);
+    const issuerOrganizationDids = new Set([
+      issuerDid,
+      ...(Array.isArray(issuerDidDoc?.alsoKnownAs) ? issuerDidDoc.alsoKnownAs : []),
+    ].map((value) => String(value || '').trim()).filter((value) => value.startsWith('did:web:')));
+    const actor = {
+      ...parsedActor,
+      // Hosted professional DIDs may use either :employee: or :member:.
+      // Resolve a registered public did:web alias back to the canonical issuer
+      // before deciding that the organization is foreign.
+      organization: actorOrganizationDid && issuerOrganizationDids.has(actorOrganizationDid)
+        ? issuerDid
+        : actorOrganizationDid,
+    };
     const purpose = body.purpose?.trim();
     const requestedCapabilities = this.extractRequestedCapabilities(scope);
     const isInterTenantResearchAccess = requestedCapabilities.some((capability) =>

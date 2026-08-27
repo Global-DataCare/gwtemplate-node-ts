@@ -316,6 +316,42 @@ describe('Worker', () => {
     expect(mockDocumentReferenceManager.process).not.toHaveBeenCalled();
   });
 
+  it('routes the public digitaltwin ResearchSubject/_search contract to the twin manager', async () => {
+    const jobName = createJobName('health-care_acme', 'ResearchSubject', '_search');
+    const job: JobRequest = {
+      ...testCreateCustomerJobRequestProfessionalOnboarding,
+      tenantId: 'acme',
+      sector: 'health-care',
+      section: 'digitaltwin',
+      format: 'org.hl7.fhir.r4',
+      action: '_search',
+      resourceType: 'ResearchSubject',
+      contentType: 'application/json',
+      content: {
+        ...(testCreateCustomerJobRequestProfessionalOnboarding.content || {}),
+        thid: 'thid-twin-research-subject-search-001',
+        body: {
+          resourceType: 'Parameters',
+          parameter: [{ name: 'section', valueString: 'LOINC|10160-0' }],
+        },
+      } as any,
+    };
+    mockTwinCompositionManager.process.mockResolvedValue({
+      jti: 'research-subject-search-response',
+      type: 'transaction-response',
+      iss: API_BASE_URL,
+      aud: 'did:web:client.example.com',
+      thid: job.content?.thid as string,
+      body: { data: [] },
+    } as IDecodedDidcommPayload);
+    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'tenant-key' } as any);
+    mockKmsService.encodeResponse.mockResolvedValue('encrypted-research-subject-search-response');
+
+    await worker.process(jobName, job);
+
+    expect(mockTwinCompositionManager.process).toHaveBeenCalledWith(job);
+  });
+
   describe('Architecture Keeper Tests', () => {
     it('should ALWAYS use encodeResponse for legacy (JSON) requests, NEVER protectConfidentialData', async () => {
       // ARRANGE

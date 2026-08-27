@@ -4883,13 +4883,13 @@
         "x-profile": "core"
       }
     },
-    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_search": {
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search": {
       "post": {
         "tags": [
           "9. Research Digital Twin"
         ],
         "summary": "Search digital twins by IPS sections, clinical date range and text",
-        "description": "Submits an async section-first digital twin search request.\n\nPublic search intent:\n- the result artifact is `Composition`\n- repeated `section` parameters use OR semantics and each section may\n  span several resource families\n- inclusive `date-from` and non-empty `text` are required\n- inclusive `date-to` is optional; GW resolves an omitted value to\n  its current time for that request\n- text is matched case/accent-insensitively against a private derived\n  search document, not exposed clinical free text\n- internal matching may fan out to indexed resource families for the\n  requested section, but the response returns matched `Composition`\n  projections rather than leaf resources\n\nCurrent runtime rules:\n- request body should carry a FHIR `Parameters` resource\n- `section` is required\n- section OR, text and date constraints are combined with AND and\n  text/date must match the same clinical resource\n- matched subjects are deduplicated before returning Compositions\n- advanced resource-scoped filters remain compatibility input\n- poll completion on the existing `_batch-response` path with the\n  same `thid`\n",
+        "description": "Submits an async section-first digital twin search request.\n\nPublic search intent:\n- the result artifact is `ResearchSubject`\n- each match exposes `composition`, the canonical Composition GW\n  uses internally to index that ResearchSubject and connect its resources\n- repeated `section` parameters use OR semantics and each section may\n  span several resource families\n- inclusive `date-from` and non-empty `text` are required\n- inclusive `date-to` is optional; GW resolves an omitted value to\n  its current time for that request\n- text is matched case/accent-insensitively against a private derived\n  search document, not exposed clinical free text\n- internal matching may fan out to indexed resource families for the\n  requested section, but the response returns matched `ResearchSubject`\n  aggregates rather than leaf resources\n\nCurrent runtime rules:\n- request body should carry a FHIR `Parameters` resource\n- `section` is required\n- section OR, text and date constraints are combined with AND and\n  text/date must match the same clinical resource\n- matched subjects are deduplicated before returning ResearchSubjects\n- advanced resource-scoped filters remain compatibility input\n- poll completion on the existing `_batch-response` path with the\n  same `thid`\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -4940,6 +4940,50 @@
         "responses": {
           "202": {
             "description": "Accepted. Poll the `_batch-response` URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/ResearchSubject/_batch-response": {
+      "post": {
+        "tags": [
+          "9. Research Digital Twin"
+        ],
+        "summary": "Poll a ResearchSubject search submitted in FHIR API format",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed ResearchSubject search."
+          },
+          "202": {
+            "description": "Pending. Retry later."
           }
         },
         "x-profile": "core"
@@ -5066,13 +5110,13 @@
         "x-profile": "core"
       }
     },
-    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_search": {
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search": {
       "post": {
         "tags": [
           "9. Research Digital Twin"
         ],
         "summary": "Search strict FHIR R4 digital twins by sections, date range and text",
-        "description": "Same section-first digital twin search contract as\n`org.hl7.fhir.api/Composition/_search`, but with the versioned\nformat segment used by strict FHIR clients.\n",
+        "description": "Same section-first digital twin search contract as\n`org.hl7.fhir.api/ResearchSubject/_search`, but with the versioned\nformat segment used by strict FHIR clients.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -5118,6 +5162,50 @@
         "responses": {
           "202": {
             "description": "Accepted. Poll the `_batch-response` URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response": {
+      "post": {
+        "tags": [
+          "9. Research Digital Twin"
+        ],
+        "summary": "Poll a ResearchSubject search submitted in strict FHIR R4 format",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed ResearchSubject search."
+          },
+          "202": {
+            "description": "Pending. Retry later."
           }
         },
         "x-profile": "core"

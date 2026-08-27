@@ -903,21 +903,15 @@ describe('MedicationStatement API (integration)', () => {
       const searchByCodeThid = 'digitaltwin-medication-code-search-001';
       const codeSearchResp = await invokeExpress(app, {
         method: 'POST',
-        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: searchByCodeThid,
           body: {
-            data: [
-              {
-                type: 'MedicationStatement-search-request-v1.0',
-                meta: {
-                  claims: {
-                    '@context': 'org.hl7.fhir.api',
-                    'MedicationStatement.code': medicationCode,
-                  },
-                },
-              },
+            resourceType: 'Parameters',
+            parameter: [
+              { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
+              { name: 'MedicationStatement.code', valueString: medicationCode },
             ],
           },
         },
@@ -928,7 +922,7 @@ describe('MedicationStatement API (integration)', () => {
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
           method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/ResearchSubject/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: searchByCodeThid },
         });
@@ -939,8 +933,10 @@ describe('MedicationStatement API (integration)', () => {
         await new Promise((r) => setTimeout(r, 50));
       }
       expect(codeSearchPayload?.data?.[0]?.resource?.total).toBe(1);
-      expect(codeSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
-      expect(codeSearchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.api.MedicationStatement.subject']).toBe(twinSubjectId);
+      const matchedResearchSubject = codeSearchPayload?.data?.[0]?.resource?.data?.[0];
+      expect(matchedResearchSubject?.resourceType).toBe('ResearchSubject');
+      expect(matchedResearchSubject?.['ResearchSubject.identifier']).toBe(twinSubjectId);
+      expect(matchedResearchSubject?.composition).toBeDefined();
     } finally {
       queueAdapter.stop();
     }

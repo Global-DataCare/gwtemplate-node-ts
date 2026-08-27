@@ -468,7 +468,7 @@ export class TestResearchOrgControllerSdk {
  * Test-only facade that mirrors the high-level responsibilities expected from
  * a future `digitalTwinSdk`:
  * - obtain a SMART access token using the research contract proof
- * - search `digitaltwin/.../Composition/_search`
+ * - search `digitaltwin/.../ResearchSubject/_search` with FHIR Parameters
  * - consume the asynchronous bundle-response contract
  */
 export class TestResearchDigitalTwinSdk {
@@ -566,17 +566,17 @@ export class TestResearchDigitalTwinSdk {
     const searchThreadId = `${RESEARCH_ACCESS_TEST_IDS.compositionSearchThreadId}-${String(medicationCode || '').split('|').pop()}`;
     const submitResp = await invokeExpress(this.deps.app, {
       method: 'POST',
-      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_search`,
+      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search`,
       headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
       body: {
         thid: searchThreadId,
-        body: { data: [{
-          type: 'MedicationStatement-search-request-v1.0',
-          meta: { claims: {
-            '@context': 'org.hl7.fhir.api',
-            [RESEARCH_ACCESS_SEARCH_FIXTURE.codeClaim]: medicationCode,
-          } },
-        }] },
+        body: {
+          resourceType: 'Parameters',
+          parameter: [
+            { name: 'section', valueString: RESEARCH_ACCESS_SEARCH_FIXTURE.section },
+            { name: RESEARCH_ACCESS_SEARCH_FIXTURE.codeClaim, valueString: medicationCode },
+          ],
+        },
       },
     });
 
@@ -586,7 +586,7 @@ export class TestResearchDigitalTwinSdk {
 
     return pollAcceptedGatewayOperation({
       app: this.deps.app,
-      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/MedicationStatement/_batch-response`,
+      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/ResearchSubject/_batch-response`,
       thid: searchThreadId,
     });
   }

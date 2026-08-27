@@ -90,11 +90,13 @@ Record<string, readonly TwinCompositionProjectionConfig[]>
 });
 
 /**
- * Dedicated manager for digital twin `Composition` search semantics.
+ * Dedicated manager for public digital-twin `ResearchSubject` search.
  *
- * It owns the section-first fan-out from IPS summary sections to internal
- * resource-family collections and the claims-backed matching behavior used by
- * `digitaltwin/.../Composition/_search`.
+ * A ResearchSubject is the public digital twin aggregate. GW reuses its
+ * canonical Composition as the internal index document that joins the twin's
+ * projected clinical resources and exposes it as `composition` on each match.
+ * Both normal discovery and researcher tag/author filters therefore use the
+ * single public `digitaltwin/.../ResearchSubject/_search` contract.
  */
 export class TwinCompositionManager {
   constructor(
@@ -132,13 +134,19 @@ export class TwinCompositionManager {
           return true;
         }),
     });
+    const exposesResearchSubjects = String(job.resourceType || '').trim().toLowerCase() === 'researchsubject';
+    const publicMatches = exposesResearchSubjects
+      ? matches.map((composition) => this.toResearchSubjectMatch(composition))
+      : matches;
 
     const responseBundle: BundleJsonApi = {
       resourceType: ResourceTypesFhirR4.Bundle,
       type: BundleType.BatchResponse,
       data: [{
-        type: GatewayResponseEntryTypes.CompositionSearch,
-        resource: { total: matches.length, data: matches },
+        type: exposesResearchSubjects
+          ? GatewayResponseEntryTypes.ResearchSubjectSearch
+          : GatewayResponseEntryTypes.CompositionSearch,
+        resource: { total: publicMatches.length, data: publicMatches },
         response: { status: '200' },
       } as any],
       total: 1,
@@ -151,6 +159,25 @@ export class TwinCompositionManager {
       iss: job.content?.aud as string,
       aud: job.content?.iss as string,
       body: responseBundle,
+    };
+  }
+
+  /**
+   * Projects the internal canonical Composition as one public ResearchSubject.
+   * Compatibility claim fields remain at the top level so existing SDK readers
+   * can obtain the pseudonymous subject while migrating to the aggregate shape.
+   */
+  private toResearchSubjectMatch(composition: Record<string, any>): Record<string, any> {
+    const subject = this.normalizeReference(getClaimValue<string>(composition, 'Composition.subject'));
+    if (!subject) throw new Error('Digital twin canonical Composition is missing Composition.subject.');
+    const logicalId = subject.startsWith('urn:uuid:') ? subject.slice('urn:uuid:'.length) : subject;
+    return {
+      ...composition,
+      resourceType: 'ResearchSubject',
+      id: logicalId,
+      'ResearchSubject.identifier': subject,
+      'ResearchSubject.status': 'candidate',
+      composition,
     };
   }
 
@@ -171,7 +198,7 @@ export class TwinCompositionManager {
     filterMatchesBySectionsAndTypes: (matches: any[], requiredSections: string[], excludedSections: string[], requiredTypes: string[]) => any[];
   }): Promise<any[]> {
     if (!Array.isArray(params.requiredSections) || params.requiredSections.length === 0) {
-      throw new Error('digitaltwin Composition/_search requires at least one section filter.');
+      throw new Error('digitaltwin ResearchSubject/_search requires at least one section filter.');
     }
 
     const filters = this.collectSearchFilters(params.body);
@@ -189,10 +216,10 @@ export class TwinCompositionManager {
       if (match?.[1]) requestedResourceTypes.add(match[1]);
     }
     if (requestedResourceTypes.size === 0 && !basicSearch) {
-      throw new Error('digitaltwin Composition/_search requires at least one resource-scoped claim filter.');
+      throw new Error('digitaltwin ResearchSubject/_search requires at least one resource-scoped claim filter.');
     }
     if (requestedResourceTypes.size > 1) {
-      throw new Error('digitaltwin Composition/_search currently supports one resource type per request.');
+      throw new Error('digitaltwin ResearchSubject/_search currently supports one resource type per request.');
     }
 
     if (basicSearch) {

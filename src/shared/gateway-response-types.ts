@@ -13,6 +13,7 @@ export const GatewayResponseEntryTypes = Object.freeze({
   CommunicationSearch: 'Communication-search-response-v1.0',
   CompositionSearch: 'Composition-search-response-v1.0',
   DocumentReferenceSearch: 'DocumentReference-search-response-v1.0',
+  ResearchSubjectSearch: 'ResearchSubject-search-response-v1.0',
   OperationOutcome: 'OperationOutcome',
 } as const);
 

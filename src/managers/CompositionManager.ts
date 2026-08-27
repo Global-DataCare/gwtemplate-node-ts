@@ -80,7 +80,8 @@ export const IPS_ALL_SECTIONS_EXAMPLE_URL =
 
 /**
  * Internal subject-scoped storage collection ids used to fan out a digital
- * twin `Composition/_search` into resource-family indexes.
+ * twin `ResearchSubject/_search` into resource-family indexes through the
+ * ResearchSubject's canonical Composition.
  *
  * These are not IPS section tokens and they are not equivalent to
  * `HealthcareSummarySections`:

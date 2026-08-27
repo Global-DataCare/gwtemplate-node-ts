@@ -52,6 +52,9 @@ Verify current branches, versions and published npm state before release claims.
 - GW alone assigns and reuses the internal `Consent.identifier`; the BFF never generates, stores, sends or receives it.
 - Reusing the same source reference updates one rule. A different source reference creates a separate FHIR Consent.
 - Status lookup must include active deny rules; "active" is validity/period state and must not be confused with `decision=permit`.
+- Read status through an individual `Communication` carrying
+  `Subject/_search` FHIR Parameters. Consent is not part of clinical
+  `Bundle/_search`, and the individual Subject is not a twin ResearchSubject.
 
 ## Keep projection separate from consent
 
@@ -66,6 +69,20 @@ Verify current branches, versions and published npm state before release claims.
 
 ## Preserve MVP discovery and organization authorization
 
+- Use one public search contract for discovery and saved selections:
+  `digitaltwin/.../ResearchSubject/_search` with a FHIR `Parameters` body.
+- A ResearchSubject is the public twin aggregate. Its `composition` is the
+  canonical Composition GW uses internally to index it and connect its
+  projected resources; do not expose `Composition/_search` as the app contract.
+- `saveSelection(...)` selects a ResearchSubject. Its private persistence may
+  use a researcher-owned Composition, but `searchSelections(...)` reopens it
+  through the same public `ResearchSubject/_search` route.
+- For employee-specific selections, search with `section` plus
+  `Composition.meta-tag`; the SDK binds `Composition.author` to the employee
+  DID and GW verifies it against the authenticated SMART `sub`.
+- The default SMART reader scope is
+  `organization/ResearchSubject.rs?subject=*`; the SDK also completes an
+  explicitly supplied bare `organization/ResearchSubject.rs` to that form.
 - Basic search accepts one or more IPS section tokens, inclusive `date-from`,
   optional inclusive `date-to`, and non-empty `text`.
 - Sections use OR. Text and date use AND and must match the same clinical
@@ -80,6 +97,9 @@ Verify current branches, versions and published npm state before release claims.
 - Keep age range and host-wide aggregation out of the MVP.
 - Same-tenant access uses verified employee proof. Foreign access also needs a
   matching FHIR Contract VC and provider authorization.
+- Recover the full hosted organization DID from both `:employee:` and
+  `:member:` actor DIDs. A root `did:web` domain is only an alias/discovery
+  identity and must not turn a same-tenant employee into a foreign consumer.
 - Emit signer roles `provider-authorized-signatory` and
   `consumer-authorized-signatory`; accept `provider-controller` and
   `consumer-controller` only as deprecated read aliases.

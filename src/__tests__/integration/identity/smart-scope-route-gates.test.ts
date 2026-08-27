@@ -107,7 +107,7 @@ describe('SMART scope route gates (integration)', () => {
 
       const response = await invokeExpress(app, {
         method: 'POST',
-        url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/Composition/_search`,
+        url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search`,
         headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
         body: {
           thid: 'digitaltwin-scope-gate-001',

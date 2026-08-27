@@ -20,9 +20,8 @@ import {
  * 3. the provider ingests two medication-only fixtures for Novita
  * 3. the controller facade materializes the contract VC presentation
  * 4. a digital-twin facade asks GW for a SMART token with that proof
- * 5. the same digital-twin facade performs `Composition/_search` over the
- *    indexed document bundles for Doraemon and Novita and consumes the
- *    bundle-response payloads
+ * 5. the same digital-twin facade performs `ResearchSubject/_search` with
+ *    FHIR Parameters; each result is backed by its canonical Composition
  *
  * Internal smart-contract, queue, and policy plumbing stay inside GW.
  */
@@ -89,15 +88,14 @@ describe('Research access conversation (integration)', () => {
       );
 
       expect(compositionSearchPayload?.resourceType).toBe('Bundle');
-      expect(compositionSearchPayload?.data?.[0]?.type).toBe('MedicationStatement-search-response-v1.0');
+      expect(compositionSearchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
       expect(compositionSearchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
 
       const firstMatch = compositionSearchPayload?.data?.[0]?.resource?.data?.[0];
       expect(
-        firstMatch?.['MedicationStatement.subject']
-        || firstMatch?.['org.hl7.fhir.api.MedicationStatement.subject']
-        || firstMatch?.meta?.claims?.['MedicationStatement.subject']
-        || firstMatch?.meta?.claims?.['org.hl7.fhir.api.MedicationStatement.subject'],
+        firstMatch?.['ResearchSubject.identifier']
+        || firstMatch?.['Composition.subject']
+        || firstMatch?.composition?.['Composition.subject'],
       ).toMatch(/^urn:uuid:/);
 
       const novitaIbuprofenSearchPayload = await digitalTwinSdk.searchMedicationTwinsByCodeValue(
@@ -111,14 +109,13 @@ describe('Research access conversation (integration)', () => {
 
       for (const payload of [novitaIbuprofenSearchPayload, novitaParacetamolSearchPayload]) {
         expect(payload?.resourceType).toBe('Bundle');
-        expect(payload?.data?.[0]?.type).toBe('MedicationStatement-search-response-v1.0');
+        expect(payload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
         expect(payload?.data?.[0]?.resource?.total).toBe(1);
         const onlyMatch = payload?.data?.[0]?.resource?.data?.[0];
         expect(
-          onlyMatch?.['MedicationStatement.subject']
-          || onlyMatch?.['org.hl7.fhir.api.MedicationStatement.subject']
-          || onlyMatch?.meta?.claims?.['MedicationStatement.subject']
-          || onlyMatch?.meta?.claims?.['org.hl7.fhir.api.MedicationStatement.subject'],
+          onlyMatch?.['ResearchSubject.identifier']
+          || onlyMatch?.['Composition.subject']
+          || onlyMatch?.composition?.['Composition.subject'],
         ).toMatch(/^urn:uuid:/);
       }
 

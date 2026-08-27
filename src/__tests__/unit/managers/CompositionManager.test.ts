@@ -6,7 +6,7 @@ import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import {
   CompositionManager,
 } from '../../../managers/CompositionManager';
-import { TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG } from '../../../managers/TwinCompositionManager';
+import { TwinCompositionManager, TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG } from '../../../managers/TwinCompositionManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import {
@@ -65,6 +65,7 @@ describe('CompositionManager', () => {
   } as unknown as jest.Mocked<IVaultRepository>;
 
   const manager = new CompositionManager(mockVaultRepository);
+  const twinManager = new TwinCompositionManager(mockVaultRepository);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1009,6 +1010,58 @@ describe('CompositionManager', () => {
       expect(data[0].resource.data[0].id).toBe(expectedCompositionId);
     },
   );
+
+  it('exposes a ResearchSubject whose canonical Composition indexes the matching twin resources', async () => {
+    const subjectDid = REGISTERED_TWIN_SUBJECT;
+    const medicationSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'medications');
+    const compositionSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
+    mockVaultRepository.getAllSections.mockResolvedValue([medicationSectionId, compositionSectionId] as any);
+    mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
+      if (sectionId === medicationSectionId) {
+        return [{
+          id: 'medication-research-subject-001',
+          'MedicationStatement.subject': subjectDid,
+          'MedicationStatement.code': 'RXNORM|161',
+        }] as any;
+      }
+      if (sectionId === compositionSectionId) {
+        return [{
+          id: 'composition-research-subject-001',
+          'Composition.subject': subjectDid,
+          'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+          'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+        }] as any;
+      }
+      return [] as any;
+    });
+
+    const response = await twinManager.process(createJob({
+      resourceType: 'ResearchSubject',
+      action: '_search',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [
+            { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
+            { name: 'MedicationStatement.code', valueString: 'RXNORM|161' },
+          ],
+        },
+      } as any,
+    }));
+
+    const entry = (response.body as any).data[0];
+    expect(entry.type).toBe('ResearchSubject-search-response-v1.0');
+    expect(entry.resource.data[0]).toMatchObject({
+      resourceType: 'ResearchSubject',
+      'ResearchSubject.identifier': subjectDid,
+      'ResearchSubject.status': 'candidate',
+      composition: {
+        id: 'composition-research-subject-001',
+        'Composition.subject': subjectDid,
+      },
+    });
+  });
 
   it('supports digitaltwin Composition/_search by section plus MedicationStatement code-display and code-text together', async () => {
     const subjectDid = 'did:web:api.acme.org:research-subject:med-combo-001';

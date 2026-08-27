@@ -130,7 +130,10 @@ function buildAliasedIndividualSelfReadJob(vpToken: string): JobRequest {
   } as JobRequest;
 }
 
-function buildSameTenantDigitalTwinManager(): OpenIdAuthManager {
+function buildSameTenantDigitalTwinManager(
+  issuerDid = 'did:web:api.acme.org',
+  issuerAliases: string[] = [],
+): OpenIdAuthManager {
   const kmsService = {
     getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-sig-kid' }),
     signWithManagedKey: jest.fn().mockResolvedValue({
@@ -139,7 +142,7 @@ function buildSameTenantDigitalTwinManager(): OpenIdAuthManager {
     }),
   } as unknown as jest.Mocked<IKmsService>;
   const tenants = {
-    getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' }),
+    getDidDocument: jest.fn().mockResolvedValue({ id: issuerDid, alsoKnownAs: issuerAliases }),
     tenantExists: jest.fn().mockResolvedValue(true),
   } as unknown as jest.Mocked<TenantsCacheManager>;
   const vault = {
@@ -1370,20 +1373,42 @@ describe('OpenIdAuthManager', () => {
     expect(response.body.subject).toMatch(/^urn:uuid:/);
   });
 
-  it('issues DigitalTwinReader to a verified employee of the provider tenant without a consent rule', async () => {
-    const actorDid = 'did:web:api.acme.org:employee:zDoctorEmailHash:ISCO-08|2211';
+  it.each(['employee', 'member'])(
+    'issues DigitalTwinReader to a verified same-tenant %s DID without a research contract',
+    async (membershipMarker) => {
+      const organizationDid = 'did:web:api.acme.org:acme:cds-ES:v1:health-care';
+      const actorDid = `${organizationDid}:${membershipMarker}:zDoctorEmailHash:ISCO-08|2211`;
+      const vpToken = buildUnsignedProfessionalIdentityVpJwt({
+        clientId: actorDid,
+        actorDid,
+        role: 'ISCO-08|2211',
+      });
+
+      const response = await buildSameTenantDigitalTwinManager(organizationDid).process(
+        buildSameTenantDigitalTwinJob(actorDid, vpToken),
+      );
+
+      expect(response.body.access_token).toBeDefined();
+      expect(response.body.scope).toContain(ServiceCapability.DigitalTwinReader);
+    },
+  );
+
+  it('resolves a registered external organization alias before deciding access is inter-tenant', async () => {
+    const canonicalOrganizationDid = 'did:web:api.internal.example:acme:cds-ES:v1:health-care';
+    const externalOrganizationAlias = 'did:web:globaldatacare.es';
+    const actorDid = `${externalOrganizationAlias}:employee:zDoctorEmailHash:ISCO-08|2211`;
     const vpToken = buildUnsignedProfessionalIdentityVpJwt({
       clientId: actorDid,
       actorDid,
       role: 'ISCO-08|2211',
     });
 
-    const response = await buildSameTenantDigitalTwinManager().process(
-      buildSameTenantDigitalTwinJob(actorDid, vpToken),
-    );
+    const response = await buildSameTenantDigitalTwinManager(
+      canonicalOrganizationDid,
+      [externalOrganizationAlias],
+    ).process(buildSameTenantDigitalTwinJob(actorDid, vpToken));
 
     expect(response.body.access_token).toBeDefined();
-    expect(response.body.scope).toContain(ServiceCapability.DigitalTwinReader);
   });
 
   it('denies same-tenant DigitalTwinReader when the verified VP does not identify the requesting employee', async () => {

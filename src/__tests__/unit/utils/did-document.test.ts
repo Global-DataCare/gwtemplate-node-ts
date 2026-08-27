@@ -162,7 +162,7 @@ describe('populateDidDocumentServices', () => {
     const smartTokenService = allServices.find(s => s.id.endsWith('#identity:openid:smart:token'));
     const dspService = allServices.find(s => s.id.endsWith('#dsp-data-service'));
     const individualService = allServices.find(s => s.id.endsWith('#individual:org.hl7.fhir.r4:patient:_batch'));
-    const digitalTwinService = allServices.find(s => s.id.endsWith('#digitaltwin:org.hl7.fhir.r4:composition:_search'));
+    const digitalTwinService = allServices.find(s => s.id.endsWith('#digitaltwin:org.hl7.fhir.r4:researchsubject:_search'));
 
     expect(jwksService?.serviceEndpoint).toBe(
       'https://shared-runtime.example/participant-tenant/cds-ES/v1/health-care/jwks.json',
@@ -180,7 +180,7 @@ describe('populateDidDocumentServices', () => {
       'https://individual-runtime.example/participant-tenant/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Patient/_batch',
     );
     expect(digitalTwinService?.serviceEndpoint).toBe(
-      'https://individual-runtime.example/participant-tenant/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_search',
+      'https://individual-runtime.example/participant-tenant/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search',
     );
   });
 });

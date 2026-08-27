@@ -1964,7 +1964,7 @@ export function createApiRouter(
    *     responses:
    *       '202': { description: Accepted. Poll the Location URL for the result. }
    *
-   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_search:
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search:
    *   post:
    *     tags:
    *       - 9. Research Digital Twin
@@ -1973,7 +1973,9 @@ export function createApiRouter(
    *       Submits an async section-first digital twin search request.
    *
    *       Public search intent:
-   *       - the result artifact is `Composition`
+   *       - the result artifact is `ResearchSubject`
+   *       - each match exposes `composition`, the canonical Composition GW
+   *         uses internally to index that ResearchSubject and connect its resources
    *       - repeated `section` parameters use OR semantics and each section may
    *         span several resource families
    *       - inclusive `date-from` and non-empty `text` are required
@@ -1982,15 +1984,15 @@ export function createApiRouter(
    *       - text is matched case/accent-insensitively against a private derived
    *         search document, not exposed clinical free text
    *       - internal matching may fan out to indexed resource families for the
-   *         requested section, but the response returns matched `Composition`
-   *         projections rather than leaf resources
+   *         requested section, but the response returns matched `ResearchSubject`
+   *         aggregates rather than leaf resources
    *
    *       Current runtime rules:
    *       - request body should carry a FHIR `Parameters` resource
    *       - `section` is required
    *       - section OR, text and date constraints are combined with AND and
    *         text/date must match the same clinical resource
-   *       - matched subjects are deduplicated before returning Compositions
+   *       - matched subjects are deduplicated before returning ResearchSubjects
    *       - advanced resource-scoped filters remain compatibility input
    *       - poll completion on the existing `_batch-response` path with the
    *         same `thid`
@@ -2016,14 +2018,34 @@ export function createApiRouter(
    *     responses:
    *       '202': { description: Accepted. Poll the `_batch-response` URL for the result. }
    *
-   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_search:
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/ResearchSubject/_batch-response:
+   *   post:
+   *     tags:
+   *       - 9. Research Digital Twin
+   *     summary: Poll a ResearchSubject search submitted in FHIR API format
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed ResearchSubject search. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search:
    *   post:
    *     tags:
    *       - 9. Research Digital Twin
    *     summary: Search strict FHIR R4 digital twins by sections, date range and text
    *     description: |
    *       Same section-first digital twin search contract as
-   *       `org.hl7.fhir.api/Composition/_search`, but with the versioned
+   *       `org.hl7.fhir.api/ResearchSubject/_search`, but with the versioned
    *       format segment used by strict FHIR clients.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
@@ -2044,6 +2066,26 @@ export function createApiRouter(
    *       - BearerAuth: []
    *     responses:
    *       '202': { description: Accepted. Poll the `_batch-response` URL for the result. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response:
+   *   post:
+   *     tags:
+   *       - 9. Research Digital Twin
+   *     summary: Poll a ResearchSubject search submitted in strict FHIR R4 format
+   *     parameters:
+   *       - $ref: '#/components/parameters/AppId'
+   *       - $ref: '#/components/parameters/AppVersion'
+   *       - $ref: "#/components/parameters/TenantId"
+   *       - $ref: "#/components/parameters/Jurisdiction"
+   *       - $ref: "#/components/parameters/Sector"
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema: { $ref: '#/components/schemas/AsyncPollRequest' }
+   *     responses:
+   *       '202': { description: Pending. Retry later. }
+   *       '200': { description: Completed ResearchSubject search. }
    *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response:
    *   post:
