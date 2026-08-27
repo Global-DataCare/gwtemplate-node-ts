@@ -1057,6 +1057,7 @@ describe('CompositionManager', () => {
       'ResearchSubject.identifier': subjectDid,
       'ResearchSubject.status': 'candidate',
       composition: {
+        resourceType: 'Composition',
         id: 'composition-research-subject-001',
         'Composition.subject': subjectDid,
       },

@@ -166,6 +166,7 @@ export class TwinCompositionManager {
    * Projects the internal canonical Composition as one public ResearchSubject.
    * Compatibility claim fields remain at the top level so existing SDK readers
    * can obtain the pseudonymous subject while migrating to the aggregate shape.
+   * The nested index is an explicit FHIR Composition, not an untyped claims map.
    */
   private toResearchSubjectMatch(composition: Record<string, any>): Record<string, any> {
     const subject = this.normalizeReference(getClaimValue<string>(composition, 'Composition.subject'));
@@ -177,7 +178,7 @@ export class TwinCompositionManager {
       id: logicalId,
       'ResearchSubject.identifier': subject,
       'ResearchSubject.status': 'candidate',
-      composition,
+      composition: { ...composition, resourceType: 'Composition' },
     };
   }
 

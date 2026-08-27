@@ -1142,6 +1142,7 @@ describe('Composition Bundle _search API (integration)', () => {
         expect(searchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
         expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
         const firstMatch = searchPayload?.data?.[0]?.resource?.data?.[0];
+        expect(firstMatch?.composition?.resourceType).toBe('Composition');
         expect(
           firstMatch?.['Composition.subject']
           || firstMatch?.['org.hl7.fhir.r4.Composition.subject']
