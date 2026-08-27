@@ -1607,6 +1607,7 @@ export class HostingManager {
     requestedSector: string;
     resourceType: string;
   }): Promise<any> {
+    const hostDid = composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain);
     return forwardOrganizationVerificationTransactionToIcaExternal({
       ...input,
       organizationVerificationTransactionRequestType: ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST_TYPE,
@@ -1614,6 +1615,29 @@ export class HostingManager {
       hostJurisdiction: this.config.host.jurisdiction,
       buildIcaVerifyUrl: this.buildIcaVerifyUrl.bind(this),
       pollIcaJsonResult: this.pollIcaJsonResult.bind(this),
+      hostDid,
+      signHostAuthorizationPayload: async (payload) => {
+        const signingKey = await this.kmsService.getPublicVerificationKey('host', 'ES384', 'comm_sig');
+        const kid = String(signingKey?.kid || '').trim();
+        if (!kid) {
+          throw new ManagerError(
+            'GW host ES384 communication signing key is required for PDF-free ICA verification.',
+            IssueType.NotSupported,
+          );
+        }
+        return this.kmsService.createCompactJws(
+          payload,
+          kid,
+          'host',
+          'comm_sig',
+          {
+            typ: 'application/didcomm-signed+json',
+            cty: 'application/didcomm-plain+json',
+            alg: 'ES384',
+            kid: `${hostDid}#${kid}`,
+          },
+        );
+      },
     });
   }
 

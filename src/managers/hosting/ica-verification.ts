@@ -38,6 +38,8 @@ type ForwardOrganizationVerificationTransactionToIcaDeps = Readonly<{
   hostJurisdiction?: string;
   buildIcaVerifyUrl: (jurisdiction: string, sector: string, resourceType: string) => string;
   pollIcaJsonResult: (url: string, fallbackUrl?: string) => Promise<any>;
+  hostDid: string;
+  signHostAuthorizationPayload: (payload: Record<string, unknown>) => Promise<string>;
   fetchImpl?: typeof fetch;
 }>;
 
@@ -51,6 +53,8 @@ type ForwardOrganizationVerificationTransactionToIcaDeps = Readonly<{
  * - `202 Accepted` must be followed via polling until the final JSON payload arrives
  * - non-JSON success responses are tolerated and normalized to `{}` so callers can
  *   still continue with deterministic claim-side processing
+ * - when no PDF is present, GW signs the ICA route scope plus reprojected
+ *   resource as its own host DID so the authorization cannot move across routes
  */
 export async function forwardOrganizationVerificationTransactionToIca(
   deps: ForwardOrganizationVerificationTransactionToIcaDeps,
@@ -84,13 +88,27 @@ export async function forwardOrganizationVerificationTransactionToIca(
       },
     }],
   };
+  const translatedResource = translatedBody.data[0].resource;
+  const hostAuthorizationPayload = {
+    jurisdiction: String(deps.job.jurisdiction || deps.hostJurisdiction || 'ES').toUpperCase(),
+    sector: deps.requestedSector,
+    networkKind: String(deps.job.sector || '').toLowerCase(),
+    resourceType: deps.resourceType,
+    resource: translatedResource,
+  };
+  const hostAuthorizationProof = attachments.length
+    ? undefined
+    : { jws: await deps.signHostAuthorizationPayload(hostAuthorizationPayload) };
   const requestPayload = {
     jti: String(deps.job.content?.jti || uuidv4()),
     thid: String(deps.job.content?.thid || uuidv4()),
-    iss: deps.job.content?.iss,
+    iss: attachments.length ? deps.job.content?.iss : deps.hostDid,
     aud: 'ica',
     type: deps.job.content?.type || 'application/api+json',
-    body: translatedBody,
+    body: {
+      ...translatedBody,
+      ...(hostAuthorizationProof ? { hostAuthorizationProof } : {}),
+    },
     ...(attachments.length ? { attachments } : {}),
     ...(deps.job.content?.meta ? { meta: deps.job.content.meta } : {}),
   };
