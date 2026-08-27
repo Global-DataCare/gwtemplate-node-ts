@@ -45,6 +45,11 @@ the CORE tuple above. A currently active context is not evidence of the target.
 ## Mandatory gates
 
 - Commit and push intentional changes before building the release image.
+- Reusable SDK and utility packages must be exact npm registry releases.
+  Reject Git SSH/HTTPS, GitHub archives, workspace/file dependencies and
+  vendored tarballs; an image build must never require a developer SSH key.
+- Both Docker stages must use `npm ci` against the committed lockfile, never
+  recalculate the release graph with `npm install`.
 - Tag the local image `<package-version>-<short-commit-sha>`.
 - Run `docker_build_local.sh`; its context must be this repository, never the
   workspace root. Sibling source repositories must not enter the image.
