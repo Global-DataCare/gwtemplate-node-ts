@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { QueueAdapter } from '../adapters/queue';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { createJobName } from '../utils/naming';
+import { STRIPE_API_VERSION } from '../utils/stripe-api-version';
 
 /**
  * Creates a router for handling third-party webhooks, like Stripe.
@@ -26,7 +27,7 @@ export function createWebhooksRouter(queueAdapter: QueueAdapter): express.Router
     return router;
   }
 
-  const stripeClient = new stripe.Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-12-15.clover' });
+  const stripeClient = new stripe.Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: STRIPE_API_VERSION });
   const webhookSecret = process.env.STRIPE_WEBHOOK_SIGNING_SECRET;
 
 

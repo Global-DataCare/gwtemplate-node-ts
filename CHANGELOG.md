@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Centralizar la versión API de Stripe en `2026-02-25.clover`, compatible con
+  el SDK instalado, para desbloquear typecheck e imagen sin divergencias entre
+  webhook, Checkout, facturación y verificación de pagos.
+
 - Hacer auditable de extremo a extremo la incorporación de un proveedor de
   host: `HostingServiceCredential` obligatoria en las tres redes, grant de
   Fabric CA limitado a dos enrolamientos con ventana operativa, empaquetado

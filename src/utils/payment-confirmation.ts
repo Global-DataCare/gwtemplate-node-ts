@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
+import { STRIPE_API_VERSION } from './stripe-api-version';
 
 export const PAYMENT_ORCHESTRATION_MODE_GW_CORE = 'gw-core';
 export const PAYMENT_ORCHESTRATION_MODE_PORTAL_BFF = 'portal-bff';
@@ -75,7 +76,7 @@ async function verifyStripePaymentLive(
     throw new ManagerError('Stripe live payment verification requires STRIPE_SECRET_KEY.', IssueType.Required);
   }
   const stripeClient = stripeClientOverride
-    || new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-12-15.clover' });
+    || new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: STRIPE_API_VERSION });
   const refs = extractStripeReference(invoiceId, paymentUrl);
   const offerId = normalizeText(offerClaims[ClaimsOfferSchemaorg.identifier]);
   const tenantId = normalizeText(offerClaims[ClaimsOrganizationSchemaorg.alternateName]);

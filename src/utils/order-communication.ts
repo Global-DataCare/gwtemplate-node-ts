@@ -4,6 +4,7 @@
 import stripe from 'stripe';
 import { v4 as uuidv4 } from 'uuid';
 import { ClaimsOfferSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { STRIPE_API_VERSION } from './stripe-api-version';
 
 interface PaymentContext {
   offerId: string;
@@ -71,7 +72,7 @@ async function createStripeCheckoutUrl(
   if (!amount || amount <= 0) return '';
 
   const stripeClient = new stripe.Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2025-12-15.clover',
+    apiVersion: STRIPE_API_VERSION,
   });
 
   const session = await stripeClient.checkout.sessions.create({
@@ -113,7 +114,7 @@ async function createStripeInvoice(
   }
 
   const stripeClient = new stripe.Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2025-12-15.clover',
+    apiVersion: STRIPE_API_VERSION,
   });
 
   const customer = await stripeClient.customers.create({
