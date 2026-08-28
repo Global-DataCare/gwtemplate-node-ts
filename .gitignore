@@ -121,6 +121,13 @@ artifacts/**/fabric-ca-server-ica/ca-key.pem
 # Local Fabric toolchain downloads
 tools/
 
+# Reproducible Fabric local-network runtime state and private key material.
+infra/fabric/local-network/crypto/
+infra/fabric/local-network/organizations/
+infra/fabric/local-network/channel-artifacts/
+infra/fabric/local-network/.env.fabric-devnet
+infra/fabric/local-network/external-chaincodes/*/
+
 # Internal planning notes (keep local)
 _TODO-TASKS.md
 docs/_TODO-TASKS.md

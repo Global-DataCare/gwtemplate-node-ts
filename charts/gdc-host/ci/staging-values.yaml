@@ -1,0 +1,36 @@
+environment: staging
+networkMode: test-network
+host:
+  domain: host-st.example.invalid
+  publicUrl: https://host-st.example.invalid
+  legalName: Example Host staging
+  idValue: host-st.example.invalid
+  storageScope: host-st
+  allowedSectors: [onehealth-research]
+  identityChannel: identity-global
+  organizationIdentityChannel: identity-eu
+  dataChannel: health-care-eu
+gw:
+  image: registry.example.invalid/gw-core@sha256:1111111111111111111111111111111111111111111111111111111111111111
+  providers: { queue: mem, database: postgres, storage: ipfs, envelope: hashicorp-transit, replayProtection: mem }
+images:
+  init: registry.example.invalid/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
+peer:
+  enabled: true
+  image: registry.example.invalid/fabric-peer@sha256:3333333333333333333333333333333333333333333333333333333333333333
+  name: peer0-host-st
+  mspId: HOSTMSP
+  externalEndpoint: peer-st.example.invalid:7051
+  mspSecretName: host-st-peer-msp
+  tlsSecretName: host-st-peer-tls
+  couchdbSecretName: host-st-couchdb
+couchdb:
+  image: registry.example.invalid/couchdb@sha256:4444444444444444444444444444444444444444444444444444444444444444
+postgresql:
+  image: registry.example.invalid/postgres@sha256:5555555555555555555555555555555555555555555555555555555555555555
+ipfs:
+  image: registry.example.invalid/kubo@sha256:6666666666666666666666666666666666666666666666666666666666666666
+chaincodes:
+  - name: organization-sc
+    image: registry.example.invalid/organization-sc@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: organization-sc:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

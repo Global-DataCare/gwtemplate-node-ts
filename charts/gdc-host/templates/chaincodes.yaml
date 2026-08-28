@@ -1,0 +1,51 @@
+{{- range .Values.chaincodes }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gdc-host.fullname" $ }}-cc-{{ .name }}
+  labels:
+    {{- include "gdc-host.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: chaincode
+    host.dataspace.example/chaincode: {{ .name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: chaincode
+      host.dataspace.example/chaincode: {{ .name }}
+  template:
+    metadata:
+      labels:
+        {{- include "gdc-host.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: chaincode
+        host.dataspace.example/chaincode: {{ .name }}
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: chaincode
+          image: {{ .image | quote }}
+          env:
+            - { name: CHAINCODE_SERVER_ADDRESS, value: "0.0.0.0:9999" }
+            - { name: CHAINCODE_ID, value: {{ .packageId | quote }} }
+          ports: [{ name: grpc, containerPort: 9999 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gdc-host.fullname" $ }}-cc-{{ .name }}
+  labels:
+    {{- include "gdc-host.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: chaincode
+    host.dataspace.example/chaincode: {{ .name }}
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: chaincode
+    host.dataspace.example/chaincode: {{ .name }}
+  ports: [{ name: grpc, port: 9999, targetPort: grpc }]
+{{- end }}

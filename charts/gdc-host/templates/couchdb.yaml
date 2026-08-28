@@ -1,0 +1,55 @@
+{{- if and .Values.peer.enabled .Values.couchdb.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "gdc-host.couchdbService" . }}
+  labels:
+    {{- include "gdc-host.labels" . | nindent 4 }}
+    app.kubernetes.io/component: couchdb
+spec:
+  serviceName: {{ include "gdc-host.couchdbService" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: couchdb
+  template:
+    metadata:
+      labels:
+        {{- include "gdc-host.labels" . | nindent 8 }}
+        app.kubernetes.io/component: couchdb
+    spec:
+      containers:
+        - name: couchdb
+          image: {{ .Values.couchdb.image | quote }}
+          env:
+            - name: COUCHDB_USER
+              valueFrom: { secretKeyRef: { name: {{ .Values.peer.couchdbSecretName }}, key: username } }
+            - name: COUCHDB_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ .Values.peer.couchdbSecretName }}, key: password } }
+          ports: [{ name: couchdb, containerPort: 5984 }]
+          volumeMounts: [{ name: couchdb-data, mountPath: /opt/couchdb/data }]
+          resources:
+            {{- toYaml .Values.couchdb.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata: { name: couchdb-data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.couchdb.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources: { requests: { storage: {{ .Values.couchdb.persistence.size }} } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gdc-host.couchdbService" . }}
+  labels:
+    {{- include "gdc-host.labels" . | nindent 4 }}
+    app.kubernetes.io/component: couchdb
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: couchdb
+  ports: [{ name: couchdb, port: 5984, targetPort: couchdb }]
+{{- end }}

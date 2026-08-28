@@ -1,0 +1,20 @@
+FROM node:22-bookworm-slim
+
+WORKDIR /usr/src/chaincode
+
+ARG CHAINCODE_DIR
+COPY ${CHAINCODE_DIR}/package.json ${CHAINCODE_DIR}/package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+COPY ${CHAINCODE_DIR}/index.js ./
+COPY ${CHAINCODE_DIR}/lib ./lib
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
+ENV NODE_ENV=production
+ENV CHAINCODE_SERVER_ADDRESS=0.0.0.0:9999
+ENV CORE_PEER_TLS_ENABLED=false
+EXPOSE 9999
+
+USER node
+ENTRYPOINT ["./docker-entrypoint.sh"]

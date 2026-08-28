@@ -1,0 +1,51 @@
+# Reproducible render profile for the funding-deliverable storage boundary.
+# Replace every example digest and create the named Secrets before installation.
+environment: local
+networkMode: local-network
+fullnameOverride: host-evidence
+host:
+  domain: host-evidence.localhost
+  publicUrl: http://host-evidence.localhost
+  legalName: Local evidence host
+  jurisdiction: ES
+  idType: DOMAIN
+  idValue: host-evidence.localhost
+  storageScope: host-evidence
+  allowedSectors: [health-care, onehealth-research]
+  identityChannel: identity-local
+  organizationIdentityChannel: identity-local
+  dataChannel: health-care-local
+gw:
+  image: registry.example.invalid/gw-core@sha256:1111111111111111111111111111111111111111111111111111111111111111
+  existingSecret: host-evidence-gw
+  service: { type: ClusterIP, port: 80 }
+  ingress: { enabled: false, className: "", annotations: {}, tlsSecretName: "" }
+  providers: { queue: mem, database: postgres, storage: ipfs, envelope: local, replayProtection: mem }
+  authTokenVerifier: demo
+  securityMode: demo
+  didcommPlain: "true"
+images:
+  init: registry.example.invalid/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
+peer:
+  enabled: true
+  image: registry.example.invalid/fabric-peer@sha256:3333333333333333333333333333333333333333333333333333333333333333
+  name: peer0-host-evidence
+  mspId: Host1MSP
+  externalEndpoint: host-evidence-peer.local-host-evidence.svc.cluster.local:7051
+  mspSecretName: host-evidence-peer-msp
+  tlsSecretName: host-evidence-peer-tls
+  couchdbSecretName: host-evidence-couchdb
+  service: { type: ClusterIP, port: 7051 }
+couchdb:
+  enabled: true
+  image: registry.example.invalid/couchdb@sha256:4444444444444444444444444444444444444444444444444444444444444444
+postgresql:
+  enabled: true
+  image: registry.example.invalid/postgres@sha256:5555555555555555555555555555555555555555555555555555555555555555
+  existingSecret: host-evidence-postgresql
+  database: gw
+ipfs:
+  enabled: true
+  image: registry.example.invalid/kubo@sha256:6666666666666666666666666666666666666666666666666666666666666666
+redis: { enabled: false }
+chaincodes: []

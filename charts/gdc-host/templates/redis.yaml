@@ -1,0 +1,55 @@
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "gdc-host.redisService" . }}
+  labels:
+    {{- include "gdc-host.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  serviceName: {{ include "gdc-host.redisService" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "gdc-host.labels" . | nindent 8 }}
+        app.kubernetes.io/component: redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image | quote }}
+          command: [sh, -c]
+          args: ["exec redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\""]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ .Values.redis.existingSecret }}, key: REDIS_PASSWORD } }
+          ports: [{ name: redis, containerPort: 6379 }]
+          volumeMounts: [{ name: redis-data, mountPath: /data }]
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata: { name: redis-data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.redis.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources: { requests: { storage: {{ .Values.redis.persistence.size }} } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gdc-host.redisService" . }}
+  labels:
+    {{- include "gdc-host.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: redis
+  ports: [{ name: redis, port: 6379, targetPort: redis }]
+{{- end }}

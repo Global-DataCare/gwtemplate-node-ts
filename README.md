@@ -1,5 +1,9 @@
 # Gateway Template - Node.js & TypeScript
 
+La guía pública en español para reproducir el host completo con Docker,
+Fabric, ICA, chaincodes, PostgreSQL/IPFS y Helm está en
+[`ENTREGABLE-HOST-REPRODUCIBLE.md`](./ENTREGABLE-HOST-REPRODUCIBLE.md).
+
 ([test-api](https://globaldatacare-test-961105121121.europe-southwest1.run.app/api-docs/))
 
 This repository provides a robust, asynchronous, and policy-driven API gateway template.
@@ -785,18 +789,19 @@ DEMO_ALLOW_INSECURE_BEARER=false
 ```
 
 For a deterministic Fabric v3 devnet (DEMO single-host or multi-org), see:
-- `../fabric-multicloud/devnet/fabric-v3/README.md`
+- `infra/fabric/local-network/README.md`
 - local audit/operator profile in this repo: `docs-v2/24-local-audit-fabric-runtime.md`
 
 Before a local-network image smoke, verify that its packaged organization/key
-chaincode mirror matches the canonical CCAAS source in `fabric-multicloud`:
+chaincode mirror matches the canonical public CCAAS source in this repository:
 
 ```bash
 npm run check:identity-chaincode-parity
 ```
 
 For the multi-cloud Fabric deployment plan and scripts, see:
-- `../fabric-multicloud/README.md`
+- `ENTREGABLE-HOST-REPRODUCIBLE.md`
+- `charts/gdc-host/README.md`
 - `docs/04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md`
 
 Local (minikube/k3s) is test-only and documented in:

@@ -1,0 +1,41 @@
+environment: local
+networkMode: local-network
+fullnameOverride: host1
+host:
+  domain: host1.localhost
+  publicUrl: http://host1.localhost
+  legalName: Local Host 1
+  idValue: host1.localhost
+  storageScope: host1
+  allowedSectors: [onehealth-research]
+  identityChannel: identity-local
+  organizationIdentityChannel: identity-local
+  dataChannel: health-care-local
+gw:
+  image: registry.example.invalid/gw-core@sha256:1111111111111111111111111111111111111111111111111111111111111111
+  existingSecret: host1-gw
+  service: { type: ClusterIP, port: 80 }
+  ingress: { enabled: false, className: "", annotations: {}, tlsSecretName: "" }
+  providers: { queue: mem, database: mem, storage: mem, envelope: local, replayProtection: mem }
+  authTokenVerifier: demo
+  securityMode: compat
+  didcommPlain: "true"
+images:
+  init: registry.example.invalid/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
+peer:
+  enabled: true
+  image: registry.example.invalid/fabric-peer@sha256:3333333333333333333333333333333333333333333333333333333333333333
+  name: peer0-host1
+  mspId: Host1MSP
+  externalEndpoint: host1-peer.local-host1.svc.cluster.local:7051
+  mspSecretName: host1-peer-msp
+  tlsSecretName: host1-peer-tls
+  couchdbSecretName: host1-couchdb
+  service: { type: ClusterIP, port: 7051 }
+couchdb:
+  enabled: true
+  image: registry.example.invalid/couchdb@sha256:4444444444444444444444444444444444444444444444444444444444444444
+postgresql: { enabled: false }
+ipfs: { enabled: false }
+redis: { enabled: false }
+chaincodes: []

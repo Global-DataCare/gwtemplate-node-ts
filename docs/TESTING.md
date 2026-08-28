@@ -54,12 +54,18 @@ Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-cl
     - If you need a different profile, set `JEST_ENV_FILE=<filename>` before running the E2E suite.
     - Firestore E2E runs only when `FIRESTORE_E2E=true` and either `FIRESTORE_EMULATOR_HOST` or valid Google credentials are present.
     - GCS E2E runs only when `GCS_E2E=true` and `GCS_BUCKET_NAME` is set.
-    - The open-source acceptance profile is `npm run docker:smoke:open-source-local-network`.
+    - The Docker acceptance profile is `npm run docker:smoke:open-source-local-network`.
       It runs the exact GW image with Fabric `local-network`, PostgreSQL and
       IPFS/Kubo in Docker, verifies persisted confidential JWE blobs and checks
       host and tenant recovery after a GW restart. The in-memory local-network
       smoke remains a faster development check but is not the final
       reproducibility evidence.
+    - The complementary Kubernetes gate is
+      `IMAGE_NAME="gw-core:<version>-<commit>" npm run helm:smoke:local-network`.
+      It creates an isolated kind cluster and executes the same GW,
+      PostgreSQL/IPFS and Fabric E2E through a Helm release. `npm run
+      helm:test:host` is the static chart contract, not a substitute for this
+      runtime gate.
     - A project deliverable that claims governed participant onboarding must
       also reproduce the trust control plane. Run the offline `dataspace-ca-ts`
       tests and bootstrap/publish a disposable local Root/issuer trust tree,
@@ -115,23 +121,8 @@ Fabric members are `Host1MSP` and `Host2MSP`; VAT-addressed tenant
 Organizations are not Fabric MSPs. The manifest records repository commits,
 the exact image ID, public CA artifacts, gate statuses and SHA-256 hashes
 without copying CA private keys, Fabric enrollment secrets or the local KEK.
-The human-only production projection routes EU Organizations/employees to
-`identity-eu` and individuals to `identity-global`; animal/veterinary channels
-are outside this evidence scope.
-
-The presentation-grade aggregate gate is:
-
-```bash
-IMAGE_NAME="gw-core:<version>-<commit>" \
-  npm run evidence:open-source-production-readiness
-```
-
-It adds the governed host boundary to the trust and runtime gates. The local
-Fabric members are `Host1MSP` and `Host2MSP`; VAT-addressed tenant
-Organizations are not Fabric MSPs. The resulting manifest records repository
-commits, the exact image ID, public CA artifacts, gate statuses and SHA-256
-hashes without copying CA private keys, Fabric enrollment secrets or the local
-runtime KEK.
+The production projection routes EU Organizations/employees to `identity-eu`
+and individuals to `identity-global`.
 
 ### 5.1 Terminology That Must Not Be Mixed
 
@@ -142,7 +133,7 @@ runtime KEK.
 - `HOST_NETWORK`:
   host runtime/network selector such as `test`, `test-network`, `network`
 - `SECTOR`:
-  tenant business sector such as `health-care` or `veterinary`
+  tenant business sector such as `health-care` or another approved token
 
 If you confuse those four values, the test may fail with misleading `404`,
 `415`, or ICA routing errors even when the application code is correct.
@@ -262,8 +253,8 @@ npm run test:e2e:live-gw
 
 Transport note:
 
-- some shared staging profiles, including veterinary slices, may still admit
-  non-secure DIDComm or even legacy FHIR transport
+- some shared staging profiles may still admit non-secure DIDComm or even
+  legacy FHIR transport
 - do not assume that for legal-organization host onboarding
 - verify the actual deployed `SECURITY_MODE` of the target host before treating
   plaintext transport as canonical

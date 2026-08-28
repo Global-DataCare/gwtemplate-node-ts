@@ -1,0 +1,63 @@
+{{- if and (eq .Values.environment "production") (ne .Values.networkMode "network") -}}
+{{- fail "production requires networkMode=network" -}}
+{{- end -}}
+{{- if and (eq .Values.environment "production") (empty .Values.authorization.existingSecret) -}}
+{{- fail "production requires authorization.existingSecret created from a verified host authorization result" -}}
+{{- end -}}
+{{- if and (eq .Values.environment "staging") (ne .Values.networkMode "test-network") -}}
+{{- fail "staging requires networkMode=test-network" -}}
+{{- end -}}
+{{- if and (eq .Values.environment "local") (ne .Values.networkMode "local-network") -}}
+{{- fail "local requires networkMode=local-network" -}}
+{{- end -}}
+{{- if and (ne .Values.environment "local") (not (empty .Values.gw.localImage)) -}}
+{{- fail "gw.localImage is restricted to local evidence; staging and production require gw.image by digest" -}}
+{{- end -}}
+{{- if and (ne .Values.environment "local") (not (hasPrefix "https://" .Values.host.publicUrl)) -}}
+{{- fail "staging and production require an https host.publicUrl" -}}
+{{- end -}}
+{{- if and (eq .Values.environment "production") (not .Values.peer.enabled) -}}
+{{- fail "production requires a host-owned peer; a staging external peer is forbidden" -}}
+{{- end -}}
+{{- if and (not .Values.peer.enabled) (not .Values.externalPeer.host) -}}
+{{- fail "peer.enabled=false requires externalPeer.host" -}}
+{{- end -}}
+{{- if and (eq .Values.environment "production") (or (eq .Values.gw.providers.envelope "local") (eq .Values.gw.providers.envelope "memory")) -}}
+{{- fail "production requires external KEK custody: gcp-kms or hashicorp-transit" -}}
+{{- end -}}
+{{- if and (eq .Values.environment "production") (ne (int .Values.gw.replicas) 1) -}}
+{{- fail "production currently requires gw.replicas=1 because GW CORE queue processing is process-local" -}}
+{{- end -}}
+{{- if and .Values.gw.enabled (eq .Values.gw.providers.database "postgres") (not .Values.postgresql.enabled) -}}
+{{- fail "DB_PROVIDER=postgres requires postgresql.enabled=true" -}}
+{{- end -}}
+{{- if and .Values.gw.enabled (eq .Values.gw.providers.storage "ipfs") (not .Values.ipfs.enabled) -}}
+{{- fail "STORAGE_PROVIDER=ipfs requires ipfs.enabled=true" -}}
+{{- end -}}
+{{- if and .Values.gw.enabled (eq .Values.gw.providers.replayProtection "redis") (not .Values.redis.enabled) -}}
+{{- fail "REPLAY_PROTECTION_PROVIDER=redis requires redis.enabled=true" -}}
+{{- end -}}
+{{- $zeroDigest := "@sha256:0000000000000000000000000000000000000000000000000000000000000000" -}}
+{{- if and .Values.gw.enabled (contains $zeroDigest .Values.gw.image) -}}
+{{- fail "gw.image still contains the unresolved zero-digest placeholder" -}}
+{{- end -}}
+{{- if and .Values.peer.enabled (contains $zeroDigest .Values.peer.image) -}}
+{{- fail "peer.image still contains the unresolved zero-digest placeholder" -}}
+{{- end -}}
+{{- if and .Values.peer.enabled .Values.couchdb.enabled (contains $zeroDigest .Values.couchdb.image) -}}
+{{- fail "couchdb.image still contains the unresolved zero-digest placeholder" -}}
+{{- end -}}
+{{- if and .Values.postgresql.enabled (contains $zeroDigest .Values.postgresql.image) -}}
+{{- fail "postgresql.image still contains the unresolved zero-digest placeholder" -}}
+{{- end -}}
+{{- if and .Values.ipfs.enabled (contains $zeroDigest .Values.ipfs.image) -}}
+{{- fail "ipfs.image still contains the unresolved zero-digest placeholder" -}}
+{{- end -}}
+{{- if and .Values.redis.enabled (contains $zeroDigest .Values.redis.image) -}}
+{{- fail "redis.image still contains the unresolved zero-digest placeholder" -}}
+{{- end -}}
+{{- range .Values.chaincodes -}}
+{{- if contains $zeroDigest .image -}}
+{{- fail (printf "chaincode %s still contains the unresolved zero-digest placeholder" .name) -}}
+{{- end -}}
+{{- end -}}

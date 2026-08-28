@@ -15,6 +15,7 @@ test('manifest separates host MSP membership from VAT-addressed tenants', () => 
   const manifest = buildEvidenceManifest({
     evidenceDir,
     imageName: 'gw-core:test',
+    repositoryRoots: [process.cwd()],
     now: new Date('2026-08-24T00:00:00.000Z'),
     imageInspector: (name) => ({
       name,
@@ -28,7 +29,8 @@ test('manifest separates host MSP membership from VAT-addressed tenants', () => 
   assert.match(manifest.localNetwork.tenantBoundary, /not Fabric MSPs/);
   assert.equal(manifest.productionChannelProjection.euOrganizationsAndEmployees, 'identity-eu');
   assert.equal(manifest.productionChannelProjection.humanIndividuals, 'identity-global');
-  assert.match(manifest.productionChannelProjection.excludedScope, /animal/);
+  assert.equal('excludedScope' in manifest.productionChannelProjection, false);
+  assert.equal(manifest.repositories.some((repository) => repository.name === 'fabric-multicloud'), false);
   assert.equal(manifest.gates[0].status, 'PASS');
   assert.match(manifest.artifacts[0].sha256, /^[a-f0-9]{64}$/);
   assert.equal('privateKey' in manifest, false);

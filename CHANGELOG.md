@@ -3,8 +3,24 @@
 ## [Unreleased]
 
 - Document the temporary shared `legacy-v1` Firestore/KEK custody boundary
-  between CORE development and Accuro staging separately from their distinct
+  between CORE development and a hosting-provider staging deployment, separately from their distinct
   token-verification modes.
+- Hacer autocontenido el entregable SEDIA del host en el repositorio público de
+  GW CORE: incluye la red Fabric `local-network` de dos hosts, los scripts
+  genéricos de autorización, enrolamiento y reconciliación, y el chart Helm
+  reutilizable `gdc-host`, sin depender de infraestructura privada.
+- Añadir una prueba real y aislada con kind/Helm: carga la imagen GW ya probada,
+  despliega PostgreSQL/IPFS, repite los recorridos E2E de Consent y SMART sobre
+  Fabric y demuestra recuperación tras reinicio. `helm template` se conserva
+  como contrato estático independiente.
+- Enrutar los enrolamientos reproducibles de peers y orderers mediante la ICA
+  de Fabric y verificar las cadenas MSP y TLS contra la Root desechable y su
+  certificado intermedio.
+- Incluir en la evidencia agregada el contrato sin PDF de host preautorizado de
+  la ICA del espacio de datos, con emisión comprobada de
+  `HostingServiceCredential` como VC JSON y VC-JWT, sin inventar evidencia PDF.
+- Eliminar rutas absolutas de desarrollador de comandos y pruebas locales; los
+  ejemplos portables resuelven desde `${HOME}`.
 
 - Make `iss` and `aud` the canonical trusted-provider configuration names,
   retain non-conflicting `issuer`/`audience` aliases, and fail startup when the

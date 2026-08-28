@@ -10,9 +10,10 @@ import https from 'node:https';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
 const fabricDevnetRoot = resolve(
-  process.env.FABRIC_DEVNET_ROOT || resolve(repoRoot, '../fabric-multicloud/devnet/fabric-v3'),
+  process.env.FABRIC_DEVNET_ROOT || resolve(repoRoot, 'infra/fabric/local-network'),
 );
 const defaultEnvFile = resolve(repoRoot, '.env.local-fabric');
+const baseEnvFile = resolve(process.env.LOCAL_DEMO_ENV_FILE || resolve(repoRoot, '.env.local-demo'));
 const logsRoot = resolve(repoRoot, 'logs');
 const runId = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
 const runLogDir = join(logsRoot, `local-fabric-stack-${runId}`);
@@ -51,8 +52,8 @@ if (!args.hostJurisdiction && envFileValues.HOST_JURISDICTION) {
 }
 
 async function main() {
-  requirePath(fabricDevnetRoot, 'Missing sibling Fabric devnet repo');
-  requirePath(resolve(repoRoot, '.env.local-demo'), 'Missing .env.local-demo');
+  requirePath(fabricDevnetRoot, 'Missing bundled Fabric local-network infrastructure');
+  requirePath(baseEnvFile, 'Missing local demo base environment');
   if (!['dev', 'dataspace-ca'].includes(config.fabricCaSource)) {
     throw new Error('LOCAL_FABRIC_CA_SOURCE must be dev or dataspace-ca.');
   }
@@ -64,7 +65,9 @@ async function main() {
       '-lc',
       [
         'docker compose down -v --remove-orphans || true',
-        'docker rm -f consentaccess-sc >/dev/null 2>&1 || true',
+        'docker rm -f gdc-orderer gdc-peer0-host1 gdc-peer0-host2 gdc-fabric-tools gdc-fabric-ca-client gdc-ica gdc-root-ca consentaccess-sc >/dev/null 2>&1 || true',
+        'for attempt in $(seq 1 30); do remaining=false; for container in gdc-orderer gdc-peer0-host1 gdc-peer0-host2 gdc-fabric-tools gdc-fabric-ca-client gdc-ica gdc-root-ca; do docker container inspect "$container" >/dev/null 2>&1 && remaining=true; done; [ "$remaining" = false ] && break; [ "$attempt" != 30 ] || exit 1; sleep 1; done',
+        'for container in $(docker ps -aq --filter name=^/dev-peer0-host); do docker rm -f "$container" >/dev/null 2>&1 || true; done',
         'docker volume rm -f gdc-fabric-v3-devnet_orderer-data gdc-fabric-v3-devnet_peer0-host1-data gdc-fabric-v3-devnet_peer0-host2-data >/dev/null 2>&1 || true',
       ].join('; '),
     ],
@@ -104,8 +107,6 @@ async function main() {
     command: 'bash',
     args: ['./scripts/02-bootstrap-network.sh'],
     env: {
-      CA_HOST: 'root-ca',
-      CA_TLS_CERT: '/workspace/crypto/ca/root/ca-cert.pem',
       HLF_DATA_CHANNEL_NAME: config.dataChannel,
       HLF_IDENTITY_CHANNEL_NAME: config.identityChannel,
       HLF_BOOTSTRAP_CHANNELS: `${config.identityChannel},${config.dataChannel}`,

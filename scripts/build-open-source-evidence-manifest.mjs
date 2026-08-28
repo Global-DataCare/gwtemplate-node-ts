@@ -93,14 +93,14 @@ export function buildEvidenceManifest({
   imageName,
   now = new Date(),
   imageInspector = inspectImage,
+  repositoryRoots = [
+    gwRoot,
+    resolve(process.env.DATASPACE_CA_ROOT || resolve(workspaceRoot, 'dataspace-ca-ts')),
+    resolve(process.env.DATASPACE_ICA_ROOT || resolve(workspaceRoot, 'dataspace-ica-ts')),
+  ],
 }) {
   const resolvedEvidenceDir = resolve(evidenceDir);
-  const repositories = [
-    gwRoot,
-    resolve(workspaceRoot, 'dataspace-ca-ts'),
-    resolve(workspaceRoot, 'dataspace-ica-ts'),
-    resolve(workspaceRoot, 'fabric-multicloud'),
-  ].map(repositoryEvidence);
+  const repositories = repositoryRoots.map(repositoryEvidence);
   const artifacts = listFiles(resolvedEvidenceDir)
     .map((file) => ({
       path: relative(resolvedEvidenceDir, file),
@@ -130,7 +130,6 @@ export function buildEvidenceManifest({
       euOrganizationsAndEmployees: 'identity-eu',
       humanIndividuals: 'identity-global',
       euHealthData: 'health-care-eu',
-      excludedScope: 'animal identity, veterinary services and animal channels',
     },
     humanAccessProof: {
       hostedRoutes: ['entity', 'individual'],

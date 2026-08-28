@@ -5,14 +5,13 @@ set -euo pipefail
 # Consent Access CCAAS local devnet deployer
 #
 # This script prepares, installs and commits the `consentaccess-sc` chaincode as
-# an external service on the local Fabric v3 devnet that lives in:
-#   fabric-multicloud/devnet/fabric-v3
+# an external service on the bundled public Fabric local-network.
 #
 # The script is intentionally explicit so a developer who does not know Fabric
 # can follow each step and override only a few variables when needed.
 #
 # Important local assumptions:
-# - the real source of truth is the sibling repo `fabric-multicloud`
+# - the real source of truth is this repository's public local-network
 # - the local devnet channel for consent access is `health-care-local`
 # - the smart contract is deployed as CCAAS, not as in-peer chaincode
 # - `weft` is optional here; when it is missing this script builds the standard
@@ -22,10 +21,10 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORKSPACE_ROOT="$(cd "${ROOT}/../.." && pwd)"
+REPO_ROOT="$(cd "${ROOT}/.." && pwd)"
 CHAINCODE_DIR="${ROOT}/consentaccess-sc-javascript"
-DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${WORKSPACE_ROOT}/fabric-multicloud/devnet/fabric-v3}"
-ENSURE_DEVNET_ENV_SCRIPT="${WORKSPACE_ROOT}/gwtemplate-node-ts/scripts/ensure-fabric-devnet-env.sh"
+DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${REPO_ROOT}/infra/fabric/local-network}"
+ENSURE_DEVNET_ENV_SCRIPT="${REPO_ROOT}/scripts/ensure-fabric-devnet-env.sh"
 
 CHANNEL_NAME="${CHANNEL_NAME:-${HLF_DATA_CHANNEL_NAME:-health-care-local}}"
 CHAINCODE_NAME="${CHAINCODE_NAME:-consentaccess-sc}"
@@ -126,6 +125,9 @@ EOF
 }
 
 function build_chaincode_artifacts() {
+  info "Installing exact consentaccess-sc dependencies"
+  (cd "${CHAINCODE_DIR}" && npm ci)
+
   info "Running unit tests for consentaccess-sc"
   (cd "${CHAINCODE_DIR}" && npm test)
 

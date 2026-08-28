@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${ROOT}/../fabric-multicloud/devnet/fabric-v3}"
-BASE_ENV="${ROOT}/.env.local-demo"
+DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${ROOT}/infra/fabric/local-network}"
+BASE_ENV="${LOCAL_DEMO_ENV_FILE:-${ROOT}/.env.local-demo}"
 OUT_ENV="${ROOT}/.env.local-fabric"
 LEGACY_OUT_ENV="${ROOT}/.env.local-fabric-devnet"
 DEVNET_ENV="${DEVNET_ROOT}/.env.fabric-devnet"

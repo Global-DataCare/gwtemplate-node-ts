@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["environment", "networkMode", "host", "gw", "peer", "images"],
+  "properties": {
+    "environment": { "type": "string", "enum": ["local", "staging", "production"] },
+    "networkMode": { "type": "string", "enum": ["local-network", "test-network", "network"] },
+    "authorization": {
+      "type": "object",
+      "required": ["existingSecret", "key"],
+      "properties": {
+        "existingSecret": { "type": "string" },
+        "key": { "type": "string", "minLength": 1 }
+      }
+    },
+    "host": {
+      "type": "object",
+      "required": ["domain", "publicUrl", "idValue", "allowedSectors", "identityChannel", "organizationIdentityChannel", "dataChannel"],
+      "properties": {
+        "domain": { "type": "string", "minLength": 3 },
+        "publicUrl": { "type": "string", "pattern": "^https?://" },
+        "idValue": { "type": "string", "minLength": 3 },
+        "allowedSectors": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "identityChannel": { "type": "string", "minLength": 1 },
+        "organizationIdentityChannel": { "type": "string", "minLength": 1 },
+        "dataChannel": { "type": "string", "minLength": 1 }
+      }
+    },
+    "images": {
+      "type": "object",
+      "required": ["init"],
+      "properties": { "init": { "$ref": "#/definitions/digestImage" } }
+    },
+    "gw": {
+      "type": "object",
+      "required": ["enabled", "image", "existingSecret", "providers"],
+      "properties": {
+        "image": { "$ref": "#/definitions/digestImage" },
+        "localImage": { "type": "string" },
+        "imagePullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "existingSecret": { "type": "string", "minLength": 1 },
+        "providers": {
+          "type": "object",
+          "required": ["database", "storage", "envelope"],
+          "properties": {
+            "queue": { "type": "string", "enum": ["mem"] },
+            "database": { "type": "string", "enum": ["mem", "firestore", "postgres"] },
+            "storage": { "type": "string", "enum": ["mem", "gcs", "ipfs", "supabase"] },
+            "envelope": { "type": "string", "enum": ["gcp-kms", "hashicorp-transit", "local", "memory"] },
+            "replayProtection": { "type": "string", "enum": ["none", "mem", "redis"] }
+          }
+        }
+      }
+    },
+    "peer": {
+      "type": "object",
+      "required": ["enabled", "image", "mspId", "externalEndpoint", "mspSecretName", "tlsSecretName"],
+      "properties": {
+        "image": { "$ref": "#/definitions/digestImage" },
+        "mspId": { "type": "string", "pattern": "^[A-Za-z0-9]+MSP$" },
+        "externalEndpoint": { "type": "string", "minLength": 1 }
+      }
+    },
+    "couchdb": { "type": "object", "properties": { "image": { "$ref": "#/definitions/digestImage" } } },
+    "postgresql": { "type": "object", "properties": { "image": { "$ref": "#/definitions/digestImage" } } },
+    "ipfs": { "type": "object", "properties": { "image": { "$ref": "#/definitions/digestImage" } } },
+    "redis": { "type": "object", "properties": { "image": { "$ref": "#/definitions/digestImage" } } },
+    "chaincodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "image", "packageId"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "image": { "$ref": "#/definitions/digestImage" },
+          "packageId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*:[a-f0-9]{64}$" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "digestImage": {
+      "type": "string",
+      "pattern": "^[^[:space:]@]+@sha256:[a-f0-9]{64}$"
+    }
+  }
+}

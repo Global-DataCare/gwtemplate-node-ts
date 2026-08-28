@@ -14,25 +14,15 @@ image, and deploy only its immutable registry digest. Do not replace the
 checked-in scripts with ad-hoc `docker build`, `docker push` or `kubectl set
 image` commands.
 
-## Product identity boundary
+## Workload identity boundary
 
-Never infer the product from a historical GCP project, cluster, context, or
-repository name. Resolve the workload tuple first and keep these products
-strictly separate:
-
-- GW CORE development: public `34.175.78.233`, namespace `test-gdc-v1`, Deployment
-  and Service `gwtemplate`. The historical cluster name
-  `gdc-unid-southwest` does not make this GW UNID.
-- GW UNID test-network: repository `custom/uhc-unid-gw-node`, public workload
-  `uhc-gw`, canonical host `https://uhc-gw.unid.online`.
-- GW SOSCHAIN: separate public workload `soschain-gw`, canonical host
-  `https://soschain-gw.unid.online`. It is not an alias for CORE or `uhc-gw`.
-
-This skill deploys GW CORE only. It must never describe, mutate, validate, or
-report `uhc-gw` or `soschain-gw` as part of a CORE release. Before any
-`kubectl` mutation, select the CORE cluster credentials explicitly and verify
-that the resolved namespace, Deployment, Service and public address all match
-the CORE tuple above. A currently active context is not evidence of the target.
+Never infer a workload from a historical cloud project, cluster, context or
+repository name. This skill deploys GW CORE only. Before any `kubectl`
+mutation, select the intended cluster credentials explicitly and verify the
+configured namespace, Deployment, Service and public domain against the
+target-specific inventory. A currently active context is not evidence of the
+target. Participant names, domains, project identifiers and addresses must not
+be copied into this reusable skill.
 
 ## Read before acting
 
@@ -58,10 +48,10 @@ the CORE tuple above. A currently active context is not evidence of the target.
   chaincode runtime imported by `chaincode/*-javascript/index.js`. Those
   `lib/*.js` files are source, not generated output; the release-script test
   must fail before Fabric bootstrap if any imported runtime file is untracked.
-- Run `npm run check:identity-chaincode-parity` before the Docker smoke. Shared
-  identity chaincodes are canonical in sibling `fabric-multicloud`; the GW
-  `chaincode/*-javascript` copies are temporary local-network packaging mirrors
-  and must be byte-equivalent apart from generated dependency/coverage output.
+- Run `npm run check:identity-chaincode-parity` before the Docker smoke. The
+  public `chaincode/*-javascript` sources in GW CORE are canonical for the
+  reproducible local-network; the check must not depend on a private sibling
+  repository.
 - Run `npm run docker:smoke:local-network` against the selected image.
 - Run `cloud_deploy.sh` in dry-run mode with the checked-in profiles.
 - Publish the already-tested image with `SKIP_BUILD=true`.
@@ -122,7 +112,7 @@ bootstrap through the configured KMS adapter. Firebase token verification,
 Firestore vault persistence and GCS object persistence are separate concerns;
 PostgreSQL and IPFS are alternative provider choices, not identity services.
 
-The final open-source project evidence has three mandatory, complementary gates:
+The final open-source project evidence has four mandatory, complementary gates:
 
 1. trust control plane: `dataspace-ca-ts` tests plus disposable local
    Root/issuer publication, followed by a local `dataspace-ica-ts` signed
@@ -137,6 +127,10 @@ The final open-source project evidence has three mandatory, complementary gates:
    two-peer topology. Name generic Fabric members `Host1MSP` and `Host2MSP`;
    never use `Org1MSP`/`Org2MSP` in report evidence because VAT-addressed
    tenant Organizations are hosted application data, not Fabric members.
+4. Kubernetes portability plane: validate the complete immutable host chart,
+   create an isolated kind cluster, load the already-tested GW image by digest,
+   install GW/PostgreSQL/IPFS with Helm, repeat the local-network E2E and prove
+   recovery after restart. A render-only `helm template` is not this gate.
 
 Generate the presentation bundle with
 `npm run evidence:open-source-production-readiness`. It must contain only
@@ -146,10 +140,9 @@ evidence directory. State explicitly that a two-host genesis/bootstrap proves
 multi-host topology but does not prove dynamic admission to an already-running
 channel; the real operator mutation driver needs a live E2E before production.
 
-For the human-only GDC report, keep production identity routing explicit:
-EU VAT Organizations and organization-scoped employees use `identity-eu`,
-while natural-person individuals use `identity-global`. Animal identity,
-veterinary services and `animal-*` channels are outside this evidence scope.
+For the report, keep production identity routing explicit: EU VAT
+Organizations and organization-scoped employees use `identity-eu`, while
+natural-person individuals use `identity-global`.
 When one provisional host serves both employee and individual routes for the
 same VAT tenant, require two complementary proofs: employee onboarding/DCR and
 a live SMART data-access smoke with explicit consent plus an unconsented

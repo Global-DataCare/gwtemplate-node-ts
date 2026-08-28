@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${ROOT}/../fabric-multicloud/devnet/fabric-v3}"
+DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${ROOT}/infra/fabric/local-network}"
 DEVNET_ENV="${DEVNET_ROOT}/.env.fabric-devnet"
 
 function fail() {

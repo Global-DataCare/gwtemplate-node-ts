@@ -1,0 +1,55 @@
+{{- if .Values.gw.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "gdc-host.fullname" . }}-gw
+  labels:
+    {{- include "gdc-host.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gw
+data:
+  HOST_INTERNAL_IP: "0.0.0.0"
+  PORT: "3000"
+  NODE_ENV: {{ ternary "production" "demo" (eq .Values.environment "production") | quote }}
+  DEPLOYMENT_ENV: {{ .Values.environment | quote }}
+  NETWORK_MODE: {{ .Values.networkMode | quote }}
+  SECURITY_MODE: {{ .Values.gw.securityMode | quote }}
+  DIDCOMM_PLAIN: {{ .Values.gw.didcommPlain | quote }}
+  AUTH_TOKEN_VERIFIER: {{ .Values.gw.authTokenVerifier | quote }}
+  HOST_EXTERNAL_DOMAIN: {{ .Values.host.domain | quote }}
+  HOST_PUBLIC_URL: {{ .Values.host.publicUrl | quote }}
+  HOST_ID_TYPE: {{ .Values.host.idType | quote }}
+  HOST_ID_VALUE: {{ .Values.host.idValue | quote }}
+  HOST_LEGAL_NAME: {{ .Values.host.legalName | quote }}
+  HOST_JURISDICTION: {{ .Values.host.jurisdiction | quote }}
+  HOST_STORAGE_SCOPE: {{ .Values.host.storageScope | quote }}
+  HOST_TERMS_URL: {{ printf "%s/terms" (trimSuffix "/" .Values.host.publicUrl) | quote }}
+  ALLOWED_SECTORS: {{ join "," .Values.host.allowedSectors | quote }}
+  SECTORS_ALLOWED: {{ join "," .Values.host.allowedSectors | quote }}
+  LEDGER_ENABLED: "true"
+  LEDGER_PROVIDER_DEFAULT: "fabric"
+  LEDGER_PROVIDER_MAP: "test=mem,local-network=fabric,test-network=fabric,network=fabric"
+  LEDGER_FABRIC_MSP_ID: {{ .Values.peer.mspId | quote }}
+  LEDGER_MSP_ID: {{ .Values.peer.mspId | quote }}
+  LEDGER_IDENTITY_CHANNEL_DEFAULT: {{ .Values.host.identityChannel | quote }}
+  LEDGER_ORGANIZATION_IDENTITY_CHANNEL_DEFAULT: {{ .Values.host.organizationIdentityChannel | quote }}
+  LEDGER_DATA_CHANNEL_DEFAULT: {{ .Values.host.dataChannel | quote }}
+  HLF_CONNECTION_PEER: {{ ternary (printf "%s:7051" (include "gdc-host.peerService" .)) (printf "%s:%v" .Values.externalPeer.host .Values.externalPeer.port) .Values.peer.enabled | quote }}
+  {{ printf "HLF_CONNECTION_PEER_%s" .Values.peer.mspId }}: {{ ternary (printf "%s:7051" (include "gdc-host.peerService" .)) (printf "%s:%v" .Values.externalPeer.host .Values.externalPeer.port) .Values.peer.enabled | quote }}
+  QUEUE_PROVIDER: {{ .Values.gw.providers.queue | quote }}
+  DB_PROVIDER: {{ .Values.gw.providers.database | quote }}
+  STORAGE_PROVIDER: {{ .Values.gw.providers.storage | quote }}
+  ENVELOPE_PROVIDER: {{ .Values.gw.providers.envelope | quote }}
+  REPLAY_PROTECTION_PROVIDER: {{ .Values.gw.providers.replayProtection | quote }}
+  {{- if eq .Values.gw.providers.database "postgres" }}
+  POSTGRES_HOST: {{ include "gdc-host.postgresqlService" . | quote }}
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: {{ .Values.postgresql.database | quote }}
+  {{- end }}
+  {{- if eq .Values.gw.providers.storage "ipfs" }}
+  IPFS_API_URL: {{ printf "http://%s:5001" (include "gdc-host.ipfsService" .) | quote }}
+  IPFS_GATEWAY_URL: {{ printf "http://%s:8080" (include "gdc-host.ipfsService" .) | quote }}
+  {{- end }}
+  {{- range $key, $value := .Values.gw.extraEnv }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}
