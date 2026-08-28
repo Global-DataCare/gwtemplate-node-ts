@@ -207,6 +207,30 @@ function join_peer_channel_if_needed() {
   return ${status}
 }
 
+function wait_for_peer() {
+  local peer_address="$1"
+  local msp_id="$2"
+  local admin_msp_path="$3"
+  local peer_tls_root="$4"
+
+  for _attempt in $(seq 1 30); do
+    if exec_tools env \
+      CORE_PEER_LOCALMSPID="${msp_id}" \
+      CORE_PEER_MSPCONFIGPATH="${admin_msp_path}" \
+      CORE_PEER_ADDRESS="${peer_address}" \
+      CORE_PEER_TLS_ENABLED=true \
+      CORE_PEER_TLS_ROOTCERT_FILE="${peer_tls_root}" \
+      peer node status >/dev/null 2>&1; then
+      echo "Peer ${peer_address} is ready."
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "Peer ${peer_address} did not become ready." >&2
+  return 1
+}
+
 function write_node_ou_config() {
   local msp_dir="$1"
   local ca_cert_rel="$2"
@@ -469,6 +493,18 @@ fi
 
 echo "Waiting for orderer..."
 sleep 3
+
+wait_for_peer "peer0-host1:7051" \
+  "${HOST1_MSP_ID}" \
+  "/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp" \
+  "/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls/ca.crt"
+
+if [[ "${SINGLE_HOST}" != "true" ]]; then
+  wait_for_peer "peer0-host2:7051" \
+    "${HOST2_MSP_ID}" \
+    "/workspace/organizations/peerOrganizations/${HOST2_DOMAIN}/users/Admin@${HOST2_DOMAIN}/msp" \
+    "/workspace/organizations/peerOrganizations/${HOST2_DOMAIN}/peers/peer0.${HOST2_DOMAIN}/tls/ca.crt"
+fi
 
 # ---------------------------------------------------------------------------
 # 7) Join orderer to channel (channel participation API)

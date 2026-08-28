@@ -6,7 +6,11 @@ IMAGE_NAME="${IMAGE_NAME:-gwtemplate}"
 CONTAINER_NAME="${CONTAINER_NAME:-gw-core-local-network-smoke}"
 HOST_PORT="${HOST_PORT:-18081}"
 CONTAINER_PORT="${CONTAINER_PORT:-3000}"
-DOCKER_NETWORK="${DOCKER_NETWORK:-gdc-fabric-v3-devnet}"
+GDC_CONTAINER_PREFIX="${GDC_CONTAINER_PREFIX:-gdc-public}"
+DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"
+DOCKER_NETWORK="${DOCKER_NETWORK:-${DEVNET_NETWORK_NAME}}"
+FABRIC_PEER_CONTAINER="${GDC_CONTAINER_PREFIX}-peer0-host1"
+FABRIC_TOOLS_CONTAINER="${GDC_CONTAINER_PREFIX}-fabric-tools"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env.local-fabric}"
 BASE_URL="http://127.0.0.1:${HOST_PORT}"
 RUN_FULL_SMOKE="${RUN_FULL_SMOKE:-true}"
@@ -68,19 +72,21 @@ fi
 
 cd "$ROOT_DIR"
 if [[ "$SKIP_FABRIC_PREP" != "true" ]]; then
-  node ./scripts/bootstrap-local-fabric-stack.mjs --prepare-only --no-bootstrap-tenant
+  GDC_CONTAINER_PREFIX="$GDC_CONTAINER_PREFIX" DEVNET_NETWORK_NAME="$DEVNET_NETWORK_NAME" \
+    node ./scripts/bootstrap-local-fabric-stack.mjs --prepare-only --no-bootstrap-tenant
 fi
 
-docker ps --format '{{.Names}}' | grep -qx 'gdc-peer0-host1' || {
-  echo 'ERROR: local Fabric peer is not running: gdc-peer0-host1' >&2
+docker ps --format '{{.Names}}' | grep -qx "$FABRIC_PEER_CONTAINER" || {
+  echo "ERROR: local Fabric peer is not running: ${FABRIC_PEER_CONTAINER}" >&2
   exit 2
 }
-docker ps --format '{{.Names}}' | grep -qx 'gdc-fabric-tools' || {
-  echo 'ERROR: local Fabric tools container is not running: gdc-fabric-tools' >&2
+docker ps --format '{{.Names}}' | grep -qx "$FABRIC_TOOLS_CONTAINER" || {
+  echo "ERROR: local Fabric tools container is not running: ${FABRIC_TOOLS_CONTAINER}" >&2
   exit 2
 }
 
-bash "${ROOT_DIR}/scripts/warm-local-fabric-chaincodes.sh"
+FABRIC_TOOLS_CONTAINER="$FABRIC_TOOLS_CONTAINER" \
+  bash "${ROOT_DIR}/scripts/warm-local-fabric-chaincodes.sh"
 
 FABRIC_PEER_ENDPOINT_VALUE=peer0-host1:7051 npm run prepare:local-fabric-env
 docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1 || {
@@ -150,8 +156,10 @@ curl --fail --silent --show-error --max-time 5 "$PING_URL" >/dev/null || {
 
 if [[ "$RUN_FULL_SMOKE" == "true" ]]; then
   BASE_URL="$BASE_URL" npx dotenv -e "$ENV_FILE" -- ./scripts/bootstrap-single-tenant.sh
-  BASE_URL="$BASE_URL" bash ./scripts/smoke-consentaccess-local-network.sh
-  BASE_URL="$BASE_URL" bash ./scripts/smoke-smart-access-local-network.sh
+  BASE_URL="$BASE_URL" FABRIC_TOOLS_CONTAINER="$FABRIC_TOOLS_CONTAINER" \
+    bash ./scripts/smoke-consentaccess-local-network.sh
+  BASE_URL="$BASE_URL" FABRIC_TOOLS_CONTAINER="$FABRIC_TOOLS_CONTAINER" \
+    bash ./scripts/smoke-smart-access-local-network.sh
 fi
 
 if [[ "$PERSISTENCE_PROFILE" == "postgres-ipfs" ]]; then

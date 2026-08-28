@@ -6,6 +6,9 @@
   evidencia, representarlas como `${HOME}` y hacer fallar el paquete si queda
   alguna ruta `/Users/<usuario>` o `/home/<usuario>`.
 
+- Retirar de las skills públicas inventarios operativos, direcciones y nombres
+  de participantes; los ejemplos usan roles y valores ficticios portables.
+
 - Actualizar en `deliverables/` la guía Word pública en español con la prueba
   completa kind/Helm: lifecycle CCAAS y E2E del GW contra el peer Kubernetes.
 
@@ -13,6 +16,11 @@
   enrolar MSP/TLS exclusivos con la ICA de Fabric, unir el peer a los dos
   canales locales y comprobar canales, estado CouchDB y persistencia tras
   reiniciar peer y GW.
+
+- Esperar activamente a que cada peer Fabric acepte conexiones antes de unirlo
+  a los canales, evitar carreras de arranque en la reproducción limpia y fijar
+  explícitamente el Compose y proyecto públicos empaquetados para impedir que
+  otra infraestructura local con nombres históricos contamine la prueba.
 
 - Instalar y aprobar de forma reproducible nueve paquetes CCAAS en el peer
   kind, dirigir el GW exclusivamente a ese peer y comprobar Consent, SMART y

@@ -1,6 +1,6 @@
 ---
 name: configure-trusted-identity-providers
-description: Configure or audit several trusted OIDC id_token providers inside one GW CORE deployment. Use for AUTH_TOKEN_VERIFIER, exact iss and aud validation, OpenID discovery and jwks_uri, direct GlobalDataCare plus Firebase trust, or identity-provider rollout tests.
+description: Configure or audit several trusted OIDC id_token providers inside one GW CORE deployment. Use for AUTH_TOKEN_VERIFIER, exact iss and aud validation, OpenID discovery and jwks_uri, direct issuer plus managed identity-provider trust, or identity-provider rollout tests.
 ---
 
 # Configure trusted identity providers
@@ -35,23 +35,11 @@ description: Configure or audit several trusted OIDC id_token providers inside o
 
 ```dotenv
 AUTH_TOKEN_VERIFIER=trusted-oidc
-OIDC_TRUSTED_PROVIDERS_JSON=[{"iss":"globaldatacare.es","aud":"globaldatacare.es"},{"iss":"https://securetoken.google.com/unid-production","aud":"unid-production"}]
+OIDC_TRUSTED_PROVIDERS_JSON=[{"iss":"https://issuer.example","aud":"host-api"},{"iss":"https://securetoken.google.com/firebase-project-id","aud":"firebase-project-id"}]
 ```
 
-## Staging workload matrix
-
-- Keep GW CORE development at `34.175.78.233` on `demo`; it intentionally does
-  not validate signatures.
-- Configure host Accuro with GlobalDataCare `iss=aud=globaldatacare.es`.
-- OIDC mode and key custody are independent. While CORE development and
-  Accuro still share the `globaldatacare-test` Firestore `legacy-v1` host
-  collection, their Kubernetes Secrets must contain the same `KEK_SECRET` or
-  either deployment can leave wrapped records unreadable to the other. The GKE
-  deploy script preserves an existing Secret; verify custody explicitly.
-- Configure `uhc-gw.unid.online` with `uhc-unid`,
-  `uhc-unid-personal-staging`, `unid-professional` and GlobalDataCare.
-- Configure `beta-gw.vetchain.app` with `uhc-can`,
-  `vetchain-connect-personal-st`, `vetchain-connect-prof-staging` and
-  GlobalDataCare.
-- Re-evaluate each list independently; never infer token trust from a browser
-  origin or copy a staging list into production.
+Use deployment-specific issuer and audience placeholders in tracked examples;
+keep real project names, domains, addresses and custody mappings in an
+untracked operator inventory. Re-evaluate each trust list independently and
+never infer token trust from a browser origin or copy a staging list into
+production.

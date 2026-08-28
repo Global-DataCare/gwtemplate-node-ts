@@ -18,6 +18,12 @@ KUBE_CONTEXT="kind-${CLUSTER_NAME}"
 NAMESPACE="${HELM_EVIDENCE_NAMESPACE:-local-host-evidence}"
 RELEASE="${HELM_EVIDENCE_RELEASE:-host-evidence}"
 KEEP_CLUSTER="${KEEP_HELM_EVIDENCE_CLUSTER:-false}"
+GDC_CONTAINER_PREFIX="${GDC_CONTAINER_PREFIX:-gdc-public}"
+DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"
+FABRIC_PEER_CONTAINER="${GDC_CONTAINER_PREFIX}-peer0-host1"
+FABRIC_TOOLS_CONTAINER="${GDC_CONTAINER_PREFIX}-fabric-tools"
+FABRIC_CA_CLIENT_CONTAINER="${GDC_CONTAINER_PREFIX}-fabric-ca-client"
+FABRIC_ICA_CONTAINER="${GDC_CONTAINER_PREFIX}-ica"
 EVIDENCE_TENANT_ID="${HELM_EVIDENCE_TENANT_ID:-helm-evidence}"
 EVIDENCE_SUBJECT_ID="did:web:api.${EVIDENCE_TENANT_ID}.org:individual:subject-001"
 FABRIC_DEVNET_ROOT="$(cd "${FABRIC_DEVNET_ROOT:-${ROOT}/infra/fabric/local-network}" && pwd -P)"
@@ -78,15 +84,15 @@ docker image inspect "${IMAGE_NAME}" >/dev/null
   echo "Falta ${FABRIC_ENV}; ejecute primero la prueba Docker local-network." >&2
   exit 2
 }
-docker ps --format '{{.Names}}' | grep -qx 'gdc-peer0-host1' || {
-  echo 'No está activo el peer Docker gdc-peer0-host1.' >&2
+docker ps --format '{{.Names}}' | grep -qx "${FABRIC_PEER_CONTAINER}" || {
+  echo "No está activo el peer Docker ${FABRIC_PEER_CONTAINER}." >&2
   exit 2
 }
 
 assert_public_fabric_mounts() {
   local ica_mount peer_mounts
-  ica_mount="$(docker inspect gdc-ica --format '{{range .Mounts}}{{if eq .Destination "/etc/hyperledger/fabric-ca-server"}}{{.Source}}{{end}}{{end}}')"
-  peer_mounts="$(docker inspect gdc-peer0-host1 --format '{{range .Mounts}}{{println .Source}}{{end}}')"
+  ica_mount="$(docker inspect "${FABRIC_ICA_CONTAINER}" --format '{{range .Mounts}}{{if eq .Destination "/etc/hyperledger/fabric-ca-server"}}{{.Source}}{{end}}{{end}}')"
+  peer_mounts="$(docker inspect "${FABRIC_PEER_CONTAINER}" --format '{{range .Mounts}}{{println .Source}}{{end}}')"
   if [[ "${ica_mount}" != "${FABRIC_DEVNET_ROOT}/crypto/ca/ica" ]] \
     || [[ "${peer_mounts}" != *"${FABRIC_DEVNET_ROOT}/organizations/"* ]]; then
     echo 'Los contenedores Fabric activos no pertenecen al local-network público de este checkout.' >&2
@@ -121,7 +127,7 @@ prepare_kind_peer_identity() {
 
   docker exec \
     -e FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-admin \
-    gdc-fabric-ca-client fabric-ca-client register \
+    "${FABRIC_CA_CLIENT_CONTAINER}" fabric-ca-client register \
       -u 'https://admin:adminpw@ica:7054' \
       --id.name "${enrollment_id}" \
       --id.secret "${enrollment_secret}" \
@@ -130,7 +136,7 @@ prepare_kind_peer_identity() {
       --id.maxenrollments 2 \
       --tls.certfiles "${ca_tls_cert}" >/dev/null
 
-  docker exec gdc-fabric-ca-client fabric-ca-client enroll \
+  docker exec "${FABRIC_CA_CLIENT_CONTAINER}" fabric-ca-client enroll \
     -u "https://${enrollment_id}:${enrollment_secret}@ica:7054" \
     -M "${container_peer_dir}/msp" \
     --csr.hosts "${KIND_PEER_SERVICE}" \
@@ -139,7 +145,7 @@ prepare_kind_peer_identity() {
   cp "${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/msp/config.yaml" \
     "${KIND_PEER_DIR}/msp/config.yaml"
 
-  docker exec gdc-fabric-ca-client fabric-ca-client enroll \
+  docker exec "${FABRIC_CA_CLIENT_CONTAINER}" fabric-ca-client enroll \
     -u "https://${enrollment_id}:${enrollment_secret}@ica:7054" \
     -M "${container_peer_dir}/tls" \
     --enrollment.profile tls \
@@ -157,9 +163,9 @@ prepare_kind_peer_identity
 GW_IMAGE_ARCHIVE="${TEMP_DIR}/gw-image.tar"
 HOST_RUNTIME_IMAGE_ARCHIVE="${TEMP_DIR}/host-runtime-images.tar"
 PUBLIC_DOCKER_CONFIG="${TEMP_DIR}/docker-public"
-peer_image_tag="$(docker inspect gdc-peer0-host1 --format '{{.Config.Image}}')"
+peer_image_tag="$(docker inspect "${FABRIC_PEER_CONTAINER}" --format '{{.Config.Image}}')"
 peer_image="$(docker image inspect "${peer_image_tag}" --format '{{index .RepoDigests 0}}')"
-tools_image="$(docker inspect gdc-fabric-tools --format '{{.Config.Image}}')"
+tools_image="$(docker inspect "${FABRIC_TOOLS_CONTAINER}" --format '{{.Config.Image}}')"
 # Keep at most one digest-only image in this archive. kind assigns the same
 # synthetic import name to untagged Docker archives; combining several can
 # overwrite their manifest reference. BusyBox and PostgreSQL are small and are
@@ -322,7 +328,7 @@ wait_for_kind_peer_sync() {
   local channel="$1"
   local network_height=0 kind_height=0
   for _ in $(seq 1 120); do
-    network_height="$(docker exec gdc-fabric-tools env \
+    network_height="$(docker exec "${FABRIC_TOOLS_CONTAINER}" env \
       CORE_PEER_LOCALMSPID=Host1MSP \
       CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp \
       CORE_PEER_ADDRESS=peer0-host1:7051 \

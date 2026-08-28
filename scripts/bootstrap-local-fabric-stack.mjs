@@ -64,11 +64,11 @@ async function main() {
     args: [
       '-lc',
       [
+        "for container in $(docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^dev-peer0-host/ {print $1}'); do docker rm -f \"$container\" >/dev/null 2>&1 || true; done",
         'docker compose down -v --remove-orphans || true',
-        'docker rm -f gdc-orderer gdc-peer0-host1 gdc-peer0-host2 gdc-fabric-tools gdc-fabric-ca-client gdc-ica gdc-root-ca consentaccess-sc >/dev/null 2>&1 || true',
-        'for attempt in $(seq 1 30); do remaining=false; for container in gdc-orderer gdc-peer0-host1 gdc-peer0-host2 gdc-fabric-tools gdc-fabric-ca-client gdc-ica gdc-root-ca; do docker container inspect "$container" >/dev/null 2>&1 && remaining=true; done; [ "$remaining" = false ] && break; [ "$attempt" != 30 ] || exit 1; sleep 1; done',
-        'for container in $(docker ps -aq --filter name=^/dev-peer0-host); do docker rm -f "$container" >/dev/null 2>&1 || true; done',
-        'docker volume rm -f gdc-fabric-v3-devnet_orderer-data gdc-fabric-v3-devnet_peer0-host1-data gdc-fabric-v3-devnet_peer0-host2-data >/dev/null 2>&1 || true',
+        'for service in orderer peer0-host1 peer0-host2 fabric-tools fabric-ca-client ica root-ca; do docker rm -f "${GDC_CONTAINER_PREFIX:-gdc}-$service" >/dev/null 2>&1 || true; done; docker rm -f consentaccess-sc >/dev/null 2>&1 || true',
+        'for attempt in $(seq 1 30); do remaining=false; for service in orderer peer0-host1 peer0-host2 fabric-tools fabric-ca-client ica root-ca; do docker container inspect "${GDC_CONTAINER_PREFIX:-gdc}-$service" >/dev/null 2>&1 && remaining=true; done; [ "$remaining" = false ] && break; [ "$attempt" != 30 ] || exit 1; sleep 1; done',
+        'docker volume rm -f "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_orderer-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host1-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host2-data" >/dev/null 2>&1 || true',
       ].join('; '),
     ],
   });
@@ -153,6 +153,8 @@ async function main() {
       env: {
         CHANNEL_NAME: config.dataChannel,
         HLF_DATA_CHANNEL_NAME: config.dataChannel,
+        FABRIC_TOOLS_CONTAINER: `${process.env.GDC_CONTAINER_PREFIX || 'gdc'}-fabric-tools`,
+        DEVNET_NETWORK: process.env.DEVNET_NETWORK_NAME || 'gdc-fabric-v3-devnet',
       },
     });
   }
@@ -306,12 +308,19 @@ async function runStep(label, options) {
   logStream.write(`[${new Date().toISOString()}] ${label}\n`);
 
   console.log(`[local-fabric-stack] ${label}`);
+  const composeEnv = resolve(options.cwd) === fabricDevnetRoot
+    ? {
+        COMPOSE_FILE: resolve(fabricDevnetRoot, 'docker-compose.yml'),
+        COMPOSE_PROJECT_NAME: process.env.COMPOSE_PROJECT_NAME || 'gdc-public-local-network',
+      }
+    : {};
 
   await new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
       env: {
         ...process.env,
+        ...composeEnv,
         ...(options.env || {}),
       },
       stdio: ['ignore', 'pipe', 'pipe'],

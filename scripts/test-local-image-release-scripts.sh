@@ -63,6 +63,13 @@ done < <(git ls-files 'env*.example')
 bash ./scripts/smoke-docker-local-network.sh --help | grep -q 'Fabric local-network'
 grep -Fq 'PERSISTENCE_PROFILE=postgres-ipfs' package.json
 grep -Fq 'infra/fabric/local-network' ./scripts/bootstrap-local-fabric-stack.mjs
+grep -Fq "COMPOSE_FILE: resolve(fabricDevnetRoot, 'docker-compose.yml')" \
+  ./scripts/bootstrap-local-fabric-stack.mjs
+grep -Fq "COMPOSE_PROJECT_NAME: process.env.COMPOSE_PROJECT_NAME || 'gdc-public-local-network'" \
+  ./scripts/bootstrap-local-fabric-stack.mjs
+grep -Fq 'FABRIC_TOOLS_CONTAINER: `${process.env.GDC_CONTAINER_PREFIX || '\''gdc'\''}-fabric-tools`' \
+  ./scripts/bootstrap-local-fabric-stack.mjs
+grep -Fq 'awk '\''$2 ~ /^dev-peer0-host/ {print $1}'\''' ./scripts/bootstrap-local-fabric-stack.mjs
 grep -Fq 'infra/fabric/local-network' ./chaincode/scripts/consentaccess-local-devnet.sh
 grep -Fq 'npm ci' ./chaincode/scripts/consentaccess-local-devnet.sh
 grep -Fq 'helm:test:host' package.json
@@ -74,6 +81,8 @@ grep -Fq 'FABRIC_CA_SERVER_CA_CHAINFILE=/etc/hyperledger/fabric-ca-server/ca-tls
   ./infra/fabric/local-network/docker-compose.yml
 grep -Fq 'function normalize_enrolled_msp_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function normalize_enrolled_tls_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
+grep -Fq 'function wait_for_peer()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
+grep -Fq 'wait_for_peer "peer0-host1:7051"' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 git check-ignore -q ./infra/fabric/local-network/crypto/ca/root/ca-key.pem
 git check-ignore -q ./infra/fabric/local-network/organizations/private-key.pem
 test -f ./charts/gdc-host/Chart.yaml
@@ -83,6 +92,8 @@ grep -Fq 'CONFIDENTIAL_JWE_INLINE_MAX_BYTES=1' ./scripts/smoke-helm-local-networ
 grep -Fq 'La prueba Helm no persistió ningún JWE cifrado en IPFS.' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer.enabled=true' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer-kind-host1' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'GDC_CONTAINER_PREFIX="${GDC_CONTAINER_PREFIX:-gdc-public}"' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'assert_public_fabric_mounts' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'kind load image-archive' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'HOST_RUNTIME_IMAGE_ARCHIVE=' ./scripts/smoke-helm-local-network.sh
@@ -138,7 +149,11 @@ if grep -Fq 'fabric-multicloud' ./scripts/collect-open-source-production-readine
   exit 1
 fi
 grep -Fq 'Open-source persistence validated' ./scripts/smoke-docker-local-network.sh
+grep -Fq 'GDC_CONTAINER_PREFIX="${GDC_CONTAINER_PREFIX:-gdc-public}"' ./scripts/smoke-docker-local-network.sh
+grep -Fq 'DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"' ./scripts/smoke-docker-local-network.sh
 grep -Fq 'warm-local-fabric-chaincodes.sh' ./scripts/smoke-docker-local-network.sh
+grep -Fq 'BASE_URL="$BASE_URL" FABRIC_TOOLS_CONTAINER="$FABRIC_TOOLS_CONTAINER"' \
+  ./scripts/smoke-docker-local-network.sh
 grep -Fq 'Host1MSP' ./scripts/warm-local-fabric-chaincodes.sh
 grep -Fq 'tenant_rehydration=ok' ./scripts/smoke-docker-local-network.sh
 grep -Fq 'ready_status_count' ./scripts/smoke-consentaccess-local-network.sh
