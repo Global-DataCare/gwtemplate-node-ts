@@ -263,6 +263,12 @@ The canonical newbie story for document cases is:
 - read the attached document bundle back through `Communication`
 - teach backend search separately with FHIR params such as `Composition.section`
 
+For one section, `updateClinicalSection` accepts a FHIR `batch` whose entries
+may create and delete different resources. A delete addresses exactly
+`ResourceType/id`; the clinical resource retains only its creator DID, while
+GW checks any linked verified login channel during authorization. See the
+[high-level lifecycle 101](docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md#authored-clinical-resource-deletion).
+
 Default mode (`didcomm`):
 
 ```bash

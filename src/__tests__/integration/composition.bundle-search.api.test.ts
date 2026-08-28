@@ -1,4 +1,10 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: ingest clinical sections, read the current summary, delete one
+// exact authored resource through a batch, then prove operational and permitted
+// Digital Twin readback no longer contains it.
+// Authorization invariant: creator identity and Communication.subject match.
+// Persistence invariant: delete changes current views while audit/history and
+// the separate consent/offboarding lifecycle contracts remain intact.
+// TDD contract: write this test red first; make it green only with complete behavior.
 import { invokeExpress } from './helpers/invokeExpress';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'fs';
@@ -893,6 +899,7 @@ describe('Composition Bundle _search API (integration)', () => {
 
       const allergiesSection = 'LOINC|48765-2';
       const sectionSubjectDid = 'did:web:api.acme.org:individual:section-only-allergy-001';
+      const clinicalControllerDid = 'did:web:api.acme.org:individual:controller-section-allergy-001';
       await applyDigitalTwinSecondaryUseDecision({
         vaultRepository,
         tenantVaultId,
@@ -932,6 +939,7 @@ describe('Composition Bundle _search API (integration)', () => {
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'allergy-section-update-integration-001',
+          iss: clinicalControllerDid,
           body: {
             resourceType: 'Bundle',
             type: 'batch',
@@ -1150,6 +1158,149 @@ describe('Composition Bundle _search API (integration)', () => {
           || firstMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'],
         ).toBe(searchCase.expectedSubject);
       }
+
+      // Step 4: the same authenticated author deletes one exact version through
+      // the normal FHIR batch DELETE entry; the request has no resource body.
+      // Authorization invariant: both creator and Communication.subject match.
+      // Persistence invariant: the next operational summary and synchronized
+      // twin view omit the fact while their lifecycle contracts stay distinct.
+      const individualAllergySectionId = getSubjectScopedSectionId(sectionSubjectDid, 'individual', 'allergies');
+      const storedAllergy = await vaultRepository.get<any>(
+        tenantVaultId,
+        'allergy-section-update-integration-001',
+        individualAllergySectionId,
+      );
+      expect(storedAllergy?.['Composition.author']).toBe(clinicalControllerDid);
+      const storedAllergyVersion = storedAllergy?.['AllergyIntolerance.meta.versionId'];
+      expect(storedAllergyVersion).toBeTruthy();
+
+      const deleteBundle = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [{
+          request: {
+            method: 'DELETE',
+            url: 'AllergyIntolerance/allergy-section-update-integration-001',
+            ifMatch: `W/"${storedAllergyVersion}"`,
+          },
+        }],
+      };
+      const deleteResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'allergy-section-delete-integration-001',
+          iss: clinicalControllerDid,
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [{
+              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              meta: { claims: {
+                '@context': 'org.hl7.fhir.r4',
+                'Communication.subject': sectionSubjectDid,
+                'Composition.section': allergiesSection,
+              } },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: sectionSubjectDid },
+                payload: [{ contentAttachment: {
+                  contentType: 'application/fhir+json',
+                  title: 'allergies-section-delete.json',
+                  data: Buffer.from(JSON.stringify(deleteBundle), 'utf8').toString('base64'),
+                } }],
+              },
+            }],
+          },
+        },
+      });
+      expect(deleteResp.status).toBe(202);
+
+      let deletePayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'allergy-section-delete-integration-001' },
+        });
+        if (pollResp.status === 200) {
+          deletePayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(deletePayload?.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'allergy-section-update-integration-001',
+          response: { status: '204' },
+        }),
+      ]));
+      expect(await vaultRepository.get<any>(
+        tenantVaultId,
+        'allergy-section-update-integration-001',
+        individualAllergySectionId,
+      )).toBeUndefined();
+      expect((await vaultRepository.getContainersInSection<any>(
+        tenantVaultId,
+        getSubjectScopedSectionId(sectionTwinSubjectId, 'digitaltwin', 'allergies'),
+      )).some((record: any) =>
+        (record['AllergyIntolerance.identifier'] || record['org.hl7.fhir.api.AllergyIntolerance.identifier'])
+          === 'urn:uuid:allergy-section-update-integration-001')).toBe(false);
+
+      const summaryAfterDeleteResp = await invokeExpress(app, {
+        method: 'POST',
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        body: {
+          thid: 'allergy-section-summary-after-delete-integration-001',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            data: [{
+              type: 'Communication',
+              resource: {
+                resourceType: 'Communication',
+                meta: { claims: {
+                  '@context': 'org.hl7.fhir.api',
+                  'Communication.status': 'completed',
+                  'Communication.subject': sectionSubjectDid,
+                  'Communication.sender': 'did:web:provider.example.org',
+                  'Communication.content-reference': 'individual/org.hl7.fhir.api/Subject/$summary',
+                  'Communication.content-attachment-type': 'application/fhir+json',
+                  'Communication.content-attachment-data': Buffer.from(JSON.stringify({
+                    resourceType: 'Parameters',
+                    parameter: [
+                      { name: 'subject', valueString: sectionSubjectDid },
+                      { name: 'section', valueString: allergiesSection },
+                    ],
+                  }), 'utf8').toString('base64'),
+                } },
+              },
+            }],
+          },
+        },
+      });
+      expect(summaryAfterDeleteResp.status).toBe(202);
+      let summaryAfterDeletePayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'allergy-section-summary-after-delete-integration-001' },
+        });
+        if (pollResp.status === 200) {
+          summaryAfterDeletePayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(summaryAfterDeletePayload?.data?.[0]?.resource?.entry?.some((summaryEntry: any) =>
+        summaryEntry?.resource?.resourceType === 'AllergyIntolerance'
+        && summaryEntry?.resource?.id === 'allergy-section-update-integration-001')).toBe(false);
 
       const purgeThid = 'ips-index-provider-offboarding-001';
       const purgeSubmit = await invokeExpress(app, {

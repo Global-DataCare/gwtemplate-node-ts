@@ -1,4 +1,10 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: Communication ingestion persists authorized resources and
+// returns independent per-entry outcomes for mixed clinical batch operations.
+// Authorization invariant: only the exact subject's creator or the same
+// privately linked verified identity can delete an authored clinical fact.
+// Persistence invariant: resources retain only creator DID provenance and a
+// failed entry never rolls back a successful sibling entry.
+// TDD contract: write this test red first; make it green only with complete behavior.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/CommunicationManager.unit.test.ts
 // Description: Unit tests for the CommunicationManager.
@@ -45,6 +51,8 @@ describe('CommunicationManager Unit Tests', () => {
       }),
       get: jest.fn(async (vaultId: string, id: string, sectionId?: string) =>
         storedRecords.get(`${vaultId}|${sectionId}|${id}`)),
+      delete: jest.fn(async (vaultId: string, id: string, sectionId?: string) =>
+        storedRecords.delete(`${vaultId}|${sectionId}|${id}`)),
       query: jest.fn(async () => []),
       listContainersInSection: jest.fn(async () => []),
       getAllSections: jest.fn(async () => []),
@@ -487,6 +495,215 @@ describe('CommunicationManager Unit Tests', () => {
 
   describe('process (FHIR Bundle resource projections)', () => {
     const subjectDid = 'did:web:api.acme.org:individual:bundle-subject-001';
+
+    it('deletes only a version-matched clinical resource authored by the same linked controller identity', async () => {
+      // Flow contract:
+      // 1. A phone-authenticated controller creates one allergy; the resource
+      //    persists only that session's creator DID.
+      // 2. After phone and email are linked, an email-DID session whose verified
+      //    token proves the same phone deletes that exact resource version.
+      // 3. The same batch creates a different allergy and returns per-entry 204.
+      // 4. A stale version fails 412 and an unrelated professional fails 403.
+      // Authorization invariant: subject and linked verified creator must match.
+      // Persistence invariant: no email, phone or stable hash enters the resource.
+      const controllerDid = 'did:web:api.acme.org:individual:controller-delete-001';
+      const linkedEmailDid = 'did:web:api.acme.org:individual:controller-delete-email-001';
+      const controllerPhone = '+34600111222';
+      const controllerEmail = 'controller.delete@example.org';
+      const allergyId = 'allergy-controller-delete-001';
+      const mixedCreateId = 'allergy-controller-mixed-create-001';
+      const partialSuccessCreateId = 'allergy-partial-success-create-001';
+      const section = 'LOINC|48765-2';
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+
+      const buildJob = (
+        attachedBundle: Record<string, any>,
+        issuer: string,
+        thid: string,
+        bearerPayload?: Record<string, any>,
+      ): JobRequest => ({
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'es',
+        sector: 'health-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: {
+          jti: randomUUID(),
+          thid,
+          iss: issuer,
+          aud: testServerDid,
+          exp: Math.floor(Date.now() / 1000) + 300,
+          type: 'org.hl7.fhir.r4.Bundle',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            data: [{
+              type: 'Communication',
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                topic: { coding: [{ system: 'http://loinc.org', code: '48765-2' }] },
+                payload: [{
+                  contentAttachment: {
+                    contentType: 'application/fhir+json',
+                    data: Buffer.from(JSON.stringify(attachedBundle), 'utf8').toString('base64'),
+                  },
+                }],
+              },
+            }],
+          },
+          ...(bearerPayload ? { meta: { bearer: { jwt: { payload: bearerPayload } } } } : {}),
+        } as IDecodedDidcommPayload,
+      });
+
+      // Step 1. The individual controller authors one clinical resource.
+      await communicationManager.process(buildJob({
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [{
+          request: { method: 'POST', url: 'AllergyIntolerance' },
+          resource: {
+            resourceType: 'AllergyIntolerance',
+            id: allergyId,
+            identifier: [{ value: `urn:uuid:${allergyId}` }],
+            patient: { reference: subjectDid },
+          },
+        }],
+      }, controllerDid, 'clinical-create-before-delete-001', {
+        sub: 'phone-login-account-001',
+        phone_number: controllerPhone,
+      }));
+
+      const tenantVaultId = 'health-care_acme';
+      const allergySectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'allergies');
+      const stored = await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId) as any;
+      expect(stored?.['Composition.author']).toBe(controllerDid);
+      expect(Object.keys(stored || {}).some((key) => /email|phone|contact/i.test(key))).toBe(false);
+      expect(JSON.stringify(stored)).not.toContain(controllerPhone);
+      expect(JSON.stringify(stored)).not.toContain(controllerEmail);
+      const versionId = stored?.['AllergyIntolerance.meta.versionId'];
+      expect(versionId).toBeTruthy();
+
+      // Step 2. The same authenticated controller deletes exactly that version.
+      const deleteResult = await communicationManager.process(buildJob({
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [
+          {
+            request: { method: 'POST', url: 'AllergyIntolerance' },
+            resource: {
+              resourceType: 'AllergyIntolerance',
+              id: mixedCreateId,
+              identifier: [{ value: `urn:uuid:${mixedCreateId}` }],
+              patient: { reference: subjectDid },
+            },
+          },
+          {
+            request: {
+              method: 'DELETE',
+              url: `AllergyIntolerance/${allergyId}`,
+              ifMatch: `W/"${versionId}"`,
+            },
+          },
+        ],
+      }, linkedEmailDid, 'clinical-delete-001', {
+        sub: 'email-login-account-002',
+        email: controllerEmail,
+        email_verified: true,
+        phone_number: controllerPhone,
+      }));
+
+      // Step 3. The fact is absent and the per-entry batch result is 204.
+      expect(mockVaultRepository.delete).toHaveBeenCalledWith(tenantVaultId, allergyId, allergySectionId);
+      expect(await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId)).toBeUndefined();
+      expect(await mockVaultRepository.get(tenantVaultId, mixedCreateId, allergySectionId)).toBeDefined();
+      expect((deleteResult.body as any).data).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: allergyId,
+          response: { status: '204' },
+        }),
+      ]));
+
+      // Step 4. A different actor cannot delete a controller-authored resource.
+      await communicationManager.process(buildJob({
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [{
+          request: { method: 'POST', url: 'AllergyIntolerance' },
+          resource: {
+            resourceType: 'AllergyIntolerance',
+            id: allergyId,
+            identifier: [{ value: `urn:uuid:${allergyId}` }],
+            patient: { reference: subjectDid },
+          },
+        }],
+      }, linkedEmailDid, 'clinical-recreate-before-forbidden-delete-001', {
+        sub: 'email-login-account-002',
+        email: controllerEmail,
+        email_verified: true,
+        phone_number: controllerPhone,
+      }));
+      const recreated = await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId) as any;
+      const staleResult = await communicationManager.process(buildJob({
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [{
+          request: {
+            method: 'DELETE',
+            url: `AllergyIntolerance/${allergyId}`,
+            ifMatch: 'W/"stale-version"',
+          },
+        }],
+      }, controllerDid, 'clinical-delete-stale-version-001', {
+        sub: 'phone-login-account-001',
+        phone_number: controllerPhone,
+      }));
+      expect((staleResult.body as any).data).toEqual(expect.arrayContaining([
+        expect.objectContaining({ response: expect.objectContaining({ status: '412' }) }),
+      ]));
+      expect(await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId)).toBeDefined();
+
+      const forbiddenResult = await communicationManager.process(buildJob({
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [
+          {
+            request: { method: 'POST', url: 'AllergyIntolerance' },
+            resource: {
+              resourceType: 'AllergyIntolerance',
+              id: partialSuccessCreateId,
+              identifier: [{ value: `urn:uuid:${partialSuccessCreateId}` }],
+              patient: { reference: subjectDid },
+            },
+          },
+          {
+            request: {
+              method: 'DELETE',
+              url: `AllergyIntolerance/${allergyId}`,
+              ifMatch: recreated['AllergyIntolerance.meta.versionId'],
+            },
+          },
+        ],
+      }, 'did:web:api.acme.org:employee:professional-001', 'clinical-delete-forbidden-001', {
+        sub: 'different-professional-account-001',
+        email: 'different.professional@example.org',
+        email_verified: true,
+      }));
+      expect((forbiddenResult.body as any).data).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: partialSuccessCreateId, response: { status: '201' } }),
+        expect.objectContaining({ response: expect.objectContaining({ status: '403' }) }),
+      ]));
+      expect(await mockVaultRepository.get(tenantVaultId, partialSuccessCreateId, allergySectionId)).toBeDefined();
+      expect(await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId)).toBeDefined();
+    });
 
     it('normalizes a native EHR section update without meta.claims and never invents a medication section', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);

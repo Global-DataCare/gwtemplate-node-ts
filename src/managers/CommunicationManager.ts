@@ -44,6 +44,9 @@ import {
   projectClaimsForDigitalTwin,
 } from '../utils/digital-twin-research-projection';
 import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
+import {
+  getAuthenticatedJobActorIdentifiers,
+} from '../utils/authenticated-job-actor';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -152,6 +155,8 @@ const PROJECTED_RESOURCE_CONFIG: Record<SupportedProjectedResourceType, Projecti
   },
 };
 
+const CLINICAL_AUTHOR_IDENTITY_BINDINGS_SECTION = 'clinical_author_identity_bindings';
+
 interface CommunicationManagerOptions {
   tenantsCacheManager: ITenantsManager;
   vaultRepository: IVaultRepository;
@@ -257,6 +262,8 @@ export class CommunicationManager implements IJobProcessor {
         await this.persistCompositionProjectionFromCommunication(job, entry as any, fhirResource, serverDid);
         await this.persistDocumentReferenceProjectionFromCommunication(job, entry as any, fhirResource);
         await this.persistProjectedResourcesFromCommunication(job, entry as any, fhirResource);
+        bundleEntries.push(...this.buildEmbeddedClinicalWriteResponses(entry, fhirResource));
+        bundleEntries.push(...await this.executeEmbeddedClinicalDeleteRequests(job, entry, fhirResource));
 
         const embeddedSearchResponseEntries = await this.executeEmbeddedSearchRequest(
           job,
@@ -674,12 +681,13 @@ export class CommunicationManager implements IJobProcessor {
       || determineResourceId(compositionIdentifier, process.env.NODE_ENV);
 
     const sectionValue = sectionCodes.join(',');
+    const authenticatedActorDid = this.resolveClinicalResourceAuthor(job, entry, fhirResource);
     const claims = normalizeContextualizedClaims({
       '@context': 'org.hl7.fhir.r4',
       'Composition.identifier': compositionIdentifier,
       'Composition.subject': subject,
       'Composition.section': sectionValue,
-      'Composition.author': serverDid,
+      'Composition.author': authenticatedActorDid || serverDid,
       'Composition.date': sent,
       'Composition.type': typeCode,
       'Composition.source': 'Communication',
@@ -1016,6 +1024,8 @@ export class CommunicationManager implements IJobProcessor {
     if (!tenantExists) return;
 
     const communicationSubject = this.resolveCommunicationSubject(entry, fhirResource);
+    const clinicalAuthorDid = this.resolveClinicalResourceAuthor(job, entry, fhirResource);
+    await this.persistClinicalAuthorIdentityBinding(job, tenantVaultId, clinicalAuthorDid);
     const explicitSection = String(
       (entry?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
       || (entry?.resource?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
@@ -1035,7 +1045,13 @@ export class CommunicationManager implements IJobProcessor {
         if (!resource || !resourceType) continue;
 
         const config = PROJECTED_RESOURCE_CONFIG[resourceType];
-        const claims = this.extractProjectedResourceClaims(resourceType, resource, communicationSubject, fhirResource);
+        const claims = this.extractProjectedResourceClaims(
+          resourceType,
+          resource,
+          communicationSubject,
+          fhirResource,
+          clinicalAuthorDid,
+        );
         if (explicitSection && !getClaimValue<string>(claims, 'Composition.section')) {
           claims['Composition.section'] = explicitSection;
         }
@@ -1120,6 +1136,247 @@ export class CommunicationManager implements IJobProcessor {
     }
   }
 
+  private resolveClinicalResourceAuthor(
+    job: JobRequest,
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): string | undefined {
+    const composition = this.extractCompositionResourceFromCommunication(entry, fhirResource);
+    const compositionClaims = composition?.meta?.claims && typeof composition.meta.claims === 'object'
+      ? normalizeContextualizedClaims(composition.meta.claims as Record<string, any>)
+      : {};
+    const claimedAuthor = this.getFirstClaimValue(compositionClaims, [
+      'Composition.author',
+      'org.hl7.fhir.r4.Composition.author',
+    ]);
+    const nativeAuthor = Array.isArray(composition?.author)
+      ? composition.author
+        .map((author: any) => this.normalizeOptionalString(author?.reference))
+        .filter(Boolean)
+        .join(',')
+      : undefined;
+    return claimedAuthor?.split(',')[0]?.trim()
+      || nativeAuthor?.split(',')[0]?.trim()
+      || getAuthenticatedJobActorIdentifiers(job)[0];
+  }
+
+  /**
+   * Reports each successfully persisted write in an attached clinical batch.
+   * These entries deliberately remain separate from DELETE results so a
+   * rejected delete cannot roll back or hide an earlier successful create.
+   */
+  private buildEmbeddedClinicalWriteResponses(
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): BundleEntryResponse[] {
+    const responses: BundleEntryResponse[] = [];
+    for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
+      const parsed = this.parseAttachmentJson(resolved.documentAttachment);
+      if (parsed?.resourceType !== ResourceTypesFhirR4.Bundle || String(parsed?.type || '').toLowerCase() !== 'batch') {
+        continue;
+      }
+      const entries = Array.isArray(parsed.data) ? parsed.data : Array.isArray(parsed.entry) ? parsed.entry : [];
+      for (const batchEntry of entries) {
+        const method = String(batchEntry?.request?.method || '').toUpperCase();
+        if (!['POST', 'PUT', 'PATCH'].includes(method)) continue;
+        const resourceType = this.getSupportedProjectedResourceType(batchEntry?.resource?.resourceType);
+        const resourceId = this.normalizeOptionalString(batchEntry?.resource?.id);
+        if (!resourceType || !resourceId) continue;
+        responses.push({
+          id: resourceId,
+          type: `${resourceType}-write-response-v1.0`,
+          response: { status: method === 'POST' ? '201' : '200' },
+        } as BundleEntryResponse);
+      }
+    }
+    return responses;
+  }
+
+  private async executeEmbeddedClinicalDeleteRequests(
+    job: JobRequest,
+    entry: any,
+    fhirResource: FhirCommunication,
+  ): Promise<Array<BundleEntryResponse | ErrorEntry>> {
+    const responses: Array<BundleEntryResponse | ErrorEntry> = [];
+    for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
+      const parsed = this.parseAttachmentJson(resolved.documentAttachment);
+      if (parsed?.resourceType !== ResourceTypesFhirR4.Bundle || String(parsed?.type || '').toLowerCase() !== 'batch') {
+        continue;
+      }
+      const entries = Array.isArray(parsed.data) ? parsed.data : Array.isArray(parsed.entry) ? parsed.entry : [];
+      for (const batchEntry of entries) {
+        if (String(batchEntry?.request?.method || '').toUpperCase() !== 'DELETE') continue;
+        responses.push(await this.executeClinicalDeleteRequest(job, entry, fhirResource, batchEntry));
+      }
+    }
+    return responses;
+  }
+
+  /**
+   * Deletes one exact authored clinical resource requested by a FHIR batch
+   * entry. The stored resource proves authorship only with its creator DID;
+   * linked verified login channels are resolved from private authorization
+   * metadata and are never copied into the clinical resource.
+   */
+  private async executeClinicalDeleteRequest(
+    job: JobRequest,
+    entry: any,
+    fhirResource: FhirCommunication,
+    batchEntry: any,
+  ): Promise<BundleEntryResponse | ErrorEntry> {
+    const requestUrl = String(batchEntry?.request?.url || '').trim();
+    const match = /^([A-Za-z][A-Za-z0-9]+)\/([^/?#]+)$/.exec(requestUrl);
+    const resourceType = this.getSupportedProjectedResourceType(match?.[1]);
+    const resourceId = this.normalizeOptionalString(match?.[2]);
+    if (!resourceType || !resourceId) {
+      return this.buildClinicalDeleteError(resourceId || requestUrl || 'clinical-delete', '400', 'invalid', 'DELETE request.url must be a supported ResourceType/id.');
+    }
+
+    const subject = this.resolveCommunicationSubject(entry, fhirResource);
+    const actorIdentifiers = getAuthenticatedJobActorIdentifiers(job);
+    if (!subject || actorIdentifiers.length === 0) {
+      return this.buildClinicalDeleteError(resourceId, '403', 'forbidden', 'An authenticated actor and Communication.subject are required.');
+    }
+
+    const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
+    const config = PROJECTED_RESOURCE_CONFIG[resourceType];
+    const sectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, config.collectionId);
+    const stored = await this.vaultRepository.get<{ id: string; [key: string]: any }>(tenantVaultId, resourceId, sectionId);
+    if (!stored) {
+      return this.buildClinicalDeleteError(resourceId, '404', 'not-found', `${resourceType}/${resourceId} was not found.`);
+    }
+
+    const storedSubject = this.resolveProjectedResourceSubject(stored, config.subjectClaimKeys);
+    const authors = String(stored['Composition.author'] || '')
+      .split(',')
+      .map((author) => author.trim())
+      .filter(Boolean);
+    if (storedSubject !== subject || !await this.isAuthenticatedClinicalAuthor(job, tenantVaultId, authors)) {
+      return this.buildClinicalDeleteError(resourceId, '403', 'forbidden', 'Only an authenticated author may delete this clinical resource.');
+    }
+
+    const expectedVersion = this.normalizeEntityTag(batchEntry?.request?.ifMatch);
+    const currentVersion = this.normalizeEntityTag(stored[`${resourceType}.meta.versionId`]);
+    if (expectedVersion && expectedVersion !== currentVersion) {
+      return this.buildClinicalDeleteError(resourceId, '412', 'conflict', 'The requested clinical resource version is no longer current.');
+    }
+
+    const deleted = await this.vaultRepository.delete(tenantVaultId, resourceId, sectionId);
+    if (!deleted) {
+      return this.buildClinicalDeleteError(resourceId, '404', 'not-found', `${resourceType}/${resourceId} was not found.`);
+    }
+    await this.deleteDigitalTwinProjectionIfPresent(tenantVaultId, resourceType, storedSubject, stored);
+    return {
+      id: resourceId,
+      type: `${resourceType}-delete-response-v1.0`,
+      response: { status: '204' },
+    } as BundleEntryResponse;
+  }
+
+  private normalizeEntityTag(value: unknown): string | undefined {
+    return this.normalizeOptionalString(value)?.replace(/^W\//i, '').replace(/^"|"$/g, '');
+  }
+
+  /**
+   * Persists contact continuity outside the clinical resource. The resource
+   * itself stores only its creator DID in `Composition.author`; verified
+   * contact identifiers are private authorization metadata keyed by that DID.
+   */
+  private async persistClinicalAuthorIdentityBinding(
+    job: JobRequest,
+    tenantVaultId: string,
+    authorDid: string | undefined,
+  ): Promise<void> {
+    const authenticatedDid = getAuthenticatedJobActorIdentifiers(job)
+      .find((identifier) => identifier.startsWith('did:web:'));
+    if (!authorDid || authorDid !== authenticatedDid) return;
+    const verifiedContacts = getAuthenticatedJobActorIdentifiers(job)
+      .filter((identifier) => !identifier.startsWith('did:web:'));
+    if (verifiedContacts.length === 0) return;
+    const sectionId = getEnvSectionId(CLINICAL_AUTHOR_IDENTITY_BINDINGS_SECTION);
+    const id = createHash('sha256').update(authorDid, 'utf8').digest('hex');
+    const existing = await this.vaultRepository.get<{ id: string; verifiedContacts?: string[] }>(
+      tenantVaultId,
+      id,
+      sectionId,
+    );
+    await this.vaultRepository.put(tenantVaultId, [{
+      id,
+      verifiedContacts: Array.from(new Set([
+        ...(Array.isArray(existing?.verifiedContacts) ? existing.verifiedContacts : []),
+        ...verifiedContacts,
+      ])),
+    }], sectionId);
+  }
+
+  private async isAuthenticatedClinicalAuthor(
+    job: JobRequest,
+    tenantVaultId: string,
+    authorDids: string[],
+  ): Promise<boolean> {
+    const authenticatedIdentifiers = getAuthenticatedJobActorIdentifiers(job);
+    if (authorDids.some((authorDid) => authenticatedIdentifiers.includes(authorDid))) return true;
+    const verifiedContacts = authenticatedIdentifiers.filter((identifier) => !identifier.startsWith('did:web:'));
+    if (verifiedContacts.length === 0) return false;
+    const sectionId = getEnvSectionId(CLINICAL_AUTHOR_IDENTITY_BINDINGS_SECTION);
+    for (const authorDid of authorDids) {
+      const id = createHash('sha256').update(authorDid, 'utf8').digest('hex');
+      const binding = await this.vaultRepository.get<{ id: string; verifiedContacts?: string[] }>(
+        tenantVaultId,
+        id,
+        sectionId,
+      );
+      if (binding?.verifiedContacts?.some((identifier) => verifiedContacts.includes(identifier))) return true;
+    }
+    return false;
+  }
+
+  private buildClinicalDeleteError(
+    resourceId: string,
+    status: string,
+    code: string,
+    message: string,
+  ): ErrorEntry {
+    return {
+      id: resourceId,
+      type: GatewayResponseEntryTypes.OperationOutcome,
+      response: {
+        status,
+        outcome: {
+          resourceType: GatewayLocalFhirResourceTypes.OperationOutcome,
+          issue: [{ severity: 'error', code: code as any, diagnostics: message }],
+        },
+      },
+    } as ErrorEntry;
+  }
+
+  private async deleteDigitalTwinProjectionIfPresent(
+    tenantVaultId: string,
+    resourceType: SupportedProjectedResourceType,
+    sourceSubject: string,
+    claims: Record<string, any>,
+  ): Promise<void> {
+    if (!isDigitalTwinResearchResourceType(resourceType) || !await isDigitalTwinSecondaryUseEnabled({
+      vaultRepository: this.vaultRepository,
+      tenantVaultId,
+      sourceSubject,
+    })) return;
+    const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
+      vaultRepository: this.vaultRepository,
+      tenantVaultId,
+      sourceSubject,
+    });
+    const researchClaims = projectClaimsForDigitalTwin({ claims, resourceType, twinSubjectId });
+    const researchVersionId = claimsToContentCid(researchClaims).cid;
+    const researchRecordId = String(
+      researchClaims[`${resourceType}.identifier`]
+      || researchClaims[`org.hl7.fhir.r4.${resourceType}.identifier`]
+      || researchVersionId,
+    );
+    const sectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, PROJECTED_RESOURCE_CONFIG[resourceType].collectionId);
+    await this.vaultRepository.delete(tenantVaultId, researchRecordId, sectionId);
+  }
+
   private getSupportedProjectedResourceType(resourceType: unknown): SupportedProjectedResourceType | undefined {
     if (typeof resourceType !== 'string') return undefined;
     return Object.prototype.hasOwnProperty.call(PROJECTED_RESOURCE_CONFIG, resourceType)
@@ -1164,6 +1421,7 @@ export class CommunicationManager implements IJobProcessor {
     resource: Record<string, any>,
     communicationSubject: string | undefined,
     fhirResource: FhirCommunication,
+    authorDid: string | undefined,
   ): Record<string, any> {
     const baseClaims = normalizeContextualizedClaims(
       normalizeClaimsFromFhirResource(resource as any, {
@@ -1171,6 +1429,7 @@ export class CommunicationManager implements IJobProcessor {
       }) as Record<string, any>,
     );
     baseClaims['@context'] = baseClaims['@context'] || 'org.hl7.fhir.api';
+    if (authorDid) baseClaims['Composition.author'] = authorDid;
 
     const resourceSubjectRef = String(
       resource?.subject?.reference
@@ -1222,7 +1481,9 @@ export class CommunicationManager implements IJobProcessor {
       }
     }
 
-    return normalizeContextualizedClaims(baseClaims);
+    const normalizedClaims = normalizeContextualizedClaims(baseClaims);
+    if (authorDid) normalizedClaims['Composition.author'] = authorDid;
+    return normalizedClaims;
   }
 
   private buildIndexedAttributesFromClaims(
