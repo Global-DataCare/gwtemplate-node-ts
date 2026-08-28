@@ -17,6 +17,7 @@ if [[ "${authorized}" != true || -z "${host_url}" || -z "${msp_id}" \
   echo 'Authorization JSON is incomplete or not authorized' >&2
   exit 1
 fi
+credential_digest="$(printf '%s' "${credential_id}" | shasum -a 256 | awk '{print $1}')"
 
 now_epoch_seconds="${NOW_EPOCH_SECONDS:-$(date -u +%s)}"
 grant_ttl_seconds="${ENROLLMENT_GRANT_TTL_SECONDS:-900}"
@@ -32,7 +33,7 @@ enrollment_secret="${HOST_CLIENT_ENROLLMENT_SECRET:-$(openssl rand -base64 36 | 
 export FABRIC_CA_CLIENT_HOME="${CA_ADMIN_HOME}"
 register_args=(-u "${CA_URL}" --id.name "${enrollment_id}" --id.secret "${enrollment_secret}"
   --id.type client --id.maxenrollments 1
-  --id.attrs "gdc.mspId=${msp_id}:ecert,gdc.hostCredentialId=${credential_id}:ecert")
+  --id.attrs "gdc.mspId=${msp_id}:ecert,gdc.hostCredentialSha256=${credential_digest}:ecert")
 [[ -z "${CA_TLS_CERT:-}" ]] || register_args+=(--tls.certfiles "${CA_TLS_CERT}")
 fabric-ca-client register "${register_args[@]}"
 

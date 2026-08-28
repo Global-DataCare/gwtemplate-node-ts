@@ -52,7 +52,8 @@ Reconciliación de canales y chaincodes, escritura, lectura y reinicio
 
 La evidencia encadena una Host VC verificada, el grant real de dos usos para el
 peer, un grant independiente de un uso para el cliente GW, la emisión de
-MSP/TLS y del certificado cliente vinculada al identificador de esa VC, la admisión dinámica por
+MSP/TLS y del certificado cliente vinculada al SHA-256 del identificador de esa
+VC, la admisión dinámica por
 el reconciliador, los Secrets, la instalación Helm,
 el arranque del peer y CouchDB, la unión real del peer Kubernetes a los canales
 externos, el lifecycle de los nueve CCAAS y el E2E del GW, que firma como

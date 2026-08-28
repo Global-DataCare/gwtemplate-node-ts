@@ -36,6 +36,7 @@ jq -e --arg msp "${HOST2_MSP_ID}" '
   exit 2
 }
 HOST_CREDENTIAL_ID="$(jq -r '.hostCredentialId' "${HOST_AUTHORIZATION_JSON}")"
+HOST_CREDENTIAL_SHA256="$(printf '%s' "${HOST_CREDENTIAL_ID}" | shasum -a 256 | awk '{print $1}')"
 PEER_ENROLLMENT_ID="host2-$(printf '%s' "${HOST_CREDENTIAL_ID}" | shasum -a 256 | cut -c1-20)"
 PEER_ENROLLMENT_SECRET="$(openssl rand -base64 36 | tr -d '=+/\n' | cut -c1-32)"
 GW_ENROLLMENT_ID="host2-gw-$(printf '%s' "${HOST_CREDENTIAL_ID}" | shasum -a 256 | cut -c1-17)"
@@ -109,12 +110,12 @@ exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-
 exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-admin \
   fabric-ca-client register --id.name "${PEER_ENROLLMENT_ID}" --id.secret "${PEER_ENROLLMENT_SECRET}" \
   --id.type peer --id.affiliation host2.department1 --id.maxenrollments 2 \
-  --id.attrs "gdc.mspId=${HOST2_MSP_ID}:ecert,gdc.hostCredentialId=${HOST_CREDENTIAL_ID}:ecert" \
+  --id.attrs "gdc.mspId=${HOST2_MSP_ID}:ecert,gdc.hostCredentialSha256=${HOST_CREDENTIAL_SHA256}:ecert" \
   -u "${CA_URL}" --tls.certfiles "${CA_TLS_CERT}"
 exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-admin \
   fabric-ca-client register --id.name "${GW_ENROLLMENT_ID}" --id.secret "${GW_ENROLLMENT_SECRET}" \
   --id.type client --id.affiliation host2.department1 --id.maxenrollments 1 \
-  --id.attrs "gdc.mspId=${HOST2_MSP_ID}:ecert,gdc.hostCredentialId=${HOST_CREDENTIAL_ID}:ecert" \
+  --id.attrs "gdc.mspId=${HOST2_MSP_ID}:ecert,gdc.hostCredentialSha256=${HOST_CREDENTIAL_SHA256}:ecert" \
   -u "${CA_URL}" --tls.certfiles "${CA_TLS_CERT}"
 
 umask 077
@@ -150,8 +151,8 @@ exec_ca fabric-ca-client enroll \
 normalize_tls "${HOST2_ROOT}/peers/peer0.${HOST2_DOMAIN}/tls"
 openssl x509 \
   -in "${HOST2_ROOT}/peers/peer0.${HOST2_DOMAIN}/msp/signcerts/cert.pem" \
-  -text -noout | grep -Fq "${HOST_CREDENTIAL_ID}" || {
-    echo 'Host2 Fabric certificate is not bound to the authorized Host credential.' >&2
+  -text -noout | grep -Fq "${HOST_CREDENTIAL_SHA256}" || {
+    echo 'Host2 Fabric certificate is not bound to the authorized Host credential digest.' >&2
     exit 1
   }
 
@@ -168,8 +169,8 @@ exec_ca fabric-ca-client enroll \
 normalize_msp "${HOST2_ROOT}/users/GW@${HOST2_DOMAIN}/msp"
 openssl x509 \
   -in "${HOST2_ROOT}/users/GW@${HOST2_DOMAIN}/msp/signcerts/cert.pem" \
-  -text -noout | grep -Fq "${HOST_CREDENTIAL_ID}" || {
-    echo 'Host2 GW certificate is not bound to the authorized Host credential.' >&2
+  -text -noout | grep -Fq "${HOST_CREDENTIAL_SHA256}" || {
+    echo 'Host2 GW certificate is not bound to the authorized Host credential digest.' >&2
     exit 1
   }
 

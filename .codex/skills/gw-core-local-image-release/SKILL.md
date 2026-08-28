@@ -139,7 +139,7 @@ The final open-source project evidence has four mandatory, complementary gates:
 
 The peer MSP/TLS two-use grant must remain separate from the one-use GW client
 grant. Generate all three private keys inside host custody, bind both Fabric
-identities to the same authorized Host VC identifier, and prove that GW signs
+identities to the SHA-256 digest of the same authorized Host VC identifier, and prove that GW signs
 as the newly admitted MSP. A GW that points at Host2 while signing with Host1
 does not satisfy the portability gate.
 
