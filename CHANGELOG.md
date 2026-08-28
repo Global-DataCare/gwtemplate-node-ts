@@ -10,6 +10,10 @@
   Artifact registration now owns its canonical `artifact-sc` target instead
   of accepting caller-selected or environment-fallback chaincode names.
 
+- Allow an authenticated clinical-record creator to delete its own record
+  without an `If-Match` condition, while still rejecting malformed or stale
+  optional weak ETags and preserving subject and creator authorization checks.
+
 - Remove the `openapi-extension.json` profile from GW CORE: the runtime exposes
   its complete specification and the `core`/`compat` views, while each derived
   solution maintains its own extensions outside this repository.

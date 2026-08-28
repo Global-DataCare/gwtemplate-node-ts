@@ -1183,15 +1183,17 @@ export class CommunicationManager implements IJobProcessor {
         return errorResponse('403', 'Clinical record does not belong to Communication.subject.');
       }
       const expectedVersion = this.parseIfMatchVersion(request.ifMatch);
-      if (!expectedVersion) {
-        return errorResponse('400', 'Clinical delete requires request.ifMatch with a weak ETag version.');
-      }
-      const currentVersion = this.getFirstClaimValue(existing, [
-        `${resourceType}.meta.versionId`,
-        `org.hl7.fhir.r4.${resourceType}.meta.versionId`,
-      ]);
-      if (!currentVersion || currentVersion !== expectedVersion) {
-        return errorResponse('412', 'Clinical record version does not match request.ifMatch.');
+      if (request.ifMatch !== undefined) {
+        if (!expectedVersion) {
+          return errorResponse('400', 'Clinical delete request.ifMatch must contain a weak ETag version.');
+        }
+        const currentVersion = this.getFirstClaimValue(existing, [
+          `${resourceType}.meta.versionId`,
+          `org.hl7.fhir.r4.${resourceType}.meta.versionId`,
+        ]);
+        if (!currentVersion || currentVersion !== expectedVersion) {
+          return errorResponse('412', 'Clinical record version does not match request.ifMatch.');
+        }
       }
       await this.vaultRepository.delete(input.tenantVaultId, recordId, sectionId);
       return {

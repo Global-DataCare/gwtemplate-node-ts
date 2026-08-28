@@ -127,7 +127,7 @@ describe('CommunicationManager Unit Tests', () => {
       };
     }
 
-    it('lets the authenticated creator delete the mistaken record with the current version', async () => {
+    it('lets the authenticated creator delete the mistaken record without a version condition', async () => {
       // Step 1. Authoritative storage says who created the record and which version is current.
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.get.mockResolvedValue({
@@ -143,7 +143,6 @@ describe('CommunicationManager Unit Tests', () => {
         request: {
           method: 'DELETE',
           url: 'Immunization/immunization-mistake',
-          ifMatch: 'W/"version-current"',
         },
         resource: { resourceType: 'Immunization', id: 'immunization-mistake', meta: { claims: {} } },
       }]));
@@ -155,6 +154,27 @@ describe('CommunicationManager Unit Tests', () => {
         }),
       ]));
       expect(mockVaultRepository.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 412 when the optional ifMatch version is stale', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.get.mockResolvedValue({
+        id: 'immunization-mistake',
+        audit: { creatorDid },
+        'Immunization.subject': subjectDid,
+        'Immunization.meta.versionId': 'version-current',
+      } as any);
+      const response = await communicationManager.process(buildClinicalBatchJob([{
+        type: 'Immunization-delete-request-v1.0',
+        request: {
+          method: 'DELETE',
+          url: 'Immunization/immunization-mistake',
+          ifMatch: 'W/"version-stale"',
+        },
+        resource: { resourceType: 'Immunization', id: 'immunization-mistake', meta: { claims: {} } },
+      }]));
+      expect((response.body as any).data[0].response.status).toBe('412');
+      expect(mockVaultRepository.delete).not.toHaveBeenCalled();
     });
 
     it('keeps create success independent when another entry is forbidden', async () => {
