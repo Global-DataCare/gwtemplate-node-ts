@@ -73,6 +73,7 @@ export function validateOnboardingManifest(manifest) {
     host: {
       peerDns: requiredString(host.peerDns, 'manifest.host.peerDns'),
       mspOutputDir: requiredPath(host.mspOutputDir, 'manifest.host.mspOutputDir'),
+      runtimeOutputDir: requiredPath(host.runtimeOutputDir, 'manifest.host.runtimeOutputDir'),
       caTlsCert: host.caTlsCert
         ? requiredPath(host.caTlsCert, 'manifest.host.caTlsCert')
         : undefined,
@@ -109,9 +110,7 @@ export function parseAssistantArgs(argv) {
 export function buildRolePlan(manifest, role) {
   if (role === 'authority') {
     return [
-      manifest.environment === 'production'
-        ? 'Verify the controller decision, current operator token and mandatory HostingServiceCredential.'
-        : 'Verify the controller approval and current operator token; verify HostingServiceCredential when supplied.',
+      'Verify the controller decision, current operator token and mandatory HostingServiceCredential.',
       'Register a bounded two-use Fabric CA enrollment identity.',
       'Write the enrollment grant with mode 0600; never print its secret.',
     ];
@@ -121,6 +120,7 @@ export function buildRolePlan(manifest, role) {
       'Read the bounded enrollment grant on the host.',
       'Generate the peer MSP and TLS private keys plus CSRs locally.',
       'Keep private keys inside the host output directory; receive certificates only.',
+      'Create a sanitized Helm runtime package without the enrollment grant or Host VC-JWT.',
     ];
   }
   if (role === 'platform') {

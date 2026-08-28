@@ -42,6 +42,7 @@ function manifest(overrides = {}) {
     host: {
       peerDns: 'peer0.host.example.invalid',
       mspOutputDir: '/secure/host-msp',
+      runtimeOutputDir: '/secure/host-runtime',
     },
     platform: {
       driver: '/opt/fabric/driver.mjs',
@@ -67,7 +68,7 @@ test('accepts a disposable local-network manifest with shared infrastructure', (
   const value = validateOnboardingManifest(example);
   assert.equal(value.environment, 'local');
   assert.equal(value.sharedInfrastructure, true);
-  assert.match(buildRolePlan(value, 'authority').join(' '), /controller approval/);
+  assert.match(buildRolePlan(value, 'authority').join(' '), /mandatory HostingServiceCredential/);
 });
 
 test('rejects a production manifest that claims shared infrastructure', () => {
@@ -86,6 +87,7 @@ test('ships a valid isolated production manifest with host-local key output', ()
   assert.equal(value.environment, 'production');
   assert.equal(value.sharedInfrastructure, false);
   assert.match(value.host.mspOutputDir, /^\/secure\/host\//);
+  assert.match(value.host.runtimeOutputDir, /^\/secure\/host\//);
   assert.doesNotMatch(JSON.stringify(example), /seed|privateKey/i);
 });
 
@@ -104,6 +106,7 @@ test('explains that host enrollment creates local keys and receives certificates
   const plan = buildRolePlan(validateOnboardingManifest(manifest()), 'host').join(' ');
   assert.match(plan, /private keys plus CSRs locally/);
   assert.match(plan, /receive certificates only/);
+  assert.match(plan, /sanitized Helm runtime package/);
 });
 
 test('places peer runtime reconciliation before governed channel joins', () => {

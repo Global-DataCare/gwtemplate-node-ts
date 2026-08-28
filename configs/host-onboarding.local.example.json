@@ -20,6 +20,7 @@
   "host": {
     "peerDns": "host2-peer.local-host2.svc.cluster.local",
     "mspOutputDir": "/tmp/gdc-host-onboarding/host2/fabric-peer",
+    "runtimeOutputDir": "/tmp/gdc-host-onboarding/host2/helm-runtime",
     "caTlsCert": "/tmp/gdc-host-onboarding/fabric-ca/ca.crt"
   },
   "platform": {

@@ -7,11 +7,11 @@ desplegar los chaincodes incluidos en el repositorio.
 La ruta recomendada usa material desechable generado por `dataspace-ca-ts`:
 
 ```bash
-cd "${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network"
+cd "${REPO_ROOT}/infra/fabric/local-network"
 
 ROOT_PASSPHRASE='<valor-local-desechable>' \
 ISSUER_PASSPHRASE='<valor-local-desechable>' \
-DATASPACE_CA_ROOT="${HOME}/GITS/gdc-workspace/dataspace-ca-ts" \
+DATASPACE_CA_ROOT="${DATASPACE_CA_ROOT}" \
 SINGLE_HOST=false \
 ./scripts/00-bootstrap-from-dataspace-ca.sh
 ```
@@ -29,6 +29,22 @@ El flujo realiza:
 Los certificados de los peers deben verificar contra la Root usando la ICA de
 Fabric como intermedia. Las claves privadas permanecen bajo
 `organizations/` y nunca forman parte de la evidencia pública.
+
+La puerta de auditoría prueba además la admisión dinámica. Arranca los canales
+solo con `Host1MSP`, genera las identidades MSP/TLS de `Host2MSP`, firma con el
+administrador gobernador una actualización de configuración, la aplica y solo
+entonces arranca y une el segundo peer:
+
+```bash
+SINGLE_HOST=true HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
+  ./scripts/02-bootstrap-network.sh
+SINGLE_HOST=true HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
+  ./scripts/06-admit-host2.sh
+```
+
+`06-admit-host2.sh` contiene secretos únicamente desechables de local-network.
+En redes externas, la misma mutación se ejecuta mediante el reconciliador y su
+inventario privado; el host no puede admitirse a sí mismo.
 
 Para desplegar los chaincodes de identidad incluidos en GW CORE:
 

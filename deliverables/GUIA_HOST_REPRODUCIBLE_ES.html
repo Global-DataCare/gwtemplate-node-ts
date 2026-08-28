@@ -90,6 +90,14 @@ Canales, escritura, lectura, denegación y reinicio</pre>
   generado por el host, la incorporación gobernada a los canales y los Secrets
   Kubernetes. La reconciliación privilegiada se ejecuta por la autoridad.</p>
 
+  <p>La autorización exige una <code>HostingServiceCredential</code> también en
+  local-network y test-network. «Sin PDF» significa que la ICA del espacio de
+  datos puede emitir esa VC para un host preautorizado; no significa omitir la
+  credencial. La ICA de Fabric registra después un identificador limitado a dos
+  enrolamientos, uno MSP y otro TLS. El helper aplica
+  <code>issuedAt/expiresAt</code>; la autoridad debe revocar el identificador no
+  consumido porque Fabric CA garantiza el límite de usos, no esa fecha.</p>
+
   <h2>7. Datos requeridos al proveedor</h2>
   <ul>
     <li>Versión de Kubernetes, namespace, StorageClass e IngressClass.</li>
@@ -105,5 +113,108 @@ Canales, escritura, lectura, denegación y reinicio</pre>
   reproducible, incluido el lifecycle CCAAS y el E2E del GW contra el peer
   Kubernetes. La promoción a otra red conserva el chart, pero exige nuevas
   credenciales, Secrets, digests, values y reconciliación gobernada.</p>
+
+  <h2>9. Prueba completa del auditor</h2>
+  <pre>export REPO_ROOT="$(pwd)"
+export DATASPACE_CA_ROOT="/ruta/al/checkout/dataspace-ca-ts"
+export DATASPACE_ICA_ROOT="/ruta/al/checkout/dataspace-ica-ts"
+cd "${REPO_ROOT}"
+npm ci
+release_tag="$(node -p "require('./package.json').version")-$(git rev-parse --short HEAD)"
+export IMAGE_NAME="gw-core:${release_tag}"
+LOCAL_IMAGE_NAME="${IMAGE_NAME}" ./docker_build_local.sh
+npm run evidence:open-source-production-readiness</pre>
+  <p>El auditor conserva el directorio anunciado bajo
+  <code>artifacts/open-source-production-readiness/</code>, comprueba todos los
+  estados <code>PASS</code> y verifica los hashes. Ningún grant, token, PDF,
+  clave, IP o fichero env forma parte de la evidencia pública.</p>
+
+  <h2>10. Fases de autorización y enrolamiento</h2>
+  <p>La autoridad recibe por canal seguro la petición con URL, MSP, Host VC-JWT,
+  decisión firmada, DID públicos, JWKS e inventario gobernado. Ejecuta:</p>
+  <pre>request_id="$(jq -r '.governanceDecision.decision.requestId' \
+  /secure/approvals/host-enrollment-request.json)"
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role authority
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role authority \
+  --apply --confirm-request "${request_id}"</pre>
+  <p>El proveedor recibe únicamente el grant 0600 y la cadena TLS pública de
+  Fabric CA. Las claves se crean en su infraestructura:</p>
+  <pre>node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role host
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role host \
+  --apply --confirm-request "${request_id}"
+cd /secure/host/helm-runtime
+shasum -a 256 -c manifest.sha256</pre>
+  <p>El paquete resultante contiene solo <code>msp.tgz</code>,
+  <code>tls.tgz</code>, <code>authorization.json</code> y
+  <code>manifest.sha256</code>.</p>
+
+  <h2>11. Imagen OCI, values y package IDs</h2>
+  <pre>docker build -t "${OCI_REPOSITORY}/gw-core:${release_tag}" .
+docker push "${OCI_REPOSITORY}/gw-core:${release_tag}"
+docker buildx imagetools inspect "${OCI_REPOSITORY}/gw-core:${release_tag}"</pre>
+  <p>GW CORE es un servicio y no se publica en npm. El values usa el digest OCI.
+  Cada CCAAS necesita una imagen por digest y un paquete cuya dirección sea el
+  Service exacto del release. El package ID es
+  <code>&lt;label&gt;:&lt;sha256 del .tgz&gt;</code>; cualquier cambio de Service,
+  release, puerto o TLS obliga a regenerarlo.</p>
+  <pre>HOST_FULLNAME="${HELM_RELEASE}" \
+KUBE_NAMESPACE="${KUBE_NAMESPACE}" \
+CCAAS_IMAGE="${OCI_REPOSITORY}/host-runtime@sha256:&lt;digest&gt;" \
+CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
+  bash scripts/onboarding/prepare-ccaas-packages.sh
+shasum -a 256 -c /secure/onboarding/ccaas/manifest.sha256</pre>
+  <p>El resultado contiene nueve archivos, sus package IDs en
+  <code>manifest.tsv</code> y el fragmento
+  <code>chaincodes.values.yaml</code>.</p>
+
+  <h2>12. Secrets e instalación Kubernetes</h2>
+  <pre>export KUBE_CONTEXT="contexto-del-cluster"
+export KUBE_NAMESPACE="namespace-del-host"
+export HELM_RELEASE="nombre-del-host"
+kubectl --context "${KUBE_CONTEXT}" create namespace "${KUBE_NAMESPACE}"
+HOST_RUNTIME_DIR=/secure/host/helm-runtime \
+POSTGRES_SECRET_ENV_FILE=/secure/host/postgresql.env \
+COUCHDB_SECRET_ENV_FILE=/secure/host/couchdb.env \
+GW_SECRET_ENV_FILE=/secure/host/gw.env \
+REDIS_SECRET_ENV_FILE=/secure/host/redis.env \
+  bash scripts/onboarding/materialize-kubernetes-secrets.sh
+bash scripts/validate-host-helm-values.sh \
+  /secure/inventory/host.values.yaml "${KUBE_NAMESPACE}" "${HELM_RELEASE}"
+helm upgrade --install "${HELM_RELEASE}" charts/gdc-host \
+  --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
+  --values /secure/inventory/host.values.yaml \
+  --atomic --wait --timeout 15m</pre>
+  <p>Se materializan seis Secrets básicos —peer MSP, peer TLS, autorización,
+  PostgreSQL, CouchDB y GW— y un séptimo si Redis está habilitado. Los values
+  nunca contienen sus valores. En producción cada pod
+  desenvuelve una vez la KEK mediante el adaptador KMS; una KEK plana solo es
+  válida en local/demo.</p>
+
+  <h2>13. Reconciliación y aceptación</h2>
+  <pre>node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role platform
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role platform \
+  --apply --confirm-request "${request_id}"
+kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" get pods,pvc,svc
+kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" rollout status \
+  statefulset/"${HELM_RELEASE}"-peer --timeout=5m
+kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" rollout status \
+  deployment/"${HELM_RELEASE}"-gw --timeout=5m</pre>
+  <p>El mapa privado del operador contiene comandos reales de inspección y
+  aplicación para MSP, grants, peer, canales y lifecycle CCAAS. Si falta uno,
+  el reconciliador falla cerrado. La aceptación prueba escritura/lectura por el
+  peer propio, permiso/denegación y persistencia tras reiniciar GW, peer y
+  CCAAS; un pod arrancado no basta.</p>
+
+  <h2>14. Material que se entrega</h2>
+  <p>Commit, digest OCI, chart, values saneado, versiones, gates, logs saneados,
+  auditoría y manifiesto de hashes. Los datos reales del proveedor se mantienen
+  en un anexo privado. La prueba local demuestra reproducibilidad del software;
+  no declara desplegada una infraestructura externa concreta.</p>
 </body>
 </html>

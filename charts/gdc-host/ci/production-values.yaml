@@ -14,6 +14,7 @@ host:
   dataChannel: health-care-eu
 gw:
   image: registry.example.invalid/gw-core@sha256:1111111111111111111111111111111111111111111111111111111111111111
+  existingSecret: host-gw
   providers: { queue: mem, database: postgres, storage: ipfs, envelope: hashicorp-transit, replayProtection: redis }
 images:
   init: registry.example.invalid/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
@@ -34,8 +35,33 @@ ipfs:
   image: registry.example.invalid/kubo@sha256:6666666666666666666666666666666666666666666666666666666666666666
 redis:
   enabled: true
+  existingSecret: host-redis
   image: registry.example.invalid/redis@sha256:8888888888888888888888888888888888888888888888888888888888888888
 chaincodes:
   - name: organization-sc
     image: registry.example.invalid/organization-sc@sha256:7777777777777777777777777777777777777777777777777777777777777777
-    packageId: organization-sc:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    packageId: organization-sc-v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  - name: cryptographickey-sc
+    image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: cryptographickey-sc-v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  - name: employee-sc
+    image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: employee-sc-v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  - name: evidence-sc
+    image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: evidence-sc-v1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+  - name: credential-sc
+    image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: credential-sc-v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+  - name: artifact-sc
+    image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: artifact-sc-v1:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+  - name: artifactevent-sc
+    image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: artifactevent-sc-v1:abababababababababababababababababababababababababababababababab
+  - name: subjectkeybinding-sc
+    image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: subjectkeybinding-sc-v1:bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc
+  - name: consentaccess-sc
+    image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: consentaccess-sc-v1:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd

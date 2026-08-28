@@ -9,12 +9,26 @@ fi
 enrollment_id="$(jq -r '.enrollmentId // empty' "${ENROLLMENT_GRANT_FILE}")"
 enrollment_secret="$(jq -r '.enrollmentSecret // empty' "${ENROLLMENT_GRANT_FILE}")"
 ca_url="$(jq -r '.caUrl // empty' "${ENROLLMENT_GRANT_FILE}")"
-if [[ -z "${enrollment_id}" || -z "${enrollment_secret}" || -z "${ca_url}" ]]; then
+spec_version="$(jq -r '.specVersion // empty' "${ENROLLMENT_GRANT_FILE}")"
+expires_at="$(jq -r '.expiresAt // empty' "${ENROLLMENT_GRANT_FILE}")"
+max_enrollments="$(jq -r '.maxEnrollments // 0' "${ENROLLMENT_GRANT_FILE}")"
+if [[ "${spec_version}" != "gdc.fabric.host-enrollment-grant/v1" \
+  || -z "${enrollment_id}" || -z "${enrollment_secret}" || -z "${ca_url}" || -z "${expires_at}" \
+  || "${max_enrollments}" != "2" ]]; then
   echo "Enrollment grant is incomplete" >&2
   exit 1
 fi
 if [[ "${ca_url}" != *"://"* ]]; then
   echo "Enrollment grant caUrl must include a URL scheme" >&2
+  exit 1
+fi
+now_epoch_seconds="${NOW_EPOCH_SECONDS:-$(date -u +%s)}"
+expires_epoch_seconds="$(node -e 'const value = Date.parse(process.argv[1]); if (!Number.isFinite(value)) process.exit(2); process.stdout.write(String(Math.floor(value / 1000)))' "${expires_at}")" || {
+  echo "Enrollment grant expiresAt is invalid" >&2
+  exit 1
+}
+if (( now_epoch_seconds >= expires_epoch_seconds )); then
+  echo "Enrollment grant has expired" >&2
   exit 1
 fi
 ca_scheme="${ca_url%%://*}"

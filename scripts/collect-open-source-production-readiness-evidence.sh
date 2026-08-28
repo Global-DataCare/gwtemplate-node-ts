@@ -151,7 +151,13 @@ test_dataspace_ica_host_activation() {
 test_fabric_governance_contract() {
   cd "${GW_ROOT}"
   bash ./scripts/tests/local-fabric-host-names.test.sh
+  bash ./scripts/tests/dynamic-host-admission-contract.test.sh
+  bash ./scripts/tests/public-deliverables-layout.test.sh
   node --test scripts/governance/tests/*.test.mjs scripts/onboarding/tests/*.test.mjs
+  bash ./scripts/onboarding/tests/enrollment-grant.test.sh
+  bash ./scripts/onboarding/tests/package-host-runtime.test.sh
+  bash ./scripts/onboarding/tests/materialize-kubernetes-secrets.test.sh
+  bash ./scripts/onboarding/tests/prepare-ccaas-packages.test.sh
   bash ./scripts/check-identity-chaincode-parity.sh
 }
 
@@ -217,11 +223,16 @@ prove_multi_host_topology() {
   cd "${FABRIC_DEVNET_ROOT}"
   bash ./scripts/00-copy-dataspace-ca.sh "${CA_ROOT_DIR}" "${CA_ISSUER_DIR}"
   bash ./scripts/01-up-cas.sh
-  SINGLE_HOST=false \
+  SINGLE_HOST=true \
   HLF_DATA_CHANNEL_NAME=health-care-local \
   HLF_IDENTITY_CHANNEL_NAME=identity-local \
   HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
     bash ./scripts/02-bootstrap-network.sh
+  SINGLE_HOST=true \
+  HLF_DATA_CHANNEL_NAME=health-care-local \
+  HLF_IDENTITY_CHANNEL_NAME=identity-local \
+  HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
+    bash ./scripts/06-admit-host2.sh
   SINGLE_HOST=false \
   HLF_DATA_CHANNEL_NAME=health-care-local \
   HLF_IDENTITY_CHANNEL_NAME=identity-local \
@@ -303,8 +314,8 @@ const body = `# Evidencia local de preparación para producción\n\n` +
   `El contrato de alta crea un secretario médico limitado a su organización. La prueba real con PostgreSQL, IPFS y Fabric crea datos de una persona, concede un consentimiento IPS explícito al secretario, acredita la lectura autorizada mediante SMART y deniega a otro secretario sin consentimiento. El perfil mantiene separadas las vinculaciones de identidad de organización y de persona.\n\n` +
   `## Prueba Kubernetes mediante Helm\n\n` +
   `El gate \`45-helm-kubernetes-runtime\` instala peer Host1MSP, CouchDB, GW, PostgreSQL, IPFS y nueve runtimes CCAAS en un clúster kind mediante el chart público. Enrola MSP/TLS exclusivos, une el peer a \`identity-local\` y \`health-care-local\`, instala y aprueba los nueve paquetes CCAAS en el peer kind, dirige el GW a ese peer y repite Consent y SMART. Después reinicia GW, peer y CCAAS y demuestra persistencia y nueva capacidad de endoso; el peer Docker queda limitado a gossip/bootstrap de la red externa.\n\n` +
-  `## Límite demostrado\n\n` +
-  `El paquete demuestra el contrato de admisión gobernada y el arranque reproducible de una topología con dos hosts. No declara todavía como automática la incorporación dinámica de \`Host2MSP\` a un canal que ya estuviera funcionando únicamente con \`Host1MSP\`; esa mutación del consorcio requiere su propia prueba E2E viva.\n`;
+  `## Admisión dinámica demostrada\n\n` +
+  `La puerta Fabric arranca los canales únicamente con \`Host1MSP\`. A continuación genera las identidades de \`Host2MSP\`, calcula y firma la actualización de configuración con el administrador gobernador, aplica la mutación a cada canal, arranca el segundo peer y lo une. La evidencia comprueba después la pertenencia desde ambos peers.\n`;
 writeFileSync(join(evidenceDir, 'SUMMARY.md'), body, { mode: 0o644 });
 NODE
 }
