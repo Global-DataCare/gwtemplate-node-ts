@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Document the temporary shared `legacy-v1` Firestore/KEK custody boundary
+  between CORE development and Accuro staging separately from their distinct
+  token-verification modes.
+
 - Make `iss` and `aud` the canonical trusted-provider configuration names,
   retain non-conflicting `issuer`/`audience` aliases, and fail startup when the
   two forms disagree.

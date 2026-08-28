@@ -34,6 +34,16 @@ uses `NETWORK_MODE=test`; local image validation uses `local-network`, while a
 future production profile must use `network`. Inspect the live ConfigMap and
 Deployment instead of assuming remembered values remain current.
 
+The CORE development and Accuro staging namespaces currently use the same
+`globaldatacare-test` Firestore data with `STORAGE_LAYOUT=legacy-v1` and the
+same host identity. Until they are migrated atomically to distinct
+`scoped-v2` collections, they therefore share one data-custody boundary and
+must use the same `KEK_SECRET`. This does not make their authentication modes
+the same: development remains `AUTH_TOKEN_VERIFIER=demo`, while Accuro uses
+`trusted-oidc`. Kubernetes Secrets are not overwritten by the deployment
+script, so compare custody by length/hash without printing the secret and
+restart only the new pod after a deliberate synchronization.
+
 `globaldatacare-test` is the GCP project and `gdc-unid-southwest` is the legacy
 cluster name; neither is a product name. This target's lifecycle role is
 development even though some resource names contain `test` and the release
