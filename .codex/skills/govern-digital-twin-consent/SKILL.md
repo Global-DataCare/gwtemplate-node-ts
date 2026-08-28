@@ -140,6 +140,15 @@ Verify current branches, versions and published npm state before release claims.
 - A later enrollment after purge receives a new twin UUID and cannot reconnect the old projection.
 - Administrative cleanup of erroneous direct records must resolve the exact tenant, section, document ids and subject first. Delete only proven erroneous index records; do not represent cleanup as patient purge, and do not claim immutable audit anchors were erased.
 
+## Preserve authored clinical deletion
+
+- Use `Bundle.type = batch`; each entry independently selects `.create()`, `.update()` or `.delete()`. Do not turn this flow into a transaction.
+- A typed delete addresses exactly `ResourceType/id`, has no resource body and may carry `.ifMatch(versionId)`.
+- Store only the creator DID in the clinical resource as `Composition.author`. Never store email, phone or their stable hashes in that resource.
+- At delete time, authorize the exact subject and creator. Resolve linked verified email/phone login channels from private identity metadata outside the resource, so phone-created and email-created data remain manageable after account linking.
+- Remove the exact fact from later operational summaries and the synchronized research projection when enabled. This is neither secondary-use `deny` nor provider-offboarding link purge.
+- Keep 101 documentation at application level: typed batch entry, authorization result and visible summary behavior, without vault, queue or hashing plumbing.
+
 ## Keep every artifact aligned
 
 For any contract change, update together:

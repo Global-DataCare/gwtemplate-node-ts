@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Admit mixed FHIR `POST` and `DELETE` entries in clinical section batches.
+  Project the authenticated creator as `Composition.author`, authorize delete
+  by exact subject and a verified linked login identity while retaining only
+  the creator DID on the clinical resource, honor optional `ifMatch`, return per-entry
+  independent `201`/`204`/`403`/`404`/`412` outcomes, and remove the matching
+  operational and Digital Twin resource projections without treating delete
+  as disable.
+
 - Vincular certificados Fabric de peer y cliente GW mediante
   `gdc.hostCredentialSha256`: Fabric CA no admite los `:` de un `urn:uuid`
   dentro de un atributo `:ecert`; la autorización conserva el identificador
