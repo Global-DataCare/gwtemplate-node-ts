@@ -63,3 +63,14 @@ FAKE_FABRIC_CA_CALLS="${WORK}/calls.log" \
   }
 grep -Fq 'has expired' "${WORK}/enroll.stderr"
 [[ ! -e "${WORK}/expired-host" ]]
+
+NOW_EPOCH_SECONDS=1785315961 \
+ENROLLMENT_GRANT_FILE="${grant}" \
+HOST_MSP_OUTPUT_DIR="${WORK}/valid-host" \
+HOST_PEER_DNS="peer0.host.example.invalid" \
+PATH="${WORK}/bin:${PATH}" \
+FAKE_FABRIC_CA_CALLS="${WORK}/calls.log" \
+  bash "${ROOT}/scripts/enrollment/enroll-host-msp.sh"
+[[ -d "${WORK}/valid-host" ]]
+[[ "$(grep -c '^enroll ' "${WORK}/calls.log")" == 2 ]]
+grep -Fq -- '--enrollment.profile tls' "${WORK}/calls.log"

@@ -73,7 +73,7 @@ GW_FABRIC_ENV_OUTPUT="${WORK}/gw.fabric.env" \
 grep -qx 'LEDGER_FABRIC_MSP_ID=HostExampleMSP' "${WORK}/gw.fabric.env"
 grep -qx 'HLF_MSP_ID_HOST1=HostExampleMSP' "${WORK}/gw.fabric.env"
 grep -qx 'HLF_CONNECTION_PEER=peer0.host.example.invalid:7051' "${WORK}/gw.fabric.env"
-grep -Fq 'HLF_CERTIFICATE=-----BEGIN CERTIFICATE-----\\nclient-certificate' "${WORK}/gw.fabric.env"
-grep -Fq 'HLF_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\\nclient-private-key' "${WORK}/gw.fabric.env"
+grep -Fq 'HLF_CERTIFICATE=-----BEGIN CERTIFICATE-----\nclient-certificate' "${WORK}/gw.fabric.env"
+grep -Fq 'HLF_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nclient-private-key' "${WORK}/gw.fabric.env"
 ! grep -Fq 'client-secret-must-not-print' "${WORK}/gw.fabric.env"
 [[ "$(stat -f '%Lp' "${WORK}/gw.fabric.env" 2>/dev/null || stat -c '%a' "${WORK}/gw.fabric.env")" == "600" ]]

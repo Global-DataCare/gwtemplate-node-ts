@@ -42,25 +42,17 @@ fi
 mkdir -p "${HOST_MSP_OUTPUT_DIR}"
 chmod 700 "${HOST_MSP_OUTPUT_DIR}"
 
-tls_args=()
-if [[ -n "${CA_TLS_CERT:-}" ]]; then
-  tls_args=(--tls.certfiles "${CA_TLS_CERT}")
-fi
-
 # fabric-ca-client creates both private keys locally under HOST_MSP_OUTPUT_DIR.
 # Only the CSR/public key crosses the network; no private key is downloaded.
 export FABRIC_CA_CLIENT_HOME="${HOST_MSP_OUTPUT_DIR}"
-fabric-ca-client enroll \
-  -u "${enroll_url}" \
-  --csr.hosts "${HOST_PEER_DNS}" \
-  "${tls_args[@]}"
+enroll_args=(-u "${enroll_url}" --csr.hosts "${HOST_PEER_DNS}")
+[[ -z "${CA_TLS_CERT:-}" ]] || enroll_args+=(--tls.certfiles "${CA_TLS_CERT}")
+fabric-ca-client enroll "${enroll_args[@]}"
 
 export FABRIC_CA_CLIENT_MSPDIR=tls
-fabric-ca-client enroll \
-  -u "${enroll_url}" \
-  --enrollment.profile tls \
-  --csr.hosts "${HOST_PEER_DNS}" \
-  "${tls_args[@]}"
+tls_enroll_args=(-u "${enroll_url}" --enrollment.profile tls --csr.hosts "${HOST_PEER_DNS}")
+[[ -z "${CA_TLS_CERT:-}" ]] || tls_enroll_args+=(--tls.certfiles "${CA_TLS_CERT}")
+fabric-ca-client enroll "${tls_enroll_args[@]}"
 
 unset FABRIC_CA_CLIENT_MSPDIR
 echo "Host MSP and TLS identities generated locally in ${HOST_MSP_OUTPUT_DIR}" >&2

@@ -28,20 +28,12 @@ expires_at="$(node -e 'process.stdout.write(new Date((Number(process.argv[1]) + 
 
 enrollment_id="${HOST_ENROLLMENT_ID:-host-$(printf '%s' "${host_url}" | shasum -a 256 | cut -c1-20)}"
 enrollment_secret="${HOST_ENROLLMENT_SECRET:-$(openssl rand -base64 36 | tr -d '=+/' | cut -c1-32)}"
-tls_args=()
-if [[ -n "${CA_TLS_CERT:-}" ]]; then
-  tls_args=(--tls.certfiles "${CA_TLS_CERT}")
-fi
-
 export FABRIC_CA_CLIENT_HOME="${CA_ADMIN_HOME}"
-fabric-ca-client register \
-  -u "${CA_URL}" \
-  --id.name "${enrollment_id}" \
-  --id.secret "${enrollment_secret}" \
-  --id.type peer \
-  --id.maxenrollments 2 \
-  --id.attrs "gdc.mspId=${msp_id}:ecert,gdc.hostCredentialId=${credential_id}:ecert" \
-  "${tls_args[@]}"
+register_args=(-u "${CA_URL}" --id.name "${enrollment_id}" --id.secret "${enrollment_secret}"
+  --id.type peer --id.maxenrollments 2
+  --id.attrs "gdc.mspId=${msp_id}:ecert,gdc.hostCredentialId=${credential_id}:ecert")
+[[ -z "${CA_TLS_CERT:-}" ]] || register_args+=(--tls.certfiles "${CA_TLS_CERT}")
+fabric-ca-client register "${register_args[@]}"
 
 umask 077
 jq -n \
