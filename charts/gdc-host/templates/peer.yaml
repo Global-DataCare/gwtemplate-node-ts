@@ -60,8 +60,8 @@ spec:
               cp /tls/signcerts/cert.pem /tls/server.crt
               cp /tls/keystore/*_sk /tls/server.key
               cp /tls/tlscacerts/*.pem /tls/ca.crt
-              if ls /msp/intermediatecerts/*.pem >/dev/null 2>&1; then
-                cat /msp/intermediatecerts/*.pem >> /tls/ca.crt
+              if ls /tls/tlsintermediatecerts/*.pem >/dev/null 2>&1; then
+                cat /tls/tlsintermediatecerts/*.pem >> /tls/ca.crt
               fi
           volumeMounts:
             - { name: msp-source, mountPath: /msp-source, readOnly: true }
@@ -80,6 +80,8 @@ spec:
             - { name: CORE_PEER_LOCALMSPID, value: {{ .Values.peer.mspId | quote }} }
             - { name: CORE_PEER_ADDRESS, value: {{ printf "%s:7051" (include "gdc-host.peerService" .) | quote }} }
             - { name: CORE_PEER_LISTENADDRESS, value: "0.0.0.0:7051" }
+            - { name: CORE_PEER_CHAINCODEADDRESS, value: {{ printf "%s:7052" (include "gdc-host.peerService" .) | quote }} }
+            - { name: CORE_PEER_CHAINCODELISTENADDRESS, value: "0.0.0.0:7052" }
             - { name: CORE_PEER_GOSSIP_EXTERNALENDPOINT, value: {{ .Values.peer.externalEndpoint | quote }} }
             - { name: CORE_PEER_GOSSIP_BOOTSTRAP, value: {{ default (printf "%s:7051" (include "gdc-host.peerService" .)) .Values.peer.bootstrap | quote }} }
             - { name: CORE_PEER_TLS_ENABLED, value: "true" }
@@ -97,7 +99,19 @@ spec:
               value: '[{"name":"ccaas_builder","path":"/opt/hyperledger/ccaas_builder","propagateEnvironment":[]}]'
           ports:
             - { name: peer, containerPort: 7051 }
+            - { name: chaincode, containerPort: 7052 }
             - { name: operations, containerPort: 9443 }
+          startupProbe:
+            tcpSocket: { port: peer }
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            tcpSocket: { port: peer }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: peer }
+            initialDelaySeconds: 15
+            periodSeconds: 10
           volumeMounts:
             - { name: peer-data, mountPath: /var/hyperledger/production }
             - { name: msp, mountPath: /etc/hyperledger/fabric/msp }
@@ -149,4 +163,5 @@ spec:
     app.kubernetes.io/component: peer
   ports:
     - { name: peer, port: {{ .Values.peer.service.port }}, targetPort: peer }
+    - { name: chaincode, port: 7052, targetPort: chaincode }
 {{- end }}

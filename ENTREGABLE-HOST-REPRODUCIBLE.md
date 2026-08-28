@@ -5,6 +5,12 @@ GW CORE, los chaincodes necesarios, una red Hyperledger Fabric local de dos
 hosts, el chart Helm del host y los flujos E2E. No requiere el repositorio
 operativo privado de la red.
 
+El llamado «runner SEDIA» no es Helm, ni una herramienta suministrada u
+homologada por SEDIA. Es el nombre informal del recolector público
+`scripts/collect-open-source-production-readiness-evidence.sh`, ejecutado por
+`npm run evidence:open-source-production-readiness`. Su función es ejecutar
+las pruebas y reunir estados, logs saneados, resumen y hashes para la memoria.
+
 ## Qué demuestra
 
 La evidencia se divide en dos puertas complementarias:
@@ -15,13 +21,42 @@ La evidencia se divide en dos puertas complementarias:
    del tenant, Consent, acceso SMART permitido y denegado, reinicio y
    recuperación persistente.
 2. **Helm/Kubernetes**, prueba de portabilidad. Crea un clúster `kind` aislado,
-   carga la misma imagen GW por digest, instala GW CORE, PostgreSQL e IPFS con
-   el chart y repite los flujos E2E contra la Fabric `local-network`. El
-   contrato estático del chart también renderiza peer, CouchDB y CCAAS para un
-   host autónomo.
+   carga la misma imagen GW por digest, instala un peer con identidad exclusiva
+   `Host1MSP`, CouchDB, GW CORE, PostgreSQL e IPFS, y une el peer a los canales
+   de la Fabric Docker `local-network`. El GW repite los flujos E2E contra el
+   peer Docker que ya dispone de los chaincodes aprobados.
 
 `helm template` por sí solo no se considera una prueba de despliegue. Se
 conserva como validación estática previa a la instalación real.
+
+La secuencia objetivo de incorporación de un host autónomo es:
+
+```text
+Autorización del host
+        ↓
+HostingServiceCredential (VC JSON y VC-JWT)
+        ↓
+Registro gobernado en la ICA de Fabric
+        ↓
+Enrolamiento MSP y TLS con claves privadas generadas por el host
+        ↓
+Secrets de Kubernetes
+        ↓
+helm upgrade --install gdc-host
+        ↓
+Peer + CouchDB + GW CORE + PostgreSQL + IPFS + CCAAS
+        ↓
+Reconciliación de canales y chaincodes, escritura, lectura y reinicio
+```
+
+La evidencia actual encadena la emisión de MSP/TLS, los Secrets, la instalación
+Helm, el arranque del peer y CouchDB y la unión real del peer Kubernetes a los
+canales externos. Docker sigue ejecutando la ICA de Fabric, orderer y peers de
+referencia con los chaincodes aprobados. El GW Kubernetes se conecta a ese peer
+Docker para el E2E porque el peer kind todavía no instala los paquetes CCAAS.
+Quedan como puerta pendiente el lifecycle CCAAS sobre el peer kind y repetir el
+E2E con el GW apuntando a su propio peer; peer y CouchDB ya no son una
+limitación pendiente.
 
 ## Autoridades que no deben confundirse
 
@@ -111,6 +146,16 @@ Helm no posee credenciales de registrar, no decide qué MSP entra en la red y no
 modifica canales. Instala el runtime autorizado. La autoridad y el
 reconciliador realizan las mutaciones privilegiadas antes y después de la
 instalación, respectivamente.
+
+| Entorno | Chart | Configuración específica |
+| --- | --- | --- |
+| `local-network` | `gdc-host` | Imágenes locales, autoridades locales, DNS `.localhost` y StorageClass de kind. |
+| `test-network` | El mismo `gdc-host` | Digests publicados, autoridades de staging, DNS/TLS y almacenamiento cloud. |
+| Producción | El mismo `gdc-host` | Host VC y certificados nuevos, digests aprobados, KMS y configuración del proveedor. |
+
+No se reutilizan MSP, TLS, claves, Secrets, grants ni credenciales verificables
+entre entornos. Se reutilizan el chart, la estructura de configuración y las
+versiones o digests que hayan superado las puertas correspondientes.
 
 ## Archivos principales
 

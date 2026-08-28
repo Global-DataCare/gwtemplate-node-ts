@@ -38,6 +38,7 @@
         "image": { "$ref": "#/definitions/digestImage" },
         "localImage": { "type": "string" },
         "imagePullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "fabricPeerEndpoint": { "type": "string" },
         "existingSecret": { "type": "string", "minLength": 1 },
         "providers": {
           "type": "object",

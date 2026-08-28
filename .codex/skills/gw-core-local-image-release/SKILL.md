@@ -129,8 +129,17 @@ The final open-source project evidence has four mandatory, complementary gates:
    tenant Organizations are hosted application data, not Fabric members.
 4. Kubernetes portability plane: validate the complete immutable host chart,
    create an isolated kind cluster, load the already-tested GW image by digest,
-   install GW/PostgreSQL/IPFS with Helm, repeat the local-network E2E and prove
-   recovery after restart. A render-only `helm template` is not this gate.
+   enroll a dedicated peer identity through the Fabric ICA, install
+   peer/CouchDB/GW/PostgreSQL/IPFS with Helm, join the Kubernetes peer to the
+   local channels, repeat the local-network E2E and prove recovery after
+   restarting GW and peer. A render-only `helm template` is not this gate.
+
+The Kubernetes peer proof and the application endorsement proof are separate
+until the exact CCAAS packages have been installed on that peer. It is valid to
+keep the GW temporarily on an already-endorsing peer while proving the new
+peer's MSP/TLS, channel join, CouchDB state and restart persistence. Do not call
+the host autonomous until CCAAS lifecycle succeeds on the Kubernetes peer and
+the GW E2E is repeated through it.
 
 Generate the presentation bundle with
 `npm run evidence:open-source-production-readiness`. It must contain only

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Flujo contractual Helm/Kubernetes para local-network:
 # 1. Crea un clúster kind aislado y carga la imagen GW ya validada por Docker.
-# 2. Despliega por Helm GW CORE, PostgreSQL e IPFS por referencias inmutables.
-# 3. Conecta el GW al peer Host1MSP de la Fabric local-network mediante DNS local.
-# 4. Ejecuta bootstrap de tenant, Consent e intercambio SMART positivo/negativo.
-# 5. Reinicia GW y demuestra persistencia PostgreSQL/IPFS y recuperación del tenant.
+# 2. Despliega por Helm peer Host1MSP, CouchDB, GW CORE, PostgreSQL e IPFS.
+# 3. Enrola una identidad exclusiva para el peer kind y lo une a la Fabric Docker.
+# 4. Mantiene el GW sobre el peer Docker que ya tiene los paquetes de chaincode.
+# 5. Ejecuta bootstrap de tenant, Consent e intercambio SMART positivo/negativo.
+# 6. Reinicia GW y peer y demuestra persistencia de canales, PostgreSQL e IPFS.
 # Autorización: Helm consume identidad/configuración ya preparadas; no registra MSP ni administra Fabric CA.
 # Persistencia: el reinicio no rota claves ni pierde el DID o los blobs cifrados.
 set -euo pipefail
@@ -18,6 +19,11 @@ RELEASE="${HELM_EVIDENCE_RELEASE:-host-evidence}"
 KEEP_CLUSTER="${KEEP_HELM_EVIDENCE_CLUSTER:-false}"
 EVIDENCE_TENANT_ID="${HELM_EVIDENCE_TENANT_ID:-helm-evidence}"
 EVIDENCE_SUBJECT_ID="did:web:api.${EVIDENCE_TENANT_ID}.org:individual:subject-001"
+FABRIC_DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${ROOT}/infra/fabric/local-network}"
+KIND_PEER_DOMAIN="peer-kind.host1.example.com"
+KIND_PEER_SERVICE="${RELEASE}-peer"
+KIND_PEER_DIR="${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/host1.example.com/peers/${KIND_PEER_DOMAIN}"
+HOST1_ADMIN_MSP="${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp"
 PREFLIGHT_ONLY=false
 TEMP_DIR="$(mktemp -d)"
 PORT_FORWARD_PID=""
@@ -66,9 +72,59 @@ docker ps --format '{{.Names}}' | grep -qx 'gdc-peer0-host1' || {
   exit 2
 }
 
+prepare_kind_peer_identity() {
+  local enrollment_id="peer-kind-host1-$(openssl rand -hex 6)"
+  local enrollment_secret
+  enrollment_secret="$(openssl rand -base64 24 | tr -d '=+/\n' | cut -c1-24)"
+  local container_peer_dir="/workspace/organizations/peerOrganizations/host1.example.com/peers/${KIND_PEER_DOMAIN}"
+  local ca_tls_cert="/workspace/crypto/ca/ica/ca-tls-bundle.pem"
+
+  test -d "${HOST1_ADMIN_MSP}"
+  rm -rf "${KIND_PEER_DIR}"
+  mkdir -p "${KIND_PEER_DIR}"
+
+  docker exec \
+    -e FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-admin \
+    gdc-fabric-ca-client fabric-ca-client register \
+      -u 'https://admin:adminpw@ica:7054' \
+      --id.name "${enrollment_id}" \
+      --id.secret "${enrollment_secret}" \
+      --id.type peer \
+      --id.affiliation host1.department1 \
+      --id.maxenrollments 2 \
+      --tls.certfiles "${ca_tls_cert}" >/dev/null
+
+  docker exec gdc-fabric-ca-client fabric-ca-client enroll \
+    -u "https://${enrollment_id}:${enrollment_secret}@ica:7054" \
+    -M "${container_peer_dir}/msp" \
+    --csr.hosts "${KIND_PEER_SERVICE}" \
+    --csr.hosts "${KIND_PEER_DOMAIN}" \
+    --tls.certfiles "${ca_tls_cert}" >/dev/null
+  cp "${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/msp/config.yaml" \
+    "${KIND_PEER_DIR}/msp/config.yaml"
+
+  docker exec gdc-fabric-ca-client fabric-ca-client enroll \
+    -u "https://${enrollment_id}:${enrollment_secret}@ica:7054" \
+    -M "${container_peer_dir}/tls" \
+    --enrollment.profile tls \
+    --csr.hosts "${KIND_PEER_SERVICE}" \
+    --csr.hosts "${KIND_PEER_DOMAIN}" \
+    --tls.certfiles "${ca_tls_cert}" >/dev/null
+
+  tar -C "${KIND_PEER_DIR}/msp" -czf "${TEMP_DIR}/peer-msp.tgz" .
+  tar -C "${KIND_PEER_DIR}/tls" -czf "${TEMP_DIR}/peer-tls.tgz" .
+}
+
+prepare_kind_peer_identity
+
 kind delete cluster --name "${CLUSTER_NAME}" >/dev/null 2>&1 || true
 kind create cluster --name "${CLUSTER_NAME}" --wait 90s
 kind load docker-image "${IMAGE_NAME}" --name "${CLUSTER_NAME}"
+peer_image_tag="$(docker inspect gdc-peer0-host1 --format '{{.Config.Image}}')"
+peer_image="$(docker image inspect "${peer_image_tag}" --format '{{index .RepoDigests 0}}')"
+tools_image="$(docker inspect gdc-fabric-tools --format '{{.Config.Image}}')"
+kind load docker-image "${peer_image_tag}" --name "${CLUSTER_NAME}"
+kind load docker-image "${tools_image}" --name "${CLUSTER_NAME}"
 
 docker_image_id="$(docker image inspect "${IMAGE_NAME}" --format '{{.Id}}')"
 kind_image_record="$(docker exec "${CLUSTER_NAME}-control-plane" crictl images -o json \
@@ -83,6 +139,8 @@ kind_image_digest="$(jq -r '.repoDigests[0]' <<< "${kind_image_record}")"
 
 kubectl --context "${KUBE_CONTEXT}" create namespace "${NAMESPACE}"
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create service externalname peer0-host1 \
+  --external-name host.docker.internal
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create service externalname orderer \
   --external-name host.docker.internal
 
 GW_SECRET_ENV="${TEMP_DIR}/gw.secret.env"
@@ -115,6 +173,17 @@ kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create secret generic host
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create secret generic host-evidence-postgresql \
   --from-literal=POSTGRES_USER=postgres \
   --from-literal=POSTGRES_PASSWORD=postgres-local-evidence
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create secret generic host-evidence-peer-msp \
+  --from-file=msp.tgz="${TEMP_DIR}/peer-msp.tgz"
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create secret generic host-evidence-peer-tls \
+  --from-file=tls.tgz="${TEMP_DIR}/peer-tls.tgz"
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create secret generic host-evidence-couchdb \
+  --from-literal=username=admin \
+  --from-literal=password=couchdb-local-evidence
+printf '%s\n' '{"authorized":true,"mspId":"Host1MSP","networkKind":"local-network","hostCredentialId":"local-evidence-host-credential"}' \
+  > "${TEMP_DIR}/authorization.json"
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create secret generic host-evidence-authorization \
+  --from-file=authorization.json="${TEMP_DIR}/authorization.json"
 
 helm upgrade --install "${RELEASE}" "${ROOT}/charts/gdc-host" \
   --kube-context "${KUBE_CONTEXT}" \
@@ -122,16 +191,116 @@ helm upgrade --install "${RELEASE}" "${ROOT}/charts/gdc-host" \
   --values "${ROOT}/charts/gdc-host/ci/local-evidence-values.yaml" \
   --set-string "gw.localImage=${IMAGE_NAME}" \
   --set-string gw.imagePullPolicy=Never \
-  --set peer.enabled=false \
+  --set-string gw.fabricPeerEndpoint=peer0-host1:7051 \
+  --set peer.enabled=true \
+  --set-string peer.image="${peer_image}" \
+  --set-string peer.name=peer-kind-host1 \
+  --set-string peer.mspId=Host1MSP \
+  --set-string peer.externalEndpoint="${KIND_PEER_SERVICE}:7051" \
+  --set-string peer.mspSecretName=host-evidence-peer-msp \
+  --set-string peer.tlsSecretName=host-evidence-peer-tls \
+  --set-string peer.couchdbSecretName=host-evidence-couchdb \
+  --set-string peer.service.type=ClusterIP \
+  --set-string authorization.existingSecret=host-evidence-authorization \
   --set-string externalPeer.host=peer0-host1 \
   --set externalPeer.port=7051 \
   --set-string images.init=docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662 \
+  --set-string couchdb.image=docker.io/library/couchdb@sha256:307a3f5276f64c0db28f226b7b5c180b8f2c851afa681cfb4fbb1b1fe7fd5587 \
   --set-string postgresql.image=docker.io/library/postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685 \
   --set-string ipfs.image=docker.io/ipfs/kubo@sha256:7cc0e0de8f845d6c9fa1dce414c069974c34ed3cd3742e0d4f5bccda4adc376d \
   --wait --timeout 10m
 
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
   "deployment/${RELEASE}-gw" --timeout=5m
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
+  "statefulset/${RELEASE}-peer" --timeout=5m
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
+  "statefulset/${RELEASE}-couchdb" --timeout=5m
+
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" run peer-join-tools \
+  --image="${tools_image}" \
+  --image-pull-policy=Never \
+  --restart=Never \
+  --command -- sleep 900
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" wait \
+  --for=condition=Ready pod/peer-join-tools --timeout=3m
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" cp \
+  "${HOST1_ADMIN_MSP}/." peer-join-tools:/tmp/admin-msp
+kind_peer_tls_bundle="${TEMP_DIR}/peer-tls-ca-bundle.pem"
+find "${KIND_PEER_DIR}/tls/tlscacerts" "${KIND_PEER_DIR}/tls/tlsintermediatecerts" \
+  -type f -name '*.pem' -exec cat {} + > "${kind_peer_tls_bundle}"
+test -s "${kind_peer_tls_bundle}"
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" cp \
+  "${kind_peer_tls_bundle}" peer-join-tools:/tmp/peer-tls-root.pem
+for _ in $(seq 1 60); do
+  if kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec peer-join-tools -- env \
+    CORE_PEER_LOCALMSPID=Host1MSP \
+    CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp \
+    CORE_PEER_ADDRESS="${KIND_PEER_SERVICE}:7051" \
+    CORE_PEER_TLS_ENABLED=true \
+    CORE_PEER_TLS_ROOTCERT_FILE=/tmp/peer-tls-root.pem \
+    CORE_PEER_TLS_SERVERHOSTOVERRIDE="${KIND_PEER_SERVICE}" \
+    peer node status >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec peer-join-tools -- env \
+  CORE_PEER_LOCALMSPID=Host1MSP \
+  CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp \
+  CORE_PEER_ADDRESS="${KIND_PEER_SERVICE}:7051" \
+  CORE_PEER_TLS_ENABLED=true \
+  CORE_PEER_TLS_ROOTCERT_FILE=/tmp/peer-tls-root.pem \
+  CORE_PEER_TLS_SERVERHOSTOVERRIDE="${KIND_PEER_SERVICE}" \
+  peer node status >/dev/null
+for channel in identity-local health-care-local; do
+  kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" cp \
+    "${FABRIC_DEVNET_ROOT}/channel-artifacts/${channel}.block" \
+    "peer-join-tools:/tmp/${channel}.block"
+  kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec peer-join-tools -- env \
+    CORE_PEER_LOCALMSPID=Host1MSP \
+    CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp \
+    CORE_PEER_ADDRESS="${KIND_PEER_SERVICE}:7051" \
+    CORE_PEER_TLS_ENABLED=true \
+    CORE_PEER_TLS_ROOTCERT_FILE=/tmp/peer-tls-root.pem \
+    CORE_PEER_TLS_SERVERHOSTOVERRIDE="${KIND_PEER_SERVICE}" \
+    peer channel join -b "/tmp/${channel}.block"
+done
+kind_peer_channels="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec peer-join-tools -- env \
+  CORE_PEER_LOCALMSPID=Host1MSP \
+  CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp \
+  CORE_PEER_ADDRESS="${KIND_PEER_SERVICE}:7051" \
+  CORE_PEER_TLS_ENABLED=true \
+  CORE_PEER_TLS_ROOTCERT_FILE=/tmp/peer-tls-root.pem \
+  CORE_PEER_TLS_SERVERHOSTOVERRIDE="${KIND_PEER_SERVICE}" \
+  peer channel list)"
+for channel in identity-local health-care-local; do
+  grep -qx "${channel}" <<< "${kind_peer_channels}"
+  kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec peer-join-tools -- env \
+    CORE_PEER_LOCALMSPID=Host1MSP \
+    CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp \
+    CORE_PEER_ADDRESS="${KIND_PEER_SERVICE}:7051" \
+    CORE_PEER_TLS_ENABLED=true \
+    CORE_PEER_TLS_ROOTCERT_FILE=/tmp/peer-tls-root.pem \
+    CORE_PEER_TLS_SERVERHOSTOVERRIDE="${KIND_PEER_SERVICE}" \
+    peer channel getinfo -c "${channel}" | grep -Eq 'height[^0-9]*[1-9][0-9]*'
+done
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" get pod \
+  -l app.kubernetes.io/component=peer -o jsonpath='{.items[0].spec.containers[0].env}' \
+  | grep -Fq 'CORE_PEER_LOCALMSPID'
+couchdb_pod="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" get pod \
+  -l app.kubernetes.io/component=couchdb -o jsonpath='{.items[0].metadata.name}')"
+for _ in $(seq 1 60); do
+  couchdb_databases="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec "${couchdb_pod}" -- \
+    curl --fail --silent --user admin:couchdb-local-evidence http://127.0.0.1:5984/_all_dbs 2>/dev/null || true)"
+  if grep -Fq 'identity-local' <<< "${couchdb_databases}" \
+    && grep -Fq 'health-care-local' <<< "${couchdb_databases}"; then
+    break
+  fi
+  sleep 1
+done
+grep -Fq 'identity-local' <<< "${couchdb_databases}"
+grep -Fq 'health-care-local' <<< "${couchdb_databases}"
 
 LOCAL_PORT="${HELM_EVIDENCE_LOCAL_PORT:-18082}"
 BASE_URL="http://127.0.0.1:${LOCAL_PORT}"
@@ -177,8 +346,11 @@ if [[ "${ipfs_blobs}" -le 0 ]]; then
 fi
 
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout restart "deployment/${RELEASE}-gw"
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout restart "statefulset/${RELEASE}-peer"
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
   "deployment/${RELEASE}-gw" --timeout=5m
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
+  "statefulset/${RELEASE}-peer" --timeout=5m
 start_port_forward
 for _ in $(seq 1 60); do
   curl --fail --silent --max-time 2 "${PING_URL}" >/dev/null 2>&1 && break
@@ -187,5 +359,16 @@ done
 curl --fail --silent --show-error --max-time 5 \
   "${BASE_URL}/${EVIDENCE_TENANT_ID}/cds-ES/v1/health-care/.well-known/did.json" \
   | jq -e '.id | startswith("did:web:")' >/dev/null
+kind_peer_channels="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec peer-join-tools -- env \
+  CORE_PEER_LOCALMSPID=Host1MSP \
+  CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp \
+  CORE_PEER_ADDRESS="${KIND_PEER_SERVICE}:7051" \
+  CORE_PEER_TLS_ENABLED=true \
+  CORE_PEER_TLS_ROOTCERT_FILE=/tmp/peer-tls-root.pem \
+  CORE_PEER_TLS_SERVERHOSTOVERRIDE="${KIND_PEER_SERVICE}" \
+  peer channel list)"
+for channel in identity-local health-care-local; do
+  grep -qx "${channel}" <<< "${kind_peer_channels}"
+done
 
-echo "Helm local-network validado: postgres_documents=${postgres_documents} ipfs_jwe_blobs=${ipfs_blobs} restart=ok docker_image_id=${docker_image_id} kind_image_id=${kind_image_id}"
+echo "Helm local-network validado: kind_peer_msp=Host1MSP kind_peer_channels=$(tr '\n' ',' <<< "${kind_peer_channels}" | sed 's/,$//') couchdb_channels=ok postgres_documents=${postgres_documents} ipfs_jwe_blobs=${ipfs_blobs} gw_peer_restart=ok docker_image_id=${docker_image_id} kind_image_id=${kind_image_id}"

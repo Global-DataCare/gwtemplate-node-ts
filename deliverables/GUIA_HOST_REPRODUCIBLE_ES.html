@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Guía reproducible para el alta y despliegue de un host</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2cm; color: #1f2937; line-height: 1.45; }
+    h1 { color: #123b5d; font-size: 24pt; }
+    h2 { color: #175b7f; margin-top: 24pt; }
+    table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
+    th, td { border: 1px solid #9ca3af; padding: 7pt; vertical-align: top; }
+    th { background: #e8f1f5; }
+    pre { background: #f3f4f6; padding: 10pt; white-space: pre-wrap; }
+    .notice { border-left: 5px solid #d97706; background: #fff7ed; padding: 10pt; }
+  </style>
+</head>
+<body>
+  <h1>Guía reproducible para el alta y despliegue de un host</h1>
+  <p><strong>Documento público en español para memoria, consultoría e integración.</strong></p>
+
+  <h2>1. Qué es el recolector de evidencias</h2>
+  <p>El término «runner SEDIA» es informal. No es Helm ni una herramienta
+  oficial de SEDIA. Es el recolector público
+  <code>scripts/collect-open-source-production-readiness-evidence.sh</code>,
+  invocado mediante <code>npm run evidence:open-source-production-readiness</code>.
+  Ejecuta las pruebas y genera estados, logs saneados, resumen y manifiesto con
+  hashes.</p>
+
+  <h2>2. Flujo objetivo</h2>
+  <pre>Autorización del host
+        ↓
+HostingServiceCredential (VC JSON y VC-JWT)
+        ↓
+Registro gobernado en la ICA de Fabric
+        ↓
+Enrolamiento MSP y TLS con claves privadas locales
+        ↓
+Secrets de Kubernetes
+        ↓
+helm upgrade --install gdc-host
+        ↓
+Peer + CouchDB + GW CORE + PostgreSQL + IPFS + CCAAS
+        ↓
+Canales, escritura, lectura, denegación y reinicio</pre>
+
+  <h2>3. Evidencia ejecutada</h2>
+  <ul>
+    <li>CA del espacio de datos local con Root e Issuer desechables.</li>
+    <li>ICA del espacio de datos y Host VC JSON/VC-JWT sin PDF para un host preautorizado.</li>
+    <li>ICA de Fabric, certificados MSP/TLS, Host1MSP, Host2MSP, canales y chaincodes.</li>
+    <li>GW CORE, PostgreSQL e IPFS con escritura, lectura y recuperación tras reinicio.</li>
+    <li>Instalación real de peer Host1MSP, CouchDB, GW CORE, PostgreSQL e IPFS mediante kind y Helm.</li>
+    <li>Unión del peer Kubernetes a los canales locales y persistencia tras reinicio.</li>
+    <li>Acceso consentido y controles negativos de acceso no autorizado.</li>
+  </ul>
+
+  <div class="notice">
+    <strong>Límite que debe declararse:</strong> peer y CouchDB ya se ejecutan
+    dentro de Kubernetes y el peer se une realmente a los canales externos. El
+    GW usa todavía el peer Docker que ya dispone de chaincodes. Falta instalar
+    los paquetes CCAAS en el peer kind y repetir el E2E contra ese peer para
+    afirmar que el host Fabric autónomo completo está probado.
+  </div>
+
+  <h2>4. Qué hace realmente la puerta Kubernetes</h2>
+  <p>La prueba ya no se limita a <code>helm template</code>. Crea un clúster
+  kind aislado, namespace y Secrets; carga la imagen aprobada; ejecuta
+  <code>helm upgrade --install</code>; espera el rollout; realiza operaciones
+  E2E; comprueba canales y CouchDB; consulta PostgreSQL e IPFS dentro de los
+  pods; reinicia GW y peer y comprueba la recuperación. <code>helm
+  template</code> permanece como comprobación estática complementaria.</p>
+
+  <h2>5. Promoción del mismo chart</h2>
+  <table>
+    <tr><th>Entorno</th><th>Chart</th><th>Diferencias</th></tr>
+    <tr><td>local-network</td><td>gdc-host</td><td>Imágenes y autoridades locales, DNS .localhost y StorageClass de kind.</td></tr>
+    <tr><td>test-network</td><td>gdc-host</td><td>Digests publicados, autoridades de staging, DNS/TLS y almacenamiento cloud.</td></tr>
+    <tr><td>Producción</td><td>gdc-host</td><td>Host VC y certificados nuevos, digests aprobados, KMS y values del proveedor.</td></tr>
+  </table>
+  <p>No se reutilizan MSP, TLS, claves, Secrets, grants ni credenciales
+  verificables entre entornos. Se reutilizan el chart, su estructura de
+  configuración y las versiones o digests aprobados.</p>
+
+  <h2>6. Responsabilidad de Helm</h2>
+  <p>Helm no crea la red Fabric, no actúa como administrador de ninguna ICA y no
+  decide qué MSP entra en los canales. Antes de instalar un host autónomo deben
+  existir la autorización, el grant de enrolamiento, el material MSP/TLS
+  generado por el host, la incorporación gobernada a los canales y los Secrets
+  Kubernetes. La reconciliación privilegiada se ejecuta por la autoridad.</p>
+
+  <h2>7. Datos requeridos al proveedor</h2>
+  <ul>
+    <li>Versión de Kubernetes, namespace, StorageClass e IngressClass.</li>
+    <li>DNS, TLS, reglas de red y registro de imágenes.</li>
+    <li>PVC, backups, restauración y observabilidad.</li>
+    <li>Gestor de secretos y custodia externa del KEK.</li>
+    <li>Valores no secretos del release y canal seguro para grants y Secrets.</li>
+  </ul>
+
+  <h2>8. Criterio de presentación</h2>
+  <p>La memoria puede afirmar que la red Fabric local y el despliegue Kubernetes
+  con peer, CouchDB, GW CORE, PostgreSQL e IPFS se han probado de forma
+  reproducible. Debe marcar como pendiente el lifecycle CCAAS en el peer kind y
+  el E2E del GW contra ese peer hasta que exista la evidencia correspondiente.</p>
+</body>
+</html>

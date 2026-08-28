@@ -137,6 +137,13 @@ export function buildEvidenceManifest({
       positiveControl: 'explicit consent permits SMART IPS read by the selected medical secretary',
       negativeControl: 'a different medical secretary without consent receives no access token',
     },
+    kubernetesProof: {
+      components: ['peer', 'couchdb', 'gw-core', 'postgresql', 'ipfs'],
+      fabricMsp: 'Host1MSP',
+      joinedChannels: ['identity-local', 'health-care-local'],
+      persistence: 'peer channels, PostgreSQL documents and IPFS JWE blobs survive pod restart',
+      pending: 'CCAAS lifecycle and GW endorsement through the Kubernetes peer',
+    },
     repositories,
     image: imageInspector(imageName),
     gates: readGateStatuses(resolvedEvidenceDir),
@@ -146,6 +153,7 @@ export function buildEvidenceManifest({
       'use production DNS, TLS, secret custody, persistent volumes and monitored backup/recovery',
       'use production Fabric Root/ICA material and governed channel inventory',
       'exercise the real operator-owned Fabric reconciliation driver before claiming dynamic host admission',
+      'install approved CCAAS packages on the host peer and validate GW endorsement through that peer',
       'deploy the already-tested image by immutable registry digest',
     ],
   };

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- Añadir en `deliverables/` una guía Word pública en español, aclarando qué
+  ejecuta realmente kind/Helm y que solo quedan pendientes el lifecycle CCAAS
+  y el E2E del GW contra el peer Kubernetes.
+
+- Ejecutar mediante el chart el peer `Host1MSP` y CouchDB dentro de kind,
+  enrolar MSP/TLS exclusivos con la ICA de Fabric, unir el peer a los dos
+  canales locales y comprobar canales, estado CouchDB y persistencia tras
+  reiniciar peer y GW.
+
 - Forzar en la prueba real Helm que los JWE cifrados se externalicen a IPFS y
   abortar explícitamente si Kubernetes no conserva documentos en PostgreSQL o
   blobs en IPFS, incluso cuando el recolector ejecute el gate en una tubería.
