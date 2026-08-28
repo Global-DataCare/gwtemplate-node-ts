@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Forzar en la prueba real Helm que los JWE cifrados se externalicen a IPFS y
+  abortar explícitamente si Kubernetes no conserva documentos en PostgreSQL o
+  blobs en IPFS, incluso cuando el recolector ejecute el gate en una tubería.
+
 - Incluir en Git los módulos `lib/*.mjs` de gobierno y onboarding requeridos
   por los ejecutables públicos, y hacer que el gate falle si un clon limpio no
   contiene cualquiera de estos runtimes.

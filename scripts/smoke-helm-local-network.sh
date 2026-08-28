@@ -99,6 +99,7 @@ POSTGRES_PASSWORD=postgres-local-evidence
 POSTGRES_SSL=false
 POSTGRES_SCHEMA=public
 IPFS_MFS_ROOT=/gwtemplate/blobs
+CONFIDENTIAL_JWE_INLINE_MAX_BYTES=1
 KEK_SECRET=$(openssl rand -base64 32 | tr -d '\n')
 FHIR_LEGACY=true
 JSON_LEGACY=true
@@ -166,8 +167,14 @@ postgres_documents="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec
   psql -U postgres -d gw -Atc 'SELECT count(*) FROM public.vault_documents WHERE deleted_at IS NULL')"
 ipfs_blobs="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec "${ipfs_pod}" -- \
   sh -lc 'ipfs files ls /gwtemplate/blobs 2>/dev/null | wc -l | tr -d " "')"
-[[ "${postgres_documents}" -gt 0 ]]
-[[ "${ipfs_blobs}" -gt 0 ]]
+if [[ "${postgres_documents}" -le 0 ]]; then
+  echo 'La prueba Helm no persistió ningún documento cifrado en PostgreSQL.' >&2
+  exit 1
+fi
+if [[ "${ipfs_blobs}" -le 0 ]]; then
+  echo 'La prueba Helm no persistió ningún JWE cifrado en IPFS.' >&2
+  exit 1
+fi
 
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout restart "deployment/${RELEASE}-gw"
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \

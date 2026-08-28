@@ -72,6 +72,8 @@ git check-ignore -q ./infra/fabric/local-network/organizations/private-key.pem
 test -f ./charts/gdc-host/Chart.yaml
 test -f ./scripts/test-portable-host-helm.sh
 bash ./scripts/smoke-helm-local-network.sh --preflight-only | grep -Fq 'Preflight Helm local-network superado.'
+grep -Fq 'CONFIDENTIAL_JWE_INLINE_MAX_BYTES=1' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'La prueba Helm no persistió ningún JWE cifrado en IPFS.' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'test:host-preauthorization' ./scripts/collect-open-source-production-readiness-evidence.sh
 if grep -Fq 'fabric-multicloud' ./scripts/collect-open-source-production-readiness-evidence.sh; then
   echo 'ERROR: the public evidence runner must not require a private Fabric repository.' >&2
