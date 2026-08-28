@@ -191,7 +191,6 @@ HOST_RUNTIME_IMAGE_ARCHIVE="${TEMP_DIR}/host-runtime-images.tar"
 PUBLIC_DOCKER_CONFIG="${TEMP_DIR}/docker-public"
 peer_image_tag="$(docker inspect "${FABRIC_PEER_CONTAINER}" --format '{{.Config.Image}}')"
 peer_image="$(docker image inspect "${peer_image_tag}" --format '{{index .RepoDigests 0}}')"
-tools_image="$(docker inspect "${FABRIC_TOOLS_CONTAINER}" --format '{{.Config.Image}}')"
 # Keep at most one digest-only image in this archive. kind assigns the same
 # synthetic import name to untagged Docker archives; combining several can
 # overwrite their manifest reference. BusyBox and PostgreSQL are small and are
@@ -200,7 +199,6 @@ host_runtime_images=(
   "${COUCHDB_IMAGE}"
   "${IPFS_IMAGE}"
   "${peer_image_tag}"
-  "${tools_image}"
 )
 mkdir -p "${PUBLIC_DOCKER_CONFIG}"
 for runtime_image in "${host_runtime_images[@]}"; do
@@ -323,7 +321,7 @@ kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
   deployment --selector app.kubernetes.io/component=chaincode --timeout=5m
 
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" run peer-join-tools \
-  --image="${tools_image}" \
+  --image="${peer_image}" \
   --image-pull-policy=Never \
   --restart=Never \
   --command -- sleep 900

@@ -3,6 +3,8 @@
 # 1. the Helm peer belongs to dynamically admitted Host2MSP, not bootstrap Host1MSP;
 # 2. Host2 installs and approves all nine local CCAAS packages;
 # 3. GW targets that Kubernetes Host2 peer for the E2E and restart proof.
+# 4. kind imports only images used by Kubernetes workloads, while Fabric tools
+#    remain in the external Docker network used for governance operations.
 # Authorization invariant: the committed policy permits either governed host MSP to endorse.
 # Persistence invariant: Host2 peer membership and CCAAS readiness survive restart.
 set -euo pipefail
@@ -17,6 +19,11 @@ grep -Fq 'host2.example.com' "${SMOKE}"
 grep -Fq 'HOST_AUTHORIZATION_JSON' "${SMOKE}"
 grep -Fq 'gdc.hostCredentialSha256' "${SMOKE}"
 grep -Fq 'KIND_GW_MSP' "${SMOKE}"
+if grep -Fq 'tools_image=' "${SMOKE}"; then
+  echo 'kind must not import the oversized Fabric tools image.' >&2
+  exit 1
+fi
+grep -Fq -- '--image="${peer_image}"' "${SMOKE}"
 grep -Fq 'LEDGER_FABRIC_MSP_ID=${KIND_PEER_MSP_ID}' "${SMOKE}"
 grep -Fq 'HLF_MSP_ID_HOST1=${KIND_PEER_MSP_ID}' "${SMOKE}"
 grep -Fq 'HLF_CERTIFICATE=$(to_env_one_line_pem "${KIND_GW_CERT}")' "${SMOKE}"
