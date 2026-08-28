@@ -43,6 +43,11 @@ OIDC_TRUSTED_PROVIDERS_JSON=[{"iss":"globaldatacare.es","aud":"globaldatacare.es
 - Keep GW CORE development at `34.175.78.233` on `demo`; it intentionally does
   not validate signatures.
 - Configure host Accuro with GlobalDataCare `iss=aud=globaldatacare.es`.
+- OIDC mode and key custody are independent. While CORE development and
+  Accuro still share the `globaldatacare-test` Firestore `legacy-v1` host
+  collection, their Kubernetes Secrets must contain the same `KEK_SECRET` or
+  either deployment can leave wrapped records unreadable to the other. The GKE
+  deploy script preserves an existing Secret; verify custody explicitly.
 - Configure `uhc-gw.unid.online` with `uhc-unid`,
   `uhc-unid-personal-staging`, `unid-professional` and GlobalDataCare.
 - Configure `beta-gw.vetchain.app` with `uhc-can`,
