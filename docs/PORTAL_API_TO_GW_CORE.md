@@ -27,6 +27,13 @@ Personal owns that concrete inventory in
 `custom/uhc-unidonline-next/docs/PORTAL_BFF_GW_MVP_FLOW.md` in the shared
 workspace.
 
+Public BFF paths are named after the governed aggregate or authority, never a
+product brand. Use `/subject`, `/organizations`, `/employees`, `/licenses` and
+`/research`; reserve `/host/...` for host-operator authority and
+`/test-network/...` for Test Network admission and governance. Historical
+`/unid/...` or `/vetchain/...` paths may remain only as documented
+compatibility aliases while consumers migrate.
+
 Read the visual GW execution model first in
 [`01.I-GW-CORE-CONTRACT-MAP.md`](01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md);
 the table below says *what* a portal facade exposes, while that map explains
@@ -66,11 +73,11 @@ CORE behind the scenes.
 | `/organizations/{uuid}/activate-tenant` | `GET` | retrieve activation status/result | reads the status persisted by the portal |
 | `/organizations/{uuid}/did-binding` | `POST` | replace the organization public DID aliases (`alsoKnownAs`) once the legal onboarding already exists | calls the published tenant route `did/document/_binding` and polls `did/document/_binding-response` through the SDK |
 | `/organizations/{uuid}/did-binding` | `GET` | read the current public DID binding/aliases of the organization | resolves the current DID document view and its `alsoKnownAs` aliases from the hosted/provider projection |
-| `/organizations/{uuid}/license-offers` | `POST` | request an offer to buy/add more licenses | today the portal must orchestrate this as its own capability; GW does not yet expose one converged public route for this commercial offer flow |
-| `/organizations/{uuid}/license-offers` | `GET` | list license offers known by the portal | uses portal-side commercial/materialized history |
+| `/organizations/{uuid}/license-offers` | `POST` | request an offer to buy/add more licenses | calls the organization-controller facade `requestEmployeeLicenseOffer(...)`; the configured payment adapter remains a BFF concern |
+| `/organizations/{uuid}/license-offers` | `GET` | list license offers known by the portal | calls the organization-controller Offer reader and projects authoritative state |
 | `/organizations/{uuid}/license-offers/{offerId}` | `GET` | get one license offer detail | returns known price, quantity, currency, and state |
-| `/organizations/{uuid}/license-orders` | `POST` | request purchase/addition of more licenses | conceptually triggers `offer -> order -> payment`; today the portal must orchestrate this with its own commercial/backend layer |
-| `/organizations/{uuid}/license-orders` | `GET` | list license purchases launched from the portal | uses commercial/materialized history |
+| `/organizations/{uuid}/license-orders` | `POST` | request purchase/addition of more licenses | verifies payment through the configured BFF adapter and calls `confirmOrganizationLicenseOrder(...)` for the accepted Offer |
+| `/organizations/{uuid}/license-orders` | `GET` | list license purchases launched from the portal | calls the organization-controller Order reader and projects authoritative state |
 | `/organizations/{uuid}/license-orders/{orderId}` | `GET` | get one purchase status | returns the status materialized by the portal |
 | `/organizations/{uuid}/license-orders/{orderId}/payment-confirmation` | `POST` | confirm payment for a license purchase so seats can be emitted | in portal-managed mode the BFF receives the Stripe or other provider confirmation, then submits one `Order`-style confirmation to GW CORE so seats are emitted from the accepted offer |
 | `/organizations/{uuid}/licenses` | `GET` | list visible organization seats/licenses | calls the SDK organization-controller license reader, backed by tenant `entity/org.schema/License/_search`, and projects the returned seats/devices for the UI |
@@ -94,6 +101,13 @@ calls.
 | SMART token | obtain an operational token with protected scopes |
 
 ## Subject / Individual Onboarding
+
+`individual` is the product-neutral aggregate. Its demographic specialization
+does not change the lifecycle: UHC materializes a person and VetChain
+materializes an animal. Both use individual Organization start, Offer, Order,
+exchange and controller DCR. A professional credential may authorize an
+assisted channel to start this flow, but it does not itself become controller
+authority for the created subject.
 
 | Portal API | Method | Frontend purpose | Portal backend behavior |
 |---|---|---|---|
@@ -192,6 +206,24 @@ software product or study and reuses it for GET/PUT. GW maps it to
 that internal identifier. Future studies use different source references even
 when they share the same subject, index provider, `HRESCH` and Digital Twin
 reader action.
+
+## Host and Test Network facades
+
+These paths exist because they require a distinct operational authority, not
+because a named product currently provides the UI.
+
+| Portal API | Method | Frontend purpose | Portal backend behavior |
+|---|---|---|---|
+| `/host/observability/errors` | `GET` | read minimized gateway failures for a configured time window | requires an enrolled host-controller profile and returns no clinical payload, token or personal identifier |
+| `/host/organizations` | `GET` | list hosted tenants visible to the operator | calls the host-scoped tenant reader or its authoritative materialized projection |
+| `/host/organizations/{tenantId}/lifecycle` | `POST` | apply an explicit host-authorized tenant lifecycle transition | invokes the host facade and never reuses a tenant controller profile |
+| `/test-network/applications` | `POST`, `GET` | submit or list Test Network admission cases | stores immutable evidence and exposes only the applicant/reviewer-authorized projection |
+| `/test-network/applications/{applicationId}/review` | `POST` | authorize or reject one admission | requires the independent Test Network reviewer profile and signed governance evidence |
+| `/test-network/applications/{applicationId}/complete` | `POST` | complete tenant transaction, Order, exchange and controller DCR | preserves applicant, reviewer, controller and device proofs as separate steps |
+
+Do not expose these as `/unid/...`, `/vetchain/...` or another operator brand.
+Branding belongs in configuration and presentation; authorization belongs in
+the enrolled host-controller or Test Network reviewer profile.
 
 ## Related Persons
 

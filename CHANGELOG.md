@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- Clarify canonical BFF naming: aggregate facades use `subject`,
+  `organizations`, `employees`, `licenses` and `research`; operator functions
+  use `/host/...`; admission governance uses `/test-network/...`. Product names
+  are compatibility aliases only.
+- Define the shared `individual` specialization explicitly: UHC uses a person
+  and VetChain an animal while preserving the same bootstrap, Order,
+  controller DCR, Communication and secondary-use lifecycle.
+- Update organization professional-seat documentation to the current
+  high-level Offer/Order SDK lifecycle and authoritative readback.
+
 - Document the temporary shared `legacy-v1` Firestore/KEK custody boundary
   between CORE development and Accuro staging separately from their distinct
   token-verification modes.

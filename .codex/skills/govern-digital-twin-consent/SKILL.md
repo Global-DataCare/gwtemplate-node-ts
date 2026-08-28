@@ -33,6 +33,11 @@ Verify current branches, versions and published npm state before release claims.
 
 - Accept only the product-level browser choice `{ enabled: boolean }`.
 - Resolve the authenticated subject, index-provider organization and enrollment state in the BFF. Never accept them from browser JSON.
+- Keep portal facade names product-neutral: `/subject` owns the individual,
+  `/research` owns researcher operations, `/host/*` owns host administration
+  and `/test-network/*` owns Test Network governance. Product-branded paths are
+  compatibility aliases only. UHC specializes `individual` as a person and
+  VetChain as an animal without changing the consent or twin contract.
 - Call `IndividualControllerSdk.setDigitalTwinSecondaryUseConsent(...)` with `decision: 'permit' | 'deny'`.
 - Author one FHIR `Consent` through `resource.meta.claims` and `entry.meta.claims`:
   - `Consent.subject`: authenticated operational subject DID
