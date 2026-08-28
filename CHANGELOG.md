@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Separate the emergency `ETREAT` Consent period from each break-glass SMART
+  token. Persist and anchor one Consent for up to 24 hours, send a minimized
+  FHIR Communication to the controller mailbox, and reuse it for independently
+  audited read-only tokens lasting at most 15 minutes. Publish requester
+  organization/jurisdiction while hashing the professional identity.
+  Artifact registration now owns its canonical `artifact-sc` target instead
+  of accepting caller-selected or environment-fallback chaincode names.
+
 - Remove the `openapi-extension.json` profile from GW CORE: the runtime exposes
   its complete specification and the `core`/`compat` views, while each derived
   solution maintains its own extensions outside this repository.
@@ -21,6 +29,10 @@
 - Reuse the Fabric peer image for in-cluster channel administration instead of
   importing the substantially larger Fabric tools image into kind, reducing
   the local evidence disk requirement without changing governance boundaries.
+
+- Keep the first peer of a newly admitted host independent from foreign-MSP
+  gossip bootstrap peers, allow sufficient configurable time for direct
+  orderer catch-up and preserve exact-height verification before E2E traffic.
 
 - Bind Fabric peer and GW client certificates through
   `gdc.hostCredentialSha256`: Fabric CA does not accept the `:` characters of a

@@ -120,8 +120,9 @@ grep -Fq '.source.Type.LocalPackage.package_id == $package_id' ./scripts/install
 grep -Fq '.version == $version and .sequence == 1 and .approvals[$msp] == true' \
   ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gw.fabricPeerEndpoint="${KIND_PEER_SERVICE}:7051"' ./scripts/smoke-helm-local-network.sh
-grep -Fq 'create service externalname peer0-host1' ./scripts/smoke-helm-local-network.sh
-grep -Fq 'peer.bootstrap=peer0-host1:7051' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'create service externalname orderer' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'peer.bootstrap=' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'KIND_PEER_SYNC_ATTEMPTS="${KIND_PEER_SYNC_ATTEMPTS:-600}"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'wait_for_kind_peer_sync' ./scripts/smoke-helm-local-network.sh
 grep -Fq -- '--set gw.enabled=false' ./scripts/smoke-helm-local-network.sh
 grep -Fq -- '--reuse-values' ./scripts/smoke-helm-local-network.sh

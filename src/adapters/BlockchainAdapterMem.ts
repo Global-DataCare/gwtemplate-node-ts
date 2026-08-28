@@ -68,7 +68,6 @@ export class BlockchainAdapterMem implements IBlockchainAdapter {
     assetId: string;
     payload: Record<string, unknown>;
     channel: string;
-    chaincode: string;
   }): Promise<{ accepted: number; txId?: string }> {
     this.consentAccessBundles.set(params.assetId, params.payload);
     await new Promise(resolve => setTimeout(resolve, 10));

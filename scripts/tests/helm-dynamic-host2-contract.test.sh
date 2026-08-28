@@ -5,6 +5,8 @@
 # 3. GW targets that Kubernetes Host2 peer for the E2E and restart proof.
 # 4. kind imports only images used by Kubernetes workloads, while Fabric tools
 #    remain in the external Docker network used for governance operations.
+# 5. the first peer of a host pulls blocks from the orderer without attempting
+#    to use a peer from another MSP as its gossip bootstrap.
 # Authorization invariant: the committed policy permits either governed host MSP to endorse.
 # Persistence invariant: Host2 peer membership and CCAAS readiness survive restart.
 set -euo pipefail
@@ -24,6 +26,12 @@ if grep -Fq 'tools_image=' "${SMOKE}"; then
   exit 1
 fi
 grep -Fq -- '--image="${peer_image}"' "${SMOKE}"
+if grep -Fq 'peer.bootstrap=peer0-host1:7051' "${SMOKE}"; then
+  echo 'a peer from another MSP must not be configured as gossip bootstrap.' >&2
+  exit 1
+fi
+grep -Fq 'KIND_PEER_SYNC_ATTEMPTS="${KIND_PEER_SYNC_ATTEMPTS:-600}"' "${SMOKE}"
+grep -Fq 'value: {{ .Values.peer.bootstrap | quote }}' "${ROOT}/charts/gdc-host/templates/peer.yaml"
 grep -Fq 'LEDGER_FABRIC_MSP_ID=${KIND_PEER_MSP_ID}' "${SMOKE}"
 grep -Fq 'HLF_MSP_ID_HOST1=${KIND_PEER_MSP_ID}' "${SMOKE}"
 grep -Fq 'HLF_CERTIFICATE=$(to_env_one_line_pem "${KIND_GW_CERT}")' "${SMOKE}"

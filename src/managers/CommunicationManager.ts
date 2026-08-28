@@ -256,7 +256,11 @@ export class CommunicationManager implements IJobProcessor {
         await this.persistCommunicationChannelRecord(job, entry as any, fhirResource, commMsg);
         await this.persistCompositionProjectionFromCommunication(job, entry as any, fhirResource, serverDid);
         await this.persistDocumentReferenceProjectionFromCommunication(job, entry as any, fhirResource);
-        await this.persistProjectedResourcesFromCommunication(job, entry as any, fhirResource);
+        const clinicalBatchResponses = await this.persistProjectedResourcesFromCommunication(
+          job,
+          entry as any,
+          fhirResource,
+        );
 
         const embeddedSearchResponseEntries = await this.executeEmbeddedSearchRequest(
           job,
@@ -265,6 +269,11 @@ export class CommunicationManager implements IJobProcessor {
         );
         if (embeddedSearchResponseEntries && embeddedSearchResponseEntries.length > 0) {
           bundleEntries.push(...embeddedSearchResponseEntries);
+          continue;
+        }
+
+        if (clinicalBatchResponses.length > 0) {
+          bundleEntries.push(...clinicalBatchResponses);
           continue;
         }
 
@@ -1010,10 +1019,12 @@ export class CommunicationManager implements IJobProcessor {
     job: JobRequest,
     entry: any,
     fhirResource: FhirCommunication,
-  ): Promise<void> {
+  ): Promise<Array<BundleEntryResponse | ErrorEntry>> {
     const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
     const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
-    if (!tenantExists) return;
+    if (!tenantExists) return [];
+
+    const batchResponses: Array<BundleEntryResponse | ErrorEntry> = [];
 
     const communicationSubject = this.resolveCommunicationSubject(entry, fhirResource);
     const explicitSection = String(
@@ -1026,6 +1037,31 @@ export class CommunicationManager implements IJobProcessor {
     ).trim();
     for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
       const attachment = resolved.documentAttachment;
+      const parsedAttachment = this.parseAttachmentJson(attachment);
+      const attachedBundleType = String(parsedAttachment?.type || '').toLowerCase();
+      if (
+        parsedAttachment?.resourceType === ResourceTypesFhirR4.Bundle
+        && attachedBundleType === 'batch'
+      ) {
+        const attachedEntries = Array.isArray(parsedAttachment.data)
+          ? parsedAttachment.data
+          : Array.isArray(parsedAttachment.entry) ? parsedAttachment.entry : [];
+        const isRequestBatch = attachedEntries.length > 0
+          && attachedEntries.every((attachedEntry: any) => attachedEntry?.request && typeof attachedEntry.request === 'object');
+        if (isRequestBatch) {
+          for (const attachedEntry of attachedEntries) {
+            batchResponses.push(await this.processProjectedClinicalBatchEntry({
+              job,
+              entry: attachedEntry,
+              communicationSubject,
+              explicitSection,
+              fhirResource,
+              tenantVaultId,
+            }));
+          }
+          continue;
+        }
+      }
       const resources = this.extractProjectedFhirResourcesFromAttachment(
         attachment,
         Boolean(explicitSection),
@@ -1034,90 +1070,257 @@ export class CommunicationManager implements IJobProcessor {
         const resourceType = this.getSupportedProjectedResourceType(resource?.resourceType);
         if (!resource || !resourceType) continue;
 
-        const config = PROJECTED_RESOURCE_CONFIG[resourceType];
-        const claims = this.extractProjectedResourceClaims(resourceType, resource, communicationSubject, fhirResource);
-        if (explicitSection && !getClaimValue<string>(claims, 'Composition.section')) {
-          claims['Composition.section'] = explicitSection;
-        }
-        const subjectRef = this.resolveProjectedResourceSubject(claims, config.subjectClaimKeys);
-        if (!subjectRef) continue;
-
-        const identifier =
-          this.getFirstClaimValue(claims, config.identifierClaimKeys)
-          || `urn:uuid:${uuidv4()}`;
-        const fallbackId = determineResourceId(identifier, process.env.NODE_ENV);
-        const claimsVersionId = claimsToContentCid(claims).cid;
-        applyFhirCidVersioningToEntry({
-          entry: { resource },
-          claims,
+        await this.persistProjectedClinicalResource({
+          job,
+          resource,
           resourceType,
-          resourceId: fallbackId,
+          communicationSubject,
+          explicitSection,
+          fhirResource,
+          tenantVaultId,
+          creatorDid: this.normalizeOptionalString(job.content?.iss),
         });
-        // Claims-first resources can have identical sparse FHIR shells while
-        // carrying different clinical meaning in meta.claims. Deduplicate by
-        // the canonical claims CID, not by the bare resource shell CID.
-        claims[`${resourceType}.meta.versionId`] = claimsVersionId;
-        claims[`org.hl7.fhir.r4.${resourceType}.meta.versionId`] = claimsVersionId;
-        const versionId = claimsVersionId;
-
-        const sectionId = getSubjectScopedSectionId(subjectRef, SUBJECT_SECTION_INDIVIDUAL, config.collectionId);
-        if (versionId) {
-          const alreadyIndexed = await this.hasSectionRecordWithClaims(tenantVaultId, sectionId, [
-            { name: `${resourceType}.meta.versionId`, value: versionId },
-          ]);
-          if (alreadyIndexed) continue;
-        }
-
-        const isConsentRule = resourceType === 'Consent'
-          && Boolean(this.getFirstClaimValue(claims, ['Consent.decision', 'org.hl7.fhir.api.Consent.decision']));
-        if (isConsentRule) {
-          await persistConsentRuleAndAttachment({
-            vaultRepository: this.vaultRepository,
-            tenantVaultId,
-            sector: String(job.sector || ''),
-            claims,
-          });
-          continue;
-        }
-
-        const recordId = String(resource?.id || versionId || fallbackId);
-        const record: Record<string, any> = {
-          id: recordId,
-          ...claims,
-          indexed: { attributes: this.buildIndexedAttributesFromClaims(claims) },
-        };
-        await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
-        if (
-          isDigitalTwinResearchResourceType(resourceType)
-          && await isDigitalTwinSecondaryUseEnabled({
-            vaultRepository: this.vaultRepository,
-            tenantVaultId,
-            sourceSubject: subjectRef,
-          })
-        ) {
-          const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
-            vaultRepository: this.vaultRepository,
-            tenantVaultId,
-            sourceSubject: subjectRef,
-          });
-          const researchClaims = projectClaimsForDigitalTwin({ claims, resourceType, twinSubjectId });
-          const researchVersionId = claimsToContentCid(researchClaims).cid;
-          researchClaims[`${resourceType}.meta.versionId`] = researchVersionId;
-          researchClaims[`org.hl7.fhir.r4.${resourceType}.meta.versionId`] = researchVersionId;
-          const researchRecordId = String(
-            researchClaims[`${resourceType}.identifier`]
-            || researchClaims[`org.hl7.fhir.r4.${resourceType}.identifier`]
-            || researchVersionId,
-          );
-          const digitalTwinSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, config.collectionId);
-          await this.vaultRepository.put(tenantVaultId, [{
-            id: researchRecordId,
-            ...researchClaims,
-            indexed: { attributes: this.buildIndexedAttributesFromClaims(researchClaims) },
-          } as any], digitalTwinSectionId);
-        }
       }
     }
+    return batchResponses;
+  }
+
+  private async processProjectedClinicalBatchEntry(input: {
+    job: JobRequest;
+    entry: any;
+    communicationSubject?: string;
+    explicitSection: string;
+    fhirResource: FhirCommunication;
+    tenantVaultId: string;
+  }): Promise<BundleEntryResponse | ErrorEntry> {
+    const request = input.entry?.request;
+    const resource = input.entry?.resource;
+    const resourceType = this.getSupportedProjectedResourceType(resource?.resourceType);
+    const recordId = this.normalizeOptionalString(resource?.id);
+    const responseType = this.normalizeOptionalString(input.entry?.type)
+      || `${String(resource?.resourceType || 'Resource')}-response-v1.0`;
+
+    const errorResponse = (status: string, text: string): ErrorEntry => ({
+      id: recordId,
+      type: responseType,
+      meta: input.entry?.meta,
+      response: {
+        status,
+        outcome: {
+          resourceType: GatewayLocalFhirResourceTypes.OperationOutcome,
+          issue: [{
+            severity: 'error',
+            code: status === '403' ? 'forbidden' : status === '412' ? 'conflict' : 'processing',
+            diagnostics: text,
+          }],
+        },
+      },
+    });
+
+    if (!resourceType || !request || typeof request !== 'object') {
+      return errorResponse('400', 'Clinical batch entry requires one supported resource and request.');
+    }
+    const actorDid = this.normalizeOptionalString(input.job.content?.iss);
+    if (!actorDid) {
+      return errorResponse('403', 'Clinical batch entry requires one verified DIDComm issuer.');
+    }
+
+    if (request.method === 'POST') {
+      if (this.normalizeOptionalString(request.url) !== resourceType) {
+        return errorResponse('400', 'Clinical create request.url must equal resource.resourceType.');
+      }
+      try {
+        const created = await this.persistProjectedClinicalResource({
+          job: input.job,
+          resource,
+          resourceType,
+          communicationSubject: input.communicationSubject,
+          explicitSection: input.explicitSection,
+          fhirResource: input.fhirResource,
+          tenantVaultId: input.tenantVaultId,
+          creatorDid: actorDid,
+        });
+        return {
+          id: created.recordId,
+          type: responseType,
+          response: { status: created.created ? '201' : '200', etag: `W/"${created.versionId}"` },
+          resource: { resourceType, id: created.recordId },
+        };
+      } catch (error) {
+        return errorResponse('400', error instanceof Error ? error.message : 'Clinical create failed.');
+      }
+    }
+
+    if (request.method === 'DELETE') {
+      if (!recordId || this.normalizeOptionalString(request.url) !== `${resourceType}/${recordId}`) {
+        return errorResponse('400', 'Clinical delete request.url must address resource.resourceType/resource.id.');
+      }
+      const subject = this.normalizeOptionalString(input.communicationSubject);
+      if (!subject) {
+        return errorResponse('400', 'Clinical delete requires Communication.subject.');
+      }
+      const sectionId = getSubjectScopedSectionId(
+        subject,
+        SUBJECT_SECTION_INDIVIDUAL,
+        PROJECTED_RESOURCE_CONFIG[resourceType].collectionId,
+      );
+      const existing = await this.vaultRepository.get<{ id: string; [key: string]: any }>(
+        input.tenantVaultId,
+        recordId,
+        sectionId,
+      );
+      if (!existing) {
+        return errorResponse('404', 'Clinical record was not found for this subject.');
+      }
+      if (this.normalizeOptionalString(existing?.audit?.creatorDid) !== actorDid) {
+        return errorResponse('403', 'Only the authenticated creator may delete this clinical record.');
+      }
+      const storedSubject = this.resolveProjectedResourceSubject(
+        existing,
+        PROJECTED_RESOURCE_CONFIG[resourceType].subjectClaimKeys,
+      );
+      if (storedSubject !== subject) {
+        return errorResponse('403', 'Clinical record does not belong to Communication.subject.');
+      }
+      const expectedVersion = this.parseIfMatchVersion(request.ifMatch);
+      if (!expectedVersion) {
+        return errorResponse('400', 'Clinical delete requires request.ifMatch with a weak ETag version.');
+      }
+      const currentVersion = this.getFirstClaimValue(existing, [
+        `${resourceType}.meta.versionId`,
+        `org.hl7.fhir.r4.${resourceType}.meta.versionId`,
+      ]);
+      if (!currentVersion || currentVersion !== expectedVersion) {
+        return errorResponse('412', 'Clinical record version does not match request.ifMatch.');
+      }
+      await this.vaultRepository.delete(input.tenantVaultId, recordId, sectionId);
+      return {
+        id: recordId,
+        type: responseType,
+        response: { status: '204' },
+        resource: { resourceType, id: recordId },
+      };
+    }
+
+    return errorResponse('400', `Unsupported clinical batch method: ${String(request.method || '')}`);
+  }
+
+  private parseIfMatchVersion(value: unknown): string | undefined {
+    const normalized = this.normalizeOptionalString(value);
+    const match = normalized?.match(/^W\/"([^"]+)"$/);
+    return match?.[1];
+  }
+
+  private async persistProjectedClinicalResource(input: {
+    job: JobRequest;
+    resource: Record<string, any>;
+    resourceType: SupportedProjectedResourceType;
+    communicationSubject?: string;
+    explicitSection: string;
+    fhirResource: FhirCommunication;
+    tenantVaultId: string;
+    creatorDid?: string;
+  }): Promise<{ recordId: string; versionId: string; created: boolean }> {
+    const config = PROJECTED_RESOURCE_CONFIG[input.resourceType];
+    const claims = this.extractProjectedResourceClaims(
+      input.resourceType,
+      input.resource,
+      input.communicationSubject,
+      input.fhirResource,
+    );
+    if (input.explicitSection && !getClaimValue<string>(claims, 'Composition.section')) {
+      claims['Composition.section'] = input.explicitSection;
+    }
+    const subjectRef = this.resolveProjectedResourceSubject(claims, config.subjectClaimKeys);
+    if (!subjectRef) {
+      throw new Error('Clinical resource requires one subject.');
+    }
+    if (input.communicationSubject && subjectRef !== input.communicationSubject) {
+      throw new Error('Clinical resource subject must equal Communication.subject.');
+    }
+
+    const identifier = this.getFirstClaimValue(claims, config.identifierClaimKeys) || `urn:uuid:${uuidv4()}`;
+    const fallbackId = determineResourceId(identifier, process.env.NODE_ENV);
+    const versionId = claimsToContentCid(claims).cid;
+    applyFhirCidVersioningToEntry({
+      entry: { resource: input.resource },
+      claims,
+      resourceType: input.resourceType,
+      resourceId: fallbackId,
+    });
+    claims[`${input.resourceType}.meta.versionId`] = versionId;
+    claims[`org.hl7.fhir.r4.${input.resourceType}.meta.versionId`] = versionId;
+    const sectionId = getSubjectScopedSectionId(
+      subjectRef,
+      SUBJECT_SECTION_INDIVIDUAL,
+      config.collectionId,
+    );
+    const alreadyIndexed = await this.hasSectionRecordWithClaims(input.tenantVaultId, sectionId, [
+      { name: `${input.resourceType}.meta.versionId`, value: versionId },
+    ]);
+    const recordId = String(input.resource?.id || versionId || fallbackId);
+    if (alreadyIndexed) {
+      return { recordId, versionId, created: false };
+    }
+
+    const isConsentRule = input.resourceType === 'Consent'
+      && Boolean(this.getFirstClaimValue(claims, ['Consent.decision', 'org.hl7.fhir.api.Consent.decision']));
+    if (isConsentRule) {
+      await persistConsentRuleAndAttachment({
+        vaultRepository: this.vaultRepository,
+        tenantVaultId: input.tenantVaultId,
+        sector: String(input.job.sector || ''),
+        claims,
+      });
+      return { recordId, versionId, created: true };
+    }
+
+    const record: Record<string, any> = {
+      id: recordId,
+      ...claims,
+      ...(input.creatorDid ? { audit: { creatorDid: input.creatorDid } } : {}),
+      indexed: { attributes: this.buildIndexedAttributesFromClaims(claims) },
+    };
+    await this.vaultRepository.put(input.tenantVaultId, [record as any], sectionId);
+    if (
+      isDigitalTwinResearchResourceType(input.resourceType)
+      && await isDigitalTwinSecondaryUseEnabled({
+        vaultRepository: this.vaultRepository,
+        tenantVaultId: input.tenantVaultId,
+        sourceSubject: subjectRef,
+      })
+    ) {
+      const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
+        vaultRepository: this.vaultRepository,
+        tenantVaultId: input.tenantVaultId,
+        sourceSubject: subjectRef,
+      });
+      const researchClaims = projectClaimsForDigitalTwin({
+        claims,
+        resourceType: input.resourceType,
+        twinSubjectId,
+      });
+      const researchVersionId = claimsToContentCid(researchClaims).cid;
+      researchClaims[`${input.resourceType}.meta.versionId`] = researchVersionId;
+      researchClaims[`org.hl7.fhir.r4.${input.resourceType}.meta.versionId`] = researchVersionId;
+      const researchRecordId = String(
+        researchClaims[`${input.resourceType}.identifier`]
+        || researchClaims[`org.hl7.fhir.r4.${input.resourceType}.identifier`]
+        || researchVersionId
+      );
+      const digitalTwinSectionId = getSubjectScopedSectionId(
+        twinSubjectId,
+        SUBJECT_SECTION_DIGITAL_TWIN,
+        config.collectionId,
+      );
+      await this.vaultRepository.put(input.tenantVaultId, [{
+        id: researchRecordId,
+        ...researchClaims,
+        ...(input.creatorDid ? { audit: { creatorDid: input.creatorDid, sourceRecordId: recordId } } : {}),
+        indexed: { attributes: this.buildIndexedAttributesFromClaims(researchClaims) },
+      } as any], digitalTwinSectionId);
+    }
+    return { recordId, versionId, created: true };
   }
 
   private getSupportedProjectedResourceType(resourceType: unknown): SupportedProjectedResourceType | undefined {
