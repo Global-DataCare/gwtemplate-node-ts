@@ -2,13 +2,17 @@
 
 ## [Unreleased]
 
+- Incluir en Git los módulos `lib/*.mjs` de gobierno y onboarding requeridos
+  por los ejecutables públicos, y hacer que el gate falle si un clon limpio no
+  contiene cualquiera de estos runtimes.
+
 - Clarify canonical BFF naming: aggregate facades use `subject`,
   `organizations`, `employees`, `licenses` and `research`; operator functions
   use `/host/...`; admission governance uses `/test-network/...`. Product names
   are compatibility aliases only.
-- Define the shared `individual` specialization explicitly: UHC uses a person
-  and VetChain an animal while preserving the same bootstrap, Order,
-  controller DCR, Communication and secondary-use lifecycle.
+- Define the shared `individual` specialization without product-specific
+  naming while preserving the same bootstrap, Order, controller DCR,
+  Communication and secondary-use lifecycle.
 - Update organization professional-seat documentation to the current
   high-level Offer/Order SDK lifecycle and authoritative readback.
 

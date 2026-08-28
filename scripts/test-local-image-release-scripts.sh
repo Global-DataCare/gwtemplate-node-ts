@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Flow contract: a clean checkout contains every JavaScript chaincode runtime
-# entrypoint required by the mandatory local-Fabric image smoke.
+# Flow contract: a clean checkout contains every authored chaincode and host
+# governance runtime required by the mandatory local-Fabric evidence.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,6 +39,18 @@ for chaincode_entrypoint in chaincode/*-javascript/index.js; do
       exit 1
     }
   done < <(rg -o "\./lib/[^\"']+" "$chaincode_entrypoint")
+done
+
+for host_runtime_file in \
+  scripts/governance/lib/canonical-json.mjs \
+  scripts/governance/lib/decision.mjs \
+  scripts/governance/lib/jws.mjs \
+  scripts/governance/lib/planner.mjs \
+  scripts/onboarding/lib/workflow.mjs; do
+  git ls-files --error-unmatch "${host_runtime_file}" >/dev/null 2>&1 || {
+    echo "ERROR: host governance runtime is absent from a clean checkout: ${host_runtime_file}" >&2
+    exit 1
+  }
 done
 
 while IFS= read -r env_example; do
