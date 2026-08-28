@@ -6,6 +6,10 @@
   `errexit`/`pipefail`, registre `FAIL` en el primer error y elimine las bases
   SQLite desechables de las CA de Fabric antes de cada reproducción limpia.
 
+- Hacer portables los helpers MSP/TLS de Fabric CA en Bash 3 cuando la CA local
+  no necesita `CA_TLS_CERT`, y probar tanto el rechazo del grant caducado como
+  los dos enrolamientos positivos del peer.
+
 - Centralizar la versión API de Stripe en `2025-12-15.clover`, compatible con
   el SDK instalado, para desbloquear typecheck e imagen sin divergencias entre
   webhook, Checkout, facturación y verificación de pagos.
