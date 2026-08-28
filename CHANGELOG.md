@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Sanear las rutas absolutas del directorio personal en los logs públicos de
+  evidencia, representarlas como `${HOME}` y hacer fallar el paquete si queda
+  alguna ruta `/Users/<usuario>` o `/home/<usuario>`.
+
 - Añadir en `deliverables/` una guía Word pública en español, aclarando qué
   ejecuta realmente kind/Helm y que solo quedan pendientes el lifecycle CCAAS
   y el E2E del GW contra el peer Kubernetes.

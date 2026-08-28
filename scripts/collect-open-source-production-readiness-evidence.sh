@@ -5,6 +5,8 @@ GW_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATASPACE_CA_ROOT="${DATASPACE_CA_ROOT:-${GW_ROOT}/../dataspace-ca-ts}"
 DATASPACE_ICA_ROOT="${DATASPACE_ICA_ROOT:-${GW_ROOT}/../dataspace-ica-ts}"
 FABRIC_DEVNET_ROOT="${GW_ROOT}/infra/fabric/local-network"
+HOME_PLACEHOLDER='${HOME}'
+export HOME_PLACEHOLDER
 
 RUN_ID="${EVIDENCE_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 EVIDENCE_DIR="${EVIDENCE_DIR:-${GW_ROOT}/artifacts/open-source-production-readiness/${RUN_ID}}"
@@ -38,6 +40,7 @@ run_gate() {
   echo "[evidence] ${gate_id}"
   set +e
   "$@" 2>&1 \
+    | perl -pe 's/\Q$ENV{HOME}\E/$ENV{HOME_PLACEHOLDER}/g' \
     | sed -E \
       -e 's/^Password: .+$/Password: [REDACTED]/' \
       -e 's#(https?://[^:/[:space:]]+):[^@/[:space:]]+@#\1:[REDACTED]@#g' \
@@ -62,6 +65,10 @@ assert_public_evidence_contains_no_demo_secrets() {
   fi
   if rg -n --pcre2 'Password: (?!\[REDACTED\])' "${EVIDENCE_DIR}"; then
     echo 'Public evidence contains an unredacted password line.' >&2
+    return 1
+  fi
+  if rg -n '/Users/[^/[:space:]]+/|/home/[^/[:space:]]+/' "${EVIDENCE_DIR}"; then
+    echo 'Public evidence contains an absolute user-home path.' >&2
     return 1
   fi
 }

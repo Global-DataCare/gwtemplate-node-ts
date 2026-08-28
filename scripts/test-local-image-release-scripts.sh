@@ -84,6 +84,8 @@ grep -Fq 'kind_peer_channels=' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'height[^0-9]*[1-9]' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'gw.fabricPeerEndpoint' ./charts/gdc-host/templates/gw-configmap.yaml
 grep -Fq 'test:host-preauthorization' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq 'HOME_PLACEHOLDER' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq 'absolute user-home path' ./scripts/collect-open-source-production-readiness-evidence.sh
 if grep -Fq 'fabric-multicloud' ./scripts/collect-open-source-production-readiness-evidence.sh; then
   echo 'ERROR: the public evidence runner must not require a private Fabric repository.' >&2
   exit 1
