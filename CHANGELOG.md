@@ -14,6 +14,10 @@
   Dataspace ICA contienen cambios rastreados sin commit, evitando informes de
   auditoría que no correspondan a revisiones reproducibles.
 
+- Mantener una sola identidad de Compose durante toda la evidencia mediante
+  `gdc-public`/`gdc-public-local-network`, de forma que las puertas Fabric,
+  Docker y kind reutilicen exactamente la misma red local preparada.
+
 - Vincular certificados Fabric de peer y cliente GW mediante
   `gdc.hostCredentialSha256`: Fabric CA no admite los `:` de un `urn:uuid`
   dentro de un atributo `:ecert`; la autorización conserva el identificador
