@@ -14,7 +14,6 @@ Output files:
 
 - `docs/openapi-profiles/openapi-core.json`
 - `docs/openapi-profiles/openapi-compat.json`
-- `docs/openapi-profiles/openapi-extension.json`
 
 These generated profiles are versioned documentation artifacts, not ephemeral
 test output. `artifacts/` remains reserved for local logs, runtime traces, and
@@ -24,13 +23,16 @@ other non-versioned build/test byproducts.
 
 - `core`: canonical GW onboarding + consent + communication + composition/index flows.
 - `compat`: `core` + compatibility/legacy aliases.
-- `extension`: `compat` + extension-oriented capabilities.
+
+La especificación completa y autoritativa del runtime es `swagger-spec.json`.
+GW CORE no publica un perfil de extensiones: las capacidades adicionales de
+una solución se definen y documentan en su repositorio derivado.
 
 ## Operation Marking
 
 Each operation in generated artifacts includes:
 
-- `x-profile: core|compat|extension`
+- `x-profile: core|compat`
 
 This tag identifies the operation origin class in the source spec.
 
@@ -39,10 +41,9 @@ This tag identifies the operation origin class in the source spec.
 Rules are implemented in `scripts/generate-openapi-profiles.mjs` by path pattern:
 
 - `compat`: routes under `/identity/openid/*`, `/auth/token`, and legacy individual order aliases.
-- `extension`: digital twin and non-core vertical paths (e.g., observation/subject and extension appointment surfaces).
-- `core`: everything else.
+- `core`: todas las rutas implementadas que no son alias de compatibilidad.
 
-Adjust these rules when promoting capabilities from extension/compat to core.
+Adjust these rules when replacing a compatibility alias with a canonical route.
 
 See explicit endpoint intent in:
 - `docs/OPENAPI_PROFILE_MATRIX.md`

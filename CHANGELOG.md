@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Retirar de GW CORE el perfil `openapi-extension.json`: el runtime publica su
+  especificación completa y las vistas `core`/`compat`, mientras que cada
+  solución derivada mantiene sus propias extensiones fuera de este repositorio.
+
+- Completar el lifecycle local de `consentaccess-sc` para redes con múltiples
+  hosts: instalar y aprobar el mismo paquete en cada MSP activo y dirigir el
+  commit a ambos peers tras la admisión gobernada de `Host2MSP`.
+
 - Vincular certificados Fabric de peer y cliente GW mediante
   `gdc.hostCredentialSha256`: Fabric CA no admite los `:` de un `urn:uuid`
   dentro de un atributo `:ecert`; la autorización conserva el identificador

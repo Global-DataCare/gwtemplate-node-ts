@@ -10,7 +10,11 @@ bash -n ./docker_build_local.sh ./docker_run_local.sh ./cloud_deploy.sh \
   ./scripts/smoke-docker-local-network.sh ./scripts/prepare-consentaccess-local-fabric-env.sh \
   ./scripts/collect-open-source-production-readiness-evidence.sh \
   ./scripts/smoke-helm-local-network.sh \
-  ./scripts/warm-local-fabric-chaincodes.sh
+  ./scripts/warm-local-fabric-chaincodes.sh \
+  ./chaincode/scripts/consentaccess-local-devnet.sh
+
+node --test ./scripts/tests/openapi-core-boundary.test.mjs
+bash ./scripts/tests/consentaccess-multi-host-lifecycle.test.sh
 
 grep -qx 'node_modules' .dockerignore
 grep -qx 'build' .dockerignore
@@ -91,7 +95,7 @@ bash ./scripts/smoke-helm-local-network.sh --preflight-only | grep -Fq 'Prefligh
 grep -Fq 'CONFIDENTIAL_JWE_INLINE_MAX_BYTES=1' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'La prueba Helm no persistió ningún JWE cifrado en IPFS.' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer.enabled=true' ./scripts/smoke-helm-local-network.sh
-grep -Fq 'peer-kind-host1' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'KIND_PEER_DOMAIN="peer-kind.${KIND_PEER_ORG_DOMAIN}"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'GDC_CONTAINER_PREFIX="${GDC_CONTAINER_PREFIX:-gdc-public}"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'assert_public_fabric_mounts' ./scripts/smoke-helm-local-network.sh
@@ -113,7 +117,7 @@ grep -Fq 'touch -t 198001010000' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'tar --format ustar --uid 0 --gid 0' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gzip -n' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq '.source.Type.LocalPackage.package_id == $package_id' ./scripts/install-kind-ccaas-chaincodes.sh
-grep -Fq '.version == $version and .sequence == 1 and .approvals.Host1MSP == true' \
+grep -Fq '.version == $version and .sequence == 1 and .approvals[$msp] == true' \
   ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gw.fabricPeerEndpoint="${KIND_PEER_SERVICE}:7051"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'create service externalname peer0-host1' ./scripts/smoke-helm-local-network.sh
@@ -142,7 +146,7 @@ grep -Fq 'cat /tls/tlsintermediatecerts/*.pem >> /tls/server.crt' ./charts/gdc-h
 grep -Fq 'test:host-preauthorization' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'HOME_PLACEHOLDER' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'absolute user-home path' ./scripts/collect-open-source-production-readiness-evidence.sh
-grep -Fq 'instala y aprueba los nueve paquetes CCAAS en el peer kind' \
+grep -Fq 'instala y aprueba los nueve paquetes CCAAS' \
   ./scripts/collect-open-source-production-readiness-evidence.sh
 if grep -Fq 'fabric-multicloud' ./scripts/collect-open-source-production-readiness-evidence.sh; then
   echo 'ERROR: the public evidence runner must not require a private Fabric repository.' >&2
@@ -198,7 +202,7 @@ fi
 grep -Fq 'medical-secretary-consent-smart-bundle-search-allow' \
   ./scripts/smoke-smart-access-local-network.sh
 grep -Fq 'humanAccessProof' ./scripts/build-open-source-evidence-manifest.mjs
-grep -Fq 'Password: [REDACTED]' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq "Password: (?!\\[REDACTED\\])" ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq '60-public-secret-scan' ./scripts/collect-open-source-production-readiness-evidence.sh
 
 if grep -Fq '../../gdc-common-utils-ts/src/' ./scripts/render-demo-smart-access-payload.mts; then

@@ -5677,6 +5677,238 @@
         "x-profile": "core"
       }
     },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Observation/_batch": {
+      "post": {
+        "tags": [
+          "8.4 Personal Observations"
+        ],
+        "summary": "Collect personal (non-clinical) observations",
+        "description": "Collects non-clinical observations created by the individual (or their family controller) for emergencies and care continuity.\nThese observations are not \"official clinical data\"; they are self-reported and intended for context and emergency use.\n\nUse contextualized flat claims with `@context: org.hl7.fhir.api` (keys like `Observation.category`, `Observation.code`, `Observation.valueString`, etc.).\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plain+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Observation/_batch-response": {
+      "post": {
+        "tags": [
+          "8.4 Personal Observations"
+        ],
+        "summary": "Poll the observation collection result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrderPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrderPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/_batch": {
+      "post": {
+        "tags": [
+          "8.1 Subject Profile"
+        ],
+        "summary": "Create or update Subject profile (claims-first)",
+        "description": "Creates or updates One Health Subject profiles using contextualized flat claims (`@context: org.hl7.fhir.api`).\n\nClaims container note:\n- `resource.meta.claims` is a project-specific non-standard claims container\n- it is not part of base FHIR\n- `@context` may be `org.hl7.fhir.api`, `org.schema`, or another supported context\n- when `@context` is already present, keys may be written in a less-qualified form\n  instead of always repeating the full reverse-DNS prefix\n\nContract notes:\n- Endpoint may autofill `@context` and `@type` if omitted.\n- `@type` (when provided) can be `Person`, `Animal`, or `Thing`.\n- `Subject.id` is immutable once created.\n- `Subject.organization` (`did:web` of Individual Organization) can be updated and must be auditable.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plain+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/_batch-response": {
+      "post": {
+        "tags": [
+          "8.1 Subject Profile"
+        ],
+        "summary": "Poll the Subject profile operation result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrderPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrderPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary": {
       "post": {
         "x-contract-level": "internal-compatibility",

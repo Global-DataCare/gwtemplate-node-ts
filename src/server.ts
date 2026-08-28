@@ -108,7 +108,6 @@ let swaggerSpec: any = loadSwaggerSpecFromDisk();
 const OPENAPI_PROFILE_DOCS = [
   { name: 'CORE', url: '/docs/openapi-profiles/openapi-core.json' },
   { name: 'COMPAT', url: '/docs/openapi-profiles/openapi-compat.json' },
-  { name: 'EXTENSIONS', url: '/docs/openapi-profiles/openapi-extension.json' },
   { name: 'RUNTIME', url: '/swagger-spec.json' },
 ];
 
