@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Hacer que cada puerta del runner de evidencia se ejecute en un subshell con
+  `errexit`/`pipefail`, registre `FAIL` en el primer error y elimine las bases
+  SQLite desechables de las CA de Fabric antes de cada reproducción limpia.
+
 - Centralizar la versión API de Stripe en `2025-12-15.clover`, compatible con
   el SDK instalado, para desbloquear typecheck e imagen sin divergencias entre
   webhook, Checkout, facturación y verificación de pagos.

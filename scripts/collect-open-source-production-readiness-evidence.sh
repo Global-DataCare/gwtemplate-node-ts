@@ -8,6 +8,9 @@ FABRIC_DEVNET_ROOT="${GW_ROOT}/infra/fabric/local-network"
 HOME_PLACEHOLDER='${HOME}'
 export HOME_PLACEHOLDER
 
+# shellcheck source=lib/evidence-gate.sh
+source "${GW_ROOT}/scripts/lib/evidence-gate.sh"
+
 RUN_ID="${EVIDENCE_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 EVIDENCE_DIR="${EVIDENCE_DIR:-${GW_ROOT}/artifacts/open-source-production-readiness/${RUN_ID}}"
 IMAGE_NAME="${IMAGE_NAME:-gw-core:$(node -p "require('${GW_ROOT}/package.json').version")-$(git -C "${GW_ROOT}" rev-parse --short HEAD)}"
@@ -33,29 +36,6 @@ finalize() {
 }
 
 trap 'finalize; cleanup' EXIT
-
-run_gate() {
-  local gate_id="$1"
-  shift
-  local log_file="${EVIDENCE_DIR}/logs/${gate_id}.log"
-  echo "[evidence] ${gate_id}"
-  set +e
-  "$@" 2>&1 \
-    | perl -pe 's/\Q$ENV{HOME}\E/$ENV{HOME_PLACEHOLDER}/g' \
-    | sed -E \
-      -e 's/^Password: .+$/Password: [REDACTED]/' \
-      -e 's#(https?://[^:/[:space:]]+):[^@/[:space:]]+@#\1:[REDACTED]@#g' \
-    | tee "${log_file}"
-  local status="${PIPESTATUS[0]}"
-  set -e
-  if [[ ${status} -ne 0 ]]; then
-    printf 'FAIL\n' > "${EVIDENCE_DIR}/gates/${gate_id}.status"
-    echo "[evidence] FAIL ${gate_id}; see ${log_file}" >&2
-    return "${status}"
-  fi
-  printf 'PASS\n' > "${EVIDENCE_DIR}/gates/${gate_id}.status"
-  echo "[evidence] PASS ${gate_id}"
-}
 
 assert_public_evidence_contains_no_demo_secrets() {
   local leaked_secret_pattern
@@ -154,6 +134,7 @@ test_fabric_governance_contract() {
   bash ./scripts/tests/local-fabric-host-names.test.sh
   bash ./scripts/tests/dynamic-host-admission-contract.test.sh
   bash ./scripts/tests/helm-dynamic-host2-contract.test.sh
+  bash ./scripts/tests/evidence-runner-fail-closed.test.sh
   bash ./scripts/tests/public-deliverables-layout.test.sh
   node --test scripts/governance/tests/*.test.mjs scripts/onboarding/tests/*.test.mjs
   bash ./scripts/onboarding/tests/enrollment-grant.test.sh
@@ -207,6 +188,12 @@ reset_fabric_devnet() {
       docker volume rm "${volume}"
     fi
   done
+  # The Fabric CAs use bind-mounted SQLite state, not named volumes. These two
+  # exact files are disposable local-network databases and must not survive an
+  # evidence rerun, otherwise previous affiliations/registrations contaminate it.
+  rm -f \
+    "${FABRIC_DEVNET_ROOT}/crypto/ca/root/fabric-ca-server.db" \
+    "${FABRIC_DEVNET_ROOT}/crypto/ca/ica/fabric-ca-server.db"
 }
 
 peer_channels() {
