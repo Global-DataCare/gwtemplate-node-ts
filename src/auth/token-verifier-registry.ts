@@ -38,13 +38,18 @@ function parseTrustedOidcProviders(): TrustedOidcProvider[] {
     const provider = raw && typeof raw === 'object' && !Array.isArray(raw)
       ? raw as Record<string, unknown>
       : {};
-    const required = (field: 'issuer' | 'audience'): string => {
-      const value = typeof provider[field] === 'string' ? provider[field].trim() : '';
-      if (!value) throw new Error(`${name}[${index}].${field} is required.`);
+    const required = (canonical: 'iss' | 'aud', alias: 'issuer' | 'audience'): string => {
+      const canonicalValue = typeof provider[canonical] === 'string' ? provider[canonical].trim() : '';
+      const aliasValue = typeof provider[alias] === 'string' ? provider[alias].trim() : '';
+      if (canonicalValue && aliasValue && canonicalValue !== aliasValue) {
+        throw new Error(`${name}[${index}].${canonical} conflicts with ${alias}.`);
+      }
+      const value = canonicalValue || aliasValue;
+      if (!value) throw new Error(`${name}[${index}].${canonical} is required.`);
       return value;
     };
-    const issuer = required('issuer');
-    const audience = required('audience');
+    const issuer = required('iss', 'issuer');
+    const audience = required('aud', 'audience');
     if (seenIssuers.has(issuer)) throw new Error(`${name} contains duplicate issuer '${issuer}'.`);
     seenIssuers.add(issuer);
     const jwksUri = typeof provider.jwksUri === 'string' ? provider.jwksUri.trim() : '';
