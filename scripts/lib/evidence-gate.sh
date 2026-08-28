@@ -2,7 +2,7 @@
 
 # Runs one evidence function in an errexit-enabled subshell while preserving a
 # redacted log and an explicit PASS/FAIL status in the parent process.
-run_gate() {
+run_gate() (
   local gate_id="$1"
   shift
   local log_file="${EVIDENCE_DIR}/logs/${gate_id}.log"
@@ -27,4 +27,4 @@ run_gate() {
   fi
   printf 'PASS\n' > "${EVIDENCE_DIR}/gates/${gate_id}.status"
   echo "[evidence] PASS ${gate_id}"
-}
+)
