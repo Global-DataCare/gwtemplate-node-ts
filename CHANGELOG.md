@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Accept `Bundle.type=batch` clinical commands attached to `Communication` with
+  independent per-entry create/delete results. Persist the verified DIDComm
+  issuer as creator evidence; only that creator may delete the subject-scoped
+  record by `resource.id`. `request.ifMatch` is optional, but when present its
+  weak ETag is enforced with `412` on a stale version; one failed entry never
+  rolls back another successful entry.
+
 - Separate the emergency `ETREAT` Consent period from each break-glass SMART
   token. Persist and anchor one Consent for up to 24 hours, send a minimized
   FHIR Communication to the controller mailbox, and reuse it for independently
