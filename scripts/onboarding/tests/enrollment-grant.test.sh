@@ -50,6 +50,8 @@ jq -e '
 ' "${grant}" >/dev/null
 [[ "$(stat -f '%Lp' "${grant}" 2>/dev/null || stat -c '%a' "${grant}")" == "600" ]]
 ! grep -Fq 'enrollmentSecret' "${stderr}"
+credential_digest="$(printf '%s' 'urn:uuid:10000000-0000-4000-8000-000000000001' | shasum -a 256 | awk '{print $1}')"
+grep -Fq -- "gdc.hostCredentialSha256=${credential_digest}:ecert" "${WORK}/calls.log"
 
 NOW_EPOCH_SECONDS=1785316861 \
 ENROLLMENT_GRANT_FILE="${grant}" \

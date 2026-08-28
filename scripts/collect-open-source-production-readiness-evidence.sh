@@ -284,10 +284,12 @@ prove_multi_host_topology() {
     done
   done
   local host2_gw_certificate="${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/host2.example.com/users/GW@host2.example.com/msp/signcerts/cert.pem"
+  local host_credential_sha256
+  host_credential_sha256="$(jq -r '.hostCredentialId' "${HOST_AUTHORIZATION_FILE}" | tr -d '\n' | shasum -a 256 | awk '{print $1}')"
   openssl verify -CAfile "${root_certificate}" -untrusted "${fabric_ica_certificate}" "${host2_gw_certificate}"
   openssl x509 -in "${host2_gw_certificate}" -text -noout \
-    | grep -Fq "$(jq -r '.hostCredentialId' "${HOST_AUTHORIZATION_FILE}")" || {
-      echo 'La identidad cliente del GW no conserva gdc.hostCredentialId.' >&2
+    | grep -Fq "${host_credential_sha256}" || {
+      echo 'La identidad cliente del GW no conserva gdc.hostCredentialSha256.' >&2
       return 1
     }
 }
@@ -335,9 +337,9 @@ const body = `# Evidencia local de preparación para producción\n\n` +
   `## Prueba de acceso de un empleado\n\n` +
   `El contrato de alta crea un secretario médico limitado a su organización. La prueba real con PostgreSQL, IPFS y Fabric crea datos de una persona, concede un consentimiento IPS explícito al secretario, acredita la lectura autorizada mediante SMART y deniega a otro secretario sin consentimiento. El perfil mantiene separadas las vinculaciones de identidad de organización y de persona.\n\n` +
   `## Prueba Kubernetes mediante Helm\n\n` +
-  `El gate \`45-helm-kubernetes-runtime\` instala un nuevo peer de \`Host2MSP\`, CouchDB, GW, PostgreSQL, IPFS y nueve runtimes CCAAS en un clúster kind mediante el chart público. Los certificados del peer y de la identidad cliente del GW conservan el identificador de la misma Host VC usada para la admisión. El peer se une a \`identity-local\` y \`health-care-local\`, instala y aprueba los nueve paquetes CCAAS, y el GW firma como \`Host2MSP\` contra ese peer para repetir Consent y SMART. Después reinicia GW, peer y CCAAS y demuestra persistencia y nueva capacidad de endoso; el peer Docker queda limitado a gossip/bootstrap.\n\n` +
+  `El gate \`45-helm-kubernetes-runtime\` instala un nuevo peer de \`Host2MSP\`, CouchDB, GW, PostgreSQL, IPFS y nueve runtimes CCAAS en un clúster kind mediante el chart público. Los certificados del peer y de la identidad cliente del GW conservan el SHA-256 del identificador de la misma Host VC usada para la admisión. El peer se une a \`identity-local\` y \`health-care-local\`, instala y aprueba los nueve paquetes CCAAS, y el GW firma como \`Host2MSP\` contra ese peer para repetir Consent y SMART. Después reinicia GW, peer y CCAAS y demuestra persistencia y nueva capacidad de endoso; el peer Docker queda limitado a gossip/bootstrap.\n\n` +
   `## Admisión dinámica demostrada\n\n` +
-  `La puerta Fabric arranca los canales únicamente con \`Host1MSP\`. Una Host VC-JWT desechable se verifica criptográficamente, el grant Fabric queda limitado a dos usos y el certificado resultante se vincula a su identificador. El reconciliador con driver Fabric vivo calcula y firma la entrada de \`Host2MSP\`, aplica la mutación, arranca el segundo peer y lo une. La evidencia comprueba después pertenencia, lifecycle y tráfico GW desde el peer Kubernetes del MSP recién admitido.\n`;
+  `La puerta Fabric arranca los canales únicamente con \`Host1MSP\`. Una Host VC-JWT desechable se verifica criptográficamente, el grant Fabric queda limitado a dos usos y el certificado resultante se vincula al SHA-256 de su identificador. El reconciliador con driver Fabric vivo calcula y firma la entrada de \`Host2MSP\`, aplica la mutación, arranca el segundo peer y lo une. La evidencia comprueba después pertenencia, lifecycle y tráfico GW desde el peer Kubernetes del MSP recién admitido.\n`;
 writeFileSync(join(evidenceDir, 'SUMMARY.md'), body, { mode: 0o644 });
 NODE
 }

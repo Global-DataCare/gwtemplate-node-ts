@@ -138,6 +138,11 @@ El asistente produce además `/secure/host/gw.fabric.env`, privado y en modo
 cliente. Ningún grant aparece en ese fichero. El paquete
 `/secure/host/helm-runtime` contiene únicamente:
 
+Los certificados Fabric incluyen `gdc.hostCredentialSha256`, el SHA-256
+hexadecimal del identificador completo de la Host VC. Se usa el digest porque
+la sintaxis `:ecert` de Fabric CA no admite los `:` de un `urn:uuid`; el
+identificador completo permanece en `authorization.json`.
+
 ```text
 msp.tgz
 tls.tgz

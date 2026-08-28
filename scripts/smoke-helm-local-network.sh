@@ -90,6 +90,7 @@ docker image inspect "${IMAGE_NAME}" >/dev/null
   exit 2
 }
 HOST_CREDENTIAL_ID="$(jq -er '.hostCredentialId' "${HOST_AUTHORIZATION_JSON}")"
+HOST_CREDENTIAL_SHA256="$(printf '%s' "${HOST_CREDENTIAL_ID}" | shasum -a 256 | awk '{print $1}')"
 [[ "$(jq -r '.mspId' "${HOST_AUTHORIZATION_JSON}")" == "${KIND_PEER_MSP_ID}" ]] || {
   echo 'La autorización no pertenece al MSP del peer Kubernetes.' >&2
   exit 2
@@ -153,7 +154,7 @@ prepare_kind_peer_identity() {
       --id.type peer \
       --id.affiliation host2.department1 \
       --id.maxenrollments 2 \
-      --id.attrs "gdc.mspId=${KIND_PEER_MSP_ID}:ecert,gdc.hostCredentialId=${HOST_CREDENTIAL_ID}:ecert" \
+      --id.attrs "gdc.mspId=${KIND_PEER_MSP_ID}:ecert,gdc.hostCredentialSha256=${HOST_CREDENTIAL_SHA256}:ecert" \
       --tls.certfiles "${ca_tls_cert}" >/dev/null
 
   docker exec "${FABRIC_CA_CLIENT_CONTAINER}" fabric-ca-client enroll \
@@ -175,8 +176,8 @@ prepare_kind_peer_identity() {
 
   normalize_kind_peer_identity
   openssl x509 -in "${KIND_PEER_DIR}/msp/signcerts/cert.pem" -text -noout \
-    | grep -Fq "${HOST_CREDENTIAL_ID}" || {
-      echo 'El certificado del peer Kubernetes no contiene el vínculo de la Host VC.' >&2
+    | grep -Fq "${HOST_CREDENTIAL_SHA256}" || {
+      echo 'El certificado del peer Kubernetes no contiene el digest de la Host VC.' >&2
       return 1
     }
   COPYFILE_DISABLE=1 tar -C "${KIND_PEER_DIR}/msp" -czf "${TEMP_DIR}/peer-msp.tgz" .

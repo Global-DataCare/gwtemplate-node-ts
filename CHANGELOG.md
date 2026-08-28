@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Vincular certificados Fabric de peer y cliente GW mediante
+  `gdc.hostCredentialSha256`: Fabric CA no admite los `:` de un `urn:uuid`
+  dentro de un atributo `:ecert`; la autorización conserva el identificador
+  completo y los certificados conservan su SHA-256 verificable.
+
 - Hacer que cada puerta del runner de evidencia se ejecute en un subshell con
   `errexit`/`pipefail`, registre `FAIL` en el primer error y elimine las bases
   SQLite desechables de las CA de Fabric antes de cada reproducción limpia.
