@@ -1,0 +1,57 @@
+{{- if .Values.ipfs.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "gdc-host.ipfsService" . }}
+  labels:
+    {{- include "gdc-host.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ipfs
+spec:
+  serviceName: {{ include "gdc-host.ipfsService" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: ipfs
+  template:
+    metadata:
+      labels:
+        {{- include "gdc-host.labels" . | nindent 8 }}
+        app.kubernetes.io/component: ipfs
+    spec:
+      containers:
+        - name: ipfs
+          image: {{ .Values.ipfs.image | quote }}
+          env: [{ name: IPFS_PROFILE, value: server }]
+          ports:
+            - { name: api, containerPort: 5001 }
+            - { name: gateway, containerPort: 8080 }
+            - { name: swarm, containerPort: 4001 }
+          volumeMounts: [{ name: ipfs-data, mountPath: /data/ipfs }]
+          resources:
+            {{- toYaml .Values.ipfs.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata: { name: ipfs-data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.ipfs.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources: { requests: { storage: {{ .Values.ipfs.persistence.size }} } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gdc-host.ipfsService" . }}
+  labels:
+    {{- include "gdc-host.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ipfs
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ipfs
+  ports:
+    - { name: api, port: 5001, targetPort: api }
+    - { name: gateway, port: 8080, targetPort: gateway }
+    - { name: swarm, port: 4001, targetPort: swarm }
+{{- end }}

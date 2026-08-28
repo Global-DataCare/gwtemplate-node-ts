@@ -1,0 +1,38 @@
+environment: staging
+networkMode: test-network
+host:
+  domain: host-st.example.invalid
+  publicUrl: https://host-st.example.invalid
+  legalName: Example Host staging
+  idValue: host-st.example.invalid
+  storageScope: host-st
+  allowedSectors: [onehealth-research]
+  identityChannel: identity-global
+  organizationIdentityChannel: identity-eu
+  dataChannel: health-care-eu
+gw:
+  image: registry.example.invalid/gw-core@sha256:1111111111111111111111111111111111111111111111111111111111111111
+  providers: { queue: mem, database: firestore, storage: gcs, envelope: local, replayProtection: none }
+images:
+  init: registry.example.invalid/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
+peer:
+  enabled: false
+  image: registry.example.invalid/fabric-peer@sha256:3333333333333333333333333333333333333333333333333333333333333333
+  name: peer0-host-st
+  mspId: HOSTMSP
+  externalEndpoint: peer-st.example.invalid:7051
+  mspSecretName: host-st-peer-msp
+  tlsSecretName: host-st-peer-tls
+  couchdbSecretName: host-st-couchdb
+externalPeer:
+  host: peer0.shared-fabric.svc.cluster.local
+  port: 7051
+postgresql:
+  enabled: false
+  image: registry.example.invalid/postgres@sha256:5555555555555555555555555555555555555555555555555555555555555555
+ipfs:
+  enabled: false
+  image: registry.example.invalid/kubo@sha256:6666666666666666666666666666666666666666666666666666666666666666
+couchdb:
+  enabled: false
+  image: registry.example.invalid/couchdb@sha256:4444444444444444444444444444444444444444444444444444444444444444

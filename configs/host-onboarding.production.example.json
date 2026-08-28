@@ -1,0 +1,31 @@
+{
+  "specVersion": "gdc.fabric.host-onboarding-assistant/v1",
+  "environment": "production",
+  "sharedInfrastructure": false,
+  "inputs": {
+    "request": "/secure/approvals/host-enrollment-request.json",
+    "decision": "/secure/approvals/channel-governance-envelope.json",
+    "controllerDidDocument": "/secure/cache/root-controller.did.json",
+    "icaDidDocument": "/secure/cache/dataspace-issuing-ica.did.json",
+    "inventory": "/secure/inventory/fabric.json",
+    "identityJwks": "/secure/cache/identity-provider.jwks.json"
+  },
+  "authority": {
+    "caUrl": "https://fabric-ica.example.invalid:7054",
+    "caAdminHome": "/secure/fabric-ca/admin",
+    "caTlsCert": "/secure/fabric-ca/tls/ca-chain.pem",
+    "authorizationOutput": "/secure/onboarding/authorization.json",
+    "enrollmentGrantOutput": "/secure/onboarding/enrollment-grant.json"
+  },
+  "host": {
+    "peerDns": "peer0.host.example.invalid",
+    "mspOutputDir": "/secure/host/fabric-peer",
+    "caTlsCert": "/secure/fabric-ca/tls/ca-chain.pem"
+  },
+  "platform": {
+    "driver": "scripts/governance/drivers/operator-command.mjs",
+    "commandMap": "/secure/inventory/driver-commands.json",
+    "state": "/secure/state/fabric-reconciler.json",
+    "audit": "/secure/audit/fabric-reconciler.jsonl"
+  }
+}

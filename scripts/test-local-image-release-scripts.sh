@@ -9,6 +9,7 @@ cd "$ROOT_DIR"
 bash -n ./docker_build_local.sh ./docker_run_local.sh ./cloud_deploy.sh \
   ./scripts/smoke-docker-local-network.sh ./scripts/prepare-consentaccess-local-fabric-env.sh \
   ./scripts/collect-open-source-production-readiness-evidence.sh \
+  ./scripts/smoke-helm-local-network.sh \
   ./scripts/warm-local-fabric-chaincodes.sh
 
 grep -qx 'node_modules' .dockerignore
@@ -49,6 +50,21 @@ while IFS= read -r env_example; do
 done < <(git ls-files 'env*.example')
 bash ./scripts/smoke-docker-local-network.sh --help | grep -q 'Fabric local-network'
 grep -Fq 'PERSISTENCE_PROFILE=postgres-ipfs' package.json
+grep -Fq 'infra/fabric/local-network' ./scripts/bootstrap-local-fabric-stack.mjs
+grep -Fq 'infra/fabric/local-network' ./chaincode/scripts/consentaccess-local-devnet.sh
+grep -Fq 'npm ci' ./chaincode/scripts/consentaccess-local-devnet.sh
+grep -Fq 'helm:test:host' package.json
+test -f ./infra/fabric/local-network/docker-compose.yml
+git check-ignore -q ./infra/fabric/local-network/crypto/ca/root/ca-key.pem
+git check-ignore -q ./infra/fabric/local-network/organizations/private-key.pem
+test -f ./charts/gdc-host/Chart.yaml
+test -f ./scripts/test-portable-host-helm.sh
+bash ./scripts/smoke-helm-local-network.sh --preflight-only | grep -Fq 'Preflight Helm local-network superado.'
+grep -Fq 'test:host-preauthorization' ./scripts/collect-open-source-production-readiness-evidence.sh
+if grep -Fq 'fabric-multicloud' ./scripts/collect-open-source-production-readiness-evidence.sh; then
+  echo 'ERROR: the public evidence runner must not require a private Fabric repository.' >&2
+  exit 1
+fi
 grep -Fq 'Open-source persistence validated' ./scripts/smoke-docker-local-network.sh
 grep -Fq 'warm-local-fabric-chaincodes.sh' ./scripts/smoke-docker-local-network.sh
 grep -Fq 'Host1MSP' ./scripts/warm-local-fabric-chaincodes.sh
@@ -63,7 +79,6 @@ grep -Fq 'Host1MSP' ./scripts/prepare-consentaccess-local-fabric-env.sh
 grep -Fq 'Host2MSP' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'identity-eu' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq 'identity-global' ./scripts/build-open-source-evidence-manifest.mjs
-grep -Fq 'excludedScope' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq 'FABRIC_PEER_ENDPOINT_VALUE="${FABRIC_PEER_ENDPOINT_VALUE:-localhost:7051}"' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER=${LEGACY_REPRESENTATIVE_CONTROLLER_VALUE}' \

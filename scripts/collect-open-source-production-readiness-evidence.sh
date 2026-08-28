@@ -2,11 +2,9 @@
 set -euo pipefail
 
 GW_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORKSPACE_ROOT="$(cd "${GW_ROOT}/.." && pwd)"
-DATASPACE_CA_ROOT="${WORKSPACE_ROOT}/dataspace-ca-ts"
-DATASPACE_ICA_ROOT="${WORKSPACE_ROOT}/dataspace-ica-ts"
-FABRIC_ROOT="${WORKSPACE_ROOT}/fabric-multicloud"
-FABRIC_DEVNET_ROOT="${FABRIC_ROOT}/devnet/fabric-v3"
+DATASPACE_CA_ROOT="${DATASPACE_CA_ROOT:-${GW_ROOT}/../dataspace-ca-ts}"
+DATASPACE_ICA_ROOT="${DATASPACE_ICA_ROOT:-${GW_ROOT}/../dataspace-ica-ts}"
+FABRIC_DEVNET_ROOT="${GW_ROOT}/infra/fabric/local-network"
 
 RUN_ID="${EVIDENCE_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 EVIDENCE_DIR="${EVIDENCE_DIR:-${GW_ROOT}/artifacts/open-source-production-readiness/${RUN_ID}}"
@@ -70,7 +68,7 @@ assert_public_evidence_contains_no_demo_secrets() {
 
 require_repository() {
   local repository="$1"
-  [[ -d "${repository}/.git" ]] || {
+  git -C "${repository}" rev-parse --git-dir >/dev/null 2>&1 || {
     echo "Missing sibling repository: ${repository}" >&2
     exit 2
   }
@@ -81,7 +79,7 @@ record_environment() {
   printf 'image=%s\n' "${IMAGE_NAME}"
   printf 'node=%s\n' "$(node --version)"
   printf 'docker=%s\n' "$(docker --version)"
-  for repository in "${GW_ROOT}" "${DATASPACE_CA_ROOT}" "${DATASPACE_ICA_ROOT}" "${FABRIC_ROOT}"; do
+  for repository in "${GW_ROOT}" "${DATASPACE_CA_ROOT}" "${DATASPACE_ICA_ROOT}"; do
     printf '%s_commit=%s\n' "$(basename "${repository}")" "$(git -C "${repository}" rev-parse HEAD)"
     if git -C "${repository}" diff --quiet && git -C "${repository}" diff --cached --quiet; then
       printf '%s_tracked_tree=clean\n' "$(basename "${repository}")"
@@ -139,15 +137,15 @@ test_dataspace_ica_host_activation() {
   node --test \
     ./test/api.host-service-form-pdf-fields.test.ts \
     ./test/api.vc-bundle.test.ts
+  npm run test:host-preauthorization
   npm run check:skills
 }
 
 test_fabric_governance_contract() {
   cd "${GW_ROOT}"
   bash ./scripts/tests/local-fabric-host-names.test.sh
-  cd "${FABRIC_ROOT}"
   node --test scripts/governance/tests/*.test.mjs scripts/onboarding/tests/*.test.mjs
-  bash ./scripts/tests/local-host-msp-names.test.sh
+  bash ./scripts/check-identity-chaincode-parity.sh
 }
 
 test_human_channel_taxonomy() {
@@ -167,7 +165,22 @@ test_employee_onboarding_contract() {
 reset_fabric_devnet() {
   cd "${FABRIC_DEVNET_ROOT}"
   docker compose down -v --remove-orphans || true
-  docker rm -f consentaccess-sc >/dev/null 2>&1 || true
+  local container
+  for container in gdc-orderer gdc-peer0-host1 gdc-peer0-host2 gdc-fabric-tools gdc-fabric-ca-client gdc-ica gdc-root-ca consentaccess-sc; do
+    docker rm -f "${container}" >/dev/null 2>&1 || true
+  done
+  for attempt in $(seq 1 30); do
+    local remaining=false
+    for container in gdc-orderer gdc-peer0-host1 gdc-peer0-host2 gdc-fabric-tools gdc-fabric-ca-client gdc-ica gdc-root-ca; do
+      docker container inspect "${container}" >/dev/null 2>&1 && remaining=true
+    done
+    [[ "${remaining}" == "false" ]] && break
+    [[ "${attempt}" != "30" ]] || {
+      echo 'Fabric devnet containers were not removed before reset.' >&2
+      return 1
+    }
+    sleep 1
+  done
   local volume
   for volume in \
     gdc-fabric-v3-devnet_orderer-data \
@@ -198,8 +211,6 @@ prove_multi_host_topology() {
   bash ./scripts/00-copy-dataspace-ca.sh "${CA_ROOT_DIR}" "${CA_ISSUER_DIR}"
   bash ./scripts/01-up-cas.sh
   SINGLE_HOST=false \
-  CA_HOST=root-ca \
-  CA_TLS_CERT=/workspace/crypto/ca/root/ca-cert.pem \
   HLF_DATA_CHANNEL_NAME=health-care-local \
   HLF_IDENTITY_CHANNEL_NAME=identity-local \
   HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
@@ -223,17 +234,46 @@ prove_multi_host_topology() {
   grep -Fq 'HLF_MSP_ID_HOST2=Host2MSP' .env.fabric-devnet
   docker inspect gdc-peer0-host1 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host1MSP'
   docker inspect gdc-peer0-host2 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host2MSP'
+
+  local root_certificate="${FABRIC_DEVNET_ROOT}/crypto/ca/root/ca-cert.pem"
+  local fabric_ica_certificate="${FABRIC_DEVNET_ROOT}/crypto/ca/ica/ca-cert.pem"
+  local fabric_ica_subject
+  fabric_ica_subject="$(openssl x509 -in "${fabric_ica_certificate}" -noout -subject -nameopt RFC2253 | sed 's/^subject=//')"
+  local host_domain leaf certificate_issuer
+  for host_domain in host1.example.com host2.example.com; do
+    for leaf in \
+      "${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/${host_domain}/peers/peer0.${host_domain}/msp/signcerts/cert.pem" \
+      "${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/${host_domain}/peers/peer0.${host_domain}/tls/signcerts/cert.pem"; do
+      openssl verify -CAfile "${root_certificate}" -untrusted "${fabric_ica_certificate}" "${leaf}"
+      certificate_issuer="$(openssl x509 -in "${leaf}" -noout -issuer -nameopt RFC2253 | sed 's/^issuer=//')"
+      [[ "${certificate_issuer}" == "${fabric_ica_subject}" ]] || {
+        echo "Fabric identity was not issued by the Fabric ICA: ${leaf}" >&2
+        return 1
+      }
+    done
+  done
 }
 
 prove_runtime_data_plane() {
   export OPEN_SOURCE_LOCAL_KEK_SECRET="$(openssl rand -base64 32 | tr -d '\n')"
+  local local_demo_env="${CA_WORKSPACE}/gw-local-demo.env"
+  cp "${GW_ROOT}/env.local-demo.example" "${local_demo_env}"
   cd "${GW_ROOT}"
   LOCAL_FABRIC_CA_SOURCE=dataspace-ca \
+  LOCAL_DEMO_ENV_FILE="${local_demo_env}" \
   DATASPACE_CA_ROOT_DIR="${CA_ROOT_DIR}" \
   DATASPACE_CA_ISSUER_DIR="${CA_ISSUER_DIR}" \
   KEEP_CONTAINER=false \
   IMAGE_NAME="${IMAGE_NAME}" \
     npm run docker:smoke:open-source-local-network
+}
+
+prove_helm_runtime_data_plane() {
+  cd "${GW_ROOT}"
+  IMAGE_NAME="${IMAGE_NAME}" \
+  FABRIC_ENV_FILE="${GW_ROOT}/.env.local-fabric" \
+  KEEP_HELM_EVIDENCE_CLUSTER=false \
+    npm run helm:smoke:local-network
 }
 
 write_summary() {
@@ -247,20 +287,22 @@ const gates = readdirSync(join(evidenceDir, 'gates'))
   .sort()
   .map((name) => `- ${name.replace('.status', '')}: ${readFileSync(join(evidenceDir, 'gates', name), 'utf8').trim()}`)
   .join('\n');
-const body = `# Local production-readiness evidence\n\n` +
-  `Image: \`${imageName}\`\n\n` +
-  `## Verified gates\n\n${gates}\n\n` +
-  `## Fabric and tenant boundary\n\n` +
-  `\`Host1MSP\` and \`Host2MSP\` are Fabric members. VAT-addressed tenant Organizations are application data hosted by a GW and are not Fabric MSPs. Both local host peers join \`identity-local\` and \`health-care-local\`; \`onehealth-research\` is the GW sector, not a channel. In production, EU Organizations and employees route to \`identity-eu\`, while human individuals route to \`identity-global\`. Animal and veterinary domains are outside this evidence scope.\n\n` +
-  `## Human employee access proof\n\n` +
-  `The employee onboarding/DCR contract creates an organization-scoped medical secretary. The live PostgreSQL/IPFS/Fabric smoke creates a person's health data, grants that secretary an explicit IPS consent, proves the SMART-authorized read and denies a second secretary without consent. The selected production profile routes both entity/employee and individual services for the same VAT tenant to one host while keeping identity-eu and identity-global ledger bindings separate.\n\n` +
-  `## Production limitation\n\n` +
-  `This package proves the governed admission contract and a real two-host bootstrap topology. It does not claim that Host2MSP was dynamically added to an already-running Host1-only channel: the operator-owned Fabric mutation driver still requires a live E2E before production admission can be called automatic.\n`;
+const body = `# Evidencia local de preparación para producción\n\n` +
+  `Imagen: \`${imageName}\`\n\n` +
+  `## Comprobaciones verificadas\n\n${gates}\n\n` +
+  `## Separación entre hosts y tenants\n\n` +
+  `\`Host1MSP\` y \`Host2MSP\` son miembros de Fabric. Las organizaciones tenant identificadas por VAT son datos de aplicación alojados por un GW y no son MSP de Fabric. Los dos peers locales participan en \`identity-local\` y \`health-care-local\`; \`onehealth-research\` es un sector del GW, no un canal. En el perfil europeo, organizaciones y empleados usan \`identity-eu\`, mientras que las personas usan \`identity-global\`.\n\n` +
+  `## Prueba de acceso de un empleado\n\n` +
+  `El contrato de alta crea un secretario médico limitado a su organización. La prueba real con PostgreSQL, IPFS y Fabric crea datos de una persona, concede un consentimiento IPS explícito al secretario, acredita la lectura autorizada mediante SMART y deniega a otro secretario sin consentimiento. El perfil mantiene separadas las vinculaciones de identidad de organización y de persona.\n\n` +
+  `## Prueba Kubernetes mediante Helm\n\n` +
+  `El gate \`45-helm-kubernetes-runtime\` instala el GW, PostgreSQL e IPFS en un clúster kind mediante el chart público, conecta el GW al peer local ya verificado, repite los flujos funcionales y demuestra recuperación del tenant y de los datos tras reiniciar el pod.\n\n` +
+  `## Límite demostrado\n\n` +
+  `El paquete demuestra el contrato de admisión gobernada y el arranque reproducible de una topología con dos hosts. No declara todavía como automática la incorporación dinámica de \`Host2MSP\` a un canal que ya estuviera funcionando únicamente con \`Host1MSP\`; esa mutación del consorcio requiere su propia prueba E2E viva.\n`;
 writeFileSync(join(evidenceDir, 'SUMMARY.md'), body, { mode: 0o644 });
 NODE
 }
 
-for repository in "${GW_ROOT}" "${DATASPACE_CA_ROOT}" "${DATASPACE_ICA_ROOT}" "${FABRIC_ROOT}"; do
+for repository in "${GW_ROOT}" "${DATASPACE_CA_ROOT}" "${DATASPACE_ICA_ROOT}"; do
   require_repository "${repository}"
 done
 docker image inspect "${IMAGE_NAME}" >/dev/null
@@ -274,6 +316,7 @@ run_gate 31-fabric-multi-host-topology prove_multi_host_topology
 run_gate 35-human-channel-taxonomy test_human_channel_taxonomy
 run_gate 36-employee-onboarding-contract test_employee_onboarding_contract
 run_gate 40-gw-postgres-ipfs-fabric-runtime prove_runtime_data_plane
+run_gate 45-helm-kubernetes-runtime prove_helm_runtime_data_plane
 run_gate 50-evidence-summary write_summary
 run_gate 60-public-secret-scan assert_public_evidence_contains_no_demo_secrets
 

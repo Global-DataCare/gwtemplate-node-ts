@@ -27,6 +27,16 @@ grep -Fq 'HOST1_DOMAIN="${HOST1_DOMAIN:-host1.example.com}"' \
 grep -Fq 'CORE_PEER_ADDRESS=peer0-host1:7051' \
   "${ROOT}/scripts/smoke-smart-access-local-network.sh"
 grep -Fq 'FABRIC_DEVNET_ROOT' "${ROOT}/scripts/bootstrap-local-fabric-stack.mjs"
+grep -Fq 'CA_HOST="${CA_HOST:-ica}"' \
+  "${ROOT}/infra/fabric/local-network/scripts/02-bootstrap-network.sh"
+if grep -Fq 'CA_HOST=root-ca' "${ROOT}/scripts/collect-open-source-production-readiness-evidence.sh"; then
+  echo 'The public evidence runner bypasses the Fabric ICA.' >&2
+  exit 1
+fi
+if grep -Eq "CA_HOST:[[:space:]]*'root-ca'" "${ROOT}/scripts/bootstrap-local-fabric-stack.mjs"; then
+  echo 'The GW bootstrap bypasses the Fabric ICA.' >&2
+  exit 1
+fi
 
 if rg -n -i \
   'peer0-org[12]|org[12]\.example|org[12]msp|hlf_msp_id_org[12]|org[12]_domain' \

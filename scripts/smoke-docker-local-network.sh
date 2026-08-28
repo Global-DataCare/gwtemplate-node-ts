@@ -91,6 +91,21 @@ docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1 || {
 if [[ "$PERSISTENCE_PROFILE" == "postgres-ipfs" ]]; then
   if [[ "$RESET_OPEN_SOURCE_PERSISTENCE" == "true" ]]; then
     DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f "$OPEN_SOURCE_COMPOSE_FILE" down -v
+    for container_name in gw-open-source-postgres gw-open-source-ipfs; do
+      docker rm -f "$container_name" >/dev/null 2>&1 || true
+    done
+    for attempt in $(seq 1 30); do
+      remaining=false
+      for container_name in gw-open-source-postgres gw-open-source-ipfs; do
+        docker container inspect "$container_name" >/dev/null 2>&1 && remaining=true
+      done
+      [[ "$remaining" == "false" ]] && break
+      [[ "$attempt" != "30" ]] || {
+        echo 'ERROR: open-source persistence containers were not removed.' >&2
+        exit 1
+      }
+      sleep 1
+    done
   fi
   DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f "$OPEN_SOURCE_COMPOSE_FILE" up -d --wait
   local_kek_secret="${OPEN_SOURCE_LOCAL_KEK_SECRET:-$(openssl rand -base64 32 | tr -d '\n')}"

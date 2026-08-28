@@ -1,0 +1,6 @@
+apiVersion: v2
+name: gdc-host
+description: Portable governed Fabric peer and GW host runtime
+type: application
+version: 0.3.0
+appVersion: "0.3.0"

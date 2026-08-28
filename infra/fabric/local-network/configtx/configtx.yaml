@@ -1,0 +1,179 @@
+Organizations:
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: ../organizations/ordererOrganizations/example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+
+  # Fabric membership belongs to host operators. Tenants hosted by the GW are
+  # business organizations identified by VAT; they are not Fabric MSPs.
+  - &Host1
+    Name: Host1MSP
+    ID: Host1MSP
+    MSPDir: ../organizations/peerOrganizations/host1.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('Host1MSP.admin', 'Host1MSP.peer', 'Host1MSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('Host1MSP.admin', 'Host1MSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('Host1MSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('Host1MSP.peer')"
+    AnchorPeers:
+      - Host: peer0-host1
+        Port: 7051
+
+  - &Host2
+    Name: Host2MSP
+    ID: Host2MSP
+    MSPDir: ../organizations/peerOrganizations/host2.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('Host2MSP.admin', 'Host2MSP.peer', 'Host2MSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('Host2MSP.admin', 'Host2MSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('Host2MSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('Host2MSP.peer')"
+    AnchorPeers:
+      - Host: peer0-host2
+        Port: 7051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_0: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer:7050
+  EtcdRaft:
+    Consenters:
+      - Host: orderer
+        Port: 7050
+        ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/signcerts/cert.pem
+        ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/signcerts/cert.pem
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  GdcGenesis:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Consortiums:
+      GdcConsortium:
+        Organizations:
+          - *Host1
+          - *Host2
+
+  GdcChannel:
+    Consortium: GdcConsortium
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Host1
+        - *Host2
+
+  # DEMO-style: single host org only (tenants are client identities, not peer operators)
+  GdcGenesisSingleHost:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Consortiums:
+      GdcConsortium:
+        Organizations:
+          - *Host1
+
+  GdcChannelSingleHost:
+    Consortium: GdcConsortium
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Host1

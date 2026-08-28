@@ -1,0 +1,133 @@
+environment: staging
+networkMode: test-network
+
+nameOverride: ""
+fullnameOverride: ""
+imagePullSecrets: []
+
+# Reference to the post-verification authorization result. The raw signed PDF
+# and HostingServiceCredential stay outside Helm and Kubernetes manifests.
+authorization:
+  existingSecret: ""
+  key: authorization.json
+
+host:
+  domain: host.example.invalid
+  publicUrl: https://host.example.invalid
+  legalName: Host provider
+  jurisdiction: ES
+  idType: DOMAIN
+  idValue: host.example.invalid
+  storageScope: host
+  allowedSectors:
+    - onehealth-research
+  identityChannel: identity-global
+  organizationIdentityChannel: identity-eu
+  dataChannel: health-care-eu
+
+images:
+  init: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+
+gw:
+  enabled: true
+  image: registry.example.invalid/gw-core@sha256:0000000000000000000000000000000000000000000000000000000000000000
+  # Solo para pruebas locales con una imagen cargada previamente en kind.
+  localImage: ""
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  existingSecret: gdc-host-gw
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: true
+    className: ""
+    annotations: {}
+    tlsSecretName: ""
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+  providers:
+    queue: mem
+    database: postgres
+    storage: ipfs
+    envelope: hashicorp-transit
+    replayProtection: postgres
+  authTokenVerifier: firebase
+  securityMode: strict
+  didcommPlain: disabled
+  extraEnv: {}
+
+peer:
+  enabled: true
+  image: docker.io/hyperledger/fabric-peer@sha256:f3120ed321d406f8025e87b91b0708be0327fe512603be30f9f74924cf26afb2
+  name: peer0
+  mspId: HostMSP
+  externalEndpoint: peer0.host.example.invalid:7051
+  bootstrap: ""
+  mspSecretName: peer-msp
+  tlsSecretName: peer-tls
+  couchdbSecretName: couchdb-auth
+  service:
+    type: LoadBalancer
+    annotations: {}
+    port: 7051
+  persistence:
+    storageClass: ""
+    size: 20Gi
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+externalPeer:
+  host: ""
+  port: 7051
+
+couchdb:
+  enabled: true
+  image: docker.io/library/couchdb@sha256:307a3f5276f64c0db28f226b7b5c180b8f2c851afa681cfb4fbb1b1fe7fd5587
+  persistence:
+    storageClass: ""
+    size: 20Gi
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+postgresql:
+  enabled: true
+  image: docker.io/library/postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+  existingSecret: gdc-host-postgresql
+  database: gw
+  persistence:
+    storageClass: ""
+    size: 20Gi
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+ipfs:
+  enabled: true
+  image: docker.io/ipfs/kubo@sha256:7cc0e0de8f845d6c9fa1dce414c069974c34ed3cd3742e0d4f5bccda4adc376d
+  persistence:
+    storageClass: ""
+    size: 50Gi
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+redis:
+  enabled: false
+  image: docker.io/library/redis@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+  existingSecret: gdc-host-redis
+  persistence:
+    storageClass: ""
+    size: 5Gi
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+chaincodes: []
