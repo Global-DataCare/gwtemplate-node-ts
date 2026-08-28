@@ -34,6 +34,9 @@ gw:
   # Solo para pruebas locales con una imagen cargada previamente en kind.
   localImage: ""
   imagePullPolicy: IfNotPresent
+  # Optional endpoint used only while a newly deployed peer synchronizes and
+  # the application plane must keep using an already endorsed peer.
+  fabricPeerEndpoint: ""
   replicas: 1
   existingSecret: gdc-host-gw
   serviceAccount:

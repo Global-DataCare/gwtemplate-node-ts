@@ -32,6 +32,18 @@ test('manifest separates host MSP membership from VAT-addressed tenants', () => 
   assert.equal('excludedScope' in manifest.productionChannelProjection, false);
   assert.equal(manifest.repositories.some((repository) => repository.name === 'fabric-multicloud'), false);
   assert.equal(manifest.gates[0].status, 'PASS');
+  assert.deepEqual(manifest.kubernetesProof.components, [
+    'peer',
+    'couchdb',
+    'gw-core',
+    'postgresql',
+    'ipfs',
+  ]);
+  assert.deepEqual(manifest.kubernetesProof.joinedChannels, [
+    'identity-local',
+    'health-care-local',
+  ]);
+  assert.equal(manifest.kubernetesProof.pending, 'CCAAS lifecycle and GW endorsement through the Kubernetes peer');
   assert.match(manifest.artifacts[0].sha256, /^[a-f0-9]{64}$/);
   assert.equal('privateKey' in manifest, false);
 });

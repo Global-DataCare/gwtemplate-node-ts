@@ -295,7 +295,7 @@ const body = `# Evidencia local de preparación para producción\n\n` +
   `## Prueba de acceso de un empleado\n\n` +
   `El contrato de alta crea un secretario médico limitado a su organización. La prueba real con PostgreSQL, IPFS y Fabric crea datos de una persona, concede un consentimiento IPS explícito al secretario, acredita la lectura autorizada mediante SMART y deniega a otro secretario sin consentimiento. El perfil mantiene separadas las vinculaciones de identidad de organización y de persona.\n\n` +
   `## Prueba Kubernetes mediante Helm\n\n` +
-  `El gate \`45-helm-kubernetes-runtime\` instala el GW, PostgreSQL e IPFS en un clúster kind mediante el chart público, conecta el GW al peer local ya verificado, repite los flujos funcionales y demuestra recuperación del tenant y de los datos tras reiniciar el pod.\n\n` +
+  `El gate \`45-helm-kubernetes-runtime\` instala peer Host1MSP, CouchDB, GW, PostgreSQL e IPFS en un clúster kind mediante el chart público. Enrola MSP/TLS exclusivos, une el peer a \`identity-local\` y \`health-care-local\`, repite los flujos funcionales y demuestra persistencia tras reiniciar GW y peer. El GW usa el peer Docker con los chaincodes ya instalados; quedan pendientes el lifecycle CCAAS sobre el peer kind y el E2E apuntando a ese peer.\n\n` +
   `## Límite demostrado\n\n` +
   `El paquete demuestra el contrato de admisión gobernada y el arranque reproducible de una topología con dos hosts. No declara todavía como automática la incorporación dinámica de \`Host2MSP\` a un canal que ya estuviera funcionando únicamente con \`Host1MSP\`; esa mutación del consorcio requiere su propia prueba E2E viva.\n`;
 writeFileSync(join(evidenceDir, 'SUMMARY.md'), body, { mode: 0o644 });

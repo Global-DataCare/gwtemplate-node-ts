@@ -84,6 +84,9 @@ for component in peer couchdb gw postgresql ipfs redis; do
   grep -q "app.kubernetes.io/component: ${component}" "${TMP_DIR}/production.yaml"
 done
 grep -q 'app.kubernetes.io/component: chaincode' "${TMP_DIR}/production.yaml"
+grep -A4 -F 'readinessProbe:' "${TMP_DIR}/production.yaml" | grep -Fq 'port: peer'
+grep -q 'CORE_PEER_CHAINCODELISTENADDRESS' "${TMP_DIR}/production.yaml"
+grep -q '/tls/tlsintermediatecerts' "${TMP_DIR}/production.yaml"
 grep -q 'peer0.shared-fabric.svc.cluster.local:7051' "${TMP_DIR}/external-staging.yaml"
 if grep -q 'app.kubernetes.io/component: peer' "${TMP_DIR}/external-staging.yaml"; then
   echo "external staging profile rendered a managed peer" >&2

@@ -33,8 +33,10 @@ data:
   LEDGER_IDENTITY_CHANNEL_DEFAULT: {{ .Values.host.identityChannel | quote }}
   LEDGER_ORGANIZATION_IDENTITY_CHANNEL_DEFAULT: {{ .Values.host.organizationIdentityChannel | quote }}
   LEDGER_DATA_CHANNEL_DEFAULT: {{ .Values.host.dataChannel | quote }}
-  HLF_CONNECTION_PEER: {{ ternary (printf "%s:7051" (include "gdc-host.peerService" .)) (printf "%s:%v" .Values.externalPeer.host .Values.externalPeer.port) .Values.peer.enabled | quote }}
-  {{ printf "HLF_CONNECTION_PEER_%s" .Values.peer.mspId }}: {{ ternary (printf "%s:7051" (include "gdc-host.peerService" .)) (printf "%s:%v" .Values.externalPeer.host .Values.externalPeer.port) .Values.peer.enabled | quote }}
+  {{- $defaultPeerEndpoint := ternary (printf "%s:7051" (include "gdc-host.peerService" .)) (printf "%s:%v" .Values.externalPeer.host .Values.externalPeer.port) .Values.peer.enabled }}
+  {{- $fabricPeerEndpoint := default $defaultPeerEndpoint .Values.gw.fabricPeerEndpoint }}
+  HLF_CONNECTION_PEER: {{ $fabricPeerEndpoint | quote }}
+  {{ printf "HLF_CONNECTION_PEER_%s" .Values.peer.mspId }}: {{ $fabricPeerEndpoint | quote }}
   QUEUE_PROVIDER: {{ .Values.gw.providers.queue | quote }}
   DB_PROVIDER: {{ .Values.gw.providers.database | quote }}
   STORAGE_PROVIDER: {{ .Values.gw.providers.storage | quote }}

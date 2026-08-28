@@ -74,6 +74,15 @@ test -f ./scripts/test-portable-host-helm.sh
 bash ./scripts/smoke-helm-local-network.sh --preflight-only | grep -Fq 'Preflight Helm local-network superado.'
 grep -Fq 'CONFIDENTIAL_JWE_INLINE_MAX_BYTES=1' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'La prueba Helm no persistió ningún JWE cifrado en IPFS.' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'peer.enabled=true' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'peer-kind-host1' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'peer channel join' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'peer node status' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'tlsintermediatecerts' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'CORE_PEER_LOCALMSPID=Host1MSP' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'kind_peer_channels=' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'height[^0-9]*[1-9]' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'gw.fabricPeerEndpoint' ./charts/gdc-host/templates/gw-configmap.yaml
 grep -Fq 'test:host-preauthorization' ./scripts/collect-open-source-production-readiness-evidence.sh
 if grep -Fq 'fabric-multicloud' ./scripts/collect-open-source-production-readiness-evidence.sh; then
   echo 'ERROR: the public evidence runner must not require a private Fabric repository.' >&2

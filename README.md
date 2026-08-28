@@ -3,6 +3,8 @@
 La guía pública en español para reproducir el host completo con Docker,
 Fabric, ICA, chaincodes, PostgreSQL/IPFS y Helm está en
 [`ENTREGABLE-HOST-REPRODUCIBLE.md`](./ENTREGABLE-HOST-REPRODUCIBLE.md).
+El [Word público](./deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx) está agrupado
+con su fuente editable en `deliverables/`.
 
 ([test-api](https://globaldatacare-test-961105121121.europe-southwest1.run.app/api-docs/))
 
