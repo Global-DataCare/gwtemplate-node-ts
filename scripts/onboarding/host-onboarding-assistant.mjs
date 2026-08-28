@@ -83,7 +83,16 @@ async function applyHost(manifest) {
       ...(manifest.host.caTlsCert ? { CA_TLS_CERT: manifest.host.caTlsCert } : {}),
     },
   });
-  log('Host phase complete. Keep the private MSP/TLS material in host custody.');
+  await run('bash', ['scripts/onboarding/package-host-runtime.sh'], {
+    label: 'host runtime packaging',
+    env: {
+      HOST_IDENTITY_DIR: manifest.host.mspOutputDir,
+      AUTHORIZATION_JSON: manifest.authority.authorizationOutput,
+      ENROLLMENT_GRANT_FILE: manifest.authority.enrollmentGrantOutput,
+      HOST_RUNTIME_OUTPUT_DIR: manifest.host.runtimeOutputDir,
+    },
+  });
+  log('Host phase complete. Keep private MSP/TLS material and the sanitized runtime package in host custody.');
 }
 
 async function runPlatform(manifest, apply) {
@@ -113,6 +122,7 @@ async function showStatus(manifest) {
     ['authorization', manifest.authority.authorizationOutput],
     ['enrollment grant', manifest.authority.enrollmentGrantOutput],
     ['host MSP/TLS', manifest.host.mspOutputDir],
+    ['Helm runtime package', manifest.host.runtimeOutputDir],
     ['reconciler state', manifest.platform.state],
     ['audit log', manifest.platform.audit],
   ];

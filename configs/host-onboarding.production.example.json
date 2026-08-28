@@ -20,6 +20,7 @@
   "host": {
     "peerDns": "peer0.host.example.invalid",
     "mspOutputDir": "/secure/host/fabric-peer",
+    "runtimeOutputDir": "/secure/host/helm-runtime",
     "caTlsCert": "/secure/fabric-ca/tls/ca-chain.pem"
   },
   "platform": {

@@ -122,9 +122,12 @@ The final open-source project evidence has four mandatory, complementary gates:
    confidential JWE blobs out of relational rows, verifies both persistence
    systems contain data, restarts GW with the same local KEK, and proves both
    host and tenant metadata recover.
-3. governed host plane: a signed host-form to `HostingServiceCredential`
-   contract, the signed governance/reconciler contract and a real local
-   two-peer topology. Name generic Fabric members `Host1MSP` and `Host2MSP`;
+3. governed host plane: a signed host-form or governed preauthorization to
+   mandatory `HostingServiceCredential` contract, the signed
+   governance/reconciler contract and a real local dynamic-admission topology.
+   Bootstrap channels with `Host1MSP`, admit `Host2MSP` through a signed config
+   update, and only then start/join its peer. Name generic Fabric members
+   `Host1MSP` and `Host2MSP`;
    never use `Org1MSP`/`Org2MSP` in report evidence because VAT-addressed
    tenant Organizations are hosted application data, not Fabric members.
 4. Kubernetes portability plane: validate the complete immutable host chart,
@@ -145,9 +148,15 @@ Generate the presentation bundle with
 `npm run evidence:open-source-production-readiness`. It must contain only
 public CA artifacts, logs, statuses, repository/image identities and hashes.
 Never copy private CA keys, Fabric enrollment secrets or the local KEK into the
-evidence directory. State explicitly that a two-host genesis/bootstrap proves
-multi-host topology but does not prove dynamic admission to an already-running
-channel; the real operator mutation driver needs a live E2E before production.
+evidence directory. The audit gate must prove dynamic `Host2MSP` admission to
+channels initially bootstrapped with `Host1MSP`; a two-host genesis alone is
+not sufficient. Require the Host VC in local, test and production. PDF-free
+local preauthorization still emits a VC and never means controller-only Fabric
+enrollment. Package only `msp.tgz`, `tls.tgz`, sanitized authorization and
+hashes for Helm; the grant and raw VC-JWT stay outside runtime Secrets.
+Generate all nine CCAAS packages deterministically from the exact Helm fullname
+and namespace. Never copy example package IDs: a Service, release, port or TLS
+change requires new archives, hashes, values and governed approvals.
 
 For the report, keep production identity routing explicit: EU VAT
 Organizations and organization-scoped employees use `identity-eu`, while

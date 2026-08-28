@@ -68,7 +68,10 @@ canales, lectura, autorización y persistencia PostgreSQL/IPFS.
 
 La `HostingServiceCredential` autoriza el alta, pero no es un certificado de
 Fabric. Después de verificarla, la autoridad registra un identificador y un
-secreto temporal en la ICA de Fabric. El host ejecuta el enrollment y genera
+secreto de enrolamiento limitado a dos usos en la ICA de Fabric. El helper
+añade una ventana operativa de caducidad y rechaza el grant una vez vencida;
+la autoridad revoca cualquier identificador no consumido porque Fabric CA no
+aplica por sí sola esa fecha del fichero. El host ejecuta el enrollment y genera
 localmente sus claves privadas MSP/TLS; únicamente la CSR sale del host y
 únicamente los certificados firmados regresan.
 
@@ -92,7 +95,7 @@ indique sus rutas con `DATASPACE_CA_ROOT` y `DATASPACE_ICA_ROOT`.
 ## Ejecución completa
 
 ```bash
-cd "${HOME}/GITS/gdc-workspace/gwtemplate-node-ts"
+cd "${REPO_ROOT}"
 npm ci
 
 release_tag="$(node -p "require('./package.json').version")-$(git rev-parse --short HEAD)"
@@ -101,8 +104,8 @@ image_name="gw-core:${release_tag}"
 LOCAL_IMAGE_NAME="${image_name}" ./docker_build_local.sh
 
 IMAGE_NAME="${image_name}" \
-DATASPACE_CA_ROOT="${HOME}/GITS/gdc-workspace/dataspace-ca-ts" \
-DATASPACE_ICA_ROOT="${HOME}/GITS/gdc-workspace/dataspace-ica-ts" \
+DATASPACE_CA_ROOT="${DATASPACE_CA_ROOT}" \
+DATASPACE_ICA_ROOT="${DATASPACE_ICA_ROOT}" \
 npm run evidence:open-source-production-readiness
 ```
 
@@ -134,7 +137,8 @@ Se promueven la misma imagen inmutable y el mismo chart; cambian los values y
 los secretos de cada entorno. Antes de instalar un host autónomo deben existir:
 
 - decisión de gobernanza y `HostingServiceCredential` verificadas;
-- grant temporal de la ICA de Fabric;
+- grant de la ICA de Fabric, limitado a dos enrolamientos y dentro de su
+  ventana operativa;
 - MSP y TLS generados localmente por el host;
 - secretos Kubernetes para GW, peer, CouchDB, PostgreSQL y autorización;
 - DNS, TLS, StorageClass, IngressClass y KMS del proveedor;
@@ -166,3 +170,4 @@ versiones o digests que hayan superado las puertas correspondientes.
 - `scripts/onboarding/`: asistente por roles autoridad/host/plataforma.
 - `scripts/collect-open-source-production-readiness-evidence.sh`: runner total.
 - `scripts/smoke-helm-local-network.sh`: instalación y E2E Kubernetes.
+- `deliverables/GUIA_OPERATIVA_HOST_ES.md`: procedimiento detallado por rol.

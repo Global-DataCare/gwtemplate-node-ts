@@ -345,7 +345,7 @@ test('authorizes host enrollment only when Host VC and Root governance decision 
   }), /subject must equal request.hostUrl/);
 });
 
-test('allows controller-approved technical enrollment without a Host VC only outside production', async () => {
+test('requires a HostingServiceCredential in every network, including local and test', async () => {
   const now = Date.parse('2026-07-29T09:06:00.000Z');
   for (const networkKind of ['local-network', 'test-network']) {
     const value = decision();
@@ -363,7 +363,7 @@ test('allows controller-approved technical enrollment without a Host VC only out
     const hostUrl = networkKind === 'local-network'
       ? 'http://host2.localhost'
       : 'https://host-st.example.invalid';
-    const authorized = await authorizeHostEnrollment({
+    await assert.rejects(() => authorizeHostEnrollment({
       request: {
         specVersion: 'gdc.fabric.host-enrollment/v1',
         hostUrl,
@@ -374,12 +374,7 @@ test('allows controller-approved technical enrollment without a Host VC only out
       inventory: technicalInventory,
       identityJwks: authentication.jwks,
       now,
-    });
-    assert.equal(authorized.authorized, true);
-    assert.equal(authorized.hostUrl, hostUrl);
-    assert.equal(authorized.networkKind, networkKind);
-    assert.equal(authorized.evidencePolicy, 'controller-approval');
-    assert.equal(authorized.hostCredentialId, undefined);
+    }), /requires a HostingServiceCredential/);
   }
 });
 
@@ -400,7 +395,7 @@ test('fails closed when a production host omits HostingServiceCredential', async
     inventory,
     identityJwks: authentication.jwks,
     now,
-  }), /Production network requires a HostingServiceCredential/);
+  }), /requires a HostingServiceCredential/);
 });
 
 test('apply re-inspects every step, persists completion and is idempotent', async () => {

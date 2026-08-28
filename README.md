@@ -1,10 +1,8 @@
 # Gateway Template - Node.js & TypeScript
 
-La guía pública en español para reproducir el host completo con Docker,
-Fabric, ICA, chaincodes, PostgreSQL/IPFS y Helm está en
-[`ENTREGABLE-HOST-REPRODUCIBLE.md`](./ENTREGABLE-HOST-REPRODUCIBLE.md).
-El [Word público](./deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx) está agrupado
-con su fuente editable en `deliverables/`.
+El [índice de entregables públicos en español](./deliverables/README.md)
+agrupa la guía Markdown, su fuente HTML editable y el Word para reproducir el
+host completo con Docker, Fabric, ICA, chaincodes, PostgreSQL/IPFS y Helm.
 
 ([test-api](https://globaldatacare-test-961105121121.europe-southwest1.run.app/api-docs/))
 
@@ -802,7 +800,7 @@ npm run check:identity-chaincode-parity
 ```
 
 For the multi-cloud Fabric deployment plan and scripts, see:
-- `ENTREGABLE-HOST-REPRODUCIBLE.md`
+- `deliverables/ENTREGABLE_HOST_REPRODUCIBLE_ES.md`
 - `charts/gdc-host/README.md`
 - `docs/04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md`
 

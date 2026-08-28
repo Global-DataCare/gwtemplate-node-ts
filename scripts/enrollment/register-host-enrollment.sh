@@ -10,10 +10,21 @@ authorized="$(jq -r '.authorized // false' "${AUTHORIZATION_JSON}")"
 host_url="$(jq -r '.hostUrl // empty' "${AUTHORIZATION_JSON}")"
 msp_id="$(jq -r '.mspId // empty' "${AUTHORIZATION_JSON}")"
 credential_id="$(jq -r '.hostCredentialId // empty' "${AUTHORIZATION_JSON}")"
-if [[ "${authorized}" != "true" || -z "${host_url}" || -z "${msp_id}" || -z "${credential_id}" ]]; then
+network_kind="$(jq -r '.networkKind // empty' "${AUTHORIZATION_JSON}")"
+if [[ "${authorized}" != "true" || -z "${host_url}" || -z "${msp_id}" || -z "${credential_id}" || -z "${network_kind}" ]]; then
   echo "Authorization JSON is incomplete or not authorized" >&2
   exit 1
 fi
+
+now_epoch_seconds="${NOW_EPOCH_SECONDS:-$(date -u +%s)}"
+grant_ttl_seconds="${ENROLLMENT_GRANT_TTL_SECONDS:-900}"
+if ! [[ "${now_epoch_seconds}" =~ ^[0-9]+$ && "${grant_ttl_seconds}" =~ ^[0-9]+$ ]] \
+  || (( grant_ttl_seconds < 60 || grant_ttl_seconds > 3600 )); then
+  echo "ENROLLMENT_GRANT_TTL_SECONDS must be an integer between 60 and 3600" >&2
+  exit 1
+fi
+issued_at="$(node -e 'process.stdout.write(new Date(Number(process.argv[1]) * 1000).toISOString().replace(".000Z", "Z"))' "${now_epoch_seconds}")"
+expires_at="$(node -e 'process.stdout.write(new Date((Number(process.argv[1]) + Number(process.argv[2])) * 1000).toISOString().replace(".000Z", "Z"))' "${now_epoch_seconds}" "${grant_ttl_seconds}")"
 
 enrollment_id="${HOST_ENROLLMENT_ID:-host-$(printf '%s' "${host_url}" | shasum -a 256 | cut -c1-20)}"
 enrollment_secret="${HOST_ENROLLMENT_SECRET:-$(openssl rand -base64 36 | tr -d '=+/' | cut -c1-32)}"
@@ -41,6 +52,9 @@ jq -n \
   --arg mspId "${msp_id}" \
   --arg hostUrl "${host_url}" \
   --arg hostCredentialId "${credential_id}" \
+  --arg networkKind "${network_kind}" \
+  --arg issuedAt "${issued_at}" \
+  --arg expiresAt "${expires_at}" \
   '{
     specVersion: $specVersion,
     enrollmentId: $enrollmentId,
@@ -49,6 +63,9 @@ jq -n \
     mspId: $mspId,
     hostUrl: $hostUrl,
     hostCredentialId: $hostCredentialId,
+    networkKind: $networkKind,
+    issuedAt: $issuedAt,
+    expiresAt: $expiresAt,
     maxEnrollments: 2
   }' > "${ENROLLMENT_OUTPUT_FILE}"
 chmod 600 "${ENROLLMENT_OUTPUT_FILE}"

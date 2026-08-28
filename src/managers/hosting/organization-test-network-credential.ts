@@ -80,7 +80,6 @@ export async function verifyOrganizationTestNetworkCredential(
   if (credential.validUntil && now >= new Date(credential.validUntil)) fail('Organization Test Network admission has expired.');
 
   const subject = credential.credentialSubject as Record<string, any>;
-  if (subject.targetNetwork !== 'test-network') fail('Test Network admission VC is restricted to Test Network.');
   const organizationIdentifier = String(
     input.claims[ClaimsOrganizationSchemaorg.identifierValue]
       || input.claims[ClaimsOrganizationSchemaorg.taxId]
@@ -241,7 +240,6 @@ async function verifyTestNetworkDomainCredentials(input: Readonly<{
   }
   for (const domainCredential of credentials) {
     if (!domainCredential.type.includes(EnvironmentCredentialTypes.TestNetworkCredential)
-      || domainCredential.credentialSubject?.targetNetwork !== 'test-network'
       || domainCredential.issuer !== input.organizationTestNetworkCredential.issuer
       || !Array.isArray(domainCredential.evidence)
       || !(domainCredential.evidence as any[]).some(item => item?.id === pdfEvidenceId)) {

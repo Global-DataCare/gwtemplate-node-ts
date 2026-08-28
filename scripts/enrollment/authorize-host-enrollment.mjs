@@ -102,10 +102,9 @@ export async function authorizeHostEnrollment(input) {
     controllerKid: decisionVerification.controllerKid,
   });
 
-  const credentialRequired = decisionVerification.networkKind === 'network';
   const credentialSupplied = Boolean(input.request.hostCredentialJwt);
-  if (credentialRequired && !credentialSupplied) {
-    throw new Error('Production network requires a HostingServiceCredential.');
+  if (!credentialSupplied) {
+    throw new Error(`${decisionVerification.networkKind} requires a HostingServiceCredential.`);
   }
 
   let hostCredential;

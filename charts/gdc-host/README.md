@@ -22,7 +22,7 @@ El orden correcto es:
 
 1. la ICA del espacio de datos emite la `HostingServiceCredential`;
 2. la autoridad verifica esa VC-JWT y la decisión de gobernanza;
-3. la autoridad registra una identidad temporal en la ICA de Fabric;
+3. la autoridad registra una identidad de dos enrolamientos en la ICA de Fabric;
 4. el host ejecuta enrollment y genera localmente claves MSP/TLS;
 5. el operador materializa Secrets y ejecuta Helm;
 6. el reconciliador añade el MSP, une canales y aplica lifecycle CCAAS;
@@ -31,6 +31,13 @@ El orden correcto es:
 El chart recibe únicamente `authorization.json` saneado. La VC-JWT, un posible
 PDF y los secretos de enrollment no entran en values, ConfigMaps ni manifiestos
 renderizados.
+
+La `HostingServiceCredential` es obligatoria en `local-network`,
+`test-network` y `network`. El modo local sin PDF usa una Host VC emitida por
+la ICA local para un host preautorizado; no omite la credencial. El grant añade
+una ventana `issuedAt`/`expiresAt` comprobada por el helper, mientras que
+Fabric CA impone de forma nativa `maxEnrollments=2`. La autoridad revoca los
+identificadores no consumidos al vencer la ventana.
 
 ## Configuración y secretos
 
@@ -66,6 +73,25 @@ kubectl -n <namespace> create secret generic <authorization-secret> \
   --from-file=authorization.json=/secure/onboarding/authorization.json
 ```
 
+Los artefactos se empaquetan y los seis Secrets se convergen con helpers que no
+imprimen sus valores:
+
+```bash
+HOST_IDENTITY_DIR=/secure/host/fabric-peer \
+AUTHORIZATION_JSON=/secure/onboarding/authorization.json \
+ENROLLMENT_GRANT_FILE=/secure/onboarding/enrollment-grant.json \
+HOST_RUNTIME_OUTPUT_DIR=/secure/host/helm-runtime \
+  bash scripts/onboarding/package-host-runtime.sh
+
+KUBE_CONTEXT=<context> KUBE_NAMESPACE=<namespace> HELM_RELEASE=<release> \
+HOST_RUNTIME_DIR=/secure/host/helm-runtime \
+POSTGRES_SECRET_ENV_FILE=/secure/host/postgresql.env \
+COUCHDB_SECRET_ENV_FILE=/secure/host/couchdb.env \
+GW_SECRET_ENV_FILE=/secure/host/gw.env \
+REDIS_SECRET_ENV_FILE=/secure/host/redis.env \
+  bash scripts/onboarding/materialize-kubernetes-secrets.sh
+```
+
 En producción se recomienda External Secrets, Secret Store CSI o mecanismo
 equivalente. `KEK_SECRET` solo es válido en local/demo. Cada pod de producción
 debe desenvolver una vez su KEK de runtime mediante el adaptador KMS elegido.
@@ -87,7 +113,7 @@ antes de una instalación.
 ## Validación estática
 
 ```bash
-cd "${HOME}/GITS/gdc-workspace/gwtemplate-node-ts"
+cd "${REPO_ROOT}"
 npm run helm:test:host
 
 bash scripts/validate-host-helm-values.sh \
@@ -148,3 +174,16 @@ nombre completo, el Service o el contrato TLS requiere regenerar el paquete.
 Helm arranca el runtime CCAAS. La instalación del paquete en el peer, la
 aprobación de organizaciones y el commit son operaciones auditadas del
 reconciliador de la red.
+
+Los nueve paquetes y sus IDs se generan de forma determinista para el Service
+exacto del release:
+
+```bash
+HOST_FULLNAME=<fullname-helm> KUBE_NAMESPACE=<namespace> \
+CCAAS_IMAGE=<registro>/host-runtime@sha256:<digest> \
+CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
+  bash scripts/onboarding/prepare-ccaas-packages.sh
+```
+
+El fragmento `chaincodes.values.yaml` se combina con los values privados y el
+`manifest.tsv` se entrega al reconciliador para instalación/aprobación.

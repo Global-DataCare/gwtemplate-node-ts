@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+- Hacer auditable de extremo a extremo la incorporación de un proveedor de
+  host: `HostingServiceCredential` obligatoria en las tres redes, grant de
+  Fabric CA limitado a dos enrolamientos con ventana operativa, empaquetado
+  saneado MSP/TLS y creación reproducible de los seis Secrets de Helm.
+
+- Sustituir la mera topología Fabric de dos MSP en génesis por una prueba viva
+  de admisión dinámica: los canales arrancan con `Host1MSP`, la gobernanza
+  firma y aplica la entrada de `Host2MSP`, y el segundo peer se inicia y une
+  después a ambos canales.
+
+- Reunir Markdown, HTML y Word bajo `deliverables/` y ampliar la guía pública
+  española con comandos separados para autoridad, proveedor del host,
+  operador Kubernetes, reconciliación, digests OCI, CCAAS y aceptación.
+
+- Generar de forma determinista los nueve paquetes CCAAS y sus package IDs a
+  partir del nombre Helm y namespace exactos, junto con el fragmento values y
+  manifiestos de hashes que consume la gobernanza.
+
+- Validar el alcance Test Network exclusivamente mediante los tipos firmados
+  `OrganizationTestNetworkCredential` y `TestNetworkCredential`. Los sujetos
+  schema.org y la evidencia ya no necesitan el campo no estándar
+  `targetNetwork`.
+
 - Sanear las rutas absolutas del directorio personal en los logs públicos de
   evidencia, representarlas como `${HOME}` y hacer fallar el paquete si queda
   alguna ruta `/Users/<usuario>` o `/home/<usuario>`.
