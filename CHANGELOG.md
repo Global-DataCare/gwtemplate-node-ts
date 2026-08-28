@@ -2,19 +2,25 @@
 
 ## [Unreleased]
 
-- Centralizar la versión API de Stripe en `2026-02-25.clover`, compatible con
+- Centralizar la versión API de Stripe en `2025-12-15.clover`, compatible con
   el SDK instalado, para desbloquear typecheck e imagen sin divergencias entre
   webhook, Checkout, facturación y verificación de pagos.
 
 - Hacer auditable de extremo a extremo la incorporación de un proveedor de
   host: `HostingServiceCredential` obligatoria en las tres redes, grant de
-  Fabric CA limitado a dos enrolamientos con ventana operativa, empaquetado
-  saneado MSP/TLS y creación reproducible de los seis Secrets de Helm.
+  Fabric CA limitado a dos enrolamientos con ventana operativa, grant separado
+  de un uso para la identidad cliente GW, claves generadas dentro del host,
+  empaquetado saneado MSP/TLS y creación reproducible de los seis Secrets de Helm.
 
 - Sustituir la mera topología Fabric de dos MSP en génesis por una prueba viva
   de admisión dinámica: los canales arrancan con `Host1MSP`, la gobernanza
   firma y aplica la entrada de `Host2MSP`, y el segundo peer se inicia y une
   después a ambos canales.
+
+- Ejecutar la puerta kind/Helm con el peer, los nueve CCAAS y la identidad
+  cliente GW del `Host2MSP` recién admitido, todos vinculados a la misma Host
+  VC; el GW ya no puede pasar la evidencia apuntando a Host2 pero firmando con
+  material de Host1.
 
 - Reunir Markdown, HTML y Word bajo `deliverables/` y ampliar la guía pública
   española con comandos separados para autoridad, proveedor del host,
@@ -39,7 +45,7 @@
 - Actualizar en `deliverables/` la guía Word pública en español con la prueba
   completa kind/Helm: lifecycle CCAAS y E2E del GW contra el peer Kubernetes.
 
-- Ejecutar mediante el chart el peer `Host1MSP` y CouchDB dentro de kind,
+- Ejecutar mediante el chart el peer `Host2MSP` y CouchDB dentro de kind,
   enrolar MSP/TLS exclusivos con la ICA de Fabric, unir el peer a los dos
   canales locales y comprobar canales, estado CouchDB y persistencia tras
   reiniciar peer y GW.

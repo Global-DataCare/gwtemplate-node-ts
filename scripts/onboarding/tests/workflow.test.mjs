@@ -38,11 +38,15 @@ function manifest(overrides = {}) {
       caAdminHome: '/secure/ca-admin',
       authorizationOutput: '/secure/authorization.json',
       enrollmentGrantOutput: '/secure/enrollment-grant.json',
+      clientEnrollmentGrantOutput: '/secure/client-enrollment-grant.json',
     },
     host: {
       peerDns: 'peer0.host.example.invalid',
       mspOutputDir: '/secure/host-msp',
       runtimeOutputDir: '/secure/host-runtime',
+      gwClientOutputDir: '/secure/gw-client',
+      gwFabricEnvOutput: '/secure/gw.fabric.env',
+      peerEndpoint: 'peer0.host.example.invalid:7051',
     },
     platform: {
       driver: '/opt/fabric/driver.mjs',
@@ -88,6 +92,8 @@ test('ships a valid isolated production manifest with host-local key output', ()
   assert.equal(value.sharedInfrastructure, false);
   assert.match(value.host.mspOutputDir, /^\/secure\/host\//);
   assert.match(value.host.runtimeOutputDir, /^\/secure\/host\//);
+  assert.match(value.host.gwClientOutputDir, /^\/secure\/host\//);
+  assert.match(value.host.gwFabricEnvOutput, /^\/secure\/host\//);
   assert.doesNotMatch(JSON.stringify(example), /seed|privateKey/i);
 });
 
@@ -107,6 +113,8 @@ test('explains that host enrollment creates local keys and receives certificates
   assert.match(plan, /private keys plus CSRs locally/);
   assert.match(plan, /receive certificates only/);
   assert.match(plan, /sanitized Helm runtime package/);
+  assert.match(plan, /independent Fabric client identity/);
+  assert.match(plan, /private GW Fabric environment/);
 });
 
 test('places peer runtime reconciliation before governed channel joins', () => {

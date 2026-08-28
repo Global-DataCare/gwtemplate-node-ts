@@ -3,4 +3,4 @@
  * Centralizing it prevents webhook, Checkout, Invoicing and verification
  * clients from silently using different response schemas.
  */
-export const STRIPE_API_VERSION = '2026-02-25.clover' as const;
+export const STRIPE_API_VERSION = '2025-12-15.clover' as const;

@@ -15,12 +15,16 @@
     "caAdminHome": "/secure/fabric-ca/admin",
     "caTlsCert": "/secure/fabric-ca/tls/ca-chain.pem",
     "authorizationOutput": "/secure/onboarding/authorization.json",
-    "enrollmentGrantOutput": "/secure/onboarding/enrollment-grant.json"
+    "enrollmentGrantOutput": "/secure/onboarding/enrollment-grant.json",
+    "clientEnrollmentGrantOutput": "/secure/onboarding/gw-client-enrollment-grant.json"
   },
   "host": {
     "peerDns": "peer0.host.example.invalid",
     "mspOutputDir": "/secure/host/fabric-peer",
     "runtimeOutputDir": "/secure/host/helm-runtime",
+    "gwClientOutputDir": "/secure/host/fabric-gw-client",
+    "gwFabricEnvOutput": "/secure/host/gw.fabric.env",
+    "peerEndpoint": "peer0.host.example.invalid:7051",
     "caTlsCert": "/secure/fabric-ca/tls/ca-chain.pem"
   },
   "platform": {

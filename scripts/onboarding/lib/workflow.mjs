@@ -69,11 +69,24 @@ export function validateOnboardingManifest(manifest) {
         authority.enrollmentGrantOutput,
         'manifest.authority.enrollmentGrantOutput',
       ),
+      clientEnrollmentGrantOutput: requiredPath(
+        authority.clientEnrollmentGrantOutput,
+        'manifest.authority.clientEnrollmentGrantOutput',
+      ),
     },
     host: {
       peerDns: requiredString(host.peerDns, 'manifest.host.peerDns'),
       mspOutputDir: requiredPath(host.mspOutputDir, 'manifest.host.mspOutputDir'),
       runtimeOutputDir: requiredPath(host.runtimeOutputDir, 'manifest.host.runtimeOutputDir'),
+      gwClientOutputDir: requiredPath(
+        host.gwClientOutputDir,
+        'manifest.host.gwClientOutputDir',
+      ),
+      gwFabricEnvOutput: requiredPath(
+        host.gwFabricEnvOutput,
+        'manifest.host.gwFabricEnvOutput',
+      ),
+      peerEndpoint: requiredString(host.peerEndpoint, 'manifest.host.peerEndpoint'),
       caTlsCert: host.caTlsCert
         ? requiredPath(host.caTlsCert, 'manifest.host.caTlsCert')
         : undefined,
@@ -112,6 +125,7 @@ export function buildRolePlan(manifest, role) {
     return [
       'Verify the controller decision, current operator token and mandatory HostingServiceCredential.',
       'Register a bounded two-use Fabric CA enrollment identity.',
+      'Register an independent one-use Fabric client identity for GW.',
       'Write the enrollment grant with mode 0600; never print its secret.',
     ];
   }
@@ -119,6 +133,8 @@ export function buildRolePlan(manifest, role) {
     return [
       'Read the bounded enrollment grant on the host.',
       'Generate the peer MSP and TLS private keys plus CSRs locally.',
+      'Generate the independent Fabric client identity for GW locally.',
+      'Render a private GW Fabric environment without enrollment grants.',
       'Keep private keys inside the host output directory; receive certificates only.',
       'Create a sanitized Helm runtime package without the enrollment grant or Host VC-JWT.',
     ];

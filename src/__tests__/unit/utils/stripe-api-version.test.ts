@@ -8,6 +8,6 @@ import { STRIPE_API_VERSION } from '../../../utils/stripe-api-version';
 
 describe('Stripe API version contract', () => {
   it('matches the API version supported by the installed SDK', () => {
-    expect(STRIPE_API_VERSION).toBe('2026-02-25.clover');
+    expect(STRIPE_API_VERSION).toBe('2025-12-15.clover');
   });
 });

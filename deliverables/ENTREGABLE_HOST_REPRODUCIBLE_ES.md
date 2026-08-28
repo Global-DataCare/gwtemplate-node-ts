@@ -22,9 +22,9 @@ La evidencia se divide en dos puertas complementarias:
    recuperación persistente.
 2. **Helm/Kubernetes**, prueba de portabilidad. Crea un clúster `kind` aislado,
    carga la misma imagen GW por digest, instala un peer con identidad exclusiva
-   `Host1MSP`, CouchDB, GW CORE, PostgreSQL, IPFS y nueve runtimes CCAAS, y une
+   del `Host2MSP` recién admitido, CouchDB, GW CORE, PostgreSQL, IPFS y nueve runtimes CCAAS, y une
    el peer a los canales de la Fabric Docker `local-network`. Instala en ese
-   peer los paquetes CCAAS exactos, actualiza la aprobación de `Host1MSP` y el
+   peer los paquetes CCAAS exactos, actualiza la aprobación de `Host2MSP` y el
    GW repite los flujos E2E endosando exclusivamente mediante el peer kind.
 
 `helm template` por sí solo no se considera una prueba de despliegue. Se
@@ -50,9 +50,13 @@ Peer + CouchDB + GW CORE + PostgreSQL + IPFS + CCAAS
 Reconciliación de canales y chaincodes, escritura, lectura y reinicio
 ```
 
-La evidencia encadena la emisión de MSP/TLS, los Secrets, la instalación Helm,
+La evidencia encadena una Host VC verificada, el grant real de dos usos para el
+peer, un grant independiente de un uso para el cliente GW, la emisión de
+MSP/TLS y del certificado cliente vinculada al identificador de esa VC, la admisión dinámica por
+el reconciliador, los Secrets, la instalación Helm,
 el arranque del peer y CouchDB, la unión real del peer Kubernetes a los canales
-externos, el lifecycle de los nueve CCAAS y el E2E del GW contra ese mismo peer.
+externos, el lifecycle de los nueve CCAAS y el E2E del GW, que firma como
+`Host2MSP`, contra ese mismo peer.
 Docker mantiene la ICA de Fabric, el orderer y el peer de referencia que
 representan la red externa; no endosa las operaciones del GW durante la puerta
 Kubernetes. Tras reiniciar GW, peer y runtimes CCAAS se vuelven a comprobar
@@ -63,17 +67,18 @@ canales, lectura, autorización y persistencia PostgreSQL/IPFS.
 - La **CA del espacio de datos** publica el ancla y firma la Issuer CA.
 - La **ICA del espacio de datos** verifica la autorización y emite la
   `HostingServiceCredential` como JSON VC y VC-JWT.
-- La **ICA de Fabric** registra la identidad de enrollment y firma los
-  certificados MSP y TLS del peer.
+- La **ICA de Fabric** registra identidades de enrollment y firma los
+  certificados MSP/TLS del peer y el certificado cliente independiente del GW.
 
 La `HostingServiceCredential` autoriza el alta, pero no es un certificado de
 Fabric. Después de verificarla, la autoridad registra un identificador y un
-secreto de enrolamiento limitado a dos usos en la ICA de Fabric. El helper
+secreto de enrolamiento limitado a dos usos en la ICA de Fabric para MSP/TLS,
+más otro identificador de un uso para el cliente GW. El helper
 añade una ventana operativa de caducidad y rechaza el grant una vez vencida;
 la autoridad revoca cualquier identificador no consumido porque Fabric CA no
 aplica por sí sola esa fecha del fichero. El host ejecuta el enrollment y genera
-localmente sus claves privadas MSP/TLS; únicamente la CSR sale del host y
-únicamente los certificados firmados regresan.
+localmente las claves privadas MSP/TLS y cliente GW; únicamente las CSR salen
+del host y únicamente los certificados firmados regresan.
 
 Para `local-network`, un dominio configurado previamente en la ICA del espacio
 de datos puede obtener la credencial sin PDF. La petición sigue firmada por la
@@ -137,9 +142,9 @@ Se promueven la misma imagen inmutable y el mismo chart; cambian los values y
 los secretos de cada entorno. Antes de instalar un host autónomo deben existir:
 
 - decisión de gobernanza y `HostingServiceCredential` verificadas;
-- grant de la ICA de Fabric, limitado a dos enrolamientos y dentro de su
-  ventana operativa;
-- MSP y TLS generados localmente por el host;
+- grant de la ICA de Fabric limitado a dos enrolamientos para el peer y grant
+  independiente de un uso para el cliente GW, ambos dentro de su ventana;
+- MSP, TLS e identidad cliente GW generados localmente por el host;
 - secretos Kubernetes para GW, peer, CouchDB, PostgreSQL y autorización;
 - DNS, TLS, StorageClass, IngressClass y KMS del proveedor;
 - imágenes CCAAS por digest y package IDs calculados para la dirección de

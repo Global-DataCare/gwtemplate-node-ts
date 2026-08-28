@@ -49,9 +49,9 @@ Canales, escritura, lectura, denegación y reinicio</pre>
     <li>ICA del espacio de datos y Host VC JSON/VC-JWT sin PDF para un host preautorizado.</li>
     <li>ICA de Fabric, certificados MSP/TLS, Host1MSP, Host2MSP, canales y chaincodes.</li>
     <li>GW CORE, PostgreSQL e IPFS con escritura, lectura y recuperación tras reinicio.</li>
-    <li>Instalación real de peer Host1MSP, CouchDB, GW CORE, PostgreSQL, IPFS y nueve runtimes CCAAS mediante kind y Helm.</li>
+    <li>Instalación real mediante kind y Helm de un peer del Host2MSP recién admitido, CouchDB, GW CORE, PostgreSQL, IPFS y nueve runtimes CCAAS.</li>
     <li>Unión del peer Kubernetes a los canales locales, instalación y aprobación de los paquetes CCAAS exactos.</li>
-    <li>GW dirigido al peer Kubernetes, con persistencia y nueva capacidad de endoso tras reiniciar GW, peer y CCAAS.</li>
+    <li>La misma Host VC queda vinculada a los certificados del peer y del cliente GW; GW firma como Host2MSP y se dirige al peer Kubernetes de ese MSP, con persistencia y nueva capacidad de endoso tras reiniciar GW, peer y CCAAS.</li>
     <li>Acceso consentido y controles negativos de acceso no autorizado.</li>
   </ul>
 
@@ -94,7 +94,9 @@ Canales, escritura, lectura, denegación y reinicio</pre>
   local-network y test-network. «Sin PDF» significa que la ICA del espacio de
   datos puede emitir esa VC para un host preautorizado; no significa omitir la
   credencial. La ICA de Fabric registra después un identificador limitado a dos
-  enrolamientos, uno MSP y otro TLS. El helper aplica
+  enrolamientos, uno MSP y otro TLS, y otro identificador de un solo uso para
+  la identidad cliente del GW. Las tres claves privadas se generan dentro del
+  host. El helper aplica
   <code>issuedAt/expiresAt</code>; la autoridad debe revocar el identificador no
   consumido porque Fabric CA garantiza el límite de usos, no esa fecha.</p>
 
