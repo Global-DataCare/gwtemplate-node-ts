@@ -109,15 +109,17 @@ IMAGE_NAME="gw-core:<version-commit>" npm run helm:smoke:local-network
 ```
 
 El script crea un `kind` aislado, carga la imagen ya probada y obtiene su digest
-local, enrola una identidad exclusiva, instala peer/CouchDB/GW/PostgreSQL/IPFS,
-une el peer a los canales locales, ejecuta los E2E y reinicia GW y peer. Todos
-los comandos usan un contexto explícito para no tocar otro clúster configurado.
+local, enrola una identidad exclusiva, instala peer/CouchDB/GW/PostgreSQL/IPFS
+y nueve runtimes CCAAS, une el peer a los canales locales, instala y aprueba en
+él los paquetes CCAAS exactos, ejecuta los E2E y reinicia GW, peer y CCAAS.
+Todos los comandos usan un contexto explícito para no tocar otro clúster
+configurado.
 
-La ICA de Fabric, el orderer y los peers de referencia permanecen en Docker. El
-peer kind se une realmente a sus canales y crea sus bases en CouchDB. El GW usa
-temporalmente el peer Docker para repetir el plano de datos con los chaincodes
-ya instalados. El lifecycle CCAAS en el peer kind y el E2E del GW contra ese
-peer siguen siendo la puerta pendiente para un host autónomo completo.
+La ICA de Fabric, el orderer y el peer de referencia permanecen en Docker para
+representar la red externa. El peer kind se une realmente a sus canales, crea
+sus bases en CouchDB y endosa las operaciones del GW mediante sus propios
+paquetes CCAAS. La ruta al peer Docker solo se usa para gossip/bootstrap y no
+como endpoint de endoso del GW.
 
 ## Instalación de un host autorizado
 

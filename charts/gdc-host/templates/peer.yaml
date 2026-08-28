@@ -61,6 +61,7 @@ spec:
               cp /tls/keystore/*_sk /tls/server.key
               cp /tls/tlscacerts/*.pem /tls/ca.crt
               if ls /tls/tlsintermediatecerts/*.pem >/dev/null 2>&1; then
+                cat /tls/tlsintermediatecerts/*.pem >> /tls/server.crt
                 cat /tls/tlsintermediatecerts/*.pem >> /tls/ca.crt
               fi
           volumeMounts:

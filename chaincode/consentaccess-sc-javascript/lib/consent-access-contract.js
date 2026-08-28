@@ -17,6 +17,37 @@ const CONSENT_ACCESS_ASSET_LABEL = "ConsentAccess";
 const PAYLOAD_LABEL = "payload";
 
 /**
+ * Produces a stable JSON representation without changing array order.
+ * Fabric transports JSON values, so object insertion order and JavaScript
+ * prototypes are representation details rather than consent changes.
+ *
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function canonicalizeJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalizeJson);
+  if (!value || typeof value !== "object") return value;
+
+  return Object.keys(value)
+    .sort()
+    .reduce((canonical, key) => {
+      canonical[key] = canonicalizeJson(value[key]);
+      return canonical;
+    }, {});
+}
+
+/**
+ * Compares JSON payloads by value instead of serialized property order.
+ *
+ * @param {unknown} left
+ * @param {unknown} right
+ * @returns {boolean}
+ */
+function jsonValuesEqual(left, right) {
+  return JSON.stringify(canonicalizeJson(left)) === JSON.stringify(canonicalizeJson(right));
+}
+
+/**
  * Smart contract responsible for persisting blockchain-safe consent access
  * bundles.
  *
@@ -94,7 +125,7 @@ class ConsentAccessContract extends ContractBase {
 
     const previousAsset = await readAsset(ctx.stub, assetId, CONSENT_ACCESS_ASSET_LABEL);
     const nextAsset = buildStoredAsset(ctx, assetId, parseJson(payloadJson, PAYLOAD_LABEL), previousAsset);
-    if (JSON.stringify(previousAsset.data) === JSON.stringify(nextAsset.data)
+    if (jsonValuesEqual(previousAsset.data, nextAsset.data)
       && previousAsset.meta.audit.status === nextAsset.meta.audit.status) {
       return previousAsset;
     }

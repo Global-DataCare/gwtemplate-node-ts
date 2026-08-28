@@ -48,4 +48,9 @@ ipfs:
   enabled: true
   image: registry.example.invalid/kubo@sha256:6666666666666666666666666666666666666666666666666666666666666666
 redis: { enabled: false }
-chaincodes: []
+chaincodes:
+  - name: organization-sc
+    image: registry.example.invalid/organization-sc@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    localImage: gdc-ccaas/organization-sc:local-test
+    imagePullPolicy: Never
+    packageId: organization-sc-kind-v1:8888888888888888888888888888888888888888888888888888888888888888

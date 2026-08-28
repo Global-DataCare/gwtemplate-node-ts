@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Flujo contractual Helm/Kubernetes para local-network:
 # 1. Crea un clúster kind aislado y carga la imagen GW ya validada por Docker.
-# 2. Despliega por Helm peer Host1MSP, CouchDB, GW CORE, PostgreSQL e IPFS.
-# 3. Enrola una identidad exclusiva para el peer kind y lo une a la Fabric Docker.
-# 4. Mantiene el GW sobre el peer Docker que ya tiene los paquetes de chaincode.
-# 5. Ejecuta bootstrap de tenant, Consent e intercambio SMART positivo/negativo.
-# 6. Reinicia GW y peer y demuestra persistencia de canales, PostgreSQL e IPFS.
+# 2. Empaqueta y carga los nueve runtimes CCAAS usados por GW CORE.
+# 3. Despliega por Helm peer Host1MSP, CouchDB, GW CORE, PostgreSQL, IPFS y CCAAS.
+# 4. Enrola una identidad exclusiva para el peer kind y lo une a la Fabric Docker.
+# 5. Instala los paquetes CCAAS en el peer kind y actualiza la aprobación Host1MSP.
+# 6. Ejecuta el GW contra el peer kind: bootstrap, Consent y SMART positivo/negativo.
+# 7. Reinicia GW, peer y CCAAS y demuestra persistencia y nueva capacidad de endoso.
 # Autorización: Helm consume identidad/configuración ya preparadas; no registra MSP ni administra Fabric CA.
 # Persistencia: el reinicio no rota claves ni pierde el DID o los blobs cifrados.
 set -euo pipefail
@@ -19,14 +20,24 @@ RELEASE="${HELM_EVIDENCE_RELEASE:-host-evidence}"
 KEEP_CLUSTER="${KEEP_HELM_EVIDENCE_CLUSTER:-false}"
 EVIDENCE_TENANT_ID="${HELM_EVIDENCE_TENANT_ID:-helm-evidence}"
 EVIDENCE_SUBJECT_ID="did:web:api.${EVIDENCE_TENANT_ID}.org:individual:subject-001"
-FABRIC_DEVNET_ROOT="${FABRIC_DEVNET_ROOT:-${ROOT}/infra/fabric/local-network}"
+FABRIC_DEVNET_ROOT="$(cd "${FABRIC_DEVNET_ROOT:-${ROOT}/infra/fabric/local-network}" && pwd -P)"
 KIND_PEER_DOMAIN="peer-kind.host1.example.com"
 KIND_PEER_SERVICE="${RELEASE}-peer"
 KIND_PEER_DIR="${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/host1.example.com/peers/${KIND_PEER_DOMAIN}"
 HOST1_ADMIN_MSP="${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp"
+ORDERER_TLS_CA_HOST="${FABRIC_DEVNET_ROOT}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt"
+FABRIC_ROOT_CA_CERT="${FABRIC_DEVNET_ROOT}/crypto/ca/root/ca-cert.pem"
+FABRIC_ICA_CERT="${FABRIC_DEVNET_ROOT}/crypto/ca/ica/ca-cert.pem"
 PREFLIGHT_ONLY=false
 TEMP_DIR="$(mktemp -d)"
 PORT_FORWARD_PID=""
+BUSYBOX_IMAGE='docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662'
+COUCHDB_IMAGE='docker.io/library/couchdb@sha256:307a3f5276f64c0db28f226b7b5c180b8f2c851afa681cfb4fbb1b1fe7fd5587'
+POSTGRESQL_IMAGE='docker.io/library/postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685'
+IPFS_IMAGE='docker.io/ipfs/kubo@sha256:7cc0e0de8f845d6c9fa1dce414c069974c34ed3cd3742e0d4f5bccda4adc376d'
+
+# shellcheck source=install-kind-ccaas-chaincodes.sh
+source "${ROOT}/scripts/install-kind-ccaas-chaincodes.sh"
 
 if [[ "${1:-}" == "--preflight-only" ]]; then
   PREFLIGHT_ONLY=true
@@ -72,6 +83,31 @@ docker ps --format '{{.Names}}' | grep -qx 'gdc-peer0-host1' || {
   exit 2
 }
 
+assert_public_fabric_mounts() {
+  local ica_mount peer_mounts
+  ica_mount="$(docker inspect gdc-ica --format '{{range .Mounts}}{{if eq .Destination "/etc/hyperledger/fabric-ca-server"}}{{.Source}}{{end}}{{end}}')"
+  peer_mounts="$(docker inspect gdc-peer0-host1 --format '{{range .Mounts}}{{println .Source}}{{end}}')"
+  if [[ "${ica_mount}" != "${FABRIC_DEVNET_ROOT}/crypto/ca/ica" ]] \
+    || [[ "${peer_mounts}" != *"${FABRIC_DEVNET_ROOT}/organizations/"* ]]; then
+    echo 'Los contenedores Fabric activos no pertenecen al local-network público de este checkout.' >&2
+    echo 'Reconstruya la red con: node scripts/bootstrap-local-fabric-stack.mjs --prepare-only' >&2
+    return 1
+  fi
+}
+
+assert_public_fabric_mounts
+
+normalize_kind_peer_identity() {
+  mkdir -p "${KIND_PEER_DIR}/msp/cacerts" "${KIND_PEER_DIR}/msp/intermediatecerts" \
+    "${KIND_PEER_DIR}/tls/tlscacerts" "${KIND_PEER_DIR}/tls/tlsintermediatecerts"
+  rm -f "${KIND_PEER_DIR}/msp/cacerts/"*.pem "${KIND_PEER_DIR}/msp/intermediatecerts/"*.pem \
+    "${KIND_PEER_DIR}/tls/tlscacerts/"*.pem "${KIND_PEER_DIR}/tls/tlsintermediatecerts/"*.pem
+  cp -f "${FABRIC_ROOT_CA_CERT}" "${KIND_PEER_DIR}/msp/cacerts/root-ca-cert.pem"
+  cp -f "${FABRIC_ICA_CERT}" "${KIND_PEER_DIR}/msp/intermediatecerts/issuer-ca-cert.pem"
+  cp -f "${FABRIC_ROOT_CA_CERT}" "${KIND_PEER_DIR}/tls/tlscacerts/root-ca-cert.pem"
+  cp -f "${FABRIC_ICA_CERT}" "${KIND_PEER_DIR}/tls/tlsintermediatecerts/issuer-ca-cert.pem"
+}
+
 prepare_kind_peer_identity() {
   local enrollment_id="peer-kind-host1-$(openssl rand -hex 6)"
   local enrollment_secret
@@ -111,20 +147,42 @@ prepare_kind_peer_identity() {
     --csr.hosts "${KIND_PEER_DOMAIN}" \
     --tls.certfiles "${ca_tls_cert}" >/dev/null
 
-  tar -C "${KIND_PEER_DIR}/msp" -czf "${TEMP_DIR}/peer-msp.tgz" .
-  tar -C "${KIND_PEER_DIR}/tls" -czf "${TEMP_DIR}/peer-tls.tgz" .
+  normalize_kind_peer_identity
+  COPYFILE_DISABLE=1 tar -C "${KIND_PEER_DIR}/msp" -czf "${TEMP_DIR}/peer-msp.tgz" .
+  COPYFILE_DISABLE=1 tar -C "${KIND_PEER_DIR}/tls" -czf "${TEMP_DIR}/peer-tls.tgz" .
 }
 
 prepare_kind_peer_identity
 
-kind delete cluster --name "${CLUSTER_NAME}" >/dev/null 2>&1 || true
-kind create cluster --name "${CLUSTER_NAME}" --wait 90s
-kind load docker-image "${IMAGE_NAME}" --name "${CLUSTER_NAME}"
+GW_IMAGE_ARCHIVE="${TEMP_DIR}/gw-image.tar"
+HOST_RUNTIME_IMAGE_ARCHIVE="${TEMP_DIR}/host-runtime-images.tar"
+PUBLIC_DOCKER_CONFIG="${TEMP_DIR}/docker-public"
 peer_image_tag="$(docker inspect gdc-peer0-host1 --format '{{.Config.Image}}')"
 peer_image="$(docker image inspect "${peer_image_tag}" --format '{{index .RepoDigests 0}}')"
 tools_image="$(docker inspect gdc-fabric-tools --format '{{.Config.Image}}')"
-kind load docker-image "${peer_image_tag}" --name "${CLUSTER_NAME}"
-kind load docker-image "${tools_image}" --name "${CLUSTER_NAME}"
+# Keep at most one digest-only image in this archive. kind assigns the same
+# synthetic import name to untagged Docker archives; combining several can
+# overwrite their manifest reference. BusyBox and PostgreSQL are small and are
+# therefore resolved directly by their immutable digest inside the cluster.
+host_runtime_images=(
+  "${COUCHDB_IMAGE}"
+  "${IPFS_IMAGE}"
+  "${peer_image_tag}"
+  "${tools_image}"
+)
+mkdir -p "${PUBLIC_DOCKER_CONFIG}"
+for runtime_image in "${host_runtime_images[@]}"; do
+  if ! docker image inspect "${runtime_image}" >/dev/null 2>&1; then
+    DOCKER_CONFIG="${PUBLIC_DOCKER_CONFIG}" docker pull "${runtime_image}"
+  fi
+done
+docker save --output "${GW_IMAGE_ARCHIVE}" "${IMAGE_NAME}"
+docker save --output "${HOST_RUNTIME_IMAGE_ARCHIVE}" "${host_runtime_images[@]}"
+kind delete cluster --name "${CLUSTER_NAME}" >/dev/null 2>&1 || true
+kind create cluster --name "${CLUSTER_NAME}" --wait 90s
+kind load image-archive "${GW_IMAGE_ARCHIVE}" --name "${CLUSTER_NAME}"
+kind load image-archive "${HOST_RUNTIME_IMAGE_ARCHIVE}" --name "${CLUSTER_NAME}"
+prepare_kind_ccaas_chaincodes
 
 docker_image_id="$(docker image inspect "${IMAGE_NAME}" --format '{{.Id}}')"
 kind_image_record="$(docker exec "${CLUSTER_NAME}-control-plane" crictl images -o json \
@@ -138,9 +196,12 @@ kind_image_digest="$(jq -r '.repoDigests[0]' <<< "${kind_image_record}")"
 }
 
 kubectl --context "${KUBE_CONTEXT}" create namespace "${NAMESPACE}"
-kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create service externalname peer0-host1 \
-  --external-name host.docker.internal
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create service externalname orderer \
+  --external-name host.docker.internal
+# El peer nuevo necesita descubrir al menos un peer ya miembro para sincronizar
+# los bloques históricos. Esta ruta es solo de gossip/bootstrap: ni GW CORE ni
+# las consultas de evidencia la utilizan para endosar o leer transacciones.
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create service externalname peer0-host1 \
   --external-name host.docker.internal
 
 GW_SECRET_ENV="${TEMP_DIR}/gw.secret.env"
@@ -189,14 +250,17 @@ helm upgrade --install "${RELEASE}" "${ROOT}/charts/gdc-host" \
   --kube-context "${KUBE_CONTEXT}" \
   --namespace "${NAMESPACE}" \
   --values "${ROOT}/charts/gdc-host/ci/local-evidence-values.yaml" \
+  --values "${KIND_CCAAS_VALUES_FILE}" \
+  --set gw.enabled=false \
   --set-string "gw.localImage=${IMAGE_NAME}" \
   --set-string gw.imagePullPolicy=Never \
-  --set-string gw.fabricPeerEndpoint=peer0-host1:7051 \
+  --set-string gw.fabricPeerEndpoint="${KIND_PEER_SERVICE}:7051" \
   --set peer.enabled=true \
   --set-string peer.image="${peer_image}" \
   --set-string peer.name=peer-kind-host1 \
   --set-string peer.mspId=Host1MSP \
   --set-string peer.externalEndpoint="${KIND_PEER_SERVICE}:7051" \
+  --set-string peer.bootstrap=peer0-host1:7051 \
   --set-string peer.mspSecretName=host-evidence-peer-msp \
   --set-string peer.tlsSecretName=host-evidence-peer-tls \
   --set-string peer.couchdbSecretName=host-evidence-couchdb \
@@ -204,18 +268,18 @@ helm upgrade --install "${RELEASE}" "${ROOT}/charts/gdc-host" \
   --set-string authorization.existingSecret=host-evidence-authorization \
   --set-string externalPeer.host=peer0-host1 \
   --set externalPeer.port=7051 \
-  --set-string images.init=docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662 \
-  --set-string couchdb.image=docker.io/library/couchdb@sha256:307a3f5276f64c0db28f226b7b5c180b8f2c851afa681cfb4fbb1b1fe7fd5587 \
-  --set-string postgresql.image=docker.io/library/postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685 \
-  --set-string ipfs.image=docker.io/ipfs/kubo@sha256:7cc0e0de8f845d6c9fa1dce414c069974c34ed3cd3742e0d4f5bccda4adc376d \
+  --set-string images.init="${BUSYBOX_IMAGE}" \
+  --set-string couchdb.image="${COUCHDB_IMAGE}" \
+  --set-string postgresql.image="${POSTGRESQL_IMAGE}" \
+  --set-string ipfs.image="${IPFS_IMAGE}" \
   --wait --timeout 10m
 
-kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
-  "deployment/${RELEASE}-gw" --timeout=5m
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
   "statefulset/${RELEASE}-peer" --timeout=5m
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
   "statefulset/${RELEASE}-couchdb" --timeout=5m
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
+  deployment --selector app.kubernetes.io/component=chaincode --timeout=5m
 
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" run peer-join-tools \
   --image="${tools_image}" \
@@ -253,6 +317,31 @@ kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec peer-join-tools -- en
   CORE_PEER_TLS_ROOTCERT_FILE=/tmp/peer-tls-root.pem \
   CORE_PEER_TLS_SERVERHOSTOVERRIDE="${KIND_PEER_SERVICE}" \
   peer node status >/dev/null
+
+wait_for_kind_peer_sync() {
+  local channel="$1"
+  local network_height=0 kind_height=0
+  for _ in $(seq 1 120); do
+    network_height="$(docker exec gdc-fabric-tools env \
+      CORE_PEER_LOCALMSPID=Host1MSP \
+      CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp \
+      CORE_PEER_ADDRESS=peer0-host1:7051 \
+      CORE_PEER_TLS_ENABLED=true \
+      CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/ca.crt \
+      peer channel getinfo -c "${channel}" 2>/dev/null \
+      | sed 's/^Blockchain info: //' | jq -r '.height')"
+    kind_height="$(kind_peer_exec peer channel getinfo -c "${channel}" 2>/dev/null \
+      | sed 's/^Blockchain info: //' | jq -r '.height')"
+    if [[ "${network_height}" -ge 1 && "${kind_height}" == "${network_height}" ]]; then
+      echo "Peer Kubernetes sincronizado: channel=${channel} height=${kind_height}"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "El peer Kubernetes no sincronizó ${channel}: kind=${kind_height} network=${network_height}" >&2
+  return 1
+}
+
 for channel in identity-local health-care-local; do
   kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" cp \
     "${FABRIC_DEVNET_ROOT}/channel-artifacts/${channel}.block" \
@@ -284,6 +373,7 @@ for channel in identity-local health-care-local; do
     CORE_PEER_TLS_ROOTCERT_FILE=/tmp/peer-tls-root.pem \
     CORE_PEER_TLS_SERVERHOSTOVERRIDE="${KIND_PEER_SERVICE}" \
     peer channel getinfo -c "${channel}" | grep -Eq 'height[^0-9]*[1-9][0-9]*'
+  wait_for_kind_peer_sync "${channel}"
 done
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" get pod \
   -l app.kubernetes.io/component=peer -o jsonpath='{.items[0].spec.containers[0].env}' \
@@ -302,6 +392,24 @@ done
 grep -Fq 'identity-local' <<< "${couchdb_databases}"
 grep -Fq 'health-care-local' <<< "${couchdb_databases}"
 
+install_kind_ccaas_chaincodes
+verify_kind_ccaas_readiness
+helm upgrade "${RELEASE}" "${ROOT}/charts/gdc-host" \
+  --kube-context "${KUBE_CONTEXT}" \
+  --namespace "${NAMESPACE}" \
+  --reuse-values \
+  --set gw.enabled=true \
+  --wait --timeout 10m
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
+  "deployment/${RELEASE}-gw" --timeout=5m
+gw_pod="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" get pod \
+  -l app.kubernetes.io/component=gw -o jsonpath='{.items[0].metadata.name}')"
+gw_fabric_peer="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec "${gw_pod}" -- \
+  printenv HLF_CONNECTION_PEER)"
+[[ "${gw_fabric_peer}" == "${KIND_PEER_SERVICE}:7051" ]] || {
+  echo "El GW no apunta al peer Kubernetes: ${gw_fabric_peer}" >&2
+  exit 1
+}
 LOCAL_PORT="${HELM_EVIDENCE_LOCAL_PORT:-18082}"
 BASE_URL="http://127.0.0.1:${LOCAL_PORT}"
 start_port_forward() {
@@ -324,8 +432,14 @@ curl --fail --silent --show-error --max-time 5 "${PING_URL}" >/dev/null
 BASE_URL="${BASE_URL}" TENANT_ID="${EVIDENCE_TENANT_ID}" SUBJECT_ID="${EVIDENCE_SUBJECT_ID}" \
   npx dotenv -e "${FABRIC_ENV}" -- ./scripts/bootstrap-single-tenant.sh
 BASE_URL="${BASE_URL}" TENANT_ID="${EVIDENCE_TENANT_ID}" SUBJECT_ID="${EVIDENCE_SUBJECT_ID}" \
+  FABRIC_QUERY_MODE=kubectl FABRIC_KUBE_CONTEXT="${KUBE_CONTEXT}" \
+  FABRIC_KUBE_NAMESPACE="${NAMESPACE}" FABRIC_KUBE_PEER_ADDRESS="${KIND_PEER_SERVICE}:7051" \
+  FABRIC_KUBE_SERVER_HOST_OVERRIDE="${KIND_PEER_SERVICE}" \
   bash ./scripts/smoke-consentaccess-local-network.sh
 BASE_URL="${BASE_URL}" TENANT_ID="${EVIDENCE_TENANT_ID}" SUBJECT_ID="${EVIDENCE_SUBJECT_ID}" \
+  FABRIC_QUERY_MODE=kubectl FABRIC_KUBE_CONTEXT="${KUBE_CONTEXT}" \
+  FABRIC_KUBE_NAMESPACE="${NAMESPACE}" FABRIC_KUBE_PEER_ADDRESS="${KIND_PEER_SERVICE}:7051" \
+  FABRIC_KUBE_SERVER_HOST_OVERRIDE="${KIND_PEER_SERVICE}" \
   bash ./scripts/smoke-smart-access-local-network.sh
 
 postgres_pod="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" get pod \
@@ -347,10 +461,15 @@ fi
 
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout restart "deployment/${RELEASE}-gw"
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout restart "statefulset/${RELEASE}-peer"
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout restart \
+  deployment --selector app.kubernetes.io/component=chaincode
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
   "deployment/${RELEASE}-gw" --timeout=5m
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
   "statefulset/${RELEASE}-peer" --timeout=5m
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
+  deployment --selector app.kubernetes.io/component=chaincode --timeout=5m
+verify_kind_ccaas_readiness
 start_port_forward
 for _ in $(seq 1 60); do
   curl --fail --silent --max-time 2 "${PING_URL}" >/dev/null 2>&1 && break
@@ -371,4 +490,4 @@ for channel in identity-local health-care-local; do
   grep -qx "${channel}" <<< "${kind_peer_channels}"
 done
 
-echo "Helm local-network validado: kind_peer_msp=Host1MSP kind_peer_channels=$(tr '\n' ',' <<< "${kind_peer_channels}" | sed 's/,$//') couchdb_channels=ok postgres_documents=${postgres_documents} ipfs_jwe_blobs=${ipfs_blobs} gw_peer_restart=ok docker_image_id=${docker_image_id} kind_image_id=${kind_image_id}"
+echo "Helm local-network validado: kind_peer_msp=Host1MSP kind_peer_channels=$(tr '\n' ',' <<< "${kind_peer_channels}" | sed 's/,$//') kind_peer_ccaas=${KIND_PEER_CCAAS_NAMES} gw_fabric_peer=${gw_fabric_peer} couchdb_channels=ok postgres_documents=${postgres_documents} ipfs_jwe_blobs=${ipfs_blobs} gw_peer_ccaas_restart=ok docker_image_id=${docker_image_id} kind_image_id=${kind_image_id}"

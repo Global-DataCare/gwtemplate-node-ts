@@ -67,6 +67,13 @@ grep -Fq 'infra/fabric/local-network' ./chaincode/scripts/consentaccess-local-de
 grep -Fq 'npm ci' ./chaincode/scripts/consentaccess-local-devnet.sh
 grep -Fq 'helm:test:host' package.json
 test -f ./infra/fabric/local-network/docker-compose.yml
+grep -Fq 'rm -f "${DST_ICA}/tls-cert.pem"' ./infra/fabric/local-network/scripts/00-copy-dev-cas.sh
+grep -Fq 'ca-tls-bundle.pem' ./infra/fabric/local-network/scripts/00-copy-dev-cas.sh
+grep -Fq 'ca-tls-bundle.pem' ./infra/fabric/local-network/scripts/00-copy-dataspace-ca.sh
+grep -Fq 'FABRIC_CA_SERVER_CA_CHAINFILE=/etc/hyperledger/fabric-ca-server/ca-tls-bundle.pem' \
+  ./infra/fabric/local-network/docker-compose.yml
+grep -Fq 'function normalize_enrolled_msp_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
+grep -Fq 'function normalize_enrolled_tls_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 git check-ignore -q ./infra/fabric/local-network/crypto/ca/root/ca-key.pem
 git check-ignore -q ./infra/fabric/local-network/organizations/private-key.pem
 test -f ./charts/gdc-host/Chart.yaml
@@ -76,16 +83,56 @@ grep -Fq 'CONFIDENTIAL_JWE_INLINE_MAX_BYTES=1' ./scripts/smoke-helm-local-networ
 grep -Fq 'La prueba Helm no persistió ningún JWE cifrado en IPFS.' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer.enabled=true' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer-kind-host1' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'assert_public_fabric_mounts' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'kind load image-archive' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'HOST_RUNTIME_IMAGE_ARCHIVE=' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'DOCKER_CONFIG="${PUBLIC_DOCKER_CONFIG}" docker pull' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'normalize_kind_peer_identity' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'COPYFILE_DISABLE=1 tar -C "${KIND_PEER_DIR}/msp"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer channel join' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer node status' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'tlsintermediatecerts' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'CORE_PEER_LOCALMSPID=Host1MSP' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'kind_peer_channels=' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'install_kind_ccaas_chaincodes' ./scripts/smoke-helm-local-network.sh
+test -x ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'peer lifecycle chaincode install' ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'peer lifecycle chaincode approveformyorg' ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'touch -t 198001010000' ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'tar --format ustar --uid 0 --gid 0' ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'gzip -n' ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq '.source.Type.LocalPackage.package_id == $package_id' ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq '.version == $version and .sequence == 1 and .approvals.Host1MSP == true' \
+  ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'gw.fabricPeerEndpoint="${KIND_PEER_SERVICE}:7051"' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'create service externalname peer0-host1' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'peer.bootstrap=peer0-host1:7051' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'wait_for_kind_peer_sync' ./scripts/smoke-helm-local-network.sh
+grep -Fq -- '--set gw.enabled=false' ./scripts/smoke-helm-local-network.sh
+grep -Fq -- '--reuse-values' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'kind_peer_ccaas=' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'gw_fabric_peer=' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'FABRIC_QUERY_MODE=kubectl' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'FABRIC_QUERY_MODE:-docker' ./scripts/smoke-consentaccess-local-network.sh
+grep -Fq 'FABRIC_QUERY_MODE:-docker' ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'kubectl --context "${FABRIC_KUBE_CONTEXT}"' ./scripts/smoke-consentaccess-local-network.sh
+grep -Fq 'kubectl --context "${FABRIC_KUBE_CONTEXT}"' ./scripts/smoke-smart-access-local-network.sh
+if grep -Fq 'Mantiene el GW sobre el peer Docker' ./scripts/smoke-helm-local-network.sh; then
+  echo 'ERROR: Helm evidence still permits GW traffic through the Docker peer.' >&2
+  exit 1
+fi
+if grep -Fq 'get service peer0-host1' ./scripts/smoke-helm-local-network.sh; then
+  echo 'ERROR: the network discovery route must not be confused with the GW endorsement route.' >&2
+  exit 1
+fi
 grep -Fq 'height[^0-9]*[1-9]' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'gw.fabricPeerEndpoint' ./charts/gdc-host/templates/gw-configmap.yaml
+grep -Fq 'cat /tls/tlsintermediatecerts/*.pem >> /tls/server.crt' ./charts/gdc-host/templates/peer.yaml
 grep -Fq 'test:host-preauthorization' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'HOME_PLACEHOLDER' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'absolute user-home path' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq 'instala y aprueba los nueve paquetes CCAAS en el peer kind' \
+  ./scripts/collect-open-source-production-readiness-evidence.sh
 if grep -Fq 'fabric-multicloud' ./scripts/collect-open-source-production-readiness-evidence.sh; then
   echo 'ERROR: the public evidence runner must not require a private Fabric repository.' >&2
   exit 1

@@ -49,17 +49,17 @@ Canales, escritura, lectura, denegación y reinicio</pre>
     <li>ICA del espacio de datos y Host VC JSON/VC-JWT sin PDF para un host preautorizado.</li>
     <li>ICA de Fabric, certificados MSP/TLS, Host1MSP, Host2MSP, canales y chaincodes.</li>
     <li>GW CORE, PostgreSQL e IPFS con escritura, lectura y recuperación tras reinicio.</li>
-    <li>Instalación real de peer Host1MSP, CouchDB, GW CORE, PostgreSQL e IPFS mediante kind y Helm.</li>
-    <li>Unión del peer Kubernetes a los canales locales y persistencia tras reinicio.</li>
+    <li>Instalación real de peer Host1MSP, CouchDB, GW CORE, PostgreSQL, IPFS y nueve runtimes CCAAS mediante kind y Helm.</li>
+    <li>Unión del peer Kubernetes a los canales locales, instalación y aprobación de los paquetes CCAAS exactos.</li>
+    <li>GW dirigido al peer Kubernetes, con persistencia y nueva capacidad de endoso tras reiniciar GW, peer y CCAAS.</li>
     <li>Acceso consentido y controles negativos de acceso no autorizado.</li>
   </ul>
 
   <div class="notice">
-    <strong>Límite que debe declararse:</strong> peer y CouchDB ya se ejecutan
-    dentro de Kubernetes y el peer se une realmente a los canales externos. El
-    GW usa todavía el peer Docker que ya dispone de chaincodes. Falta instalar
-    los paquetes CCAAS en el peer kind y repetir el E2E contra ese peer para
-    afirmar que el host Fabric autónomo completo está probado.
+    <strong>Separación comprobada:</strong> Docker mantiene la ICA de Fabric,
+    el orderer y un peer de referencia como red externa. El peer desplegado por
+    Helm se une a esa red y el GW endosa exclusivamente mediante ese peer
+    Kubernetes; la ruta al peer Docker solo se usa para gossip/bootstrap.
   </div>
 
   <h2>4. Qué hace realmente la puerta Kubernetes</h2>
@@ -67,7 +67,9 @@ Canales, escritura, lectura, denegación y reinicio</pre>
   kind aislado, namespace y Secrets; carga la imagen aprobada; ejecuta
   <code>helm upgrade --install</code>; espera el rollout; realiza operaciones
   E2E; comprueba canales y CouchDB; consulta PostgreSQL e IPFS dentro de los
-  pods; reinicia GW y peer y comprueba la recuperación. <code>helm
+  pods; instala y aprueba los nueve paquetes CCAAS en el peer Kubernetes;
+  ejecuta Consent y SMART mediante ese peer; reinicia GW, peer y CCAAS y
+  comprueba la recuperación. <code>helm
   template</code> permanece como comprobación estática complementaria.</p>
 
   <h2>5. Promoción del mismo chart</h2>
@@ -99,8 +101,9 @@ Canales, escritura, lectura, denegación y reinicio</pre>
 
   <h2>8. Criterio de presentación</h2>
   <p>La memoria puede afirmar que la red Fabric local y el despliegue Kubernetes
-  con peer, CouchDB, GW CORE, PostgreSQL e IPFS se han probado de forma
-  reproducible. Debe marcar como pendiente el lifecycle CCAAS en el peer kind y
-  el E2E del GW contra ese peer hasta que exista la evidencia correspondiente.</p>
+  con peer, CouchDB, GW CORE, PostgreSQL, IPFS y CCAAS se han probado de forma
+  reproducible, incluido el lifecycle CCAAS y el E2E del GW contra el peer
+  Kubernetes. La promoción a otra red conserva el chart, pero exige nuevas
+  credenciales, Secrets, digests, values y reconciliación gobernada.</p>
 </body>
 </html>

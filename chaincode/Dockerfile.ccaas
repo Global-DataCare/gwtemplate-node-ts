@@ -1,0 +1,34 @@
+FROM node:22-alpine
+
+# Every public JavaScript contract uses the same Fabric runtime versions. Keep
+# those dependencies in one immutable layer and select the contract at runtime
+# instead of shipping nine duplicate Node images.
+WORKDIR /runtime
+COPY organization-sc-javascript/package.json organization-sc-javascript/package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY organization-sc-javascript/package.json organization-sc-javascript/index.js /chaincodes/organization-sc/
+COPY organization-sc-javascript/lib /chaincodes/organization-sc/lib
+COPY cryptographickey-sc-javascript/package.json cryptographickey-sc-javascript/index.js /chaincodes/cryptographickey-sc/
+COPY cryptographickey-sc-javascript/lib /chaincodes/cryptographickey-sc/lib
+COPY employee-sc-javascript/package.json employee-sc-javascript/index.js /chaincodes/employee-sc/
+COPY employee-sc-javascript/lib /chaincodes/employee-sc/lib
+COPY evidence-sc-javascript/package.json evidence-sc-javascript/index.js /chaincodes/evidence-sc/
+COPY evidence-sc-javascript/lib /chaincodes/evidence-sc/lib
+COPY credential-sc-javascript/package.json credential-sc-javascript/index.js /chaincodes/credential-sc/
+COPY credential-sc-javascript/lib /chaincodes/credential-sc/lib
+COPY artifact-sc-javascript/package.json artifact-sc-javascript/index.js /chaincodes/artifact-sc/
+COPY artifact-sc-javascript/lib /chaincodes/artifact-sc/lib
+COPY artifactevent-sc-javascript/package.json artifactevent-sc-javascript/index.js /chaincodes/artifactevent-sc/
+COPY artifactevent-sc-javascript/lib /chaincodes/artifactevent-sc/lib
+COPY subjectkeybinding-sc-javascript/package.json subjectkeybinding-sc-javascript/index.js /chaincodes/subjectkeybinding-sc/
+COPY subjectkeybinding-sc-javascript/lib /chaincodes/subjectkeybinding-sc/lib
+COPY consentaccess-sc-javascript/package.json consentaccess-sc-javascript/index.js /chaincodes/consentaccess-sc/
+COPY consentaccess-sc-javascript/lib /chaincodes/consentaccess-sc/lib
+
+ENV CHAINCODE_SERVER_ADDRESS=0.0.0.0:9999
+ENV NODE_PATH=/runtime/node_modules
+EXPOSE 9999
+USER node
+
+CMD ["sh", "-c", "cd /chaincodes/${CHAINCODE_NAME} && exec /runtime/node_modules/.bin/fabric-chaincode-node server --chaincode-address=\"${CHAINCODE_SERVER_ADDRESS}\" --chaincode-id=\"${CHAINCODE_ID}\""]

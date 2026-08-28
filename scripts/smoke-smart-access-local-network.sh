@@ -24,6 +24,13 @@ SECTOR="${SECTOR:-health-care}"
 CHANNEL_NAME="${CHANNEL_NAME:-health-care-local}"
 CHAINCODE_NAME="${CHAINCODE_NAME:-consentaccess-sc}"
 FABRIC_TOOLS_CONTAINER="${FABRIC_TOOLS_CONTAINER:-gdc-fabric-tools}"
+FABRIC_QUERY_MODE="${FABRIC_QUERY_MODE:-docker}"
+FABRIC_KUBE_CONTEXT="${FABRIC_KUBE_CONTEXT:-}"
+FABRIC_KUBE_NAMESPACE="${FABRIC_KUBE_NAMESPACE:-}"
+FABRIC_KUBE_POD="${FABRIC_KUBE_POD:-peer-join-tools}"
+FABRIC_KUBE_PEER_ADDRESS="${FABRIC_KUBE_PEER_ADDRESS:-host-evidence-peer:7051}"
+FABRIC_KUBE_TLS_ROOT="${FABRIC_KUBE_TLS_ROOT:-/tmp/peer-tls-root.pem}"
+FABRIC_KUBE_SERVER_HOST_OVERRIDE="${FABRIC_KUBE_SERVER_HOST_OVERRIDE:-host-evidence-peer}"
 HOST1_DOMAIN="${HOST1_DOMAIN:-host1.example.com}"
 HOST1_MSP_ID="${HOST1_MSP_ID:-Host1MSP}"
 AUTH_BEARER="${AUTH_BEARER:-demo-token}"
@@ -43,12 +50,35 @@ DIGITAL_TWIN_SEARCH_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/
 HOST1_ADMIN_MSP="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp"
 HOST1_PEER_TLS="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls/ca.crt"
 
-for cmd in curl jq docker; do
+required_commands=(curl jq)
+if [[ "${FABRIC_QUERY_MODE}" == "kubectl" ]]; then
+  required_commands+=(kubectl)
+  [[ -n "${FABRIC_KUBE_CONTEXT}" && -n "${FABRIC_KUBE_NAMESPACE}" ]] || {
+    echo "ERROR: FABRIC_KUBE_CONTEXT and FABRIC_KUBE_NAMESPACE are required for kubectl queries" >&2
+    exit 2
+  }
+else
+  required_commands+=(docker)
+fi
+for cmd in "${required_commands[@]}"; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing $cmd"; exit 2; }
 done
 
 query_rule_asset() {
   local rule_id="$1"
+  if [[ "${FABRIC_QUERY_MODE}" == "kubectl" ]]; then
+    kubectl --context "${FABRIC_KUBE_CONTEXT}" -n "${FABRIC_KUBE_NAMESPACE}" \
+      exec "${FABRIC_KUBE_POD}" -- env \
+      CORE_PEER_LOCALMSPID="${HOST1_MSP_ID}" \
+      CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp \
+      CORE_PEER_ADDRESS="${FABRIC_KUBE_PEER_ADDRESS}" \
+      CORE_PEER_TLS_ENABLED=true \
+      CORE_PEER_TLS_ROOTCERT_FILE="${FABRIC_KUBE_TLS_ROOT}" \
+      CORE_PEER_TLS_SERVERHOSTOVERRIDE="${FABRIC_KUBE_SERVER_HOST_OVERRIDE}" \
+      peer chaincode query -C "${CHANNEL_NAME}" -n "${CHAINCODE_NAME}" \
+      -c "{\"Args\":[\"ReadConsentAccess\",\"${rule_id}\"]}"
+    return
+  fi
   docker exec "${FABRIC_TOOLS_CONTAINER}" bash -lc \
     "CORE_PEER_LOCALMSPID=${HOST1_MSP_ID} \
 CORE_PEER_MSPCONFIGPATH=${HOST1_ADMIN_MSP} \

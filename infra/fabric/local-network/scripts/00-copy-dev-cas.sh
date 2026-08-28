@@ -49,6 +49,8 @@ rm -f "${DST_ROOT_CA}/fabric-ca-server.db"
 cp -f "${SRC_ICA}/ca-key.pem" "${DST_ICA}/ca-key.pem"
 cp -f "${SRC_ICA}/ca-cert.pem" "${DST_ICA}/ca-cert.pem"
 cp -f "${SRC_ICA}/ca-chain.pem" "${DST_ICA}/ca-chain.pem"
+cat "${DST_ICA}/ca-cert.pem" "${DST_ICA}/ca-chain.pem" > "${DST_ICA}/ca-tls-bundle.pem"
+rm -f "${DST_ICA}/tls-cert.pem"
 rm -f "${DST_ICA}/fabric-ca-server.db"
 
 echo "Copied deterministic dev CAs into:"

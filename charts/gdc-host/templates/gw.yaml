@@ -30,6 +30,20 @@ spec:
           envFrom:
             - configMapRef: { name: {{ include "gdc-host.fullname" . }}-gw }
             - secretRef: { name: {{ .Values.gw.existingSecret }} }
+          env:
+            # Explicit values override stale compatibility keys that may still
+            # exist in a migrated Secret. The selected peer is deployment
+            # configuration, never secret material.
+            - name: HLF_CONNECTION_PEER
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "gdc-host.fullname" . }}-gw
+                  key: HLF_CONNECTION_PEER
+            - name: {{ printf "HLF_CONNECTION_PEER_%s" .Values.peer.mspId }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "gdc-host.fullname" . }}-gw
+                  key: {{ printf "HLF_CONNECTION_PEER_%s" .Values.peer.mspId }}
           ports:
             - { name: http, containerPort: 3000 }
           readinessProbe:

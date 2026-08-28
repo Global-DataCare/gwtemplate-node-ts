@@ -6,14 +6,20 @@
   evidencia, representarlas como `${HOME}` y hacer fallar el paquete si queda
   alguna ruta `/Users/<usuario>` o `/home/<usuario>`.
 
-- Añadir en `deliverables/` una guía Word pública en español, aclarando qué
-  ejecuta realmente kind/Helm y que solo quedan pendientes el lifecycle CCAAS
-  y el E2E del GW contra el peer Kubernetes.
+- Actualizar en `deliverables/` la guía Word pública en español con la prueba
+  completa kind/Helm: lifecycle CCAAS y E2E del GW contra el peer Kubernetes.
 
 - Ejecutar mediante el chart el peer `Host1MSP` y CouchDB dentro de kind,
   enrolar MSP/TLS exclusivos con la ICA de Fabric, unir el peer a los dos
   canales locales y comprobar canales, estado CouchDB y persistencia tras
   reiniciar peer y GW.
+
+- Instalar y aprobar de forma reproducible nueve paquetes CCAAS en el peer
+  kind, dirigir el GW exclusivamente a ese peer y comprobar Consent, SMART y
+  nueva capacidad de endoso después de reiniciar GW, peer y runtimes CCAAS.
+
+- Evitar revisiones Fabric falsas cuando dos reglas Consent contienen el mismo
+  JSON semántico con distinto orden de propiedades.
 
 - Forzar en la prueba real Helm que los JWE cifrados se externalicen a IPFS y
   abortar explícitamente si Kubernetes no conserva documentos en PostgreSQL o

@@ -74,6 +74,8 @@
         "properties": {
           "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
           "image": { "$ref": "#/definitions/digestImage" },
+          "localImage": { "type": "string", "minLength": 1 },
+          "imagePullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
           "packageId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*:[a-f0-9]{64}$" }
         }
       }

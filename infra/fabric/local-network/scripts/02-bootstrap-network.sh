@@ -74,6 +74,28 @@ function write_tls_server_chain() {
   cp -f "${tls_dir}/tlscacerts/"*.pem "${tls_dir}/ca.crt"
 }
 
+# The ICA server trusts a full CA bundle for authenticated registry calls. The
+# Fabric CA client consequently classifies the issuing ICA as a root in the
+# generated MSP folders. Normalize those folders back to Fabric's required
+# root + intermediate layout before a peer or orderer consumes them.
+function normalize_enrolled_msp_trust() {
+  local msp_dir="$1"
+  [[ "${CA_HOST}" != "root-ca" ]] || return 0
+  mkdir -p "${msp_dir}/cacerts" "${msp_dir}/intermediatecerts"
+  rm -f "${msp_dir}/cacerts/"*.pem "${msp_dir}/intermediatecerts/"*.pem
+  cp -f "${ROOT}/crypto/ca/root/ca-cert.pem" "${msp_dir}/cacerts/root-ca-cert.pem"
+  cp -f "${ROOT}/crypto/ca/ica/ca-cert.pem" "${msp_dir}/intermediatecerts/issuer-ca-cert.pem"
+}
+
+function normalize_enrolled_tls_trust() {
+  local tls_dir="$1"
+  [[ "${CA_HOST}" != "root-ca" ]] || return 0
+  mkdir -p "${tls_dir}/tlscacerts" "${tls_dir}/tlsintermediatecerts"
+  rm -f "${tls_dir}/tlscacerts/"*.pem "${tls_dir}/tlsintermediatecerts/"*.pem
+  cp -f "${ROOT}/crypto/ca/root/ca-cert.pem" "${tls_dir}/tlscacerts/root-ca-cert.pem"
+  cp -f "${ROOT}/crypto/ca/ica/ca-cert.pem" "${tls_dir}/tlsintermediatecerts/issuer-ca-cert.pem"
+}
+
 function parse_channels() {
   local raw="$1"
   local normalized
@@ -328,6 +350,7 @@ exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-
   -M "/workspace/organizations/ordererOrganizations/${ORDERER_DOMAIN}/orderers/orderer.${ORDERER_DOMAIN}/msp" \
   --csr.hosts orderer \
   --tls.certfiles "${CA_TLS_CERT}"
+normalize_enrolled_msp_trust "organizations/ordererOrganizations/${ORDERER_DOMAIN}/orderers/orderer.${ORDERER_DOMAIN}/msp"
 write_enrolled_node_ou_config "organizations/ordererOrganizations/${ORDERER_DOMAIN}/orderers/orderer.${ORDERER_DOMAIN}/msp"
 
 exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-admin \
@@ -340,6 +363,7 @@ exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-
   --tls.certfiles "${CA_TLS_CERT}"
 
 ORDERER_TLS_DIR="organizations/ordererOrganizations/${ORDERER_DOMAIN}/orderers/orderer.${ORDERER_DOMAIN}/tls"
+normalize_enrolled_tls_trust "${ORDERER_TLS_DIR}"
 write_tls_server_chain "${ORDERER_TLS_DIR}"
 cp -f "${ORDERER_TLS_DIR}/keystore/"*_sk "${ORDERER_TLS_DIR}/server.key" 2>/dev/null || cp -f "${ORDERER_TLS_DIR}/keystore/"* "${ORDERER_TLS_DIR}/server.key"
 
@@ -352,6 +376,7 @@ exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-
   --csr.hosts peer0-host1 \
   --csr.hosts localhost \
   --tls.certfiles "${CA_TLS_CERT}"
+normalize_enrolled_msp_trust "organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/msp"
 write_enrolled_node_ou_config "organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/msp"
 
 exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-admin \
@@ -364,6 +389,7 @@ exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-
   --tls.certfiles "${CA_TLS_CERT}"
 
 PEER1_TLS_DIR="organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls"
+normalize_enrolled_tls_trust "${PEER1_TLS_DIR}"
 write_tls_server_chain "${PEER1_TLS_DIR}"
 cp -f "${PEER1_TLS_DIR}/keystore/"*_sk "${PEER1_TLS_DIR}/server.key" 2>/dev/null || cp -f "${PEER1_TLS_DIR}/keystore/"* "${PEER1_TLS_DIR}/server.key"
 
@@ -377,6 +403,7 @@ if [[ "${SINGLE_HOST}" != "true" ]]; then
     --csr.hosts peer0-host2 \
     --csr.hosts localhost \
     --tls.certfiles "${CA_TLS_CERT}"
+  normalize_enrolled_msp_trust "organizations/peerOrganizations/${HOST2_DOMAIN}/peers/peer0.${HOST2_DOMAIN}/msp"
   write_enrolled_node_ou_config "organizations/peerOrganizations/${HOST2_DOMAIN}/peers/peer0.${HOST2_DOMAIN}/msp"
 
   exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-admin \
@@ -389,6 +416,7 @@ if [[ "${SINGLE_HOST}" != "true" ]]; then
     --tls.certfiles "${CA_TLS_CERT}"
 
   PEER2_TLS_DIR="organizations/peerOrganizations/${HOST2_DOMAIN}/peers/peer0.${HOST2_DOMAIN}/tls"
+  normalize_enrolled_tls_trust "${PEER2_TLS_DIR}"
   write_tls_server_chain "${PEER2_TLS_DIR}"
   cp -f "${PEER2_TLS_DIR}/keystore/"*_sk "${PEER2_TLS_DIR}/server.key" 2>/dev/null || cp -f "${PEER2_TLS_DIR}/keystore/"* "${PEER2_TLS_DIR}/server.key"
 fi
@@ -400,6 +428,7 @@ exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-
   -u "https://host1admin:host1adminpw@${CA_HOST}:${CA_PORT}" \
   -M "/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp" \
   --tls.certfiles "${CA_TLS_CERT}"
+normalize_enrolled_msp_trust "organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp"
 write_enrolled_node_ou_config "organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp"
 
 if [[ "${SINGLE_HOST}" != "true" ]]; then
@@ -409,6 +438,7 @@ if [[ "${SINGLE_HOST}" != "true" ]]; then
     -u "https://host2admin:host2adminpw@${CA_HOST}:${CA_PORT}" \
     -M "/workspace/organizations/peerOrganizations/${HOST2_DOMAIN}/users/Admin@${HOST2_DOMAIN}/msp" \
     --tls.certfiles "${CA_TLS_CERT}"
+  normalize_enrolled_msp_trust "organizations/peerOrganizations/${HOST2_DOMAIN}/users/Admin@${HOST2_DOMAIN}/msp"
   write_enrolled_node_ou_config "organizations/peerOrganizations/${HOST2_DOMAIN}/users/Admin@${HOST2_DOMAIN}/msp"
 fi
 

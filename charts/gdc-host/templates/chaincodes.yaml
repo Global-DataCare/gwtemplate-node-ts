@@ -28,10 +28,12 @@ spec:
       {{- end }}
       containers:
         - name: chaincode
-          image: {{ .image | quote }}
+          image: {{ ternary .localImage .image (and (eq $.Values.environment "local") (not (empty .localImage))) | quote }}
+          imagePullPolicy: {{ default "IfNotPresent" .imagePullPolicy }}
           env:
             - { name: CHAINCODE_SERVER_ADDRESS, value: "0.0.0.0:9999" }
             - { name: CHAINCODE_ID, value: {{ .packageId | quote }} }
+            - { name: CHAINCODE_NAME, value: {{ .name | quote }} }
           ports: [{ name: grpc, containerPort: 9999 }]
 ---
 apiVersion: v1

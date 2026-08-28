@@ -506,6 +506,33 @@ describe("ConsentAccessContract", () => {
   });
 
   /**
+   * Equivalent JSON objects may arrive with a different property insertion
+   * order after transport. That representation detail must not create a new
+   * blockchain revision for an otherwise identical consent rule.
+   */
+  it("treats reordered but semantically identical claims as an upsert no-op", async () => {
+    const storedAsset = buildStoredConsentAccessAsset();
+    const claims = storedAsset.data[0].resource.meta.claims;
+    storedAsset.data[0].resource.meta.claims = Object.fromEntries(
+      Object.entries(claims).reverse(),
+    );
+    const ctx = createContractContext({
+      existingState: { [TEST_IDENTIFIERS.AssetId]: storedAsset },
+      txSeconds: TEST_TIMESTAMPS.UpsertChanged,
+      txId: TEST_IDENTIFIERS.UpsertTransactionId,
+    });
+
+    const asset = await contract.UpsertConsentAccess(
+      ctx,
+      TEST_IDENTIFIERS.AssetId,
+      JSON.stringify(buildPrimaryDocumentPayload()),
+    );
+
+    expect(asset).to.deep.equal(storedAsset);
+    expect(ctx.writes).to.have.length(0);
+  });
+
+  /**
    * `Upsert` writes when the sanitized data changes, and the lowercase alias
    * must behave exactly the same.
    */

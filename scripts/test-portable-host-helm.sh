@@ -63,6 +63,9 @@ grep -q 'DB_PROVIDER: "postgres"' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'STORAGE_PROVIDER: "ipfs"' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'imagePullPolicy: Never' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'image: "gw-core:evidence"' "${TMP_DIR}/local-evidence.yaml"
+grep -q 'image: "gdc-ccaas/organization-sc:local-test"' "${TMP_DIR}/local-evidence.yaml"
+grep -A4 'name: chaincode' "${TMP_DIR}/local-evidence.yaml" | grep -q 'imagePullPolicy: Never'
+grep -A5 'name: CHAINCODE_ID' "${TMP_DIR}/local-evidence.yaml" | grep -q 'name: CHAINCODE_NAME'
 grep -q 'HOST_INTERNAL_IP: "0.0.0.0"' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'PORT: "3000"' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'SECURITY_MODE: "demo"' "${TMP_DIR}/local-evidence.yaml"

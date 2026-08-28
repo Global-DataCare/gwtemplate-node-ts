@@ -46,6 +46,7 @@ rm -f "${DST_ROOT_CA}/tls-cert.pem" "${DST_ROOT_CA}/fabric-ca-server.db"
 cp -f "${ISSUER_KEY}" "${DST_ICA}/ca-key.pem"
 cp -f "${ISSUER_CERT}" "${DST_ICA}/ca-cert.pem"
 cp -f "${ISSUER_CHAIN}" "${DST_ICA}/ca-chain.pem"
+cat "${DST_ICA}/ca-cert.pem" "${DST_ICA}/ca-chain.pem" > "${DST_ICA}/ca-tls-bundle.pem"
 rm -f "${DST_ICA}/tls-cert.pem" "${DST_ICA}/fabric-ca-server.db"
 
 echo "Copied dataspace-ca material into Fabric devnet:"

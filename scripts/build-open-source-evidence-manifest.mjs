@@ -138,11 +138,12 @@ export function buildEvidenceManifest({
       negativeControl: 'a different medical secretary without consent receives no access token',
     },
     kubernetesProof: {
-      components: ['peer', 'couchdb', 'gw-core', 'postgresql', 'ipfs'],
+      components: ['peer', 'couchdb', 'gw-core', 'postgresql', 'ipfs', 'ccaas'],
       fabricMsp: 'Host1MSP',
       joinedChannels: ['identity-local', 'health-care-local'],
+      endorsementPeer: 'kubernetes',
+      ccaasLifecycle: 'nine exact packages installed and approved on Host1MSP',
       persistence: 'peer channels, PostgreSQL documents and IPFS JWE blobs survive pod restart',
-      pending: 'CCAAS lifecycle and GW endorsement through the Kubernetes peer',
     },
     repositories,
     image: imageInspector(imageName),
@@ -153,7 +154,7 @@ export function buildEvidenceManifest({
       'use production DNS, TLS, secret custody, persistent volumes and monitored backup/recovery',
       'use production Fabric Root/ICA material and governed channel inventory',
       'exercise the real operator-owned Fabric reconciliation driver before claiming dynamic host admission',
-      'install approved CCAAS packages on the host peer and validate GW endorsement through that peer',
+      'promote the locally proven CCAAS images and connection packages by approved immutable digests',
       'deploy the already-tested image by immutable registry digest',
     ],
   };

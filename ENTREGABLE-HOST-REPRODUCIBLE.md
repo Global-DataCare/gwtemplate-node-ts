@@ -22,9 +22,10 @@ La evidencia se divide en dos puertas complementarias:
    recuperación persistente.
 2. **Helm/Kubernetes**, prueba de portabilidad. Crea un clúster `kind` aislado,
    carga la misma imagen GW por digest, instala un peer con identidad exclusiva
-   `Host1MSP`, CouchDB, GW CORE, PostgreSQL e IPFS, y une el peer a los canales
-   de la Fabric Docker `local-network`. El GW repite los flujos E2E contra el
-   peer Docker que ya dispone de los chaincodes aprobados.
+   `Host1MSP`, CouchDB, GW CORE, PostgreSQL, IPFS y nueve runtimes CCAAS, y une
+   el peer a los canales de la Fabric Docker `local-network`. Instala en ese
+   peer los paquetes CCAAS exactos, actualiza la aprobación de `Host1MSP` y el
+   GW repite los flujos E2E endosando exclusivamente mediante el peer kind.
 
 `helm template` por sí solo no se considera una prueba de despliegue. Se
 conserva como validación estática previa a la instalación real.
@@ -49,14 +50,13 @@ Peer + CouchDB + GW CORE + PostgreSQL + IPFS + CCAAS
 Reconciliación de canales y chaincodes, escritura, lectura y reinicio
 ```
 
-La evidencia actual encadena la emisión de MSP/TLS, los Secrets, la instalación
-Helm, el arranque del peer y CouchDB y la unión real del peer Kubernetes a los
-canales externos. Docker sigue ejecutando la ICA de Fabric, orderer y peers de
-referencia con los chaincodes aprobados. El GW Kubernetes se conecta a ese peer
-Docker para el E2E porque el peer kind todavía no instala los paquetes CCAAS.
-Quedan como puerta pendiente el lifecycle CCAAS sobre el peer kind y repetir el
-E2E con el GW apuntando a su propio peer; peer y CouchDB ya no son una
-limitación pendiente.
+La evidencia encadena la emisión de MSP/TLS, los Secrets, la instalación Helm,
+el arranque del peer y CouchDB, la unión real del peer Kubernetes a los canales
+externos, el lifecycle de los nueve CCAAS y el E2E del GW contra ese mismo peer.
+Docker mantiene la ICA de Fabric, el orderer y el peer de referencia que
+representan la red externa; no endosa las operaciones del GW durante la puerta
+Kubernetes. Tras reiniciar GW, peer y runtimes CCAAS se vuelven a comprobar
+canales, lectura, autorización y persistencia PostgreSQL/IPFS.
 
 ## Autoridades que no deben confundirse
 
