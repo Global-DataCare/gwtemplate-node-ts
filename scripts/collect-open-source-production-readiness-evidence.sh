@@ -73,6 +73,7 @@ record_environment() {
       printf '%s_tracked_tree=clean\n' "$(basename "${repository}")"
     else
       printf '%s_tracked_tree=dirty\n' "$(basename "${repository}")"
+      return 1 # tracked repository is dirty
     fi
   done
   docker image inspect "${IMAGE_NAME}" --format 'image_id={{.Id}} platform={{.Os}}/{{.Architecture}}'

@@ -10,6 +10,10 @@
   hosts: instalar y aprobar el mismo paquete en cada MSP activo y dirigir el
   commit a ambos peers tras la admisión gobernada de `Host2MSP`.
 
+- Hacer fallar la puerta ambiental de evidencia cuando GW CORE, Dataspace CA o
+  Dataspace ICA contienen cambios rastreados sin commit, evitando informes de
+  auditoría que no correspondan a revisiones reproducibles.
+
 - Vincular certificados Fabric de peer y cliente GW mediante
   `gdc.hostCredentialSha256`: Fabric CA no admite los `:` de un `urn:uuid`
   dentro de un atributo `:ecert`; la autorización conserva el identificador
