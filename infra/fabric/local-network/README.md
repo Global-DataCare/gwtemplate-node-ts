@@ -31,13 +31,18 @@ Fabric como intermedia. Las claves privadas permanecen bajo
 `organizations/` y nunca forman parte de la evidencia pública.
 
 La puerta de auditoría prueba además la admisión dinámica. Arranca los canales
-solo con `Host1MSP`, genera las identidades MSP/TLS de `Host2MSP`, firma con el
+solo con `Host1MSP`, genera las identidades MSP/TLS del peer y la identidad
+cliente GW de `Host2MSP`, todas vinculadas a la Host VC, firma con el
 administrador gobernador una actualización de configuración, la aplica y solo
 entonces arranca y une el segundo peer:
 
 ```bash
+node "${REPO_ROOT}/scripts/onboarding/create-local-audit-authorization.mjs" \
+  --output /tmp/host2-authorization.json \
+  --bundle-dir /tmp/host2-governance
 SINGLE_HOST=true HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
   ./scripts/02-bootstrap-network.sh
+HOST_AUTHORIZATION_JSON=/tmp/host2-authorization.json \
 SINGLE_HOST=true HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
   ./scripts/06-admit-host2.sh
 ```
@@ -69,4 +74,5 @@ npm run evidence:open-source-production-readiness
 ```
 
 Ese runner reinicia únicamente el devnet identificado, prueba ambos MSP,
-despliega chaincodes, ejecuta el GW con PostgreSQL/IPFS y añade la puerta Helm.
+despliega chaincodes, ejecuta el GW como `Host2MSP` con PostgreSQL/IPFS y añade
+la puerta Helm.

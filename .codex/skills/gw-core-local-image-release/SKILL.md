@@ -137,6 +137,12 @@ The final open-source project evidence has four mandatory, complementary gates:
    local channels, repeat the local-network E2E and prove recovery after
    restarting GW and peer. A render-only `helm template` is not this gate.
 
+The peer MSP/TLS two-use grant must remain separate from the one-use GW client
+grant. Generate all three private keys inside host custody, bind both Fabric
+identities to the same authorized Host VC identifier, and prove that GW signs
+as the newly admitted MSP. A GW that points at Host2 while signing with Host1
+does not satisfy the portability gate.
+
 Keep the Kubernetes peer proof and application endorsement proof explicit. The
 local Helm gate must install and approve the nine exact CCAAS packages on the
 kind peer before enabling GW, point GW at that peer, exercise Consent and SMART

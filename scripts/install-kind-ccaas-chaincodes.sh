@@ -18,7 +18,7 @@ KIND_CCAAS_SPECS=(
 
 require_kind_ccaas_context() {
   local variable
-  for variable in ROOT TEMP_DIR CLUSTER_NAME KUBE_CONTEXT NAMESPACE KIND_PEER_SERVICE FABRIC_DEVNET_ROOT; do
+  for variable in ROOT TEMP_DIR CLUSTER_NAME KUBE_CONTEXT NAMESPACE KIND_PEER_SERVICE KIND_PEER_MSP_ID FABRIC_DEVNET_ROOT; do
     [[ -n "${!variable:-}" ]] || {
       echo "Falta la variable CCAAS requerida: ${variable}" >&2
       return 2
@@ -95,7 +95,7 @@ EOF
 
 kind_peer_exec() {
   kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec peer-join-tools -- env \
-    CORE_PEER_LOCALMSPID=Host1MSP \
+    CORE_PEER_LOCALMSPID="${KIND_PEER_MSP_ID}" \
     CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp \
     CORE_PEER_ADDRESS="${KIND_PEER_SERVICE}:7051" \
     CORE_PEER_TLS_ENABLED=true \
@@ -137,7 +137,7 @@ install_kind_ccaas_chaincodes() {
       --version 1.0 \
       --package-id "${package_id}" \
       --sequence 1 \
-      --signature-policy "OR('Host1MSP.member')"
+      --signature-policy "OR('Host1MSP.member','Host2MSP.member')"
 
     approval="$(kind_peer_exec peer lifecycle chaincode queryapproved \
       --channelID "${channel}" --name "${name}" --sequence 1 --output json)"
@@ -145,8 +145,8 @@ install_kind_ccaas_chaincodes() {
       '.source.Type.LocalPackage.package_id == $package_id' <<< "${approval}" >/dev/null
     kind_peer_exec peer lifecycle chaincode querycommitted \
       --channelID "${channel}" --name "${name}" --output json \
-      | jq -e --arg version '1.0' \
-        '.version == $version and .sequence == 1 and .approvals.Host1MSP == true' >/dev/null
+      | jq -e --arg version '1.0' --arg msp "${KIND_PEER_MSP_ID}" \
+        '.version == $version and .sequence == 1 and .approvals[$msp] == true' >/dev/null
 
     KIND_PEER_CCAAS_NAMES="${KIND_PEER_CCAAS_NAMES}${KIND_PEER_CCAAS_NAMES:+,}${name}"
   done < "${KIND_CCAAS_MANIFEST}"

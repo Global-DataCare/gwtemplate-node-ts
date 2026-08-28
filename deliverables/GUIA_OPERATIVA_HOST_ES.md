@@ -110,15 +110,16 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
   --apply --confirm-request "${request_id}"
 ```
 
-`authorization.json` no contiene la VC-JWT. El grant privado está en modo
-`0600`, admite exactamente dos enrolamientos —MSP y TLS— y contiene
-`issuedAt`/`expiresAt`. La fecha es una ventana aplicada por estos helpers; la
-garantía nativa de Fabric CA es `maxEnrollments=2`. La autoridad revoca el
-identificador si no se consume dentro de la ventana.
+`authorization.json` no contiene la VC-JWT. El asistente crea dos grants
+privados en modo `0600`: uno admite exactamente dos enrolamientos —MSP y TLS
+del peer— y otro admite un único enrolamiento para la identidad cliente del GW.
+Ambos contienen `issuedAt`/`expiresAt`. La fecha es una ventana aplicada por
+estos helpers; Fabric CA garantiza sus límites de usos. La autoridad revoca
+cualquier identificador que no se consuma dentro de la ventana.
 
 ## 6. Fase B: proveedor del host
 
-Se transfieren únicamente el grant `0600` y la cadena TLS pública de Fabric CA.
+Se transfieren únicamente los dos grants `0600` y la cadena TLS pública de Fabric CA.
 El proveedor ejecuta plan y aplicación:
 
 ```bash
@@ -130,8 +131,12 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
   --apply --confirm-request "${request_id}"
 ```
 
-`fabric-ca-client` genera las claves MSP/TLS dentro del host; solo envía CSR y
-recibe certificados. El paquete `/secure/host/helm-runtime` contiene únicamente:
+`fabric-ca-client` genera dentro del host las claves MSP/TLS del peer y la clave
+de una identidad cliente GW independiente; solo envía CSR y recibe certificados.
+El asistente produce además `/secure/host/gw.fabric.env`, privado y en modo
+`0600`, con `LEDGER_FABRIC_MSP_ID`, endpoint/TLS del peer y certificado/clave
+cliente. Ningún grant aparece en ese fichero. El paquete
+`/secure/host/helm-runtime` contiene únicamente:
 
 ```text
 msp.tgz
@@ -184,9 +189,18 @@ gobernado, no del proveedor.
 
 ## 8. Secrets e instalación Helm
 
+Parta del fichero Fabric generado y añada únicamente la configuración privada
+del despliegue en una copia bajo custodia del host:
+
+```bash
+cp /secure/host/gw.fabric.env /secure/host/gw.env
+chmod 600 /secure/host/gw.env
+# Añada mediante el gestor seguro KMS, proveedores y demás variables requeridas.
+```
+
 Prepare ficheros privados para PostgreSQL (`POSTGRES_USER`,
-`POSTGRES_PASSWORD`), CouchDB (`username`, `password`) y GW (identidad cliente
-Fabric, configuración KMS y credenciales de proveedores). Si Redis está
+`POSTGRES_PASSWORD`), CouchDB (`username`, `password`) y GW (el fichero anterior,
+configuración KMS y credenciales de proveedores). Si Redis está
 habilitado, prepare también `REDIS_PASSWORD`:
 
 ```bash
@@ -240,6 +254,11 @@ El `commandMap` privado del operador define comandos reales `inspect`/`apply`
 para admitir el MSP, aplicar grants, comprobar el peer, unir canales,
 instalar/aprobar package IDs y confirmar definiciones mediante el MSP
 gobernador. Nunca procede de la petición del host. Con el mapa revisado:
+
+La prueba local no usa un mock: ejecuta
+`scripts/governance/drivers/local-fabric-admission.mjs` contra Fabric viva. El
+`commandMap` externo solo sustituye rutas, endpoints y credenciales por los del
+operador sin cambiar el plan firmado ni el orden de convergencia.
 
 ```bash
 node scripts/onboarding/host-onboarding-assistant.mjs \

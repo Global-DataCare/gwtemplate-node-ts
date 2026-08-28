@@ -15,6 +15,7 @@ CA_WORKSPACE="$(mktemp -d)"
 CA_ROOT_DIR="${CA_WORKSPACE}/root"
 CA_ISSUER_DIR="${CA_WORKSPACE}/issuer"
 CA_PUBLIC_DIR="${CA_WORKSPACE}/public"
+HOST_AUTHORIZATION_FILE="${CA_WORKSPACE}/host2-authorization.json"
 
 mkdir -p "${EVIDENCE_DIR}/gates" "${EVIDENCE_DIR}/logs"
 
@@ -152,9 +153,12 @@ test_fabric_governance_contract() {
   cd "${GW_ROOT}"
   bash ./scripts/tests/local-fabric-host-names.test.sh
   bash ./scripts/tests/dynamic-host-admission-contract.test.sh
+  bash ./scripts/tests/helm-dynamic-host2-contract.test.sh
   bash ./scripts/tests/public-deliverables-layout.test.sh
   node --test scripts/governance/tests/*.test.mjs scripts/onboarding/tests/*.test.mjs
   bash ./scripts/onboarding/tests/enrollment-grant.test.sh
+  bash ./scripts/onboarding/tests/client-enrollment.test.sh
+  bash ./scripts/onboarding/tests/create-local-audit-authorization.test.sh
   bash ./scripts/onboarding/tests/package-host-runtime.test.sh
   bash ./scripts/onboarding/tests/materialize-kubernetes-secrets.test.sh
   bash ./scripts/onboarding/tests/prepare-ccaas-packages.test.sh
@@ -219,6 +223,7 @@ peer_channels() {
 }
 
 prove_multi_host_topology() {
+  local governance_bundle="${CA_WORKSPACE}/host2-governance"
   reset_fabric_devnet
   cd "${FABRIC_DEVNET_ROOT}"
   bash ./scripts/00-copy-dataspace-ca.sh "${CA_ROOT_DIR}" "${CA_ISSUER_DIR}"
@@ -228,16 +233,37 @@ prove_multi_host_topology() {
   HLF_IDENTITY_CHANNEL_NAME=identity-local \
   HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
     bash ./scripts/02-bootstrap-network.sh
-  SINGLE_HOST=true \
-  HLF_DATA_CHANNEL_NAME=health-care-local \
-  HLF_IDENTITY_CHANNEL_NAME=identity-local \
-  HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
-    bash ./scripts/06-admit-host2.sh
+  node "${GW_ROOT}/scripts/onboarding/create-local-audit-authorization.mjs" \
+    --output "${HOST_AUTHORIZATION_FILE}" \
+    --bundle-dir "${governance_bundle}"
+  cp "${HOST_AUTHORIZATION_FILE}" "${EVIDENCE_DIR}/host2-authorization.json"
+  HOST_AUTHORIZATION_JSON="${HOST_AUTHORIZATION_FILE}" \
+    node "${GW_ROOT}/scripts/governance/reconcile.mjs" \
+      --decision "${governance_bundle}/decision.json" \
+      --did-document "${governance_bundle}/controller-did.json" \
+      --inventory "${governance_bundle}/inventory.json" \
+      --identity-jwks "${governance_bundle}/identity-jwks.json" \
+      --driver "${GW_ROOT}/scripts/governance/drivers/local-fabric-admission.mjs" \
+      --state "${CA_WORKSPACE}/host2-reconciler-state.json" \
+      --audit "${EVIDENCE_DIR}/host2-reconciler-audit.jsonl" \
+      --apply
   SINGLE_HOST=false \
   HLF_DATA_CHANNEL_NAME=health-care-local \
   HLF_IDENTITY_CHANNEL_NAME=identity-local \
   HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
     bash ./scripts/04-generate-backend-env.sh
+  SINGLE_HOST=false \
+  CHAINCODE_SIGNATURE_POLICY="OR('Host1MSP.member','Host2MSP.member')" \
+  CHANNEL_NAME=identity-local \
+  HLF_IDENTITY_CHANNEL_NAME=identity-local \
+    bash ./scripts/05-deploy-identity-chaincodes.sh
+  SINGLE_HOST=false \
+  CHAINCODE_SIGNATURE_POLICY="OR('Host1MSP.member','Host2MSP.member')" \
+  CHANNEL_NAME=health-care-local \
+  HLF_DATA_CHANNEL_NAME=health-care-local \
+  FABRIC_TOOLS_CONTAINER=gdc-fabric-tools \
+  DEVNET_NETWORK=gdc-fabric-v3-devnet \
+    bash "${GW_ROOT}/chaincode/scripts/consentaccess-local-devnet.sh"
 
   local host1_channels host2_channels
   host1_channels="$(peer_channels Host1MSP peer0-host1:7051 host1.example.com)"
@@ -270,6 +296,13 @@ prove_multi_host_topology() {
       }
     done
   done
+  local host2_gw_certificate="${FABRIC_DEVNET_ROOT}/organizations/peerOrganizations/host2.example.com/users/GW@host2.example.com/msp/signcerts/cert.pem"
+  openssl verify -CAfile "${root_certificate}" -untrusted "${fabric_ica_certificate}" "${host2_gw_certificate}"
+  openssl x509 -in "${host2_gw_certificate}" -text -noout \
+    | grep -Fq "$(jq -r '.hostCredentialId' "${HOST_AUTHORIZATION_FILE}")" || {
+      echo 'La identidad cliente del GW no conserva gdc.hostCredentialId.' >&2
+      return 1
+    }
 }
 
 prove_runtime_data_plane() {
@@ -278,6 +311,7 @@ prove_runtime_data_plane() {
   cp "${GW_ROOT}/env.local-demo.example" "${local_demo_env}"
   cd "${GW_ROOT}"
   LOCAL_FABRIC_CA_SOURCE=dataspace-ca \
+  SKIP_FABRIC_PREP=true \
   LOCAL_DEMO_ENV_FILE="${local_demo_env}" \
   DATASPACE_CA_ROOT_DIR="${CA_ROOT_DIR}" \
   DATASPACE_CA_ISSUER_DIR="${CA_ISSUER_DIR}" \
@@ -290,6 +324,7 @@ prove_helm_runtime_data_plane() {
   cd "${GW_ROOT}"
   IMAGE_NAME="${IMAGE_NAME}" \
   FABRIC_ENV_FILE="${GW_ROOT}/.env.local-fabric" \
+  HOST_AUTHORIZATION_JSON="${HOST_AUTHORIZATION_FILE}" \
   KEEP_HELM_EVIDENCE_CLUSTER=false \
     npm run helm:smoke:local-network
 }
@@ -313,9 +348,9 @@ const body = `# Evidencia local de preparación para producción\n\n` +
   `## Prueba de acceso de un empleado\n\n` +
   `El contrato de alta crea un secretario médico limitado a su organización. La prueba real con PostgreSQL, IPFS y Fabric crea datos de una persona, concede un consentimiento IPS explícito al secretario, acredita la lectura autorizada mediante SMART y deniega a otro secretario sin consentimiento. El perfil mantiene separadas las vinculaciones de identidad de organización y de persona.\n\n` +
   `## Prueba Kubernetes mediante Helm\n\n` +
-  `El gate \`45-helm-kubernetes-runtime\` instala peer Host1MSP, CouchDB, GW, PostgreSQL, IPFS y nueve runtimes CCAAS en un clúster kind mediante el chart público. Enrola MSP/TLS exclusivos, une el peer a \`identity-local\` y \`health-care-local\`, instala y aprueba los nueve paquetes CCAAS en el peer kind, dirige el GW a ese peer y repite Consent y SMART. Después reinicia GW, peer y CCAAS y demuestra persistencia y nueva capacidad de endoso; el peer Docker queda limitado a gossip/bootstrap de la red externa.\n\n` +
+  `El gate \`45-helm-kubernetes-runtime\` instala un nuevo peer de \`Host2MSP\`, CouchDB, GW, PostgreSQL, IPFS y nueve runtimes CCAAS en un clúster kind mediante el chart público. Los certificados del peer y de la identidad cliente del GW conservan el identificador de la misma Host VC usada para la admisión. El peer se une a \`identity-local\` y \`health-care-local\`, instala y aprueba los nueve paquetes CCAAS, y el GW firma como \`Host2MSP\` contra ese peer para repetir Consent y SMART. Después reinicia GW, peer y CCAAS y demuestra persistencia y nueva capacidad de endoso; el peer Docker queda limitado a gossip/bootstrap.\n\n` +
   `## Admisión dinámica demostrada\n\n` +
-  `La puerta Fabric arranca los canales únicamente con \`Host1MSP\`. A continuación genera las identidades de \`Host2MSP\`, calcula y firma la actualización de configuración con el administrador gobernador, aplica la mutación a cada canal, arranca el segundo peer y lo une. La evidencia comprueba después la pertenencia desde ambos peers.\n`;
+  `La puerta Fabric arranca los canales únicamente con \`Host1MSP\`. Una Host VC-JWT desechable se verifica criptográficamente, el grant Fabric queda limitado a dos usos y el certificado resultante se vincula a su identificador. El reconciliador con driver Fabric vivo calcula y firma la entrada de \`Host2MSP\`, aplica la mutación, arranca el segundo peer y lo une. La evidencia comprueba después pertenencia, lifecycle y tráfico GW desde el peer Kubernetes del MSP recién admitido.\n`;
 writeFileSync(join(evidenceDir, 'SUMMARY.md'), body, { mode: 0o644 });
 NODE
 }

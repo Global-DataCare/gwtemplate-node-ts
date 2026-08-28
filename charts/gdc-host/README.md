@@ -22,8 +22,9 @@ El orden correcto es:
 
 1. la ICA del espacio de datos emite la `HostingServiceCredential`;
 2. la autoridad verifica esa VC-JWT y la decisión de gobernanza;
-3. la autoridad registra una identidad de dos enrolamientos en la ICA de Fabric;
-4. el host ejecuta enrollment y genera localmente claves MSP/TLS;
+3. la autoridad registra una identidad de dos enrolamientos para MSP/TLS y
+   otra de un uso para el cliente GW en la ICA de Fabric;
+4. el host ejecuta enrollment y genera localmente las tres claves privadas;
 5. el operador materializa Secrets y ejecuta Helm;
 6. el reconciliador añade el MSP, une canales y aplica lifecycle CCAAS;
 7. el E2E valida escritura, lectura, autorización y persistencia.
@@ -34,9 +35,10 @@ renderizados.
 
 La `HostingServiceCredential` es obligatoria en `local-network`,
 `test-network` y `network`. El modo local sin PDF usa una Host VC emitida por
-la ICA local para un host preautorizado; no omite la credencial. El grant añade
+la ICA local para un host preautorizado; no omite la credencial. Ambos grants añaden
 una ventana `issuedAt`/`expiresAt` comprobada por el helper, mientras que
-Fabric CA impone de forma nativa `maxEnrollments=2`. La autoridad revoca los
+Fabric CA impone de forma nativa `maxEnrollments=2` para el peer y
+`maxEnrollments=1` para el cliente GW. La autoridad revoca los
 identificadores no consumidos al vencer la ventana.
 
 ## Configuración y secretos
@@ -82,6 +84,9 @@ AUTHORIZATION_JSON=/secure/onboarding/authorization.json \
 ENROLLMENT_GRANT_FILE=/secure/onboarding/enrollment-grant.json \
 HOST_RUNTIME_OUTPUT_DIR=/secure/host/helm-runtime \
   bash scripts/onboarding/package-host-runtime.sh
+
+# El asistente de alta genera /secure/host/gw.fabric.env con la identidad
+# cliente del mismo MSP. Cópielo a gw.env y añada KMS/proveedores por canal seguro.
 
 KUBE_CONTEXT=<context> KUBE_NAMESPACE=<namespace> HELM_RELEASE=<release> \
 HOST_RUNTIME_DIR=/secure/host/helm-runtime \

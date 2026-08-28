@@ -47,7 +47,7 @@ async function writePrivateJson(path, jsonText) {
 }
 
 async function applyAuthority(manifest) {
-  log('1/2 Verifying governance and host VC evidence.');
+  log('1/3 Verifying governance and host VC evidence.');
   const authorization = await run(process.execPath, [
     'scripts/enrollment/authorize-host-enrollment.mjs',
     '--request', manifest.inputs.request,
@@ -58,7 +58,7 @@ async function applyAuthority(manifest) {
   ], { capture: true, label: 'host enrollment authorization' });
   await writePrivateJson(manifest.authority.authorizationOutput, authorization);
 
-  log('2/2 Registering a bounded Fabric CA enrollment identity.');
+  log('2/3 Registering a bounded Fabric CA peer enrollment identity.');
   await run('bash', ['scripts/enrollment/register-host-enrollment.sh'], {
     label: 'Fabric CA registration',
     env: {
@@ -69,7 +69,18 @@ async function applyAuthority(manifest) {
       ...(manifest.authority.caTlsCert ? { CA_TLS_CERT: manifest.authority.caTlsCert } : {}),
     },
   });
-  log('Authority phase complete. Transfer only the mode-0600 enrollment grant over an approved secure channel.');
+  log('3/3 Registering a one-use GW Fabric client identity.');
+  await run('bash', ['scripts/enrollment/register-host-client-enrollment.sh'], {
+    label: 'Fabric CA GW client registration',
+    env: {
+      AUTHORIZATION_JSON: manifest.authority.authorizationOutput,
+      CA_URL: manifest.authority.caUrl,
+      CA_ADMIN_HOME: manifest.authority.caAdminHome,
+      CLIENT_ENROLLMENT_OUTPUT_FILE: manifest.authority.clientEnrollmentGrantOutput,
+      ...(manifest.authority.caTlsCert ? { CA_TLS_CERT: manifest.authority.caTlsCert } : {}),
+    },
+  });
+  log('Authority phase complete. Transfer both mode-0600 enrollment grants over an approved secure channel.');
 }
 
 async function applyHost(manifest) {
@@ -92,7 +103,25 @@ async function applyHost(manifest) {
       HOST_RUNTIME_OUTPUT_DIR: manifest.host.runtimeOutputDir,
     },
   });
-  log('Host phase complete. Keep private MSP/TLS material and the sanitized runtime package in host custody.');
+  await run('bash', ['scripts/enrollment/enroll-host-client.sh'], {
+    label: 'host-local GW Fabric client enrollment',
+    env: {
+      ENROLLMENT_GRANT_FILE: manifest.authority.clientEnrollmentGrantOutput,
+      HOST_CLIENT_OUTPUT_DIR: manifest.host.gwClientOutputDir,
+      ...(manifest.host.caTlsCert ? { CA_TLS_CERT: manifest.host.caTlsCert } : {}),
+    },
+  });
+  await run('bash', ['scripts/onboarding/render-gw-fabric-env.sh'], {
+    label: 'private GW Fabric environment rendering',
+    env: {
+      HOST_CLIENT_MSP_DIR: resolve(manifest.host.gwClientOutputDir, 'msp'),
+      HOST_MSP_ID: JSON.parse(await readFile(manifest.authority.authorizationOutput, 'utf8')).mspId,
+      HOST_PEER_ENDPOINT: manifest.host.peerEndpoint,
+      HOST_PEER_TLS_CA: resolve(manifest.host.mspOutputDir, 'tls', 'ca.crt'),
+      GW_FABRIC_ENV_OUTPUT: manifest.host.gwFabricEnvOutput,
+    },
+  });
+  log('Host phase complete. Keep peer and GW client private identities plus sanitized runtime artifacts in host custody.');
 }
 
 async function runPlatform(manifest, apply) {
@@ -121,8 +150,10 @@ async function showStatus(manifest) {
   const entries = [
     ['authorization', manifest.authority.authorizationOutput],
     ['enrollment grant', manifest.authority.enrollmentGrantOutput],
+    ['GW client enrollment grant', manifest.authority.clientEnrollmentGrantOutput],
     ['host MSP/TLS', manifest.host.mspOutputDir],
     ['Helm runtime package', manifest.host.runtimeOutputDir],
+    ['GW Fabric client environment', manifest.host.gwFabricEnvOutput],
     ['reconciler state', manifest.platform.state],
     ['audit log', manifest.platform.audit],
   ];

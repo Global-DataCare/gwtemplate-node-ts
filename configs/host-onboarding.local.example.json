@@ -15,12 +15,16 @@
     "caAdminHome": "/tmp/gdc-host-onboarding/fabric-ca-admin",
     "caTlsCert": "/tmp/gdc-host-onboarding/fabric-ca/ca.crt",
     "authorizationOutput": "/tmp/gdc-host-onboarding/authorization.json",
-    "enrollmentGrantOutput": "/tmp/gdc-host-onboarding/enrollment-grant.json"
+    "enrollmentGrantOutput": "/tmp/gdc-host-onboarding/enrollment-grant.json",
+    "clientEnrollmentGrantOutput": "/tmp/gdc-host-onboarding/gw-client-enrollment-grant.json"
   },
   "host": {
     "peerDns": "host2-peer.local-host2.svc.cluster.local",
     "mspOutputDir": "/tmp/gdc-host-onboarding/host2/fabric-peer",
     "runtimeOutputDir": "/tmp/gdc-host-onboarding/host2/helm-runtime",
+    "gwClientOutputDir": "/tmp/gdc-host-onboarding/host2/fabric-gw-client",
+    "gwFabricEnvOutput": "/tmp/gdc-host-onboarding/host2/gw.fabric.env",
+    "peerEndpoint": "host2-peer.local-host2.svc.cluster.local:7051",
     "caTlsCert": "/tmp/gdc-host-onboarding/fabric-ca/ca.crt"
   },
   "platform": {

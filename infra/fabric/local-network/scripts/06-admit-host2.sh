@@ -21,6 +21,27 @@ HOST1_ADMIN="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/users/Ad
 HOST1_TLS_ROOT="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls/ca.crt"
 ORDERER_TLS_ROOT="/workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt"
 HOST2_ROOT="organizations/peerOrganizations/${HOST2_DOMAIN}"
+HOST_AUTHORIZATION_JSON="${HOST_AUTHORIZATION_JSON:-}"
+
+[[ -s "${HOST_AUTHORIZATION_JSON}" ]] || {
+  echo 'HOST_AUTHORIZATION_JSON must reference a sanitized Host2 authorization.' >&2
+  exit 2
+}
+jq -e --arg msp "${HOST2_MSP_ID}" '
+  .authorized == true and .mspId == $msp and .networkKind == "local-network" and
+  .hostUrl == "http://host2.localhost" and .evidencePolicy == "hosting-service-credential" and
+  (.hostCredentialId | type == "string" and length > 0)
+' "${HOST_AUTHORIZATION_JSON}" >/dev/null || {
+  echo 'Host2 authorization does not match the local Fabric admission.' >&2
+  exit 2
+}
+HOST_CREDENTIAL_ID="$(jq -r '.hostCredentialId' "${HOST_AUTHORIZATION_JSON}")"
+PEER_ENROLLMENT_ID="host2-$(printf '%s' "${HOST_CREDENTIAL_ID}" | shasum -a 256 | cut -c1-20)"
+PEER_ENROLLMENT_SECRET="$(openssl rand -base64 36 | tr -d '=+/\n' | cut -c1-32)"
+GW_ENROLLMENT_ID="host2-gw-$(printf '%s' "${HOST_CREDENTIAL_ID}" | shasum -a 256 | cut -c1-17)"
+GW_ENROLLMENT_SECRET="$(openssl rand -base64 36 | tr -d '=+/\n' | cut -c1-32)"
+ENROLLMENT_GRANT="$(mktemp)"
+trap 'rm -f "${ENROLLMENT_GRANT}"' EXIT
 
 exec_ca() { docker exec -w /workspace "${CA_CLIENT}" "$@"; }
 exec_tools() { docker exec -w /workspace "${TOOLS}" "$@"; }
@@ -86,31 +107,71 @@ exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-
   fabric-ca-client register --id.name host2admin --id.secret host2adminpw \
   --id.type admin --id.affiliation host2.department1 -u "${CA_URL}" --tls.certfiles "${CA_TLS_CERT}"
 exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-admin \
-  fabric-ca-client register --id.name peer0host2 --id.secret peer0host2pw \
-  --id.type peer --id.affiliation host2.department1 -u "${CA_URL}" --tls.certfiles "${CA_TLS_CERT}"
+  fabric-ca-client register --id.name "${PEER_ENROLLMENT_ID}" --id.secret "${PEER_ENROLLMENT_SECRET}" \
+  --id.type peer --id.affiliation host2.department1 --id.maxenrollments 2 \
+  --id.attrs "gdc.mspId=${HOST2_MSP_ID}:ecert,gdc.hostCredentialId=${HOST_CREDENTIAL_ID}:ecert" \
+  -u "${CA_URL}" --tls.certfiles "${CA_TLS_CERT}"
+exec_ca env FABRIC_CA_CLIENT_HOME=/workspace/organizations/fabric-ca-client/ica-admin \
+  fabric-ca-client register --id.name "${GW_ENROLLMENT_ID}" --id.secret "${GW_ENROLLMENT_SECRET}" \
+  --id.type client --id.affiliation host2.department1 --id.maxenrollments 1 \
+  --id.attrs "gdc.mspId=${HOST2_MSP_ID}:ecert,gdc.hostCredentialId=${HOST_CREDENTIAL_ID}:ecert" \
+  -u "${CA_URL}" --tls.certfiles "${CA_TLS_CERT}"
+
+umask 077
+jq -n \
+  --arg enrollmentId "${PEER_ENROLLMENT_ID}" \
+  --arg enrollmentSecret "${PEER_ENROLLMENT_SECRET}" \
+  --arg mspId "${HOST2_MSP_ID}" \
+  --arg hostCredentialId "${HOST_CREDENTIAL_ID}" \
+  --arg issuedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg expiresAt "$(node -e 'process.stdout.write(new Date(Date.now() + 900000).toISOString().replace(".000Z", "Z"))')" \
+  '{specVersion:"gdc.fabric.host-enrollment-grant/v1",enrollmentId:$enrollmentId,
+    enrollmentSecret:$enrollmentSecret,caUrl:"https://ica:7054",mspId:$mspId,
+    hostUrl:"http://host2.localhost",hostCredentialId:$hostCredentialId,
+    networkKind:"local-network",issuedAt:$issuedAt,expiresAt:$expiresAt,maxEnrollments:2}' \
+  > "${ENROLLMENT_GRANT}"
+chmod 600 "${ENROLLMENT_GRANT}"
 
 mkdir -p "${HOST2_ROOT}/msp" "${HOST2_ROOT}/peers/peer0.${HOST2_DOMAIN}" \
-  "${HOST2_ROOT}/users/Admin@${HOST2_DOMAIN}"
+  "${HOST2_ROOT}/users/Admin@${HOST2_DOMAIN}" "${HOST2_ROOT}/users/GW@${HOST2_DOMAIN}/msp"
 normalize_msp "${HOST2_ROOT}/msp"
 
 exec_ca fabric-ca-client enroll \
-  -u 'https://peer0host2:peer0host2pw@ica:7054' \
+  -u "https://${PEER_ENROLLMENT_ID}:${PEER_ENROLLMENT_SECRET}@ica:7054" \
   -M "/workspace/${HOST2_ROOT}/peers/peer0.${HOST2_DOMAIN}/msp" \
   --csr.hosts peer0-host2 --csr.hosts localhost --tls.certfiles "${CA_TLS_CERT}"
 normalize_msp "${HOST2_ROOT}/peers/peer0.${HOST2_DOMAIN}/msp"
 
 exec_ca fabric-ca-client enroll \
-  -u 'https://peer0host2:peer0host2pw@ica:7054' \
+  -u "https://${PEER_ENROLLMENT_ID}:${PEER_ENROLLMENT_SECRET}@ica:7054" \
   -M "/workspace/${HOST2_ROOT}/peers/peer0.${HOST2_DOMAIN}/tls" \
   --enrollment.profile tls --csr.hosts peer0-host2 --csr.hosts localhost \
   --tls.certfiles "${CA_TLS_CERT}"
 normalize_tls "${HOST2_ROOT}/peers/peer0.${HOST2_DOMAIN}/tls"
+openssl x509 \
+  -in "${HOST2_ROOT}/peers/peer0.${HOST2_DOMAIN}/msp/signcerts/cert.pem" \
+  -text -noout | grep -Fq "${HOST_CREDENTIAL_ID}" || {
+    echo 'Host2 Fabric certificate is not bound to the authorized Host credential.' >&2
+    exit 1
+  }
 
 exec_ca fabric-ca-client enroll \
   -u 'https://host2admin:host2adminpw@ica:7054' \
   -M "/workspace/${HOST2_ROOT}/users/Admin@${HOST2_DOMAIN}/msp" \
   --tls.certfiles "${CA_TLS_CERT}"
 normalize_msp "${HOST2_ROOT}/users/Admin@${HOST2_DOMAIN}/msp"
+
+exec_ca fabric-ca-client enroll \
+  -u "https://${GW_ENROLLMENT_ID}:${GW_ENROLLMENT_SECRET}@ica:7054" \
+  -M "/workspace/${HOST2_ROOT}/users/GW@${HOST2_DOMAIN}/msp" \
+  --tls.certfiles "${CA_TLS_CERT}"
+normalize_msp "${HOST2_ROOT}/users/GW@${HOST2_DOMAIN}/msp"
+openssl x509 \
+  -in "${HOST2_ROOT}/users/GW@${HOST2_DOMAIN}/msp/signcerts/cert.pem" \
+  -text -noout | grep -Fq "${HOST_CREDENTIAL_ID}" || {
+    echo 'Host2 GW certificate is not bound to the authorized Host credential.' >&2
+    exit 1
+  }
 
 exec_tools env FABRIC_CFG_PATH=/workspace/configtx \
   configtxgen -printOrg "${HOST2_MSP_ID}" > channel-artifacts/host2-org.json
