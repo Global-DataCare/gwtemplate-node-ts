@@ -36,7 +36,6 @@ function credential() {
     controllerKeyMaterial: toJwkThumbprintSha256Urn(controllerJwk),
     applicationId: 'application-dsrc',
     accessPath: 'test-network',
-    targetNetwork: 'test-network',
   });
   return {
     ...unsigned,
