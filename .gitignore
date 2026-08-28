@@ -93,6 +93,11 @@ lib
 # They are not generated build output and must exist in a clean checkout.
 !chaincode/*-javascript/lib/
 !chaincode/*-javascript/lib/**
+# Host governance/onboarding modules are authored runtime source as well.
+!scripts/governance/lib/
+!scripts/governance/lib/**
+!scripts/onboarding/lib/
+!scripts/onboarding/lib/**
 build
 
 # Ignore all .json files in the root, like service account keys
