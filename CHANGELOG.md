@@ -7,7 +7,8 @@
   issuer as creator evidence; only that creator may delete the subject-scoped
   record by `resource.id`. `request.ifMatch` is optional, but when present its
   weak ETag is enforced with `412` on a stale version; one failed entry never
-  rolls back another successful entry.
+  rolls back another successful entry. Deleting an erroneous source record also
+  removes its correlated digital-twin projection when secondary use is active.
 
 - Separate the emergency `ETREAT` Consent period from each break-glass SMART
   token. Persist and anchor one Consent for up to 24 hours, send a minimized

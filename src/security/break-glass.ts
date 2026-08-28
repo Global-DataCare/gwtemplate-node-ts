@@ -135,7 +135,6 @@ export interface BreakGlassControllerNotifier {
     subjectDid: string;
     routeSector: string;
     reasonCode: BreakGlassReasonCode;
-    justification: string;
     issuedAt: string;
     expiresAt: string;
     consentLedgerAssetId: string;
@@ -287,7 +286,6 @@ export class BreakGlassService implements BreakGlassAuthorizer {
         subjectDid: input.subjectDid,
         routeSector: input.routeSector,
         reasonCode: input.request.reasonCode,
-        justification,
         issuedAt,
         expiresAt: consentExpiresAt,
         consentLedgerAssetId: `break-glass-consent:${emergencyConsentId}`,

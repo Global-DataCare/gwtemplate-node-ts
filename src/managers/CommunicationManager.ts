@@ -1196,6 +1196,12 @@ export class CommunicationManager implements IJobProcessor {
         }
       }
       await this.vaultRepository.delete(input.tenantVaultId, recordId, sectionId);
+      await this.deleteCorrelatedDigitalTwinProjection({
+        tenantVaultId: input.tenantVaultId,
+        sourceSubject: subject,
+        resourceType,
+        sourceRecordId: recordId,
+      });
       return {
         id: recordId,
         type: responseType,
@@ -1205,6 +1211,36 @@ export class CommunicationManager implements IJobProcessor {
     }
 
     return errorResponse('400', `Unsupported clinical batch method: ${String(request.method || '')}`);
+  }
+
+  private async deleteCorrelatedDigitalTwinProjection(input: {
+    tenantVaultId: string;
+    sourceSubject: string;
+    resourceType: SupportedProjectedResourceType;
+    sourceRecordId: string;
+  }): Promise<void> {
+    if (!isDigitalTwinResearchResourceType(input.resourceType)) return;
+    const enabled = await isDigitalTwinSecondaryUseEnabled({
+      vaultRepository: this.vaultRepository,
+      tenantVaultId: input.tenantVaultId,
+      sourceSubject: input.sourceSubject,
+    });
+    if (!enabled) return;
+    const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
+      vaultRepository: this.vaultRepository,
+      tenantVaultId: input.tenantVaultId,
+      sourceSubject: input.sourceSubject,
+    });
+    const sectionId = getSubjectScopedSectionId(
+      twinSubjectId,
+      SUBJECT_SECTION_DIGITAL_TWIN,
+      PROJECTED_RESOURCE_CONFIG[input.resourceType].collectionId,
+    );
+    const projections = await this.vaultRepository.listContainersInSection<any>(input.tenantVaultId, sectionId);
+    for (const projection of projections) {
+      if (this.normalizeOptionalString(projection?.audit?.sourceRecordId) !== input.sourceRecordId) continue;
+      await this.vaultRepository.delete(input.tenantVaultId, String(projection.id), sectionId);
+    }
   }
 
   private parseIfMatchVersion(value: unknown): string | undefined {

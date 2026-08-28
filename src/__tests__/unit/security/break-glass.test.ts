@@ -107,6 +107,7 @@ describe('break-glass audit and controller notice', () => {
       }),
     }));
     expect(JSON.stringify(notify.mock.calls[0][0])).not.toContain(input.actorDid);
+    expect(notify.mock.calls[0][0]).not.toHaveProperty('justification');
     expect(JSON.stringify(notify.mock.calls[0][0])).not.toContain('doctor');
     expect(vaultRepository.put).toHaveBeenCalledTimes(1);
     const storedConsent = [...records.values()][0];

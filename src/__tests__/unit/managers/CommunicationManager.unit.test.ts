@@ -177,6 +177,43 @@ describe('CommunicationManager Unit Tests', () => {
       expect(mockVaultRepository.delete).not.toHaveBeenCalled();
     });
 
+    it('removes the correlated digital-twin projection when the creator deletes an erroneous record', async () => {
+      // Step 1. The operational record has an enabled secondary-use projection and a stable twin alias.
+      const twinSubjectDid = 'urn:uuid:7b419936-4999-4a18-b21e-681dc3e6a8c0';
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.get.mockImplementation(async (_vaultId: string, id: string, sectionId?: string) => {
+        if (id === 'immunization-mistake') return {
+          id: 'immunization-mistake',
+          audit: { creatorDid },
+          'Immunization.subject': subjectDid,
+          'Immunization.meta.versionId': 'version-current',
+        } as any;
+        if (String(sectionId).includes('digitaltwin_secondary_use_status')) return { status: 'enabled' } as any;
+        if (String(sectionId).includes('digitaltwin_subject_aliases')) return { twinSubjectId: twinSubjectDid } as any;
+        return undefined;
+      });
+      mockVaultRepository.listContainersInSection.mockResolvedValueOnce([{
+        id: 'research-immunization-mistake',
+        audit: { creatorDid, sourceRecordId: 'immunization-mistake' },
+        'Immunization.subject': twinSubjectDid,
+      }] as any);
+
+      // Step 2. One creator-authorized delete removes both the operational error and only its correlated projection.
+      const response = await communicationManager.process(buildClinicalBatchJob([{
+        type: 'Immunization-delete-request-v1.0',
+        request: { method: 'DELETE', url: 'Immunization/immunization-mistake' },
+        resource: { resourceType: 'Immunization', id: 'immunization-mistake', meta: { claims: {} } },
+      }]));
+
+      expect((response.body as any).data[0].response.status).toBe('204');
+      expect(mockVaultRepository.delete).toHaveBeenCalledTimes(2);
+      expect(mockVaultRepository.delete).toHaveBeenCalledWith(
+        'animal-care_acme',
+        'research-immunization-mistake',
+        getSubjectScopedSectionId(twinSubjectDid, 'digitaltwin', 'immunizations'),
+      );
+    });
+
     it('keeps create success independent when another entry is forbidden', async () => {
       // Step 1. The delete target belongs to a different authenticated creator.
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);

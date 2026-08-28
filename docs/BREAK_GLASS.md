@@ -43,7 +43,7 @@ The optional DIDComm body member is:
     "incidentId": "<opaque incident identifier>",
     "subjectKind": "human",
     "reasonCode": "life-threatening",
-    "justification": "<10 to 500 characters for controller notification>"
+    "justification": "<10 to 500 characters retained only in the private emergency request>"
   }
 }
 ```
@@ -62,7 +62,9 @@ free-text justification and professional email/DID never enter the ledger.
 The controller notification is a FHIR `Communication` addressed through the
 subject's secure mailbox resolver. It contains the requesting organization,
 jurisdiction, professional hash, Consent id and Fabric asset locator. It never
-contains the professional email. The first request creates three correlated
+contains the professional email or the free-text justification; it carries only the coded reason
+plus correlation metadata. A mailbox service may queue the notice by subject
+until the exact controller profile is linked. The first request creates three correlated
 Fabric records: Consent, notification acknowledgement and token authorization;
 each renewal creates another token-authorization record under the same Consent.
 
