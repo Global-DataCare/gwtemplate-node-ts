@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Make `iss` and `aud` the canonical trusted-provider configuration names,
+  retain non-conflicting `issuer`/`audience` aliases, and fail startup when the
+  two forms disagree.
+
 - Allow one GW deployment/network to trust several OIDC identity providers
   through exact `iss` + `aud` entries. Provider keys are obtained through
   standard OpenID discovery, and an unverified issuer is used only to route to

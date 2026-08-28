@@ -10,8 +10,9 @@ description: Configure or audit several trusted OIDC id_token providers inside o
 - Treat one deployed GW as belonging to one network. Do not create a second
   conceptual staging/production trust layer inside it.
 - Set `AUTH_TOKEN_VERIFIER=trusted-oidc` and configure
-  `OIDC_TRUSTED_PROVIDERS_JSON` as a non-empty array of exact `issuer` and
-  `audience` pairs.
+  `OIDC_TRUSTED_PROVIDERS_JSON` as a non-empty array of exact `iss` and `aud`
+  pairs, matching the JWT claim names. Accept `issuer` and `audience` only as
+  compatibility aliases and reject conflicting duplicate forms.
 - Obtain `jwks_uri` from `issuer/.well-known/openid-configuration`. Permit
   `jwksUri` only as an explicit compatibility override.
 - Use decoded `iss` only to select an allowlisted verifier. Accept the token
@@ -34,5 +35,18 @@ description: Configure or audit several trusted OIDC id_token providers inside o
 
 ```dotenv
 AUTH_TOKEN_VERIFIER=trusted-oidc
-OIDC_TRUSTED_PROVIDERS_JSON=[{"issuer":"globaldatacare.es","audience":"globaldatacare.es"},{"issuer":"https://securetoken.google.com/unid-production","audience":"unid-production"}]
+OIDC_TRUSTED_PROVIDERS_JSON=[{"iss":"globaldatacare.es","aud":"globaldatacare.es"},{"iss":"https://securetoken.google.com/unid-production","aud":"unid-production"}]
 ```
+
+## Staging workload matrix
+
+- Keep GW CORE development at `34.175.78.233` on `demo`; it intentionally does
+  not validate signatures.
+- Configure host Accuro with GlobalDataCare `iss=aud=globaldatacare.es`.
+- Configure `uhc-gw.unid.online` with `uhc-unid`,
+  `uhc-unid-personal-staging`, `unid-professional` and GlobalDataCare.
+- Configure `beta-gw.vetchain.app` with `uhc-can`,
+  `vetchain-connect-personal-st`, `vetchain-connect-prof-staging` and
+  GlobalDataCare.
+- Re-evaluate each list independently; never infer token trust from a browser
+  origin or copy a staging list into production.

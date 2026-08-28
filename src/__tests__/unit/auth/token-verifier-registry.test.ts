@@ -65,18 +65,43 @@ describe('token-verifier-registry', () => {
     process.env.AUTH_TOKEN_VERIFIER = 'trusted-oidc';
     process.env.OIDC_TRUSTED_PROVIDERS_JSON = JSON.stringify([
       {
-        issuer: 'globaldatacare.es',
-        audience: 'globaldatacare.es',
+        iss: 'globaldatacare.es',
+        aud: 'globaldatacare.es',
       },
       {
-        issuer: 'https://securetoken.google.com/unid-production',
-        audience: 'unid-production',
+        iss: 'https://securetoken.google.com/unid-production',
+        aud: 'unid-production',
       },
     ]);
 
     const verifier = resolveTokenVerifierFromEnv(false);
 
     expect(verifier).toBeInstanceOf(TrustedOidcTokenVerifier);
+  });
+
+  it('keeps issuer and audience as explicit compatibility aliases', () => {
+    process.env.AUTH_TOKEN_VERIFIER = 'trusted-oidc';
+    process.env.OIDC_TRUSTED_PROVIDERS_JSON = JSON.stringify([
+      { issuer: 'globaldatacare.es', audience: 'globaldatacare.es' },
+    ]);
+
+    expect(resolveTokenVerifierFromEnv(false)).toBeInstanceOf(TrustedOidcTokenVerifier);
+  });
+
+  it('rejects conflicting canonical and compatibility provider names', () => {
+    process.env.AUTH_TOKEN_VERIFIER = 'trusted-oidc';
+    process.env.OIDC_TRUSTED_PROVIDERS_JSON = JSON.stringify([
+      {
+        iss: 'globaldatacare.es',
+        issuer: 'https://attacker.example',
+        aud: 'globaldatacare.es',
+        audience: 'globaldatacare.es',
+      },
+    ]);
+
+    expect(() => resolveTokenVerifierFromEnv(false)).toThrow(
+      'OIDC_TRUSTED_PROVIDERS_JSON[0].iss conflicts with issuer',
+    );
   });
 
   it('builds the single-provider OIDC verifier without duplicating the discoverable jwks_uri', () => {
@@ -93,13 +118,13 @@ describe('token-verifier-registry', () => {
     process.env.AUTH_TOKEN_VERIFIER = 'trusted-oidc';
     process.env.OIDC_TRUSTED_PROVIDERS_JSON = JSON.stringify([
       {
-        issuer: 'globaldatacare.es',
+        iss: 'globaldatacare.es',
         jwksUri: 'https://globaldatacare.es/.well-known/jwks.json',
       },
     ]);
 
     expect(() => resolveTokenVerifierFromEnv(false)).toThrow(
-      'OIDC_TRUSTED_PROVIDERS_JSON[0].audience is required',
+      'OIDC_TRUSTED_PROVIDERS_JSON[0].aud is required',
     );
   });
 });
