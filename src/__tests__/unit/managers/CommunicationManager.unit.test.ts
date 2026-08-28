@@ -977,6 +977,7 @@ describe('CommunicationManager Unit Tests', () => {
       expect(medicationPut).toBeDefined();
       const medicationRecord = (medicationPut?.[1] as any[])[0];
       expect(medicationRecord.id).toBe('medication-001');
+      expect(medicationRecord.audit?.creatorDid).toBe(decoded.iss);
       expect(
         medicationRecord['MedicationStatement.subject']
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.subject'],
