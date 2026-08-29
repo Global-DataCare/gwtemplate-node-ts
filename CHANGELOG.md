@@ -2,94 +2,131 @@
 
 ## [Unreleased]
 
-- Admit mixed FHIR `POST` and `DELETE` entries in clinical section batches.
-  Project the authenticated creator as `Composition.author`, authorize delete
-  by exact subject and a verified linked login identity while retaining only
-  the creator DID on the clinical resource, honor optional `ifMatch`, return per-entry
-  independent `201`/`204`/`403`/`404`/`412` outcomes, and remove the matching
-  operational and Digital Twin resource projections without treating delete
-  as disable.
+- Accept `Bundle.type=batch` clinical commands attached to `Communication` with
+  independent per-entry create/delete results. Persist the verified DIDComm
+  issuer as creator evidence; only that creator may delete the subject-scoped
+  record by `resource.id`. `request.ifMatch` is optional, but when present its
+  weak ETag is enforced with `412` on a stale version; one failed entry never
+  rolls back another successful entry. Deleting an erroneous source record also
+  removes its correlated digital-twin projection when secondary use is active.
 
-- Vincular certificados Fabric de peer y cliente GW mediante
-  `gdc.hostCredentialSha256`: Fabric CA no admite los `:` de un `urn:uuid`
-  dentro de un atributo `:ecert`; la autorización conserva el identificador
-  completo y los certificados conservan su SHA-256 verificable.
+- Separate the emergency `ETREAT` Consent period from each break-glass SMART
+  token. Persist and anchor one Consent for up to 24 hours, send a minimized
+  FHIR Communication to the controller mailbox, and reuse it for independently
+  audited read-only tokens lasting at most 15 minutes. Publish requester
+  organization/jurisdiction while hashing the professional identity.
+  Artifact registration now owns its canonical `artifact-sc` target instead
+  of accepting caller-selected or environment-fallback chaincode names.
 
-- Hacer que cada puerta del runner de evidencia se ejecute en un subshell con
-  `errexit`/`pipefail`, registre `FAIL` en el primer error y elimine las bases
-  SQLite desechables de las CA de Fabric antes de cada reproducción limpia.
+- Allow an authenticated clinical-record creator to delete its own record
+  without an `If-Match` condition, while still rejecting malformed or stale
+  optional weak ETags and preserving subject and creator authorization checks.
 
-- Hacer portables los helpers MSP/TLS de Fabric CA en Bash 3 cuando la CA local
-  no necesita `CA_TLS_CERT`, y probar tanto el rechazo del grant caducado como
-  los dos enrolamientos positivos del peer.
+- Remove the `openapi-extension.json` profile from GW CORE: the runtime exposes
+  its complete specification and the `core`/`compat` views, while each derived
+  solution maintains its own extensions outside this repository.
 
-- Centralizar la versión API de Stripe en `2025-12-15.clover`, compatible con
-  el SDK instalado, para desbloquear typecheck e imagen sin divergencias entre
-  webhook, Checkout, facturación y verificación de pagos.
+- Complete the local `consentaccess-sc` lifecycle for multi-host networks:
+  install and approve the same package on every active MSP and target both
+  peers when committing after the governed admission of `Host2MSP`.
 
-- Hacer auditable de extremo a extremo la incorporación de un proveedor de
-  host: `HostingServiceCredential` obligatoria en las tres redes, grant de
-  Fabric CA limitado a dos enrolamientos con ventana operativa, grant separado
-  de un uso para la identidad cliente GW, claves generadas dentro del host,
-  empaquetado saneado MSP/TLS y creación reproducible de los seis Secrets de Helm.
+- Fail the evidence environment gate when GW CORE, Dataspace CA or Dataspace
+  ICA contain uncommitted tracked changes, preventing audit reports that do not
+  correspond to reproducible revisions.
 
-- Sustituir la mera topología Fabric de dos MSP en génesis por una prueba viva
-  de admisión dinámica: los canales arrancan con `Host1MSP`, la gobernanza
-  firma y aplica la entrada de `Host2MSP`, y el segundo peer se inicia y une
-  después a ambos canales.
+- Keep one Compose identity throughout evidence collection through
+  `gdc-public`/`gdc-public-local-network`, so the Fabric, Docker and kind gates
+  reuse exactly the same prepared local network.
 
-- Ejecutar la puerta kind/Helm con el peer, los nueve CCAAS y la identidad
-  cliente GW del `Host2MSP` recién admitido, todos vinculados a la misma Host
-  VC; el GW ya no puede pasar la evidencia apuntando a Host2 pero firmando con
-  material de Host1.
+- Reuse the Fabric peer image for in-cluster channel administration instead of
+  importing the substantially larger Fabric tools image into kind, reducing
+  the local evidence disk requirement without changing governance boundaries.
 
-- Reunir Markdown, HTML y Word bajo `deliverables/` y ampliar la guía pública
-  española con comandos separados para autoridad, proveedor del host,
-  operador Kubernetes, reconciliación, digests OCI, CCAAS y aceptación.
+- Keep the first peer of a newly admitted host independent from foreign-MSP
+  gossip bootstrap peers, allow sufficient configurable time for direct
+  orderer catch-up and preserve exact-height verification before E2E traffic.
 
-- Generar de forma determinista los nueve paquetes CCAAS y sus package IDs a
-  partir del nombre Helm y namespace exactos, junto con el fragmento values y
-  manifiestos de hashes que consume la gobernanza.
+- Bind Fabric peer and GW client certificates through
+  `gdc.hostCredentialSha256`: Fabric CA does not accept the `:` characters of a
+  `urn:uuid` inside an `:ecert` attribute; authorization retains the complete
+  identifier and certificates retain its verifiable SHA-256 digest.
 
-- Validar el alcance Test Network exclusivamente mediante los tipos firmados
-  `OrganizationTestNetworkCredential` y `TestNetworkCredential`. Los sujetos
-  schema.org y la evidencia ya no necesitan el campo no estándar
-  `targetNetwork`.
+- Run every evidence-runner gate in a subshell with `errexit`/`pipefail`, record
+  `FAIL` on the first error and remove disposable Fabric CA SQLite databases
+  before every clean reproduction.
 
-- Sanear las rutas absolutas del directorio personal en los logs públicos de
-  evidencia, representarlas como `${HOME}` y hacer fallar el paquete si queda
-  alguna ruta `/Users/<usuario>` o `/home/<usuario>`.
+- Make Fabric CA MSP/TLS helpers portable to Bash 3 when the local CA does not
+  require `CA_TLS_CERT`, and test both expired-grant rejection and the two
+  successful peer enrollments.
 
-- Retirar de las skills públicas inventarios operativos, direcciones y nombres
-  de participantes; los ejemplos usan roles y valores ficticios portables.
+- Centralize the Stripe API version on `2025-12-15.clover`, compatible with the
+  installed SDK, so type checking and image builds pass without divergence
+  across webhooks, Checkout, billing and payment verification.
 
-- Actualizar en `deliverables/` la guía Word pública en español con la prueba
-  completa kind/Helm: lifecycle CCAAS y E2E del GW contra el peer Kubernetes.
+- Make hosting-provider onboarding auditable end to end: require a
+  `HostingServiceCredential` on all three networks, limit the Fabric CA grant
+  to two enrollments within an operational window, use a separate one-use grant
+  for the GW client identity, generate keys inside the host, sanitize MSP/TLS
+  packaging and reproducibly create all six Helm Secrets.
 
-- Ejecutar mediante el chart el peer `Host2MSP` y CouchDB dentro de kind,
-  enrolar MSP/TLS exclusivos con la ICA de Fabric, unir el peer a los dos
-  canales locales y comprobar canales, estado CouchDB y persistencia tras
-  reiniciar peer y GW.
+- Replace the static two-MSP Fabric genesis topology with a live dynamic
+  admission proof: channels start with `Host1MSP`, governance signs and applies
+  the admission of `Host2MSP`, and the second peer starts and joins both
+  channels afterwards.
 
-- Esperar activamente a que cada peer Fabric acepte conexiones antes de unirlo
-  a los canales, evitar carreras de arranque en la reproducción limpia y fijar
-  explícitamente el Compose y proyecto públicos empaquetados para impedir que
-  otra infraestructura local con nombres históricos contamine la prueba.
+- Run the kind/Helm gate with the peer, all nine CCAAS runtimes and the GW
+  client identity of the newly admitted `Host2MSP`, all bound to the same Host
+  VC; the GW can no longer pass evidence while targeting Host2 but signing with
+  Host1 material.
 
-- Instalar y aprobar de forma reproducible nueve paquetes CCAAS en el peer
-  kind, dirigir el GW exclusivamente a ese peer y comprobar Consent, SMART y
-  nueva capacidad de endoso después de reiniciar GW, peer y runtimes CCAAS.
+- Consolidate Markdown, HTML and Word artifacts under `deliverables/` and
+  extend the public Spanish guide with separate commands for the authority,
+  hosting provider, Kubernetes operator, reconciliation, OCI digests, CCAAS
+  and acceptance.
 
-- Evitar revisiones Fabric falsas cuando dos reglas Consent contienen el mismo
-  JSON semántico con distinto orden de propiedades.
+- Deterministically generate all nine CCAAS packages and package IDs from the
+  exact Helm release name and namespace, together with the values fragment and
+  hash manifests consumed by governance.
 
-- Forzar en la prueba real Helm que los JWE cifrados se externalicen a IPFS y
-  abortar explícitamente si Kubernetes no conserva documentos en PostgreSQL o
-  blobs en IPFS, incluso cuando el recolector ejecute el gate en una tubería.
+- Validate Test Network scope exclusively through the signed
+  `OrganizationTestNetworkCredential` and `TestNetworkCredential` types.
+  schema.org subjects and evidence no longer require the non-standard
+  `targetNetwork` field.
 
-- Incluir en Git los módulos `lib/*.mjs` de gobierno y onboarding requeridos
-  por los ejecutables públicos, y hacer que el gate falle si un clon limpio no
-  contiene cualquiera de estos runtimes.
+- Sanitize absolute home-directory paths in public evidence logs, represent
+  them as `${HOME}` and fail the bundle if any `/Users/<user>` or
+  `/home/<user>` path remains.
+
+- Remove operational inventories, addresses and participant names from public
+  skills; examples use portable fictional roles and values.
+
+- Update the public Spanish Word guide under `deliverables/` with the complete
+  kind/Helm proof: CCAAS lifecycle and GW E2E against the Kubernetes peer.
+
+- Run the `Host2MSP` peer and CouchDB through the chart inside kind, enroll
+  exclusive MSP/TLS material with the Fabric ICA, join the peer to both local
+  channels and verify channels, CouchDB status and persistence after restarting
+  the peer and GW.
+
+- Actively wait for every Fabric peer to accept connections before joining it
+  to channels, prevent startup races during clean reproduction and explicitly
+  pin the bundled public Compose file and project so unrelated local
+  infrastructure with historical names cannot contaminate the proof.
+
+- Reproducibly install and approve nine CCAAS packages on the kind peer, target
+  the GW exclusively at that peer and verify Consent, SMART and fresh
+  endorsement capability after restarting the GW, peer and CCAAS runtimes.
+
+- Prevent false Fabric revisions when two Consent rules contain semantically
+  identical JSON with different property ordering.
+
+- Require encrypted JWEs to be externalized to IPFS in the live Helm proof and
+  fail explicitly if Kubernetes does not retain documents in PostgreSQL or
+  blobs in IPFS, even when the collector runs the gate through a pipeline.
+
+- Track the governance and onboarding `lib/*.mjs` modules required by public
+  executables, and fail the gate when a clean checkout lacks any of these
+  runtimes.
 
 - Clarify canonical BFF naming: aggregate facades use `subject`,
   `organizations`, `employees`, `licenses` and `research`; operator functions
@@ -104,22 +141,22 @@
 - Document the temporary shared `legacy-v1` Firestore/KEK custody boundary
   between CORE development and a hosting-provider staging deployment, separately from their distinct
   token-verification modes.
-- Hacer autocontenido el entregable SEDIA del host en el repositorio público de
-  GW CORE: incluye la red Fabric `local-network` de dos hosts, los scripts
-  genéricos de autorización, enrolamiento y reconciliación, y el chart Helm
-  reutilizable `gdc-host`, sin depender de infraestructura privada.
-- Añadir una prueba real y aislada con kind/Helm: carga la imagen GW ya probada,
-  despliega PostgreSQL/IPFS, repite los recorridos E2E de Consent y SMART sobre
-  Fabric y demuestra recuperación tras reinicio. `helm template` se conserva
-  como contrato estático independiente.
-- Enrutar los enrolamientos reproducibles de peers y orderers mediante la ICA
-  de Fabric y verificar las cadenas MSP y TLS contra la Root desechable y su
-  certificado intermedio.
-- Incluir en la evidencia agregada el contrato sin PDF de host preautorizado de
-  la ICA del espacio de datos, con emisión comprobada de
-  `HostingServiceCredential` como VC JSON y VC-JWT, sin inventar evidencia PDF.
-- Eliminar rutas absolutas de desarrollador de comandos y pruebas locales; los
-  ejemplos portables resuelven desde `${HOME}`.
+- Make the SEDIA host deliverable self-contained in the public GW CORE
+  repository: include the two-host Fabric `local-network`, generic
+  authorization, enrollment and reconciliation scripts, and the reusable
+  `gdc-host` Helm chart without depending on private infrastructure.
+- Add a real isolated kind/Helm proof: load the already tested GW image, deploy
+  PostgreSQL/IPFS, repeat the Consent and SMART E2E journeys over Fabric and
+  prove recovery after restart. Keep `helm template` as an independent static
+  contract.
+- Route reproducible peer and orderer enrollments through the Fabric ICA and
+  verify MSP and TLS chains against the disposable Root and its intermediate
+  certificate.
+- Include the preauthorized host's PDF-free Dataspace ICA contract in the
+  aggregate evidence, with proven `HostingServiceCredential` issuance as both
+  JSON VC and VC-JWT, without inventing PDF evidence.
+- Remove absolute developer paths from local commands and tests; portable
+  examples resolve paths from `${HOME}`.
 
 - Make `iss` and `aud` the canonical trusted-provider configuration names,
   retain non-conflicting `issuer`/`audience` aliases, and fail startup when the

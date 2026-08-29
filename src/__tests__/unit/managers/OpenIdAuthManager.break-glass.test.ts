@@ -8,6 +8,8 @@ describe('OpenIdAuthManager break-glass SMART integration', () => {
     const subjectDid = 'did:web:gw.example:individual:123';
     const vpToken = buildUnsignedProfessionalIdentityVpJwt({ clientId: actorDid, actorDid, role: 'ISCO-08|2211' });
     const authorize = jest.fn().mockResolvedValue({
+      emergencyConsentId: 'emergency-consent-123',
+      consentExpiresAt: '2026-08-27T12:00:00.000Z',
       authorizationId: 'authorization-123',
       issuedAt: '2026-08-26T12:00:00.000Z',
       expiresAt: '2026-08-26T12:10:00.000Z',
@@ -79,12 +81,15 @@ describe('OpenIdAuthManager break-glass SMART integration', () => {
       }));
       expect(response.body).toMatchObject({
         emergency: true,
+        emergency_consent_id: 'emergency-consent-123',
+        emergency_consent_expires_at: '2026-08-27T12:00:00.000Z',
         break_glass_authorization_id: 'authorization-123',
         expires_in: 600,
       });
       const payload = JSON.parse(Buffer.from(String(response.body.access_token).split('.')[1], 'base64url').toString('utf8'));
       expect(payload).toMatchObject({
         emergency: true,
+        emergency_consent_id: 'emergency-consent-123',
         break_glass_authorization_id: 'authorization-123',
         break_glass_incident_id: 'incident-123',
       });

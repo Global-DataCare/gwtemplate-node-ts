@@ -5677,6 +5677,238 @@
         "x-profile": "core"
       }
     },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Observation/_batch": {
+      "post": {
+        "tags": [
+          "8.4 Personal Observations"
+        ],
+        "summary": "Collect personal (non-clinical) observations",
+        "description": "Collects non-clinical observations created by the individual (or their family controller) for emergencies and care continuity.\nThese observations are not \"official clinical data\"; they are self-reported and intended for context and emergency use.\n\nUse contextualized flat claims with `@context: org.hl7.fhir.api` (keys like `Observation.category`, `Observation.code`, `Observation.valueString`, etc.).\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plain+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Observation/_batch-response": {
+      "post": {
+        "tags": [
+          "8.4 Personal Observations"
+        ],
+        "summary": "Poll the observation collection result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrderPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrderPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/_batch": {
+      "post": {
+        "tags": [
+          "8.1 Subject Profile"
+        ],
+        "summary": "Create or update Subject profile (claims-first)",
+        "description": "Creates or updates One Health Subject profiles using contextualized flat claims (`@context: org.hl7.fhir.api`).\n\nClaims container note:\n- `resource.meta.claims` is a project-specific non-standard claims container\n- it is not part of base FHIR\n- `@context` may be `org.hl7.fhir.api`, `org.schema`, or another supported context\n- when `@context` is already present, keys may be written in a less-qualified form\n  instead of always repeating the full reverse-DNS prefix\n\nContract notes:\n- Endpoint may autofill `@context` and `@type` if omitted.\n- `@type` (when provided) can be `Person`, `Animal`, or `Thing`.\n- `Subject.id` is immutable once created.\n- `Subject.organization` (`did:web` of Individual Organization) can be updated and must be auditable.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/didcomm-plain+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL for the result."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/_batch-response": {
+      "post": {
+        "tags": [
+          "8.1 Subject Profile"
+        ],
+        "summary": "Poll the Subject profile operation result",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrderPollRequest"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AsyncPollRequest"
+              },
+              "examples": {
+                "message": {
+                  "$ref": "#/components/examples/TenantOrderPollRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed."
+          },
+          "202": {
+            "description": "Pending. Retry later."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary": {
       "post": {
         "x-contract-level": "internal-compatibility",
@@ -6731,7 +6963,7 @@
           "2.2 SMART Token"
         ],
         "summary": "Request a SMART access_token (async)",
-        "description": "Requests a SMART access token. The request MUST include the gateway context-pinning scope item:\n`organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=*|<code>[,<code>...]]`.\nOmitting `section` is allowed and means the backend's default permitted set for that subject.\n\nOpenID4VP binding: the request MUST include `acr_values` from the prior verification event, using\none of: `urn:antifraud:acr:openid4vp:employee` or `urn:antifraud:acr:openid4vp:individual`. The issued\nSMART token includes the matching `acr` and SHOULD include `amr` entries like `openid4vp`, `vc`, and\n`device_bound`.\n\nClient authentication: the gateway accepts one signed client-authentication JWT in\n`body.client_assertion`. The canonical request shape uses the standard parameter names\n`client_assertion` + `client_assertion_type`; for compatibility, `client_assertion_type`\nmay carry either the full JWT-bearer URN or the shorter `private_key_jwt` label.\n\nProof requirement: the SMART authorization request normally carries one verifiable presentation (VP)\ninside the JAR (request object) or the DIDComm payload (demo flow). That VP is validated via the\nGaia-X Clearing House to enforce non-revocation before issuing the token.\n\nResearch-access exception: for the inter-tenant `RESEARCH` use case only, the current gateway also\naccepts one already-validated external `Bearer data access token` instead of `body.vp_token`, as long\nas the trusted issuer, provider tenant, consumer organization, purpose, and requested capability match.\n\nContract boundary: the inter-tenant FHIR `Contract` VC gate applies\nto `organization/ResearchSubject.*` digital-twin capabilities.\nIndividual `organization/Composition.*` self-read still requires\none verified VP and matching FHIR `Consent`, but not a research\ncontract solely because its public DID root differs from the\noperator DID serving the endpoint.\n\nDemo payload note: in this endpoint the DIDComm `body` represents the JAR (authorize request object),\nincluding PKCE parameters (`code_challenge`, `code_challenge_method`), `client_id`, `redirect_uri`,\n`client_assertion`, `client_assertion_type`, `vp_token`, optional `presentation_submission`, and\n`acr_values`.\n\nThe worker will validate the target subject exists and that at least one consent rule matches the actor.\n\nOptional `body.break_glass` is a disabled-by-default GW CORE extension for exceptional,\nshort-lived emergency reads. Human access is confined to `health-care` with a\nledger-verified physician credential; animal access is confined to `animal-care` with\na ledger-verified veterinarian credential. Research and One Health research routes,\nwrite scopes, employment alone and cross-subject-kind requests fail closed. The worker\nrecords a hash-minimized ledger event and requires controller-notification acknowledgement\nbefore issuing a token for at most 15 minutes.\n",
+        "description": "Requests a SMART access token. The request MUST include the gateway context-pinning scope item:\n`organization/Composition.<cruds>?subject=<did:web:...:individual:<id>>[&section=*|<code>[,<code>...]]`.\nOmitting `section` is allowed and means the backend's default permitted set for that subject.\n\nOpenID4VP binding: the request MUST include `acr_values` from the prior verification event, using\none of: `urn:antifraud:acr:openid4vp:employee` or `urn:antifraud:acr:openid4vp:individual`. The issued\nSMART token includes the matching `acr` and SHOULD include `amr` entries like `openid4vp`, `vc`, and\n`device_bound`.\n\nClient authentication: the gateway accepts one signed client-authentication JWT in\n`body.client_assertion`. The canonical request shape uses the standard parameter names\n`client_assertion` + `client_assertion_type`; for compatibility, `client_assertion_type`\nmay carry either the full JWT-bearer URN or the shorter `private_key_jwt` label.\n\nProof requirement: the SMART authorization request normally carries one verifiable presentation (VP)\ninside the JAR (request object) or the DIDComm payload (demo flow). That VP is validated via the\nGaia-X Clearing House to enforce non-revocation before issuing the token.\n\nResearch-access exception: for the inter-tenant `RESEARCH` use case only, the current gateway also\naccepts one already-validated external `Bearer data access token` instead of `body.vp_token`, as long\nas the trusted issuer, provider tenant, consumer organization, purpose, and requested capability match.\n\nContract boundary: the inter-tenant FHIR `Contract` VC gate applies\nto `organization/ResearchSubject.*` digital-twin capabilities.\nIndividual `organization/Composition.*` self-read still requires\none verified VP and matching FHIR `Consent`, but not a research\ncontract solely because its public DID root differs from the\noperator DID serving the endpoint.\n\nDemo payload note: in this endpoint the DIDComm `body` represents the JAR (authorize request object),\nincluding PKCE parameters (`code_challenge`, `code_challenge_method`), `client_id`, `redirect_uri`,\n`client_assertion`, `client_assertion_type`, `vp_token`, optional `presentation_submission`, and\n`acr_values`.\n\nThe worker will validate the target subject exists and that at least one consent rule matches the actor.\n\nOptional `body.break_glass` is a disabled-by-default GW CORE extension for exceptional\nemergency reads. Human access is confined to `health-care` with a\nledger-verified physician credential; animal access is confined to `animal-care` with\na ledger-verified veterinarian credential. Research and One Health research routes,\nwrite scopes, employment alone and cross-subject-kind requests fail closed. The worker\npersists and anchors a flat-claims `ETREAT` Consent for up to the configured 24-hour\nepisode, then requires controller-mailbox Communication acknowledgement. Each issuance\nappends a correlated Fabric event and returns a read-only token for at most 15 minutes;\nrepeated issuance reuses the active Consent without extending its period.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

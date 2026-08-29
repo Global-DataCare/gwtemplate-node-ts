@@ -7,6 +7,13 @@ import {
 } from '../blockchain/fabric/v3/ledger-channel-name';
 import { getJurisdictionGroup } from './jurisdiction';
 
+/** Resolves the configured clinical/data ledger channel without inventing one from route labels. */
+export function resolveDataChannel(): string {
+  const channel = String(process.env.LEDGER_DATA_CHANNEL_DEFAULT || '').trim();
+  if (!channel) throw new Error('LEDGER_DATA_CHANNEL_DEFAULT is required for ledger data writes.');
+  return channel;
+}
+
 export function resolveIdentityChannel(jurisdiction?: string): string {
   const explicitDefault = String(process.env.LEDGER_IDENTITY_CHANNEL_DEFAULT || '').trim();
   if (explicitDefault) return explicitDefault;

@@ -6,7 +6,10 @@ DATASPACE_CA_ROOT="${DATASPACE_CA_ROOT:-${GW_ROOT}/../dataspace-ca-ts}"
 DATASPACE_ICA_ROOT="${DATASPACE_ICA_ROOT:-${GW_ROOT}/../dataspace-ica-ts}"
 FABRIC_DEVNET_ROOT="${GW_ROOT}/infra/fabric/local-network"
 HOME_PLACEHOLDER='${HOME}'
-export HOME_PLACEHOLDER
+GDC_CONTAINER_PREFIX="${GDC_CONTAINER_PREFIX:-gdc-public}"
+DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-gdc-public-local-network}"
+export HOME_PLACEHOLDER GDC_CONTAINER_PREFIX DEVNET_NETWORK_NAME COMPOSE_PROJECT_NAME
 
 # shellcheck source=lib/evidence-gate.sh
 source "${GW_ROOT}/scripts/lib/evidence-gate.sh"
@@ -73,6 +76,7 @@ record_environment() {
       printf '%s_tracked_tree=clean\n' "$(basename "${repository}")"
     else
       printf '%s_tracked_tree=dirty\n' "$(basename "${repository}")"
+      return 1 # tracked repository is dirty
     fi
   done
   docker image inspect "${IMAGE_NAME}" --format 'image_id={{.Id}} platform={{.Os}}/{{.Architecture}}'
@@ -164,12 +168,27 @@ reset_fabric_devnet() {
   cd "${FABRIC_DEVNET_ROOT}"
   docker compose down -v --remove-orphans || true
   local container
-  for container in gdc-orderer gdc-peer0-host1 gdc-peer0-host2 gdc-fabric-tools gdc-fabric-ca-client gdc-ica gdc-root-ca consentaccess-sc; do
+  for container in \
+    "${GDC_CONTAINER_PREFIX}-orderer" \
+    "${GDC_CONTAINER_PREFIX}-peer0-host1" \
+    "${GDC_CONTAINER_PREFIX}-peer0-host2" \
+    "${GDC_CONTAINER_PREFIX}-fabric-tools" \
+    "${GDC_CONTAINER_PREFIX}-fabric-ca-client" \
+    "${GDC_CONTAINER_PREFIX}-ica" \
+    "${GDC_CONTAINER_PREFIX}-root-ca" \
+    consentaccess-sc; do
     docker rm -f "${container}" >/dev/null 2>&1 || true
   done
   for attempt in $(seq 1 30); do
     local remaining=false
-    for container in gdc-orderer gdc-peer0-host1 gdc-peer0-host2 gdc-fabric-tools gdc-fabric-ca-client gdc-ica gdc-root-ca; do
+    for container in \
+      "${GDC_CONTAINER_PREFIX}-orderer" \
+      "${GDC_CONTAINER_PREFIX}-peer0-host1" \
+      "${GDC_CONTAINER_PREFIX}-peer0-host2" \
+      "${GDC_CONTAINER_PREFIX}-fabric-tools" \
+      "${GDC_CONTAINER_PREFIX}-fabric-ca-client" \
+      "${GDC_CONTAINER_PREFIX}-ica" \
+      "${GDC_CONTAINER_PREFIX}-root-ca"; do
       docker container inspect "${container}" >/dev/null 2>&1 && remaining=true
     done
     [[ "${remaining}" == "false" ]] && break
@@ -181,9 +200,9 @@ reset_fabric_devnet() {
   done
   local volume
   for volume in \
-    gdc-fabric-v3-devnet_orderer-data \
-    gdc-fabric-v3-devnet_peer0-host1-data \
-    gdc-fabric-v3-devnet_peer0-host2-data; do
+    "${COMPOSE_PROJECT_NAME}_orderer-data" \
+    "${COMPOSE_PROJECT_NAME}_peer0-host1-data" \
+    "${COMPOSE_PROJECT_NAME}_peer0-host2-data"; do
     if docker volume inspect "${volume}" >/dev/null 2>&1; then
       docker volume rm "${volume}"
     fi
@@ -206,7 +225,7 @@ peer_channels() {
     -e CORE_PEER_ADDRESS="${peer_address}" \
     -e CORE_PEER_TLS_ENABLED=true \
     -e CORE_PEER_TLS_ROOTCERT_FILE="/workspace/organizations/peerOrganizations/${domain}/peers/peer0.${domain}/tls/ca.crt" \
-    gdc-fabric-tools peer channel list
+    "${GDC_CONTAINER_PREFIX}-fabric-tools" peer channel list
 }
 
 prove_multi_host_topology() {
@@ -248,8 +267,8 @@ prove_multi_host_topology() {
   CHAINCODE_SIGNATURE_POLICY="OR('Host1MSP.member','Host2MSP.member')" \
   CHANNEL_NAME=health-care-local \
   HLF_DATA_CHANNEL_NAME=health-care-local \
-  FABRIC_TOOLS_CONTAINER=gdc-fabric-tools \
-  DEVNET_NETWORK=gdc-fabric-v3-devnet \
+  FABRIC_TOOLS_CONTAINER="${GDC_CONTAINER_PREFIX}-fabric-tools" \
+  DEVNET_NETWORK="${DEVNET_NETWORK_NAME}" \
     bash "${GW_ROOT}/chaincode/scripts/consentaccess-local-devnet.sh"
 
   local host1_channels host2_channels
@@ -263,8 +282,8 @@ prove_multi_host_topology() {
   done
   grep -Fq 'HLF_MSP_ID_HOST1=Host1MSP' .env.fabric-devnet
   grep -Fq 'HLF_MSP_ID_HOST2=Host2MSP' .env.fabric-devnet
-  docker inspect gdc-peer0-host1 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host1MSP'
-  docker inspect gdc-peer0-host2 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host2MSP'
+  docker inspect "${GDC_CONTAINER_PREFIX}-peer0-host1" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host1MSP'
+  docker inspect "${GDC_CONTAINER_PREFIX}-peer0-host2" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'CORE_PEER_LOCALMSPID=Host2MSP'
 
   local root_certificate="${FABRIC_DEVNET_ROOT}/crypto/ca/root/ca-cert.pem"
   local fabric_ica_certificate="${FABRIC_DEVNET_ROOT}/crypto/ca/ica/ca-cert.pem"

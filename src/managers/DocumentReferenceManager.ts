@@ -139,7 +139,6 @@ export class DocumentReferenceManager implements IJobProcessor {
               resource: entry?.resource,
             },
             channel: `${job.sector}-${jurisdiction.toLowerCase()}`,
-            chaincode: process.env.FHIR_ARTIFACT_LEDGER_CHAINCODE || 'artifact-sc',
           });
         }
 

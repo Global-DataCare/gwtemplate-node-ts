@@ -149,8 +149,9 @@ configurado.
 La ICA de Fabric, el orderer y el peer de referencia permanecen en Docker para
 representar la red externa. El peer kind se une realmente a sus canales, crea
 sus bases en CouchDB y endosa las operaciones del GW mediante sus propios
-paquetes CCAAS. La ruta al peer Docker solo se usa para gossip/bootstrap y no
-como endpoint de endoso del GW.
+paquetes CCAAS. Al ser el primer peer de su MSP no usa como bootstrap gossip un
+peer de otra organización: recupera el histórico directamente del orderer. El
+peer Docker nunca se usa como endpoint de endoso del GW.
 
 ## Instalación de un host autorizado
 

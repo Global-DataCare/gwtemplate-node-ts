@@ -84,7 +84,7 @@ spec:
             - { name: CORE_PEER_CHAINCODEADDRESS, value: {{ printf "%s:7052" (include "gdc-host.peerService" .) | quote }} }
             - { name: CORE_PEER_CHAINCODELISTENADDRESS, value: "0.0.0.0:7052" }
             - { name: CORE_PEER_GOSSIP_EXTERNALENDPOINT, value: {{ .Values.peer.externalEndpoint | quote }} }
-            - { name: CORE_PEER_GOSSIP_BOOTSTRAP, value: {{ default (printf "%s:7051" (include "gdc-host.peerService" .)) .Values.peer.bootstrap | quote }} }
+            - { name: CORE_PEER_GOSSIP_BOOTSTRAP, value: {{ .Values.peer.bootstrap | quote }} }
             - { name: CORE_PEER_TLS_ENABLED, value: "true" }
             - { name: CORE_PEER_TLS_CERT_FILE, value: /etc/hyperledger/fabric/tls/server.crt }
             - { name: CORE_PEER_TLS_KEY_FILE, value: /etc/hyperledger/fabric/tls/server.key }

@@ -1,58 +1,41 @@
 # OpenAPI Profile Matrix
 
-Explicit endpoint classification used by profile generation.
+GW CORE mantiene una sola fuente OpenAPI y dos vistas derivadas. Ninguna de
+ellas representa plugins ni extensiones de producto.
 
-## Core
+| Artefacto | Alcance | Fuente |
+| --- | --- | --- |
+| `swagger-spec.json` | API completa implementada por el runtime GW CORE | JSDoc y configuración Swagger |
+| `openapi-core.json` | Recorrido canónico reducido de onboarding, identidad, consentimiento, comunicación, composición e investigación | `CORE_FLOW_PATHS` |
+| `openapi-compat.json` | API completa de CORE, marcando los alias heredados como `compat` | `classifyPath` |
 
-- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction`
-- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction-response`
-- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate`
-- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_activate-response`
-- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`
-- `/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Employee/_batch`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_batch-response`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch-response`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent/_batch`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Consent/_batch-response`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication/_batch`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Communication/_batch-response`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch-response`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch-response`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch-response`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response`
+La lista ejecutable y autoritativa de las 33 rutas del recorrido canónico está
+en `scripts/generate-openapi-profiles.mjs#CORE_FLOW_PATHS`. Duplicarla aquí
+haría posible que la documentación divergiera de la generación real.
 
-## Compat
+## Clasificación de operaciones
 
-- All `/identity/openid/*` compatibility aliases not listed as core canonical.
-- `/auth/token`
-- Direct `individual/.../Subject/$summary` and `Patient/$summary` HTTP routes.
-  The canonical application flow is an actor-facade request transported by
-  `Communication/_batch`; GW resolves `$summary` internally.
-- Direct individual `Bundle/_search` and `Composition` routes when present in
-  the full/reference specification. They remain specialized or migration
-  surfaces rather than the primary subject-index contract.
+- `core`: ruta implementada por GW CORE que no es un alias de compatibilidad.
+- `compat`: alias de identidad bajo `/identity/openid/*`, `/auth/token` y las
+  rutas directas heredadas de resumen de sujeto/paciente.
 
-## Extension
+Las rutas `Observation/_batch` y `Subject/_batch` son capacidades del runtime
+completo de CORE; no son extensiones. Que una ruta no pertenezca al recorrido
+canónico reducido no la convierte en un plugin.
 
-- `/{tenantId}/.../individual/org.hl7.fhir.api/Observation/*`
-- `/{tenantId}/.../individual/org.hl7.fhir.api/Subject/*`
-- Any appointment-specific vertical surfaces (kept out of current core profile).
+## Frontera de soluciones derivadas
 
-## Pending Core Candidates
+Las capacidades adicionales de una solución se implementan, prueban y publican
+desde su repositorio derivado. GW CORE no genera `openapi-extension.json` ni
+anuncia un perfil `EXTENSIONS` en Swagger UI.
 
-The following route shapes are intentionally not listed as core/compat/extension
-yet because GW CORE does not currently publish them in runtime/OpenAPI:
+## Regeneración verificable
 
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Organization/_binding`
-- `/{tenantId}/cds-{jurisdiction}/v1/{sector}/entity/org.schema/Organization/_binding-response`
+```bash
+npm run build:swagger
+git diff --exit-code -- swagger-spec.json swagger-spec.reference.json \
+  docs/openapi-profiles docs/openapi-examples
+```
+
+El segundo comando demuestra que los JSON versionados coinciden con el JSDoc y
+el generador del checkout actual.

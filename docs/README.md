@@ -64,7 +64,6 @@ docs/
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
   - `docs/openapi-profiles/openapi-core.json`
   - `docs/openapi-profiles/openapi-compat.json`
-  - `docs/openapi-profiles/openapi-extension.json`
   See `docs/OPENAPI_PROFILES.md`.
 - **Docs QA (Flow Report)**: `artifacts/api-integrators-guide.flow-report.json` is generated via `npm run docs:flow-report` and captures the onboarding journey requests/responses.
 - **Contract-check intent**: The flow report is used as a reproducible docs/examples contract check and to keep Swagger examples aligned with real responses.

@@ -13,14 +13,18 @@ Every request must meet all applicable conditions:
 2. Human subjects use exactly `health-care` and an ISCO-08 physician occupation
    (`221*`). Animal subjects use exactly `animal-care` and ISCO-08 veterinarian
    occupation `2250`.
-3. The SMART scope is read-only (`r` or `rs`), pinned to one subject and valid
-   for no more than 900 seconds.
+3. The emergency FHIR Consent is pinned to one professional, subject, incident
+   and read-only scope. Its configured period is at most 24 hours. Each SMART
+   token issued under it is valid for no more than 900 seconds.
 4. The declared subject kind matches the canonical subject DID. Human
    `:individual:` identifiers and animal `:card:uhc:animal:`/`:animal:`
    identifiers cannot be interchanged.
 5. The request supplies an opaque incident id, a coded reason and a meaningful
-   justification. Fabric accepts the hash-minimized authorization and the
-   controller notifier acknowledges delivery before the token is issued.
+   justification. GW persists one flat-claims FHIR Consent with purpose
+   `ETREAT`; Fabric accepts its hash-minimized anchor and the controller
+   notifier acknowledges delivery before the first token is issued.
+6. Repeating the same professional, subject, incident and scope reuses the
+   active Consent while creating a new token authorization and Fabric event.
 
 `health-research`, `animal-research` and `onehealth-research` always deny
 break-glass. Organization membership, employment, police authority, caregiver
@@ -39,7 +43,7 @@ The optional DIDComm body member is:
     "incidentId": "<opaque incident identifier>",
     "subjectKind": "human",
     "reasonCode": "life-threatening",
-    "justification": "<10 to 500 characters for controller notification>"
+    "justification": "<10 to 500 characters retained only in the private emergency request>"
   }
 }
 ```
@@ -49,10 +53,20 @@ Human reason codes are `life-threatening`, `serious-imminent-harm` and
 
 ## Audit, notification and configuration
 
-Fabric receives only stable hashes and coded facts: incident, actor and subject
-hashes; professional role; routed sector; subject kind; reason; requested-scope
-hash; issue time; expiry; and notification acknowledgement hash. The free-text
-justification never enters the ledger.
+Fabric receives only stable hashes and coded facts plus the public requesting
+organization DID and jurisdiction: incident, actor and subject hashes;
+professional role; routed sector; subject kind; reason; requested-scope hash;
+Consent period; token issue/expiry; and notification acknowledgement hash. The
+free-text justification and professional email/DID never enter the ledger.
+
+The controller notification is a FHIR `Communication` addressed through the
+subject's secure mailbox resolver. It contains the requesting organization,
+jurisdiction, professional hash, Consent id and Fabric asset locator. It never
+contains the professional email or the free-text justification; it carries only the coded reason
+plus correlation metadata. A mailbox service may queue the notice by subject
+until the exact controller profile is linked. The first request creates three correlated
+Fabric records: Consent, notification acknowledgement and token authorization;
+each renewal creates another token-authorization record under the same Consent.
 
 The feature is disabled unless all production settings exist:
 
@@ -60,8 +74,11 @@ The feature is disabled unless all production settings exist:
 BREAK_GLASS_ENABLED=true
 BREAK_GLASS_NOTIFICATION_URL=https://<controller-notification-service>/v1/break-glass
 BREAK_GLASS_NOTIFICATION_TOKEN=<secret reference>
-BREAK_GLASS_LEDGER_CHAINCODE=artifact-sc
+BREAK_GLASS_CONSENT_TTL_SECONDS=86400
 ```
+
+`registerArtifactBundle` owns the `artifact-sc` contract selection; callers
+cannot redirect artifact writes with a break-glass or FHIR environment value.
 
 The notification token must be injected from the deployment secret store. The
 feature uses the process-owned runtime KEK created during normal GW bootstrap;

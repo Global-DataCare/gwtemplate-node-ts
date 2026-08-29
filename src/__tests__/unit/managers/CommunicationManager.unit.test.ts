@@ -24,6 +24,7 @@ import {
   buildExampleCommunicationParticipantProjection,
   buildExampleCommunicationParticipantSearchInput,
   CommunicationParticipantPrefixes,
+  HealthcareBasicSections,
 } from 'gdc-common-utils-ts';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
 
@@ -54,6 +55,10 @@ describe('CommunicationManager Unit Tests', () => {
       delete: jest.fn(async (vaultId: string, id: string, sectionId?: string) =>
         storedRecords.delete(`${vaultId}|${sectionId}|${id}`)),
       query: jest.fn(async () => []),
+      delete: jest.fn(async (vaultId: string, id: string, sectionId?: string) => {
+        storedRecords.delete(`${vaultId}|${sectionId}|${id}`);
+        return true;
+      }),
       listContainersInSection: jest.fn(async () => []),
       getAllSections: jest.fn(async () => []),
     } as unknown as jest.Mocked<IVaultRepository>;
@@ -74,6 +79,192 @@ describe('CommunicationManager Unit Tests', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('process (Communication-carried mixed clinical batch)', () => {
+    const subjectDid = 'did:web:subject.example:animals:patient-1';
+    const creatorDid = 'did:web:clinic-a.example:professionals:vet-1';
+
+    function buildClinicalBatchJob(innerEntries: unknown[]): JobRequest {
+      const attachedBundle = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        data: innerEntries,
+      };
+      return {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: 'ca-bc',
+        sector: 'animal-care',
+        section: 'individual',
+        format: 'org.hl7.fhir.api' as any,
+        resourceType: 'Communication',
+        action: '_batch',
+        content: {
+          jti: randomUUID(),
+          thid: randomUUID(),
+          iss: creatorDid,
+          aud: testServerDid,
+          exp: Math.floor(Date.now() / 1000) + 300,
+          type: 'org.hl7.fhir.api.Bundle',
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            data: [{
+              type: 'Communication',
+              resource: {
+                resourceType: 'Communication',
+                meta: {
+                  claims: {
+                    [CommunicationClaim.Subject]: subjectDid,
+                    [CommunicationClaim.Sender]: creatorDid,
+                    [CommunicationClaim.Topic]: HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
+                    [CommunicationClaim.ContentAttachmentType]: 'application/fhir+json',
+                    [CommunicationClaim.ContentAttachmentData]: Buffer
+                      .from(JSON.stringify(attachedBundle), 'utf8')
+                      .toString('base64'),
+                  },
+                },
+              },
+            }],
+          },
+        } as any,
+      };
+    }
+
+    it('lets the authenticated creator delete the mistaken record without a version condition', async () => {
+      // Step 1. Authoritative storage says who created the record and which version is current.
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.get.mockResolvedValue({
+        id: 'immunization-mistake',
+        audit: { creatorDid },
+        'Immunization.subject': subjectDid,
+        'Immunization.meta.versionId': 'version-current',
+      } as any);
+
+      // Step 2. The same verified DID conditionally deletes it through the attached batch.
+      const response = await communicationManager.process(buildClinicalBatchJob([{
+        type: 'Immunization-delete-request-v1.0',
+        request: {
+          method: 'DELETE',
+          url: 'Immunization/immunization-mistake',
+        },
+        resource: { resourceType: 'Immunization', id: 'immunization-mistake', meta: { claims: {} } },
+      }]));
+
+      expect((response.body as any).data).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'immunization-mistake',
+          response: expect.objectContaining({ status: '204' }),
+        }),
+      ]));
+      expect(mockVaultRepository.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 412 when the optional ifMatch version is stale', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.get.mockResolvedValue({
+        id: 'immunization-mistake',
+        audit: { creatorDid },
+        'Immunization.subject': subjectDid,
+        'Immunization.meta.versionId': 'version-current',
+      } as any);
+      const response = await communicationManager.process(buildClinicalBatchJob([{
+        type: 'Immunization-delete-request-v1.0',
+        request: {
+          method: 'DELETE',
+          url: 'Immunization/immunization-mistake',
+          ifMatch: 'W/"version-stale"',
+        },
+        resource: { resourceType: 'Immunization', id: 'immunization-mistake', meta: { claims: {} } },
+      }]));
+      expect((response.body as any).data[0].response.status).toBe('412');
+      expect(mockVaultRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('removes the correlated digital-twin projection when the creator deletes an erroneous record', async () => {
+      // Step 1. The operational record has an enabled secondary-use projection and a stable twin alias.
+      const twinSubjectDid = 'urn:uuid:7b419936-4999-4a18-b21e-681dc3e6a8c0';
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.get.mockImplementation(async (_vaultId: string, id: string, sectionId?: string) => {
+        if (id === 'immunization-mistake') return {
+          id: 'immunization-mistake',
+          audit: { creatorDid },
+          'Immunization.subject': subjectDid,
+          'Immunization.meta.versionId': 'version-current',
+        } as any;
+        if (String(sectionId).includes('digitaltwin_secondary_use_status')) return { status: 'enabled' } as any;
+        if (String(sectionId).includes('digitaltwin_subject_aliases')) return { twinSubjectId: twinSubjectDid } as any;
+        return undefined;
+      });
+      mockVaultRepository.listContainersInSection.mockResolvedValueOnce([{
+        id: 'research-immunization-mistake',
+        audit: { creatorDid, sourceRecordId: 'immunization-mistake' },
+        'Immunization.subject': twinSubjectDid,
+      }] as any);
+
+      // Step 2. One creator-authorized delete removes both the operational error and only its correlated projection.
+      const response = await communicationManager.process(buildClinicalBatchJob([{
+        type: 'Immunization-delete-request-v1.0',
+        request: { method: 'DELETE', url: 'Immunization/immunization-mistake' },
+        resource: { resourceType: 'Immunization', id: 'immunization-mistake', meta: { claims: {} } },
+      }]));
+
+      expect((response.body as any).data[0].response.status).toBe('204');
+      expect(mockVaultRepository.delete).toHaveBeenCalledTimes(2);
+      expect(mockVaultRepository.delete).toHaveBeenCalledWith(
+        'animal-care_acme',
+        'research-immunization-mistake',
+        getSubjectScopedSectionId(twinSubjectDid, 'digitaltwin', 'immunizations'),
+      );
+    });
+
+    it('keeps create success independent when another entry is forbidden', async () => {
+      // Step 1. The delete target belongs to a different authenticated creator.
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.get.mockResolvedValue({
+        id: 'allergy-owned-by-other',
+        audit: { creatorDid: 'did:web:clinic-a.example:professionals:vet-2' },
+        'AllergyIntolerance.subject': subjectDid,
+        'AllergyIntolerance.meta.versionId': 'version-current',
+      } as any);
+
+      // Step 2. Batch semantics preserve the successful create and report the failed delete separately.
+      const response = await communicationManager.process(buildClinicalBatchJob([
+        {
+          type: 'Observation-create-request-v1.0',
+          request: { method: 'POST', url: 'Observation' },
+          resource: {
+            resourceType: 'Observation',
+            id: 'observation-new',
+            meta: { claims: { 'Observation.subject': subjectDid } },
+          },
+        },
+        {
+          type: 'AllergyIntolerance-delete-request-v1.0',
+          request: {
+            method: 'DELETE',
+            url: 'AllergyIntolerance/allergy-owned-by-other',
+            ifMatch: 'W/"version-current"',
+          },
+          resource: { resourceType: 'AllergyIntolerance', id: 'allergy-owned-by-other', meta: { claims: {} } },
+        },
+      ]));
+
+      expect((response.body as any).data).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'observation-new', response: expect.objectContaining({ status: '201' }) }),
+        expect.objectContaining({ id: 'allergy-owned-by-other', response: expect.objectContaining({ status: '403' }) }),
+      ]));
+      expect(mockVaultRepository.put).toHaveBeenCalledWith(
+        'animal-care_acme',
+        [expect.objectContaining({ id: 'observation-new', audit: { creatorDid } })],
+        expect.any(String),
+      );
+      expect(mockVaultRepository.delete).not.toHaveBeenCalled();
+    });
   });
 
   describe('convertFhirToCommMsg', () => {
@@ -698,7 +889,10 @@ describe('CommunicationManager Unit Tests', () => {
         email_verified: true,
       }));
       expect((forbiddenResult.body as any).data).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: partialSuccessCreateId, response: { status: '201' } }),
+        expect.objectContaining({
+          id: partialSuccessCreateId,
+          response: expect.objectContaining({ status: '201' }),
+        }),
         expect.objectContaining({ response: expect.objectContaining({ status: '403' }) }),
       ]));
       expect(await mockVaultRepository.get(tenantVaultId, partialSuccessCreateId, allergySectionId)).toBeDefined();
@@ -1040,6 +1234,7 @@ describe('CommunicationManager Unit Tests', () => {
       expect(medicationPut).toBeDefined();
       const medicationRecord = (medicationPut?.[1] as any[])[0];
       expect(medicationRecord.id).toBe('medication-001');
+      expect(medicationRecord.audit?.creatorDid).toBe(decoded.iss);
       expect(
         medicationRecord['MedicationStatement.subject']
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.subject'],

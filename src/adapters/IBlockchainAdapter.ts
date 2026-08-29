@@ -45,7 +45,6 @@ export interface IBlockchainAdapter {
       assetId: string;
       payload: Record<string, unknown>;
       channel: string;
-      chaincode: string;
     },
   ): Promise<{ accepted: number; txId?: string }>;
 

@@ -182,7 +182,7 @@ export function buildManagers(options: {
     tenantManager,
     vaultRepository,
     clearingHouseService,
-    buildBreakGlassAuthorizer(blockchainAdapter),
+    buildBreakGlassAuthorizer(blockchainAdapter, vaultRepository),
   );
   const observationManager = new ObservationManager(vaultRepository, blockchainAdapter, tenantManager);
   const medicationStatementManager = new MedicationStatementManager(vaultRepository, tenantManager);

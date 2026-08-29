@@ -332,6 +332,9 @@ export class OpenIdAuthManager implements IJobProcessor {
           jurisdiction: job.jurisdiction,
           routeSector: job.sector,
           actorDid: actor.sub,
+          actorOrganizationDid: actor.organization || '',
+          requestingClientId: clientId || String(job.content?.iss || ''),
+          tokenAudience: issuerDid,
           professionalRole: actor.role,
           subjectDid: subject,
           requestedScope: scope,
@@ -427,6 +430,8 @@ export class OpenIdAuthManager implements IJobProcessor {
       vp_hash: accessProof.vpHash,
       ledger_verified: accessProof.ledgerVerified,
       emergency: breakGlassAuthorization ? true : undefined,
+      emergency_consent_id: breakGlassAuthorization?.emergencyConsentId,
+      emergency_consent_expires_at: breakGlassAuthorization?.consentExpiresAt,
       break_glass_authorization_id: breakGlassAuthorization?.authorizationId,
       break_glass_incident_id: breakGlassAuthorization ? body.break_glass?.incidentId : undefined,
     };
@@ -457,6 +462,8 @@ export class OpenIdAuthManager implements IJobProcessor {
         subject: accessSubject,
         ledger_verified: accessProof.ledgerVerified,
         emergency: breakGlassAuthorization ? true : undefined,
+        emergency_consent_id: breakGlassAuthorization?.emergencyConsentId,
+        emergency_consent_expires_at: breakGlassAuthorization?.consentExpiresAt,
         break_glass_authorization_id: breakGlassAuthorization?.authorizationId,
       },
     };

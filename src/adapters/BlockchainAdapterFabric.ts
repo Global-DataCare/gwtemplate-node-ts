@@ -63,11 +63,9 @@ export class BlockchainAdapterFabric implements IBlockchainAdapter {
     assetId: string;
     payload: Record<string, unknown>;
     channel: string;
-    chaincode: string;
   }): Promise<{ accepted: number; txId?: string }> {
     const config = loadFabricBlockchainConfig();
     const manager = new ManageAssetArtifact({
-      chaincodeName: params.chaincode,
       channelName: params.channel,
     });
 

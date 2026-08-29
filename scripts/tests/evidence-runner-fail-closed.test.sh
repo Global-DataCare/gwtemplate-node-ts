@@ -2,7 +2,8 @@
 # Flow contract:
 # 1. each evidence gate executes with errexit and pipefail even while its log is piped through redaction;
 # 2. the first failing command stops that gate and records FAIL;
-# 3. disposable Fabric CA databases are removed before a clean local-network reproduction.
+# 3. the environment gate rejects any tracked repository with uncommitted changes;
+# 4. disposable Fabric CA databases are removed before a clean local-network reproduction.
 # Authorization invariant: a failed privileged mutation can never be converted into a passing gate.
 # Persistence invariant: only logs and PASS/FAIL status survive; disposable CA state never contaminates a rerun.
 set -euo pipefail
@@ -35,3 +36,7 @@ grep -Fq before-failure "${EVIDENCE_DIR}/logs/deliberate-failure.log"
 RUNNER="${ROOT}/scripts/collect-open-source-production-readiness-evidence.sh"
 grep -Fq 'crypto/ca/root/fabric-ca-server.db' "${RUNNER}"
 grep -Fq 'crypto/ca/ica/fabric-ca-server.db' "${RUNNER}"
+grep -Fq 'return 1 # tracked repository is dirty' "${RUNNER}"
+grep -Fq 'GDC_CONTAINER_PREFIX="${GDC_CONTAINER_PREFIX:-gdc-public}"' "${RUNNER}"
+grep -Fq 'DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"' "${RUNNER}"
+grep -Fq 'COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-gdc-public-local-network}"' "${RUNNER}"
