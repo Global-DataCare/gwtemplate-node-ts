@@ -59,7 +59,7 @@ gw:
     database: postgres
     storage: ipfs
     envelope: hashicorp-transit
-    replayProtection: postgres
+    replayProtection: mem
   authTokenVerifier: firebase
   securityMode: strict
   didcommPlain: disabled
@@ -72,6 +72,7 @@ peer:
   mspId: HostMSP
   externalEndpoint: peer0.host.example.invalid:7051
   bootstrap: ""
+  extraEnv: {}
   mspSecretName: peer-msp
   tlsSecretName: peer-tls
   couchdbSecretName: couchdb-auth

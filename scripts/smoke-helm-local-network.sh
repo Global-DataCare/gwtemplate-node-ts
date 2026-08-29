@@ -19,6 +19,8 @@ NAMESPACE="${HELM_EVIDENCE_NAMESPACE:-local-host-evidence}"
 RELEASE="${HELM_EVIDENCE_RELEASE:-host-evidence}"
 KEEP_CLUSTER="${KEEP_HELM_EVIDENCE_CLUSTER:-false}"
 KIND_PEER_SYNC_ATTEMPTS="${KIND_PEER_SYNC_ATTEMPTS:-600}"
+ORDERER_HOST_PORT="${ORDERER_HOST_PORT:-7050}"
+HOST2_PEER_HOST_PORT="${HOST2_PEER_HOST_PORT:-9051}"
 GDC_CONTAINER_PREFIX="${GDC_CONTAINER_PREFIX:-gdc-public}"
 DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"
 FABRIC_PEER_CONTAINER="${GDC_CONTAINER_PREFIX}-peer0-host1"
@@ -227,8 +229,77 @@ kind_image_digest="$(jq -r '.repoDigests[0]' <<< "${kind_image_record}")"
 }
 
 kubectl --context "${KUBE_CONTEXT}" create namespace "${NAMESPACE}"
-kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" create service externalname orderer \
-  --external-name host.docker.internal
+cat <<EOF | kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orderer-tcp-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orderer-tcp-bridge
+  template:
+    metadata:
+      labels:
+        app: orderer-tcp-bridge
+    spec:
+      containers:
+        - name: orderer-tcp-bridge
+          image: ${BUSYBOX_IMAGE}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-ec"]
+          args: ["exec nc -lk -p 7050 -e nc host.docker.internal ${ORDERER_HOST_PORT}"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orderer
+spec:
+  selector:
+    app: orderer-tcp-bridge
+  ports:
+    - name: grpc
+      port: 7050
+      targetPort: 7050
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: host2-bootstrap-tcp-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: host2-bootstrap-tcp-bridge
+  template:
+    metadata:
+      labels:
+        app: host2-bootstrap-tcp-bridge
+    spec:
+      containers:
+        - name: host2-bootstrap-tcp-bridge
+          image: ${BUSYBOX_IMAGE}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-ec"]
+          args: ["exec nc -lk -p 7051 -e nc host.docker.internal ${HOST2_PEER_HOST_PORT}"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: peer0-host2
+spec:
+  selector:
+    app: host2-bootstrap-tcp-bridge
+  ports:
+    - name: grpc
+      port: 7051
+      targetPort: 7051
+EOF
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
+  deployment/orderer-tcp-bridge --timeout=2m
+kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" rollout status \
+  deployment/host2-bootstrap-tcp-bridge --timeout=2m
 
 GW_SECRET_ENV="${TEMP_DIR}/gw.secret.env"
 awk -F= '
@@ -295,7 +366,7 @@ helm upgrade --install "${RELEASE}" "${ROOT}/charts/gdc-host" \
   --set-string peer.name=peer-kind-host2 \
   --set-string peer.mspId="${KIND_PEER_MSP_ID}" \
   --set-string peer.externalEndpoint="${KIND_PEER_SERVICE}:7051" \
-  --set-string peer.bootstrap= \
+  --set-string peer.bootstrap=peer0-host2:7051 \
   --set-string peer.mspSecretName=host-evidence-peer-msp \
   --set-string peer.tlsSecretName=host-evidence-peer-tls \
   --set-string peer.couchdbSecretName=host-evidence-couchdb \
@@ -364,7 +435,7 @@ wait_for_kind_peer_sync() {
       peer channel getinfo -c "${channel}" 2>/dev/null \
       | sed 's/^Blockchain info: //' | jq -r '.height')"
     kind_height="$(kind_peer_exec peer channel getinfo -c "${channel}" 2>/dev/null \
-      | sed 's/^Blockchain info: //' | jq -r '.height')"
+      | sed 's/^Blockchain info: //' | jq -r '.height' || true)"
     if [[ "${network_height}" -ge 1 && "${kind_height}" == "${network_height}" ]]; then
       echo "Peer Kubernetes sincronizado: channel=${channel} height=${kind_height}"
       return 0

@@ -45,6 +45,19 @@
   gossip bootstrap peers, allow sufficient configurable time for direct
   orderer catch-up and preserve exact-height verification before E2E traffic.
 
+- Isolate concurrent evidence stacks by namespacing the ConsentAccess CCAAS
+  container and by bridging kind to the configured Docker orderer host port
+  instead of assuming port 7050 is available on the workstation.
+
+- Allow explicit peer environment overrides in the reusable host chart. The
+  local evidence profile bridges only the existing same-MSP bootstrap peer so
+  lifecycle private data follows normal Fabric gossip while foreign-MSP
+  bootstrap remains forbidden.
+
+- Make the default Helm values schema-valid and runnable by selecting the
+  supported in-memory replay-protection provider; production values continue
+  to select Redis explicitly.
+
 - Bind Fabric peer and GW client certificates through
   `gdc.hostCredentialSha256`: Fabric CA does not accept the `:` characters of a
   `urn:uuid` inside an `:ecert` attribute; authorization retains the complete
