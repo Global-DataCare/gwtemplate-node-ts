@@ -13,3 +13,14 @@ dominios, direcciones, credenciales ni inventarios de un proveedor concreto.
 
 Los anexos específicos de un proveedor se mantienen fuera del repositorio
 público y deben fijar el commit y los checksums de esta entrega.
+
+## Imágenes OCI públicas verificadas
+
+- [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
+  `ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f`
+- [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
+  `ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac`
+
+GW CORE y CCAAS son artefactos independientes. El segundo contiene los nueve
+servidores de chaincode, pero sus package IDs se generan para el nombre,
+namespace y Services exactos de cada release Helm.

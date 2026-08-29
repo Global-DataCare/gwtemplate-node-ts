@@ -18,6 +18,17 @@
   <h1>Guía reproducible para el alta y despliegue de un host</h1>
   <p><strong>Documento público en español para memoria, consultoría e integración.</strong></p>
 
+  <h2>Imágenes OCI públicas verificadas</h2>
+  <ul>
+    <li>GW CORE: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/gw-core">https://github.com/orgs/Global-DataCare/packages/container/package/gw-core</a>:
+      <code>ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f</code>.</li>
+    <li>Runtime CCAAS: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime">https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime</a>:
+      <code>ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac</code>.</li>
+  </ul>
+  <p>GW CORE y CCAAS son artefactos OCI distintos. El runtime CCAAS contiene
+  los nueve servidores de chaincode, pero los package IDs se generan para el
+  nombre, namespace y Services exactos de cada release Helm.</p>
+
   <h2>1. Qué es el recolector de evidencias</h2>
   <p>El término «runner SEDIA» es informal. No es Helm ni una herramienta
   oficial de SEDIA. Es el recolector público
@@ -155,17 +166,20 @@ shasum -a 256 -c manifest.sha256</pre>
   <code>manifest.sha256</code>.</p>
 
   <h2>11. Imagen OCI, values y package IDs</h2>
-  <pre>docker build -t "${OCI_REPOSITORY}/gw-core:${release_tag}" .
-docker push "${OCI_REPOSITORY}/gw-core:${release_tag}"
-docker buildx imagetools inspect "${OCI_REPOSITORY}/gw-core:${release_tag}"</pre>
-  <p>GW CORE es un servicio y no se publica en npm. El values usa el digest OCI.
-  Cada CCAAS necesita una imagen por digest y un paquete cuya dirección sea el
-  Service exacto del release. El package ID es
+  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
+docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
+docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
+docker pull "${GW_PUBLIC_IMAGE}"
+docker pull "${CCAAS_PUBLIC_IMAGE}"</pre>
+  <p>GW CORE es un servicio y no se publica en npm. El values de GW usa su
+  digest OCI. Cada entrada CCAAS usa el digest del runtime común y un paquete
+  cuya dirección sea el Service exacto del release. El package ID es
   <code>&lt;label&gt;:&lt;sha256 del .tgz&gt;</code>; cualquier cambio de Service,
   release, puerto o TLS obliga a regenerarlo.</p>
   <pre>HOST_FULLNAME="${HELM_RELEASE}" \
 KUBE_NAMESPACE="${KUBE_NAMESPACE}" \
-CCAAS_IMAGE="${OCI_REPOSITORY}/host-runtime@sha256:&lt;digest&gt;" \
+CCAAS_IMAGE="${CCAAS_PUBLIC_IMAGE}" \
 CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
   bash scripts/onboarding/prepare-ccaas-packages.sh
 shasum -a 256 -c /secure/onboarding/ccaas/manifest.sha256</pre>
