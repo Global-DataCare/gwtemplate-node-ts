@@ -159,19 +159,27 @@ shasum -a 256 -c manifest.sha256
 
 ## 7. Imágenes OCI y package IDs CCAAS
 
-GW CORE no se publica en npm. Se construye, valida y publica como contenedor:
+GW CORE no se publica en npm. La versión verificada está disponible en la
+[página pública del paquete GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core).
+El runtime común de los nueve chaincodes está disponible en la
+[página pública del paquete CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime).
+
+GW CORE y CCAAS son artefactos OCI distintos. Use siempre sus digests:
 
 ```bash
-docker build -t "${OCI_REPOSITORY}/gw-core:${release_tag}" .
-docker push "${OCI_REPOSITORY}/gw-core:${release_tag}"
-docker buildx imagetools inspect "${OCI_REPOSITORY}/gw-core:${release_tag}"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
+docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
+docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
+docker pull "${GW_PUBLIC_IMAGE}"
+docker pull "${CCAAS_PUBLIC_IMAGE}"
 ```
 
-El values usa el digest devuelto por el registro. Cada CCAAS necesita imagen
-por digest y paquete `ccaas`; su `connection.json.address` debe ser el Service
-exacto del release. El package ID es `<label>:<sha256 del .tgz>`. Cambiar
-release, nombre completo, Service, puerto o TLS obliga a regenerarlo. Los IDs y
-digests de los ejemplos son marcadores, no valores desplegables.
+El values de GW usa `GW_PUBLIC_IMAGE`. Cada entrada CCAAS usa la misma
+`CCAAS_PUBLIC_IMAGE`, pero necesita su propio paquete `ccaas`; su
+`connection.json.address` debe ser el Service exacto del release. El package ID
+es `<label>:<sha256 del .tgz>`. Cambiar release, nombre completo, Service,
+puerto o TLS obliga a regenerarlo.
 
 Genere los nueve paquetes y el fragmento de values después de fijar el nombre
 completo que Helm usará para los Services:
@@ -179,7 +187,7 @@ completo que Helm usará para los Services:
 ```bash
 HOST_FULLNAME="${HELM_RELEASE}" \
 KUBE_NAMESPACE="${KUBE_NAMESPACE}" \
-CCAAS_IMAGE="${OCI_REPOSITORY}/host-runtime@sha256:<digest>" \
+CCAAS_IMAGE="${CCAAS_PUBLIC_IMAGE}" \
 CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
   bash scripts/onboarding/prepare-ccaas-packages.sh
 

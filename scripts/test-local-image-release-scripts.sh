@@ -15,6 +15,7 @@ bash -n ./docker_build_local.sh ./docker_run_local.sh ./cloud_deploy.sh \
 
 node --test ./scripts/tests/openapi-core-boundary.test.mjs
 bash ./scripts/tests/consentaccess-multi-host-lifecycle.test.sh
+bash ./scripts/tests/public-gw-core-image-docs.test.sh
 
 grep -qx 'node_modules' .dockerignore
 grep -qx 'build' .dockerignore
@@ -120,7 +121,8 @@ grep -Fq '.source.Type.LocalPackage.package_id == $package_id' ./scripts/install
 grep -Fq '.version == $version and .sequence == 1 and .approvals[$msp] == true' \
   ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gw.fabricPeerEndpoint="${KIND_PEER_SERVICE}:7051"' ./scripts/smoke-helm-local-network.sh
-grep -Fq 'create service externalname orderer' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'name: orderer-tcp-bridge' ./scripts/smoke-helm-local-network.sh
+grep -Fq 'name: orderer' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer.bootstrap=' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'KIND_PEER_SYNC_ATTEMPTS="${KIND_PEER_SYNC_ATTEMPTS:-600}"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'wait_for_kind_peer_sync' ./scripts/smoke-helm-local-network.sh

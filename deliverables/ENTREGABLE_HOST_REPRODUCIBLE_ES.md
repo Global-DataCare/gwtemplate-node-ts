@@ -11,6 +11,21 @@ homologada por SEDIA. Es el nombre informal del recolector público
 `npm run evidence:open-source-production-readiness`. Su función es ejecutar
 las pruebas y reunir estados, logs saneados, resumen y hashes para la memoria.
 
+## Imágenes públicas del entregable
+
+Las dos imágenes `linux/amd64` verificadas están disponibles públicamente en
+GitHub Container Registry:
+
+- [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
+  `ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f`.
+- [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
+  `ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac`.
+
+La primera ejecuta GW CORE. La segunda contiene los nueve servidores de
+chaincode y selecciona cada contrato mediante `CHAINCODE_NAME`. No sustituye
+los paquetes CCAAS: sus package IDs dependen de los Services exactos del
+release y se generan después de fijar el nombre y namespace Helm.
+
 ## Qué demuestra
 
 La evidencia se divide en dos puertas complementarias:
@@ -100,6 +115,8 @@ indique sus rutas con `DATASPACE_CA_ROOT` y `DATASPACE_ICA_ROOT`.
 
 ## Ejecución completa
 
+La prueba de reproducibilidad construye GW CORE desde el checkout:
+
 ```bash
 cd "${REPO_ROOT}"
 npm ci
@@ -113,6 +130,17 @@ IMAGE_NAME="${image_name}" \
 DATASPACE_CA_ROOT="${DATASPACE_CA_ROOT}" \
 DATASPACE_ICA_ROOT="${DATASPACE_ICA_ROOT}" \
 npm run evidence:open-source-production-readiness
+```
+
+Para verificar o reutilizar los artefactos ya publicados sin reconstruirlos:
+
+```bash
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
+docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
+docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
+docker pull "${GW_PUBLIC_IMAGE}"
+docker pull "${CCAAS_PUBLIC_IMAGE}"
 ```
 
 La salida pública queda bajo

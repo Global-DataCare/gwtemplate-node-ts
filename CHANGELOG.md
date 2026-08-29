@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Document the public immutable GHCR manifests for GW CORE and the separate
+  nine-contract CCAAS host runtime across the repository entry point, Helm
+  guide and Spanish deliverables; keep deployment-specific CCAAS package IDs
+  generated from each exact release address.
+
 - Accept `Bundle.type=batch` clinical commands attached to `Communication` with
   independent per-entry create/delete results. Persist the verified DIDComm
   issuer as creator evidence; only that creator may delete the subject-scoped

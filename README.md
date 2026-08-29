@@ -4,6 +4,26 @@ El [índice de entregables públicos en español](./deliverables/README.md)
 agrupa la guía Markdown, su fuente HTML editable y el Word para reproducir el
 host completo con Docker, Fabric, ICA, chaincodes, PostgreSQL/IPFS y Helm.
 
+## Published OCI images
+
+The audited `linux/amd64` runtime images are publicly available from GitHub
+Container Registry. Human-readable package pages:
+
+- [GW CORE package](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core)
+- [CCAAS host runtime package](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime)
+
+Deploy immutable manifest digests, not mutable tags:
+
+```text
+ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f
+ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac
+```
+
+GW CORE and the CCAAS host runtime are separate artifacts. The latter contains
+the nine public chaincode servers selected through `CHAINCODE_NAME`; its
+deployment-specific package IDs must still be generated for the exact Helm
+release, namespace and Service addresses.
+
 ([test-api](https://globaldatacare-test-961105121121.europe-southwest1.run.app/api-docs/))
 
 This repository provides a robust, asynchronous, and policy-driven API gateway template.

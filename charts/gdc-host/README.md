@@ -12,6 +12,17 @@ El mismo chart se instala una vez por host. No se debe copiar ni bifurcar para
 cada participante o proveedor de nube; las diferencias pertenecen al fichero
 values privado de cada release.
 
+## Imágenes públicas de referencia
+
+- [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
+  `ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f`
+- [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
+  `ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac`
+
+El runtime CCAAS contiene los nueve contratos públicos, pero cada entrada del
+chart conserva un package ID distinto y calculado para el Service exacto del
+release. No configure la imagen de GW CORE como runtime CCAAS.
+
 ## Límite de responsabilidad
 
 Helm instala runtime. No autoriza el host, no emite certificados, no registra
@@ -48,7 +59,7 @@ imágenes deben expresarse siempre por digest OCI:
 
 ```yaml
 gw:
-  image: registry.example/gw-core@sha256:<64 caracteres hexadecimales>
+  image: ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f
 ```
 
 Antes de instalar, deben existir los Secrets referenciados:
@@ -190,6 +201,9 @@ CCAAS_IMAGE=<registro>/host-runtime@sha256:<digest> \
 CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
   bash scripts/onboarding/prepare-ccaas-packages.sh
 ```
+
+Para la entrega verificada, sustituya `CCAAS_IMAGE` por
+`ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac`.
 
 El fragmento `chaincodes.values.yaml` se combina con los values privados y el
 `manifest.tsv` se entrega al reconciliador para instalación/aprobación.
