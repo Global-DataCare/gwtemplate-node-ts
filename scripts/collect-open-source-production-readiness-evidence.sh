@@ -9,7 +9,9 @@ HOME_PLACEHOLDER='${HOME}'
 GDC_CONTAINER_PREFIX="${GDC_CONTAINER_PREFIX:-gdc-public}"
 DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-gdc-public-local-network}"
-export HOME_PLACEHOLDER GDC_CONTAINER_PREFIX DEVNET_NETWORK_NAME COMPOSE_PROJECT_NAME
+CHAINCODE_SERVER_CONTAINER_NAME="${CHAINCODE_SERVER_CONTAINER_NAME:-${GDC_CONTAINER_PREFIX}-consentaccess-sc}"
+export HOME_PLACEHOLDER GDC_CONTAINER_PREFIX DEVNET_NETWORK_NAME COMPOSE_PROJECT_NAME \
+  CHAINCODE_SERVER_CONTAINER_NAME
 
 # shellcheck source=lib/evidence-gate.sh
 source "${GW_ROOT}/scripts/lib/evidence-gate.sh"
@@ -176,7 +178,7 @@ reset_fabric_devnet() {
     "${GDC_CONTAINER_PREFIX}-fabric-ca-client" \
     "${GDC_CONTAINER_PREFIX}-ica" \
     "${GDC_CONTAINER_PREFIX}-root-ca" \
-    consentaccess-sc; do
+    "${CHAINCODE_SERVER_CONTAINER_NAME}"; do
     docker rm -f "${container}" >/dev/null 2>&1 || true
   done
   for attempt in $(seq 1 30); do
