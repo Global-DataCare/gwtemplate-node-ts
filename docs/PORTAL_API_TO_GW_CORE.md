@@ -280,13 +280,26 @@ in `vet-data-utils-ts`.
 
 VetChain PETD physical/clinical facts are separate from civil/controller
 identity. Weight, height and future governed coat/skin/eye colour or size facts
-belong in subject-scoped veterinary `Observation` entries using registered
-claims and coded values. Existing LOINC weight/height codes may be reused where
-the veterinary profile approves them. Do not invent colour/size claim names or
-claim that ICAO 9303 governs them: ICAO 9303 currently applies to travel-
-document/name normalization. New PETD observation codes, units, search
-allowlists and R4/R5 projections require a shared registry, tests and explicit
-VetChain profile approval first.
+belong in animal-subject `Observation` entries using registered claims and
+coded values. A controller, owner or caregiver may author a declared
+Observation. A veterinarian may later verify its evidence through a separate
+signed attestation; verification never replaces the original author,
+performer, effective time, method or evidence reference.
+
+Changing traits are append-only observations. The current value is a derived
+view, not an overwrite of history. Existing LOINC weight/height codes may be
+reused where the veterinary profile approves them. Do not invent colour/size
+claim names or claim that ICAO 9303 governs them: ICAO 9303 currently applies
+to travel-document/name normalization. New PETD observation codes, units,
+search allowlists and R4/R5 projections require a shared registry, tests and
+explicit VetChain profile approval first.
+
+Blockchain stores neither every measurement nor raw physical traits. PETD
+issuance may record a minimal tamper-evident receipt/manifest committing to the
+exact verified Observation versions or digests, attestations, issuer, animal,
+validity and policy used. Signed evidence remains encrypted off-chain. A
+veterinarian-generated weight used for issuance is covered by that manifest;
+unrelated controller-entered weight history needs no identity-ledger write.
 
 Minimal BFF adapter shape (illustrative; no transport plumbing):
 

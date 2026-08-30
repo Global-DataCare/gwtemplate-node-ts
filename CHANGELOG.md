@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Define PETD traits as animal-subject Observations authorable by controllers
+  or caregivers and separately verifiable by veterinarians; preserve changing
+  traits append-only and anchor only a minimal issuance manifest over the exact
+  verified evidence rather than every measurement or raw trait.
+
 - Clarify that multiple civil identifiers are separate `org.schema.Person`
   entries associated to one card through flat `resource.meta.claims`, while
   PETD physical facts are governed veterinary Observations rather than ICAO
