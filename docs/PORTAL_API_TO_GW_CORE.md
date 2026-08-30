@@ -208,6 +208,33 @@ For a new developer, the flow is:
 6. Only authoritative readback may show `verified`. Browser selection, upload
    completion or a local digest never changes verification status.
 
+Identity storage is claims-first but not FHIR-identity claims. Each evidenced
+identifier is one semantic `Person` entry in the neutral `Subject` collection,
+linked to the same public card through `org.schema.Person.sameAs`. Therefore a
+controller with DNI, passport and driver licence has three associated `Person`
+identity entries; adding one never overwrites the others. The canonical flat
+projection lives in `resource.meta.claims`, for example:
+
+```ts
+{
+  "org.schema.Person.identifier.additionalType":
+    "org.hl7.terminology.CodeSystem.v2-0203.NN",
+  "org.schema.Person.identifier.jurisdiction": "ES",
+  "org.schema.Person.identifier.value": "<protected value>",
+  "org.schema.Person.sameAs": "<stable card URI>"
+}
+```
+
+The UI does not author those string keys. It calls the typed frontend facade;
+the SDK maps its model to and from flat `resource.meta.claims`. FHIR R4/R5 or
+other interoperability resources are projections/adapters and do not replace
+the canonical identity association.
+
+Do not confuse reverse-DNS coding values and Schema.org claim prefixes with
+FHIR claim names. Identity uses `org.schema.Person.*`; a FHIR-like Observation
+uses governed resource-qualified claims such as `Observation.subject`,
+`Observation.code` and `Observation.value-quantity-value`.
+
 The reusable route family is versioned under `/api/identity-evidence`. Product
 routes may proxy it, but should preserve the same request and response shapes.
 
@@ -250,6 +277,16 @@ FNMT/PAdES verification adapter. A new country's certificate-chain,
 revocation, signing-time and subject-attribute adapter belongs in
 `dataspace-ica-ts` behind shared contracts; it does not belong in a browser or
 in `vet-data-utils-ts`.
+
+VetChain PETD physical/clinical facts are separate from civil/controller
+identity. Weight, height and future governed coat/skin/eye colour or size facts
+belong in subject-scoped veterinary `Observation` entries using registered
+claims and coded values. Existing LOINC weight/height codes may be reused where
+the veterinary profile approves them. Do not invent colour/size claim names or
+claim that ICAO 9303 governs them: ICAO 9303 currently applies to travel-
+document/name normalization. New PETD observation codes, units, search
+allowlists and R4/R5 projections require a shared registry, tests and explicit
+VetChain profile approval first.
 
 Minimal BFF adapter shape (illustrative; no transport plumbing):
 

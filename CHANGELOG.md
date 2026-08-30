@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Clarify that multiple civil identifiers are separate `org.schema.Person`
+  entries associated to one card through flat `resource.meta.claims`, while
+  PETD physical facts are governed veterinary Observations rather than ICAO
+  identity claims.
+
 - Document the reusable UHC UNID, VetChain and SOSChain Next.js BFF identity-
   evidence API, including multiple controller identifiers, subject editing,
   self/worker uploads, professional attestations, ICA certificate-trust
