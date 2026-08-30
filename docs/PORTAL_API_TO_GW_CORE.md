@@ -301,6 +301,26 @@ validity and policy used. Signed evidence remains encrypted off-chain. A
 veterinarian-generated weight used for issuance is covered by that manifest;
 unrelated controller-entered weight history needs no identity-ledger write.
 
+PETD is a time-bounded summary view of identity characteristics and relevant
+animal IPS evidence selected for one issuance. Coat/skin colour, eye colour,
+weight and height/size may be shown, but every fact retains its own effective
+time, author, verification state and verifier. Declared and professionally
+verified facts must remain visibly distinct.
+
+Do not collapse temporal fields:
+
+- Observation effective time says when a fact was observed;
+- attestation time says when its evidence was verified;
+- PETD `asOf` identifies the evidence cutoff/set used;
+- PETD `issuedAt` says when the issuer signed; and
+- validity/revocation bounds how long the signed view may be relied on.
+
+`issuedAt` is not the newest verification time. Verifying weight, colour or
+another trait does not prove that the animal remains alive. If issuance policy
+requires presence/liveness evidence, include an explicit professional
+encounter/liveness attestation. It proves only its recorded time; the PETD does
+not continuously attest life after issuance.
+
 Minimal BFF adapter shape (illustrative; no transport plumbing):
 
 ```ts

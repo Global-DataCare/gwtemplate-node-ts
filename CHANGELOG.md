@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Define PETD temporal semantics: per-fact observation and verification times,
+  an explicit evidence cutoff, independent issuer signing and validity times,
+  and explicit encounter/liveness evidence instead of inferring life from the
+  latest verified physical trait.
+
 - Define PETD traits as animal-subject Observations authorable by controllers
   or caregivers and separately verifiable by veterinarians; preserve changing
   traits append-only and anchor only a minimal issuance manifest over the exact
