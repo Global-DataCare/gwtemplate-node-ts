@@ -183,6 +183,92 @@ Important:
 | `/subject/access-consents` | `GET` | list consents with associated evidence | reconstructs a portal-side aggregate from storage/audit |
 | `/subject/access-consents/{consentId}` | `GET` | get one consent detail with original evidence | returns the consent aggregate plus evidence/references |
 
+## Reusable Subject and Controller Identity Evidence
+
+This is the common Next.js BFF contract for UHC UNID, VetChain and SOSChain.
+It is intentionally written in product-neutral terms. A product extension may
+change labels, supported subject fields and evidence policy, but it must not
+replace these authorization or evidence semantics with browser logic.
+
+For a new developer, the flow is:
+
+1. The signed-in account asks the BFF for subjects it is currently authorized
+   to control. Email and telephone are login locators, not controller proof.
+2. The person selects one returned subject. Editing the subject opens the
+   existing person or animal card-management flow.
+3. The BFF returns the controller's independently evidenced identifiers. One
+   controller can have several, for example a Spanish national identifier, a
+   British Columbia driver licence and a passport.
+4. The user chooses which identifier the new evidence concerns and uploads a
+   PDF. The uploader, every signer and the trusted verifier are separate audit
+   actors.
+5. The BFF calls one high-level Node actor-facade method. It never authors
+   DIDComm, FHIR batches, claim paths or signature-validation plumbing in the
+   route handler.
+6. Only authoritative readback may show `verified`. Browser selection, upload
+   completion or a local digest never changes verification status.
+
+The reusable route family is versioned under `/api/identity-evidence`. Product
+routes may proxy it, but should preserve the same request and response shapes.
+
+| Portal API | Method | Frontend purpose | Required high-level backend behavior | Current status |
+|---|---|---|---|---|
+| `/api/identity-evidence/subjects` | `GET` | list backend-authorized controlled people or animals | resolve the signed-in actor and call the subject/controller facade; return only capability-filtered subjects | subject discovery exists in product-specific flows; common route pending |
+| `/api/identity-evidence/subjects/{subjectId}` | `GET`, `PATCH` | read or edit the selected person/animal | delegate to the existing subject/card facade; product extension owns the different person and animal fields | product-specific |
+| `/api/identity-evidence/controllers/me/identifiers` | `GET`, `POST` | list several controller identities or start adding one | call the individual actor facade; use shared identifier coding and jurisdiction types | list/create facade pending |
+| `/api/identity-evidence/evidence` | `POST` | upload a signed PDF supplied by the subject/controller or an authorized organization worker | call `uploadIdentityEvidence(...)`; preserve uploader and declared signers independently | facade and authoritative persistence pending |
+| `/api/identity-evidence/evidence/{evidenceId}/signature-verification` | `POST` | request trusted PDF-signature verification | call `verifyIdentityEvidencePdfSignature(...)`; ICA selects its configured trust adapter | facade/GW orchestration pending; Spain FNMT validator exists in ICA |
+| `/api/identity-evidence/evidence/{evidenceId}/attestations` | `POST` | record professional verification or attestation | call `attestIdentityEvidence(...)` only from an authorized professional facade | policy/facade pending |
+| `/api/identity-evidence/evidence/{evidenceId}` | `GET` | render authoritative evidence and status | call `getIdentityEvidence(...)` and return minimized signer/verifier/readback state | facade/read model pending |
+
+The high-level method names above are the application contract to implement in
+the Node SDK before a BFF route becomes live. Until then, a portal may prepare
+or locally review a document but must label the result unverified. It must not
+replace a missing facade with `fetch` to a raw GW/ICA route.
+
+Actor selection is capability-driven:
+
+- self/controller submission uses `asPersonal()` or
+  `asIndividualController()` according to the loaded profile;
+- an authorized clinic or municipal worker uses `asOrganizationEmployee()`;
+- an attesting regulated professional uses `asProfessional()` and the signed
+  occupation credential (for example ISCO-08 veterinarian `2250`);
+- programmer-friendly aliases such as `asVeterinarian()` may be added later,
+  but they must narrow an already verified professional capability and never
+  accept a role selected by the browser.
+
+Product extensions remain explicit:
+
+| Product | Subject | Extension |
+|---|---|---|
+| UHC UNID | person | self or clinic-worker document supply; minor/legal-representative and two-person signature cases; human card fields and health identifier catalog |
+| VetChain | animal plus controller person | animal fields, controller relationship, veterinarian-assisted evidence and veterinary jurisdiction catalogs; `vet-data-utils-ts` may supply catalogs but never certificate trust |
+| SOSChain | person or animal selected from an authorized card | reuses the same identity workspace and evidence status before emergency IP-call eligibility; verification alone does not grant a call, because current purpose/Consent and contact policy are checked separately |
+
+Country trust is a server-side ICA extension point. Spain reuses the existing
+FNMT/PAdES verification adapter. A new country's certificate-chain,
+revocation, signing-time and subject-attribute adapter belongs in
+`dataspace-ica-ts` behind shared contracts; it does not belong in a browser or
+in `vet-data-utils-ts`.
+
+Minimal BFF adapter shape (illustrative; no transport plumbing):
+
+```ts
+// The route authenticates the account and loads the server-owned profile.
+// The SDK chooses GW/ICA transport, audit envelope and polling internally.
+const actor = session.asIndividualController();
+const result = await actor.uploadIdentityEvidence({
+  subjectId,
+  controllerIdentifierId,
+  pdf,
+  declaredSignerIds,
+});
+
+// Return only the portal-safe projection. Do not turn upload success into
+// `verified`; the subsequent authoritative readback owns that state.
+return Response.json(result.portalView);
+```
+
 ## Secondary Research Use and Digital Twin Provider Lifecycle
 
 The Next.js BFF owns the product routes below and calls the typed Node actor

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Document the reusable UHC UNID, VetChain and SOSChain Next.js BFF identity-
+  evidence API, including multiple controller identifiers, subject editing,
+  self/worker uploads, professional attestations, ICA certificate-trust
+  adapters, actor-facade boundaries and honest implemented-versus-pending
+  status.
+
 - Clarify that organization-controller activation codes are GW-owned annual
   licence credentials returned by Order and consumed by exchange before DCR,
   not ten-minute portal/PDF OTPs. Document future Test Network email delivery,
