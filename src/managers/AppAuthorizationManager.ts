@@ -114,14 +114,17 @@ export class AppAuthorizationManager {
   }
 
   /**
-   * Authorizes one installation with an activation code. The professional seat
-   * remains active and can register additional installations up to maxDevices.
+   * Authorizes one installation with the GW-owned activation licence code.
+   * Its validity follows the annual licence `exp`, not a separate ten-minute
+   * portal/PDF TTL. The professional seat remains active and can register
+   * additional installations for the same verified actor up to maxDevices.
    * This logic assumes the code was found in the URL and passed to the DCR handler.
    * @param code The activation code.
    * @param tenantId The tenant associated with the code.
    * @param sector The sector associated with the tenant.
    * @returns An object with `valid: true` and the license if successful.
-   * @throws {ManagerError} If the code is invalid, already used, or expired.
+   * @throws {ManagerError} If the code is invalid, belongs to another actor,
+   * exceeds its device allowance, or its annual licence has expired.
    */
   public async verifyAndConsumeActivationCode(
     code: string,
