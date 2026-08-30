@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Clarify that organization-controller activation codes are GW-owned annual
+  licence credentials returned by Order and consumed by exchange before DCR,
+  not ten-minute portal/PDF OTPs. Document future Test Network email delivery,
+  production postal delivery, one-month expiry notice and renewal work without
+  changing the current authorization endpoint behavior.
+
 - Document the public immutable GHCR manifests for GW CORE and the separate
   nine-contract CCAAS host runtime across the repository entry point, Helm
   guide and Spanish deliverables; keep deployment-specific CCAAS package IDs
