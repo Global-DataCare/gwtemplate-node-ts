@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Flow contract: a clean checkout contains every authored chaincode and host
-# governance runtime required by the mandatory local-Fabric evidence.
+# Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+# A clean checkout contains every authored chaincode and host governance runtime
+# required by the mandatory local-Fabric evidence.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,6 +23,7 @@ grep -qx 'build' .dockerignore
 grep -qx '.git' .dockerignore
 grep -qx '.env\*' .dockerignore
 grep -qx 'chaincode' .dockerignore
+grep -qx 'infra/fabric/local-network' .dockerignore
 grep -Fq 'Context: ${SCRIPT_DIR}' ./docker_build_local.sh
 grep -Fq '"$SCRIPT_DIR"' ./docker_build_local.sh
 grep -Fq '"$SCRIPT_DIR"' ./cloud_deploy.sh

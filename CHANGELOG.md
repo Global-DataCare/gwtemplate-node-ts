@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Exclude the complete generated local Fabric workspace from the GW CORE
+  Docker build context. Reproducibility sources remain tracked, while enrolled
+  identities, channel artifacts and generated chaincode workspaces never enter
+  the service-image build context.
+
 - Consume the shared emergency-access policy and subject-kind matcher contract
   from `gdc-common-utils-ts@2.6.2`. CORE now owns only authorization
   orchestration, persistence and audit; derived domains inject exact identifier
