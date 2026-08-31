@@ -1,5 +1,12 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 /**
+ * Journey:
+ * 1. An authenticated operator submits the canonical Consent Communication bundle.
+ * 2. GW accepts the asynchronous write and returns its job identifier.
+ * 3. The caller polls that identifier until the ledger-backed job completes.
+ * Authorization invariant: the configured bearer authorizes only the declared tenant operation.
+ * Persistence invariant: success means the deployed ledger path confirmed the write; an accepted or pending placeholder is not success.
+ *
  * Online smoke for ConsentAccess on the shared Fabric-backed `test-network`.
  *
  * What this test proves:
@@ -13,12 +20,12 @@
  * What this test does not prove by itself:
  * - it does not read the Fabric ledger directly
  * - it does not verify the peer tx id independently
- * - it assumes the deployed runtime already has `UNIDMSP` material loaded and
- *   can reach the UNID peer from its Kubernetes environment
+ * - it assumes the deployed runtime already has its operator MSP material
+ *   loaded and can reach the configured peer from its Kubernetes environment
  *
  * Required env to run:
  * - `TEST_NETWORK_API_BASE_URL`
- *   Example: `https://uhc-gw.unid.online`
+ *   Example: `https://gw.example.org`
  *
  * Optional env:
  * - `TEST_NETWORK_AUTH_BEARER`
@@ -86,7 +93,7 @@ async function postJson(url: string, body: unknown, bearer: string): Promise<Res
   });
 }
 
-describeIfConfigured('ConsentAccess smoke against deployed UNID test-network host', () => {
+describeIfConfigured('ConsentAccess smoke against deployed test-network host', () => {
   jest.setTimeout(90_000);
 
   it('submits a healthcare Communication bundle and waits until the async job completes', async () => {

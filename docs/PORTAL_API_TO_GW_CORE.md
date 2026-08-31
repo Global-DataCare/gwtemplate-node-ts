@@ -7,7 +7,7 @@ This is the only maintained portal/API mapping in this repository. The root
 [`portal-api-gw.md`](../portal-api-gw.md) file is a navigation pointer, not a
 second contract. Product portals keep their exhaustive concrete route
 inventory beside their code and classify every route as a CORE facade, portal
-infrastructure, or a product/sector extension.
+infrastructure, or a domain extension.
 
 Use this document when you need to define or review:
 
@@ -17,22 +17,18 @@ Use this document when you need to define or review:
   `consents`
 - which concerns belong to the portal backend instead of the browser/mobile app
 
-This document is intentionally product-facing and integration-facing.
+This document is intentionally portal-facing and integration-facing.
 It does not replace lower-level SDK or GW route documentation.
 
 This is a generic facade design, not the route inventory of one deployed
-portal. Each product adapter must maintain its concrete BFF table beside its
-code and map every row back to this functional contract. For example, UHC
-Personal owns that concrete inventory in
-`custom/uhc-unidonline-next/docs/PORTAL_BFF_GW_MVP_FLOW.md` in the shared
-workspace.
+portal. Each domain adapter must maintain its concrete BFF table beside its
+code and map every row back to this functional contract.
 
-Public BFF paths are named after the governed aggregate or authority, never a
-product brand. Use `/subject`, `/organizations`, `/employees`, `/licenses` and
-`/research`; reserve `/host/...` for host-operator authority and
-`/test-network/...` for Test Network admission and governance. Historical
-`/unid/...` or `/vetchain/...` paths may remain only as documented
-compatibility aliases while consumers migrate.
+Public BFF paths are named after the governed aggregate or authority. Use
+`/subject`, `/organizations`, `/employees`, `/licenses` and `/research`;
+reserve `/host/...` for host-operator authority and `/test-network/...` for
+Test Network admission and governance. Deployment-specific compatibility
+aliases remain outside this CORE contract.
 
 Read the visual GW execution model first in
 [`01.I-GW-CORE-CONTRACT-MAP.md`](01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md);
@@ -102,12 +98,11 @@ calls.
 
 ## Subject / Individual Onboarding
 
-`individual` is the product-neutral aggregate. Its demographic specialization
-does not change the lifecycle: UHC materializes a person and VetChain
-materializes an animal. Both use individual Organization start, Offer, Order,
-exchange and controller DCR. A professional credential may authorize an
-assisted channel to start this flow, but it does not itself become controller
-authority for the created subject.
+`individual` is the neutral aggregate. A domain-specific demographic
+specialization does not change the lifecycle: individual Organization start,
+Offer, Order, exchange and controller DCR. A professional credential may
+authorize an assisted channel to start this flow, but it does not itself become
+controller authority for the created subject.
 
 | Portal API | Method | Frontend purpose | Portal backend behavior |
 |---|---|---|---|
@@ -185,8 +180,8 @@ Important:
 
 ## Reusable Subject and Controller Identity Evidence
 
-This is the common Next.js BFF contract for UHC UNID, VetChain and SOSChain.
-It is intentionally written in product-neutral terms. A product extension may
+This is the common Next.js BFF contract for subject and controller evidence.
+It is intentionally written in product-neutral terms. A domain extension may
 change labels, supported subject fields and evidence policy, but it must not
 replace these authorization or evidence semantics with browser logic.
 
@@ -240,8 +235,8 @@ routes may proxy it, but should preserve the same request and response shapes.
 
 | Portal API | Method | Frontend purpose | Required high-level backend behavior | Current status |
 |---|---|---|---|---|
-| `/api/identity-evidence/subjects` | `GET` | list backend-authorized controlled people or animals | resolve the signed-in actor and call the subject/controller facade; return only capability-filtered subjects | subject discovery exists in product-specific flows; common route pending |
-| `/api/identity-evidence/subjects/{subjectId}` | `GET`, `PATCH` | read or edit the selected person/animal | delegate to the existing subject/card facade; product extension owns the different person and animal fields | product-specific |
+| `/api/identity-evidence/subjects` | `GET` | list backend-authorized controlled people or animals | resolve the signed-in actor and call the subject/controller facade; return only capability-filtered subjects | subject discovery exists in domain flows; common route pending |
+| `/api/identity-evidence/subjects/{subjectId}` | `GET`, `PATCH` | read or edit the selected person/animal | delegate to the existing subject/card facade; domain extension owns the different person and animal fields | domain extension |
 | `/api/identity-evidence/controllers/me/identifiers` | `GET`, `POST` | list several controller identities or start adding one | call the individual actor facade; use shared identifier coding and jurisdiction types | list/create facade pending |
 | `/api/identity-evidence/evidence` | `POST` | upload a signed PDF supplied by the subject/controller or an authorized organization worker | call `uploadIdentityEvidence(...)`; preserve uploader and declared signers independently | facade and authoritative persistence pending |
 | `/api/identity-evidence/evidence/{evidenceId}/signature-verification` | `POST` | request trusted PDF-signature verification | call `verifyIdentityEvidencePdfSignature(...)`; ICA selects its configured trust adapter | facade/GW orchestration pending; Spain FNMT validator exists in ICA |
@@ -264,62 +259,11 @@ Actor selection is capability-driven:
   but they must narrow an already verified professional capability and never
   accept a role selected by the browser.
 
-Product extensions remain explicit:
-
-| Product | Subject | Extension |
-|---|---|---|
-| UHC UNID | person | self or clinic-worker document supply; minor/legal-representative and two-person signature cases; human card fields and health identifier catalog |
-| VetChain | animal plus controller person | animal fields, controller relationship, veterinarian-assisted evidence and veterinary jurisdiction catalogs; `vet-data-utils-ts` may supply catalogs but never certificate trust |
-| SOSChain | person or animal selected from an authorized card | reuses the same identity workspace and evidence status before emergency IP-call eligibility; verification alone does not grant a call, because current purpose/Consent and contact policy are checked separately |
-
 Country trust is a server-side ICA extension point. Spain reuses the existing
 FNMT/PAdES verification adapter. A new country's certificate-chain,
 revocation, signing-time and subject-attribute adapter belongs in
 `dataspace-ica-ts` behind shared contracts; it does not belong in a browser or
-in `vet-data-utils-ts`.
-
-VetChain PETD physical/clinical facts are separate from civil/controller
-identity. Weight, height and future governed coat/skin/eye colour or size facts
-belong in animal-subject `Observation` entries using registered claims and
-coded values. A controller, owner or caregiver may author a declared
-Observation. A veterinarian may later verify its evidence through a separate
-signed attestation; verification never replaces the original author,
-performer, effective time, method or evidence reference.
-
-Changing traits are append-only observations. The current value is a derived
-view, not an overwrite of history. Existing LOINC weight/height codes may be
-reused where the veterinary profile approves them. Do not invent colour/size
-claim names or claim that ICAO 9303 governs them: ICAO 9303 currently applies
-to travel-document/name normalization. New PETD observation codes, units,
-search allowlists and R4/R5 projections require a shared registry, tests and
-explicit VetChain profile approval first.
-
-Blockchain stores neither every measurement nor raw physical traits. PETD
-issuance may record a minimal tamper-evident receipt/manifest committing to the
-exact verified Observation versions or digests, attestations, issuer, animal,
-validity and policy used. Signed evidence remains encrypted off-chain. A
-veterinarian-generated weight used for issuance is covered by that manifest;
-unrelated controller-entered weight history needs no identity-ledger write.
-
-PETD is a time-bounded summary view of identity characteristics and relevant
-animal IPS evidence selected for one issuance. Coat/skin colour, eye colour,
-weight and height/size may be shown, but every fact retains its own effective
-time, author, verification state and verifier. Declared and professionally
-verified facts must remain visibly distinct.
-
-Do not collapse temporal fields:
-
-- Observation effective time says when a fact was observed;
-- attestation time says when its evidence was verified;
-- PETD `asOf` identifies the evidence cutoff/set used;
-- PETD `issuedAt` says when the issuer signed; and
-- validity/revocation bounds how long the signed view may be relied on.
-
-`issuedAt` is not the newest verification time. Verifying weight, colour or
-another trait does not prove that the animal remains alive. If issuance policy
-requires presence/liveness evidence, include an explicit professional
-encounter/liveness attestation. It proves only its recorded time; the PETD does
-not continuously attest life after issuance.
+in a domain catalog package.
 
 Minimal BFF adapter shape (illustrative; no transport plumbing):
 
@@ -341,7 +285,7 @@ return Response.json(result.portalView);
 
 ## Secondary Research Use and Digital Twin Provider Lifecycle
 
-The Next.js BFF owns the product routes below and calls the typed Node actor
+The Next.js BFF owns the application routes below and calls the typed Node actor
 facade. Browser code never posts a canonical twin Composition and never
 selects a twin UUID.
 
@@ -356,7 +300,7 @@ from current operational data. After provider purge and later enrollment, GW
 allocates a new UUID; the detached anonymous twin remains frozen.
 
 The BFF configures one stable `researchUseReference` URL or URI for its portal,
-software product or study and reuses it for GET/PUT. GW maps it to
+software or study and reuses it for GET/PUT. GW maps it to
 `Consent.source-reference`, resolves or creates the private
 `Consent.identifier`, and performs an idempotent upsert. The BFF never stores
 that internal identifier. Future studies use different source references even
@@ -377,7 +321,7 @@ because a named product currently provides the UI.
 | `/test-network/applications/{applicationId}/review` | `POST` | authorize or reject one admission | requires the independent Test Network reviewer profile and signed governance evidence |
 | `/test-network/applications/{applicationId}/complete` | `POST` | complete tenant transaction, Order, exchange and controller DCR | preserves applicant, reviewer, controller and device proofs as separate steps |
 
-Do not expose these as `/unid/...`, `/vetchain/...` or another operator brand.
+Do not expose these through operator-branded paths.
 Branding belongs in configuration and presentation; authorization belongs in
 the enrolled host-controller or Test Network reviewer profile.
 

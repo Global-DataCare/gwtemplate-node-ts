@@ -16,9 +16,10 @@ Every request must meet all applicable conditions:
 3. The emergency FHIR Consent is pinned to one professional, subject, incident
    and read-only scope. Its configured period is at most 24 hours. Each SMART
    token issued under it is valid for no more than 900 seconds.
-4. The declared subject kind matches the canonical subject DID. Human
-   `:individual:` identifiers and animal `:card:uhc:animal:`/`:animal:`
-   identifiers cannot be interchanged.
+4. The declared subject kind matches the canonical subject DID. Shared policy
+   recognizes only neutral `:individual:` and `:animal:` forms. A derived
+   domain package may inject an exact matcher for its own identifier format;
+   GW CORE does not encode card, portal or product-specific identifiers.
 5. The request supplies an opaque incident id, a coded reason and a meaningful
    justification. GW persists one flat-claims FHIR Consent with purpose
    `ETREAT`; Fabric accepts its hash-minimized anchor and the controller
