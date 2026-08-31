@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+// TDD contract: research fixtures distinguish authenticated local authors from preserved external IPS provenance.
 import { readFileSync } from 'fs';
 import path from 'path';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
@@ -126,6 +127,10 @@ export function loadResearchIpsAllSectionsFixture(subjectDid: string): any {
     const resource = entry?.resource;
     if (!resource || typeof resource !== 'object') continue;
 
+    if (resource.resourceType === 'Composition') {
+      resource.author = [{ reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn }];
+    }
+
     if (resource?.subject?.reference) {
       resource.subject.reference = subjectDid;
     }
@@ -188,7 +193,10 @@ function buildHostCollectionName(): string {
  * still belong to GW. The facade only drives the externally visible flow.
  */
 export class TestResearchOrgControllerSdk {
-  constructor(private readonly deps: ResearchAccessGatewayDeps) {}
+  constructor(
+    private readonly deps: ResearchAccessGatewayDeps,
+    private readonly authorizationHeader: string,
+  ) {}
 
   /**
    * Registers the provider tenant (`acme`) directly in the in-memory host
@@ -343,7 +351,7 @@ export class TestResearchOrgControllerSdk {
     const submitResp = await invokeExpress(this.deps.app, {
       method: 'POST',
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
-      headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+      headers: { 'content-type': 'application/json', authorization: this.authorizationHeader },
       body: {
         thid: RESEARCH_ACCESS_TEST_IDS.communicationThreadId,
         body: {
@@ -403,7 +411,7 @@ export class TestResearchOrgControllerSdk {
     const submitResp = await invokeExpress(this.deps.app, {
       method: 'POST',
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
-      headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+      headers: { 'content-type': 'application/json', authorization: this.authorizationHeader },
       body: request,
     });
 
@@ -472,7 +480,10 @@ export class TestResearchOrgControllerSdk {
  * - consume the asynchronous bundle-response contract
  */
 export class TestResearchDigitalTwinSdk {
-  constructor(private readonly deps: Pick<ResearchAccessGatewayDeps, 'app'>) {}
+  constructor(
+    private readonly deps: Pick<ResearchAccessGatewayDeps, 'app'>,
+    private readonly authorizationHeader: string,
+  ) {}
 
   /**
    * Requests a SMART token for the foreign `lab` member using the VP that
@@ -482,7 +493,7 @@ export class TestResearchDigitalTwinSdk {
     const submitResp = await invokeExpress(this.deps.app, {
       method: 'POST',
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`,
-      headers: { 'content-type': 'application/json', authorization: 'Bearer mock' },
+      headers: { 'content-type': 'application/json', authorization: this.authorizationHeader },
       body: {
         thid: RESEARCH_ACCESS_TEST_IDS.smartTokenThreadId,
         iss: RESEARCH_ACCESS_TEST_IDS.deviceDid,
@@ -534,7 +545,7 @@ export class TestResearchDigitalTwinSdk {
     const submitResp = await invokeExpress(this.deps.app, {
       method: 'POST',
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`,
-      headers: { 'content-type': 'application/json', authorization: 'Bearer mock' },
+      headers: { 'content-type': 'application/json', authorization: this.authorizationHeader },
       body: requestPayload,
     });
 

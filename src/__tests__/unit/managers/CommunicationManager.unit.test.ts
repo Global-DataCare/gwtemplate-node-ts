@@ -1,3 +1,4 @@
+// TDD contract: Communication ingestion requires authenticated local authors and preserves external provenance.
 // Flow contract: Communication ingestion persists authorized resources and
 // returns independent per-entry outcomes for mixed clinical batch operations.
 // Authorization invariant: only the exact subject's creator or the same
@@ -25,8 +26,25 @@ import {
   buildExampleCommunicationParticipantSearchInput,
   CommunicationParticipantPrefixes,
   HealthcareBasicSections,
+  ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
+import { BundleTypes } from 'gdc-common-utils-ts/models/bundle-editor-types';
+import { Format } from 'gdc-common-utils-ts/constants/Schemas';
+import { Sector } from 'gdc-common-utils-ts/models/urlPath';
+import {
+  EXAMPLE_ALLERGY_IDENTIFIER,
+  EXAMPLE_ALLERGY_ONSET_DATE_TIME,
+  EXAMPLE_CLINICAL_SECTION_ALLERGIES,
+  EXAMPLE_CONTENT_TYPE_FHIR_JSON,
+  EXAMPLE_CONTROLLER_DID,
+  EXAMPLE_HEALTHCARE_JURISDICTION,
+  EXAMPLE_IPS_COMPOSITION_IDENTIFIER,
+  EXAMPLE_PROFESSIONAL_DID,
+  EXAMPLE_PROVIDER_ORGANIZATION_DID,
+  EXAMPLE_SUBJECT_DID,
+} from 'gdc-common-utils-ts/examples/shared';
+import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 
 describe('CommunicationManager Unit Tests', () => {
   let communicationManager: CommunicationManager;
@@ -897,6 +915,134 @@ describe('CommunicationManager Unit Tests', () => {
       ]));
       expect(await mockVaultRepository.get(tenantVaultId, partialSuccessCreateId, allergySectionId)).toBeDefined();
       expect(await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId)).toBeDefined();
+    });
+
+    it('allows only the authenticated stored author to update or delete clinical data sent through a BFF', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+      const allergyId = EXAMPLE_ALLERGY_IDENTIFIER.split(':').at(-1)!;
+      const tenantId = EXAMPLE_PROVIDER_ORGANIZATION_DID.split(':').at(-1)!;
+      const bearerPayload = { sub: EXAMPLE_PROFESSIONAL_DID };
+      const buildJob = (
+        attachment: Record<string, any>,
+        authenticatedIdentity: Record<string, any> = bearerPayload,
+      ): JobRequest => ({
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId,
+        jurisdiction: EXAMPLE_HEALTHCARE_JURISDICTION,
+        sector: Sector.HEALTH_CARE,
+        section: 'individual',
+        format: Format.FHIR_R4,
+        resourceType: ResourceTypesFhirR4.Communication,
+        action: '_batch',
+        content: {
+          jti: randomUUID(),
+          thid: randomUUID(),
+          iss: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+          aud: testServerDid,
+          type: ResourceTypesFhirR4.Bundle,
+          meta: { bearer: { jwt: { payload: authenticatedIdentity } } },
+          body: {
+            resourceType: ResourceTypesFhirR4.Bundle,
+            type: BundleTypes.batch,
+            data: [{
+              type: ResourceTypesFhirR4.Communication,
+              resource: {
+                resourceType: ResourceTypesFhirR4.Communication,
+                status: 'completed',
+                subject: { reference: EXAMPLE_SUBJECT_DID },
+                topic: { text: EXAMPLE_CLINICAL_SECTION_ALLERGIES },
+                payload: [{ contentAttachment: {
+                  contentType: EXAMPLE_CONTENT_TYPE_FHIR_JSON,
+                  data: Buffer.from(JSON.stringify(attachment), 'utf8').toString('base64'),
+                } }],
+              },
+            }],
+          },
+        } as IDecodedDidcommPayload,
+      });
+      const clinicalDocument = {
+        resourceType: ResourceTypesFhirR4.Bundle,
+        type: BundleTypes.document,
+        entry: [{ resource: {
+          resourceType: ResourceTypesFhirR4.Composition,
+          id: EXAMPLE_IPS_COMPOSITION_IDENTIFIER,
+          status: 'final',
+          subject: { reference: EXAMPLE_SUBJECT_DID },
+          author: [{ reference: EXAMPLE_PROFESSIONAL_DID }],
+          section: [{
+            code: { text: EXAMPLE_CLINICAL_SECTION_ALLERGIES },
+            entry: [{ reference: `${ResourceTypesFhirR4.AllergyIntolerance}/${allergyId}` }],
+          }],
+        } }, { resource: {
+          resourceType: ResourceTypesFhirR4.AllergyIntolerance,
+          id: allergyId,
+          identifier: [{ value: EXAMPLE_ALLERGY_IDENTIFIER }],
+          patient: { reference: EXAMPLE_SUBJECT_DID },
+        } }],
+      };
+
+      await communicationManager.process(buildJob(clinicalDocument));
+      const tenantVaultId = `${Sector.HEALTH_CARE}_${tenantId}`;
+      const sectionId = getSubjectScopedSectionId(EXAMPLE_SUBJECT_DID, 'individual', 'allergies');
+      const stored = await mockVaultRepository.get(tenantVaultId, allergyId, sectionId) as any;
+      expect(stored?.['Composition.author']).toBe(EXAMPLE_PROFESSIONAL_DID);
+
+      const changedDocument = structuredClone(clinicalDocument);
+      (changedDocument.entry[1].resource as any).onsetDateTime = EXAMPLE_ALLERGY_ONSET_DATE_TIME;
+      await communicationManager.process(buildJob(changedDocument, { sub: EXAMPLE_CONTROLLER_DID }));
+      const afterForbiddenUpdate = await mockVaultRepository.get(tenantVaultId, allergyId, sectionId) as any;
+      expect(
+        afterForbiddenUpdate?.['AllergyIntolerance.onset-datetime']
+        || afterForbiddenUpdate?.['org.hl7.fhir.api.AllergyIntolerance.onset-datetime'],
+      ).toBeUndefined();
+
+      await communicationManager.process(buildJob(changedDocument));
+      const afterAuthorUpdate = await mockVaultRepository.get(tenantVaultId, allergyId, sectionId) as any;
+      expect(
+        afterAuthorUpdate?.['AllergyIntolerance.onset-datetime']
+        || afterAuthorUpdate?.['org.hl7.fhir.api.AllergyIntolerance.onset-datetime'],
+      ).toBe(EXAMPLE_ALLERGY_ONSET_DATE_TIME);
+
+      const deleteBundle = {
+        resourceType: ResourceTypesFhirR4.Bundle,
+        type: BundleTypes.batch,
+        entry: [{ request: {
+          method: 'DELETE',
+          url: `${ResourceTypesFhirR4.AllergyIntolerance}/${allergyId}`,
+        } }],
+      };
+      const otherActorDeletion = await communicationManager.process(buildJob(deleteBundle, {
+        sub: EXAMPLE_CONTROLLER_DID,
+      }));
+      expect((otherActorDeletion.body as any).data[0].response.status).toBe('403');
+      const verifiedDeletion = await communicationManager.process(buildJob(deleteBundle));
+      expect((verifiedDeletion.body as any).data[0].response.status).toBe('204');
+
+      const externallyAuthoredDocument = structuredClone(clinicalDocument);
+      (externallyAuthoredDocument.entry[0].resource as any).author = [{
+        reference: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
+      }];
+      await communicationManager.process(buildJob(externallyAuthoredDocument));
+      const externallyAuthoredRecord = await mockVaultRepository.get(tenantVaultId, allergyId, sectionId) as any;
+      expect(externallyAuthoredRecord?.['Composition.author']).toBe(
+        EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
+      );
+
+      const forbiddenExternalOverwrite = structuredClone(externallyAuthoredDocument);
+      (forbiddenExternalOverwrite.entry[1].resource as any).onsetDateTime = EXAMPLE_ALLERGY_ONSET_DATE_TIME;
+      await communicationManager.process(buildJob(forbiddenExternalOverwrite));
+      const unchangedExternalRecord = await mockVaultRepository.get(tenantVaultId, allergyId, sectionId) as any;
+      expect(
+        unchangedExternalRecord?.['AllergyIntolerance.onset-datetime']
+        || unchangedExternalRecord?.['org.hl7.fhir.api.AllergyIntolerance.onset-datetime'],
+      ).toBeUndefined();
+
+      const forbiddenExternalDeletion = await communicationManager.process(buildJob(deleteBundle));
+      expect((forbiddenExternalDeletion.body as any).data[0].response.status).toBe('403');
     });
 
     it('normalizes a native EHR section update without meta.claims and never invents a medication section', async () => {

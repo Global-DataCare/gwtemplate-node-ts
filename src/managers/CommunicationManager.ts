@@ -10,6 +10,8 @@ import {
   ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts/constants/index';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { claimsToContentCid } from 'gdc-common-utils-ts/utils/fhir-cid';
 import {
   buildCommunicationParticipantIndexAttributes,
@@ -1158,7 +1160,8 @@ export class CommunicationManager implements IJobProcessor {
           resource: { resourceType, id: created.recordId },
         };
       } catch (error) {
-        return errorResponse('400', error instanceof Error ? error.message : 'Clinical create failed.');
+        const status = error instanceof ManagerError ? error.status : '400';
+        return errorResponse(status, error instanceof Error ? error.message : 'Clinical create failed.');
       }
     }
 
@@ -1274,7 +1277,18 @@ export class CommunicationManager implements IJobProcessor {
     tenantVaultId: string;
     creatorDid?: string;
   }): Promise<{ recordId: string; versionId: string; created: boolean }> {
+    // A source-authored URN is import provenance, not the importing BFF's
+    // identity. Local author DIDs must equal the authenticated actor.
     const config = PROJECTED_RESOURCE_CONFIG[input.resourceType];
+    const authenticatedActorDid = getAuthenticatedJobActorIdentifiers(input.job)
+      .find((identifier) => identifier.startsWith('did:web:'));
+    const isExternalAuthorUrn = Boolean(input.creatorDid?.startsWith('urn:'));
+    if (!input.creatorDid || (!isExternalAuthorUrn && input.creatorDid !== authenticatedActorDid)) {
+      throw new ManagerError(
+        'Clinical Composition.author must equal the authenticated actor DID.',
+        IssueType.Security,
+      );
+    }
     const claims = this.extractProjectedResourceClaims(
       input.resourceType,
       input.resource,
@@ -1309,12 +1323,29 @@ export class CommunicationManager implements IJobProcessor {
       SUBJECT_SECTION_INDIVIDUAL,
       config.collectionId,
     );
+    const recordId = String(input.resource?.id || versionId || fallbackId);
+    const existing = await this.vaultRepository.get<{ id: string } & Record<string, any>>(
+      input.tenantVaultId,
+      recordId,
+      sectionId,
+    );
     const alreadyIndexed = await this.hasSectionRecordWithClaims(input.tenantVaultId, sectionId, [
       { name: `${input.resourceType}.meta.versionId`, value: versionId },
     ]);
-    const recordId = String(input.resource?.id || versionId || fallbackId);
     if (alreadyIndexed) {
       return { recordId, versionId, created: false };
+    }
+    if (existing?.id === recordId) {
+      const existingAuthors = String(existing['Composition.author'] || existing?.audit?.creatorDid || '')
+        .split(',')
+        .map((author) => author.trim())
+        .filter(Boolean);
+      if (!await this.isAuthenticatedClinicalAuthor(input.job, input.tenantVaultId, existingAuthors)) {
+        throw new ManagerError(
+          'Only the authenticated author may update this clinical resource.',
+          IssueType.Security,
+        );
+      }
     }
 
     const isConsentRule = input.resourceType === 'Consent'

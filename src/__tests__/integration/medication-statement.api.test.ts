@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// TDD flow contract: imported clinical documents preserve their external author while the verified BFF remains the transport actor.
 import { invokeExpress } from './helpers/invokeExpress';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
@@ -111,6 +111,7 @@ describe('MedicationStatement API (integration)', () => {
                   }],
                 },
                 subject: { reference: subjectDid },
+                author: [{ reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn }],
                 section: [
                   {
                     code: {
@@ -416,6 +417,7 @@ describe('MedicationStatement API (integration)', () => {
                 }],
               },
               subject: { reference: subjectDid },
+              author: [{ reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn }],
               date: '2026-05-22T10:00:00Z',
               title: 'IPS Medication Summary',
               section: [
@@ -765,6 +767,7 @@ describe('MedicationStatement API (integration)', () => {
               id: 'digitaltwin-composition-001',
               status: 'final',
               subject: { reference: subjectDid },
+              author: [{ reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn }],
               date: '2026-05-22T10:00:00Z',
               type: {
                 coding: [{
@@ -1007,6 +1010,7 @@ describe('MedicationStatement API (integration)', () => {
                 }],
               },
               subject: { reference: subjectDid },
+              author: [{ reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn }],
               date: '2026-05-22T09:00:00Z',
               title: 'IPS Medication Summary',
               section: [
