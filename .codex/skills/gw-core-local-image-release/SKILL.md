@@ -231,3 +231,23 @@ endpoint results. A build or push alone is not a deployment.
   its sender keys from the issuer tenant.
 - The targeted integration test must use a historical host catalog that does
   not advertise `Order`; advertising it in the fixture hides the real 404.
+
+## DIDComm signature and DCR authorization gate
+
+- Treat decryption, signature verification, key authority and operation
+  authorization as separate checks.
+- `decodeRequest()` opens JOSE and exposes the nested JWS; it does not make the
+  signature trusted by itself.
+- Verify every nested JWS. A JWS signing `jwk` and a JWE sender-encryption
+  `jwk` have different purposes and must never be interchanged.
+- Embedded controller/application communication keys are limited to the
+  pre-DCR bootstrap sequence. The first DCR separately verifies possession of
+  the new device key and authorizes its registration with the verified
+  controller/initial-access proof. After DCR, resolve persisted actor/device
+  keys even when the request supplies another key.
+- Do not describe legacy `Organization/_activate` as a complete DCR: it does
+  not create `DeviceProfile`, issue `client_id` or bind a device to a licence.
+- Verify the host-issued initial access token in plaintext and encrypted
+  `Device/_dcr`, and project only the verified token claims into the worker.
+- Keep 101 examples on `ServerProfileSessionManager.enroll(...)`; JOSE packing,
+  raw routes and queue inspection belong only in transport/integration tests.

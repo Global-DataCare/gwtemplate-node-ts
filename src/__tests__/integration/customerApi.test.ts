@@ -43,6 +43,7 @@ import { testTenant1AlternateName, testTenant1AddressCountry } from '../data/org
 import { ORGANIZATION_REGISTRATION_JOB } from '../data/example-jobs'; // Using a canonical job fixture
 import { invokeExpress } from './helpers/invokeExpress';
 import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
+import { withoutIncompleteJwsProof } from '../data/example-payloads';
 
 // --- Mock Dependencies ---
 const mockQueueAdapter: jest.Mocked<QueueAdapter> = {
@@ -112,7 +113,12 @@ describe('Person Onboarding API', () => {
     } as any);
 
     // Mock decodeRequest to return a canonical, imported job fixture.
-    const mockJob = { ...ORGANIZATION_REGISTRATION_JOB }; // Use a valid job as a template
+    // This suite proves routing/queueing. Complete JWS verification is covered
+    // by the dedicated encrypted-transport contract suites.
+    const mockJob = {
+      ...ORGANIZATION_REGISTRATION_JOB,
+      content: withoutIncompleteJwsProof(ORGANIZATION_REGISTRATION_JOB.content as any),
+    };
     mockKmsService.decodeRequest.mockResolvedValue(mockJob);
 
     // --- Act ---

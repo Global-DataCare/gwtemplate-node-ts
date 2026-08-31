@@ -54,14 +54,29 @@ import { ManageAssetArtifactEvent } from '../../blockchain/fabric/v3/manageAsset
 import { ClearingHouseService } from '../../services/ClearingHouseService';
 import { EXAMPLE_EMAIL_PROFESSIONAL } from 'gdc-common-utils-ts/examples/shared';
 import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
+import type { AppAuthorizationManager } from '../../managers/AppAuthorizationManager';
+import {
+  DEVICE_REGISTRATION_REQUEST,
+  INITIAL_ACCESS_TOKEN_EXCHANGE_RESPONSE,
+  INITIAL_ACCESS_TOKEN_VERIFIED_CLAIMS,
+  deviceJwkMldsa,
+  deviceJwkMlkem,
+} from '../data/example-payloads';
+import { DCR_REGISTRATION_JOB } from '../data/example-jobs';
+import { testTenant1AlternateName } from '../data/organization.data';
 
 describe('Device DCR replacement route story', () => {
+  // Journey: 1) verify the host-issued initial access token, 2) verify the
+  // nested device signature, 3) enqueue only verified authorization claims,
+  // 4) persist the replacement device without consuming another licence seat.
   let app: express.Express;
   let queueAdapter: QueueAdapterMem;
   let vaultRepository: VaultMemRepository;
   let tenantManager: TenantsCacheManager;
   let kmsService: KmsService;
+  let cryptographyService: CryptographyService;
   let tenantVaultId: string;
+  let verifyInitialAccessToken: jest.MockedFunction<AppAuthorizationManager['verifyInitialAccessToken']>;
 
   const readStoredContent = async <T>(doc: ConfidentialStorageDoc | undefined): Promise<T> => {
     if (!doc) throw new Error('expected stored document');
@@ -82,7 +97,7 @@ describe('Device DCR replacement route story', () => {
     jest.spyOn(ManageAssetArtifactEvent.prototype, 'createArtifactEvent').mockResolvedValue({} as any);
 
     const logger = new ConsoleLogger();
-    const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
+    cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());
     vaultRepository = new VaultMemRepository();
     const asyncResponseStore = new AsyncResponseStoreMem();
 
@@ -192,6 +207,8 @@ describe('Device DCR replacement route story', () => {
     app = express();
     app.use(express.json({ type: ['application/json', 'application/didcomm-plain+json', 'application/fhir+json'] }));
     app.use(express.urlencoded({ extended: false }));
+    verifyInitialAccessToken = jest.fn<AppAuthorizationManager['verifyInitialAccessToken']>();
+    verifyInitialAccessToken.mockResolvedValue(INITIAL_ACCESS_TOKEN_VERIFIED_CLAIMS);
     app.use(createApiRouter(
       queueAdapter,
       tenantManager,
@@ -200,15 +217,87 @@ describe('Device DCR replacement route story', () => {
       vaultRepository,
       cryptographyService,
       mockConfig.apiBaseUrl,
-      {
-        verifyInitialAccessToken: jest.fn(async () => ({ scope: 'dcr:register' })),
-      } as any,
+      { verifyInitialAccessToken } as Pick<AppAuthorizationManager, 'verifyInitialAccessToken'> as AppAuthorizationManager,
     ));
     jest.clearAllMocks();
   });
 
   afterEach(() => {
     queueAdapter.stop();
+  });
+
+  it('accepts only verified initial-access claims and a valid nested signature for encrypted Device/_dcr', async () => {
+    const initialAccessToken = INITIAL_ACCESS_TOKEN_EXCHANGE_RESPONSE.body.initial_access_token;
+    const verifySignature = jest.spyOn(cryptographyService, 'verifyDetachedJws').mockResolvedValue(true);
+    jest.spyOn(kmsService, 'decodeRequest').mockResolvedValue({
+      content: {
+        ...DEVICE_REGISTRATION_REQUEST,
+        meta: {
+          jws: {
+            protected: {
+              alg: deviceJwkMldsa.alg,
+              kid: deviceJwkMldsa.kid,
+              jwk: deviceJwkMldsa,
+            },
+            signature: DEVICE_REGISTRATION_REQUEST.jti,
+          },
+          jwe: { header: { jwk: deviceJwkMlkem } },
+        },
+      },
+    } as any);
+    const addJob = jest.spyOn(queueAdapter, 'addJob').mockResolvedValue(undefined);
+    const tenantSector = String(testClaimsTenant1Registration[ClaimsServiceSchemaorg.category]);
+    const dcrUrl = `/${testTenant1AlternateName}/cds-es/v1/${tenantSector}/${DCR_REGISTRATION_JOB.section}/${DCR_REGISTRATION_JOB.format}/${DCR_REGISTRATION_JOB.resourceType}/${DCR_REGISTRATION_JOB.action}`;
+
+    const response = await invokeExpress(app, {
+      method: 'POST',
+      url: dcrUrl,
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        authorization: `Bearer ${initialAccessToken}`,
+      },
+      body: { request: JSON.stringify(DEVICE_REGISTRATION_REQUEST) },
+    });
+
+    expect(response.status).toBe(202);
+    expect(verifyInitialAccessToken).toHaveBeenCalledWith(initialAccessToken);
+    expect(addJob.mock.calls[0]?.[1]).toEqual(expect.objectContaining({
+      content: expect.objectContaining({
+        meta: expect.objectContaining({
+          bearer: expect.objectContaining({
+            jwt: { header: {}, payload: INITIAL_ACCESS_TOKEN_VERIFIED_CLAIMS },
+          }),
+        }),
+      }),
+    }));
+
+    addJob.mockClear();
+    verifyInitialAccessToken.mockRejectedValueOnce(new Error(INITIAL_ACCESS_TOKEN_EXCHANGE_RESPONSE.jti));
+    const rejectedToken = await invokeExpress(app, {
+      method: 'POST',
+      url: dcrUrl,
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        authorization: `Bearer ${initialAccessToken}`,
+      },
+      body: { request: JSON.stringify(DEVICE_REGISTRATION_REQUEST) },
+    });
+    expect(rejectedToken.status).toBe(401);
+    expect(addJob).not.toHaveBeenCalled();
+
+    verifyInitialAccessToken.mockResolvedValue(INITIAL_ACCESS_TOKEN_VERIFIED_CLAIMS);
+    verifySignature.mockResolvedValueOnce(false);
+    const rejectedSignature = await invokeExpress(app, {
+      method: 'POST',
+      url: dcrUrl,
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        authorization: `Bearer ${initialAccessToken}`,
+      },
+      body: { request: JSON.stringify(DEVICE_REGISTRATION_REQUEST) },
+    });
+    expect(rejectedSignature.status).toBe(401);
+    expect(addJob).not.toHaveBeenCalled();
   });
 
   it('replaces the previous employee device through Device/_dcr and keeps the same license seat', async () => {

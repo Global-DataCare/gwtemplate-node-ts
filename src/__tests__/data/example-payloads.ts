@@ -38,7 +38,7 @@ const deviceJwkMldsaThumbprint = {
   "pub": "base64url-public-sig-key-device",
 } as const;
 // Full JWK as it appears in JWKS (kid/use are fine here for routing/selection).
-const deviceJwkMldsa = {
+export const deviceJwkMldsa = {
   ...deviceJwkMldsaThumbprint,
   "kid": deviceKidMldsa,
   "use": "sig",
@@ -54,7 +54,7 @@ const deviceJwkMlkemThumbprint = {
   "x": "base64url-public-enc-key-device",
 } as const;
 // Full JWK as it appears in JWKS (kid/use are fine here for routing/selection).
-const deviceJwkMlkem = {
+export const deviceJwkMlkem = {
   ...deviceJwkMlkemThumbprint,
   "kid": deviceKidMlkem,
   "use": "enc",
@@ -100,6 +100,20 @@ export const metaRequestBodyFullJWK = {
     }
   }
 };
+
+/**
+ * Removes an intentionally incomplete decoded-JWS marker from a canonical
+ * business fixture used by route/queue tests. A real decoded signed request
+ * always includes `meta.jws.signature`; cryptographic boundary suites must use
+ * a complete compact JWS instead of this helper.
+ */
+export function withoutIncompleteJwsProof<
+  T extends { meta?: Record<string, unknown> },
+>(payload: T): T {
+  if (!payload.meta) return payload;
+  const { jws: _incompleteJws, ...verifiedTransportMetadata } = payload.meta;
+  return { ...payload, meta: verifiedTransportMetadata };
+}
 
 /**
  * Meta object for subsequent requests where the client's keys are already registered.
@@ -659,6 +673,14 @@ export const INITIAL_ACCESS_TOKEN_EXCHANGE_RESPONSE = {
   "body": {
     "initial_access_token": "initial-access-token-001"
   }
+};
+
+/**
+ * Canonical claims returned after verifying the example initial access token.
+ */
+export const INITIAL_ACCESS_TOKEN_VERIFIED_CLAIMS = {
+  scope: 'dcr:register',
+  act_code: DCR_REQUEST_BODY.code,
 };
 
 /**

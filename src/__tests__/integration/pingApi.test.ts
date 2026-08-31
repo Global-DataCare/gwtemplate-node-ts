@@ -81,12 +81,6 @@ describe('Ping API Endpoint', () => {
         content: {
           ...decodedPingMessage,
           meta: {
-            jws: {
-              protected: {
-                alg: 'ML-DSA-44',
-                kid: 'did:web:some-issuer#key-1',
-              },
-            },
             jwe: {
               header: {
                 skid: 'did:web:some-issuer#enc-key-1',
@@ -147,12 +141,6 @@ describe('Ping API Endpoint', () => {
         content: {
           ...decodedTenantPingMessage,
           meta: {
-            jws: {
-              protected: {
-                alg: 'ML-DSA-44',
-                kid: 'did:web:some-issuer#key-1',
-              },
-            },
             jwe: {
               header: {
                 skid: 'did:web:some-issuer#enc-key-1',

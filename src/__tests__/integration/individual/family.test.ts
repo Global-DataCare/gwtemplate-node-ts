@@ -22,7 +22,7 @@ import {
   ClaimsServiceSchemaorg,
 } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getClaimValue } from '../../../utils/claims';
-import { FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
+import { FAMILY_REGISTRATION_REQUEST, withoutIncompleteJwsProof } from '../../data/example-payloads';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { ILogger } from '../../../loggers/ILogger';
@@ -256,7 +256,7 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
 	      format: 'org.schema',
 	      action: '_batch',
 	      resourceType: 'Organization',
-	      content: FAMILY_REGISTRATION_REQUEST as any,
+	      content: withoutIncompleteJwsProof(FAMILY_REGISTRATION_REQUEST) as any,
 	    };
     mockKmsService.decodeRequest.mockResolvedValueOnce(decodedJob as any);
 
@@ -298,7 +298,7 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
       format: 'org.schema',
       action: '_transaction',
       resourceType: 'Organization',
-      content: FAMILY_REGISTRATION_REQUEST as any,
+      content: withoutIncompleteJwsProof(FAMILY_REGISTRATION_REQUEST) as any,
     };
     mockKmsService.decodeRequest.mockResolvedValueOnce(decodedJob as any);
 
@@ -341,7 +341,7 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
       action: '_purge',
       resourceType: 'Organization',
       content: {
-        ...FAMILY_REGISTRATION_REQUEST,
+        ...withoutIncompleteJwsProof(FAMILY_REGISTRATION_REQUEST),
         body: {
           data: [{
             type: 'Family-purge-request-v1.0',

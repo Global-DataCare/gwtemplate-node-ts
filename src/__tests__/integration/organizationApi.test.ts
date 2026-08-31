@@ -27,7 +27,7 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { IStorageAdapter } from '../../database/storage/IStorageAdapter';
 import { ILogger } from '../../loggers/ILogger';
 import { generateTenantCollectionNameFromClaims } from '../../utils/tenant';
-import { ORGANIZATION_ORDER_REQUEST, ORGANIZATION_REGISTRATION_REQUEST } from '../data/example-payloads';
+import { ORGANIZATION_ORDER_REQUEST, ORGANIZATION_REGISTRATION_REQUEST, withoutIncompleteJwsProof } from '../data/example-payloads';
 import { ORGANIZATION_REGISTRATION_JOB } from '../data/example-jobs';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { MlkemPrivateJwk, MlkemPublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
@@ -200,6 +200,7 @@ describe('Organization Registration API', () => {
     kid: 'thumbprint-public-enc-key-device',
     x: 'base64url-public-enc-key-device',
   } as MlkemPublicJwk;
+  let testProvisionedJwks: { keys: JWK[] };
 
   let hostingManager: HostingManager;
   const originalSecurityMode = process.env.SECURITY_MODE;
@@ -259,6 +260,12 @@ describe('Organization Registration API', () => {
     const signerKeyPair = await cryptoService.generateKeyPairMlDsa(dsaSeed);
     const encrypterKeyPair = await cryptoService.generateKeyPairMlKem(kemSeed);
     externalEncrypter = { ...encrypterKeyPair.publicJWKey, dBytes: encrypterKeyPair.secretKeyBytes };
+    testProvisionedJwks = {
+      keys: [
+        { ...signerKeyPair.publicJWKey, use: 'sig' } as JWK,
+        { ...encrypterKeyPair.publicJWKey, use: 'enc' } as JWK,
+      ],
+    };
     mockKmsService.encodeResponse.mockImplementation(async (payload) =>
       cryptoService.encryptJweToCompact(payload, { cty: 'application/api+json' }, externalEncrypter, externalEncrypter),
     );
@@ -276,12 +283,8 @@ describe('Organization Registration API', () => {
       encodedMultiHash: 'zQm...',
     });
 
-    mockKmsService.getPublicJwks.mockImplementation(async () => ({
-      keys: [
-        { kid: 'sig-key-1', use: 'sig', alg: 'ML-DSA-44' } as any,
-        { kid: 'enc-key-1', use: 'enc', crv: 'ML-KEM-768' } as any,
-      ],
-    }));
+    mockKmsService.getPublicJwks.mockResolvedValue(testProvisionedJwks);
+    mockKmsService.provisionKeys.mockResolvedValue(testProvisionedJwks);
 
     mockKmsService.getHostPublicJwkSet.mockResolvedValue({ keys: [hostPublicEncKey as unknown as JWK] });
     mockKmsService.encodeResponse.mockImplementation(async (payload) =>
@@ -772,7 +775,7 @@ describe('Organization Registration API', () => {
       // In this test, we only care that the job is queued. We don't need a valid decoded job.
       mockKmsService.decodeRequest.mockResolvedValue({
         ...ORGANIZATION_REGISTRATION_JOB,
-        content: ORGANIZATION_REGISTRATION_REQUEST
+        content: withoutIncompleteJwsProof(ORGANIZATION_REGISTRATION_REQUEST)
       } as any);
 
       const response = await invokeExpress(app, {
@@ -798,7 +801,7 @@ describe('Organization Registration API', () => {
 
   describe('Organization Registration v2 (Offer/Order Flow)', () => {
     it('should accept a registration request and return a verifiable Offer', async () => {
-      const orgCreationPayload = { ...ORGANIZATION_REGISTRATION_REQUEST };
+      const orgCreationPayload = withoutIncompleteJwsProof(ORGANIZATION_REGISTRATION_REQUEST);
       const { thid } = orgCreationPayload;
 
       // The controller calls decodeRequest. We mock its output to be the job for the manager.
@@ -877,7 +880,7 @@ describe('Organization Registration API', () => {
     });
 
     it('should accept a legal registration request without alternateName and derive it from identifier.value', async () => {
-      const orgCreationPayload = structuredClone(ORGANIZATION_REGISTRATION_REQUEST);
+      const orgCreationPayload = structuredClone(withoutIncompleteJwsProof(ORGANIZATION_REGISTRATION_REQUEST));
       delete (orgCreationPayload.body.data[0].meta.claims as Record<string, unknown>)['org.schema.Organization.alternateName'];
       const { thid } = orgCreationPayload;
 
@@ -941,7 +944,7 @@ describe('Organization Registration API', () => {
 
     it('should process an Order and return a payment Communication', async () => {
       // --- ARRANGE (Phase 1: Initial Registration & Offer) ---
-      const orgCreationPayload = { ...ORGANIZATION_REGISTRATION_REQUEST };
+      const orgCreationPayload = withoutIncompleteJwsProof(ORGANIZATION_REGISTRATION_REQUEST);
       const { thid: regThid } = orgCreationPayload;
       const registrationUrl = `/host/cds-es/v1/test/registry/org.schema/Organization/_batch`;
 
@@ -998,7 +1001,7 @@ describe('Organization Registration API', () => {
       expect(offerId).toBeDefined();
 
       // --- ACT (Phase 2: Submit Order) ---
-      const orderPayload = { ...ORGANIZATION_ORDER_REQUEST };
+      const orderPayload = structuredClone(withoutIncompleteJwsProof(ORGANIZATION_ORDER_REQUEST));
       orderPayload.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
       const { thid: orderThid } = orderPayload;
       
@@ -1011,8 +1014,8 @@ describe('Organization Registration API', () => {
         createdAtTimestamp: Date.now(),
         content: orderPayload,
       };
-      // For this test we bypass orchestrator signature resolution by embedding a JWK,
-      // matching the "full JWK" path used during initial registration.
+      // Preserve the response-encryption key required by the manager. This
+      // manager journey begins after the separate JWS boundary proof.
       (decodedOrderJob.content as any).meta = (decodedOrderJob.content as any).meta || {};
       (decodedOrderJob.content as any).meta.jwe = (decodedOrderJob.content as any).meta.jwe || { header: {} };
       (decodedOrderJob.content as any).meta.jwe.header = (decodedOrderJob.content as any).meta.jwe.header || {};
