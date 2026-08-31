@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Add separate public Spanish runbooks for local audit evidence, data-space ICA
+  migration/promotion, and real host rollout through test-network and
+  production. Add a high-level host bootstrap assistant that generates the
+  host public DID and requests the governed HostingServiceCredential without
+  requiring operators to construct JWS or HTTP payloads manually.
+
 - Added an executable CORE contract manifest and high-level test-layout guide so derived gateways can distinguish shared contracts from product-only extensions without relying on matching test counts.
 
 - Require locally authored clinical projections to match the authenticated
