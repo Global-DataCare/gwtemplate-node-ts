@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "contracts": [
+    {
+      "id": "authenticated-clinical-author",
+      "testFile": "src/__tests__/unit/managers/CommunicationManager.unit.test.ts",
+      "marker": "requires authenticated local authors"
+    },
+    {
+      "id": "external-ips-author-provenance",
+      "testFile": "src/__tests__/integration/medication-statement.api.test.ts",
+      "marker": "preserve their external author"
+    },
+    {
+      "id": "verified-research-ingestion",
+      "testFile": "src/__tests__/integration/identity/research-access.conversation.test.ts",
+      "marker": "verified author ingests IPS data"
+    }
+  ]
+}

@@ -142,6 +142,13 @@ Verify current branches, versions and published npm state before release claims.
 
 ## Preserve authored clinical deletion
 
+- Require a locally declared `Composition.author` to equal the authenticated
+  actor DID before first persistence. An anonymous bearer or body claim never
+  becomes author evidence.
+- Preserve an imported external `urn:*` author as provenance only. The local
+  importer cannot update or delete that record merely by repeating the URN.
+- Apply the same stored-author check to updates as to deletes; never overwrite
+  first and attempt authorization afterwards.
 - Use `Bundle.type = batch`; each entry independently selects `.create()`, `.update()` or `.delete()`. Do not turn this flow into a transaction.
 - A typed delete addresses exactly `ResourceType/id`, has no resource body and may carry `.ifMatch(versionId)`.
 - Store only the creator DID in the clinical resource as `Composition.author`. Never store email, phone or their stable hashes in that resource.
