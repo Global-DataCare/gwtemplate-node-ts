@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release and Test Discipline"
+  short_description: "Enforce clean releases and test boundaries"
+  default_prompt: "Use $enforce-release-test-discipline to ship this change with canonical fixtures, layered tests, and verified branch and release state."
