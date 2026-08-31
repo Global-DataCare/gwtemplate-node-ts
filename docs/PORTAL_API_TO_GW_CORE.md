@@ -214,7 +214,8 @@ projection lives in `resource.meta.claims`, for example:
 {
   "org.schema.Person.identifier.additionalType":
     "org.hl7.terminology.CodeSystem.v2-0203.NN",
-  "org.schema.Person.identifier.jurisdiction": "ES",
+  "org.schema.Person.addressCountry": "ES",
+  "org.schema.Person.addressRegion": "ES-CT",
   "org.schema.Person.identifier.value": "<protected value>",
   "org.schema.Person.sameAs": "<stable card URI>"
 }
@@ -230,23 +231,27 @@ FHIR claim names. Identity uses `org.schema.Person.*`; a FHIR-like Observation
 uses governed resource-qualified claims such as `Observation.subject`,
 `Observation.code` and `Observation.value-quantity-value`.
 
-The reusable route family is versioned under `/api/identity-evidence`. Product
-routes may proxy it, but should preserve the same request and response shapes.
+The first implemented provider route is `/api/identity-evidence`. It is a
+product extension, not a new GW CORE endpoint. SOSChain may proxy it through a
+fixed provider route while preserving the same request and response shapes.
 
 | Portal API | Method | Frontend purpose | Required high-level backend behavior | Current status |
 |---|---|---|---|---|
 | `/api/identity-evidence/subjects` | `GET` | list backend-authorized controlled people or animals | resolve the signed-in actor and call the subject/controller facade; return only capability-filtered subjects | subject discovery exists in domain flows; common route pending |
+| `/api/identity-evidence?subjectId=...` | `GET` | list masked controller identities and signed-document status for one already-authorized card | reauthorize the signed-in account and exact card, then call `identityEvidence.list(...)` | implemented in PetChain provider BFF; extension scope |
+| `/api/identity-evidence` action `prepare-declaration` | `POST` JSON | create one separate controller `Person` and download its declaration PDF | call `identityEvidence.prepareDeclaration(...)`; store flat claims provider-side | implemented in PetChain provider BFF; extension scope |
+| `/api/identity-evidence` action `upload` | `POST` multipart | upload one signed PDF for the chosen controller identity | call `identityEvidence.upload(...)`; private custody and pending status | implemented in PetChain provider BFF; extension scope |
+| `/api/identity-evidence` action `verify-signature-pdf` | `POST` JSON | request the configured trusted signature verifier | call `identityEvidence.verifySignaturePdf(...)`; only verifier readback changes status | implemented facade and fail-closed adapter; deployed verifier configuration is product-owned |
+| `/api/identity-evidence/vetchain` | `GET`, `POST` | use that PetChain flow inside SOSChain without another login | fixed-origin bearer-forwarding proxy; PetChain independently reauthorizes and persists | implemented in SOSChain Personal; extension scope |
 | `/api/identity-evidence/subjects/{subjectId}` | `GET`, `PATCH` | read or edit the selected person/animal | delegate to the existing subject/card facade; domain extension owns the different person and animal fields | domain extension |
 | `/api/identity-evidence/controllers/me/identifiers` | `GET`, `POST` | list several controller identities or start adding one | call the individual actor facade; use shared identifier coding and jurisdiction types | list/create facade pending |
-| `/api/identity-evidence/evidence` | `POST` | upload a signed PDF supplied by the subject/controller or an authorized organization worker | call `uploadIdentityEvidence(...)`; preserve uploader and declared signers independently | facade and authoritative persistence pending |
-| `/api/identity-evidence/evidence/{evidenceId}/signature-verification` | `POST` | request trusted PDF-signature verification | call `verifyIdentityEvidencePdfSignature(...)`; ICA selects its configured trust adapter | facade/GW orchestration pending; Spain FNMT validator exists in ICA |
 | `/api/identity-evidence/evidence/{evidenceId}/attestations` | `POST` | record professional verification or attestation | call `attestIdentityEvidence(...)` only from an authorized professional facade | policy/facade pending |
-| `/api/identity-evidence/evidence/{evidenceId}` | `GET` | render authoritative evidence and status | call `getIdentityEvidence(...)` and return minimized signer/verifier/readback state | facade/read model pending |
 
-The high-level method names above are the application contract to implement in
-the Node SDK before a BFF route becomes live. Until then, a portal may prepare
-or locally review a document but must label the result unverified. It must not
-replace a missing facade with `fetch` to a raw GW/ICA route.
+The reusable browser SDK now exposes `list`, `prepareDeclaration`, `upload` and
+`verifySignaturePdf`. BFF routes call the provider identity service and its
+trusted verifier port; they do not replace a missing adapter with raw GW/ICA
+plumbing. Organization-worker intake and regulated professional attestation
+remain pending contracts and must not be presented as implemented.
 
 Actor selection is capability-driven:
 
@@ -268,19 +273,16 @@ in a domain catalog package.
 Minimal BFF adapter shape (illustrative; no transport plumbing):
 
 ```ts
-// The route authenticates the account and loads the server-owned profile.
-// The SDK chooses GW/ICA transport, audit envelope and polling internally.
-const actor = session.asIndividualController();
-const result = await actor.uploadIdentityEvidence({
+// Browser/BFF application contract only. The active-session fetch adapter is
+// injected once; the component supplies business fields only.
+await identityEvidence.upload({
   subjectId,
   controllerIdentifierId,
   pdf,
-  declaredSignerIds,
 });
 
-// Return only the portal-safe projection. Do not turn upload success into
-// `verified`; the subsequent authoritative readback owns that state.
-return Response.json(result.portalView);
+// Upload remains pending. Render only subsequent provider readback.
+const view = await identityEvidence.list({ subjectId });
 ```
 
 ## Secondary Research Use and Digital Twin Provider Lifecycle

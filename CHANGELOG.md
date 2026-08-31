@@ -25,6 +25,10 @@
   self/worker uploads, professional attestations, ICA certificate-trust
   adapters, actor-facade boundaries and honest implemented-versus-pending
   status.
+- Record the implemented PetChain `list`/`prepareDeclaration`/`upload`/
+  `verifySignaturePdf` provider facade and SOSChain fixed-origin proxy as
+  extension scope, while keeping organization-worker and professional
+  attestation contracts explicitly pending and outside GW CORE behavior.
 
 - Clarify that organization-controller activation codes are GW-owned annual
   licence credentials returned by Order and consumed by exchange before DCR,
