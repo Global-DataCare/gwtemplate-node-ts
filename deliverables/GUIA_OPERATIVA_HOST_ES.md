@@ -90,6 +90,33 @@ adaptador KMS, backups, observabilidad, NetworkPolicies y puertos.
 
 ## 5. Fase A: autoridad y Fabric ICA
 
+### 5.1 Apertura controlada y comprobación desde el proveedor
+
+La ICA de Fabric no participa en el tráfico normal de gossip, endoso, canales
+o consenso. Se necesita para alta inicial, renovación, revocación e
+incorporación de hosts. Por tanto, su LoadBalancer público puede limitarse a la
+IP fija de salida del proveedor y cerrarse después del enrolamiento.
+
+La autoridad conserva en su repositorio privado el procedimiento para abrir,
+restringir y cerrar esa ventana. Al proveedor sólo se le entregan la URL HTTPS,
+el nombre de CA y la cadena pública. Antes de consumir ningún grant comprueba:
+
+```bash
+export FABRIC_CA_URL='https://fabric-ica.example.org:443'
+export FABRIC_CA_NAME='ca-ica'
+export FABRIC_CA_TLS_CERTFILES=/secure/trust/fabric-ica-ca-chain.pem
+
+fabric-ca-client getcainfo \
+  -u "${FABRIC_CA_URL}" \
+  --caname "${FABRIC_CA_NAME}" \
+  --tls.certfiles "${FABRIC_CA_TLS_CERTFILES}"
+```
+
+La identidad registradora de la ICA de Fabric nunca se entrega al proveedor.
+La autoridad registra los identificadores y secretos acotados; el proveedor
+los consume para generar sus claves privadas y certificados en su propia
+infraestructura.
+
 La autoridad recibe por canal seguro la petición con URL/MSP/Host VC-JWT, el
 envelope de gobernanza firmado, DID públicos, JWKS del operador y el inventario
 gobernado. Primero revisa el plan:
@@ -130,6 +157,27 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
   --manifest /secure/onboarding/onboarding.json --role host \
   --apply --confirm-request "${request_id}"
 ```
+
+El asistente invoca los contratos públicos de enrolamiento. Si se ejecuta el
+procedimiento por pasos para una auditoría, los puntos de entrada son:
+
+```bash
+ENROLLMENT_GRANT_FILE=/secure/grants/peer-grant.json \
+HOST_MSP_OUTPUT_DIR=/secure/host/fabric-peer \
+HOST_PEER_DNS="${HOST_PEER_DNS}" \
+CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
+  bash scripts/enrollment/enroll-host-msp.sh
+
+ENROLLMENT_GRANT_FILE=/secure/grants/gw-client-grant.json \
+HOST_CLIENT_OUTPUT_DIR=/secure/host/fabric-gw-client \
+CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
+  bash scripts/enrollment/enroll-host-client.sh
+```
+
+El primero genera MSP y TLS del peer bajo la ruta privada del host; el segundo
+genera una identidad cliente distinta para GW CORE. Sus variables y rutas se
+materializan desde el manifiesto privado y los grants, no se escriben en el
+chart ni en un ConfigMap.
 
 `fabric-ca-client` genera dentro del host las claves MSP/TLS del peer y la clave
 de una identidad cliente GW independiente; solo envía CSR y recibe certificados.
@@ -244,7 +292,10 @@ helm template "${HELM_RELEASE}" charts/gdc-host \
   --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml > /secure/onboarding/rendered.yaml
 
-helm upgrade --install "${HELM_RELEASE}" charts/gdc-host \
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
+tar -xzf gdc-host-0.3.0.tgz -C /secure/onboarding
+
+helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml \
   --atomic --wait --timeout 15m

@@ -4,3 +4,5 @@ description: Portable governed Fabric peer and GW host runtime
 type: application
 version: 0.3.0
 appVersion: "0.3.0"
+annotations:
+  org.opencontainers.image.source: https://github.com/Global-DataCare/gwtemplate-node-ts

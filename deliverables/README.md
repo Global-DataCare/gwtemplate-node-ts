@@ -14,6 +14,23 @@ dominios, direcciones, credenciales ni inventarios de un proveedor concreto.
 Los anexos específicos de un proveedor se mantienen fuera del repositorio
 público y deben fijar el commit y los checksums de esta entrega.
 
+## Chart Helm público
+
+El mismo chart validado en `local-network` se distribuye como OCI:
+
+```bash
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
+```
+
+Paquete: [gdc-host en GHCR](https://github.com/orgs/Global-DataCare/packages/container/package/gdc-host).
+Digest del manifiesto OCI publicado:
+`sha256:1382c6d302dea258ee1c625e300e60c6a0b63959b3adef72da7d92a46e397784`.
+
+El proveedor puede usar el artefacto OCI o el directorio `charts/gdc-host` del
+commit entregado. Los `values`, Secrets, VC, grants, MSP/TLS, endpoints y
+package IDs son siempre propios del entorno y quedan fuera del repositorio.
+
 ## Imágenes OCI públicas verificadas
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):

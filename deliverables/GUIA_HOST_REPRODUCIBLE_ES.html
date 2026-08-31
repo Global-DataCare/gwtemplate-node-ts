@@ -143,6 +143,15 @@ npm run evidence:open-source-production-readiness</pre>
   clave, IP o fichero env forma parte de la evidencia pública.</p>
 
   <h2>10. Fases de autorización y enrolamiento</h2>
+  <p>La ICA de Fabric se usa para altas, renovaciones y revocaciones, no para
+  el tráfico normal de peers y orderers. La autoridad puede publicar una
+  ventana TLS limitada a la IP de salida del proveedor y cerrarla después. El
+  proveedor recibe URL, nombre de CA y cadena pública, pero nunca la identidad
+  registradora de la ICA de Fabric. Antes del enrolamiento verifica:</p>
+  <pre>fabric-ca-client getcainfo \
+  -u "${FABRIC_CA_URL}" \
+  --caname "${FABRIC_CA_NAME}" \
+  --tls.certfiles "${FABRIC_CA_TLS_CERTFILES}"</pre>
   <p>La autoridad recibe por canal seguro la petición con URL, MSP, Host VC-JWT,
   decisión firmada, DID públicos, JWKS e inventario gobernado. Ejecuta:</p>
   <pre>request_id="$(jq -r '.governanceDecision.decision.requestId' \
@@ -161,11 +170,26 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
   --apply --confirm-request "${request_id}"
 cd /secure/host/helm-runtime
 shasum -a 256 -c manifest.sha256</pre>
+  <p>Para auditar los dos enrolamientos por separado se usan los mismos helpers
+  con variables explícitas:</p>
+  <pre>ENROLLMENT_GRANT_FILE=/secure/grants/peer-grant.json \
+HOST_MSP_OUTPUT_DIR=/secure/host/fabric-peer \
+HOST_PEER_DNS="${HOST_PEER_DNS}" \
+CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
+  bash scripts/enrollment/enroll-host-msp.sh
+ENROLLMENT_GRANT_FILE=/secure/grants/gw-client-grant.json \
+HOST_CLIENT_OUTPUT_DIR=/secure/host/fabric-gw-client \
+CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
+  bash scripts/enrollment/enroll-host-client.sh</pre>
   <p>El paquete resultante contiene solo <code>msp.tgz</code>,
   <code>tls.tgz</code>, <code>authorization.json</code> y
   <code>manifest.sha256</code>.</p>
 
   <h2>11. Imagen OCI, values y package IDs</h2>
+  <pre>helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.0</pre>
+  <p>El chart OCI es el mismo artefacto validado en local-network. Los values,
+  Secrets, grants, MSP/TLS y package IDs se generan de nuevo para cada entorno.</p>
   <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
@@ -200,7 +224,9 @@ REDIS_SECRET_ENV_FILE=/secure/host/redis.env \
   bash scripts/onboarding/materialize-kubernetes-secrets.sh
 bash scripts/validate-host-helm-values.sh \
   /secure/inventory/host.values.yaml "${KUBE_NAMESPACE}" "${HELM_RELEASE}"
-helm upgrade --install "${HELM_RELEASE}" charts/gdc-host \
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
+tar -xzf gdc-host-0.3.0.tgz -C /secure/onboarding
+helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml \
   --atomic --wait --timeout 15m</pre>
