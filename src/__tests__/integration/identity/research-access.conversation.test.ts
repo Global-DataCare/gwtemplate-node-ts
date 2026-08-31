@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// TDD contract: a verified author ingests IPS data before a contract-authorized researcher discovers its pseudonymous twin.
 import { startServer, resetServerConfig } from '../../../server';
 import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
@@ -10,6 +10,7 @@ import {
   TestResearchDigitalTwinSdk,
   TestResearchOrgControllerSdk,
 } from '../helpers/research-access-sdk';
+import { configureAuthenticatedTestActor } from '../helpers/authenticated-test-actor';
 
 /**
  * Didactic end-to-end research access conversation.
@@ -45,13 +46,19 @@ describe('Research access conversation (integration)', () => {
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
     process.env.SECURITY_MODE = 'demo';
     process.env.JSON_LEGACY = 'true';
-    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+    const authenticatedActor = await configureAuthenticatedTestActor();
 
     resetServerConfig();
 
     const gateway = await startServer({ listen: false });
-    const organizationControllerSdk = new TestResearchOrgControllerSdk(gateway);
-    const digitalTwinSdk = new TestResearchDigitalTwinSdk(gateway);
+    const organizationControllerSdk = new TestResearchOrgControllerSdk(
+      gateway,
+      authenticatedActor.authorizationHeader,
+    );
+    const digitalTwinSdk = new TestResearchDigitalTwinSdk(
+      gateway,
+      authenticatedActor.authorizationHeader,
+    );
 
     try {
       await organizationControllerSdk.registerProviderTenant();
@@ -75,6 +82,11 @@ describe('Research access conversation (integration)', () => {
 
       expect(novitaIbuprofenPayload?.data?.[0]?.response?.status).toBe('200');
       expect(novitaParacetamolPayload?.data?.[0]?.response?.status).toBe('200');
+
+      // Authoring above uses the verified controller id_token. Subsequent
+      // calls exercise a GW-issued SMART token, whose signature and scope are
+      // independently covered by the SMART integration suite.
+      process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
 
       const contractVpToken = organizationControllerSdk.buildResearchAccessContractVpToken();
       const smartTokenPayload = await digitalTwinSdk.requestResearchSmartAccessToken(contractVpToken);

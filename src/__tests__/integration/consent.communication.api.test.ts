@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+// TDD contract: locally authored Consent projections require one cryptographically verified actor.
 import { invokeExpress } from './helpers/invokeExpress';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
@@ -26,6 +27,7 @@ import {
   EXAMPLE_SECONDARY_EU_COUNTRY,
   EXAMPLE_SUBJECT_DID,
 } from 'gdc-common-utils-ts/examples/shared';
+import { configureAuthenticatedTestActor } from './helpers/authenticated-test-actor';
 
 const ODRL_MEDIA_TYPE = 'application/odrl+json';
 const FHIR_JSON_MEDIA_TYPE = 'application/fhir+json';
@@ -68,7 +70,7 @@ describe('Consent via Communication API (integration)', () => {
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
     process.env.SECURITY_MODE = 'demo';
     process.env.JSON_LEGACY = 'true';
-    process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+    const authenticatedActor = await configureAuthenticatedTestActor();
 
     resetServerConfig();
 
@@ -169,7 +171,7 @@ describe('Consent via Communication API (integration)', () => {
           communicationFormat,
           '_batch',
         ),
-        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        headers: { 'content-type': 'application/json', authorization: authenticatedActor.authorizationHeader },
         body: {
           thid: thidBatch,
           body: {
@@ -299,7 +301,7 @@ describe('Consent via Communication API (integration)', () => {
           communicationFormat,
           '_batch',
         ),
-        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        headers: { 'content-type': 'application/json', authorization: authenticatedActor.authorizationHeader },
         body: {
           thid: thidRead,
           body: {

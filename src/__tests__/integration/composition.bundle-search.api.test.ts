@@ -1,4 +1,4 @@
-// Flow contract: ingest clinical sections, read the current summary, delete one
+// TDD flow contract: ingest clinical sections, read the current summary, delete one
 // exact authored resource through a batch, then prove operational and permitted
 // Digital Twin readback no longer contains it.
 // Authorization invariant: creator identity and Communication.subject match.
@@ -29,6 +29,7 @@ import { ExampleEmployeeEmails, ExampleEmployeeRoles } from 'gdc-common-utils-ts
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { applyDigitalTwinSecondaryUseDecision } from '../../utils/digital-twin-secondary-use';
+import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 
 describe('Composition Bundle _search API (integration)', () => {
   function loadIpsAllSectionsFixture(subjectDid: string): any {
@@ -47,6 +48,11 @@ describe('Composition Bundle _search API (integration)', () => {
       }
       if (resource?.patient?.reference) {
         resource.patient.reference = subjectDid;
+      }
+      if (resource?.resourceType === 'Composition') {
+        // The imported IPS keeps its external issuer as provenance; the BFF is
+        // the verified transport actor and must not impersonate that issuer.
+        resource.author = [{ reference: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN }];
       }
       if (resource?.medicationCodeableConcept?.coding?.[0]) {
         resource.medicationCodeableConcept.coding[0].userSelected = true;
@@ -141,7 +147,7 @@ describe('Composition Bundle _search API (integration)', () => {
                       'Composition.identifier': 'urn:uuid:composition-001',
                       'Composition.subject': subjectDid,
                       'Composition.section': sectionCode,
-                      'Composition.author': 'did:web:api.acme.org:employee:doctor1',
+                      'Composition.author': EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
                       'Composition.date': '2026-05-16T10:00:00Z',
                       'Composition.type': 'LOINC|60591-5',
                     },

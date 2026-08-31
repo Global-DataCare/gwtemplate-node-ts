@@ -1,6 +1,6 @@
 {
   "name": "gwtemplate-node-ts",
-  "version": "1.23.5",
+  "version": "1.23.6",
   "private": true,
   "license": "Apache-2.0",
   "main": "src/server.ts",
@@ -84,6 +84,7 @@
     "check:local-fabric-host-names": "bash ./scripts/tests/local-fabric-host-names.test.sh",
     "check:identity-chaincode-parity": "bash ./scripts/check-identity-chaincode-parity.sh",
     "test:release-scripts": "bash ./scripts/test-local-image-release-scripts.sh",
+    "check:core-contracts": "node ./scripts/check-core-contract-manifest.mjs && node --test ./scripts/tests/core-contract-manifest.test.mjs",
     "docker:run": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",
     "docker:run:mem": "ENV_FILE=./.env.local-demo ./docker_run_local.sh",
     "docker:run:firestore-demo": "ENV_FILE=./.env.firestore-demo ./docker_run_local.sh",

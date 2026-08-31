@@ -8,6 +8,16 @@
   host public DID and requests the governed HostingServiceCredential without
   requiring operators to construct JWS or HTTP payloads manually.
 
+- Added an executable CORE contract manifest and high-level test-layout guide so derived gateways can distinguish shared contracts from product-only extensions without relying on matching test counts.
+
+- Require locally authored clinical projections to match the authenticated
+  actor before create or update, while preserving external `urn:*` IPS authors
+  as immutable source provenance. Consent and research-access integration tests
+  now use a deterministically verified actor instead of an anonymous demo
+  bearer.
+- Add a high-level authenticated-clinical-author 101 and SDK-only examples for
+  IPS import and typed clinical section updates.
+
 - Include the sibling ICA's open-source Firestore/GCS to PostgreSQL/IPFS
   migration gate in the reproducible production-readiness collector. Public
   evidence uses synthetic data, proves PostgreSQL/CID rereads and digest
