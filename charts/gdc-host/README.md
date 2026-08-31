@@ -1,5 +1,11 @@
 # Chart Helm portable de un host gobernado
 
+Distribución pública OCI:
+
+```bash
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
+```
+
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:
 
 - peer de Fabric y CouchDB propiedad del host;

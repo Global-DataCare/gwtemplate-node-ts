@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Document the public `gdc-host` OCI chart and the provider-neutral Fabric ICA
+  connectivity, host-local MSP/TLS enrollment, Kubernetes Secret and Helm
+  installation handoff. Keep registrar identities, grants, private endpoints
+  and provider inventories outside the public repository.
+
 - Add repository-local release and test discipline covering branch/merge
   evidence, canonical shared fixtures and types, layered test boundaries,
   neutral shared artifacts and verified immutable release promotion.
