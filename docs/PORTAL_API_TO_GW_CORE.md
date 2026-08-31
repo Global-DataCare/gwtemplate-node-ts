@@ -232,17 +232,18 @@ uses governed resource-qualified claims such as `Observation.subject`,
 `Observation.code` and `Observation.value-quantity-value`.
 
 The first implemented provider route is `/api/identity-evidence`. It is a
-product extension, not a new GW CORE endpoint. SOSChain may proxy it through a
-fixed provider route while preserving the same request and response shapes.
+product extension, not a new GW CORE endpoint. A downstream portal may proxy it
+through a fixed provider route while preserving the same request and response
+shapes.
 
 | Portal API | Method | Frontend purpose | Required high-level backend behavior | Current status |
 |---|---|---|---|---|
 | `/api/identity-evidence/subjects` | `GET` | list backend-authorized controlled people or animals | resolve the signed-in actor and call the subject/controller facade; return only capability-filtered subjects | subject discovery exists in domain flows; common route pending |
-| `/api/identity-evidence?subjectId=...` | `GET` | list masked controller identities and signed-document status for one already-authorized card | reauthorize the signed-in account and exact card, then call `identityEvidence.list(...)` | implemented in PetChain provider BFF; extension scope |
-| `/api/identity-evidence` action `prepare-declaration` | `POST` JSON | create one separate controller `Person` and download its declaration PDF | call `identityEvidence.prepareDeclaration(...)`; store flat claims provider-side | implemented in PetChain provider BFF; extension scope |
-| `/api/identity-evidence` action `upload` | `POST` multipart | upload one signed PDF for the chosen controller identity | call `identityEvidence.upload(...)`; private custody and pending status | implemented in PetChain provider BFF; extension scope |
+| `/api/identity-evidence?subjectId=...` | `GET` | list masked controller identities and signed-document status for one already-authorized card | reauthorize the signed-in account and exact card, then call `identityEvidence.list(...)` | implemented in a reference provider BFF; extension scope |
+| `/api/identity-evidence` action `prepare-declaration` | `POST` JSON | create one separate controller `Person` and download its declaration PDF | call `identityEvidence.prepareDeclaration(...)`; store flat claims provider-side | implemented in a reference provider BFF; extension scope |
+| `/api/identity-evidence` action `upload` | `POST` multipart | upload one signed PDF for the chosen controller identity | call `identityEvidence.upload(...)`; private custody and pending status | implemented in a reference provider BFF; extension scope |
 | `/api/identity-evidence` action `verify-signature-pdf` | `POST` JSON | request the configured trusted signature verifier | call `identityEvidence.verifySignaturePdf(...)`; only verifier readback changes status | implemented facade and fail-closed adapter; deployed verifier configuration is product-owned |
-| `/api/identity-evidence/vetchain` | `GET`, `POST` | use that PetChain flow inside SOSChain without another login | fixed-origin bearer-forwarding proxy; PetChain independently reauthorizes and persists | implemented in SOSChain Personal; extension scope |
+| `/api/identity-evidence/provider-proxy` | `GET`, `POST` | use the provider flow inside a downstream portal without another login | fixed-origin bearer-forwarding proxy; the provider independently reauthorizes and persists | implemented in a downstream portal; extension scope |
 | `/api/identity-evidence/subjects/{subjectId}` | `GET`, `PATCH` | read or edit the selected person/animal | delegate to the existing subject/card facade; domain extension owns the different person and animal fields | domain extension |
 | `/api/identity-evidence/controllers/me/identifiers` | `GET`, `POST` | list several controller identities or start adding one | call the individual actor facade; use shared identifier coding and jurisdiction types | list/create facade pending |
 | `/api/identity-evidence/evidence/{evidenceId}/attestations` | `POST` | record professional verification or attestation | call `attestIdentityEvidence(...)` only from an authorized professional facade | policy/facade pending |

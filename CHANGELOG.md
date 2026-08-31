@@ -30,8 +30,8 @@
   self/worker uploads, professional attestations, ICA certificate-trust
   adapters, actor-facade boundaries and honest implemented-versus-pending
   status.
-- Record the implemented PetChain `list`/`prepareDeclaration`/`upload`/
-  `verifySignaturePdf` provider facade and SOSChain fixed-origin proxy as
+- Record an implemented reference-provider `list`/`prepareDeclaration`/
+  `upload`/`verifySignaturePdf` facade and fixed-origin downstream proxy as
   extension scope, while keeping organization-worker and professional
   attestation contracts explicitly pending and outside GW CORE behavior.
 
