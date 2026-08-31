@@ -2,6 +2,7 @@ node_modules
 build
 coverage
 chaincode
+infra/fabric/local-network
 stripe
 logs
 artifacts
