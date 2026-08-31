@@ -18,6 +18,16 @@ node --test ./scripts/tests/openapi-core-boundary.test.mjs
 bash ./scripts/tests/consentaccess-multi-host-lifecycle.test.sh
 bash ./scripts/tests/public-gw-core-image-docs.test.sh
 
+forbidden_product_pattern="pet${EMPTY_VALUE:-}chain|vet${EMPTY_VALUE:-}chain|pet${EMPTY_VALUE:-}d|sos${EMPTY_VALUE:-}chain|u${EMPTY_VALUE:-}hc|u${EMPTY_VALUE:-}nid|acc${EMPTY_VALUE:-}uro"
+if rg -n -i "$forbidden_product_pattern" \
+  ./CHANGELOG.md \
+  ./docs/PORTAL_API_TO_GW_CORE.md \
+  ./docs/BREAK_GLASS.md \
+  ./.codex/skills/govern-digital-twin-consent/SKILL.md; then
+  echo 'ERROR: shared release artifacts must remain product-neutral.' >&2
+  exit 1
+fi
+
 grep -qx 'node_modules' .dockerignore
 grep -qx 'build' .dockerignore
 grep -qx '.git' .dockerignore
