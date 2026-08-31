@@ -1,3 +1,4 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 import {
   buildDemoCommunicationBatchSubmitRequest,
@@ -26,6 +27,9 @@ describe('demo communication medications IPS fixtures', () => {
 
     expect(bundle.type).toBe('document');
     expect(bundle.entry?.[0]?.resource?.resourceType).toBe('Composition');
+    expect(bundle.entry?.[0]?.resource?.author).toEqual([
+      { reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn },
+    ]);
     const medication = bundle.entry?.[1]?.resource as any;
     expect(medication?.id).toBe('medication-ibuprofen-001');
     expect(medication?.medicationCodeableConcept?.text).toBe('Ibuprofen 400 mg');

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Make the synthetic IPS ingestion fixture declare its canonical external
+  author URN, so the high-level example preserves source provenance instead
+  of deriving authorship from an unauthenticated demo bearer.
+
 - Exclude the complete generated local Fabric workspace from the GW CORE
   Docker build context. Reproducibility sources remain tracked, while enrolled
   identities, channel artifacts and generated chaincode workspaces never enter

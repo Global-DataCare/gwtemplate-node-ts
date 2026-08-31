@@ -1,3 +1,4 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 export const demoCommunicationMedicationIpsDefaults = {
   subjectId: 'did:web:api.acme.org:individual:subject-001',
@@ -21,6 +22,7 @@ export const demoCommunicationMedicationIpsDefaults = {
   demoTimestamp: '2026-05-22T10:00:00Z',
   demoCompositionId: 'ips-composition-001',
   demoCompositionTitle: 'IPS Medication Summary',
+  externalAuthorUrn: 'urn:uuid:external-ips-source-001',
   demoMedicationCases: [
     {
       demoMedicationId: 'medication-ibuprofen-001',
@@ -94,6 +96,7 @@ export function buildDemoDocumentBundle(config: DemoConfig) {
             ],
           },
           subject: { reference: config.subjectId },
+          author: [{ reference: config.externalAuthorUrn }],
           date: config.demoTimestamp,
           title: config.demoCompositionTitle,
           section: [
