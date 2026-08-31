@@ -141,6 +141,12 @@ npm run evidence:open-source-production-readiness</pre>
   <code>artifacts/open-source-production-readiness/</code>, comprueba todos los
   estados <code>PASS</code> y verifica los hashes. Ningún grant, token, PDF,
   clave, IP o fichero env forma parte de la evidencia pública.</p>
+  <p>La puerta <code>21-dataspace-ica-postgres-ipfs-migration</code> ejecuta el
+  migrador open source de Firestore/GCS a PostgreSQL/IPFS contra Firestore
+  Emulator, PostgreSQL y Kubo reales. Utiliza solo datos sintéticos, relee los
+  registros y CIDs migrados, exige cero referencias GCS pendientes y compara
+  los digests de origen transformado y destino. Los documentos firmados, datos
+  personales y claves reales nunca se publican.</p>
 
   <h2>10. Fases de autorización y enrolamiento</h2>
   <p>La ICA de Fabric se usa para altas, renovaciones y revocaciones, no para

@@ -62,6 +62,11 @@ ICA desechables, Fabric Docker con `Host1MSP`/`Host2MSP`, PostgreSQL/IPFS y un
 clúster kind donde Helm instala peer, CouchDB, GW y nueve CCAAS. Ejecuta
 Consent/SMART, controles negativos y reinicios.
 
+El mismo recolector ejecuta el gate público de migración de la ICA desde
+Firestore/GCS a PostgreSQL/IPFS. Solo usa fixtures sintéticas; los PDF firmados,
+credenciales y claves reales permanecen fuera del repositorio y de la evidencia
+pública.
+
 Puertas separadas:
 
 ```bash

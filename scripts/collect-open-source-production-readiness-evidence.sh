@@ -135,6 +135,12 @@ test_dataspace_ica_host_activation() {
   npm run check:skills
 }
 
+test_dataspace_ica_postgres_ipfs_migration() {
+  cd "${DATASPACE_ICA_ROOT}"
+  ICA_MIGRATION_EVIDENCE_DIR="${EVIDENCE_DIR}/dataspace-ica-postgres-ipfs" \
+    npm run evidence:migration:postgres-ipfs
+}
+
 test_fabric_governance_contract() {
   cd "${GW_ROOT}"
   bash ./scripts/tests/local-fabric-host-names.test.sh
@@ -357,6 +363,8 @@ const body = `# Evidencia local de preparación para producción\n\n` +
   `\`Host1MSP\` y \`Host2MSP\` son miembros de Fabric. Las organizaciones tenant identificadas por VAT son datos de aplicación alojados por un GW y no son MSP de Fabric. Los dos peers locales participan en \`identity-local\` y \`health-care-local\`; \`onehealth-research\` es un sector del GW, no un canal. En el perfil europeo, organizaciones y empleados usan \`identity-eu\`, mientras que las personas usan \`identity-global\`.\n\n` +
   `## Prueba de acceso de un empleado\n\n` +
   `El contrato de alta crea un secretario médico limitado a su organización. La prueba real con PostgreSQL, IPFS y Fabric crea datos de una persona, concede un consentimiento IPS explícito al secretario, acredita la lectura autorizada mediante SMART y deniega a otro secretario sin consentimiento. El perfil mantiene separadas las vinculaciones de identidad de organización y de persona.\n\n` +
+  `## Migración de la ICA\n\n` +
+  `El gate \`21-dataspace-ica-postgres-ipfs-migration\` ejecuta con datos sintéticos el migrador open source de las cuatro colecciones de Firestore a PostgreSQL y de los contratos de auditoría GCS a Kubo/IPFS privado y cifrado. Relee PostgreSQL y cada CID, exige cero referencias GCS pendientes y compara los digests de origen transformado y destino. Los datos y PDF reales no forman parte de la evidencia pública.\n\n` +
   `## Prueba Kubernetes mediante Helm\n\n` +
   `El gate \`45-helm-kubernetes-runtime\` instala un nuevo peer de \`Host2MSP\`, CouchDB, GW, PostgreSQL, IPFS y nueve runtimes CCAAS en un clúster kind mediante el chart público. Los certificados del peer y de la identidad cliente del GW conservan el SHA-256 del identificador de la misma Host VC usada para la admisión. El peer se une a \`identity-local\` y \`health-care-local\`, instala y aprueba los nueve paquetes CCAAS, y el GW firma como \`Host2MSP\` contra ese peer para repetir Consent y SMART. Después reinicia GW, peer y CCAAS y demuestra persistencia y nueva capacidad de endoso; el peer Docker queda limitado a gossip/bootstrap.\n\n` +
   `## Admisión dinámica demostrada\n\n` +
@@ -374,6 +382,7 @@ run_gate 00-environment record_environment
 run_gate 10-dataspace-ca-tests test_dataspace_ca
 run_gate 11-dataspace-ca-publication publish_disposable_dataspace_ca
 run_gate 20-dataspace-ica-host-activation test_dataspace_ica_host_activation
+run_gate 21-dataspace-ica-postgres-ipfs-migration test_dataspace_ica_postgres_ipfs_migration
 run_gate 30-fabric-governance-contract test_fabric_governance_contract
 run_gate 31-fabric-multi-host-topology prove_multi_host_topology
 run_gate 35-human-channel-taxonomy test_human_channel_taxonomy
