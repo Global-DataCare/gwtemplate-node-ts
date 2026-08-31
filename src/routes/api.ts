@@ -17,6 +17,7 @@ import { JWK } from 'gdc-common-utils-ts/models/jwk';
 import { VerificationMethod } from '../gdc-backend-utils-node/models/did';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
+import type { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import { getTenantVaultIdFromIss, getTenantVaultId } from '../utils/tenant';
 import { composeHostDidWebId } from '../utils/did-backend';
 import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
@@ -130,6 +131,36 @@ function normalizeLegacyPlaintextContent<T extends Record<string, any>>(content:
     ...(content || {}),
     body: content || {},
   };
+}
+
+/**
+ * Verifies the JWS carried inside an already-decrypted DIDComm request.
+ *
+ * This proves message integrity and possession of the signing key only. The
+ * caller remains responsible for deciding whether that key is allowed as a
+ * bootstrap key or must match a previously registered actor key.
+ */
+async function verifyDecodedDidcommSignature(
+  content: Record<string, any>,
+  signingKey: PublicJwk,
+  cryptographyService: ICryptography,
+): Promise<void> {
+  const jws = content?.meta?.jws;
+  if (!jws?.protected || !jws?.signature) {
+    throw new Error('Signed secure request is missing a valid JWS structure.');
+  }
+  const signedPayload = { ...content };
+  delete signedPayload.meta;
+  const protectedHeader = Content.objectToRawBase64UrlSafe(jws.protected);
+  const detachedJws = `${protectedHeader}..${jws.signature}`;
+  const isValid = await cryptographyService.verifyDetachedJws(
+    Content.objectToBytes(signedPayload),
+    detachedJws,
+    signingKey,
+  );
+  if (!isValid) {
+    throw new Error('Invalid signature.');
+  }
 }
 
 /**
@@ -2853,6 +2884,10 @@ export function createApiRouter(
    *       Canonical route for new integrations is:
    *       `/host/cds-{jurisdiction}/v1/{sector}/{tenantId}/identity/auth/_dcr`.
    *       This `identity/openid` route is maintained as a temporary compatibility alias.
+   *       Plaintext and encrypted requests require the same host-issued initial
+   *       access token; only server-verified token claims enter the worker job.
+   *       When an encrypted bootstrap request carries a nested JWS, GW verifies
+   *       it with the device key being registered before accepting the job.
    *
    *       Registers a device/client using OpenID Dynamic Client Registration. Requires an initial_access_token from Token/_exchange.
    *       Request is usually a secure (form-encoded JWE) DIDComm message; demo plaintext is also accepted.
@@ -3371,8 +3406,58 @@ export function createApiRouter(
             );
           }
         }
+        if (requireBearerHeader && isIdentityDcrRoute) {
+          if (!appAuthManager) {
+            return sendDidcommEarlyError(
+              req,
+              res,
+              500,
+              IssueType.Exception,
+              'Initial access-token validation is required for encrypted DCR but AppAuthorizationManager is not configured.',
+            );
+          }
+          try {
+            const bearerToken = authToken?.split(' ')[1] || '';
+            verifiedBearerPayload = await appAuthManager.verifyInitialAccessToken(bearerToken);
+          } catch (error: any) {
+            return sendDidcommEarlyError(
+              req,
+              res,
+              401,
+              IssueType.Security,
+              `Invalid initial access token: ${error?.message || 'verification failed'}`,
+            );
+          }
+        }
         // The KMS decrypts the JWE using the HOST's key and returns the inner JWS, but does not verify it.
         const decodedJob = await kmsService.decodeRequest(req.body.request);
+        const decodedJws = decodedJob.content?.meta?.jws;
+        const embeddedSigningKey = decodedJws?.protected?.jwk as PublicJwk | undefined;
+        const isHostOrganizationCommunicationBootstrap = tenantId === 'host'
+          && section === 'registry'
+          && String(req.params.format || '').toLowerCase() === 'org.schema'
+          && String(resourceType || '').toLowerCase() === 'organization'
+          && ['_batch', '_verify', '_transaction', '_activate'].includes(action);
+        const isPreDcrCommercialOrder = isHostControllerCommercialOrderRoute(
+          tenantId,
+          section,
+          String(req.params.format || ''),
+          resourceType,
+          action,
+        );
+        const allowsEmbeddedBootstrapKey = isIdentityDcrRoute
+          || isHostOrganizationCommunicationBootstrap
+          || isPreDcrCommercialOrder;
+
+        const usesEmbeddedBootstrapKey = allowsEmbeddedBootstrapKey && Boolean(embeddedSigningKey);
+
+        if (usesEmbeddedBootstrapKey && decodedJws && embeddedSigningKey) {
+          await verifyDecodedDidcommSignature(
+            decodedJob.content as Record<string, any>,
+            embeddedSigningKey,
+            cryptographyService,
+          );
+        }
         // The Bearer token (e.g., Firebase id_token) is still an HTTP concern, but some identity endpoints
         // need it during async processing. We propagate it into the decoded payload meta for the worker.
         const bearerToken = req.headers.authorization;
@@ -3386,10 +3471,12 @@ export function createApiRouter(
         }
 
         // --- Signature Verification & Sender Key Resolution (Orchestrator Logic) ---
-        // If the sender's public key is not embedded, we must resolve it and verify the signature now.
-        if (!decodedJob.content?.meta?.jwe?.header?.jwk) {
+        // Outside the explicit bootstrap routes, an embedded key is never an
+        // authority source: resolve the registered actor key and verify again
+        // with that key even if the sender also supplied a JWK.
+        if (!usesEmbeddedBootstrapKey && decodedJws) {
           const senderDid = decodedJob.content?.iss;
-          const jwsToVerify = decodedJob.content?.meta?.jws;
+          const jwsToVerify = decodedJws;
 
           if (!senderDid || !jwsToVerify || !jwsToVerify.protected || !jwsToVerify.signature || !jwsToVerify.protected.kid) {
             throw new Error("Secure request is missing 'iss', 'kid', or a valid JWS structure.");
@@ -3501,20 +3588,13 @@ export function createApiRouter(
             throw new Error(`Encryption key ID '${senderEncryptionKeyId}' not found in resolved DID document for '${senderDid}'.`);
           }
 
-          // 6. Verify the JWS signature.
-          // The cryptographic `meta` field is added by the server after decryption and is not part of the signed payload.
-          const signedPayload = { ...(decodedJob.content as any) };
-          delete (signedPayload as any).meta;
-          const protectedHeaderB64Url = Content.objectToRawBase64UrlSafe(jwsToVerify.protected);
-          const detachedJws = `${protectedHeaderB64Url}..${jwsToVerify.signature}`;
-          const isValid = await cryptographyService.verifyDetachedJws(
-            Content.objectToBytes(signedPayload),
-            detachedJws,
-            senderSigningKey
+          // 6. Verify integrity with the registered signing key. This is
+          // deliberately separate from transport decryption and bearer auth.
+          await verifyDecodedDidcommSignature(
+            decodedJob.content as Record<string, any>,
+            senderSigningKey,
+            cryptographyService,
           );
-          if (!isValid) {
-            throw new Error('Invalid signature.');
-          }
 
           // 7. Enrich the job request with the resolved & verified key for the worker.
           // The worker needs this to encrypt the response.

@@ -42,6 +42,11 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // during the initial registration, and that subsequent API calls using those keys are resolved correctly.
 
 describe('End-to-End API Flow (BYOK Onboarding)', () => {
+  // Journey: 1) verify bootstrap JWS, 2) accept Offer, 3) accept pre-DCR Order,
+  // 4) register the device, 5) require registered actor keys afterwards.
+  // Authorization invariant: embedded keys prove possession only during the
+  // explicit pre-DCR bootstrap. Persistence invariant: DCR stores the keys
+  // that later requests must resolve rather than replace from their envelope.
   let app: express.Express;
   let server: Server | undefined;
   let queueAdapter: QueueAdapter;
@@ -160,6 +165,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       externalEncrypter,
       hostEncryptionKey, // Using the key obtained from the server
     );
+    const verifySignature = jest.spyOn(cryptoService, 'verifyDetachedJws');
     const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
 
     // 1. ACT (Phase 1): Post the initial job
@@ -177,6 +183,11 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     // 2. ASSERT (Phase 1): Check for 202 Accepted and polling location
     expect(response.status).toBe(202);
+    expect(verifySignature).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      expect.any(String),
+      jwsProtectedHeader.jwk,
+    );
     expect(response.headers.location).toBeDefined();
     const pollingUrl = response.headers.location;
     expect(addJobSpy).toHaveBeenCalledTimes(1);

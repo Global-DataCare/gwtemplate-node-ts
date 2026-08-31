@@ -106,12 +106,6 @@ describe('Network Enrollment API', () => {
 	          ...testInitialNetworkJobInput,
 	          iss: 'did:web:some-issuer',
           meta: {
-            jws: {
-              protected: {
-                alg: 'ML-DSA-44',
-                kid: 'did:web:some-issuer#key-1',
-              },
-            },
             jwe: {
               header: {
                 skid: 'did:web:some-issuer#enc-key-1',
@@ -264,9 +258,6 @@ describe('Network Enrollment API', () => {
 	        content: {
 	          ...jobFromNonControllerEmployee,
 	          meta: {
-            jws: {
-              protected: { alg: 'ML-DSA-44', kid: employeeKid }
-            },
             jwe: {
               header: {
                 skid: employeeKid, // Assuming sender uses same key for signing and encryption ID
@@ -276,7 +267,8 @@ describe('Network Enrollment API', () => {
           },
         },
       };
-      // The KMS successfully verifies the signature (authentication is a success).
+      // Signature authentication is proven by the dedicated encrypted-transport
+      // suites; this worker-authorization fixture begins after that boundary.
       mockKmsService.decodeRequest.mockResolvedValue(mockJobRequestFromEmployee);
       
       // The DID Document for the tenant does NOT contain the analyst's key in its assertionMethod.

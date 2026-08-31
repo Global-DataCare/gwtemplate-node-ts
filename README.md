@@ -612,6 +612,14 @@ persisted host service catalog does not yet advertise `Order`.
 The list below mixes current portal routes and legacy compatibility routes. The canonical legal-organization onboarding flow starts with `/_transaction` for verification forwarding to ICA `_verify`, and that flow is complete without requiring `/_activate` as a follow-up step. `Organization/_activate` remains published only as a legacy compatibility route for callers that already start from an ICA-issued proof. The older `Organization/_batch` / `Order/_batch` family remains only for backward compatibility and portal regression checks.
 Compatibility aliases are also enabled for older callers: `Organization/_verify` behaves as `Organization/_batch`, and `Organization/_verify-response` behaves as `Organization/_batch-response`.
 
+Portal and BFF clients register protected profiles through the high-level SDK.
+The same host-issued initial access token authorizes `Device/_dcr` when the SDK
+uses plaintext local transport or encrypted transport. The browser never
+constructs or supplies the verified token claims used by the asynchronous job.
+The signed DCR request proves possession of the new device key; the verified
+controller and initial access token authorize registering it. Organization
+`_activate` alone does not create the device profile or OAuth client.
+
 Minimum backend routes required for portal tests (current gwtemplate):
 
 1. `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_transaction`

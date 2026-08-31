@@ -343,7 +343,10 @@ export class KmsService implements IKmsService {
 
   /**
    * Decrypts an incoming JWE message to reveal its inner JWS payload.
-   * This is the primary entry point for the asynchronous API. It does not perform signature validation.
+   * This is the primary entry point for the asynchronous API. It exposes the
+   * nested JWS and its protected metadata but deliberately does not establish
+   * trust: the API orchestration layer must verify the signature and then apply
+   * bootstrap or registered-key authorization policy.
    * 
    * It works by:
    * 1. Inspecting the `kid` (Key ID) in the header of each JWE recipient.

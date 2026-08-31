@@ -312,6 +312,18 @@
   wallet's separate public DIDComm signing/encryption JWKS. PIN, seed and
   private keys remain under portal wallet custody.
 
+## [1.23.5] - 2026-08-31
+
+- Verify the host-issued initial access token for encrypted `Device/_dcr`
+  requests and project only its verified claims into the worker job, matching
+  the existing plaintext route without trusting controller authority supplied
+  by the request body.
+- Verify the nested JWS before accepting bootstrap communication keys, keep
+  signing and encryption keys distinct, and require registered actor keys
+  outside the explicit pre-DCR bootstrap sequence.
+- Add a high-level secure profile-enrollment 101 and SDK-only snippet, plus the
+  matching local-image release skill contract.
+
 ## [1.22.2] - 2026-08-26
 
 - Clarify and test the controller bootstrap split: legacy
