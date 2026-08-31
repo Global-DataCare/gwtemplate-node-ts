@@ -159,6 +159,10 @@ grep -Fq 'height[^0-9]*[1-9]' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'gw.fabricPeerEndpoint' ./charts/gdc-host/templates/gw-configmap.yaml
 grep -Fq 'cat /tls/tlsintermediatecerts/*.pem >> /tls/server.crt' ./charts/gdc-host/templates/peer.yaml
 grep -Fq 'test:host-preauthorization' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq 'evidence:migration:postgres-ipfs' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq '21-dataspace-ica-postgres-ipfs-migration' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq 'migración Firestore/GCS a PostgreSQL/IPFS' ./deliverables/ENTREGABLE_HOST_REPRODUCIBLE_ES.md
+grep -Fq '21-dataspace-ica-postgres-ipfs-migration' ./deliverables/GUIA_HOST_REPRODUCIBLE_ES.html
 grep -Fq 'HOME_PLACEHOLDER' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'absolute user-home path' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'instala y aprueba los nueve paquetes CCAAS' \

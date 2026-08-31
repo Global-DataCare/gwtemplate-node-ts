@@ -110,6 +110,11 @@ política de evidencia aprobada para el participante.
 - Helm, `kubectl` y `kind`
 - checkouts públicos adyacentes de `dataspace-ca-ts` y `dataspace-ica-ts`
 
+El checkout público de `dataspace-ica-ts` aporta además la migración Firestore/GCS a PostgreSQL/IPFS. El recolector ejecuta su gate local con Firestore Emulator,
+PostgreSQL y Kubo reales, usando exclusivamente registros y PDF sintéticos.
+Publicar el código, el esquema, las fixtures y los informes sintéticos no
+autoriza publicar credenciales, contratos firmados, datos personales o claves.
+
 No se necesita ningún path personal. Si los repositorios no son hermanos,
 indique sus rutas con `DATASPACE_CA_ROOT` y `DATASPACE_ICA_ROOT`.
 
@@ -131,6 +136,16 @@ DATASPACE_CA_ROOT="${DATASPACE_CA_ROOT}" \
 DATASPACE_ICA_ROOT="${DATASPACE_ICA_ROOT}" \
 npm run evidence:open-source-production-readiness
 ```
+
+Entre las puertas generadas debe figurar:
+
+```text
+21-dataspace-ica-postgres-ipfs-migration: PASS
+```
+
+Esta puerta exige que las cuatro colecciones lleguen a PostgreSQL, que cada
+objeto de auditoría tenga un CID recuperable, que no quede ninguna referencia
+GCS pendiente y que coincidan los digests de origen transformado y destino.
 
 Para verificar o reutilizar los artefactos ya publicados sin reconstruirlos:
 

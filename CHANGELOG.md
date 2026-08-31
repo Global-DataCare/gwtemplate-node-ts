@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Include the sibling ICA's open-source Firestore/GCS to PostgreSQL/IPFS
+  migration gate in the reproducible production-readiness collector. Public
+  evidence uses synthetic data, proves PostgreSQL/CID rereads and digest
+  reconciliation, and excludes real credentials, signed PDFs and keys.
+
 - Make the synthetic IPS ingestion fixture declare its canonical external
   author URN, so the high-level example preserves source provenance instead
   of deriving authorship from an unauthenticated demo bearer.

@@ -164,6 +164,12 @@ Generate all nine CCAAS packages deterministically from the exact Helm fullname
 and namespace. Never copy example package IDs: a Service, release, port or TLS
 change requires new archives, hashes, values and governed approvals.
 
+The collector also consumes the sibling ICA's public
+`evidence:migration:postgres-ipfs` gate. Require real local Firestore Emulator,
+PostgreSQL and Kubo boundaries, zero unresolved GCS references and equal
+source/target reconciliation digests. Only synthetic fixtures and sanitized
+manifests are public; signed contracts, credentials and keys remain private.
+
 For the report, keep production identity routing explicit: EU VAT
 Organizations and organization-scoped employees use `identity-eu`, while
 natural-person individuals use `identity-global`.
