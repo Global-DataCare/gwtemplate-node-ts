@@ -5,6 +5,11 @@ Esta guía es pública, neutral respecto del proveedor y válida para
 credenciales y nombres reales se mantienen en un inventario privado. Nunca se
 copian secretos en este repositorio ni en la salida de Helm.
 
+Para una operación real, siga primero la guía corta
+[`MIGRACION_Y_DESPLIEGUE_ICA_ES.md`](./MIGRACION_Y_DESPLIEGUE_ICA_ES.md) y
+después [`PUESTA_EN_MARCHA_HOST_ES.md`](./PUESTA_EN_MARCHA_HOST_ES.md). Este
+documento conserva el detalle técnico de referencia y no sustituye ese orden.
+
 ## 1. Resultado y roles
 
 Una ejecución correcta deja una `HostingServiceCredential` VC-JWT, una

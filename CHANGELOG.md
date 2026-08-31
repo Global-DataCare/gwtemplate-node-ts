@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Add separate public Spanish runbooks for local audit evidence, data-space ICA
+  migration/promotion, and real host rollout through test-network and
+  production. Add a high-level host bootstrap assistant that generates the
+  host public DID and requests the governed HostingServiceCredential without
+  requiring operators to construct JWS or HTTP payloads manually.
+
 - Include the sibling ICA's open-source Firestore/GCS to PostgreSQL/IPFS
   migration gate in the reproducible production-readiness collector. Public
   evidence uses synthetic data, proves PostgreSQL/CID rereads and digest

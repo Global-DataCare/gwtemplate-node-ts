@@ -163,6 +163,20 @@ grep -Fq 'evidence:migration:postgres-ipfs' ./scripts/collect-open-source-produc
 grep -Fq '21-dataspace-ica-postgres-ipfs-migration' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'migración Firestore/GCS a PostgreSQL/IPFS' ./deliverables/ENTREGABLE_HOST_REPRODUCIBLE_ES.md
 grep -Fq '21-dataspace-ica-postgres-ipfs-migration' ./deliverables/GUIA_HOST_REPRODUCIBLE_ES.html
+grep -Fq 'ENTREGABLE_LOCAL_REPRODUCIBLE_ES.md' ./deliverables/README.md
+grep -Fq 'MIGRACION_Y_DESPLIEGUE_ICA_ES.md' ./deliverables/README.md
+grep -Fq 'PUESTA_EN_MARCHA_HOST_ES.md' ./deliverables/README.md
+grep -Fq 'MENSAJE_CORTO_ENLACES_ES.md' ./deliverables/README.md
+grep -Fq 'npm run evidence:open-source-production-readiness' ./deliverables/ENTREGABLE_LOCAL_REPRODUCIBLE_ES.md
+grep -Fq 'evidence:migration:postgres-ipfs' ./deliverables/MIGRACION_Y_DESPLIEGUE_ICA_ES.md
+grep -Fq 'request-host-credential.mjs' ./deliverables/PUESTA_EN_MARCHA_HOST_ES.md
+grep -Fq 'https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/deliverables/' ./deliverables/MENSAJE_CORTO_ENLACES_ES.md
+grep -Fq 'request-host-credential.mjs' ./deliverables/MENSAJE_CORTO_ENLACES_ES.md
+if grep -Fq 'INSTRUCCIONES_OPERADOR_MIGRACION_ICA_ES.md' ./deliverables/MENSAJE_CORTO_ENLACES_ES.md; then
+  echo 'Public handoff must not link private provider instructions.' >&2
+  exit 1
+fi
+node --test ./scripts/onboarding/tests/host-credential-bootstrap.test.mjs
 grep -Fq 'HOME_PLACEHOLDER' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'absolute user-home path' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'instala y aprueba los nueve paquetes CCAAS' \

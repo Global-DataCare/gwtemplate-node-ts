@@ -4,6 +4,14 @@ Esta carpeta contiene los documentos públicos y reutilizables para justificar
 y transferir el despliegue de un host. No contiene nombres de participantes,
 dominios, direcciones, credenciales ni inventarios de un proveedor concreto.
 
+- `ENTREGABLE_LOCAL_REPRODUCIBLE_ES.md`: prueba local para auditoría; no es una
+  migración ni un despliegue externo.
+- `MIGRACION_Y_DESPLIEGUE_ICA_ES.md`: operación real para trasladar o promover
+  la ICA del espacio de datos a PostgreSQL/IPFS.
+- `PUESTA_EN_MARCHA_HOST_ES.md`: recorrido corto y secuencial para dar de alta
+  un host primero en `test-network` y después en producción.
+- `MENSAJE_CORTO_ENLACES_ES.md`: texto reenviable por email o WhatsApp con los
+  enlaces públicos anteriores.
 - `GUIA_HOST_REPRODUCIBLE_ES.docx`: Word público para memoria y consultoría.
 - `GUIA_HOST_REPRODUCIBLE_ES.html`: fuente editable del Word.
 - `GUIA_OPERATIVA_HOST_ES.md`: procedimiento copiable por rol para
@@ -13,6 +21,20 @@ dominios, direcciones, credenciales ni inventarios de un proveedor concreto.
 
 Los anexos específicos de un proveedor se mantienen fuera del repositorio
 público y deben fijar el commit y los checksums de esta entrega.
+
+Orden para una operación real:
+
+```text
+MIGRACION_Y_DESPLIEGUE_ICA_ES.md
+                  ↓
+PUESTA_EN_MARCHA_HOST_ES.md (test-network)
+                  ↓
+PUESTA_EN_MARCHA_HOST_ES.md (network, con identidades nuevas)
+```
+
+El entregable local se ejecuta aparte para demostrar la reproducibilidad de
+las mismas herramientas, sin afirmar que una infraestructura externa ya esté
+migrada o desplegada.
 
 ## Chart Helm público
 

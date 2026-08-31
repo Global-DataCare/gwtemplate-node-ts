@@ -170,6 +170,14 @@ PostgreSQL and Kubo boundaries, zero unresolved GCS references and equal
 source/target reconciliation digests. Only synthetic fixtures and sanitized
 manifests are public; signed contracts, credentials and keys remain private.
 
+Keep three public handoff tracks separate: the disposable local audit
+deliverable, the real data-space ICA migration/promotion, and the real host
+rollout through test-network and production. They reuse the same migration,
+Helm and onboarding contracts but never reuse environment identities or data.
+Use `scripts/onboarding/request-host-credential.mjs` to generate the host's
+P-384 bootstrap identity and request the governed Host VC; operators should
+not construct internal JWS or HTTP payloads by hand.
+
 For the report, keep production identity routing explicit: EU VAT
 Organizations and organization-scoped employees use `identity-eu`, while
 natural-person individuals use `identity-global`.
