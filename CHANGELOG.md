@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- Consume the shared emergency-access policy and subject-kind matcher contract
+  from `gdc-common-utils-ts@2.6.2`. CORE now owns only authorization
+  orchestration, persistence and audit; derived domains inject exact identifier
+  matchers without adding deployment-specific formats to this repository.
+- Remove deployment-specific names, hostnames, route aliases and identifier
+  formats from the affected CORE documentation, examples, tests and local
+  skill guidance. Shared test coverage now uses canonical fixtures and proves
+  that a domain matcher can be injected without changing CORE policy.
+
 - Document the public `gdc-host` OCI chart and the provider-neutral Fabric ICA
   connectivity, host-local MSP/TLS enrollment, Kubernetes Secret and Helm
   installation handoff. Keep registrar identities, grants, private endpoints
@@ -11,23 +20,8 @@
   evidence, canonical shared fixtures and types, layered test boundaries,
   neutral shared artifacts and verified immutable release promotion.
 
-- Define PETD temporal semantics: per-fact observation and verification times,
-  an explicit evidence cutoff, independent issuer signing and validity times,
-  and explicit encounter/liveness evidence instead of inferring life from the
-  latest verified physical trait.
-
-- Define PETD traits as animal-subject Observations authorable by controllers
-  or caregivers and separately verifiable by veterinarians; preserve changing
-  traits append-only and anchor only a minimal issuance manifest over the exact
-  verified evidence rather than every measurement or raw trait.
-
-- Clarify that multiple civil identifiers are separate `org.schema.Person`
-  entries associated to one card through flat `resource.meta.claims`, while
-  PETD physical facts are governed veterinary Observations rather than ICAO
-  identity claims.
-
-- Document the reusable UHC UNID, VetChain and SOSChain Next.js BFF identity-
-  evidence API, including multiple controller identifiers, subject editing,
+- Document the reusable Next.js BFF identity-evidence API, including multiple
+  controller identifiers, subject editing,
   self/worker uploads, professional attestations, ICA certificate-trust
   adapters, actor-facade boundaries and honest implemented-versus-pending
   status.
@@ -405,8 +399,8 @@
 - Return the persisted seat's effective `licenseId` and `maxDevices` in every
   successful `License/_issue` entry so SDKs and portals do not substitute a
   potentially different local installation allowance.
-- Synchronize the controller and commercial Order security contract with GW
-  UNID: compat-mode DIDComm plain may project an optional public JWK, but
+- Synchronize the controller and commercial Order security contract with the
+  derived deployment profile: compat-mode DIDComm plain may project an optional public JWK, but
   tenant operations verify `iss + kid` with the key registered by DCR.
   Encrypted host `Order/_batch` remains host-routed while resolving sender
   keys from the issuer tenant, and its exact static route is not rejected by a
@@ -783,7 +777,7 @@
 
 - Accept `antifraud` as an independent FHIR-capable tenant sector for Company
   Book, Family Book and future non-health applications.
-- Publish governance-controlled `unid.online/standards/fhir` canonical definitions from
+- Publish governance-controlled canonical definitions at the configured public standards base URL from
   the tenant `CapabilityStatement`, including active custom Communication
   search parameters and feature-gated future Contract parameters.
 - Consume `gdc-common-utils-ts@^2.5.1` from npm, align Fabric Gateway/Noble with
@@ -1149,7 +1143,7 @@
   `Subject/$summary` read path and concrete section, count, entry and
   section/type/date resource-consumption examples.
 - Document the read-only `$summary` lifecycle and the ownership split between
-  BundleReader, FhirDocumentFacade, SDK actor facades and UHC format extensions.
+  BundleReader, FhirDocumentFacade, SDK actor facades and domain format extensions.
 - Expand the cross-portal subject-binding environment contract with
   deny-by-default behavior, reciprocal receiving-GW configuration and explicit
   issuer DID boundaries.
@@ -1181,7 +1175,7 @@
 
 ### Documentation
 - Document stable operator DNS configuration such as
-  `HOST_EXTERNAL_DOMAIN=host-accuro.globaldatacare.es` and the current
+  `HOST_EXTERNAL_DOMAIN=gw.example.org` and the current
   SDK/portal responsibility for supplying the public organization DID.
 
 ## [1.20.11] - 2026-07-23
@@ -1230,8 +1224,9 @@
 ### Added
 - Add typed region-final Fabric channel construction for the six approved
   regions and make `identity-global` the non-regional human identity default.
-- Add the normative GDC Human Health versus VetChain Pets network/channel and
-  resource-chaincode matrix, with PETD explicitly marked as a target contract.
+- Add the normative human-health versus animal-health network/channel and
+  resource-chaincode matrix, with the future travel credential explicitly
+  marked as a target contract.
 
 ### Documentation
 - Define the identity-ledger bootstrap order: governance-executor organization
@@ -1242,8 +1237,8 @@
   enforcement explicitly not implemented.
 - Add the chaincode README with transactions, identity/sector channel
   boundaries, credential-plane separation and current limitations.
-- Separate the GDC human-health funding/product boundary from the commercial
-  VetChain Pets reuse boundary, including independent staging Fabric networks.
+- Separate the human-health funding boundary from the commercial animal-health
+  reuse boundary, including independent staging Fabric networks.
 
 ## [1.20.7] - 2026-07-22
 

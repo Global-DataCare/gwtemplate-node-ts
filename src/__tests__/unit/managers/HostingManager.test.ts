@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/HostingManager.test.ts
 
@@ -35,6 +35,7 @@ import { initializeHostServicesConfig } from '../../../utils/services';
 import { ILogger } from '../../../loggers/ILogger';
 import { testTenant1LegalName } from '../../data/organization.data';
 import { composeHostDidWebId } from '../../../utils/did-backend';
+import { EXAMPLE_HOST_PUBLIC_HOSTNAME } from 'gdc-common-utils-ts/examples/shared';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -283,11 +284,11 @@ describe('HostingManager', () => {
       [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
       [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
       [ClaimsOrganizationSchemaorg.identifierValue]: tenantId,
-      [ClaimsOrganizationSchemaorg.url]: 'https://uhc-gw.unid.online',
+      [ClaimsOrganizationSchemaorg.url]: `https://${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
       [ClaimsServiceSchemaorg.category]: sector,
-      [ClaimsServiceSchemaorg.url]: 'https://host-accuro.globaldatacare.es',
+      [ClaimsServiceSchemaorg.url]: `https://${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
     };
-    const did = `did:web:uhc-gw.unid.online:${tenantId}:cds-ES:v1:${sector}`;
+    const did = `${composeHostDidWebId('', EXAMPLE_HOST_PUBLIC_HOSTNAME)}:${tenantId}:cds-ES:v1:${sector}`;
     const stored = await mockKmsService.protectConfidentialData({
       id: tenantVaultId,
       status: 'active',
@@ -319,7 +320,7 @@ describe('HostingManager', () => {
     expect(tenant.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe(tenantId);
     expect(tenant.didDocument.service.find((service: any) =>
       service.id.endsWith('#entity:org.schema:employee:_batch'))?.serviceEndpoint,
-    ).toContain('https://host-accuro.globaldatacare.es/');
+    ).toContain(`https://${EXAMPLE_HOST_PUBLIC_HOSTNAME}/`);
     expect(tenant.didDocument.service.find((service: any) =>
       service.id.endsWith('#individual:org.hl7.fhir.r4:patient:_batch'))?.serviceEndpoint,
     ).toContain('https://individual-runtime.example/');
@@ -387,9 +388,9 @@ describe('HostingManager', () => {
     const sector = Sector.HEALTH_CARE;
     const tenantVaultId = tenantUtils.getTenantVaultId(sector, tenantId);
     const hostCollectionName = await mockTenantsCacheManager.getCollectionName('host') as string;
-    const did = `did:web:uhc-gw.unid.online:${tenantId}:cds-ES:v1:${sector}`;
+    const did = `${composeHostDidWebId('', EXAMPLE_HOST_PUBLIC_HOSTNAME)}:${tenantId}:cds-ES:v1:${sector}`;
     const controller = 'did:web:controller.antifraud.services';
-    const service = [{ id: `${did}#employee`, type: 'DataService', serviceEndpoint: 'https://uhc-gw.unid.online/employee' }];
+    const service = [{ id: `${did}#employee`, type: 'DataService', serviceEndpoint: `https://${EXAMPLE_HOST_PUBLIC_HOSTNAME}/employee` }];
     const staleKey = { kid: 'stale-encryption-kid', kty: 'OKP', crv: 'ML-KEM-768', x: 'stale', use: 'enc' };
     const claims: ClaimsRecord = {
       [ClaimsOrganizationSchemaorg.alternateName]: tenantId,
@@ -745,7 +746,7 @@ describe('HostingManager', () => {
       alg: 'ES256',
     } as any;
     const publicDid = 'did:web:globaldatacare.es:onehealth-research:organization:taxid:VATES-B42215152';
-    const hostedDid = 'did:web:uhc-gw.unid.online:VATES-B42215152:cds-ES:v1:onehealth-research';
+    const hostedDid = `${composeHostDidWebId('', EXAMPLE_HOST_PUBLIC_HOSTNAME)}:VATES-B42215152:cds-ES:v1:onehealth-research`;
     const ledgerOrgId = 'urn:org:tax:VATES-B42215152';
 
     await registerOrganizationOnLedger({

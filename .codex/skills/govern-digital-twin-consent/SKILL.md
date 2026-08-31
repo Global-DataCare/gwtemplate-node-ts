@@ -36,8 +36,8 @@ Verify current branches, versions and published npm state before release claims.
 - Keep portal facade names product-neutral: `/subject` owns the individual,
   `/research` owns researcher operations, `/host/*` owns host administration
   and `/test-network/*` owns Test Network governance. Product-branded paths are
-  compatibility aliases only. UHC specializes `individual` as a person and
-  VetChain as an animal without changing the consent or twin contract.
+  compatibility aliases only. Domain profiles may specialize `individual`
+  without changing the consent or twin contract.
 - Call `IndividualControllerSdk.setDigitalTwinSecondaryUseConsent(...)` with `decision: 'permit' | 'deny'`.
 - Author one FHIR `Consent` through `resource.meta.claims` and `entry.meta.claims`:
   - `Consent.subject`: authenticated operational subject DID

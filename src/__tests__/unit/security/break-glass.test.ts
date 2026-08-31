@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { BreakGlassService, evaluateBreakGlassPolicy } from '../../../security/break-glass';
 
 const humanRequest = {

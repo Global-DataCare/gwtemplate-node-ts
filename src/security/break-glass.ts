@@ -8,81 +8,25 @@ import { getIndividualSectionId } from '../utils/individual-sections';
 import { getTenantVaultId } from '../utils/tenant';
 import { canonicalize } from '../utils/json-canon';
 import { resolveDataChannel } from '../utils/ledger';
+import {
+  evaluateBreakGlassPolicy,
+  matchesBreakGlassSubjectKind,
+  type BreakGlassReasonCode,
+  type BreakGlassRequest,
+  type BreakGlassSubjectKindMatcher,
+} from 'gdc-common-utils-ts/utils/break-glass-policy';
 
-export type BreakGlassSubjectKind = 'human' | 'animal';
-export type BreakGlassReasonCode =
-  | 'life-threatening'
-  | 'serious-imminent-harm'
-  | 'unconscious-or-incapacitated'
-  | 'animal-emergency';
-
-export type BreakGlassRequest = Readonly<{
-  incidentId: string;
-  subjectKind: BreakGlassSubjectKind;
-  reasonCode: BreakGlassReasonCode;
-  justification: string;
-}>;
-
-export type BreakGlassPolicyInput = Readonly<{
-  routeSector: string;
-  subjectKind: BreakGlassSubjectKind;
-  professionalRole: string;
-  requestedScope: string;
-  reasonCode: BreakGlassReasonCode;
-}>;
-
-export type BreakGlassPolicyDecision =
-  | Readonly<{ allowed: true; maxLifetimeSeconds: 900 }>
-  | Readonly<{ allowed: false; reason: string }>;
-
-const HUMAN_EMERGENCY_ROLES = /^221(?:\d)?$/;
-const ANIMAL_EMERGENCY_ROLES = /^2250$/;
-const RESEARCH_SECTORS = new Set(['health-research', 'animal-research', 'onehealth-research']);
-
-function occupationCode(value: string): string {
-  const normalized = String(value || '').trim();
-  return (normalized.includes('|') ? normalized.slice(normalized.lastIndexOf('|') + 1) : normalized)
-    .replace(/[^0-9]/g, '');
-}
-
-function isReadOnlyScope(scope: string): boolean {
-  const tokens = String(scope || '').split(/\s+/).filter(Boolean);
-  return tokens.length > 0 && tokens.every((token) => {
-    const head = token.split('?', 1)[0] || '';
-    const permission = head.slice(head.lastIndexOf('.') + 1).toLowerCase();
-    return permission === 'r' || permission === 'rs';
-  });
-}
-
-function subjectDidMatchesKind(subjectDid: string, subjectKind: BreakGlassSubjectKind): boolean {
-  const normalized = String(subjectDid || '').trim().toLowerCase();
-  return subjectKind === 'human'
-    ? normalized.includes(':individual:')
-    : normalized.includes(':card:uhc:animal:') || normalized.includes(':animal:');
-}
-
-/**
- * Product-neutral, sector-first emergency policy. Organization membership,
- * employment and research authority never imply exceptional access.
- */
-export function evaluateBreakGlassPolicy(input: BreakGlassPolicyInput): BreakGlassPolicyDecision {
-  const routeSector = String(input.routeSector || '').trim().toLowerCase();
-  if (RESEARCH_SECTORS.has(routeSector)) return { allowed: false, reason: 'research_sector_forbidden' };
-  if (!isReadOnlyScope(input.requestedScope)) return { allowed: false, reason: 'read_only_scope_required' };
-
-  const role = occupationCode(input.professionalRole);
-  if (input.subjectKind === 'human') {
-    if (routeSector !== 'health-care') return { allowed: false, reason: 'human_sector_mismatch' };
-    if (!HUMAN_EMERGENCY_ROLES.test(role)) return { allowed: false, reason: 'professional_role_not_authorized' };
-    if (input.reasonCode === 'animal-emergency') return { allowed: false, reason: 'reason_subject_mismatch' };
-    return { allowed: true, maxLifetimeSeconds: 900 };
-  }
-
-  if (routeSector !== 'animal-care') return { allowed: false, reason: 'animal_sector_mismatch' };
-  if (!ANIMAL_EMERGENCY_ROLES.test(role)) return { allowed: false, reason: 'professional_role_not_authorized' };
-  if (input.reasonCode !== 'animal-emergency') return { allowed: false, reason: 'reason_subject_mismatch' };
-  return { allowed: true, maxLifetimeSeconds: 900 };
-}
+export {
+  evaluateBreakGlassPolicy,
+} from 'gdc-common-utils-ts/utils/break-glass-policy';
+export type {
+  BreakGlassPolicyDecision,
+  BreakGlassPolicyInput,
+  BreakGlassReasonCode,
+  BreakGlassRequest,
+  BreakGlassSubjectKind,
+  BreakGlassSubjectKindMatcher,
+} from 'gdc-common-utils-ts/utils/break-glass-policy';
 
 export type BreakGlassAuthorizationInput = Readonly<{
   tenantId: string;
@@ -116,8 +60,9 @@ type EmergencyConsentRecord = RecordBase & Record<string, unknown> & {
   notificationIdHash: string;
 };
 
-type BreakGlassServiceOptions = Readonly<{
+export type BreakGlassServiceOptions = Readonly<{
   consentLifetimeSeconds?: number;
+  subjectKindMatchers?: readonly BreakGlassSubjectKindMatcher[];
 }>;
 
 export interface BreakGlassAuthorizer {
@@ -178,7 +123,11 @@ export class BreakGlassService implements BreakGlassAuthorizer {
   async authorize(input: BreakGlassAuthorizationInput): Promise<BreakGlassAuthorization> {
     if (!input.professionalCredentialVerified || !input.ledgerVerified) throw new Error('verified_professional_credential_required');
     if (!String(input.actorOrganizationDid || '').trim()) throw new Error('requester_organization_required');
-    if (!subjectDidMatchesKind(input.subjectDid, input.request.subjectKind)) throw new Error('subject_kind_mismatch');
+    if (!matchesBreakGlassSubjectKind(
+      input.subjectDid,
+      input.request.subjectKind,
+      this.options.subjectKindMatchers,
+    )) throw new Error('subject_kind_mismatch');
     if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(input.request.incidentId)) throw new Error('invalid_incident_id');
     const justification = input.request.justification.trim();
     if (justification.length < 10 || justification.length > 500) throw new Error('invalid_emergency_justification');
@@ -396,10 +345,17 @@ class BreakGlassControllerNotifierHttp implements BreakGlassControllerNotifier {
 export function buildBreakGlassAuthorizer(
   blockchainAdapter: IBlockchainAdapter,
   vaultRepository: IVaultRepository,
+  subjectKindMatchers: readonly BreakGlassSubjectKindMatcher[] = [],
 ): BreakGlassAuthorizer | undefined {
   if (String(process.env.BREAK_GLASS_ENABLED || '').trim().toLowerCase() !== 'true') return undefined;
   const endpoint = String(process.env.BREAK_GLASS_NOTIFICATION_URL || '').trim();
   const bearerToken = String(process.env.BREAK_GLASS_NOTIFICATION_TOKEN || '').trim();
   if (!endpoint || !bearerToken) throw new Error('break_glass_notification_not_configured');
-  return new BreakGlassService(blockchainAdapter, vaultRepository, new BreakGlassControllerNotifierHttp(endpoint, bearerToken));
+  return new BreakGlassService(
+    blockchainAdapter,
+    vaultRepository,
+    new BreakGlassControllerNotifierHttp(endpoint, bearerToken),
+    () => new Date(),
+    { subjectKindMatchers },
+  );
 }
