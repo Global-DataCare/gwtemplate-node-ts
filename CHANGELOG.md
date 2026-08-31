@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add repository-local release and test discipline covering branch/merge
+  evidence, canonical shared fixtures and types, layered test boundaries,
+  neutral shared artifacts and verified immutable release promotion.
+
 - Define PETD temporal semantics: per-fact observation and verification times,
   an explicit evidence cutoff, independent issuer signing and validity times,
   and explicit encounter/liveness evidence instead of inferring life from the
