@@ -1,6 +1,6 @@
 ---
 name: enforce-release-test-discipline
-description: Enforce branch, TDD, fixture, test-layer, product-neutrality, changelog, semantic-version, npm publication, deployment and merge discipline across GW CORE, shared gdc SDKs and product portals. Use for every behavior fix, flow change, test or 101 example, documentation contract, shared-package release, portal dependency promotion, App Hosting rollout, or request to ship with branch, patch, changelog and merge to main.
+description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixture, test-layer, product-neutrality, changelog, semantic-version, npm publication, deployment and merge discipline across GW CORE, shared gdc SDKs and product portals. Use for every behavior fix, FHIR-like resource or search contract, flow change, test or 101 example, documentation contract, shared-package release, portal dependency promotion, App Hosting rollout, or request to ship with branch, patch, changelog and merge to main.
 ---
 
 # Enforce Release and Test Discipline
@@ -38,6 +38,34 @@ description: Enforce branch, TDD, fixture, test-layer, product-neutrality, chang
 - Literal values are allowed only when the literal itself is the behavior under
   test, such as malformed input or an exact serialization assertion. State
   that reason beside it.
+
+## Preserve standard vocabularies
+
+- Before authoring a FHIR-like resource, property, status, search parameter or
+  flat claim, verify the exact name and value against the applicable official
+  HL7 FHIR version and the canonical catalog already exported by
+  `gdc-common-utils-ts`. Do the same for schema.org types and properties.
+- Never invent a FHIR resource name, pseudo-resource namespace such as
+  `AccessRequest.*`, property, status or search parameter. FHIR-like flat
+  claims keep the owning HL7 resource and original API/search parameter name;
+  they do not create a parallel vocabulary.
+- When R4 and R5 differ, state the selected profile explicitly and use only a
+  value valid for that profile. For a shared claims-first contract, choose a
+  deliberately supported cross-version representation and prove both
+  projections. Never infer a value from a different FHIR release.
+- Introduce an extension only after proving that neither FHIR nor schema.org
+  covers the requirement. Give it an explicit canonical extension URL,
+  document ownership and compatibility, add it to the shared catalog first,
+  and keep it visibly separate from native standard fields.
+- Model a professional permission request as one auditable `Communication`
+  carrying a Bundle of ordinary `Consent.status=draft` resources. Draft
+  Consent describes requested rules and grants no access. Only the
+  controller-approved active Consent enters authorization evaluation; the
+  historical status-less rule is read-only migration compatibility.
+- Add regression assertions that reject invented namespaces and that prove
+  non-active Consent states cannot authorize. Cite the official vocabulary in
+  JSDoc and high-level docs, while tests import the governed constants instead
+  of copying wire literals.
 
 ## Keep test layers separate
 
