@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Add subject-scoped `RelatedPerson/_search` through the versioned response
+  serializer. The primary profile returns one match per
+  `body.data[].resource`, while the deprecated legacy nesting remains isolated;
+  `body.total` belongs to the outer Bundle in both cases.
+- Remove the incorrectly introduced `License/_add` route, manager behavior,
+  validator allowance, OpenAPI description and portal/skill guidance. Licence
+  inventory is created during onboarding or through Offer -> Order.
+
 - Add the opt-in `GW_SEARCH_RESPONSE_PROFILE=primary-resource` serializer for
   all 0..n GW searches, returning every match as a primary
   `body.data[].resource` Bundle entry with `body.total` on the outer document.
@@ -601,10 +609,8 @@
   sector variables.
 
 - Consolidate the portal-to-GW mapping in
-  `docs/PORTAL_API_TO_GW_CORE.md`: document the published DID binding,
-  organization/individual license search and non-production `License/_add`
-  contracts, with one root navigation pointer instead of a competing versioned
-  source of truth.
+  `docs/PORTAL_API_TO_GW_CORE.md`, with one root navigation pointer instead of
+  a competing versioned source of truth.
 
 ## [1.21.22] - 2026-08-20
 
@@ -632,9 +638,6 @@
 - Repair missing representative reservations at startup from protected tenant
   claims and restore only controller DID references backed by active protected
   employee records.
-- Add controller-authorized zero-cost professional `License/_add` for
-  non-production `test` (in-memory), `local-network`, and `test-network`;
-  `prod` or `network` keeps the signed payment and ledger-verifiable Order path.
 
 ## [1.21.19] - 2026-08-20
 

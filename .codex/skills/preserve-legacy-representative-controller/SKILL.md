@@ -108,9 +108,10 @@ claiming that a binding exists.
 - Startup repair may add only a missing mandatory representative seat from
   protected verified tenant claims and may restore only controller DIDs backed
   by active protected employee records.
-- Permit zero-price professional `License/_add` only in non-production `test`
-  (in-memory ledger), `local-network`, or `test-network`. `prod` or `network`
-  uses signed payment confirmation and the Order lifecycle.
+- `License/_add` does not exist in any network mode. Create professional and
+  individual inventory during organization onboarding or through the governed
+  Offer -> Order lifecycle; a zero price never creates a direct mutation
+  shortcut.
 - Employee creation persists the employee only. The following explicit
   licence-issue operation reserves the seat and returns the activation
   credential; never consume the same seat in both operations.
