@@ -4,6 +4,17 @@ La [documentación pública de los entregables en español](./deliverables/READM
 agrupa la guía Markdown, su fuente HTML editable y el Word para reproducir el
 host completo con Docker, Fabric, ICA, chaincodes, PostgreSQL/IPFS y Helm.
 
+## GW CORE runtime profile
+
+GW CORE is the application service of a portable data-space host. The portable
+open-source host profile uses PostgreSQL for structured persistence and IPFS
+through a private Kubo node for blob storage. PostgreSQL and Kubo run as
+separate services and are wired to GW CORE by the public `gdc-host` Helm chart.
+
+The Kubo API must remain private inside the host network; only the governed GW
+and explicitly required Fabric endpoints are exposed. Firestore and GCS remain
+available only as a legacy/demo compatibility profile.
+
 ## Published OCI images
 
 The audited `linux/amd64` runtime images are publicly available from GitHub
