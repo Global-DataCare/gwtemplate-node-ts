@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.23.7] - 2026-08-31
+
+- Normalize signed encrypted profile-activation requests into the manager body
+  contract only after signature verification, restoring high-level SDK
+  `Token/_exchange` and DCR interoperability.
+- Resolve contextualized `Order.acceptedOffer.identifier` claims and authorize
+  pre-DCR organization transactions and Orders only with the controller keys
+  declared by the reviewed transaction or protected pending Offer. An incoming
+  envelope JWK is not an authority source for either continuation.
+
 - Add separate public Spanish runbooks for local audit evidence, data-space ICA
   migration/promotion, and real host rollout through test-network and
   production. Add a high-level host bootstrap assistant that generates the

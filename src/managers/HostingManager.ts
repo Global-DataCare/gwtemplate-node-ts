@@ -1506,6 +1506,7 @@ export class HostingManager {
     jobMeta?: DidCommDecodedMetadata;
     fallbackAlternateName?: string;
     primaryDid?: string;
+    registrationControllerDid?: string;
     postalActivationCodeBinding?: PostalActivationCodeBinding;
   }): Promise<ClaimsRecord> {
     return createPendingTenantRegistration({
@@ -1514,6 +1515,7 @@ export class HostingManager {
       jobMeta: input.jobMeta,
       fallbackAlternateName: input.fallbackAlternateName,
       primaryDid: input.primaryDid,
+      registrationControllerDid: input.registrationControllerDid,
       postalActivationCodeBinding: input.postalActivationCodeBinding,
       config: this.config,
       vaultRepository: this.vaultRepository,
@@ -1780,7 +1782,12 @@ export class HostingManager {
 
     for (const entry of jobEntries) {
       try {
-        const resultEntry = await this.processRegistrationEntry(entry, environment, job.content?.meta);
+        const resultEntry = await this.processRegistrationEntry(
+          entry,
+          environment,
+          job.content?.meta,
+          String(job.content?.iss || '').trim() || undefined,
+        );
         responseEntries.push(resultEntry);
       } catch (error) {
         if (isBootstrap) { throw error; }
@@ -1929,11 +1936,13 @@ export class HostingManager {
     entry: BundleEntry,
     environment?: string,
     jobMeta?: DidCommDecodedMetadata,
+    registrationControllerDid?: string,
   ): Promise<BundleEntry | ErrorEntry> {
     return processRegistrationEntryExternal({
       entry,
       environment,
       jobMeta,
+      registrationControllerDid,
       sectorsAllowed: this.config.sectorsAllowed,
       vaultRepository: this.vaultRepository,
       applyLegalOrganizationIdentityCompatibility: this.applyLegalOrganizationIdentityCompatibility.bind(this),

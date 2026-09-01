@@ -36,11 +36,19 @@ import {
 import { getTenantAuthorizationStatus as readTenantAuthorizationStatusFromConfig } from '../utils/tenant-lifecycle';
 import { enforceSmartScopeRouteCompatibility } from '../utils/smart-scope-route-authorization';
 import { IdentityAuthActions } from 'gdc-common-utils-ts/constants/identity-auth';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { getClaimValue } from '../utils/claims';
+import { isEncryptionJwk, isSignatureJwk } from '../managers/hosting/registration-keys';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
 type ParsedContentType = 'secure-form' | 'didcomm-plain' | 'json' | 'fhir' | 'unsupported';
 const DIDCOMM_PLAINTEXT_JSON_LEGACY_MEDIA_TYPE = 'application/didcomm-plaintext+json';
+
+/** Resolves a canonical or contextualized accepted Offer claim before DCR. */
+export function readPendingOrderAcceptedOfferId(claims: Record<string, unknown>): string {
+  return String(getClaimValue(claims, ClaimsOrderSchemaorg.acceptedOfferIdentifier) || '').trim();
+}
 
 function getVerifiedBearerPayload(verificationResult: any): Record<string, any> {
   if (!verificationResult || typeof verificationResult !== 'object') return {};
@@ -109,12 +117,14 @@ function normalizeDidcommBodyForFhirFormat<T extends { body?: any } | undefined>
 }
 
 /**
- * Normalizes legacy plaintext request bodies so managers can consume them
+ * Normalizes request bodies so managers can consume them
  * through the same `job.content.body` contract used by secure DIDComm flows.
  *
  * Why this exists:
- * - secure requests arrive as a DIDComm envelope whose business payload already
- *   lives under `content.body`
+ * - most secure requests arrive as a DIDComm envelope whose business payload
+ *   already lives under `content.body`
+ * - high-level profile activation sends the signed Token/_exchange and DCR
+ *   fields beside `thid`; those fields are mirrored only after verification
  * - legacy `application/json` and `application/fhir+json` requests often send
  *   the business payload directly at the top level
  * - most managers only read `job.content.body`
@@ -122,7 +132,7 @@ function normalizeDidcommBodyForFhirFormat<T extends { body?: any } | undefined>
  * The returned object keeps top-level fields such as `thid`, while also
  * mirroring the normalized business payload under `body`.
  */
-function normalizeLegacyPlaintextContent<T extends Record<string, any>>(content: T): T & { body: any } {
+function normalizeBusinessBodyContent<T extends Record<string, any>>(content: T): T & { body: any } {
   if (content && typeof content === 'object' && content.body && typeof content.body === 'object') {
     return content as T & { body: any };
   }
@@ -252,6 +262,44 @@ function isHostControllerCommercialOrderRoute(
     && String(format || '').toLowerCase() === 'org.schema'
     && String(resourceType || '').toLowerCase() === 'order'
     && action === '_batch';
+}
+
+function isHostOrganizationVerificationRoute(
+  tenantId: string,
+  section: string,
+  format: string,
+  resourceType: string,
+  action: string,
+): boolean {
+  return tenantId === 'host'
+    && section === 'registry'
+    && String(format || '').toLowerCase() === 'org.schema'
+    && String(resourceType || '').toLowerCase() === 'organization'
+    && (action === '_transaction' || action === '_issue');
+}
+
+/** Resolves only keys explicitly bound to the reviewed organization controller. */
+function readReviewedOrganizationBootstrapKeys(
+  content: any,
+  senderDid: string,
+  senderSigningKeyId: string,
+  senderEncryptionKeyId: string,
+): { senderSigningKey: PublicJwk; senderEncryptionKey: PublicJwk } | undefined {
+  const entry = Array.isArray(content?.body?.data) ? content.body.data[0] : undefined;
+  const controller = entry?.resource?.controller;
+  if (String(controller?.did || '').trim() !== senderDid) return undefined;
+  const keys = Array.isArray(controller?.jwks?.keys) ? controller.jwks.keys : [];
+  const senderSigningKey = keys.find((key: any) => (
+    String(key?.kid || '').trim() === senderSigningKeyId && isSignatureJwk(key)
+  ));
+  const senderEncryptionKey = keys.find((key: any) => (
+    String(key?.kid || '').trim() === senderEncryptionKeyId && isEncryptionJwk(key)
+  ));
+  if (!senderSigningKey || !senderEncryptionKey) return undefined;
+  return {
+    senderSigningKey: senderSigningKey as PublicJwk,
+    senderEncryptionKey: senderEncryptionKey as PublicJwk,
+  };
 }
 
 function requiresActiveTenantAuthorization(
@@ -475,6 +523,42 @@ export function createApiRouter(
     } catch {
       return pathVaultId;
     }
+  };
+
+  /**
+   * Resolves the exact controller keys retained in one protected pending Offer.
+   * Incoming envelope JWKs are response material, never authority for Order.
+   */
+  const readPendingOfferBootstrapKeys = async (
+    content: any,
+    senderDid: string,
+    senderSigningKeyId: string,
+    senderEncryptionKeyId: string,
+  ): Promise<{ senderSigningKey: PublicJwk; senderEncryptionKey: PublicJwk } | undefined> => {
+    const entry = Array.isArray(content?.body?.data) ? content.body.data[0] : undefined;
+    const claims = entry?.resource?.meta?.claims || entry?.meta?.claims || {};
+    const offerId = readPendingOrderAcceptedOfferId(claims);
+    if (!offerId) return undefined;
+    const hostCollectionName = await tenantsCacheManager.getCollectionName('host');
+    if (!hostCollectionName) return undefined;
+    const candidates = await vaultRepository.query(hostCollectionName, {
+      sectionId: getEnvSectionId('tenants'),
+      where: [{ name: ClaimsOfferSchemaorg.identifier, value: offerId }],
+    });
+    for (const candidate of candidates || []) {
+      const protectedContent = await kmsService.unprotectConfidentialData<any>(candidate, 'host');
+      if (String(protectedContent?.claims?.[ClaimsOfferSchemaorg.identifier] || '').trim() !== offerId) continue;
+      if (String(protectedContent?.registrationControllerDid || '').trim() !== senderDid) continue;
+      const signerJwk = protectedContent?.registrationKeys?.signerJwk;
+      const encrypterJwk = protectedContent?.registrationKeys?.encrypterJwk;
+      if (String(signerJwk?.kid || '').trim() !== senderSigningKeyId || !isSignatureJwk(signerJwk)) continue;
+      if (String(encrypterJwk?.kid || '').trim() !== senderEncryptionKeyId || !isEncryptionJwk(encrypterJwk)) continue;
+      return {
+        senderSigningKey: signerJwk as PublicJwk,
+        senderEncryptionKey: encrypterJwk as PublicJwk,
+      };
+    }
+    return undefined;
   };
 
   const getReplayTtlSeconds = (payload: any): number => {
@@ -3218,7 +3302,7 @@ export function createApiRouter(
       }
 
       const legacyBody = normalizeDidcommBodyForFhirFormat(req.body || {}, routeParams.format);
-      const normalizedLegacyContent = normalizeLegacyPlaintextContent(legacyBody || {});
+      const normalizedLegacyContent = normalizeBusinessBodyContent(legacyBody || {});
       const legacyMeta = normalizedLegacyContent?.meta || {};
 
       jobRequest = {
@@ -3433,21 +3517,14 @@ export function createApiRouter(
         const decodedJob = await kmsService.decodeRequest(req.body.request);
         const decodedJws = decodedJob.content?.meta?.jws;
         const embeddedSigningKey = decodedJws?.protected?.jwk as PublicJwk | undefined;
-        const isHostOrganizationCommunicationBootstrap = tenantId === 'host'
+        const isLegacyHostOrganizationCommunicationBootstrap = tenantId === 'host'
           && section === 'registry'
           && String(req.params.format || '').toLowerCase() === 'org.schema'
           && String(resourceType || '').toLowerCase() === 'organization'
-          && ['_batch', '_verify', '_transaction', '_activate'].includes(action);
-        const isPreDcrCommercialOrder = isHostControllerCommercialOrderRoute(
-          tenantId,
-          section,
-          String(req.params.format || ''),
-          resourceType,
-          action,
-        );
+          && ['_batch', '_verify'].includes(action);
         const allowsEmbeddedBootstrapKey = isIdentityDcrRoute
-          || isHostOrganizationCommunicationBootstrap
-          || isPreDcrCommercialOrder;
+          || allowNoBearerForActivate
+          || isLegacyHostOrganizationCommunicationBootstrap;
 
         const usesEmbeddedBootstrapKey = allowsEmbeddedBootstrapKey && Boolean(embeddedSigningKey);
 
@@ -3487,22 +3564,42 @@ export function createApiRouter(
             throw new Error("Secure request is missing 'skid' in the JWE protected header.");
           }
 
-          // 1. Resolve registered sender-key custody independently from job
-          // routing. Host commercial Orders are queued in `host` but signed by
-          // the tenant controller that authored the accepted Offer.
-          const vaultId = await resolveRegisteredSenderVaultId(
-            tenantId,
-            sector,
-            section,
-            req.params.format,
-            resourceType,
-            action,
-            senderDid,
-          );
-          const collectionName = await tenantsCacheManager.getCollectionName(vaultId);
-          if (!collectionName) {
-            throw new Error(`Could not resolve collectionName for vaultId '${vaultId}'`);
-          }
+          const reviewedOrganizationKeys = isHostOrganizationVerificationRoute(
+            tenantId, section, req.params.format, resourceType, action,
+          )
+            ? readReviewedOrganizationBootstrapKeys(
+              decodedJob.content, senderDid, senderSigningKeyId, senderEncryptionKeyId,
+            )
+            : undefined;
+          const pendingOfferKeys = reviewedOrganizationKeys
+            ? undefined
+            : isHostControllerCommercialOrderRoute(
+              tenantId, section, req.params.format, resourceType, action,
+            )
+              ? await readPendingOfferBootstrapKeys(
+                decodedJob.content, senderDid, senderSigningKeyId, senderEncryptionKeyId,
+              )
+              : undefined;
+          const reviewedBootstrapKeys = reviewedOrganizationKeys || pendingOfferKeys;
+          let senderSigningKey = reviewedBootstrapKeys?.senderSigningKey;
+          let senderEncryptionKey = reviewedBootstrapKeys?.senderEncryptionKey;
+
+          if (!reviewedBootstrapKeys) {
+            // Resolve registered sender-key custody independently from job
+            // routing for established post-DCR actors.
+            const vaultId = await resolveRegisteredSenderVaultId(
+              tenantId,
+              sector,
+              section,
+              req.params.format,
+              resourceType,
+              action,
+              senderDid,
+            );
+            const collectionName = await tenantsCacheManager.getCollectionName(vaultId);
+            if (!collectionName) {
+              throw new Error(`Could not resolve collectionName for vaultId '${vaultId}'`);
+            }
           
           // 2. Protect query parameters using HMAC (Secure Query Pattern).
           const protectedAttrName = await kmsService.getHmacBase64Url('kid', vaultId);
@@ -3578,8 +3675,9 @@ export function createApiRouter(
           const encryptionVerificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
             (vm: VerificationMethod) => vm.id.endsWith(`#${senderEncryptionKeyId}`)
           );
-          const senderSigningKey = signingVerificationMethod?.publicKeyJwk;
-          const senderEncryptionKey = encryptionVerificationMethod?.publicKeyJwk;
+            senderSigningKey = signingVerificationMethod?.publicKeyJwk;
+            senderEncryptionKey = encryptionVerificationMethod?.publicKeyJwk;
+          }
           
           if (!senderSigningKey) {
             throw new Error(`Signing key ID '${senderSigningKeyId}' not found in resolved DID document for '${senderDid}'.`);
@@ -3601,11 +3699,14 @@ export function createApiRouter(
           if (decodedJob.content?.meta?.jwe?.header) {
             decodedJob.content.meta.jwe.header.jwk = senderEncryptionKey as JWK;
           }
+          if (decodedJob.content?.meta?.jws?.protected) {
+            decodedJob.content.meta.jws.protected.jwk = senderSigningKey as JWK;
+          }
         }
         
         // Path parameters are authoritative for routing and must override any values embedded in the payload.
         const normalizedSecureContent = normalizeDidcommBodyForFhirFormat(
-          decodedJob.content as any,
+          normalizeBusinessBodyContent(decodedJob.content as any),
           req.params.format,
         );
         jobRequest = {
@@ -3684,7 +3785,7 @@ export function createApiRouter(
         }
 
         const legacyBody = normalizeDidcommBodyForFhirFormat(req.body || {}, req.params.format);
-        const normalizedLegacyContent = normalizeLegacyPlaintextContent(legacyBody || {});
+        const normalizedLegacyContent = normalizeBusinessBodyContent(legacyBody || {});
         const legacyMeta = normalizedLegacyContent?.meta || {};
 
         jobRequest = {
