@@ -149,6 +149,10 @@ Teaching rule:
 - Submit: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch`
 - Poll: `POST /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch-response`
 - Output includes first activation code in `org.schema.IndividualProduct.serialNumber`
+- The signed Order may carry a contextualized `Order.acceptedOffer.identifier`;
+  CORE resolves it through the shared claim contract and verifies the request
+  with the controller keys protected in that pending Offer. A public JWK in the
+  incoming envelope is never authority for the continuation.
 
 3. Modern controller/employee device identity bootstrap
 - After canonical `Order/_batch`, the modern controller uses the activation code (`org.schema.IndividualProduct.serialNumber`) to run:
@@ -157,7 +161,10 @@ exchanging the email-proof `id_token` for the `initial_access_token` required by
 - Then the controller runs:
 `POST /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/Device/_dcr` (+ poll),
 binding wallet public key(s) to that license serial number and controller email before creating additional employees.
-- SDK method chain: `activateEmployeeDeviceWithActivationCode(...)`
+- Preferred SDK facade: `ServerProfileSessionManager.enroll(...)`; it performs
+  encrypted exchange and DCR without exposing transport plumbing. Signed
+  bootstrap fields may be authored beside `thid`; CORE verifies the original
+  message first and then normalizes them into the manager body contract.
 - Identity-layer rule:
   - onboarding / order confirms the human controller identity and business
     lifecycle

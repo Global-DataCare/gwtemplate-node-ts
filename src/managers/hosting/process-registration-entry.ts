@@ -15,6 +15,7 @@ type ProcessRegistrationEntryDeps = Readonly<{
   entry: BundleEntry;
   environment?: string;
   jobMeta?: DidCommDecodedMetadata;
+  registrationControllerDid?: string;
   sectorsAllowed: string[];
   vaultRepository: IVaultRepository;
   applyLegalOrganizationIdentityCompatibility: (claims: ClaimsRecord) => ClaimsRecord;
@@ -25,6 +26,7 @@ type ProcessRegistrationEntryDeps = Readonly<{
     claims: ClaimsRecord;
     environment?: string;
     jobMeta?: DidCommDecodedMetadata;
+    registrationControllerDid?: string;
   }) => Promise<ClaimsRecord>;
   handleError: (error: any, entryType?: string, meta?: any) => ErrorEntry;
 }>;
@@ -86,6 +88,7 @@ export async function processRegistrationEntry(
         claims: normalizedClaims,
         environment: deps.environment,
         jobMeta: deps.jobMeta,
+        registrationControllerDid: deps.registrationControllerDid,
       });
     }
 

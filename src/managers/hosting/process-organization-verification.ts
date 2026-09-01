@@ -87,6 +87,7 @@ type VerificationDeps = Readonly<{
     jobMeta?: DidCommDecodedMetadata;
     fallbackAlternateName?: string;
     primaryDid?: string;
+    registrationControllerDid?: string;
     postalActivationCodeBinding?: PostalActivationCodeBinding;
   }) => Promise<ClaimsRecord>;
   createOrganizationIssueClaimsFromClaims: (input: {
@@ -196,6 +197,7 @@ export async function processOrganizationVerificationTransaction(
     jobMeta: deps.job.content?.meta,
     fallbackAlternateName: deps.job.tenantId,
     primaryDid: requestedPrimaryDid || undefined,
+    registrationControllerDid: String(deps.job.content?.iss || '').trim() || undefined,
   });
 
   return {

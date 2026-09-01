@@ -30,6 +30,7 @@ type CreatePendingTenantRegistrationDeps = Readonly<{
   jobMeta?: DidCommDecodedMetadata;
   fallbackAlternateName?: string;
   primaryDid?: string;
+  registrationControllerDid?: string;
   postalActivationCodeBinding?: PostalActivationCodeBinding;
   config: IServerConfig;
   vaultRepository: IVaultRepository;
@@ -143,6 +144,7 @@ export async function createPendingTenantRegistration(
       claims: processedClaims,
       contained: [person, processedService].filter(Boolean),
       ...(deps.primaryDid ? { primaryDid: deps.primaryDid } : {}),
+      ...(deps.registrationControllerDid ? { registrationControllerDid: deps.registrationControllerDid } : {}),
       ...(deps.postalActivationCodeBinding ? { postalActivationCodeBinding: deps.postalActivationCodeBinding } : {}),
       ...(registrationKeys.signerJwk || registrationKeys.encrypterJwk ? { registrationKeys } : {}),
     },

@@ -17,6 +17,7 @@ import {
   EXAMPLE_SECTOR,
   EXAMPLE_TENANT_IDENTIFIER,
 } from 'gdc-common-utils-ts/examples/shared';
+import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 
 /**
  * Transport security contract: encrypted post-DCR traffic resolves keys by
@@ -358,6 +359,208 @@ describe('SECURITY_MODE content-type gates', () => {
       expect.stringContaining('host:Order:_batch'),
       expect.any(Object),
     );
+  });
+
+  it('authorizes a pre-DCR Order only with the controller keys protected in its pending Offer', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'false',
+      DIDCOMM_PLAIN: 'false',
+    };
+
+    const offerId = 'urn:uuid:pending-reviewed-offer';
+    const senderDid = 'did:web:controller.example';
+    const signerJwk = {
+      kid: 'reviewed-signing-key', kty: 'AKP', alg: 'ML-DSA-44', pub: 'reviewed-signing-public', use: 'sig',
+    };
+    const encrypterJwk = {
+      kid: 'reviewed-encryption-key', kty: 'OKP', crv: 'ML-KEM-768', x: 'reviewed-encryption-public', use: 'enc',
+    };
+    const unreviewedEnvelopeJwk = {
+      kid: signerJwk.kid, kty: 'AKP', alg: 'ML-DSA-44', pub: 'unreviewed-signing-public', use: 'sig',
+    };
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async () => false),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getCollectionName: jest.fn(async () => 'host-physical-collection'),
+      getDidServiceConfig: jest.fn(async () => []),
+      getTenant: jest.fn(),
+    };
+    const kmsService = {
+      decodeRequest: jest.fn(async () => ({
+        content: {
+          thid: 'pending-order-thread',
+          iss: senderDid,
+          meta: {
+            jws: { protected: { kid: signerJwk.kid, jwk: unreviewedEnvelopeJwk }, signature: 'signature' },
+            jwe: { header: { skid: encrypterJwk.kid } },
+          },
+          body: {
+            data: [{ resource: { meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } } } }],
+          },
+        },
+      })),
+      getHmacBase64Url: jest.fn(),
+      unprotectConfidentialData: jest.fn(async () => ({
+        claims: { [ClaimsOfferSchemaorg.identifier]: offerId },
+        registrationControllerDid: senderDid,
+        registrationKeys: { signerJwk, encrypterJwk },
+      })),
+      getPublicVerificationKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+    };
+    const appAuthManager = { verifyBearerToken: jest.fn(async () => ({ sub: 'portal-session' })) };
+    const harness = buildTestApp({ appAuthManager, tenantsCacheManager, kmsService });
+    harness.vaultRepository.query.mockResolvedValue([{ protected: 'pending-offer' }]);
+    harness.cryptographyService.verifyDetachedJws.mockResolvedValue(true);
+
+    const response = await request(harness.app)
+      .post('/host/cds-001/v1/test/registry/org.schema/Order/_batch')
+      .set('Authorization', 'Bearer portal-token')
+      .type('form')
+      .send({ request: 'compact-jwe' });
+
+    expect(response.status).toBe(202);
+    expect(kmsService.unprotectConfidentialData).toHaveBeenCalledWith({ protected: 'pending-offer' }, 'host');
+    expect(harness.cryptographyService.verifyDetachedJws).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      expect.any(String),
+      signerJwk,
+    );
+    expect(harness.cryptographyService.verifyDetachedJws).not.toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      expect.any(String),
+      unreviewedEnvelopeJwk,
+    );
+  });
+
+  it('authorizes an organization transaction only with its explicit reviewed controller binding', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'false',
+      DIDCOMM_PLAIN: 'false',
+    };
+
+    const senderDid = 'did:web:controller.example';
+    const signerJwk = {
+      kid: 'declared-signing-key', kty: 'AKP', alg: 'ML-DSA-44', pub: 'declared-signing-public', use: 'sig',
+    };
+    const encrypterJwk = {
+      kid: 'declared-encryption-key', kty: 'OKP', crv: 'ML-KEM-768', x: 'declared-encryption-public', use: 'enc',
+    };
+    const unreviewedEnvelopeJwk = { ...signerJwk, pub: 'unreviewed-signing-public' };
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async () => false),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getCollectionName: jest.fn(async () => 'host-physical-collection'),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#registry:org.schema',
+        selector: { section: 'registry', format: 'org.schema' },
+        serviceEndpoint: 'Organization',
+        actions: ['_transaction'],
+      }]),
+      getTenant: jest.fn(),
+    };
+    const kmsService = {
+      decodeRequest: jest.fn(async () => ({
+        content: {
+          thid: 'organization-transaction-thread',
+          iss: senderDid,
+          meta: {
+            jws: { protected: { kid: signerJwk.kid, jwk: unreviewedEnvelopeJwk }, signature: 'signature' },
+            jwe: { header: { skid: encrypterJwk.kid } },
+          },
+          body: {
+            data: [{ resource: { controller: { did: senderDid, jwks: { keys: [signerJwk, encrypterJwk] } } } }],
+          },
+        },
+      })),
+      getHmacBase64Url: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getPublicVerificationKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+    };
+    const appAuthManager = { verifyBearerToken: jest.fn(async () => ({ sub: 'verified-account-subject' })) };
+    const harness = buildTestApp({ appAuthManager, tenantsCacheManager, kmsService });
+    harness.cryptographyService.verifyDetachedJws.mockResolvedValue(true);
+
+    const response = await request(harness.app)
+      .post('/host/cds-001/v1/test/registry/org.schema/Organization/_transaction')
+      .set('Authorization', 'Bearer signed-account-token')
+      .type('form')
+      .send({ request: 'compact-jwe' });
+
+    expect(response.status).toBe(202);
+    expect(harness.cryptographyService.verifyDetachedJws).toHaveBeenCalledWith(
+      expect.any(Uint8Array), expect.any(String), signerJwk,
+    );
+    expect(harness.cryptographyService.verifyDetachedJws).not.toHaveBeenCalledWith(
+      expect.any(Uint8Array), expect.any(String), unreviewedEnvelopeJwk,
+    );
+  });
+
+  it('normalizes an encrypted SDK token exchange payload into the manager body contract', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'false',
+      DIDCOMM_PLAIN: 'false',
+    };
+
+    const appAuthManager = {
+      verifyBearerToken: jest.fn(async () => ({
+        valid: true,
+        payload: { sub: 'verified-account-subject' },
+      })),
+    };
+    const kmsService = {
+      decodeRequest: jest.fn(async () => ({
+        content: {
+          thid: 'profile-activation-exchange',
+          iss: 'did:web:controller.example',
+          subject_token: 'single-use-activation-code',
+          client_instance_id: 'browser-installation',
+        },
+      })),
+      getHmacBase64Url: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getPublicVerificationKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+    };
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async () => true),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getCollectionName: jest.fn(async () => 'tenant-physical-collection'),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#identity:openid',
+        selector: { section: 'identity', format: 'openid' },
+        serviceEndpoint: 'Token',
+        actions: ['_exchange'],
+      }]),
+      getTenant: jest.fn(async () => ({ authorizationStatus: 'active' })),
+    };
+    const { app, queueAdapter } = buildTestApp({ appAuthManager, kmsService, tenantsCacheManager });
+
+    const response = await request(app)
+      .post('/example-tenant/cds-ca-bc/v1/health-care/identity/openid/Token/_exchange')
+      .set('Authorization', 'Bearer signed-account-token')
+      .type('form')
+      .send({ request: 'opaque-jwe' });
+
+    expect(response.status).toBe(202);
+    expect(queueAdapter.addJob).toHaveBeenCalledTimes(1);
+    expect(queueAdapter.addJob.mock.calls[0][1].content.body).toMatchObject({
+      subject_token: 'single-use-activation-code',
+      client_instance_id: 'browser-installation',
+    });
   });
 
   /**
