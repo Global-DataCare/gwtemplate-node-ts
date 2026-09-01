@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Remove the obsolete dated repository roadmap and all internal-planning and
+  TODO links from the public package README. Keep CBOR only as a code-verified
+  internal backlog item; other genuine compatibility gaps remain documented
+  outside the package landing page.
+
 - Clarify on the public package-facing README that the portable open-source
   host profile uses PostgreSQL and IPFS through a private Kubo node, while
   Firestore/GCS is retained only for legacy and demonstration compatibility.

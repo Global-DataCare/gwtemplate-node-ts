@@ -31,6 +31,15 @@ grep -Fq 'open-source host profile uses PostgreSQL for structured persistence an
 grep -Fq 'through a private Kubo node for blob storage.' "$ROOT_DIR/README.md"
 grep -Fq 'The Kubo API must remain private' "$ROOT_DIR/README.md"
 grep -Fq 'available only as a legacy/demo compatibility profile.' "$ROOT_DIR/README.md"
+if grep -Eiq 'docs-internal|roadmap|pending compatibility TODO' "$ROOT_DIR/README.md"; then
+  echo 'Public package README must not expose obsolete planning documents.' >&2
+  exit 1
+fi
+if [[ -e "$ROOT_DIR/docs-internal/ROADMAP.md" ]]; then
+  echo 'The obsolete dated roadmap must not remain in the repository.' >&2
+  exit 1
+fi
+grep -Fq 'CBOR' "$ROOT_DIR/docs-internal/BACKLOG.md"
 grep -Fq 'CCAAS' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 grep -Fq 'GW CORE y CCAAS son artefactos OCI distintos' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
