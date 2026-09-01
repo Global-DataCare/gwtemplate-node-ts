@@ -63,6 +63,14 @@ For any endpoint/manager behavior change:
 3. Validate SDK live E2E impact when core flow is affected.
 
 ## Quality Gates
+- Portal evidence follows `test -> local-network -> test-network -> network`.
+  First prove normal local UI -> BFF -> high-level SDK -> GW/services with
+  in-memory `networkKind=test` and no blockchain. Fixture pages, mocked routes
+  and API-only Playwright never replace that cross-system proof. Fabric,
+  staging and production follow in that order.
+- Every affected package or SDK live E2E must run against the real local
+  services. A live E2E reported as `SKIP` blocks the release. Finish those live
+  E2E gates before `npm publish` or any container image build.
 - Type/build scripts as applicable.
 - Unit: `npm run test:unit` or targeted jest files.
 - Integration: `npm run test:integration` or targeted jest files.

@@ -85,13 +85,22 @@ Note on ESM dependencies: some packages (e.g. `gdc-common-utils-ts`, `gdc-sdk-cl
 
 ## 5. Cross-Repo Live E2E: ICA + GW + SDK Node
 
-This is the canonical order for real verification of the legal-organization
-host onboarding flow:
+This is the canonical progression for real verification of the
+legal-organization host onboarding flow:
 
-1. local process E2E from a real TTY
-2. local Docker E2E against the built image
-3. staging E2E
-4. only after that, production image/deploy
+`test -> local-network -> test-network -> network`
+
+The first `test` gate crosses the normal local UI -> BFF -> high-level SDK ->
+GW boundary with in-memory services and no blockchain. Fixture pages, mocked
+routes and API-only Playwright are diagnostics; they never satisfy that gate.
+Every affected package or SDK live E2E must then run against the real local
+services. A live E2E reported as `SKIP` blocks the release. Finish all live E2E
+gates before `npm publish` or any container image build.
+
+1. local process and browser E2E in `networkKind=test`
+2. Fabric `local-network` E2E and only then a local container smoke
+3. deployed `test-network` staging E2E
+4. production `network` deployment and E2E
 
 These runs are driven from `gdc-sdk-node-ts/tests/live-gw-node-runtime.e2e.test.mjs`,
 but the operational setup belongs here because the most expensive failures were

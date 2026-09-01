@@ -1,3 +1,4 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD flow contract: ingest clinical sections, read the current summary, delete one
 // exact authored resource through a batch, then prove operational and permitted
 // Digital Twin readback no longer contains it.
@@ -30,6 +31,7 @@ import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { applyDigitalTwinSecondaryUseDecision } from '../../utils/digital-twin-secondary-use';
 import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 
 describe('Composition Bundle _search API (integration)', () => {
   function loadIpsAllSectionsFixture(subjectDid: string): any {
@@ -217,9 +219,7 @@ describe('Composition Bundle _search API (integration)', () => {
 
       expect(searchPayload?.resourceType).toBe('Bundle');
       expect(searchPayload?.data?.[0]?.response?.status).toBe('200');
-      expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
-      expect(Array.isArray(searchPayload?.data?.[0]?.resource?.data)).toBe(true);
-      expect(searchPayload?.data?.[0]?.resource?.data?.length).toBeGreaterThanOrEqual(1);
+      expect(extractBundleSearchResources(searchPayload).length).toBeGreaterThanOrEqual(1);
     } finally {
       queueAdapter.stop();
     }
@@ -458,8 +458,9 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(searchPayload?.resourceType).toBe('Bundle');
       expect(searchPayload?.data?.[0]?.response?.status).toBe('200');
       expect(searchPayload?.data?.[0]?.type).toBe('DocumentReference-search-response-v1.0');
-      expect(searchPayload?.data?.[0]?.resource?.total).toBe(1);
-      expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.['DocumentReference.contenthash']).toBe(cid);
+      const matches = extractBundleSearchResources(searchPayload);
+      expect(matches).toHaveLength(1);
+      expect(matches[0]?.['DocumentReference.contenthash']).toBe(cid);
     } finally {
       queueAdapter.stop();
     }
@@ -595,8 +596,9 @@ describe('Composition Bundle _search API (integration)', () => {
         expect(searchPayload?.resourceType).toBe('Bundle');
         expect(searchPayload?.data?.[0]?.response?.status).toBe('200');
         expect(searchPayload?.data?.[0]?.type).toBe('Communication-search-response-v1.0');
-        expect(searchPayload?.data?.[0]?.resource?.total).toBe(1);
-        expect(searchPayload?.data?.[0]?.resource?.data?.[0]?.['Communication.identifier']).toBe('comm-permission-001');
+        const matches = extractBundleSearchResources(searchPayload);
+        expect(matches).toHaveLength(1);
+        expect(matches[0]?.['Communication.identifier']).toBe('comm-permission-001');
       }
     } finally {
       queueAdapter.stop();
@@ -1154,8 +1156,9 @@ describe('Composition Bundle _search API (integration)', () => {
 
         expect(searchPayload?.resourceType).toBe('Bundle');
         expect(searchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
-        expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
-        const firstMatch = searchPayload?.data?.[0]?.resource?.data?.[0];
+        const matches = extractBundleSearchResources(searchPayload);
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+        const firstMatch = matches[0];
         expect(firstMatch?.composition?.resourceType).toBe('Composition');
         expect(
           firstMatch?.['Composition.subject']
@@ -1510,8 +1513,9 @@ describe('Composition Bundle _search API (integration)', () => {
 
       expect(searchPayload?.resourceType).toBe('Bundle');
       expect(searchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
-      expect(searchPayload?.data?.[0]?.resource?.total).toBe(1);
-      const savedResearchSubject = searchPayload?.data?.[0]?.resource?.data?.[0];
+      const matches = extractBundleSearchResources(searchPayload);
+      expect(matches).toHaveLength(1);
+      const savedResearchSubject = matches[0];
       expect(savedResearchSubject?.resourceType).toBe('ResearchSubject');
       expect(savedResearchSubject?.['ResearchSubject.identifier']).toBe(subjectDid);
       expect(savedResearchSubject?.composition?.id).toBe(selectionCompositionId);
@@ -1679,11 +1683,13 @@ describe('Composition Bundle _search API (integration)', () => {
         }
         await new Promise((r) => setTimeout(r, 50));
       }
-      expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
-      const matchedSubject = searchPayload?.data?.[0]?.resource?.data?.[0]?.['Composition.subject']
-        || searchPayload?.data?.[0]?.resource?.data?.[0]?.['org.hl7.fhir.r4.Composition.subject']
-        || searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.claims?.['Composition.subject']
-        || searchPayload?.data?.[0]?.resource?.data?.[0]?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'];
+      const matches = extractBundleSearchResources(searchPayload);
+      expect(matches.length).toBeGreaterThanOrEqual(1);
+      const firstMatch = matches[0] as any;
+      const matchedSubject = firstMatch?.['Composition.subject']
+        || firstMatch?.['org.hl7.fhir.r4.Composition.subject']
+        || firstMatch?.meta?.claims?.['Composition.subject']
+        || firstMatch?.meta?.claims?.['org.hl7.fhir.r4.Composition.subject'];
       expect(matchedSubject).toBe(twinSubjectId);
 
       const r4MaterializeResp = await invokeExpress(app, {

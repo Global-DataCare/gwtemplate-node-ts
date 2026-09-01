@@ -1,10 +1,11 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { MedicationStatementManager } from '../../../managers/MedicationStatementManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
 import { getEnvSectionId } from '../../../utils/section-env';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 
 describe('MedicationStatementManager', () => {
   const storedRecords = new Map<string, any>();
@@ -130,7 +131,7 @@ describe('MedicationStatementManager', () => {
     const response = await manager.process(job);
     const data = (response.body as any).data;
     expect(data[0].response.status).toBe('200');
-    expect(data[0].resource.total).toBe(1);
+    expect(extractBundleSearchResources(response)).toHaveLength(1);
     expect(mockVaultRepository.query).toHaveBeenCalled();
   });
 
@@ -180,10 +181,7 @@ describe('MedicationStatementManager', () => {
     });
 
     const response = await manager.process(job);
-    const data = (response.body as any).data;
-    expect(data[0].response.status).toBe('200');
-    expect(data[0].resource.total).toBe(0);
-    expect(data[0].resource.data).toEqual([]);
+    expect(extractBundleSearchResources(response)).toEqual([]);
     expect(mockVaultRepository.getAllSections).not.toHaveBeenCalled();
   });
 
@@ -228,7 +226,8 @@ describe('MedicationStatementManager', () => {
     const response = await manager.process(job);
     const data = (response.body as any).data;
     expect(data[0].response.status).toBe('200');
-    expect(data[0].resource.total).toBe(1);
-    expect(data[0].resource.data[0].id).toBe('med-a');
+    const matches = extractBundleSearchResources(response);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].id).toBe('med-a');
   });
 });

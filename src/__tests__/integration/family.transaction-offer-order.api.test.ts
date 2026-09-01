@@ -1,5 +1,6 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 import type { StoryHarness } from './helpers/story-flow';
 import {
   installBasicJsonFetchMock,
@@ -153,7 +154,7 @@ describe('Family transaction Offer/Order route story', () => {
     );
     expect(offerSearchPoll.status).toBe(200);
     expect(offerSearchPoll.body.data[0].response.status).toBe('200');
-    expect(offerSearchPoll.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
+    expect(extractBundleSearchResources(offerSearchPoll.body).length).toBeGreaterThanOrEqual(1);
 
     // Re-starting the same individual is a read/idempotency outcome, not a new
     // pending Order. Channels use this status to avoid reconfirming an active

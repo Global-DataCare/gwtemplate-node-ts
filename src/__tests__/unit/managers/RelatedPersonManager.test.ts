@@ -1,29 +1,40 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/RelatedPersonManager.test.ts
 
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals';
 import { RelatedPersonManager } from '../../../managers/RelatedPersonManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
 import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/enums';
 import { InteroperableLifecycleStatuses } from 'gdc-common-utils-ts/utils/interoperable-resource-operation';
+import {
+  SearchResponseProfileEnvironment,
+  SearchResponseProfiles,
+} from '../../../utils/didcomm-response';
 
 describe('RelatedPersonManager', () => {
   const mockVaultRepository = {
     vaultExists: jest.fn(),
     get: jest.fn(),
     put: jest.fn(),
+    listContainersInSection: jest.fn(),
   } as unknown as jest.Mocked<IVaultRepository>;
 
   const manager = new RelatedPersonManager(mockVaultRepository);
 
   beforeEach(() => {
+    process.env[SearchResponseProfileEnvironment.Variable] = SearchResponseProfiles.PrimaryResource;
     jest.clearAllMocks();
     mockVaultRepository.vaultExists.mockResolvedValue(true as any);
     mockVaultRepository.get.mockResolvedValue(undefined as any);
     mockVaultRepository.put.mockResolvedValue(true as any);
+    mockVaultRepository.listContainersInSection.mockResolvedValue([] as any);
+  });
+
+  afterEach(() => {
+    delete process.env[SearchResponseProfileEnvironment.Variable];
   });
 
   const createJob = (overrides: Partial<JobRequest> = {}): JobRequest => ({
@@ -172,5 +183,58 @@ describe('RelatedPersonManager', () => {
     expect(stored.status).toBe(InteroperableLifecycleStatuses.Purged);
     expect(stored['RelatedPerson.lifecycle-disposition']).toBeUndefined();
     expect(stored.meta.lifecycleDisposition).toBe('purged');
+  });
+
+  it('returns one primary Bundle resource per subject-scoped RelatedPerson search match', async () => {
+    const sourceJob = createJob();
+    const sourceClaims = (sourceJob.content as any).body.entry[0].meta.claims;
+    const subject = sourceClaims['RelatedPerson.patient'];
+    mockVaultRepository.listContainersInSection.mockResolvedValue([{
+      id: 'urn:uuid:rel-001',
+      status: EntityLifecycleStatus.Active,
+      ...sourceClaims,
+    }] as any);
+
+    const response = await manager.process(createJob({
+      action: '_search',
+      content: {
+        ...(sourceJob.content as any),
+        body: {
+          resourceType: 'Parameters',
+          parameter: [{ name: 'patient', valueString: subject }],
+        },
+      } as any,
+    }));
+
+    expect(mockVaultRepository.listContainersInSection).toHaveBeenCalledWith(
+      'health-care_acme',
+      getSubjectScopedSectionId(subject, 'individual', 'related-persons'),
+    );
+    expect((response.body as any).total).toBe(1);
+    expect((response.body as any).data).toHaveLength(1);
+    expect((response.body as any).data[0]).toMatchObject({
+      type: 'RelatedPerson-search-response-v1.0',
+      response: { status: '200' },
+      resource: {
+        type: 'RelatedPerson',
+        resource: {
+          resourceType: 'RelatedPerson',
+          id: 'urn:uuid:rel-001',
+        },
+      },
+    });
+    expect((response.body as any).data[0].resource.data).toBeUndefined();
+  });
+
+  it('rejects RelatedPerson search without an explicit subject or patient', async () => {
+    const sourceJob = createJob();
+    await expect(manager.process(createJob({
+      action: '_search',
+      content: {
+        ...(sourceJob.content as any),
+        body: { resourceType: 'Parameters', parameter: [] },
+      } as any,
+    }))).rejects.toThrow('RelatedPerson search requires an explicit subject or patient.');
+    expect(mockVaultRepository.listContainersInSection).not.toHaveBeenCalled();
   });
 });

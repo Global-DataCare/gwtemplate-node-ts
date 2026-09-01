@@ -2,12 +2,38 @@
 
 ## [Unreleased]
 
+## [1.23.11] - 2026-09-01
+
+- Make the cross-product portal release order executable and explicit:
+  `test -> local-network -> test-network -> network`, with real local UI, BFF,
+  high-level SDK and GW proof required before Fabric or staging. Fixture,
+  mocked and API-only Playwright remain diagnostic layers. Enabled local live
+  E2E must finish with no `SKIP` before npm publication or image construction.
+
+- Add subject-scoped `RelatedPerson/_search` through the versioned response
+  serializer. The primary profile returns one match per
+  `body.data[].resource`, while the deprecated legacy nesting remains isolated;
+  `body.total` belongs to the outer Bundle in both cases.
+- Remove the incorrectly introduced `License/_add` route, manager behavior,
+  validator allowance, OpenAPI description and portal/skill guidance. Licence
+  inventory is created during onboarding or through Offer -> Order.
+- Migrate CORE search-response test readers to the shared
+  `extractBundleSearchResources(...)` compatibility boundary so the complete
+  suite proves both primary and deprecated rolling-deployment profiles without
+  confusing a real resource-owned `data` property with the legacy wrapper.
+- Pin `gdc-common-utils-ts@2.7.0` so CORE consumes the released claims-first
+  Composition translation and canonical search compatibility boundary.
+
+## [1.23.10] - 2026-09-01
+
 - Add the opt-in `GW_SEARCH_RESPONSE_PROFILE=primary-resource` serializer for
   all 0..n GW searches, returning every match as a primary
   `body.data[].resource` Bundle entry with `body.total` on the outer document.
   Unset deployments retain the deprecated `legacy-resource-data` response
   during the SDK rollout. Pin `gdc-common-utils-ts@2.6.3` for dual-shape
   readers and reusable Employee/License fixtures without duplicated literals.
+
+## [1.23.9] - 2026-09-01
 
 - Publish the validated GW CORE `1.23.9` image built from commit `cc1cfdb` to
   the public GHCR package and pin every public host guide to its immutable OCI
@@ -601,10 +627,8 @@
   sector variables.
 
 - Consolidate the portal-to-GW mapping in
-  `docs/PORTAL_API_TO_GW_CORE.md`: document the published DID binding,
-  organization/individual license search and non-production `License/_add`
-  contracts, with one root navigation pointer instead of a competing versioned
-  source of truth.
+  `docs/PORTAL_API_TO_GW_CORE.md`, with one root navigation pointer instead of
+  a competing versioned source of truth.
 
 ## [1.21.22] - 2026-08-20
 
@@ -632,9 +656,6 @@
 - Repair missing representative reservations at startup from protected tenant
   claims and restore only controller DID references backed by active protected
   employee records.
-- Add controller-authorized zero-cost professional `License/_add` for
-  non-production `test` (in-memory), `local-network`, and `test-network`;
-  `prod` or `network` keeps the signed payment and ledger-verifiable Order path.
 
 ## [1.21.19] - 2026-08-20
 

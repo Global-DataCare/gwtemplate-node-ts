@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 /**
  * TEST SECTOR USAGE: This test uses both network (infra) and business (functional) sectors.
  *
@@ -21,6 +21,7 @@ import { ILogger } from '../../../loggers/ILogger';
 import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { FAMILY_ORDER_REQUEST, FAMILY_REGISTRATION_REQUEST } from '../../data/example-payloads';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 import * as tenantUtils from '../../../utils/tenant';
 import {
   ClaimsOfferSchemaorg,
@@ -325,7 +326,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
     });
 
     expect(offerSearch.body.data[0].response.status).toBe('200');
-    expect(offerSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
+    expect(extractBundleSearchResources(offerSearch.body).length).toBeGreaterThanOrEqual(1);
 
     const orderSearch = await familyManager.process({
       id: 'job-family-order-search-1',
@@ -350,7 +351,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
     });
 
     expect(orderSearch.body.data[0].response.status).toBe('200');
-    expect(orderSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
+    expect(extractBundleSearchResources(orderSearch.body).length).toBeGreaterThanOrEqual(1);
   });
 
   it('uses the route network even when an individual address country conflicts', async () => {

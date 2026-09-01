@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/CompositionManager.test.ts
 
@@ -31,6 +31,7 @@ import {
   ExampleEmployeeRoles,
 } from 'gdc-common-utils-ts/examples/employee';
 import { getDigitalTwinSubjectAliasSectionId } from '../../../utils/digital-twin-research-projection';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 
 const HOSTED_ORGANIZATION_DID = buildOrganizationDidWeb({
   hostDidWeb: `did:web:${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
@@ -283,8 +284,7 @@ describe('CompositionManager', () => {
     const response = await manager.process(job);
     const data = (response.body as any).data;
     expect(data[0].type).toBe('Composition-search-response-v1.0');
-    expect(data[0].resource.total).toBe(1);
-    expect(data[0].resource.data).toHaveLength(1);
+    expect(extractBundleSearchResources(response)).toHaveLength(1);
   });
 
   it('supports _search with FHIR Parameters format', async () => {
@@ -301,8 +301,7 @@ describe('CompositionManager', () => {
     const response = await manager.process(job);
     const data = (response.body as any).data;
     expect(data[0].type).toBe('Composition-search-response-v1.0');
-    expect(data[0].resource.total).toBe(2);
-    expect(data[0].resource.data).toHaveLength(2);
+    expect(extractBundleSearchResources(response)).toHaveLength(2);
   });
 
   it('supports _search with POST wrapper entries carrying FHIR Parameters', async () => {
@@ -336,8 +335,7 @@ describe('CompositionManager', () => {
     const response = await manager.process(job);
     const data = (response.body as any).data;
     expect(data[0].type).toBe('Composition-search-response-v1.0');
-    expect(data[0].resource.total).toBe(1);
-    expect(data[0].resource.data).toHaveLength(1);
+    expect(extractBundleSearchResources(response)).toHaveLength(1);
   });
 
   it('supports Subject/$summary with FHIR Parameters format in supported sectors', async () => {
@@ -671,10 +669,9 @@ describe('CompositionManager', () => {
       } as any,
     }));
 
-    const result = (response.body as any).data[0].resource;
-    expect(result.total).toBe(1);
-    expect(result.data).toEqual([expect.objectContaining({ id: 'composition-basic-search' })]);
-    expect(JSON.stringify(result.data)).not.toContain('__digitalTwinSearch');
+    const results = extractBundleSearchResources(response);
+    expect(results).toEqual([expect.objectContaining({ id: 'composition-basic-search' })]);
+    expect(JSON.stringify(results)).not.toContain('__digitalTwinSearch');
   });
 
   it('rejects a basic search whose end date precedes its start date', async () => {
@@ -1006,8 +1003,9 @@ describe('CompositionManager', () => {
       const response = await manager.process(job);
       const data = (response.body as any).data;
       expect(data[0].type).toBe('Composition-search-response-v1.0');
-      expect(data[0].resource.total).toBe(1);
-      expect(data[0].resource.data[0].id).toBe(expectedCompositionId);
+      const matches = extractBundleSearchResources(response);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].id).toBe(expectedCompositionId);
     },
   );
 
@@ -1052,7 +1050,7 @@ describe('CompositionManager', () => {
 
     const entry = (response.body as any).data[0];
     expect(entry.type).toBe('ResearchSubject-search-response-v1.0');
-    expect(entry.resource.data[0]).toMatchObject({
+    expect(extractBundleSearchResources(response)[0]).toMatchObject({
       resourceType: 'ResearchSubject',
       'ResearchSubject.identifier': subjectDid,
       'ResearchSubject.status': 'candidate',
@@ -1113,9 +1111,9 @@ describe('CompositionManager', () => {
       } as any,
     }));
 
-    const data = (response.body as any).data;
-    expect(data[0].resource.total).toBe(1);
-    expect(data[0].resource.data[0].id).toBe('comp-med-combo-1');
+    const matches = extractBundleSearchResources(response);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].id).toBe('comp-med-combo-1');
   });
 
   it('supports digitaltwin Composition/_search by section plus Observation code-display and code-text together', async () => {
@@ -1166,9 +1164,9 @@ describe('CompositionManager', () => {
       } as any,
     }));
 
-    const data = (response.body as any).data;
-    expect(data[0].resource.total).toBe(1);
-    expect(data[0].resource.data[0].id).toBe('comp-obs-combo-1');
+    const matches = extractBundleSearchResources(response);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].id).toBe('comp-obs-combo-1');
   });
 
   it('supports digitaltwin Composition/_search by section plus Composition.meta-tag for one researcher selection', async () => {
@@ -1229,9 +1227,10 @@ describe('CompositionManager', () => {
 
     const data = (response.body as any).data;
     expect(data[0].type).toBe('Composition-search-response-v1.0');
-    expect(data[0].resource.total).toBe(1);
-    expect(data[0].resource.data[0].id).toBe(selectionCompositionId);
-    expect(data[0].resource.data[0].meta?.tag?.[0]?.system).toBe('urn:research:tag:score');
-    expect(data[0].resource.data[0].meta?.tag?.[0]?.code).toBe('10');
+    const matches = extractBundleSearchResources(response);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].id).toBe(selectionCompositionId);
+    expect((matches[0].meta as any)?.tag?.[0]?.system).toBe('urn:research:tag:score');
+    expect((matches[0].meta as any)?.tag?.[0]?.code).toBe('10');
   });
 });

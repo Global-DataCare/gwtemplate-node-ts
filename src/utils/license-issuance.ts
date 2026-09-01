@@ -57,14 +57,6 @@ export type MaterializeFreeIndividualLicensesParams = {
   nowEpochSeconds?: number;
 };
 
-export type MaterializeFreeProfessionalLicensesParams = {
-  vaultRepository: IVaultRepository;
-  tenantVaultId: string;
-  tenantId: string;
-  quantity: number;
-  nowEpochSeconds?: number;
-};
-
 export type ReserveTechnicalControllerSeatParams = {
   vaultRepository: IVaultRepository;
   tenantVaultId: string;
@@ -126,57 +118,15 @@ export async function reserveTechnicalControllerSeat(
 }
 
 /**
- * Adds unassigned employee seats for a zero-cost test-network order.
- *
- * The caller owns the environment gate. This helper only materializes the
- * already-authorized result and never assigns a controller, representative or
- * employee implicitly. Each later `License/_issue` binds exactly one actor,
- * while the same seat can hold up to five independently revocable devices.
- */
-export async function materializeFreeProfessionalLicenses(
-  params: MaterializeFreeProfessionalLicensesParams,
-): Promise<ConfidentialStorageDoc[]> {
-  if (!Number.isInteger(params.quantity) || params.quantity <= 0) {
-    throw new Error('Professional license quantity must be a positive integer.');
-  }
-  const now = params.nowEpochSeconds ?? Math.floor(Date.now() / 1000);
-  const documents: ConfidentialStorageDoc[] = Array.from({ length: params.quantity }, () => {
-    const id = randomUUID();
-    const license: DeviceLicense = {
-      id,
-      tenantId: params.tenantId,
-      orderId: `professional-test-network-free:${params.tenantId}`,
-      userClass: LICENSE_USER_CLASS_EMPLOYEE,
-      userCategory: 'default',
-      type: LICENSE_TYPE_WEB,
-      status: LICENSE_STATUS_AVAILABLE,
-      plan: 'professional-test-network-free',
-      renewalCycle: null,
-      reactivationEnabled: true,
-      maxDevices: 5,
-      exp: now + 31_536_000,
-    };
-    return { id, status: LICENSE_STATUS_AVAILABLE, sequence: 0, content: license };
-  });
-  await params.vaultRepository.put(
-    params.tenantVaultId,
-    documents,
-    getEnvSectionId('device-licenses'),
-  );
-  return documents;
-}
-
-/**
  * Materializes zero-cost seats for one hosted individual organization.
  *
  * This is deliberately scoped by `ownerOrganizationId`: several individual
  * organizations can coexist in the same UNID tenant vault and must never
  * borrow each other's member seats.
  *
- * Two call modes are supported:
- * - onboarding uses `ensureTotal=true`, `quantity=2` and a controller id;
- * - the portal's "Add licenses" action uses `ensureTotal=false` and adds the
- *   requested number as available seats.
+ * Organization onboarding uses `ensureTotal=true`, an initial quantity and a
+ * controller id. Later additions belong to the Offer -> Order lifecycle; this
+ * helper is not a public licence-mutation route.
  */
 export async function materializeFreeIndividualLicenses(
   params: MaterializeFreeIndividualLicensesParams,

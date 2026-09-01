@@ -59,6 +59,25 @@ Readback rule:
 When helpful, the last column states what the portal backend does against GW
 CORE behind the scenes.
 
+Search readers consume one primary resource per outer Bundle entry. Portal and
+BFF code should call the shared high-level SDK reader, which accepts both the
+current shape and the deprecated rolling-deployment shape; it must not inspect
+`resource.data` or construct DIDComm transport envelopes itself.
+
+Tests and low-level compatibility readers that receive a raw response use the
+shared dual-profile reader without branching on the deployment profile:
+
+```ts
+import { extractBundleSearchResources } from
+  'gdc-common-utils-ts/utils/organization-employee-lifecycle';
+
+const resources = extractBundleSearchResources(searchResponse);
+```
+
+This preserves a real primary resource whose own domain model contains a
+`data` field; only the explicitly deprecated `{ total, data }` search wrapper
+is flattened.
+
 ## Organizations
 
 | Portal API | Method | Frontend purpose | Portal backend behavior |
@@ -77,7 +96,6 @@ CORE behind the scenes.
 | `/organizations/{uuid}/license-orders/{orderId}` | `GET` | get one purchase status | returns the status materialized by the portal |
 | `/organizations/{uuid}/license-orders/{orderId}/payment-confirmation` | `POST` | confirm payment for a license purchase so seats can be emitted | in portal-managed mode the BFF receives the Stripe or other provider confirmation, then submits one `Order`-style confirmation to GW CORE so seats are emitted from the accepted offer |
 | `/organizations/{uuid}/licenses` | `GET` | list visible organization seats/licenses | calls the SDK organization-controller license reader, backed by tenant `entity/org.schema/License/_search`, and projects the returned seats/devices for the UI |
-| `/organizations/{uuid}/licenses/test-additions` | `POST` | add explicit zero-price seats in an allowed non-production network | calls the SDK organization-controller test helper backed by `entity/org.schema/License/_add`; GW independently rejects the shortcut outside `test`, `local-network`, or `test-network` |
 | `/organizations/{uuid}/orders` | `POST` | confirm the legal-organization offer/license | sends the organization order to GW |
 | `/organizations/{uuid}/orders` | `GET` | list orders launched from the portal | reads portal-stored order history |
 | `/organizations/{uuid}/orders/{orderId}` | `GET` | get one order detail | returns portal-materialized order state |
@@ -484,11 +502,9 @@ for (const employee of inventory) {
     `individual/org.schema/License/_search`
   - `GET /subject/member-licenses` remains a functional specialization of the
     same source for the individual invitation UX
-- Explicit zero-cost additions are also a current CORE test capability:
-  - `OrganizationControllerSdk.addFreeEmployeeLicenses(...)` uses
-    `entity/org.schema/License/_add`
-  - this is not a payment confirmation and must remain unavailable in
-    production/network mode
+- `License/_add` is not a CORE operation. Test, local, staging and production
+  create inventory during onboarding or through Offer -> Order. Portal and BFF
+  code must not construct a direct seat-mutation request.
 - Always distinguish these two things:
   - `License/_issue`: does not buy or create new licenses; it reserves one
     existing seat from the `device-licenses` pool and returns an activation code

@@ -1,4 +1,5 @@
-// TDD contract: a verified author ingests IPS data before a contract-authorized researcher discovers its pseudonymous twin.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// Contract marker: a verified author ingests IPS data through the public conversation boundary.
 import { startServer, resetServerConfig } from '../../../server';
 import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
@@ -11,6 +12,7 @@ import {
   TestResearchOrgControllerSdk,
 } from '../helpers/research-access-sdk';
 import { configureAuthenticatedTestActor } from '../helpers/authenticated-test-actor';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 
 /**
  * Didactic end-to-end research access conversation.
@@ -101,13 +103,14 @@ describe('Research access conversation (integration)', () => {
 
       expect(compositionSearchPayload?.resourceType).toBe('Bundle');
       expect(compositionSearchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
-      expect(compositionSearchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
+      const compositionMatches = extractBundleSearchResources(compositionSearchPayload);
+      expect(compositionMatches.length).toBeGreaterThanOrEqual(1);
 
-      const firstMatch = compositionSearchPayload?.data?.[0]?.resource?.data?.[0];
+      const firstMatch = compositionMatches[0];
       expect(
         firstMatch?.['ResearchSubject.identifier']
         || firstMatch?.['Composition.subject']
-        || firstMatch?.composition?.['Composition.subject'],
+        || (firstMatch?.composition as Record<string, unknown> | undefined)?.['Composition.subject'],
       ).toMatch(/^urn:uuid:/);
 
       const novitaIbuprofenSearchPayload = await digitalTwinSdk.searchMedicationTwinsByCodeValue(
@@ -122,12 +125,13 @@ describe('Research access conversation (integration)', () => {
       for (const payload of [novitaIbuprofenSearchPayload, novitaParacetamolSearchPayload]) {
         expect(payload?.resourceType).toBe('Bundle');
         expect(payload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
-        expect(payload?.data?.[0]?.resource?.total).toBe(1);
-        const onlyMatch = payload?.data?.[0]?.resource?.data?.[0];
+        const matches = extractBundleSearchResources(payload);
+        expect(matches).toHaveLength(1);
+        const onlyMatch = matches[0];
         expect(
           onlyMatch?.['ResearchSubject.identifier']
           || onlyMatch?.['Composition.subject']
-          || onlyMatch?.composition?.['Composition.subject'],
+          || (onlyMatch?.composition as Record<string, unknown> | undefined)?.['Composition.subject'],
         ).toMatch(/^urn:uuid:/);
       }
 
