@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/IndividualManager.test.ts
 
@@ -24,6 +24,7 @@ import {
 import { BundleEntry, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 
 
 const uuidMock = {
@@ -372,9 +373,7 @@ describe('IndividualManager', () => {
       );
       expect(responseEntry.type).toBe('Subject-search-response-v1.0');
       expect(responseEntry.response.status).toBe('200');
-      expect(responseEntry.resource.resourceType).toBe('Bundle');
-      expect(responseEntry.resource.total).toBe(2);
-      expect(responseEntry.resource.data).toHaveLength(2);
+      expect(extractBundleSearchResources(response)).toHaveLength(2);
     });
 
     it('filters one contextualized HRESCH rule by provider, action and source reference', async () => {
@@ -441,9 +440,9 @@ describe('IndividualManager', () => {
         } as any,
       });
 
-      const responseEntry = response.body.data[0] as any;
-      expect(responseEntry.resource.total).toBe(1);
-      expect(responseEntry.resource.data[0].id).toBe('permit-globaldatacare');
+      const matches = extractBundleSearchResources(response);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].id).toBe('permit-globaldatacare');
     });
   });
 });

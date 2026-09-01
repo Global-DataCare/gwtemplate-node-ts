@@ -64,6 +64,20 @@ BFF code should call the shared high-level SDK reader, which accepts both the
 current shape and the deprecated rolling-deployment shape; it must not inspect
 `resource.data` or construct DIDComm transport envelopes itself.
 
+Tests and low-level compatibility readers that receive a raw response use the
+shared dual-profile reader without branching on the deployment profile:
+
+```ts
+import { extractBundleSearchResources } from
+  'gdc-common-utils-ts/utils/organization-employee-lifecycle';
+
+const resources = extractBundleSearchResources(searchResponse);
+```
+
+This preserves a real primary resource whose own domain model contains a
+`data` field; only the explicitly deprecated `{ total, data }` search wrapper
+is flattened.
+
 ## Organizations
 
 | Portal API | Method | Frontend purpose | Portal backend behavior |

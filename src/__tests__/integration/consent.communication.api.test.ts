@@ -1,6 +1,7 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD contract: locally authored Consent projections require one cryptographically verified actor.
 import { invokeExpress } from './helpers/invokeExpress';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import {
@@ -363,8 +364,7 @@ describe('Consent via Communication API (integration)', () => {
       expect(readPayload?.resourceType).toBe('Bundle');
       expect(readPayload?.data?.[0]?.response?.status).toBe('200');
       expect(readPayload?.data?.[0]?.type).toBe('Subject-search-response-v1.0');
-      expect(readPayload?.data?.[0]?.resource?.total).toBe(3);
-      expect(Array.isArray(readPayload?.data?.[0]?.resource?.data)).toBe(true);
+      expect(extractBundleSearchResources(readPayload)).toHaveLength(3);
 
       const communications = await vaultRepository.getContainersInSection(
         tenantVaultId,

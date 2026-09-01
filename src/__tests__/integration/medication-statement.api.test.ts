@@ -1,5 +1,6 @@
-// TDD flow contract: imported clinical documents preserve their external author while the verified BFF remains the transport actor.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { invokeExpress } from './helpers/invokeExpress';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import {
@@ -568,8 +569,7 @@ describe('MedicationStatement API (integration)', () => {
 
       expect(searchPayload?.resourceType).toBe('Bundle');
       expect(searchPayload?.data?.[0]?.response?.status).toBe('200');
-      expect(searchPayload?.data?.[0]?.resource?.total).toBeGreaterThanOrEqual(1);
-      expect(Array.isArray(searchPayload?.data?.[0]?.resource?.data)).toBe(true);
+      expect(extractBundleSearchResources(searchPayload).length).toBeGreaterThanOrEqual(1);
 
       const thidIpsSearch = 'ips-bundle-search-001';
       const ipsSearchReference = `individual/org.hl7.fhir.r4/Bundle/_search?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.type=${encodeURIComponent(ipsDocumentTypeToken)}`;
@@ -935,8 +935,9 @@ describe('MedicationStatement API (integration)', () => {
         }
         await new Promise((r) => setTimeout(r, 50));
       }
-      expect(codeSearchPayload?.data?.[0]?.resource?.total).toBe(1);
-      const matchedResearchSubject = codeSearchPayload?.data?.[0]?.resource?.data?.[0];
+      const matches = extractBundleSearchResources(codeSearchPayload);
+      expect(matches).toHaveLength(1);
+      const matchedResearchSubject = matches[0];
       expect(matchedResearchSubject?.resourceType).toBe('ResearchSubject');
       expect(matchedResearchSubject?.['ResearchSubject.identifier']).toBe(twinSubjectId);
       expect(matchedResearchSubject?.composition).toBeDefined();

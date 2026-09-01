@@ -9,6 +9,10 @@
 - Remove the incorrectly introduced `License/_add` route, manager behavior,
   validator allowance, OpenAPI description and portal/skill guidance. Licence
   inventory is created during onboarding or through Offer -> Order.
+- Migrate CORE search-response test readers to the shared
+  `extractBundleSearchResources(...)` compatibility boundary so the complete
+  suite proves both primary and deprecated rolling-deployment profiles without
+  confusing a real resource-owned `data` property with the legacy wrapper.
 
 - Add the opt-in `GW_SEARCH_RESPONSE_PROFILE=primary-resource` serializer for
   all 0..n GW searches, returning every match as a primary

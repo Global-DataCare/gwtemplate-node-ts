@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 /**
  * TEST SECTOR USAGE: This test uses both network (infra) and business (functional) sectors.
  *
@@ -21,6 +21,7 @@ import { ILogger } from '../../../loggers/ILogger';
 import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { EXAMPLE_LICENSE_INVALID_OFFER_ID } from 'gdc-common-utils-ts';
+import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 
 // Create a mock KMS service for testing.
 export const mockKmsService: jest.Mocked<IKmsService> = {
@@ -483,7 +484,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     });
 
     expect(offerSearch.body.data[0].response.status).toBe('200');
-    expect(offerSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
+    expect(extractBundleSearchResources(offerSearch.body).length).toBeGreaterThanOrEqual(1);
 
     const orderSearch = await hostingManager.process({
       id: 'job-host-order-search-1',
@@ -508,6 +509,6 @@ describe('HostingManager - Offer/Order Flow', () => {
     });
 
     expect(orderSearch.body.data[0].response.status).toBe('200');
-    expect(orderSearch.body.data[0].resource.total).toBeGreaterThanOrEqual(1);
+    expect(extractBundleSearchResources(orderSearch.body).length).toBeGreaterThanOrEqual(1);
   });
 });
