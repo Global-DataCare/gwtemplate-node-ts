@@ -48,6 +48,7 @@ import {
 } from '../utils/digital-twin-research-projection';
 import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
 import { getAuthenticatedJobActorIdentifiers } from '../utils/authenticated-job-actor';
+import { ClaimConsent, ConsentStatuses } from 'gdc-common-utils-ts/models/consent-rule';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -1053,6 +1054,11 @@ export class CommunicationManager implements IJobProcessor {
         const attachedEntries = Array.isArray(parsedAttachment.data)
           ? parsedAttachment.data
           : Array.isArray(parsedAttachment.entry) ? parsedAttachment.entry : [];
+        // A permission request remains an inbox Communication. Its attached
+        // canonical draft Consent Bundle must not become authorization state.
+        if (this.isDraftConsentRequestBatch(attachedEntries)) {
+          continue;
+        }
         const isRequestBatch = attachedEntries.length > 0
           && attachedEntries.every((attachedEntry: any) => attachedEntry?.request && typeof attachedEntry.request === 'object');
         if (isRequestBatch) {
@@ -1348,8 +1354,10 @@ export class CommunicationManager implements IJobProcessor {
       }
     }
 
+    const consentStatus = this.getFirstClaimValue(claims, [ClaimConsent.status]);
     const isConsentRule = input.resourceType === 'Consent'
-      && Boolean(this.getFirstClaimValue(claims, ['Consent.decision', 'org.hl7.fhir.api.Consent.decision']));
+      && (!consentStatus || consentStatus === ConsentStatuses.Active)
+      && Boolean(this.getFirstClaimValue(claims, [ClaimConsent.decision]));
     if (isConsentRule) {
       await persistConsentRuleAndAttachment({
         vaultRepository: this.vaultRepository,
@@ -1486,6 +1494,19 @@ export class CommunicationManager implements IJobProcessor {
     return Object.prototype.hasOwnProperty.call(PROJECTED_RESOURCE_CONFIG, resourceType)
       ? resourceType as SupportedProjectedResourceType
       : undefined;
+  }
+
+  private isDraftConsentRequestBatch(entries: any[]): boolean {
+    return entries.length > 0 && entries.every((entry) => {
+      const resource = entry?.resource;
+      if (resource?.resourceType !== ResourceTypesFhirR4.Consent) return false;
+      const claims = normalizeContextualizedClaims(
+        normalizeClaimsFromFhirResource(resource as any, {
+          identifierClaimKey: ClaimConsent.identifier,
+        }) as Record<string, any>,
+      );
+      return getClaimValue<string>(claims, ClaimConsent.status) === ConsentStatuses.Draft;
+    });
   }
 
   private resolveProjectedResourceSubject(

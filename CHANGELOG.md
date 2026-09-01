@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Keep permission requests as auditable `Communication` attachments containing
+  canonical FHIR `Consent.status = draft` Bundles. Draft entries remain in the
+  individual inbox and cannot be projected as active authorization rules; no
+  `AccessRequest.*` pseudo-resource is used.
+- Decrypt DCR-protected device-license documents inside the trusted tenant
+  boundary before `License/_search` filtering and public projection, without
+  exposing ciphertext or activation material.
+
 ## [1.23.12] - 2026-09-01
 
 - Preserve the authenticated bearer subject in explicitly insecure local demo

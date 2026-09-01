@@ -15,7 +15,7 @@ import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
 import { getIndividualSectionId, getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
-import { ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
+import { ConsentDecisions, ConsentStatuses } from 'gdc-common-utils-ts/models/consent-rule';
 import { getClaimValue } from '../../utils/claims';
 import { testTenant1TenantId } from '../data/organization.data';
 import { knownDomainsReversedEnum } from 'gdc-common-utils-ts/models/urlPath';
@@ -45,7 +45,7 @@ function buildCommunicationBatchPath(
 
 function buildIdentifierUuidForTesting(
   resourceType: 'consent',
-  qualifier: 'professional' | 'organization' | 'jurisdictions',
+  qualifier: 'professional' | 'organization' | 'jurisdictions' | 'draft',
   sequence: number,
 ): string {
   return `urn:uuid:${resourceType}-${qualifier}-${String(sequence).padStart(3, '0')}`;
@@ -292,6 +292,96 @@ describe('Consent via Communication API (integration)', () => {
         EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
       ]);
 
+      // A request uses the same FHIR Consent vocabulary as the eventual rule,
+      // but `draft` keeps it inbox-only until the controller accepts it.
+      const draftConsentBase = makeConsentResource(
+        buildIdentifierUuidForTesting('consent', 'draft', 1),
+        EXAMPLE_EMAIL_PROFESSIONAL,
+        HealthcareConsentPurposes.Treatment,
+        HealthcareConsentActions.PatientSummaryDocument,
+        makeAttachment('draft professional access request'),
+      );
+      const draftConsent = {
+        ...draftConsentBase,
+        status: ConsentStatuses.Draft,
+        meta: {
+          ...draftConsentBase.meta,
+          claims: {
+            ...draftConsentBase.meta.claims,
+            [ClaimConsent.status]: ConsentStatuses.Draft,
+          },
+        },
+      };
+      const draftConsentBundle = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [{
+          request: { method: 'POST', url: 'Consent' },
+          resource: draftConsent,
+        }],
+      };
+      const thidDraft = 'communication-consent-draft-001';
+      const draftSubmitResp = await invokeExpress(app, {
+        method: 'POST',
+        url: buildCommunicationBatchPath(
+          testTenant1TenantId,
+          EXAMPLE_HEALTHCARE_JURISDICTION,
+          Sector.HEALTH_CARE,
+          communicationFormat,
+          '_batch',
+        ),
+        headers: { 'content-type': 'application/json', authorization: authenticatedActor.authorizationHeader },
+        body: {
+          thid: thidDraft,
+          body: {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [{
+              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              resource: {
+                resourceType: 'Communication',
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [{
+                  contentAttachment: {
+                    contentType: FHIR_JSON_MEDIA_TYPE,
+                    title: 'draft-consent-request.json',
+                    data: Buffer.from(JSON.stringify(draftConsentBundle), 'utf8').toString('base64'),
+                  },
+                }],
+              },
+            }],
+          },
+        },
+      });
+      expect(draftSubmitResp.status).toBe(202);
+
+      let draftPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: 'POST',
+          url: buildCommunicationBatchPath(
+            testTenant1TenantId,
+            EXAMPLE_HEALTHCARE_JURISDICTION,
+            Sector.HEALTH_CARE,
+            communicationFormat,
+            '_batch-response',
+          ),
+          headers: { 'content-type': 'application/json' },
+          body: { thid: thidDraft },
+        });
+        if (pollResp.status === 200) {
+          draftPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(draftPayload?.data?.[0]?.response?.status).toBe('200');
+      expect(await vaultRepository.getContainersInSection(
+        tenantVaultId,
+        getIndividualSectionId(subjectDid, 'rules'),
+      )).toHaveLength(3);
+
       const thidRead = 'communication-consent-read-001';
       const readResp = await invokeExpress(app, {
         method: 'POST',
@@ -370,7 +460,7 @@ describe('Consent via Communication API (integration)', () => {
         tenantVaultId,
         getSubjectScopedSectionId(subjectDid, 'individual', 'communications'),
       );
-      expect(communications).toHaveLength(2);
+      expect(communications).toHaveLength(3);
       expect(
         communications.some((communication: any) => communication['Communication.note-text'] === consentBundleSummaryNote),
       ).toBe(true);

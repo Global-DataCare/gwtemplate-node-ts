@@ -230,7 +230,7 @@ export class LicenseManager implements IJobProcessor {
     for (const entry of entries) {
       try {
         const filters = extractLicenseSearchFilters(entry);
-        const matches = await searchLicenseDocuments(this.vaultRepository, tenantVaultId, filters);
+        const matches = await this.searchLicenseDocuments(tenantVaultId, filters);
         responseEntries.push(...buildSearchResponseEntries(
           OrganizationEmployeeSearchResponseEntryTypes.License,
           matches,
@@ -414,7 +414,17 @@ export class LicenseManager implements IJobProcessor {
     tenantVaultId: string,
     filters: ReturnType<typeof extractLicenseSearchFilters>,
   ): Promise<Array<Record<string, unknown>>> {
-    return searchLicenseDocuments(this.vaultRepository, tenantVaultId, filters);
+    return searchLicenseDocuments(
+      this.vaultRepository,
+      tenantVaultId,
+      filters,
+      this.kmsService
+        ? (document, vaultId) => this.kmsService!.unprotectConfidentialData<DeviceLicense & Record<string, unknown>>(
+            document,
+            vaultId,
+          )
+        : undefined,
+    );
   }
 
   /**
