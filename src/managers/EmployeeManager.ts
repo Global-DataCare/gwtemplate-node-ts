@@ -2,6 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4 } from 'uuid';
+import { OrganizationEmployeeSearchResponseEntryTypes } from 'gdc-common-utils-ts';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
@@ -36,6 +37,7 @@ import type { ITenantsManager } from './ITenantsManager';
 import type { ITenantDidRegistryMutator } from './ITenantDidRegistryMutator';
 import type { IHostRuntime } from './IHostRuntime';
 import { buildOfferOrderIndexedAttributes } from '../utils/offer-order-read-model';
+import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import {
   ACTION_PURGE,
   LICENSE_STATUS_AVAILABLE,
@@ -170,7 +172,7 @@ export class EmployeeManager {
 
     for (const entry of entries) {
       try {
-        responseEntries.push(await this.processSearchEntry(employeeCollectionName, tenantVaultId, entry));
+        responseEntries.push(...await this.processSearchEntry(employeeCollectionName, tenantVaultId, entry));
       } catch (error: any) {
         responseEntries.push(this.handleError(error, 'Employee-search-response-v1.0', entry?.meta));
       }
@@ -192,22 +194,20 @@ export class EmployeeManager {
     };
   }
 
+  /**
+   * Projects every employee match as the primary resource of one response
+   * Bundle entry. Search aggregation belongs to the surrounding Bundle; a
+   * FHIR-like resource must never contain a second `{ total, data }` list.
+   */
   private async processSearchEntry(
     employeeCollectionName: string,
     tenantVaultId: string,
     entry: any,
-  ): Promise<BundleEntry> {
+  ): Promise<BundleEntry[]> {
     const filters = extractSearchFiltersFromEntry(entry, 'Employee');
     const matches = await this.searchEmployees(employeeCollectionName, tenantVaultId, filters);
 
-    return {
-      type: 'Employee-search-response-v1.0',
-      resource: {
-        total: matches.length,
-        data: matches,
-      } as any,
-      response: { status: '200' },
-    };
+    return buildSearchResponseEntries(OrganizationEmployeeSearchResponseEntryTypes.Employee, matches);
   }
 
   private async searchEmployees(

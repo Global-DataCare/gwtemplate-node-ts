@@ -1,4 +1,5 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: License search returns 0..n actual resources as Bundle
+// entries; a FHIR resource is never replaced by a nested `{ total, data }` list.
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import type { IVaultRepository } from '../../database/repositories/vault/vault.repository';
@@ -45,6 +46,10 @@ import {
   LicenseStatuses,
   buildLicenseSearchEntry,
 } from 'gdc-common-utils-ts';
+import {
+  SearchResponseProfileEnvironment,
+  SearchResponseProfiles,
+} from '../../utils/didcomm-response';
 
 const TEST_TENANT_ID = EXAMPLE_TENANT_IDENTIFIER;
 const TEST_SECTOR = EXAMPLE_SECTOR;
@@ -165,9 +170,14 @@ describe('LicenseManager (_search)', () => {
   let manager: LicenseManager;
 
   beforeEach(() => {
+    process.env[SearchResponseProfileEnvironment.Variable] = SearchResponseProfiles.PrimaryResource;
     mockVaultRepository = mock<IVaultRepository>();
     manager = new LicenseManager(mockVaultRepository);
     mockVaultRepository.getContainersInSection.mockResolvedValue(newDocumentsLicenseSearchFixture() as any);
+  });
+
+  afterEach(() => {
+    delete process.env[SearchResponseProfileEnvironment.Variable];
   });
 
   it('searches device licenses from one shared claims-first search entry', async () => {
@@ -189,8 +199,8 @@ describe('LicenseManager (_search)', () => {
 
     const firstEntry = (response.body as any).data[0];
     expect(firstEntry.response.status).toBe('200');
-    expect(firstEntry.resource.total).toBe(1);
-    expect(firstEntry.resource.data).toEqual([
+    expect((response.body as any).total).toBe(1);
+    expect(firstEntry.resource).toEqual(
       expect.objectContaining({
         id: EXAMPLE_LICENSE_SEAT_UUID_ACTIVE,
         meta: expect.objectContaining({
@@ -207,7 +217,8 @@ describe('LicenseManager (_search)', () => {
           }),
         }),
       }),
-    ]);
+    );
+    expect(firstEntry.resource.data).toBeUndefined();
     expect(mockVaultRepository.getContainersInSection).toHaveBeenCalledWith(
       TEST_VAULT_ID,
       getEnvSectionId('device-licenses'),
@@ -229,8 +240,8 @@ describe('LicenseManager (_search)', () => {
 
     const firstEntry = (response.body as any).data[0];
     expect(firstEntry.response.status).toBe('200');
-    expect(firstEntry.resource.total).toBe(1);
-    expect(firstEntry.resource.data[0]).toEqual(expect.objectContaining({
+    expect((response.body as any).total).toBe(1);
+    expect(firstEntry.resource).toEqual(expect.objectContaining({
       id: EXAMPLE_LICENSE_SEAT_UUID_AVAILABLE,
       meta: expect.objectContaining({
         status: LicenseStatuses.Available,
@@ -254,8 +265,8 @@ describe('LicenseManager (_search)', () => {
     const response = await manager.process(newJobSearchLicense(entry as unknown as Record<string, unknown>));
     const firstEntry = (response.body as any).data[0];
 
-    expect(firstEntry.resource.total).toBe(1);
-    expect(firstEntry.resource.data[0].meta.claims).toMatchObject({
+    expect((response.body as any).total).toBe(1);
+    expect(firstEntry.resource.meta.claims).toMatchObject({
       [ClaimsPersonSchemaorg.telephone]: EXAMPLE_FORM_CONTROLLER_PHONE,
     });
   });

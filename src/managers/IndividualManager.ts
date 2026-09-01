@@ -2,7 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4} from 'uuid';
-import { getBundleResponseTypeForAction } from '../utils/bundle';
+import { BundleType, getBundleResponseTypeForAction } from '../utils/bundle';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts';
 import { BundleJsonApi, BundleEntry, BundleEntryRequest, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -48,6 +49,8 @@ import type { ITenantsManager } from './ITenantsManager';
 import type { IHostRuntime } from './IHostRuntime';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { getClaimValue } from '../utils/claims';
+import { buildSearchResponseEntries } from '../utils/didcomm-response';
+import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 
 
 const INDIVIDUAL_SECTION = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
@@ -126,8 +129,8 @@ export class IndividualManager {
         break;
       case '_search':
         try {
-          const resultEntry = await this.processSubjectSearch(job, tenantVaultId);
-          responseEntries.push(resultEntry);
+          const resultEntries = await this.processSubjectSearch(job, tenantVaultId);
+          responseEntries.push(...resultEntries);
         } catch (error: any) {
           const errorEntry = this.handleError(error, 'Subject-search-response-v1.0', job.content?.body);
           responseEntries.push(errorEntry);
@@ -306,7 +309,7 @@ export class IndividualManager {
   private async processSubjectSearch(
     job: JobRequest,
     tenantVaultId: string,
-  ): Promise<BundleEntry> {
+  ): Promise<BundleEntry[]> {
     const body = job.content?.body as any;
     const filters = this.extractSubjectSearchFilters(body);
     const subject = String(filters.subject?.[0] || '').trim();
@@ -323,16 +326,12 @@ export class IndividualManager {
     const matchesRaw = await this.vaultRepository.listContainersInSection(tenantVaultId, sectionId);
     const matches = this.filterConsentMatches(matchesRaw, filters);
 
-    return {
-      type: 'Subject-search-response-v1.0',
-      resource: {
-        resourceType: 'Bundle',
-        type: 'searchset',
-        total: matches.length,
-        data: matches,
-      },
-      response: { status: '200' },
-    };
+    return buildSearchResponseEntries(
+      GatewayResponseEntryTypes.SubjectSearch,
+      matches,
+      undefined,
+      { resourceType: ResourceTypesFhirR4.Bundle, type: BundleType.Searchset },
+    );
   }
 
   private extractSubjectSearchFilters(body: any): Record<string, string[]> {

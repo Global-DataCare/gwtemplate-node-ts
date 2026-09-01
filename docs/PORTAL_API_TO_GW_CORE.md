@@ -437,6 +437,31 @@ Use it as a backend concept when you need:
 
 ## Notes On Offers And Licenses
 
+### Employee and license search readback
+
+Employee and license searches return a 0..n Bundle result. The surrounding
+DIDComm `body` is the FHIR-like/JSON primary document: `body.total` counts its
+entries and every match is the `resource` of one `body.data[]` entry. A client
+reads the typed SDK projection and does not parse a nested `resource.data`
+list; that older shape was an invalid transport regression, not a FHIR
+resource contract.
+
+During the rolling migration, a deployment without
+`GW_SEARCH_RESPONSE_PROFILE` keeps emitting the deprecated
+`legacy-resource-data` shape so old SDKs do not break. Set
+`GW_SEARCH_RESPONSE_PROFILE=primary-resource` to emit the canonical shape.
+New SDK readers accept both; only the canonical profile is shown below and in
+new application examples.
+
+```ts
+// Application code consumes the business projection. Bundle/DIDComm polling
+// and `body.data[].resource` extraction remain inside the SDK/BFF.
+const inventory = await organizationController.listEmployeeLifecycle(routeContext);
+for (const employee of inventory) {
+  renderEmployee(employee.email, employee.status, employee.license?.activeDevices ?? 0);
+}
+```
+
 - In legal organizations:
   - the initial offer usually comes from the activation response
   - the backend can extract `offerId` and preview with helpers such as

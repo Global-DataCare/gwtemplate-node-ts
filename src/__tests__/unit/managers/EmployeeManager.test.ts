@@ -13,6 +13,9 @@ import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
+import {
+  OrganizationEmployeeSearchResponseEntryTypes,
+} from 'gdc-common-utils-ts';
 import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { RecordBase, ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { JwkSet } from '../../../gdc-backend-utils-node/models/jwk';
@@ -32,6 +35,10 @@ import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-no
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { EXAMPLE_DEVICE_LICENSE_AVAILABLE } from 'gdc-common-utils-ts/examples/license';
 import { EXAMPLE_JURISDICTION, EXAMPLE_SECTOR, EXAMPLE_TENANT_IDENTIFIER } from 'gdc-common-utils-ts/examples/shared';
+import {
+  SearchResponseProfileEnvironment,
+  SearchResponseProfiles,
+} from '../../../utils/didcomm-response';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -395,6 +402,14 @@ describe('EmployeeManager', () => {
   });
 
   describe('Employee Search', () => {
+    beforeEach(() => {
+      process.env[SearchResponseProfileEnvironment.Variable] = SearchResponseProfiles.PrimaryResource;
+    });
+
+    afterEach(() => {
+      delete process.env[SearchResponseProfileEnvironment.Variable];
+    });
+
     it('should search employees via Bundle entry.request.url filters', async () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       job.action = '_search';
@@ -449,12 +464,13 @@ describe('EmployeeManager', () => {
         expect.any(Object),
         TENANT_VAULT_ID,
       );
-      expect(response.body.data[0].type).toBe('Employee-search-response-v1.0');
-      expect((response.body.data[0] as any).resource.total).toBe(1);
-      expect((response.body.data[0] as any).resource.data[0].id).toBe('employee-search-hit');
-      expect((response.body.data[0] as any).resource.data[0].claims[ClaimsPersonSchemaorg.email]).toBe(
+      expect(response.body.data[0].type).toBe(OrganizationEmployeeSearchResponseEntryTypes.Employee);
+      expect(response.body.total).toBe(1);
+      expect((response.body.data[0] as any).resource.id).toBe('employee-search-hit');
+      expect((response.body.data[0] as any).resource.claims[ClaimsPersonSchemaorg.email]).toBe(
         testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email],
       );
+      expect((response.body.data[0] as any).resource.data).toBeUndefined();
     });
 
     it('should search employees via POST search entries carrying FHIR Parameters', async () => {
@@ -499,9 +515,10 @@ describe('EmployeeManager', () => {
 
       const response = await employeeManager.process(job);
 
-      expect(response.body.data[0].type).toBe('Employee-search-response-v1.0');
-      expect((response.body.data[0] as any).resource.total).toBe(1);
-      expect((response.body.data[0] as any).resource.data[0].id).toBe('employee-search-hit');
+      expect(response.body.data[0].type).toBe(OrganizationEmployeeSearchResponseEntryTypes.Employee);
+      expect(response.body.total).toBe(1);
+      expect((response.body.data[0] as any).resource.id).toBe('employee-search-hit');
+      expect((response.body.data[0] as any).resource.data).toBeUndefined();
     });
   });
 

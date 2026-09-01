@@ -21,6 +21,7 @@ import { SUBJECT_SECTION_DIGITAL_TWIN } from '../constants/domain';
 import { getAuthenticatedJobActorDid } from '../utils/authenticated-job-actor';
 import { GatewayEnvelopeTypes, GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { BundleType } from '../utils/bundle';
+import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import type { IJobProcessor } from './registry';
 import {
   DIGITAL_TWIN_SEARCH_DATE_CLAIM,
@@ -139,17 +140,15 @@ export class TwinCompositionManager {
       ? matches.map((composition) => this.toResearchSubjectMatch(composition))
       : matches;
 
+    const responseType = exposesResearchSubjects
+      ? GatewayResponseEntryTypes.ResearchSubjectSearch
+      : GatewayResponseEntryTypes.CompositionSearch;
+    const data = buildSearchResponseEntries(responseType, publicMatches);
     const responseBundle: BundleJsonApi = {
       resourceType: ResourceTypesFhirR4.Bundle,
       type: BundleType.BatchResponse,
-      data: [{
-        type: exposesResearchSubjects
-          ? GatewayResponseEntryTypes.ResearchSubjectSearch
-          : GatewayResponseEntryTypes.CompositionSearch,
-        resource: { total: publicMatches.length, data: publicMatches },
-        response: { status: '200' },
-      } as any],
-      total: 1,
+      data,
+      total: data.length,
     };
 
     return {

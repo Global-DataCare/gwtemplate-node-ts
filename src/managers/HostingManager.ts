@@ -1672,7 +1672,7 @@ export class HostingManager {
     });
   }
 
-  private async processOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
+  private async processOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry[]> {
     return this.offerOrderService.processOfferSearchEntry(job, entry);
   }
 
@@ -1702,7 +1702,7 @@ export class HostingManager {
     };
   }
 
-  private async processOrderSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
+  private async processOrderSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry[]> {
     return this.offerOrderService.processOrderSearchEntry(job, entry);
   }
 
