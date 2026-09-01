@@ -1,4 +1,8 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+/**
+ * Flow contract: activate a tenant, purchase a professional seat through the
+ * explicit Offer and host Order boundary, restart KMS, then prove that the
+ * tenant can still create an employee with authoritative asynchronous readback.
+ */
 import * as express from 'express';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
@@ -28,6 +32,7 @@ import { ORGANIZATION_ORDER_REQUEST, EMPLOYEE_REGISTRATION_REQUEST } from '../da
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import type { IHostRuntime } from '../../managers/IHostRuntime';
 import { testClaimsHostInitialization } from '../data/end-to-end.data';
+import { buildLicensePurchaseEntry } from 'gdc-common-utils-ts';
 
 const hostBootstrapClaims = testClaimsHostInitialization;
 
@@ -52,6 +57,7 @@ describe('Tenant KMS rehydration after activate route story', () => {
 
     initialHarness = await buildHarness(vaultRepository, hostCollectionName, cryptographyService, logger);
     tenantId = await onboardViaActivateAndOrder(initialHarness.app, initialHarness.queueAdapter);
+    await purchaseEmployeeSeat(initialHarness.app, initialHarness.queueAdapter, tenantId);
     await initialHarness.queueAdapter.waitForEmptyQueue();
     initialHarness.queueAdapter.stop();
 
@@ -98,13 +104,61 @@ describe('Tenant KMS rehydration after activate route story', () => {
 
     const poll = await pollJsonBody(restartedHarness.app, submit.headers.location, createPayload.thid);
     expect(poll.status).toBe(200);
-    // A tenant without a free employee seat receives the commercial offer
-    // projection (200); a pre-licensed tenant creates the employee (201). Both
-    // outcomes prove that the restarted KMS decrypted and processed the route.
-    expect(['200', '201']).toContain(poll.body.data[0].response.status);
-    expect(poll.body.data[0].type).toBeTruthy();
+    expect(poll.body.data[0].response.status).toBe('201');
+    expect(String(poll.body.data[0].resource?.id || '')).toBeTruthy();
   });
 });
+
+async function purchaseEmployeeSeat(
+  app: express.Express,
+  queueAdapter: QueueAdapterMem,
+  tenantId: string,
+): Promise<void> {
+  const offerPayload = {
+    jti: 'employee-kms-seat-offer-jti',
+    iss: `did:web:testhost.com:${tenantId}:cds-es:v1:health-care:employee:controller`,
+    aud: tenantId,
+    type: 'application/didcomm-plain+json',
+    thid: 'employee-kms-seat-offer-thid',
+    body: {
+      resourceType: 'Bundle',
+      type: 'batch',
+      data: [buildLicensePurchaseEntry({ quantity: 1, userClass: 'employee', type: 'web' })],
+    },
+  };
+  const offerSubmit = await invokeExpress(app, {
+    method: 'POST',
+    url: `/${tenantId}/cds-es/v1/health-care/entity/org.schema/Offer/_create`,
+    headers: { 'content-type': 'application/json' },
+    body: offerPayload,
+  });
+  expect(offerSubmit.status).toBe(202);
+  await queueAdapter.waitForEmptyQueue();
+  const offerPoll = await pollJsonBody(app, offerSubmit.headers.location, offerPayload.thid);
+  const offerId = String(offerPoll.body.data[0].meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
+  expect(offerPoll.body.data[0].response.status).toBe('201');
+  expect(offerId).toBeTruthy();
+
+  const orderPayload = structuredClone(ORGANIZATION_ORDER_REQUEST) as any;
+  orderPayload.thid = 'employee-kms-seat-order-thid';
+  orderPayload.jti = 'employee-kms-seat-order-jti';
+  orderPayload.body.data[0].meta = {};
+  orderPayload.body.data[0].resource = { meta: { claims: {
+    [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
+    [ClaimsOrderSchemaorg.paymentMethod]: 'Stripe',
+    [ClaimsOrderSchemaorg.partOfInvoice]: 'employee-kms-seat-invoice',
+  } } };
+  const orderSubmit = await invokeExpress(app, {
+    method: 'POST',
+    url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
+    headers: { 'content-type': 'application/json' },
+    body: orderPayload,
+  });
+  expect(orderSubmit.status).toBe(202);
+  await queueAdapter.waitForEmptyQueue();
+  const orderPoll = await pollJsonBody(app, orderSubmit.headers.location, orderPayload.thid);
+  expect(orderPoll.body.data[0].response.status).toBe('201');
+}
 
 async function buildHarness(
   sharedVaultRepository: VaultMemRepository,

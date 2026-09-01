@@ -3,8 +3,42 @@
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import {
   buildStableActorIdentifier,
+  stableActorIdentifierFromDidWeb,
   StableActorContactKinds,
 } from 'gdc-common-utils-ts/utils/actor-identifier';
+
+/**
+ * Proves that a trusted OIDC bearer represents the DIDComm actor. Provider
+ * account subjects are local to that provider, so a canonical professional DID
+ * may instead be bound through its verified email or telephone identifier.
+ */
+export function isVerifiedBearerBoundToActorDid(
+  payload: Readonly<Record<string, unknown>> | undefined,
+  actorDid: string,
+): boolean {
+  const exactSubject = String(payload?.sub || '').trim();
+  if (exactSubject && exactSubject === actorDid) return true;
+
+  let expectedIdentifier: string;
+  try {
+    expectedIdentifier = stableActorIdentifierFromDidWeb(actorDid);
+  } catch {
+    return false;
+  }
+
+  const email = String(payload?.email || '').trim();
+  if (email && payload?.email_verified === true && buildStableActorIdentifier({
+    contactKind: StableActorContactKinds.Email,
+    contact: email,
+  }) === expectedIdentifier) return true;
+
+  const phone = String(payload?.phone_number || '').trim();
+  return Boolean(phone && payload?.phone_number_verified !== false
+    && buildStableActorIdentifier({
+      contactKind: StableActorContactKinds.Phone,
+      contact: phone,
+    }) === expectedIdentifier);
+}
 
 /**
  * Returns the operational actor DID authenticated for one queued request.

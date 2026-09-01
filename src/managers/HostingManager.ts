@@ -829,6 +829,9 @@ export class HostingManager {
           if (job.action === '_search') {
             return await this.processOfferOrderSearch(job);
           }
+          if (job.action === '_create') {
+            return await this.processEmployeeLicenseOfferCreate(job);
+          }
           throw new ManagerError(`Unsupported action for Offer: '${job.action}'`, IssueType.NotSupported);
         case 'Order':
           if (job.action === '_search') {
@@ -1671,6 +1674,32 @@ export class HostingManager {
 
   private async processOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
     return this.offerOrderService.processOfferSearchEntry(job, entry);
+  }
+
+  /** Creates host-policy professional-seat Offers from controller requests. */
+  private async processEmployeeLicenseOfferCreate(job: JobRequest): Promise<IDecodedDidcommPayload> {
+    const responseEntries: (BundleEntry | ErrorEntry)[] = [];
+    for (const entry of job.content?.body?.data || []) {
+      try {
+        responseEntries.push(await this.offerOrderService.processEmployeeLicenseOfferCreateEntry(job, entry));
+      } catch (error) {
+        responseEntries.push(this.handleError(error, entry.type, entry.meta));
+      }
+    }
+    return {
+      jti: uuidv4(),
+      type: 'hosting-response',
+      thid: job.content?.thid as string,
+      iss: composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain),
+      aud: job.content?.iss as string,
+      exp: Math.floor(Date.now() / 1000) + 300,
+      body: {
+        data: responseEntries,
+        resourceType: 'Bundle',
+        type: getBundleResponseTypeForAction(job.action),
+        total: responseEntries.length,
+      },
+    };
   }
 
   private async processOrderSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {

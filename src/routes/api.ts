@@ -39,6 +39,8 @@ import { IdentityAuthActions } from 'gdc-common-utils-ts/constants/identity-auth
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getClaimValue } from '../utils/claims';
 import { isEncryptionJwk, isSignatureJwk } from '../managers/hosting/registration-keys';
+import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
+import { isVerifiedBearerBoundToActorDid } from '../utils/authenticated-job-actor';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -262,6 +264,49 @@ function isHostControllerCommercialOrderRoute(
     && String(format || '').toLowerCase() === 'org.schema'
     && String(resourceType || '').toLowerCase() === 'order'
     && action === '_batch';
+}
+
+type RegisteredSenderVaultResolverInput = {
+  tenantId: string;
+  sector: string;
+  section: string;
+  format: string;
+  resourceType: string;
+  action: string;
+  senderDid: string;
+  pathVaultId?: string;
+  tenantExists: (vaultId: string) => Promise<boolean>;
+  findTenantVaultIdByIdentifierValue: (identifier: string) => Promise<string | undefined>;
+};
+
+/**
+ * Resolves established controller custody before any repository adapter is
+ * called. Host commercial Orders are routed through `host`, but the signing
+ * controller remains in the canonical tenant vault identified by its DID.
+ */
+export async function resolveRegisteredSenderVaultIdForRoute(
+  input: RegisteredSenderVaultResolverInput,
+): Promise<string> {
+  const pathVaultId = input.pathVaultId
+    || (input.tenantId === 'host' ? 'host' : getTenantVaultId(input.sector, input.tenantId));
+  if (!isHostControllerCommercialOrderRoute(
+    input.tenantId,
+    input.section,
+    input.format,
+    input.resourceType,
+    input.action,
+  )) return pathVaultId;
+
+  try {
+    const issuerVaultId = getTenantVaultIdFromIss(input.senderDid);
+    if (await input.tenantExists(issuerVaultId)) return issuerVaultId;
+
+    const issuerTenantIdentifier = String(input.senderDid.split(':')[3] || '').trim();
+    if (!issuerTenantIdentifier) return pathVaultId;
+    return await input.findTenantVaultIdByIdentifierValue(issuerTenantIdentifier) || pathVaultId;
+  } catch {
+    return pathVaultId;
+  }
 }
 
 function isHostOrganizationVerificationRoute(
@@ -514,15 +559,19 @@ export function createApiRouter(
     senderDid: string,
   ): Promise<string> => {
     const pathVaultId = await resolveVaultId(tenantId, sector);
-    if (!isHostControllerCommercialOrderRoute(tenantId, section, format, resourceType, action)) {
-      return pathVaultId;
-    }
-    try {
-      const issuerVaultId = getTenantVaultIdFromIss(senderDid);
-      return await tenantsCacheManager.tenantExists(issuerVaultId) ? issuerVaultId : pathVaultId;
-    } catch {
-      return pathVaultId;
-    }
+    return resolveRegisteredSenderVaultIdForRoute({
+      tenantId,
+      sector,
+      section,
+      format,
+      resourceType,
+      action,
+      senderDid,
+      pathVaultId,
+      tenantExists: (vaultId) => tenantsCacheManager.tenantExists(vaultId),
+      findTenantVaultIdByIdentifierValue: (identifier) =>
+        tenantsCacheManager.findTenantVaultIdByIdentifierValue(identifier),
+    });
   };
 
   /**
@@ -3660,23 +3709,45 @@ export function createApiRouter(
               if (employeeConfig) break;
             }
           }
-          if (!queryResult || queryResult.length === 0) {
-            throw new Error(`Could not find an entity with key ID '${senderSigningKeyId}' in vault '${vaultId}'.`);
-          }
-
-          // 4. Unprotect the document to get the sender's full config.
-          const employeeDoc = queryResult[0];
-          employeeConfig ||= await kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
-
-          // 5. Find the specific public keys that match the key IDs.
-          const signingVerificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
-            (vm: VerificationMethod) => vm.id.endsWith(`#${senderSigningKeyId}`)
-          );
-          const encryptionVerificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
-            (vm: VerificationMethod) => vm.id.endsWith(`#${senderEncryptionKeyId}`)
-          );
+          if (queryResult && queryResult.length > 0) {
+            // 4a. Employee controllers resolve from their protected tenant DID.
+            const employeeDoc = queryResult[0];
+            employeeConfig ||= await kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
+            const signingVerificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
+              (vm: VerificationMethod) => vm.id.endsWith(`#${senderSigningKeyId}`)
+            );
+            const encryptionVerificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
+              (vm: VerificationMethod) => vm.id.endsWith(`#${senderEncryptionKeyId}`)
+            );
             senderSigningKey = signingVerificationMethod?.publicKeyJwk;
             senderEncryptionKey = encryptionVerificationMethod?.publicKeyJwk;
+          } else {
+            // 4b. A non-employee controller authenticates with the exact DCR
+            // client named by the secure message and a bearer bound to the
+            // same actor DID. Incoming envelope keys remain non-authoritative.
+            const clientId = String((decodedJob.content as any)?.client_id || '').trim();
+            if (!clientId) {
+              throw new Error(`Secure request for '${senderDid}' does not identify its registered DCR client.`);
+            }
+            if (!isVerifiedBearerBoundToActorDid(verifiedBearerPayload, senderDid)) {
+              throw new Error(`Verified bearer identity does not match secure-message issuer '${senderDid}'.`);
+            }
+            const deviceProfileDoc = await vaultRepository.get<ConfidentialStorageDoc>(
+              vaultId,
+              clientId,
+              getEnvSectionId('device-profiles'),
+            );
+            if (!deviceProfileDoc || deviceProfileDoc.status !== DeviceBindingStatuses.Active) {
+              throw new Error(`DCR client '${clientId}' is not active in vault '${vaultId}'.`);
+            }
+            const deviceProfile = await kmsService.unprotectConfidentialData<any>(deviceProfileDoc, vaultId);
+            if (String(deviceProfile?.clientId || '').trim() !== clientId) {
+              throw new Error(`DCR client '${clientId}' does not match its protected profile.`);
+            }
+            const deviceKeys = Array.isArray(deviceProfile?.jwks?.keys) ? deviceProfile.jwks.keys : [];
+            senderSigningKey = deviceKeys.find((key: any) => String(key?.kid || '').trim() === senderSigningKeyId);
+            senderEncryptionKey = deviceKeys.find((key: any) => String(key?.kid || '').trim() === senderEncryptionKeyId);
+          }
           }
           
           if (!senderSigningKey) {
