@@ -30,6 +30,7 @@ import {
   ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
+import { DocumentReferenceClaim } from 'gdc-common-utils-ts/models/interoperable-claims/document-reference-claims';
 import { BundleTypes } from 'gdc-common-utils-ts/models/bundle-editor-types';
 import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
@@ -71,8 +72,6 @@ describe('CommunicationManager Unit Tests', () => {
       }),
       get: jest.fn(async (vaultId: string, id: string, sectionId?: string) =>
         storedRecords.get(`${vaultId}|${sectionId}|${id}`)),
-      delete: jest.fn(async (vaultId: string, id: string, sectionId?: string) =>
-        storedRecords.delete(`${vaultId}|${sectionId}|${id}`)),
       query: jest.fn(async () => []),
       delete: jest.fn(async (vaultId: string, id: string, sectionId?: string) => {
         storedRecords.delete(`${vaultId}|${sectionId}|${id}`);
@@ -534,10 +533,14 @@ describe('CommunicationManager Unit Tests', () => {
       const putCalls = mockVaultRepository.put.mock.calls.filter((args) => args[0] === tenantVaultId && args[2] === docRefSectionId);
       expect(putCalls.length).toBeGreaterThan(0);
       const record = (putCalls[0][1] as any[])[0];
-      expect(record['DocumentReference.subject'] || record['org.hl7.fhir.r4.DocumentReference.subject']).toBe(subjectDid);
-      expect(record['DocumentReference.contenttype'] || record['org.hl7.fhir.r4.DocumentReference.contenttype']).toBe(contentType);
-      expect(String(record['DocumentReference.identifier'] || record['org.hl7.fhir.r4.DocumentReference.identifier']).startsWith('urn:uuid:')).toBe(true);
-      expect(String(record['DocumentReference.contenthash'] || record['org.hl7.fhir.r4.DocumentReference.contenthash']).startsWith('z')).toBe(true);
+      const readCanonicalClaim = (claim: string) =>
+        record[claim] || record[`${Format.FHIR_API}.${claim}`];
+      expect(record['@context']).toBe(Format.FHIR_API);
+      expect(readCanonicalClaim(DocumentReferenceClaim.Subject)).toBe(subjectDid);
+      expect(record[`${Format.FHIR_R4}.${DocumentReferenceClaim.Subject}`]).toBeUndefined();
+      expect(readCanonicalClaim(DocumentReferenceClaim.ContentType)).toBe(contentType);
+      expect(String(readCanonicalClaim(DocumentReferenceClaim.Identifier)).startsWith('urn:uuid:')).toBe(true);
+      expect(String(readCanonicalClaim(DocumentReferenceClaim.ContentHash)).startsWith('z')).toBe(true);
     });
 
     it('does not persist the same DocumentReference attachment twice when contenthash already exists', async () => {
@@ -696,10 +699,10 @@ describe('CommunicationManager Unit Tests', () => {
       const putCalls = mockVaultRepository.put.mock.calls.filter((args) => args[0] === tenantVaultId && args[2] === docRefSectionId);
       expect(putCalls.length).toBeGreaterThan(0);
       const record = (putCalls[0][1] as any[])[0];
-      expect(record['DocumentReference.subject'] || record['org.hl7.fhir.r4.DocumentReference.subject']).toBe(subjectDid);
-      expect(record['DocumentReference.identifier'] || record['org.hl7.fhir.r4.DocumentReference.identifier']).toBe('urn:uuid:docref-ips-001');
-      expect(record['DocumentReference.description'] || record['org.hl7.fhir.r4.DocumentReference.description']).toBe('IPS Medication Summary');
-      expect(record['DocumentReference.contenttype'] || record['org.hl7.fhir.r4.DocumentReference.contenttype']).toBe('application/fhir+json');
+      expect(record['DocumentReference.subject'] || record['org.hl7.fhir.api.DocumentReference.subject']).toBe(subjectDid);
+      expect(record['DocumentReference.identifier'] || record['org.hl7.fhir.api.DocumentReference.identifier']).toBe('urn:uuid:docref-ips-001');
+      expect(record['DocumentReference.description'] || record['org.hl7.fhir.api.DocumentReference.description']).toBe('IPS Medication Summary');
+      expect(record['DocumentReference.contenttype'] || record['org.hl7.fhir.api.DocumentReference.contenttype']).toBe('application/fhir+json');
     });
   });
 
@@ -1174,6 +1177,11 @@ describe('CommunicationManager Unit Tests', () => {
         record['Composition.section'] || record['org.hl7.fhir.r4.Composition.section']);
       expect(projectedSections).toEqual([section]);
       expect(projectedSections).not.toContain('LOINC|10160-0');
+      expect(compositionRecords).toEqual(expect.arrayContaining([
+        expect.objectContaining({ '@context': Format.FHIR_API }),
+      ]));
+      expect(compositionRecords.some((record) =>
+        Object.keys(record).some((key) => key.startsWith(`${Format.FHIR_R4}.Composition.`)))).toBe(false);
     });
 
     it('rejects an unscoped clinical batch instead of accepting an update that reads back empty', async () => {
@@ -2679,6 +2687,9 @@ describe('CommunicationManager Unit Tests', () => {
       const data = (response.body as any).data;
       expect(data).toHaveLength(1);
       expect(data[0].id).toBe('communication-participant-record-001');
+      expect(data[0].meta.claims['@context']).toBe(Format.FHIR_API);
+      expect(Object.keys(data[0].meta.claims).some((key) =>
+        key.startsWith(`${Format.FHIR_R4}.Communication.`))).toBe(false);
       expect(data[0].meta.claims[CommunicationClaim.Identifier]).toBe('comm-1');
     });
   });

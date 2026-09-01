@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import express from 'express';
 import request from 'supertest';
 import { createApiRouter } from '../../routes/api';
@@ -14,10 +14,12 @@ import {
   EXAMPLE_EMAIL_CONTROLLER_ORG,
   EXAMPLE_EMPLOYEE_ACTIVATION_CODE,
   EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY,
+  EXAMPLE_PROFILE_PROVIDER_DID,
   EXAMPLE_SECTOR,
   EXAMPLE_TENANT_IDENTIFIER,
 } from 'gdc-common-utils-ts/examples/shared';
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { buildUnsignedJwt } from 'gdc-common-utils-ts/utils/jwt';
 
 /**
  * Transport security contract: encrypted post-DCR traffic resolves keys by
@@ -157,6 +159,67 @@ describe('SECURITY_MODE content-type gates', () => {
       .send({});
 
     expect(response.status).toBe(400);
+  });
+
+  /**
+   * Journey:
+   * 1. A local FHIR client sends one Communication Bundle with an unsigned demo bearer.
+   * 2. GW accepts that bearer only because the explicit demo switch is enabled.
+   * 3. The queued job preserves `sub` so managers can enforce clinical author ownership.
+   * Authorization invariant: this decoding path is unavailable outside demo mode.
+   * Persistence invariant: the bearer stays in job security metadata, never in the FHIR resource.
+   */
+  it('preserves an insecure demo bearer subject for a FHIR transport job', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'demo',
+      DEMO_ALLOW_INSECURE_BEARER: 'true',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'true',
+      DIDCOMM_PLAIN: 'false',
+    };
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async () => true),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#individual:org.hl7.fhir.r4',
+        selector: { sector: EXAMPLE_SECTOR, section: 'individual', format: 'org.hl7.fhir.r4' },
+        serviceEndpoint: 'Communication',
+        actions: ['_batch'],
+      }]),
+      getTenant: jest.fn(async () => ({})),
+      getCollectionName: jest.fn(),
+    };
+    const harness = buildTestApp({ tenantsCacheManager });
+    const bearer = buildUnsignedJwt({ sub: EXAMPLE_PROFILE_PROVIDER_DID });
+
+    const response = await request(harness.app)
+      .post(`/${EXAMPLE_TENANT_IDENTIFIER}/cds-ES/v1/${EXAMPLE_SECTOR}/individual/org.hl7.fhir.r4/Communication/_batch`)
+      .set('Content-Type', 'application/fhir+json')
+      .set('Authorization', `Bearer ${bearer}`)
+      .send({
+        resourceType: 'Bundle',
+        type: 'batch',
+        id: 'demo-fhir-communication',
+        thid: 'demo-fhir-communication',
+        entry: [],
+      });
+
+    expect(response.status).toBe(202);
+    expect(harness.queueAdapter.addJob).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        content: expect.objectContaining({
+          meta: expect.objectContaining({
+            bearer: expect.objectContaining({
+              jwt: expect.objectContaining({
+                payload: expect.objectContaining({ sub: EXAMPLE_PROFILE_PROVIDER_DID }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    );
   });
 
   /**

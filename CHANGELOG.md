@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [1.23.12] - 2026-09-01
+
+- Preserve the authenticated bearer subject in explicitly insecure local demo
+  mode, without treating the decoded token as verified proof or weakening
+  strict and compatibility security modes. This lets real local SDK E2E prove
+  the same actor-authorization checks before any image or staging rollout.
+- Store newly projected DocumentReference, Composition and Communication flat
+  claims under the version-neutral `org.hl7.fhir.api` context. Native FHIR R4
+  or R5 resources retain their concrete version; deprecated R4 claim prefixes
+  remain readable but are no longer emitted by these writers.
+- Pin `gdc-common-utils-ts@2.7.1` for the canonical DIDComm `from`, JWT `iss`,
+  signing-key `kid`, SMART `sub` and native-FHIR transport boundary.
+- Synchronize Swagger examples, tests, JSDoc and release guidance with the rule
+  that legacy FHIR adapters receive Communication/Bundle resources and HTTP
+  Authorization carries caller proof.
+
 ## [1.23.11] - 2026-09-01
 
 - Make the cross-product portal release order executable and explicit:

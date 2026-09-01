@@ -10,6 +10,7 @@ import {
   ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts/constants/index';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
+import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { claimsToContentCid } from 'gdc-common-utils-ts/utils/fhir-cid';
@@ -36,7 +37,7 @@ import { getEnvSectionId } from '../utils/section-env';
 import { createHash } from 'crypto';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import { applyFhirCidVersioningToEntry, fhirResourceToCid } from '../utils/fhir-versioning';
-import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
+import { canonicalizeFhirClaims, getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { persistConsentRuleAndAttachment } from '../utils/consent-storage';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
@@ -688,8 +689,9 @@ export class CommunicationManager implements IJobProcessor {
       || determineResourceId(compositionIdentifier, process.env.NODE_ENV);
 
     const sectionValue = sectionCodes.join(',');
-    const claims = normalizeContextualizedClaims({
-      '@context': 'org.hl7.fhir.r4',
+    const claims = canonicalizeFhirClaims({
+      ...(embeddedClaims || {}),
+      '@context': Format.FHIR_API,
       'Composition.identifier': compositionIdentifier,
       'Composition.subject': subject,
       'Composition.section': sectionValue,
@@ -697,10 +699,7 @@ export class CommunicationManager implements IJobProcessor {
       'Composition.date': sent,
       'Composition.type': typeCode,
       'Composition.source': 'Communication',
-    });
-    if (embeddedClaims) {
-      Object.assign(claims, embeddedClaims, { 'Composition.section': sectionValue });
-    }
+    }, Format.FHIR_API);
     applyFhirCidVersioningToEntry({
       entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: 'Composition', id: fallbackId } },
       claims,
@@ -709,7 +708,6 @@ export class CommunicationManager implements IJobProcessor {
     });
     const contentVersionId = claimsToContentCid(claims).cid;
     claims['Composition.meta.versionId'] = contentVersionId;
-    claims['org.hl7.fhir.r4.Composition.meta.versionId'] = contentVersionId;
 
     const individualSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
     const versionId = this.normalizeOptionalString(
@@ -930,7 +928,9 @@ export class CommunicationManager implements IJobProcessor {
         || this.getFirstClaimValue(embeddedClaims || {}, ['DocumentReference.identifier', 'DocumentReference.identifier.value'])
         || `urn:uuid:${uuidv4()}`;
       const claims = normalizeContextualizedClaims({
-        '@context': 'org.hl7.fhir.r4',
+        // Flat claims are version-neutral; only the attached native resource
+        // carries its concrete FHIR R4/R5 representation.
+        '@context': Format.FHIR_API,
         'DocumentReference.identifier': documentIdentifier,
         'DocumentReference.contenthash': cid,
         'DocumentReference.subject': this.normalizeOptionalString(documentReference?.subject?.reference)?.replace(/^Patient\//i, '').trim() || subject,
@@ -1681,8 +1681,8 @@ export class CommunicationManager implements IJobProcessor {
   }
 
   private buildSearchResponseClaims(record: Record<string, any>): Record<string, unknown> {
-    return {
-      '@context': 'org.hl7.fhir.r4',
+    return canonicalizeFhirClaims({
+      '@context': Format.FHIR_API,
       [CommunicationClaim.Identifier]: this.normalizeOptionalString(record[CommunicationClaim.Identifier]) || this.normalizeOptionalString(record.id),
       [CommunicationClaim.Subject]: this.normalizeOptionalString(record[CommunicationClaim.Subject]),
       [CommunicationClaim.Sender]: this.normalizeOptionalString(record[CommunicationClaim.Sender]) || this.normalizeOptionalString(record.from),
@@ -1695,7 +1695,7 @@ export class CommunicationManager implements IJobProcessor {
       ...(this.normalizeOptionalString(record.thid)
         ? { [CommunicationClaim.PartOf]: this.normalizeOptionalString(record.thid) }
         : {}),
-    };
+    }, Format.FHIR_API);
   }
 
   private joinSearchResponseRecipients(value: unknown): string | undefined {

@@ -61,6 +61,13 @@ E2E gates before `npm publish` or any container image build.
 - `resource.meta.claims` is the canonical project-specific claims carrier in a Bundle document (or JSON:API Primary document embedded in a DIDComm message) and must always be persisted/propagated.
 - `resource.meta.claims` is not part of base FHIR. It is a claims-first extension used by GW/SDK contracts on top of FHIR-like resources.
 - Those claims are often contextualized with `@context` such as `org.schema` or `org.hl7.fhir.api`, but may also use less-contextualized keys when the active `@context` already disambiguates them.
+- DIDComm `from` is the sender DID, JWT `iss` is the signing entity, `kid` is
+  the concrete key DID URL, and SMART `sub` is the authorized actor. A direct
+  actor flow may deliberately share the actor DID across `from`, `iss` and
+  `sub`, but those roles remain separate. Native FHIR adapters receive a
+  `Communication` or `Bundle`; they never receive DIDComm identity fields.
+  HTTP Authorization proves the caller and `Communication.sender` remains a
+  FHIR business participant reference.
 
 If you are new and confused by the front-story vs GW boundary, read first:
 

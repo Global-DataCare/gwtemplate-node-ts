@@ -16,6 +16,7 @@ import { TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG } from '../managers/TwinCompos
 import { canonicalizeFhirClaims } from './claims';
 import { SupportedFhirIngestionFormat } from './fhir-ingestion';
 import { randomUUID } from 'crypto';
+import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 
 type BuildConsolidatedIpsBundleDocumentParams = {
   vaultRepository: IVaultRepository;
@@ -141,7 +142,7 @@ export async function buildConsolidatedIpsBundleDocument(
   const compositionIdentifier = `urn:uuid:${compositionId}`;
   const compositionSectionTokens = Array.from(sectionRefs.keys());
   const compositionClaims: Record<string, any> = {
-    '@context': 'org.hl7.fhir.r4',
+    '@context': Format.FHIR_API,
     'Composition.identifier': compositionIdentifier,
     'Composition.subject': params.subject,
     'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,

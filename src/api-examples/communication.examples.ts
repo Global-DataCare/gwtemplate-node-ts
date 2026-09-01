@@ -2,6 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { CommunicationCategoryCodes, HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
+import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 
 const IPS_BUNDLE_LIGHT_EXAMPLE = {
   resourceType: 'Bundle',
@@ -46,7 +47,9 @@ export const COMMUNICATION_INGESTION_ENTRY_EXAMPLE = {
     note: [{ text: 'IPS ingestion request' }],
     meta: {
       claims: {
-        '@context': 'org.hl7.fhir.r4',
+        // Flat API claims are version-neutral. The native Communication above
+        // remains the concrete FHIR representation accepted by this adapter.
+        '@context': Format.FHIR_API,
         'Communication.category': CommunicationCategoryCodes.Notification.claim,
         'Communication.subject': 'did:web:api.acme.org:individual:123',
         'Communication.sent': '2026-05-16T00:00:00.000Z',
