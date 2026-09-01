@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Promote the validated GW CORE `1.23.7` image built from commit `9e2be08` to
+  the public GHCR package and pin every public host guide to its immutable OCI
+  digest. The independently managed CCAAS runtime digest remains unchanged,
+  and public handoff documentation now uses formal deliverable terminology.
+
 ## [1.23.7] - 2026-08-31
 
 - Normalize signed encrypted profile-activation requests into the manager body

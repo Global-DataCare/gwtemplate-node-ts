@@ -21,7 +21,7 @@ values privado de cada release.
 ## Imágenes públicas de referencia
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-  `ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f`
+  `ghcr.io/global-datacare/gw-core@sha256:cebed0ecfd7e509ec26974fb9808a79ade6355fa7bd786c5694babd2ce3300c5`
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac`
 
@@ -65,7 +65,7 @@ imágenes deben expresarse siempre por digest OCI:
 
 ```yaml
 gw:
-  image: ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f
+  image: ghcr.io/global-datacare/gw-core@sha256:cebed0ecfd7e509ec26974fb9808a79ade6355fa7bd786c5694babd2ce3300c5
 ```
 
 Antes de instalar, deben existir los Secrets referenciados:

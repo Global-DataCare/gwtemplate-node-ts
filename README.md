@@ -1,6 +1,6 @@
 # Gateway Template - Node.js & TypeScript
 
-El [índice de entregables públicos en español](./deliverables/README.md)
+La [documentación pública de los entregables en español](./deliverables/README.md)
 agrupa la guía Markdown, su fuente HTML editable y el Word para reproducir el
 host completo con Docker, Fabric, ICA, chaincodes, PostgreSQL/IPFS y Helm.
 
@@ -15,7 +15,7 @@ Container Registry. Human-readable package pages:
 Deploy immutable manifest digests, not mutable tags:
 
 ```text
-ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f
+ghcr.io/global-datacare/gw-core@sha256:cebed0ecfd7e509ec26974fb9808a79ade6355fa7bd786c5694babd2ce3300c5
 ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac
 ```
 
