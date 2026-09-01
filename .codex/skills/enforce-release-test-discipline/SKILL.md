@@ -52,6 +52,11 @@ description: Enforce branch, TDD, fixture, test-layer, product-neutrality, chang
   local services before releasing it. A live E2E reported as `SKIP` means the
   release gate failed; it is not passing evidence. Complete these live E2E
   gates before `npm publish` or any container image build.
+- Preserve identity roles at every transport boundary: DIDComm `from` is a
+  sender DID, JWT `iss` is the signing entity, `kid` is a concrete key DID URL,
+  and SMART `sub` is the authorized actor. Native FHIR Communication/Bundle
+  inputs carry none of those DIDComm fields; HTTP Authorization proves the
+  caller and `Communication.sender` keeps its FHIR business meaning.
 
 - High-level `101`, documentation snippets and E2E journeys use only public
   application/SDK facades and assert user-visible or contract-visible results.

@@ -42,6 +42,7 @@ import { isEncryptionJwk, isSignatureJwk } from '../managers/hosting/registratio
 import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
 import { isVerifiedBearerBoundToActorDid } from '../utils/authenticated-job-actor';
 import { resolveHostRegistrySector } from '../utils/services';
+import { decodeJwt } from 'jose';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -211,6 +212,25 @@ function isContentTypeAllowedBySecurityPolicy(contentType: ParsedContentType): b
 function allowsInsecureBearerBySecurityMode(): boolean {
   return resolveSecurityModeFromEnv() === 'demo'
     && parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
+}
+
+/**
+ * Decodes local/demo bearer claims without treating them as verified proof.
+ *
+ * This helper is called only when `SECURITY_MODE=demo` and
+ * `DEMO_ALLOW_INSECURE_BEARER=true`. It lets the in-memory test network retain
+ * an actor `sub` for the same authorization checks exercised in production,
+ * while strict/compat modes continue through the configured verifier. A
+ * malformed optional demo token preserves the historical anonymous behavior.
+ */
+function decodeInsecureDemoBearerPayload(authorization: string | undefined): Record<string, any> {
+  const compact = String(authorization || '').replace(/^Bearer\s+/i, '').trim();
+  if (!compact) return {};
+  try {
+    return decodeJwt(compact) as Record<string, any>;
+  } catch {
+    return {};
+  }
 }
 
 function isHostOrganizationActivateRoute(
@@ -3852,6 +3872,9 @@ export function createApiRouter(
               `Invalid Bearer token: ${error?.message || 'verification failed'}`,
             );
           }
+        }
+        if (!enforceBearerValidation) {
+          verifiedBearerPayload = decodeInsecureDemoBearerPayload(authToken);
         }
 
         if (

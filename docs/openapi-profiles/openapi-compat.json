@@ -1739,7 +1739,7 @@
                   ],
                   "meta": {
                     "claims": {
-                      "@context": "org.hl7.fhir.r4",
+                      "@context": "org.hl7.fhir.api",
                       "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|notification",
                       "Communication.subject": "did:web:api.acme.org:individual:123",
                       "Communication.sent": "2026-05-16T00:00:00.000Z",
@@ -2874,7 +2874,7 @@
                   ],
                   "meta": {
                     "claims": {
-                      "@context": "org.hl7.fhir.r4",
+                      "@context": "org.hl7.fhir.api",
                       "Communication.category": "http://terminology.hl7.org/CodeSystem/communication-category|notification",
                       "Communication.subject": "did:web:api.acme.org:individual:123",
                       "Communication.sent": "2026-05-16T00:00:00.000Z",
