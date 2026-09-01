@@ -41,6 +41,7 @@ import { getClaimValue } from '../utils/claims';
 import { isEncryptionJwk, isSignatureJwk } from '../managers/hosting/registration-keys';
 import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
 import { isVerifiedBearerBoundToActorDid } from '../utils/authenticated-job-actor';
+import { resolveHostRegistrySector } from '../utils/services';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -251,15 +252,21 @@ function isHostTenantLifecycleRoute(
  * Host commercial Orders continue a tenant-authored Offer through the shared
  * registry endpoint. They are host-routed jobs, but their post-DCR sender proof
  * still belongs to the tenant controller identified by the signed `iss`.
+ * The shared segment is `businessSectorOrNetworkKind`: tenant routes carry a
+ * business sector, while this host route must carry the exact network kind.
+ * `test`, `local-network`, `test-network`, and `network` are distinct stages.
  */
 function isHostControllerCommercialOrderRoute(
   tenantId: string,
+  businessSectorOrNetworkKind: string,
+  hostNetworkKind: string,
   section: string,
   format: string,
   resourceType: string,
   action: string,
 ): boolean {
   return tenantId === 'host'
+    && businessSectorOrNetworkKind === hostNetworkKind
     && section === 'registry'
     && String(format || '').toLowerCase() === 'org.schema'
     && String(resourceType || '').toLowerCase() === 'order'
@@ -268,13 +275,14 @@ function isHostControllerCommercialOrderRoute(
 
 type RegisteredSenderVaultResolverInput = {
   tenantId: string;
-  sector: string;
+  businessSectorOrNetworkKind: string;
   section: string;
   format: string;
   resourceType: string;
   action: string;
   senderDid: string;
   pathVaultId?: string;
+  hostNetworkKind: string;
   tenantExists: (vaultId: string) => Promise<boolean>;
   findTenantVaultIdByIdentifierValue: (identifier: string) => Promise<string | undefined>;
 };
@@ -288,9 +296,11 @@ export async function resolveRegisteredSenderVaultIdForRoute(
   input: RegisteredSenderVaultResolverInput,
 ): Promise<string> {
   const pathVaultId = input.pathVaultId
-    || (input.tenantId === 'host' ? 'host' : getTenantVaultId(input.sector, input.tenantId));
+    || (input.tenantId === 'host' ? 'host' : getTenantVaultId(input.businessSectorOrNetworkKind, input.tenantId));
   if (!isHostControllerCommercialOrderRoute(
     input.tenantId,
+    input.businessSectorOrNetworkKind,
+    input.hostNetworkKind,
     input.section,
     input.format,
     input.resourceType,
@@ -561,13 +571,17 @@ export function createApiRouter(
     const pathVaultId = await resolveVaultId(tenantId, sector);
     return resolveRegisteredSenderVaultIdForRoute({
       tenantId,
-      sector,
+      businessSectorOrNetworkKind: sector,
       section,
       format,
       resourceType,
       action,
       senderDid,
       pathVaultId,
+      hostNetworkKind: resolveHostRegistrySector({
+        nodeEnv: process.env.NODE_ENV,
+        networkMode: process.env.NETWORK_MODE,
+      }),
       tenantExists: (vaultId) => tenantsCacheManager.tenantExists(vaultId),
       findTenantVaultIdByIdentifierValue: (identifier) =>
         tenantsCacheManager.findTenantVaultIdByIdentifierValue(identifier),
@@ -3623,7 +3637,13 @@ export function createApiRouter(
           const pendingOfferKeys = reviewedOrganizationKeys
             ? undefined
             : isHostControllerCommercialOrderRoute(
-              tenantId, section, req.params.format, resourceType, action,
+              tenantId,
+              sector,
+              resolveHostRegistrySector({ nodeEnv: process.env.NODE_ENV, networkMode: process.env.NETWORK_MODE }),
+              section,
+              req.params.format,
+              resourceType,
+              action,
             )
               ? await readPendingOfferBootstrapKeys(
                 decodedJob.content, senderDid, senderSigningKeyId, senderEncryptionKeyId,
@@ -3932,6 +3952,8 @@ export function createApiRouter(
     // Every other route remains behind the persisted service policy.
     const usesHostCommercialOrderContract = isHostControllerCommercialOrderRoute(
       tenantId,
+      sector,
+      resolveHostRegistrySector({ nodeEnv: process.env.NODE_ENV, networkMode: process.env.NETWORK_MODE }),
       section,
       req.params.format,
       resourceType,

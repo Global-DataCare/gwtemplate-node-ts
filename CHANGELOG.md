@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Require host commercial routes to carry the deployment's exact
+  `networkKind`. The shared segment is `businessSectorOrNetworkKind`: tenant
+  routes carry a business sector, while `test`, `local-network`,
+  `test-network`, and `network` remain distinct host network stages.
+- Add adapter-neutral regressions proving that neither a tenant business sector
+  nor in-memory `test` can select a `test-network` host Order route.
+
 - Remove the obsolete dated repository roadmap and all internal-planning and
   TODO links from the public package README. Keep CBOR only as a code-verified
   internal backlog item; other genuine compatibility gaps remain documented

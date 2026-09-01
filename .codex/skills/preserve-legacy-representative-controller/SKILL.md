@@ -92,6 +92,10 @@ claiming that a binding exists.
   recover and return the representative seat's existing activation code. Do
   not rotate the code, consume another seat or return a successful response
   that omits the continuation material.
+- Treat the shared path segment as `businessSectorOrNetworkKind`. Tenant routes
+  carry a business sector; host commercial routes carry the exact deployment
+  `networkKind`. Never alias `test` to `test-network`: the progression is
+  `test` (in-memory), `local-network`, `test-network`, then `network`.
 
 ## Preserve employee-seat and device boundaries
 
