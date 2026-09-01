@@ -305,11 +305,11 @@ describe('Host activation Offer/Order route story', () => {
    * Consumer contract guard for host registry path construction.
    *
    * Host onboarding routes use the host registry network selector in the path
-   * (`test`, `test-network`, `network`), not the tenant business sector
+   * (`test`, `local-network`, `test-network`, `network`), not the tenant business sector
    * (`health-care`, etc.). A caller that reuses the Offer business sector in
    * the host Order URL must fail with 404 so the mismatch is explicit.
    */
-  it('routes host Order/_batch while preserving the tenant business-sector context', async () => {
+  it('rejects a tenant business sector where the host network kind is required', async () => {
     const activationPayload = buildActivationPayload() as any;
     const uniqueTaxId = 'VATES-B00998877';
     const uniqueAlternateName = 'acme-wrong-sector';
@@ -366,6 +366,6 @@ describe('Host activation Offer/Order route story', () => {
       body: orderPayload,
     });
 
-    expect(wrongPathSubmit.status).toBe(202);
+    expect(wrongPathSubmit.status).toBe(404);
   });
 });
