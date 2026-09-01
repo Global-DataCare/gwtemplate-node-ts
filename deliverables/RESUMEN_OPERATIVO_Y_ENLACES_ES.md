@@ -1,6 +1,6 @@
-# Mensaje corto para email o WhatsApp
+# Resumen operativo y referencias públicas
 
-Puede reenviarse este texto:
+Texto de transferencia para el equipo responsable:
 
 > El proceso está separado en tres recorridos públicos. Primero puede
 > reproducirse el entregable local sin datos reales. Después se migra o

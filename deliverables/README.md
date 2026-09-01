@@ -10,8 +10,8 @@ dominios, direcciones, credenciales ni inventarios de un proveedor concreto.
   la ICA del espacio de datos a PostgreSQL/IPFS.
 - `PUESTA_EN_MARCHA_HOST_ES.md`: recorrido corto y secuencial para dar de alta
   un host primero en `test-network` y después en producción.
-- `MENSAJE_CORTO_ENLACES_ES.md`: texto reenviable por email o WhatsApp con los
-  enlaces públicos anteriores.
+- `RESUMEN_OPERATIVO_Y_ENLACES_ES.md`: resumen ejecutivo del orden de
+  ejecución y referencias públicas para su transferencia al equipo responsable.
 - `GUIA_HOST_REPRODUCIBLE_ES.docx`: Word público para memoria y consultoría.
 - `GUIA_HOST_REPRODUCIBLE_ES.html`: fuente editable del Word.
 - `GUIA_OPERATIVA_HOST_ES.md`: procedimiento copiable por rol para
@@ -56,7 +56,7 @@ package IDs son siempre propios del entorno y quedan fuera del repositorio.
 ## Imágenes OCI públicas verificadas
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-  `ghcr.io/global-datacare/gw-core@sha256:6b37c7dfea17dc2ee42628c5467fb5b44fe7f669536e695bd4f2932714485e5f`
+  `ghcr.io/global-datacare/gw-core@sha256:cebed0ecfd7e509ec26974fb9808a79ade6355fa7bd786c5694babd2ce3300c5`
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac`
 

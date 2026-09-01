@@ -166,13 +166,13 @@ grep -Fq '21-dataspace-ica-postgres-ipfs-migration' ./deliverables/GUIA_HOST_REP
 grep -Fq 'ENTREGABLE_LOCAL_REPRODUCIBLE_ES.md' ./deliverables/README.md
 grep -Fq 'MIGRACION_Y_DESPLIEGUE_ICA_ES.md' ./deliverables/README.md
 grep -Fq 'PUESTA_EN_MARCHA_HOST_ES.md' ./deliverables/README.md
-grep -Fq 'MENSAJE_CORTO_ENLACES_ES.md' ./deliverables/README.md
+grep -Fq 'RESUMEN_OPERATIVO_Y_ENLACES_ES.md' ./deliverables/README.md
 grep -Fq 'npm run evidence:open-source-production-readiness' ./deliverables/ENTREGABLE_LOCAL_REPRODUCIBLE_ES.md
 grep -Fq 'evidence:migration:postgres-ipfs' ./deliverables/MIGRACION_Y_DESPLIEGUE_ICA_ES.md
 grep -Fq 'request-host-credential.mjs' ./deliverables/PUESTA_EN_MARCHA_HOST_ES.md
-grep -Fq 'https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/deliverables/' ./deliverables/MENSAJE_CORTO_ENLACES_ES.md
-grep -Fq 'request-host-credential.mjs' ./deliverables/MENSAJE_CORTO_ENLACES_ES.md
-if grep -Fq 'INSTRUCCIONES_OPERADOR_MIGRACION_ICA_ES.md' ./deliverables/MENSAJE_CORTO_ENLACES_ES.md; then
+grep -Fq 'https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/deliverables/' ./deliverables/RESUMEN_OPERATIVO_Y_ENLACES_ES.md
+grep -Fq 'request-host-credential.mjs' ./deliverables/RESUMEN_OPERATIVO_Y_ENLACES_ES.md
+if grep -Fq 'INSTRUCCIONES_OPERADOR_MIGRACION_ICA_ES.md' ./deliverables/RESUMEN_OPERATIVO_Y_ENLACES_ES.md; then
   echo 'Public handoff must not link private provider instructions.' >&2
   exit 1
 fi
