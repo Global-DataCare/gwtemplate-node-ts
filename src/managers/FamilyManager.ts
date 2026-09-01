@@ -55,6 +55,8 @@ import {
   LICENSE_USER_CLASS_INDIVIDUAL,
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
+import { buildSearchResponseEntries } from '../utils/didcomm-response';
+import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 
 type FamilyRegistrationContent = {
   status: EntityLifecycleStatus;
@@ -87,9 +89,9 @@ export class FamilyManager {
           if (job.action === '_search' && job.resourceType === 'Organization') {
             responseEntries.push(await this.processFamilySearchEntry(job, entry, environment));
           } else if (job.action === '_search' && job.resourceType === 'Offer') {
-            responseEntries.push(await this.processFamilyOfferSearchEntry(job, entry));
+            responseEntries.push(...await this.processFamilyOfferSearchEntry(job, entry));
           } else if (job.action === '_search' && job.resourceType === 'Order') {
-            responseEntries.push(await this.processFamilyOrderSearchEntry(job, entry));
+            responseEntries.push(...await this.processFamilyOrderSearchEntry(job, entry));
           } else if (job.action === ACTION_DISABLE && job.resourceType === 'Organization') {
             responseEntries.push(await this.processFamilyDisableEntry(job, entry));
           } else if (job.action === ACTION_PURGE && job.resourceType === 'Organization') {
@@ -151,7 +153,7 @@ export class FamilyManager {
     }
   }
 
-  private async processFamilyOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
+  private async processFamilyOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry[]> {
     const tenantId = job.tenantId;
     const sector = job.sector as Sector | undefined;
     if (!tenantId || !sector) {
@@ -188,14 +190,10 @@ export class FamilyManager {
       ));
     }
 
-    return {
-      type: 'Offer-search-response-v1.0',
-      resource: { total: matches.length, data: matches } as any,
-      response: { status: '200' },
-    };
+    return buildSearchResponseEntries(GatewayResponseEntryTypes.OfferSearch, matches);
   }
 
-  private async processFamilyOrderSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry> {
+  private async processFamilyOrderSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry[]> {
     const tenantId = job.tenantId;
     const sector = job.sector as Sector | undefined;
     if (!tenantId || !sector) {
@@ -230,11 +228,7 @@ export class FamilyManager {
       ));
     }
 
-    return {
-      type: 'Order-search-response-v1.0',
-      resource: { total: matches.length, data: matches } as any,
-      response: { status: '200' },
-    };
+    return buildSearchResponseEntries(GatewayResponseEntryTypes.OrderSearch, matches);
   }
 
   private async processFamilyRegistrationEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {

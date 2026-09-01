@@ -796,6 +796,21 @@ If `NETWORK_MODE` is unset, GW falls back to `NODE_ENV` mapping:
 - `development|staging` -> `test-network`
 - otherwise -> `test`
 
+### Search response migration profile
+
+`GW_SEARCH_RESPONSE_PROFILE` changes only how 0..n search matches are
+serialized after authorization and query execution:
+
+- unset or `legacy-resource-data`: deprecated compatibility output with the
+  old nested `resource.data` list;
+- `primary-resource`: canonical output with one match in each
+  `payload.body.data[].resource` (or `entry[].resource` after FHIR conversion)
+  and `payload.body.total` on the outer Bundle.
+
+Use `primary-resource` in updated local/staging deployments. Keep the variable
+unset only while older SDK readers are still deployed; removal of the legacy
+profile requires a separately announced compatibility release.
+
 
 GW supports a unified inbound security policy controlled by `SECURITY_MODE`:
 

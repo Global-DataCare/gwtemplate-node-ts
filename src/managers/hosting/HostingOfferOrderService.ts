@@ -29,6 +29,8 @@ import { verifyOrderPaymentConfirmation } from '../../utils/payment-confirmation
 import { generateLicenseOffer } from '../../utils/offer';
 import { getClaimValue, normalizeContextualizedClaims } from '../../utils/claims';
 import { LICENSE_CATEGORY_PROFESSIONAL } from '../../constants/domain';
+import { buildSearchResponseEntries } from '../../utils/didcomm-response';
+import { GatewayResponseEntryTypes } from '../../shared/gateway-response-types';
 
 export class HostingOfferOrderService {
   constructor(
@@ -112,7 +114,7 @@ export class HostingOfferOrderService {
     };
   }
 
-  async processOfferSearchEntry(job: { tenantId?: string }, entry: BundleEntry): Promise<BundleEntry> {
+  async processOfferSearchEntry(job: { tenantId?: string }, entry: BundleEntry): Promise<BundleEntry[]> {
     const hostCollectionName = this.hostRuntime.hostCollectionName;
     const filters = extractOfferOrderSearchClaims(entry);
     const tenantIdFilter = String(job.tenantId || '').trim();
@@ -147,14 +149,10 @@ export class HostingOfferOrderService {
       matches.push(row);
     }
 
-    return {
-      type: 'Offer-search-response-v1.0',
-      resource: { total: matches.length, data: matches } as any,
-      response: { status: '200' },
-    };
+    return buildSearchResponseEntries(GatewayResponseEntryTypes.OfferSearch, matches);
   }
 
-  async processOrderSearchEntry(job: { tenantId?: string }, entry: BundleEntry): Promise<BundleEntry> {
+  async processOrderSearchEntry(job: { tenantId?: string }, entry: BundleEntry): Promise<BundleEntry[]> {
     const hostCollectionName = this.hostRuntime.hostCollectionName;
     const filters = extractOfferOrderSearchClaims(entry);
     const tenantIdFilter = String(job.tenantId || '').trim();
@@ -191,11 +189,7 @@ export class HostingOfferOrderService {
       matches.push(buildOfferOrderSearchRow(secureDoc, claims, ClaimsOrderSchemaorg.acceptedOfferIdentifier));
     }
 
-    return {
-      type: 'Order-search-response-v1.0',
-      resource: { total: matches.length, data: matches } as any,
-      response: { status: '200' },
-    };
+    return buildSearchResponseEntries(GatewayResponseEntryTypes.OrderSearch, matches);
   }
 
   async processLicenseOrderEntry(orderClaims: ClaimsRecord, offerId: string): Promise<BundleEntry> {

@@ -2,6 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { v4 as uuidv4 } from 'uuid';
+import { OrganizationEmployeeSearchResponseEntryTypes } from 'gdc-common-utils-ts';
 import { IJobProcessor } from './registry';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
@@ -33,6 +34,7 @@ import {
   searchLicenseDocuments,
   toFilterValues,
 } from '../utils/license-search';
+import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import {
   LICENSE_CATEGORY_INDIVIDUAL,
   LICENSE_CATEGORY_PROFESSIONAL,
@@ -285,6 +287,9 @@ export class LicenseManager implements IJobProcessor {
    * Searches one tenant `device-licenses` pool using either:
    * - FHIR-like `Bundle.entry.request.url + Parameters`
    * - current shared claims-first search entries emitted by common-utils
+   *
+   * Every match is returned as `body.data[].resource`. The surrounding Bundle
+   * owns `total`; `resource.data` is not a valid search-result container.
    */
   private async searchLicenses(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const thid = String(job.content?.thid || uuidv4());
@@ -309,14 +314,10 @@ export class LicenseManager implements IJobProcessor {
       try {
         const filters = extractLicenseSearchFilters(entry);
         const matches = await searchLicenseDocuments(this.vaultRepository, tenantVaultId, filters);
-        responseEntries.push({
-          type: 'License-search-response-v1.0',
-          resource: {
-            total: matches.length,
-            data: matches,
-          } as any,
-          response: { status: '200' },
-        });
+        responseEntries.push(...buildSearchResponseEntries(
+          OrganizationEmployeeSearchResponseEntryTypes.License,
+          matches,
+        ));
       } catch (e: any) {
         responseEntries.push({
           type: 'License-search-response-v1.0',

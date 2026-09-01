@@ -18,6 +18,8 @@ import {
   projectClaimsForDigitalTwin,
 } from '../utils/digital-twin-research-projection';
 import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
+import { buildSearchResponseEntries } from '../utils/didcomm-response';
+import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -264,11 +266,10 @@ export class MedicationStatementManager implements IJobProcessor {
         const sectionId = getSubjectScopedSectionId(subject!, scope, 'medications');
         matches = await this.vaultRepository.query(tenantVaultId, { sectionId, where }, { hydrate: false });
       }
-      responseEntries.push({
-        type: 'MedicationStatement-search-response-v1.0',
-        resource: { total: matches.length, data: matches },
-        response: { status: '200' },
-      });
+      responseEntries.push(...buildSearchResponseEntries(
+        GatewayResponseEntryTypes.MedicationStatementSearch,
+        matches,
+      ));
     }
 
     return {

@@ -8,8 +8,8 @@ type ProcessOfferOrderSearchDeps = Readonly<{
   job: JobRequest;
   issuerDid: string;
   handleError: (error: any, entryType?: string, meta?: any) => ErrorEntry;
-  processOfferSearchEntry: (job: JobRequest, entry: BundleEntry) => Promise<BundleEntry>;
-  processOrderSearchEntry: (job: JobRequest, entry: BundleEntry) => Promise<BundleEntry>;
+  processOfferSearchEntry: (job: JobRequest, entry: BundleEntry) => Promise<BundleEntry[]>;
+  processOrderSearchEntry: (job: JobRequest, entry: BundleEntry) => Promise<BundleEntry[]>;
 }>;
 
 export async function processOfferOrderSearch(
@@ -20,11 +20,10 @@ export async function processOfferOrderSearch(
 
   for (const entry of jobEntries) {
     try {
-      responseEntries.push(
-        deps.job.resourceType === 'Offer'
-          ? await deps.processOfferSearchEntry(deps.job, entry)
-          : await deps.processOrderSearchEntry(deps.job, entry),
-      );
+      const entries = deps.job.resourceType === 'Offer'
+        ? await deps.processOfferSearchEntry(deps.job, entry)
+        : await deps.processOrderSearchEntry(deps.job, entry);
+      responseEntries.push(...entries);
     } catch (error) {
       responseEntries.push(deps.handleError(error, entry?.type || `${deps.job.resourceType}-search`, entry?.meta));
     }

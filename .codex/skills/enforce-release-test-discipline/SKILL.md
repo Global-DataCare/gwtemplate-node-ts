@@ -28,6 +28,13 @@ description: Enforce branch, TDD, fixture, test-layer, product-neutrality, chang
 - Import defined enums, constants, claim names, resource types, transport
   profiles and HTTP methods from their owning package. Never restate their wire
   strings merely to make a test pass.
+- Preserve the primary-document Bundle boundary: a DIDComm payload body is one
+  FHIR-like/JSON-primary-document Bundle, and each successful result belongs in
+  `body.data[].resource` (or canonical FHIR `entry[].resource`). Never place a
+  second `{ total, data }` search list inside `BundleEntry.resource` except in
+  the isolated, explicitly deprecated rolling-deployment serializer. Add a
+  negative assertion against `resource.data` for the current profile and prove
+  the legacy profile separately without teaching it in high-level snippets.
 - Literal values are allowed only when the literal itself is the behavior under
   test, such as malformed input or an exact serialization assertion. State
   that reason beside it.

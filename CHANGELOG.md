@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Add the opt-in `GW_SEARCH_RESPONSE_PROFILE=primary-resource` serializer for
+  all 0..n GW searches, returning every match as a primary
+  `body.data[].resource` Bundle entry with `body.total` on the outer document.
+  Unset deployments retain the deprecated `legacy-resource-data` response
+  during the SDK rollout. Pin `gdc-common-utils-ts@2.6.3` for dual-shape
+  readers and reusable Employee/License fixtures without duplicated literals.
+
 - Publish the validated GW CORE `1.23.9` image built from commit `cc1cfdb` to
   the public GHCR package and pin every public host guide to its immutable OCI
   manifest digest.

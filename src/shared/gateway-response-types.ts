@@ -1,4 +1,5 @@
 import { BundleType } from '../utils/bundle';
+import { OrganizationEmployeeSearchResponseEntryTypes } from 'gdc-common-utils-ts';
 
 /**
  * Gateway-specific async envelope and entry `type` values.
@@ -13,7 +14,13 @@ export const GatewayResponseEntryTypes = Object.freeze({
   CommunicationSearch: 'Communication-search-response-v1.0',
   CompositionSearch: 'Composition-search-response-v1.0',
   DocumentReferenceSearch: 'DocumentReference-search-response-v1.0',
+  EmployeeSearch: OrganizationEmployeeSearchResponseEntryTypes.Employee,
+  LicenseSearch: OrganizationEmployeeSearchResponseEntryTypes.License,
+  MedicationStatementSearch: 'MedicationStatement-search-response-v1.0',
+  OfferSearch: 'Offer-search-response-v1.0',
+  OrderSearch: 'Order-search-response-v1.0',
   ResearchSubjectSearch: 'ResearchSubject-search-response-v1.0',
+  SubjectSearch: 'Subject-search-response-v1.0',
   OperationOutcome: 'OperationOutcome',
 } as const);
 
