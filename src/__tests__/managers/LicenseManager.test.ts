@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/managers/LicenseManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -206,10 +206,7 @@ describe('LicenseManager', () => {
       expect(mockVaultRepository.put).not.toHaveBeenCalled();
     });
 
-    it.each(['test', 'local-network', 'test-network'])(
-      'adds zero-cost employee seats in non-production %s', async (networkMode) => {
-      process.env.NETWORK_MODE = networkMode;
-      process.env.DEPLOYMENT_ENV = networkMode === 'test-network' ? 'staging' : 'dev';
+    it('rejects the nonexistent License/_add action without creating inventory', async () => {
       mockVaultRepository.vaultExists.mockResolvedValue(true);
       const job = {
         id: 'job-add-professional-seats', tenantId: TEST_TENANT_ID,
@@ -225,66 +222,9 @@ describe('LicenseManager', () => {
         }] } },
       } as JobRequest;
 
-      const result = await manager.process(job);
-
-      expect((result.body as any).data[0].response.status).toBe('201');
-      expect(mockVaultRepository.put).toHaveBeenCalledWith(
-        TEST_VAULT_ID,
-        expect.arrayContaining([expect.objectContaining({ content: expect.objectContaining({
-          tenantId: TEST_TENANT_ID,
-          userClass: 'employee',
-          status: 'available',
-          maxDevices: 5,
-        }) })]),
-        getEnvSectionId('device-licenses'),
+      await expect(manager.process(job)).rejects.toThrow(
+        "Unsupported License action '_add'. Licence inventory is created during onboarding or through Offer -> Order.",
       );
-      expect((mockVaultRepository.put as jest.Mock).mock.calls[0][1]).toHaveLength(2);
-    });
-
-    it('rejects zero-cost employee seats outside test-network', async () => {
-      process.env.NETWORK_MODE = 'network';
-      mockVaultRepository.vaultExists.mockResolvedValue(true);
-      const job = {
-        id: 'job-reject-free-professional-seats', tenantId: TEST_TENANT_ID,
-        jurisdiction: 'ES', sector: 'health-care', section: 'identity',
-        format: 'org.schema', resourceType: 'License', action: '_add',
-        content: { thid: 'thread-reject-free-professional-seats', body: { data: [{
-          meta: { claims: {
-            '@context': 'org.schema',
-            'org.schema.Offer.eligibleQuantity.value': 1,
-            'org.schema.Offer.price': 0,
-            'org.schema.IndividualProduct.category': 'professional',
-          } },
-        }] } },
-      } as JobRequest;
-
-      const result = await manager.process(job);
-
-      expect((result.body as any).data[0].response.status).toBe('403');
-      expect((result.body as any).data[0].response.outcome.issue[0].diagnostics)
-        .toContain('non-production');
-      expect(mockVaultRepository.put).not.toHaveBeenCalled();
-    });
-
-    it('rejects zero-cost employee seats in production even if test-network is selected', async () => {
-      process.env.NETWORK_MODE = 'test-network';
-      process.env.DEPLOYMENT_ENV = 'prod';
-      mockVaultRepository.vaultExists.mockResolvedValue(true);
-      const job = {
-        id: 'job-reject-production-free-professional-seats', tenantId: TEST_TENANT_ID,
-        jurisdiction: 'ES', sector: 'health-care', section: 'identity',
-        format: 'org.schema', resourceType: 'License', action: '_add',
-        content: { thid: 'thread-reject-production', body: { data: [{ meta: { claims: {
-          '@context': 'org.schema',
-          'org.schema.Offer.eligibleQuantity.value': 1,
-          'org.schema.Offer.price': 0,
-          'org.schema.IndividualProduct.category': 'professional',
-        } } }] } },
-      } as JobRequest;
-
-      const result = await manager.process(job);
-
-      expect((result.body as any).data[0].response.status).toBe('403');
       expect(mockVaultRepository.put).not.toHaveBeenCalled();
     });
   });

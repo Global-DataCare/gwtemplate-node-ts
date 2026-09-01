@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/unit/utils/request-validator.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -258,6 +258,23 @@ describe('isRequestValid', () => {
       format: 'org.schema',
       resourceType: 'License',
       action: '_issue',
+    })).toBe(false);
+  });
+
+  it('rejects License/_add even when a historical service advertises it', () => {
+    const obsoleteServices: DidService[] = [{
+      id: '#entity:org.schema:license',
+      type: 'ApiService',
+      serviceEndpoint: 'License',
+      actions: ['_add'],
+      selector: { section: 'entity', format: 'org.schema' },
+    }];
+    expect(isRequestValid(obsoleteServices, {
+      sector: Sector.HEALTH_CARE,
+      section: 'entity',
+      format: 'org.schema',
+      resourceType: 'License',
+      action: '_add',
     })).toBe(false);
   });
 

@@ -27,6 +27,11 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
   if (!normalizedSection || !normalizedFormat || !normalizedResourceType || !normalizedAction) {
     return false;
   }
+  // License inventory has no direct mutation route. Historical DID documents
+  // that advertised `_add` must not revive the removed shortcut.
+  if (normalizedResourceType === 'license' && normalizedAction === '_add') {
+    return false;
+  }
 
   const getSelectorFromService = (service: DidService): { sector?: string; section?: string; format?: string } => {
     const selector = (service as any).selector as { sector?: string; section?: string; format?: string } | undefined;
