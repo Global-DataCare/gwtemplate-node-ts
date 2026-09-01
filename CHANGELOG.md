@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Clarify on the public package-facing README that the portable open-source
+  host profile uses PostgreSQL and IPFS through a private Kubo node, while
+  Firestore/GCS is retained only for legacy and demonstration compatibility.
+
 - Promote the validated GW CORE `1.23.7` image built from commit `9e2be08` to
   the public GHCR package and pin every public host guide to its immutable OCI
   digest. The independently managed CCAAS runtime digest remains unchanged,

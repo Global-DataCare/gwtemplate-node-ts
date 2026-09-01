@@ -27,6 +27,10 @@ for relative_path in \
   grep -Fq "$CCAAS_IMAGE" "$ROOT_DIR/$relative_path"
 done
 
+grep -Fq 'open-source host profile uses PostgreSQL for structured persistence and IPFS' "$ROOT_DIR/README.md"
+grep -Fq 'through a private Kubo node for blob storage.' "$ROOT_DIR/README.md"
+grep -Fq 'The Kubo API must remain private' "$ROOT_DIR/README.md"
+grep -Fq 'available only as a legacy/demo compatibility profile.' "$ROOT_DIR/README.md"
 grep -Fq 'CCAAS' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 grep -Fq 'GW CORE y CCAAS son artefactos OCI distintos' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
