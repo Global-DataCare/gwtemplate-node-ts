@@ -298,7 +298,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
       createDidEndpointConfigFromSelector(
         { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.r4' },
         ['RelatedPerson'],
-        [ACTION_PURGE],
+        ['_search', ACTION_PURGE],
       ),
     );
     services.push(
@@ -320,7 +320,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
       createDidEndpointConfigFromSelector(
         { sector, section: SUBJECT_SECTION_INDIVIDUAL, format: 'org.hl7.fhir.api' },
         ['RelatedPerson'],
-        [ACTION_PURGE],
+        ['_search', ACTION_PURGE],
       ),
     );
     services.push(

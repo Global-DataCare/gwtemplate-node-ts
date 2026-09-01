@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/unit/utils/services.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
@@ -191,6 +191,7 @@ describe('Service Initialization Utilities', () => {
           (s.actions || []).includes('_search'),
       );
       expect(employeeLicenseSearchService).toBeDefined();
+      expect(employeeLicenseSearchService?.actions).not.toContain('_add');
 
       const organizationCommercialSearchService = services.find(
         (s: DidService) =>
@@ -218,6 +219,15 @@ describe('Service Initialization Utilities', () => {
       expect(fhirApiService).toBeDefined();
       expect(fhirApiService!.serviceEndpoint).toContain('Consent');
       expect(fhirApiService!.serviceEndpoint).toContain('DocumentReference');
+
+      const relatedPersonSearchServices = services.filter(
+        (service: DidService) =>
+          (service as any).selector?.section === 'individual'
+          && ['org.hl7.fhir.api', 'org.hl7.fhir.r4'].includes((service as any).selector?.format)
+          && service.serviceEndpoint === 'RelatedPerson'
+          && (service.actions || []).includes('_search'),
+      );
+      expect(relatedPersonSearchServices).toHaveLength(2);
 
       const tenantSubscriptionService = services.find(
         (s: DidService) =>

@@ -20,6 +20,7 @@ export const GatewayResponseEntryTypes = Object.freeze({
   OfferSearch: 'Offer-search-response-v1.0',
   OrderSearch: 'Order-search-response-v1.0',
   ResearchSubjectSearch: 'ResearchSubject-search-response-v1.0',
+  RelatedPersonSearch: 'RelatedPerson-search-response-v1.0',
   SubjectSearch: 'Subject-search-response-v1.0',
   OperationOutcome: 'OperationOutcome',
 } as const);

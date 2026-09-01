@@ -24,6 +24,11 @@ import { ACTION_PURGE, SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL 
 import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
 import { InteroperableLifecycleStatuses } from 'gdc-common-utils-ts/utils/interoperable-resource-operation';
 import type { ITenantsManager } from './ITenantsManager';
+import { extractSearchFiltersFromEntry, extractSearchFiltersFromParametersResource } from '../utils/search-request';
+import { buildSearchResponseEntries } from '../utils/didcomm-response';
+import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
+import { BundleType } from '../utils/bundle';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -73,11 +78,16 @@ function normalizeStoredRelatedPersonRecord(record: any): StoredRelatedPersonRec
 }
 
 /**
- * Registers family member relationships / emergency contacts using FHIR RelatedPerson-style claims.
+ * Registers and searches subject-scoped relationships using FHIR
+ * RelatedPerson-style claims.
  *
  * Contract:
  * - Endpoint: `/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/RelatedPerson/_batch`
  * - Payload is a DIDComm message whose body is a FHIR Bundle with `entry[]` and `meta.claims` using `@context: org.hl7.fhir.api`.
+ * - `_search` requires an explicit subject or patient. Its outer Bundle owns
+ *   `total`; the current profile returns one match per `data[].resource`, while
+ *   the deprecated nested legacy shape remains isolated in the shared rolling
+ *   serializer.
  */
 export class RelatedPersonManager implements IJobProcessor {
   constructor(
@@ -122,6 +132,29 @@ export class RelatedPersonManager implements IJobProcessor {
     const responseEntries: any[] = [];
     const cidMappings: FhirCidVersionMapping[] = [];
 
+    if (normalizedAction === '_search') {
+      const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
+      if (!(await this.tenantExists(tenantVaultId))) {
+        throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
+      }
+      const filters = this.extractSearchFilters(bundle);
+      const subject = String(filters.patient?.[0] || filters.subject?.[0] || '').trim();
+      if (!subject) {
+        throw new ManagerError('RelatedPerson search requires an explicit subject or patient.', IssueType.Required);
+      }
+      const sectionId = getSubjectScopedSectionId(subject, scope, 'related-persons');
+      const records = await this.vaultRepository.listContainersInSection<any>(tenantVaultId, sectionId);
+      const matches = records
+        .map((record) => normalizeStoredRelatedPersonRecord(record))
+        .filter((record): record is StoredRelatedPersonRecord => !!record)
+        .filter((record) => this.matchesSearchFilters(record, filters));
+      responseEntries.push(...buildSearchResponseEntries(
+        GatewayResponseEntryTypes.RelatedPersonSearch,
+        matches.map((record) => this.toSearchEntry(record)),
+        undefined,
+        { resourceType: ResourceTypesFhirR4.Bundle, type: BundleType.Searchset },
+      ));
+    } else {
     for (const entry of entries) {
         const rawClaims = getEntryClaims(entry);
         try {
@@ -229,6 +262,7 @@ export class RelatedPersonManager implements IJobProcessor {
         });
       }
     }
+    }
 
     await registerFhirCidMappings({
       blockchainAdapter: this.blockchainAdapter,
@@ -247,7 +281,58 @@ export class RelatedPersonManager implements IJobProcessor {
       body: {
         resourceType: 'Bundle',
         type: `${normalizedAction}-response`,
+        total: responseEntries.length,
         data: responseEntries,
+      },
+    };
+  }
+
+  /** Reads either direct Parameters or the standard Bundle search wrapper. */
+  private extractSearchFilters(body: any): Record<string, string[]> {
+    if (body?.resourceType === 'Parameters') {
+      return extractSearchFiltersFromParametersResource(body);
+    }
+    const entries: any[] =
+      (Array.isArray(body?.entry) && body.entry)
+      || (Array.isArray(body?.data) && body.data)
+      || [];
+    return entries.length > 0 ? extractSearchFiltersFromEntry(entries[0], 'RelatedPerson') : {};
+  }
+
+  /** Applies only the public RelatedPerson filters after subject scoping. */
+  private matchesSearchFilters(record: StoredRelatedPersonRecord, filters: Record<string, string[]>): boolean {
+    const matches = (filterNames: string[], actual: unknown): boolean => {
+      const requested = filterNames.flatMap((name) => filters[name] || []);
+      return requested.length === 0 || requested.includes(String(actual ?? '').trim());
+    };
+    return matches(
+      ['identifier'],
+      getClaimValue(record, 'RelatedPerson.identifier') || getClaimValue(record, 'RelatedPerson.identifier.value'),
+    )
+      && matches(['relationship'], getClaimValue(record, 'RelatedPerson.relationship'))
+      && matches(['telecom'], getClaimValue(record, 'RelatedPerson.telecom'))
+      && matches(['active'], getClaimValue(record, 'RelatedPerson.active'))
+      && matches(['status'], record.status);
+  }
+
+  /** Rehydrates one protected record as the primary search resource. */
+  private toSearchEntry(record: StoredRelatedPersonRecord): Record<string, any> {
+    const claims: Record<string, any> = {};
+    for (const [key, value] of Object.entries(record)) {
+      if (key === 'id' || key === 'status' || key === 'meta' || key === 'indexed' || key === 'content') continue;
+      claims[key] = value;
+    }
+    if (!claims['@context']) claims['@context'] = 'org.hl7.fhir.api';
+    return {
+      type: 'RelatedPerson',
+      meta: { ...(record.status ? { status: record.status } : {}) },
+      resource: {
+        resourceType: 'RelatedPerson',
+        id: record.id,
+        meta: {
+          ...(record.status ? { status: record.status } : {}),
+          claims,
+        },
       },
     };
   }
