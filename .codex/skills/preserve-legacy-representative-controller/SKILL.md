@@ -112,6 +112,15 @@ claiming that a binding exists.
   credential; never consume the same seat in both operations.
 - Employee records use the resolved physical tenant collection while
   device-licence records remain in the logical tenant vault.
+- Host-routed professional-seat Orders must resolve the controller DID's
+  official organization identifier through the canonical tenant registry
+  before reading DCR custody. Never fall back to the host configuration vault,
+  and apply the rule before every Firestore, PostgreSQL, memory or future
+  repository adapter.
+- A trusted OIDC account `sub` is provider-local, not a professional DID.
+  Bind an established DCR actor only by exact DID subject or by the verified
+  email/telephone stable identifier embedded in that canonical DID; never
+  bridge the identities by sharing HMAC secrets or accepting envelope keys.
 - One actor seat supports five active channel/device bindings by default.
   Revoking one binding requires explicit portal confirmation and never releases
   the employee seat; only purging an already suspended employee releases it.

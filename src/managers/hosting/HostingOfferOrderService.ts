@@ -26,6 +26,9 @@ import { getTenantVaultId } from '../../utils/tenant';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../../utils/order-communication';
 import { buildGatewayInvoiceBundle } from '../../utils/invoice-bundle';
 import { verifyOrderPaymentConfirmation } from '../../utils/payment-confirmation';
+import { generateLicenseOffer } from '../../utils/offer';
+import { getClaimValue, normalizeContextualizedClaims } from '../../utils/claims';
+import { LICENSE_CATEGORY_PROFESSIONAL } from '../../constants/domain';
 
 export class HostingOfferOrderService {
   constructor(
@@ -35,6 +38,79 @@ export class HostingOfferOrderService {
     private readonly config: IServerConfig,
     private readonly hostRuntime: IHostRuntime,
   ) {}
+
+  /**
+   * Creates one host-authored professional-seat Offer for an active tenant.
+   * The controller supplies quantity only; all commercial terms remain host
+   * policy and the protected Offer stays under host communication custody.
+   */
+  async processEmployeeLicenseOfferCreateEntry(
+    job: Pick<import('gdc-common-utils-ts/models/confidential-job').JobRequest, 'tenantId' | 'sector'>,
+    entry: BundleEntry,
+  ): Promise<BundleEntry> {
+    const tenantId = String(job.tenantId || '').trim();
+    const sector = String(job.sector || '').trim() as Sector;
+    if (!tenantId || !sector) {
+      throw new ManagerError('Professional-seat Offer requires tenantId and sector.', IssueType.Required);
+    }
+    const tenantVaultId = getTenantVaultId(sector, tenantId);
+    if (!(await this.tenantsCacheManager.isTenantOperational(tenantVaultId))) {
+      throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
+    }
+
+    const requestedClaims = normalizeContextualizedClaims(entry.meta?.claims || {});
+    const category = String(getClaimValue<string>(
+      requestedClaims,
+      'org.schema.IndividualProduct.category',
+    ) || '').trim();
+    const quantity = Number(getClaimValue<unknown>(
+      requestedClaims,
+      ClaimsOfferSchemaorg.eligibleQuantityValue,
+    ));
+    if (category !== LICENSE_CATEGORY_PROFESSIONAL) {
+      throw new ManagerError('Professional-seat Offer requires the professional category.', IssueType.Invalid);
+    }
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+      throw new ManagerError('Professional-seat Offer quantity must be an integer from 1 to 100.', IssueType.Value);
+    }
+
+    const claims: ClaimsRecord = {
+      ...generateLicenseOffer(
+        quantity,
+        composeHostDidWebId(this.config.apiBaseUrl, this.config.hostExternalDomain),
+        this.config.host.jurisdiction || '',
+        sector,
+        this.config.allowedPaymentMethods,
+      ),
+      [ClaimsOrganizationSchemaorg.alternateName]: tenantId,
+      [ClaimsServiceSchemaorg.category]: sector,
+    };
+    const offerId = String(claims[ClaimsOfferSchemaorg.identifier]);
+    const document: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
+      id: uuidv4(),
+      status: EntityLifecycleStatus.Pending,
+      sequence: 0,
+      meta: { claims },
+      indexed: {
+        attributes: buildOfferOrderIndexedAttributes(claims),
+        hmac: { id: 'urn:unsupported', type: 'Sha256HmacKey2019' },
+      },
+      content: { claims },
+    };
+    const protectedDocument = await this.kmsService.protectConfidentialData(document, 'host');
+    await this.vaultRepository.put(
+      this.hostRuntime.hostCollectionName,
+      [protectedDocument],
+      getEnvSectionId('communications'),
+    );
+
+    return {
+      type: 'Organization-license-offer-response-v1.0',
+      meta: { claims },
+      resource: { id: offerId, meta: { claims } } as any,
+      response: { status: '201' },
+    };
+  }
 
   async processOfferSearchEntry(job: { tenantId?: string }, entry: BundleEntry): Promise<BundleEntry> {
     const hostCollectionName = this.hostRuntime.hostCollectionName;

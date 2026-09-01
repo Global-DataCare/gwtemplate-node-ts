@@ -172,6 +172,14 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
     ['_search']
   ));
 
+  // The controller requests quantity; GW authors and persists the Offer before
+  // the existing host Order confirmation.
+  services.push(createDidEndpointConfigFromSelector(
+    { sector, section: 'entity', format: 'org.schema' },
+    ['Offer'],
+    ['_create']
+  ));
+
   services.push(createDidEndpointConfigFromSelector(
     { sector, section: 'did', format: 'document' },
     ['Document'],

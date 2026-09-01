@@ -75,6 +75,15 @@ describe('Service Initialization Utilities', () => {
       expect(entityService!.serviceEndpoint).toContain('Employee');
       expect(entityService!.serviceEndpoint).not.toContain('Practitioner');
 
+      const professionalSeatOfferService = services.find(
+        (service: DidService) =>
+          (service as any).selector?.section === 'entity'
+          && (service as any).selector?.format === 'org.schema'
+          && service.serviceEndpoint === 'Offer'
+          && service.actions?.includes('_create'),
+      );
+      expect(professionalSeatOfferService).toBeDefined();
+
       const individualService = services.find((s: DidService) => s.id.includes('individual'));
       expect(individualService).toBeDefined();
       expect(individualService!.serviceEndpoint).toContain('Person');

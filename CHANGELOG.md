@@ -11,6 +11,21 @@
   digest. The independently managed CCAAS runtime digest remains unchanged,
   and public handoff documentation now uses formal deliverable terminology.
 
+## [1.23.8] - 2026-08-31
+
+- Add the shared active-tenant `Offer/_create` contract for professional seats;
+  controllers request quantity while GW authors and protects the commercial
+  terms for the existing host `Order/_batch` continuation.
+- Bind established DCR actors to either their exact DID subject or the verified
+  email/telephone identifier embedded in the canonical professional DID. An
+  external identity-provider account id is never treated as a DID.
+- Resolve host-routed Order controller custody through the canonical tenant
+  registry when the DID contains an official organization identifier. This is
+  adapter-neutral and prevents Firestore, PostgreSQL, memory or future vault
+  repositories from falling back to host custody.
+- Replace the permissive employee-flow integration outcome with an explicit
+  Offer, Order, KMS restart and successful employee creation contract.
+
 ## [1.23.7] - 2026-08-31
 
 - Normalize signed encrypted profile-activation requests into the manager body
