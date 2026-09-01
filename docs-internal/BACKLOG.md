@@ -1,9 +1,8 @@
 # GW CORE Backlog
 
-Roadmap references:
-- `ROADMAP.md`
-- `../docs/90.E-TODO_SMART_EHR_COMPAT.md`
-- `../docs/UC_CAPABILITY_MATRIX_SEDIA.md`
+This file is internal planning material and is not part of the public package
+landing page or production-readiness evidence. Entries must remain backed by
+current code or executable tests.
 
 ## NOW
 0. Support the additive MVP Bundle-change/readback contract documented in
@@ -68,5 +67,8 @@ Roadmap references:
 8. Add integration coverage for unified-view / IPS section/date filters and XHTML reuse/generation.
 
 ## LATER
-1. Advanced profile support (additional validator adapters/profiles).
-2. Additional extension-only feature migrations to separate scope docs.
+1. Add a CBOR transport/profile option alongside the current signed and
+   encrypted JSON/JWT profiles, with an explicit compatibility matrix and
+   executable interoperability tests.
+2. Advanced profile support (additional validator adapters/profiles).
+3. Additional extension-only feature migrations to separate scope docs.

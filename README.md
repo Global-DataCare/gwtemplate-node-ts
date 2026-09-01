@@ -74,7 +74,6 @@ GW starts after upstream profile/runtime unlock and document/Communication autho
 - Local audit/runtime with Fabric: [docs-v2/24-local-audit-fabric-runtime.md](docs-v2/24-local-audit-fabric-runtime.md)
 - Reproducible open-source production-readiness evidence: [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md)
 - Portal/BFF to GW CORE reference: [portal-api-gw.md](portal-api-gw.md)
-- Internal backlog and roadmap: [docs-internal/README.md](docs-internal/README.md)
 - Environment-variable reference: [docs-v2/22-environment-variables-reference.md](docs-v2/22-environment-variables-reference.md)
 - Testing and live E2E operations: [docs/TESTING.md](docs/TESTING.md)
 - Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)
@@ -84,7 +83,6 @@ GW starts after upstream profile/runtime unlock and document/Communication autho
 - Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
 - Employee bundle/lifecycle contract reference: [gdc-sdk-core-ts/docs/101-EMPLOYEES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-EMPLOYEES.md)
 - SDK live local reference before running cross-repo E2E: [gdc-sdk-node-ts/docs/101-LIVE_GW_LOCAL.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-LIVE_GW_LOCAL.md)
-- Repo roadmap: [docs-internal/ROADMAP.md](docs-internal/ROADMAP.md)
 - Repo briefing: [docs/BRIEFING_DATASPACE_EN.md](docs/BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
 - Local demo template: [env.local-demo.example](env.local-demo.example)
@@ -851,14 +849,6 @@ For the multi-cloud Fabric deployment plan and scripts, see:
 
 Local (minikube/k3s) is test-only and documented in:
 - `private-deploy.local.config`
-
-## Roadmap and Briefing
-- `docs/BRIEFING_DATASPACE_EN.md`
-- `docs-internal/ROADMAP.md`
-
-## Pending Compatibility TODO
-- See [SMART EHR compatibility TODO](docs/90.E-TODO_SMART_EHR_COMPAT.md).
-- See [Tenant identifier and vault migration TODO (v2.0)](docs/90.K-TODO_TENANT_IDENTIFIER_V2.md).
 
 ## Local Single-Tenant Bootstrap (acme-id)
 Run this when you need tenant `acme-id` ready for activation, employee, consent, and FHIR flows:
