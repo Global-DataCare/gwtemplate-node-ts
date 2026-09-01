@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// Contract marker: a verified author ingests IPS data through the public conversation boundary.
 import { startServer, resetServerConfig } from '../../../server';
 import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
@@ -109,7 +110,7 @@ describe('Research access conversation (integration)', () => {
       expect(
         firstMatch?.['ResearchSubject.identifier']
         || firstMatch?.['Composition.subject']
-        || firstMatch?.composition?.['Composition.subject'],
+        || (firstMatch?.composition as Record<string, unknown> | undefined)?.['Composition.subject'],
       ).toMatch(/^urn:uuid:/);
 
       const novitaIbuprofenSearchPayload = await digitalTwinSdk.searchMedicationTwinsByCodeValue(
@@ -130,7 +131,7 @@ describe('Research access conversation (integration)', () => {
         expect(
           onlyMatch?.['ResearchSubject.identifier']
           || onlyMatch?.['Composition.subject']
-          || onlyMatch?.composition?.['Composition.subject'],
+          || (onlyMatch?.composition as Record<string, unknown> | undefined)?.['Composition.subject'],
         ).toMatch(/^urn:uuid:/);
       }
 

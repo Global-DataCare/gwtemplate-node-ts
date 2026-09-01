@@ -1,4 +1,5 @@
-// TDD flow contract: every canonical CORE contract points to a real test whose first line declares TDD and whose marker cannot silently disappear.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// Every canonical CORE contract points to a real test whose marker cannot silently disappear.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

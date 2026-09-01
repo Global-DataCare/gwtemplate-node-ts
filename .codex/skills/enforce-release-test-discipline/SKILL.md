@@ -41,6 +41,18 @@ description: Enforce branch, TDD, fixture, test-layer, product-neutrality, chang
 
 ## Keep test layers separate
 
+- Enforce the same portal progression everywhere: `test -> local-network -> test-network -> network`.
+  First prove normal local UI -> BFF -> high-level
+  SDK -> GW/services with in-memory `networkKind=test` and no blockchain.
+  Fixture pages, mocked routes and API-only Playwright are diagnostics and
+  never satisfy this cross-system gate. Run Fabric/local-network only after it
+  is green; staging repeats the journey after deployment, and production is
+  last.
+- Enable and execute every affected package or SDK live E2E against the real
+  local services before releasing it. A live E2E reported as `SKIP` means the
+  release gate failed; it is not passing evidence. Complete these live E2E
+  gates before `npm publish` or any container image build.
+
 - High-level `101`, documentation snippets and E2E journeys use only public
   application/SDK facades and assert user-visible or contract-visible results.
   They must not provision wallets, decode compact JOSE, record raw fetch calls,
@@ -69,7 +81,8 @@ description: Enforce branch, TDD, fixture, test-layer, product-neutrality, chang
 1. Update the owning changelog with tested behavior. Shared changelogs remain
    product-neutral.
 2. Run focused tests, affected integration/E2E tests, full tests, typecheck,
-   build and neutrality/skill checks required by the repository.
+   build and neutrality/skill checks required by the repository. Enable every
+   affected live E2E and reject a run containing `SKIP` before release.
 3. Commit on the branch and push the branch.
 4. Merge the reviewed branch into `main` with an explicit merge commit unless
    repository policy requires a PR merge. Push `main` and verify both remote

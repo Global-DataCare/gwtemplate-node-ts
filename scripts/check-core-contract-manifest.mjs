@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = path.join(repositoryRoot, 'contracts', 'core-contracts.json');
+const requiredFlowContract = '// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.';
 
 /** Checks that CORE contract identifiers still resolve to executable TDD suites. */
 export async function checkCoreContractManifest() {
@@ -22,8 +23,8 @@ export async function checkCoreContractManifest() {
       continue;
     }
     const firstLine = source.split(/\r?\n/, 1)[0];
-    if (!firstLine.includes('TDD')) {
-      errors.push(`${contract.id}: first line must declare TDD`);
+    if (firstLine !== requiredFlowContract) {
+      errors.push(`${contract.id}: first line must declare the canonical flow contract`);
     }
     if (!source.includes(contract.marker)) {
       errors.push(`${contract.id}: missing contract marker ${contract.marker}`);

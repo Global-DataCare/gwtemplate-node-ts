@@ -46,6 +46,15 @@ It is designed for building secure, multi-tenant systems that handle complex dat
 For the cross-repo 101 story order and security narrative, read
 [NARRATIVE-ALIGNMENT.md](NARRATIVE-ALIGNMENT.md).
 
+Every consuming portal follows `test -> local-network -> test-network -> network`.
+The first proof must cross normal local UI -> BFF -> high-level SDK
+-> GW/services with in-memory state and no blockchain. Fixture pages, mocked
+routes and API-only Playwright are diagnostics, never release evidence.
+Fabric/local-network, deployed staging and production follow in that order.
+Every affected package or SDK live E2E must be enabled against real local
+services. A live E2E reported as `SKIP` blocks the release; complete all live
+E2E gates before `npm publish` or any container image build.
+
 - FHIR SearchParameter names are canonical FHIR names only: lowercase and `-` where applicable.
 - No invented camelCase for FHIR claims/search keys (example: use `Communication.part-of`, never `Communication.partOf`).
 - Custom parameter names are allowed only when FHIR has no defined parameter.

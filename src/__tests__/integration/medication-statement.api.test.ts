@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// Contract marker: imported clinical resources preserve their external author provenance.
 import { invokeExpress } from './helpers/invokeExpress';
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';

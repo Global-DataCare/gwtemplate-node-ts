@@ -1,4 +1,5 @@
-// TDD contract: Communication ingestion requires authenticated local authors and preserves external provenance.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// Communication ingestion requires authenticated local authors and preserves external provenance.
 // Flow contract: Communication ingestion persists authorized resources and
 // returns independent per-entry outcomes for mixed clinical batch operations.
 // Authorization invariant: only the exact subject's creator or the same
