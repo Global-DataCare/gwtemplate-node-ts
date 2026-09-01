@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Publish the validated GW CORE `1.23.9` image built from commit `cc1cfdb` to
+  the public GHCR package and pin every public host guide to its immutable OCI
+  manifest digest.
+
 - Require host commercial routes to carry the deployment's exact
   `networkKind`. The shared segment is `businessSectorOrNetworkKind`: tenant
   routes carry a business sector, while `test`, `local-network`,

@@ -10,7 +10,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PACKAGE_PAGE="https://github.com/orgs/Global-DataCare/packages/container/package/gw-core"
-PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:cebed0ecfd7e509ec26974fb9808a79ade6355fa7bd786c5694babd2ce3300c5"
+PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:3c2c4eade8123d7e3b1a40fc5d32864dd685603dcbe09a9e44393f60864a626f"
 CCAAS_PACKAGE_PAGE="https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime"
 CCAAS_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
 
@@ -43,7 +43,7 @@ grep -Fq 'CBOR' "$ROOT_DIR/docs-internal/BACKLOG.md"
 grep -Fq 'CCAAS' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 grep -Fq 'GW CORE y CCAAS son artefactos OCI distintos' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
-  | grep -Fq 'cebed0ecfd7e509ec26974fb9808a79ade6355fa7bd786c5694babd2ce3300c5'
+  | grep -Fq '3c2c4eade8123d7e3b1a40fc5d32864dd685603dcbe09a9e44393f60864a626f'
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
   | grep -Fq '67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac'
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
