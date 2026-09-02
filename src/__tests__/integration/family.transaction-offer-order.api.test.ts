@@ -20,6 +20,15 @@ import {
   FAMILY_ORDER_REQUEST,
   FAMILY_REGISTRATION_TRANSACTION_REQUEST,
 } from '../data/example-payloads';
+import {
+  EXAMPLE_JOB_IDENTIFIER_LICENSE_SEARCH,
+  EXAMPLE_THREAD_IDENTIFIER_LICENSE_SEARCH,
+  EXAMPLE_EMAIL_RELATED_PERSON,
+  EXAMPLE_RELATED_PERSON_ROLE,
+} from 'gdc-common-utils-ts/examples/shared';
+import { buildLicenseIssueEntry, LicenseEntryTypes } from 'gdc-common-utils-ts/utils/license';
+import { Format, JobAction, Resource, Section } from 'gdc-common-utils-ts/constants/Schemas';
+import { DeviceAppTypes, DeviceUserClasses } from 'gdc-common-utils-ts/constants/device';
 
 describe('Family transaction Offer/Order route story', () => {
   let harness: StoryHarness;
@@ -121,6 +130,67 @@ describe('Family transaction Offer/Order route story', () => {
     const orderEntry = orderPoll.body.data[0];
     expect(orderEntry.response.status).toBe('201');
     expect(orderEntry.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+
+    const licenseSearchPayload = {
+      thid: EXAMPLE_THREAD_IDENTIFIER_LICENSE_SEARCH,
+      jti: EXAMPLE_JOB_IDENTIFIER_LICENSE_SEARCH,
+      type: 'application/json',
+      body: {
+        data: [{
+          type: LicenseEntryTypes.Search,
+          resource: { meta: { claims: {} } },
+        }],
+      },
+    };
+    const licenseSearchSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: `/${tenantId}/cds-es/v1/health-care/${Section.INDIVIDUAL}/${Format.SCHEMA}/${Resource.LICENSE}/${JobAction.SEARCH}`,
+      headers: { 'content-type': 'application/json' },
+      body: licenseSearchPayload,
+    });
+    expect(licenseSearchSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+    const licenseSearchPoll = await pollJsonBody(
+      harness.app,
+      licenseSearchSubmit.headers.location,
+      licenseSearchPayload.thid,
+    );
+    expect(licenseSearchPoll.status).toBe(200);
+    expect(licenseSearchPoll.body.data[0].response.status).toBe('200');
+
+    const licenseIssueEntry = buildLicenseIssueEntry({
+      email: EXAMPLE_EMAIL_RELATED_PERSON,
+      role: EXAMPLE_RELATED_PERSON_ROLE,
+      userClass: DeviceUserClasses.Individual,
+      type: DeviceAppTypes.Mobile,
+    });
+    const licenseIssuePayload = {
+      thid: `${EXAMPLE_THREAD_IDENTIFIER_LICENSE_SEARCH}-issue`,
+      jti: `${EXAMPLE_JOB_IDENTIFIER_LICENSE_SEARCH}-issue`,
+      type: 'application/json',
+      body: {
+        data: [{
+          type: licenseIssueEntry.type,
+          request: licenseIssueEntry.request,
+          resource: { meta: { claims: licenseIssueEntry.meta.claims } },
+        }],
+      },
+    };
+    const licenseIssueSubmit = await invokeExpress(harness.app, {
+      method: 'POST',
+      url: `/${tenantId}/cds-es/v1/health-care/${Section.INDIVIDUAL}/${Format.SCHEMA}/${Resource.LICENSE}/_issue`,
+      headers: { 'content-type': 'application/json' },
+      body: licenseIssuePayload,
+    });
+    expect(licenseIssueSubmit.status).toBe(202);
+    await harness.queueAdapter.waitForEmptyQueue();
+    const licenseIssuePoll = await pollJsonBody(
+      harness.app,
+      licenseIssueSubmit.headers.location,
+      licenseIssuePayload.thid,
+    );
+    expect(licenseIssuePoll.status).toBe(200);
+    expect(licenseIssuePoll.body.data[0].response.status).toBe('201');
 
     // A confirmed registration remains discoverable through its original
     // Offer projection. This catches pending -> active rewrites that preserve
