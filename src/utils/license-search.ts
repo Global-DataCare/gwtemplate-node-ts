@@ -27,6 +27,11 @@ export type LicenseSearchRepository = {
   getContainersInSection(vaultId: string, sectionId: string): Promise<unknown[] | undefined>;
 };
 
+export type LicenseDocumentUnprotector = (
+  document: ConfidentialStorageDoc,
+  tenantVaultId: string,
+) => Promise<DeviceLicense & Record<string, unknown>>;
+
 /**
  * Extracts current GW license filters from either:
  * - a FHIR-like `Bundle.entry[].request.url + Parameters` envelope
@@ -90,17 +95,33 @@ export function extractLicenseSearchMetaClaims(entry: BundleEntry | Record<strin
  * GW currently returns the full matching set. Introduce page/limit/date-range
  * semantics only after shared `common-utils` and BFF contracts define the
  * canonical UX-facing behavior.
+ *
+ * Protected post-DCR documents are opened by the process-owned tenant KMS
+ * callback before exact filtering. This helper never receives a key, never
+ * calls external KMS directly and never projects protected storage material.
  */
 export async function searchLicenseDocuments(
   repository: LicenseSearchRepository,
   tenantVaultId: string,
   filters: SearchFilters,
+  unprotect?: LicenseDocumentUnprotector,
 ): Promise<LicenseRow[]> {
-  const licenseDocs =
+  const storedDocuments =
     (await repository.getContainersInSection(
       tenantVaultId,
       getEnvSectionId('device-licenses'),
     )) as ConfidentialStorageDoc[] || [];
+  const licenseDocs = await Promise.all(storedDocuments.map(async (document) => {
+    if (isDeviceLicense(document.content)) return document;
+    if (!unprotect) {
+      throw new Error('Encrypted device license cannot be searched without KMS.');
+    }
+    const content = await unprotect(document, tenantVaultId);
+    if (!isDeviceLicense(content)) {
+      throw new Error('Decrypted device license has an invalid shape.');
+    }
+    return { ...document, content };
+  }));
 
   return licenseDocs
     .filter((doc) => matchesLicenseFilters(doc?.content as DeviceLicense & Record<string, any>, filters))
@@ -137,6 +158,14 @@ export async function searchLicenseDocuments(
         },
       };
     });
+}
+
+function isDeviceLicense(value: unknown): value is DeviceLicense & Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.id === 'string'
+    && typeof candidate.userClass === 'string'
+    && typeof candidate.status === 'string';
 }
 
 /**
