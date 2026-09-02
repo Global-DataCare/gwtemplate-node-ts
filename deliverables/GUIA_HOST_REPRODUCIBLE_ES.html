@@ -21,7 +21,7 @@
   <h2>Imágenes OCI públicas verificadas</h2>
   <ul>
     <li>GW CORE: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/gw-core">https://github.com/orgs/Global-DataCare/packages/container/package/gw-core</a>:
-      <code>ghcr.io/global-datacare/gw-core@sha256:3c2c4eade8123d7e3b1a40fc5d32864dd685603dcbe09a9e44393f60864a626f</code>.</li>
+      <code>ghcr.io/global-datacare/gw-core@sha256:e09bc2bc86d50cccdec57e9b5fa9862cd6404e10305b6b9c33073f2cc5c8b632</code>.</li>
     <li>Runtime CCAAS: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime">https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime</a>:
       <code>ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac</code>.</li>
   </ul>
@@ -196,7 +196,7 @@ CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
 helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.0</pre>
   <p>El chart OCI es el mismo artefacto validado en local-network. Los values,
   Secrets, grants, MSP/TLS y package IDs se generan de nuevo para cada entorno.</p>
-  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:3c2c4eade8123d7e3b1a40fc5d32864dd685603dcbe09a9e44393f60864a626f"
+  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e09bc2bc86d50cccdec57e9b5fa9862cd6404e10305b6b9c33073f2cc5c8b632"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
