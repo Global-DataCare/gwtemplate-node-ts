@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Flow contract:
 # 1. The authority accepts only an authorization bound to a Host VC.
-# 2. Fabric CA registration creates a two-enrollment grant with an explicit expiry.
+# 2. Fabric CA registration creates a two-enrollment grant with an explicit expiry of up to 72 hours.
 # 3. The host rejects an expired grant before creating private-key directories.
 # Authorization invariant: neither controller approval alone nor an expired grant can enroll a peer.
 # Persistence invariant: secrets are mode 0600 and are never written to stdout.
@@ -52,6 +52,20 @@ jq -e '
 ! grep -Fq 'enrollmentSecret' "${stderr}"
 credential_digest="$(printf '%s' 'urn:uuid:10000000-0000-4000-8000-000000000001' | shasum -a 256 | awk '{print $1}')"
 grep -Fq -- "gdc.hostCredentialSha256=${credential_digest}:ecert" "${WORK}/calls.log"
+
+weekend_grant="${WORK}/weekend-grant.json"
+PATH="${WORK}/bin:${PATH}" \
+FAKE_FABRIC_CA_CALLS="${WORK}/weekend-calls.log" \
+AUTHORIZATION_JSON="${WORK}/authorization.json" \
+CA_URL="https://fabric-ca.example.invalid:7054" \
+CA_ADMIN_HOME="${WORK}/ca-admin" \
+ENROLLMENT_OUTPUT_FILE="${weekend_grant}" \
+HOST_ENROLLMENT_ID='host-weekend-window' \
+ENROLLMENT_GRANT_TTL_SECONDS=259200 \
+NOW_EPOCH_SECONDS=1785315960 \
+  bash "${ROOT}/scripts/enrollment/register-host-enrollment.sh"
+jq -e '.expiresAt == "2026-08-01T09:06:00Z" and .maxEnrollments == 2' \
+  "${weekend_grant}" >/dev/null
 
 NOW_EPOCH_SECONDS=1785316861 \
 ENROLLMENT_GRANT_FILE="${grant}" \

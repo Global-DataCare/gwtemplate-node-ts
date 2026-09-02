@@ -1,33 +1,34 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 /**
  * Journey:
- * 1. The host operator generates one P-384 bootstrap identity under private custody.
- * 2. The public DID document is delivered to the data-space ICA authority for pinning.
- * 3. The operator submits the exact approved host metadata and route in a signed request.
+ * 1. The host operator receives one activation file from the data-space ICA operator.
+ * 2. The host generates one P-384 request-signing key under private custody.
+ * 3. The operator submits the exact approved host metadata, activation and signed request.
  * 4. The ICA returns the HostingServiceCredential as JSON VC and compact VC-JWT.
- * Authorization invariant: the request signature binds domain, controller, legal identity, sector and network.
- * Persistence invariant: private JWK and returned credential bundle are mode 0600 and never printed.
+ * Authorization invariant: activation and signature bind domain, controller, legal identity, sector and network.
+ * Persistence invariant: activation, private JWK and returned credential bundle are mode 0600 and never printed.
  */
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
-  initializeHostBootstrapIdentity,
+  initializeHostRequestKey,
   requestHostCredential,
 } from '../request-host-credential.mjs';
 
-test('generates the host identity and obtains a governed Host VC without a PDF', async (t) => {
+test('uses one activation and a locally generated request key to obtain a governed Host VC without a PDF', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'host-credential-bootstrap-'));
   const privateJwkFile = join(root, 'host-signing.private.jwk.json');
-  const didDocumentFile = join(root, 'did.json');
+  const activationFile = join(root, 'host-activation.json');
   const credentialOutputFile = join(root, 'host-credential.json');
   const hostDomain = 'host.provider.example';
   const controllerEmail = 'controller@provider.example';
   const organizationTaxId = 'VAT-EXAMPLE-001';
   const received = [];
+  const receivedAuthorization = [];
   const server = createServer((request, response) => {
     if (request.method === 'POST') {
       let body = '';
@@ -35,6 +36,7 @@ test('generates the host identity and obtains a governed Host VC without a PDF',
       request.on('data', (chunk) => { body += chunk; });
       request.on('end', () => {
         received.push(JSON.parse(body));
+        receivedAuthorization.push(request.headers.authorization);
         response.writeHead(202, { location: '/jobs/host-credential-001' });
         response.end();
       });
@@ -61,11 +63,43 @@ test('generates the host identity and obtains a governed Host VC without a PDF',
   const address = server.address();
   assert.ok(address && typeof address === 'object');
 
-  await initializeHostBootstrapIdentity({ hostDomain, privateJwkFile, didDocumentFile });
-  const didDocument = JSON.parse(await readFile(didDocumentFile, 'utf8'));
-  assert.equal(didDocument.id, `did:web:${hostDomain}`);
-  assert.equal('d' in didDocument.verificationMethod[0].publicKeyJwk, false);
+  await writeFile(activationFile, JSON.stringify({
+    domain: hostDomain,
+    networkKind: 'network',
+    expiresAt: '2099-09-05T12:00:00.000Z',
+    approval: {
+      jurisdiction: 'ES',
+      sector: 'health-care',
+      legalName: 'Example Hosting Provider',
+      addressCountry: 'ES',
+      controllerEmail,
+      serviceUrl: `https://${hostDomain}`,
+      taxId: organizationTaxId,
+    },
+    activationCode: 'ica_host_test_activation_code',
+  }), { mode: 0o600 });
+  await initializeHostRequestKey({ hostDomain, privateJwkFile });
   assert.equal((await stat(privateJwkFile)).mode & 0o777, 0o600);
+
+  await assert.rejects(
+    requestHostCredential({
+      verifyUrl: `http://127.0.0.1:${address.port}/ica/cds-ES/v1/health-care/network/pdf/contract/_verify`,
+      hostDomain,
+      serviceUrl: `https://${hostDomain}`,
+      jurisdiction: 'ES',
+      sector: 'health-care',
+      networkKind: 'network',
+      legalName: 'Example Hosting Provider',
+      addressCountry: 'ES',
+      taxId: organizationTaxId,
+      controllerEmail: 'different-controller@provider.example',
+      privateJwkFile,
+      activationFile,
+      credentialOutputFile,
+    }),
+    /does not match the approved host data/i,
+  );
+  assert.equal(received.length, 0);
 
   await requestHostCredential({
     verifyUrl: `http://127.0.0.1:${address.port}/ica/cds-ES/v1/health-care/network/pdf/contract/_verify`,
@@ -79,10 +113,12 @@ test('generates the host identity and obtains a governed Host VC without a PDF',
     taxId: organizationTaxId,
     controllerEmail,
     privateJwkFile,
+    activationFile,
     credentialOutputFile,
   });
 
   assert.equal(received.length, 1);
+  assert.deepEqual(receivedAuthorization, ['HostActivation ica_host_test_activation_code']);
   assert.equal(received[0].iss, `did:web:${hostDomain}`);
   assert.equal(received[0].body.data[0].resource.meta.claims['org.schema.Service.owner.email'], controllerEmail);
   assert.equal(received[0].body.data[0].resource.meta.claims['org.schema.Organization.taxID'], organizationTaxId);

@@ -7687,6 +7687,23 @@
         "x-profile": "core"
       }
     },
+    "/.well-known/did.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Resolve the operational DID document of the host",
+        "responses": {
+          "200": {
+            "description": "Host DID document generated from its runtime KMS keys"
+          },
+          "503": {
+            "description": "Host bootstrap has not completed"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/tenant-status.json": {
       "get": {
         "tags": [

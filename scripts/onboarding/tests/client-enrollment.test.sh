@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Flow contract:
 # 1. the authority registers a one-use Fabric client identity bound to the authorized Host VC;
-# 2. the host generates the GW client private key locally and receives its certificate;
-# 3. a mode-0600 dotenv file points GW at its own MSP peer without copying either grant.
+# 2. an approved handoff window may last up to 72 hours without increasing that one-use limit;
+# 3. the host generates the GW client private key locally and receives its certificate;
+# 4. a mode-0600 dotenv file points GW at its own MSP peer without copying either grant.
 # Authorization invariant: client MSP, host URL, network and Host VC identifier come from authorization.json.
 # Persistence invariant: the resulting client MSP and dotenv survive pod replacement through host-owned Secret custody.
 set -euo pipefail
@@ -55,6 +56,19 @@ grep -Fq -- '--id.type client' "${WORK}/ca.calls"
 credential_digest="$(printf '%s' 'urn:uuid:host-credential' | shasum -a 256 | awk '{print $1}')"
 grep -Fq -- "gdc.hostCredentialSha256=${credential_digest}:ecert" "${WORK}/ca.calls"
 ! grep -Fq -- 'gdc.hostCredentialId=' "${WORK}/ca.calls"
+
+AUTHORIZATION_JSON="${WORK}/authorization.json" \
+CA_URL="https://fabric-ica.example.invalid:7054" \
+CA_ADMIN_HOME="${WORK}/ca-admin" \
+CLIENT_ENROLLMENT_OUTPUT_FILE="${WORK}/weekend-client-grant.json" \
+HOST_CLIENT_ENROLLMENT_ID='host-gw-weekend-window' \
+HOST_CLIENT_ENROLLMENT_SECRET='weekend-client-secret' \
+ENROLLMENT_GRANT_TTL_SECONDS=259200 \
+NOW_EPOCH_SECONDS=1700000000 \
+  bash "${ROOT}/scripts/enrollment/register-host-client-enrollment.sh"
+jq -e '
+  .expiresAt == "2023-11-17T22:13:20Z" and .maxEnrollments == 1
+' "${WORK}/weekend-client-grant.json" >/dev/null
 
 ENROLLMENT_GRANT_FILE="${WORK}/client-grant.json" \
 HOST_CLIENT_OUTPUT_DIR="${WORK}/gw-client" \

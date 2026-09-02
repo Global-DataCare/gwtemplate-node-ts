@@ -98,9 +98,53 @@ El inventario fija URL, `mspId`, orderer, bootstrap peers, canales, namespace,
 release, StorageClass, IngressClass, DNS/TLS, digests OCI, package IDs CCAAS,
 adaptador KMS, backups, observabilidad, NetworkPolicies y puertos.
 
-## 5. Fase A: autoridad y Fabric ICA
+Los values también fijan `host.adminEmail`, `host.adminUid` y
+`host.adminRole`: son el controller inicial del registro técnico reservado
+`host`. GW genera sus claves operativas mediante KMS y publica el DID raíz en
+`/.well-known/did.json`. Este registro del operador no es un tenant de negocio;
+la misma organización puede darse de alta después como primer tenant en uno de
+los `host.allowedSectors` autorizados.
 
-### 5.1 Apertura controlada y comprobación desde el proveedor
+## 5. Activación y HostingServiceCredential
+
+La preautorización del dominio y la red no sustituye la prueba de posesión de
+clave. Para evitar un `did.json` provisional, el operador de la ICA crea una
+activación de un solo uso desde el pod que comparte la base de datos de la ICA:
+
+```bash
+export HOST_HANDOFF_DIR="${HOME}/gdc-host-handoff"
+install -d -m 700 "${HOST_HANDOFF_DIR}"
+
+cp configs/host-activation-approval.example.json \
+  "${HOST_HANDOFF_DIR}/approved-host.json"
+chmod 600 "${HOST_HANDOFF_DIR}/approved-host.json"
+
+kubectl --context '<contexto>' --namespace '<namespace-ica>' \
+  exec -i deployment/<deployment-ica> -- \
+  node ./bin/ica-cli.js host:activation:create \
+    --approval-stdin \
+    --expires-in 72h \
+    --created-by '<id-estable-operador-ica>' \
+  < "${HOST_HANDOFF_DIR}/approved-host.json" \
+  > "${HOST_HANDOFF_DIR}/host-activation.json"
+
+chmod 600 "${HOST_HANDOFF_DIR}/host-activation.json"
+```
+
+La copia privada de `approved-host.json` contiene los datos ya aprobados de
+dominio, URL, red, jurisdicción, contexto, identidad legal y controller. `<`
+los envía por entrada estándar sin copiarlos al disco del pod. `>` pertenece al
+shell que ejecuta `kubectl`: el fichero de activación queda en el ordenador del
+operador, no en el pod. La base de datos conserva el hash, los datos aprobados,
+la caducidad y el estado, pero nunca el código original. El operador entrega el
+fichero cifrado al proveedor; el asistente rechaza cualquier cambio respecto de
+la aprobación, genera localmente la clave y ejecuta la solicitud. Esta lleva la
+JWK pública, `kid` y JWS; `thid` solo consulta el trabajo asíncrono. La ICA
+consume la activación y emite la Host VC sin PDF.
+
+## 6. Fase A: autoridad y Fabric ICA
+
+### 6.1 Apertura controlada y comprobación desde el proveedor
 
 La ICA de Fabric no participa en el tráfico normal de gossip, endoso, canales
 o consenso. Se necesita para alta inicial, renovación, revocación e
@@ -127,9 +171,11 @@ La autoridad registra los identificadores y secretos acotados; el proveedor
 los consume para generar sus claves privadas y certificados en su propia
 infraestructura.
 
-La autoridad recibe por canal seguro la petición con URL/MSP/Host VC-JWT, el
-envelope de gobernanza firmado, DID públicos, JWKS del operador y el inventario
-gobernado. Primero revisa el plan:
+El administrador de Fabric recibe por canal seguro la petición con
+URL/MSP/Host VC-JWT y reúne, bajo su propia custodia, el envelope de gobernanza
+firmado, el DID del controller de gobernanza, el DID de la ICA emisora, los
+JWKS del operador autorizado y el inventario de Fabric. No necesita un DID
+público previo del nuevo host. Primero revisa el plan:
 
 ```bash
 request_id="$(jq -r '.governanceDecision.decision.requestId' \
@@ -154,7 +200,14 @@ Ambos contienen `issuedAt`/`expiresAt`. La fecha es una ventana aplicada por
 estos helpers; Fabric CA garantiza sus límites de usos. La autoridad revoca
 cualquier identificador que no se consuma dentro de la ventana.
 
-## 6. Fase B: proveedor del host
+La ventana predeterminada es de 15 minutos y puede ampliarse hasta 72 horas con
+`ENROLLMENT_GRANT_TTL_SECONDS=259200` para una entrega operativa acordada, sin
+aumentar `maxEnrollments`: dos usos para MSP/TLS del peer y uno para el cliente
+GW. Como `expiresAt` es una comprobación del helper y no una caducidad impuesta
+por Fabric CA al secreto registrado, la autoridad debe revocar al cerrar la
+ventana cualquier identificador no consumido.
+
+## 7. Fase B: proveedor del host
 
 Se transfieren únicamente los dos grants `0600` y la cadena TLS pública de Fabric CA.
 El proveedor ejecuta plan y aplicación:
@@ -215,7 +268,7 @@ cd /secure/host/helm-runtime
 shasum -a 256 -c manifest.sha256
 ```
 
-## 7. Imágenes OCI y package IDs CCAAS
+## 8. Imágenes OCI y package IDs CCAAS
 
 GW CORE no se publica en npm. La versión verificada está disponible en la
 [página pública del paquete GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core).
@@ -258,7 +311,7 @@ empleados usan `identity-eu`, personas `identity-global` y el contrato de
 consentimiento `health-care-eu`; cualquier cambio debe proceder del inventario
 gobernado, no del proveedor.
 
-## 8. Secrets e instalación Helm
+## 9. Secrets e instalación Helm
 
 Parta del fichero Fabric generado y añada únicamente la configuración privada
 del despliegue en una copia bajo custodia del host:
@@ -302,8 +355,8 @@ helm template "${HELM_RELEASE}" charts/gdc-host \
   --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml > /secure/onboarding/rendered.yaml
 
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
-tar -xzf gdc-host-0.3.0.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.1
+tar -xzf gdc-host-0.3.1.tgz -C /secure/onboarding
 
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
@@ -315,7 +368,7 @@ No instale si el render contiene Secrets, VC-JWT, PDF, claves o imágenes sin
 digest. En producción cada pod desenvuelve una vez la KEK de runtime mediante
 el adaptador KMS; `KEK_SECRET` solo es válido en local/demo.
 
-## 9. Gobernanza de Fabric
+## 10. Gobernanza de Fabric
 
 El operador revisa primero:
 
@@ -344,7 +397,7 @@ El reconciliador re-inspecciona cada paso, es idempotente, conserva estado y
 escribe auditoría JSONL. Si falta un comando real, falla cerrado; un mock no es
 válido como prueba de aceptación externa.
 
-## 10. Aceptación
+## 11. Aceptación
 
 ```bash
 kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" get pods,pvc,svc

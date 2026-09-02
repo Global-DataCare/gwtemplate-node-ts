@@ -21,6 +21,12 @@ Texto de transferencia para el equipo responsable:
 > Herramienta de bootstrap y solicitud de Host VC:
 > https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/scripts/onboarding/request-host-credential.mjs
 >
+> La ICA genera desde su pod una activación de un solo uso ligada al dominio,
+> red, identidad legal, controller, jurisdicción y contexto aprobados. La
+> entrada se lee del ordenador mediante `kubectl exec -i`; la salida se captura
+> en ese mismo ordenador, se entrega cifrada al DevOps del host y sustituye
+> cualquier intercambio de un `did.json` provisional.
+>
 > Chart Helm público:
 > https://github.com/orgs/Global-DataCare/packages/container/package/gdc-host
 

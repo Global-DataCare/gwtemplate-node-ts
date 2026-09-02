@@ -6,6 +6,9 @@ host:
   publicUrl: http://host2.localhost
   legalName: Local Host 2
   idValue: host2.localhost
+  adminEmail: controller@host2.localhost
+  adminUid: host2-controller-001
+  adminRole: ISCO-08|1120
   storageScope: host2
   allowedSectors: [onehealth-research]
   identityChannel: identity-local

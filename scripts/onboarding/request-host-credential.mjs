@@ -47,28 +47,52 @@ async function writePrivateJson(path, value, exclusive = false) {
   await chmod(path, 0o600);
 }
 
-export async function initializeHostBootstrapIdentity(input) {
+/** Generates the private ES384 key used only to sign the activated host request. */
+export async function initializeHostRequestKey(input) {
   const hostDomain = normalizeDomain(input.hostDomain);
   const privateJwkFile = required(input.privateJwkFile, 'privateJwkFile');
-  const didDocumentFile = required(input.didDocumentFile, 'didDocumentFile');
   const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-384' });
   const privateKeyJwk = privateKey.export({ format: 'jwk' });
   const kid = `did:web:${hostDomain}#host-signing-es384-001`;
   await writePrivateJson(privateJwkFile, { ...privateKeyJwk, kid, alg: 'ES384', use: 'sig' }, true);
-  const document = {
-    '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/jwk/v1'],
-    id: `did:web:${hostDomain}`,
-    verificationMethod: [{
-      id: kid,
-      type: 'JsonWebKey2020',
-      controller: `did:web:${hostDomain}`,
-      publicKeyJwk: { ...publicJwk(privateKeyJwk), kid, alg: 'ES384', use: 'sig' },
-    }],
-    assertionMethod: [kid],
-    authentication: [kid],
+  return { kid, publicKeyJwk: publicJwk(privateKeyJwk) };
+}
+
+async function loadHostActivation(input, hostDomain, networkKind) {
+  const activation = JSON.parse(await readFile(required(input.activationFile, 'activationFile'), 'utf8'));
+  const activationCode = required(activation.activationCode, 'activationCode');
+  if (normalizeDomain(activation.domain) !== hostDomain) {
+    throw new Error('Host activation domain does not match hostDomain.');
+  }
+  if (required(activation.networkKind, 'activation networkKind').toLowerCase() !== networkKind) {
+    throw new Error('Host activation networkKind does not match the request.');
+  }
+  const expiresAt = Date.parse(required(activation.expiresAt, 'activation expiresAt'));
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
+    throw new Error('Host activation has expired.');
+  }
+  const approval = activation.approval;
+  if (!approval || typeof approval !== 'object' || Array.isArray(approval)) {
+    throw new Error('Host activation must contain the approved host data.');
+  }
+  const expectedApproval = {
+    jurisdiction: required(input.jurisdiction, 'jurisdiction').toUpperCase(),
+    sector: required(input.sector, 'sector').toLowerCase(),
+    legalName: required(input.legalName, 'legalName'),
+    addressCountry: required(input.addressCountry, 'addressCountry').toUpperCase(),
+    controllerEmail: required(input.controllerEmail, 'controllerEmail').toLowerCase(),
+    serviceUrl: assertServiceUrl(input.serviceUrl, hostDomain),
+    ...(input.taxId
+      ? { taxId: String(input.taxId).trim() }
+      : {
+          identifierType: required(input.identifierType, 'identifierType'),
+          identifierValue: required(input.identifierValue, 'identifierValue'),
+        }),
   };
-  await writeFile(didDocumentFile, `${JSON.stringify(document, null, 2)}\n`, { mode: 0o644, flag: 'wx' });
-  return document;
+  if (JSON.stringify(approval) !== JSON.stringify(expectedApproval)) {
+    throw new Error('Host manifest does not match the approved host data in the activation.');
+  }
+  return activationCode;
 }
 
 function findCredentialPayload(value) {
@@ -103,12 +127,13 @@ async function readJsonResponse(response, label) {
   }
 }
 
-async function submitAndPoll(verifyUrl, envelope, fetchImpl) {
+async function submitAndPoll(verifyUrl, envelope, activationCode, fetchImpl) {
   const response = await fetchImpl(verifyUrl, {
     method: 'POST',
     headers: {
       accept: 'application/json',
       'content-type': 'application/didcomm-plain+json',
+      authorization: `HostActivation ${activationCode}`,
     },
     body: JSON.stringify(envelope),
   });
@@ -137,6 +162,7 @@ export async function requestHostCredential(input, fetchImpl = fetch) {
   if (!['local-network', 'test-network', 'network'].includes(networkKind)) {
     throw new Error('networkKind must be local-network, test-network or network.');
   }
+  const activationCode = await loadHostActivation(input, hostDomain, networkKind);
   const privateJwk = JSON.parse(await readFile(required(input.privateJwkFile, 'privateJwkFile'), 'utf8'));
   const kid = required(privateJwk.kid, 'private JWK kid');
   const issuerDid = `did:web:${hostDomain}`;
@@ -179,7 +205,7 @@ export async function requestHostCredential(input, fetchImpl = fetch) {
       hostAuthorizationProof: { jws: `${protectedSegment}.${payloadSegment}.${signatureSegment}` },
     },
   };
-  const response = await submitAndPoll(verifyUrl, envelope, fetchImpl);
+  const response = await submitAndPoll(verifyUrl, envelope, activationCode, fetchImpl);
   const result = findCredentialPayload(response);
   await writePrivateJson(required(input.credentialOutputFile, 'credentialOutputFile'), result, true);
   return result;
@@ -202,8 +228,8 @@ async function main(argv) {
   const options = parseArgs(argv);
   const manifest = JSON.parse(await readFile(required(options.manifest, '--manifest'), 'utf8'));
   if (options.init) {
-    await initializeHostBootstrapIdentity(manifest);
-    process.stderr.write(`Public DID document created at ${manifest.didDocumentFile}. Keep the private JWK under host custody.\n`);
+    await initializeHostRequestKey(manifest);
+    process.stderr.write(`Private host request-signing key created at ${manifest.privateJwkFile}. Keep it under host custody.\n`);
   } else {
     await requestHostCredential(manifest);
     process.stderr.write(`HostingServiceCredential written privately to ${manifest.credentialOutputFile}.\n`);

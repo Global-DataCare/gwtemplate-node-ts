@@ -8,7 +8,8 @@ migración ni un despliegue productivo.
 
 Demuestra con datos sintéticos:
 
-1. ICA del espacio de datos y emisión de una Host VC;
+1. ICA del espacio de datos, activación de host de un solo uso y emisión de
+   una Host VC sin PDF ni DID provisional;
 2. Root CA e ICA de Fabric desechables;
 3. admisión de `Host2MSP` en una red inicialmente formada por `Host1MSP`;
 4. instalación mediante el chart `gdc-host` en kind;

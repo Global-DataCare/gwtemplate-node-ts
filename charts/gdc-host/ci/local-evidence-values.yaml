@@ -10,6 +10,9 @@ host:
   jurisdiction: ES
   idType: DOMAIN
   idValue: host-evidence.localhost
+  adminEmail: controller@host-evidence.localhost
+  adminUid: host-evidence-controller-001
+  adminRole: ISCO-08|1120
   storageScope: host-evidence
   allowedSectors: [health-care, onehealth-research]
   identityChannel: identity-local

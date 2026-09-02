@@ -2,7 +2,7 @@ apiVersion: v2
 name: gdc-host
 description: Portable governed Fabric peer and GW host runtime
 type: application
-version: 0.3.0
-appVersion: "0.3.0"
+version: 0.3.1
+appVersion: "0.3.1"
 annotations:
   org.opencontainers.image.source: https://github.com/Global-DataCare/gwtemplate-node-ts

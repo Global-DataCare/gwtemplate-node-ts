@@ -18,6 +18,9 @@ host:
   jurisdiction: ES
   idType: DOMAIN
   idValue: host.example.invalid
+  adminEmail: controller@host.example.invalid
+  adminUid: host-controller-001
+  adminRole: ISCO-08|1120
   storageScope: host
   allowedSectors:
     - onehealth-research

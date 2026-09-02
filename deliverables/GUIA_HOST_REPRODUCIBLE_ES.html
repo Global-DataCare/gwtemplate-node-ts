@@ -192,8 +192,8 @@ CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
   <code>manifest.sha256</code>.</p>
 
   <h2>11. Imagen OCI, values y package IDs</h2>
-  <pre>helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
-helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.0</pre>
+  <pre>helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.1
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.1</pre>
   <p>El chart OCI es el mismo artefacto validado en local-network. Los values,
   Secrets, grants, MSP/TLS y package IDs se generan de nuevo para cada entorno.</p>
   <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e09bc2bc86d50cccdec57e9b5fa9862cd6404e10305b6b9c33073f2cc5c8b632"
@@ -230,8 +230,8 @@ REDIS_SECRET_ENV_FILE=/secure/host/redis.env \
   bash scripts/onboarding/materialize-kubernetes-secrets.sh
 bash scripts/validate-host-helm-values.sh \
   /secure/inventory/host.values.yaml "${KUBE_NAMESPACE}" "${HELM_RELEASE}"
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
-tar -xzf gdc-host-0.3.0.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.1
+tar -xzf gdc-host-0.3.1.tgz -C /secure/onboarding
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml \

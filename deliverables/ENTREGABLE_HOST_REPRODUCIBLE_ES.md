@@ -50,6 +50,8 @@ La secuencia objetivo de incorporación de un host autónomo es:
 ```text
 Autorización del host
         ↓
+Activación de un solo uso ligada a dominio y red
+        ↓
 HostingServiceCredential (VC JSON y VC-JWT)
         ↓
 Registro gobernado en la ICA de Fabric
@@ -97,10 +99,12 @@ localmente las claves privadas MSP/TLS y cliente GW; únicamente las CSR salen
 del host y únicamente los certificados firmados regresan.
 
 Para `local-network`, un dominio configurado previamente en la ICA del espacio
-de datos puede obtener la credencial sin PDF. La petición sigue firmada por la
-clave ES384 publicada en su `did:web`, y la evidencia registra el digest de esa
-autorización sin inventar PDF, PAdES ni objeto IPFS. En producción se aplica la
-política de evidencia aprobada para el participante.
+de datos puede obtener la credencial sin PDF. El operador de la ICA crea una
+activación de un solo uso y la petición incluye la JWK pública y una firma
+ES384 de la clave privada que permanece en el host. La evidencia registra el
+digest de esa autorización sin inventar PDF, PAdES, DID provisional ni objeto
+IPFS. En producción se aplica la misma separación con una activación y claves
+nuevas.
 
 ## Requisitos
 

@@ -763,6 +763,28 @@ export function createDiscoveryRouter(
   const tenantWellKnownPrefix = '/:tenantId/cds-:jurisdiction/:version/:sector/.well-known';
   const tenantControllerDidPrefix = '/:tenantId/cds-:jurisdiction/:version/:sector/employee/:memberId/:role';
 
+  /**
+   * Publishes the canonical root DID document for the host domain. A host DID
+   * such as `did:web:host.example` resolves at this root URL; the contextual
+   * host route remains available for CDS-aware clients.
+   *
+   * @openapi
+   * /.well-known/did.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Resolve the operational DID document of the host
+   *     responses:
+   *       '200': { description: Host DID document generated from its runtime KMS keys }
+   *       '503': { description: Host bootstrap has not completed }
+   */
+  router.get('/.well-known/did.json', async (_req, res) => {
+    const didDocument = await tenantsCacheManager.getDidDocument('host');
+    if (!didDocument?.id) {
+      return res.status(503).type('text').send('Service Unavailable: Host configuration not loaded.');
+    }
+    return res.json(didDocument);
+  });
+
   router.get(
     [`${hostPingPrefix}/ping`, `${hostScopedWellKnownPrefix}/ping`, `${tenantWellKnownPrefix}/ping`],
     resolveTenant,

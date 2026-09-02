@@ -20,8 +20,8 @@ credential_digest="$(printf '%s' "${credential_id}" | shasum -a 256 | awk '{prin
 now_epoch_seconds="${NOW_EPOCH_SECONDS:-$(date -u +%s)}"
 grant_ttl_seconds="${ENROLLMENT_GRANT_TTL_SECONDS:-900}"
 if ! [[ "${now_epoch_seconds}" =~ ^[0-9]+$ && "${grant_ttl_seconds}" =~ ^[0-9]+$ ]] \
-  || (( grant_ttl_seconds < 60 || grant_ttl_seconds > 3600 )); then
-  echo "ENROLLMENT_GRANT_TTL_SECONDS must be an integer between 60 and 3600" >&2
+  || (( grant_ttl_seconds < 60 || grant_ttl_seconds > 259200 )); then
+  echo "ENROLLMENT_GRANT_TTL_SECONDS must be an integer between 60 and 259200" >&2
   exit 1
 fi
 issued_at="$(node -e 'process.stdout.write(new Date(Number(process.argv[1]) * 1000).toISOString().replace(".000Z", "Z"))' "${now_epoch_seconds}")"
@@ -63,4 +63,4 @@ jq -n \
   }' > "${ENROLLMENT_OUTPUT_FILE}"
 chmod 600 "${ENROLLMENT_OUTPUT_FILE}"
 
-echo "One-time host enrollment grant written to ${ENROLLMENT_OUTPUT_FILE}" >&2
+echo "Bounded two-use peer MSP/TLS enrollment grant written to ${ENROLLMENT_OUTPUT_FILE}" >&2
