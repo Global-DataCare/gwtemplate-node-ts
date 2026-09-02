@@ -33,6 +33,8 @@
   execute destructive individual and host cleanup in a second fresh runtime so
   sibling journeys cannot leave descendants behind or hide an incomplete end,
   while retaining both the governed transaction and legacy ICA-proof paths.
+- Pin public GW CORE examples and host handoff documents to the independently
+  published 1.23.13 OCI manifest digest.
 
 ## [1.23.12] - 2026-09-01
 
