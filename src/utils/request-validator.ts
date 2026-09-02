@@ -86,6 +86,17 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
       normalizedAction === '_search' &&
       configuredResources.includes('employee') &&
       actions.includes('_search');
+    const legacyIndividualCommercialLicenseSelection =
+      normalizedSection === 'individual' &&
+      normalizedFormat === 'org.schema' &&
+      normalizedResourceType === 'license' &&
+      configuredResources.includes('offer') &&
+      configuredResources.includes('order') &&
+      actions.includes('_search');
+    const legacyIndividualLicenseInventorySelection =
+      legacyIndividualCommercialLicenseSelection && normalizedAction === '_search';
+    const legacyIndividualMemberLicenseIssueSelection =
+      legacyIndividualCommercialLicenseSelection && normalizedAction === '_issue';
     const legacyDigitalTwinResearchSubjectDiscovery =
       normalizedSection === 'digitaltwin' &&
       normalizedResourceType === 'researchsubject' &&
@@ -97,6 +108,12 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
     // available without widening any mutation capability.
     const resourceAllowed = configuredResources.includes(normalizedResourceType)
       || legacyEmployeeLicenseInventorySelection
+      // Historical individual organizations published their commercial seat
+      // pool as Offer/Order search before License inventory became explicit.
+      || legacyIndividualLicenseInventorySelection
+      // The same historical pool supports the exact member invitation issue
+      // action; other licence mutations remain unavailable.
+      || legacyIndividualMemberLicenseIssueSelection
       // ResearchSubject replaced Composition as the public twin aggregate.
       // Treat the old read declaration as authorization for that read-only
       // replacement so existing tenants do not need reactivation or DCR.
@@ -120,6 +137,8 @@ export function isRequestValid(services: DidService[] | undefined, params: any):
     const actionAllowed = actions.includes(normalizedAction)
       || legacyDigitalTwinWorkingSelection
       || legacyEmployeeLicenseInventorySelection
+      || legacyIndividualLicenseInventorySelection
+      || legacyIndividualMemberLicenseIssueSelection
       || employeeWalletRecoverySelection;
     return actionAllowed;
   });

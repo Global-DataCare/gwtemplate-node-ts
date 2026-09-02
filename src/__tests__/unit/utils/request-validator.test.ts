@@ -251,6 +251,36 @@ describe('isRequestValid', () => {
     })).toBe(true);
   });
 
+  it('keeps individual member licence inventory readable for historical commercial service declarations', () => {
+    expect(isRequestValid(mockServices, {
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      resourceType: 'License',
+      action: '_search',
+    })).toBe(true);
+  });
+
+  it('keeps individual member invitation issuance available for historical commercial service declarations', () => {
+    expect(isRequestValid(mockServices, {
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      resourceType: 'License',
+      action: '_issue',
+    })).toBe(true);
+  });
+
+  it('does not widen historical individual commercial services to removed licence mutations', () => {
+    expect(isRequestValid(mockServices, {
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      resourceType: 'License',
+      action: '_add',
+    })).toBe(false);
+  });
+
   it('does not widen historical employee search into licence mutations', () => {
     expect(isRequestValid(mockServices, {
       sector: Sector.HEALTH_CARE,

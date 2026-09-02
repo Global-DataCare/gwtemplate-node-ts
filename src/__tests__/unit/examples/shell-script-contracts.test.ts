@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { readFileSync } from 'fs';
 import path from 'path';
 
@@ -51,5 +51,26 @@ describe('shell script payload contracts', () => {
     expect(bootstrapScript).toContain('organization Offer');
     expect(bootstrapScript).toContain('organization Order activation');
     expect(bootstrapScript).toContain('any(. == "201" or . == 201)');
+  });
+
+  it('fails closed on nested Organization errors', () => {
+    const bootstrapScript = readScript('scripts/bootstrap-single-tenant.sh');
+
+    expect(bootstrapScript).toContain('.body.data[0].response.outcome.issue[0].diagnostics');
+  });
+
+  it('exposes the mandatory Node 24 live-E2E runner and rejects skipped journeys', () => {
+    const liveRunner = readScript('scripts/run-secure-e2e-google-user.sh');
+
+    expect(liveRunner).toContain('NODE_MAJOR');
+    expect(liveRunner).toContain('LIVE_GW_API_SCRIPT:-api:local-demo');
+    expect(liveRunner).toContain('npm run "$GW_API_SCRIPT"');
+    expect(liveRunner).toContain('test:e2e:live-gw');
+    expect(liveRunner).toContain('LIVE_GW_ALLOW_HOST_TEARDOWN=0');
+    expect(liveRunner).toContain('RUN_LIVE_GW_E2E_PROFILE_RUNTIME=0');
+    expect(liveRunner).toContain('RUN_LIVE_GW_E2E_INDIVIDUAL_LIFECYCLE="$individual_lifecycle_enabled"');
+    expect(liveRunner).toContain('RUN_LIVE_GW_E2E_HOST_VERIFICATION_TRANSACTION="$host_verification_enabled"');
+    expect(liveRunner).toContain('LIVE_GW_E2E_SUITE=individual');
+    expect(liveRunner).toContain('SKIP');
   });
 });

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.23.13] - 2026-09-02
+
 - Keep permission requests as auditable `Communication` attachments containing
   canonical FHIR `Consent.status = draft` Bundles. Draft entries remain in the
   individual inbox and cannot be projected as active authorization rules; no
@@ -9,6 +11,28 @@
 - Decrypt DCR-protected device-license documents inside the trusted tenant
   boundary before `License/_search` filtering and public projection, without
   exposing ciphertext or activation material.
+- Preserve individual member licence inventory and the exact invitation
+  `License/_issue` action for historical commercial DID service declarations
+  that advertised Offer and Order search before those licence capabilities
+  became explicit; removed and unrelated mutation routes remain closed.
+- Pin `gdc-common-utils-ts@2.7.2` for the canonical FHIR consent status
+  vocabulary consumed by draft permission-request ingestion.
+- Remove tracked internal planning notes, use-case-specific municipality and
+  animal fixtures, and the unreferenced root JWKS sample from GW CORE. Public
+  closeout documents and audit scripts now resolve only maintained public
+  references, while local internal-note paths remain ignored.
+- Fail closed when host organization registration returns an entry-level
+  `OperationOutcome`, while retaining the existing persisted Offer and Order
+  readiness checks.
+- Add the repository-owned secure local SDK E2E runner. It requires Node 24,
+  enables every live GW journey and transport profile, preserves audit logs,
+  and rejects any reported `SKIP` before the service can be released.
+- Run that release gate against the isolated in-memory local profile by
+  default. Persistent Firestore validation remains an explicit opt-in through
+  `LIVE_GW_API_SCRIPT` and cannot contaminate the reproducible lifecycle gate;
+  execute destructive individual and host cleanup in a second fresh runtime so
+  sibling journeys cannot leave descendants behind or hide an incomplete end,
+  while retaining both the governed transaction and legacy ICA-proof paths.
 
 ## [1.23.12] - 2026-09-01
 
