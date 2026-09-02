@@ -52,6 +52,9 @@ grep -q 'host-st.example.invalid' "${TMP_DIR}/staging.yaml"
 grep -q 'host.example.invalid' "${TMP_DIR}/production.yaml"
 grep -q 'NETWORK_MODE: "test-network"' "${TMP_DIR}/staging.yaml"
 grep -q 'NETWORK_MODE: "network"' "${TMP_DIR}/production.yaml"
+grep -q 'HOST_ADMIN_EMAIL: "controller@host.example.invalid"' "${TMP_DIR}/production.yaml"
+grep -q 'HOST_ADMIN_UID: "host-controller-001"' "${TMP_DIR}/production.yaml"
+grep -q 'HOST_ADMIN_ROLE: "ISCO-08|1120"' "${TMP_DIR}/production.yaml"
 grep -q 'secretName: host-authorization' "${TMP_DIR}/production.yaml"
 grep -q 'mountPath: /var/run/gdc-host-authorization' "${TMP_DIR}/production.yaml"
 grep -q 'test -s /var/run/gdc-host-authorization/authorization.json' "${TMP_DIR}/production.yaml"
@@ -110,6 +113,20 @@ if grep -q 'KEK_SECRET' "${TMP_DIR}/production.yaml"; then
 fi
 if grep -q 'peer0.shared-fabric.svc.cluster.local' "${TMP_DIR}/production.yaml"; then
   echo "production rendered the staging peer" >&2
+  exit 1
+fi
+
+cp "${CHART}/ci/production-values.yaml" "${TMP_DIR}/missing-host-controller.yaml"
+sed -i.bak 's/adminEmail: controller@host.example.invalid/adminEmail: ""/' "${TMP_DIR}/missing-host-controller.yaml"
+if helm lint "${CHART}" -f "${TMP_DIR}/missing-host-controller.yaml" >/dev/null 2>&1; then
+  echo "chart accepted production without the host controller email" >&2
+  exit 1
+fi
+
+cp "${CHART}/ci/production-values.yaml" "${TMP_DIR}/missing-host-legal-name.yaml"
+sed -i.bak 's/legalName: Example Host/legalName: ""/' "${TMP_DIR}/missing-host-legal-name.yaml"
+if helm lint "${CHART}" -f "${TMP_DIR}/missing-host-legal-name.yaml" >/dev/null 2>&1; then
+  echo "chart accepted production without the approved host legal name" >&2
   exit 1
 fi
 if grep -Eq 'hostCredentialJwt|signedPdf|HostingServiceCredential' "${TMP_DIR}/production.yaml"; then

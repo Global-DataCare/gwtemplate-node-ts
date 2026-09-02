@@ -1,0 +1,11 @@
+{
+  "hostDomain": "host.provider.example",
+  "serviceUrl": "https://host.provider.example",
+  "jurisdiction": "ES",
+  "sector": "onehealth-research",
+  "networkKind": "network",
+  "legalName": "<razón-social-aprobada>",
+  "addressCountry": "ES",
+  "taxId": "<identificador-fiscal-aprobado>",
+  "controllerEmail": "<email-controller-aprobado>"
+}

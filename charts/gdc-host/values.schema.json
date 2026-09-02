@@ -15,11 +15,17 @@
     },
     "host": {
       "type": "object",
-      "required": ["domain", "publicUrl", "idValue", "allowedSectors", "identityChannel", "organizationIdentityChannel", "dataChannel"],
+      "required": ["domain", "publicUrl", "legalName", "jurisdiction", "idType", "idValue", "adminEmail", "adminUid", "adminRole", "allowedSectors", "identityChannel", "organizationIdentityChannel", "dataChannel"],
       "properties": {
         "domain": { "type": "string", "minLength": 3 },
         "publicUrl": { "type": "string", "pattern": "^https?://" },
+        "legalName": { "type": "string", "minLength": 1 },
+        "jurisdiction": { "type": "string", "minLength": 2 },
+        "idType": { "type": "string", "minLength": 1 },
         "idValue": { "type": "string", "minLength": 3 },
+        "adminEmail": { "type": "string", "format": "email" },
+        "adminUid": { "type": "string", "minLength": 3 },
+        "adminRole": { "type": "string", "minLength": 3 },
         "allowedSectors": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
         "identityChannel": { "type": "string", "minLength": 1 },
         "organizationIdentityChannel": { "type": "string", "minLength": 1 },

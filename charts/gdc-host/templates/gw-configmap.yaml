@@ -21,6 +21,9 @@ data:
   HOST_ID_VALUE: {{ .Values.host.idValue | quote }}
   HOST_LEGAL_NAME: {{ .Values.host.legalName | quote }}
   HOST_JURISDICTION: {{ .Values.host.jurisdiction | quote }}
+  HOST_ADMIN_EMAIL: {{ .Values.host.adminEmail | quote }}
+  HOST_ADMIN_UID: {{ .Values.host.adminUid | quote }}
+  HOST_ADMIN_ROLE: {{ .Values.host.adminRole | quote }}
   HOST_STORAGE_SCOPE: {{ .Values.host.storageScope | quote }}
   HOST_TERMS_URL: {{ printf "%s/terms" (trimSuffix "/" .Values.host.publicUrl) | quote }}
   ALLOWED_SECTORS: {{ join "," .Values.host.allowedSectors | quote }}

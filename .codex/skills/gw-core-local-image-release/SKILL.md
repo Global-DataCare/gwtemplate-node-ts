@@ -175,8 +175,10 @@ deliverable, the real data-space ICA migration/promotion, and the real host
 rollout through test-network and production. They reuse the same migration,
 Helm and onboarding contracts but never reuse environment identities or data.
 Use `scripts/onboarding/request-host-credential.mjs` to generate the host's
-P-384 bootstrap identity and request the governed Host VC; operators should
-not construct internal JWS or HTTP payloads by hand.
+P-384 request-signing key and request the governed Host VC with the one-time
+activation received from the data-space ICA operator. Do not generate or
+exchange a provisional host DID document, and do not construct internal JWS or
+HTTP payloads by hand.
 
 For the report, keep production identity routing explicit: EU VAT
 Organizations and organization-scoped employees use `identity-eu`, while

@@ -170,6 +170,11 @@ grep -Fq 'RESUMEN_OPERATIVO_Y_ENLACES_ES.md' ./deliverables/README.md
 grep -Fq 'npm run evidence:open-source-production-readiness' ./deliverables/ENTREGABLE_LOCAL_REPRODUCIBLE_ES.md
 grep -Fq 'evidence:migration:postgres-ipfs' ./deliverables/MIGRACION_Y_DESPLIEGUE_ICA_ES.md
 grep -Fq 'request-host-credential.mjs' ./deliverables/PUESTA_EN_MARCHA_HOST_ES.md
+grep -Fq 'host:activation:create' ./deliverables/PUESTA_EN_MARCHA_HOST_ES.md
+grep -Fq 'host-activation-approval.example.json' ./deliverables/PUESTA_EN_MARCHA_HOST_ES.md
+grep -Fq -- '--approval-stdin' ./deliverables/PUESTA_EN_MARCHA_HOST_ES.md
+grep -Fq 'HostActivation' ./scripts/onboarding/request-host-credential.mjs
+grep -Fq 'approved host data' ./scripts/onboarding/request-host-credential.mjs
 grep -Fq 'https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/deliverables/' ./deliverables/RESUMEN_OPERATIVO_Y_ENLACES_ES.md
 grep -Fq 'request-host-credential.mjs' ./deliverables/RESUMEN_OPERATIVO_Y_ENLACES_ES.md
 if grep -Fq 'INSTRUCCIONES_OPERADOR_MIGRACION_ICA_ES.md' ./deliverables/RESUMEN_OPERATIVO_Y_ENLACES_ES.md; then

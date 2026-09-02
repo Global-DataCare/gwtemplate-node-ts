@@ -3,7 +3,7 @@
 Distribución pública OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.1
 ```
 
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:
@@ -67,6 +67,28 @@ imágenes deben expresarse siempre por digest OCI:
 gw:
   image: ghcr.io/global-datacare/gw-core@sha256:e09bc2bc86d50cccdec57e9b5fa9862cd6404e10305b6b9c33073f2cc5c8b632
 ```
+
+La sección `host` identifica al operador y al controller técnico inicial del
+registro reservado `host`:
+
+```yaml
+host:
+  legalName: <razón-social-aprobada>
+  idType: <tipo-identificador>
+  idValue: <identificador-legal>
+  adminEmail: <email-controller-aprobado>
+  adminUid: <identificador-estable-controller>
+  adminRole: <rol-ISCO-08>
+  allowedSectors:
+    - <sector-autorizado>
+```
+
+El chart valida que los tres campos `admin*` existan y los inyecta en GW CORE.
+Durante el arranque, GW crea el registro técnico `host`, genera sus claves
+operativas mediante el adaptador KMS y publica su DID canónico en
+`https://<host>/.well-known/did.json`. El registro del operador no constituye
+un tenant de negocio; los tenants se incorporan después por su flujo normal en
+uno de los `host.allowedSectors` autorizados.
 
 Antes de instalar, deben existir los Secrets referenciados:
 

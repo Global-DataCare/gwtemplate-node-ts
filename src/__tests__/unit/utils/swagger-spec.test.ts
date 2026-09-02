@@ -60,6 +60,7 @@ describe('Swagger Spec Generation', () => {
         ?.post?.['x-contract-level'],
     ).toBe('internal-compatibility');
     expect(spec.paths['/host/ping']).toBeDefined();
+    expect(spec.paths['/.well-known/did.json']).toBeDefined();
     expect(spec.paths['/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/ping']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/ping']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/did.json']).toBeDefined();

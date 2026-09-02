@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [1.23.15] - 2026-09-02
+
+- Clarify the public host-onboarding guide with explicit governance,
+  data-space ICA DevOps, host DevOps and Fabric administrator responsibilities;
+  define the `_verify` URL, private host manifest and one-time activation
+  handoff without conflating the Host VC with Fabric MSP/TLS.
+- Permit an explicitly approved Fabric enrollment handoff window of up to 72
+  hours without increasing the bounded two-use peer MSP/TLS grant or one-use GW
+  client grant, and document server-side revocation of unused identities.
+- Separate the Host VC issuance sector, host `networkMode` and Helm
+  `host.allowedSectors` coverage so a multi-sector host is not represented as
+  belonging to one tenant business sector.
+- Require and inject the approved initial host controller identity through the
+  Helm chart, and expose the KMS-backed operational host `did:web` document at
+  the canonical root `/.well-known/did.json` URL after GW bootstrap.
+- Replace the provisional host DID-document exchange with a private one-time
+  activation file: the onboarding helper generates only its local request key,
+  rejects changes to the approved legal identity, controller, jurisdiction,
+  service, sector, domain or network, submits the public JWK and signed proof,
+  and keeps `thid` limited to asynchronous correlation.
+
 ## [1.23.13] - 2026-09-02
 
 - Keep permission requests as auditable `Communication` attachments containing

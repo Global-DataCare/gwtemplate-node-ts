@@ -21,7 +21,7 @@ for file in "${GUIDE}" "${INDEX}" "${CHART_README}" "${CHART_METADATA}"; do
 done
 
 grep -Fq 'oci://ghcr.io/global-datacare/gdc-host' "${INDEX}"
-grep -Fq 'helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.0' "${GUIDE}"
+grep -Fq 'helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.1' "${GUIDE}"
 grep -Fq 'fabric-ca-client getcainfo' "${GUIDE}"
 grep -Fq 'enroll-host-msp.sh' "${GUIDE}"
 grep -Fq 'enroll-host-client.sh' "${GUIDE}"

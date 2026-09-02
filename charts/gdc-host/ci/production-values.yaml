@@ -7,6 +7,9 @@ host:
   publicUrl: https://host.example.invalid
   legalName: Example Host
   idValue: host.example.invalid
+  adminEmail: controller@host.example.invalid
+  adminUid: host-controller-001
+  adminRole: ISCO-08|1120
   storageScope: host
   allowedSectors: [onehealth-research]
   identityChannel: identity-global

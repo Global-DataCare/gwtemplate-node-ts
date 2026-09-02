@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/integration/hostDemoWellKnown.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -38,6 +38,10 @@ describe('Host well-known endpoints (demo, mem)', () => {
     try {
       process.env.HOST_COVERAGE_SCOPE = 'EU';
       process.env.NETWORK_MODE = 'test';
+
+      const rootDid = await invokeExpress(app, { method: 'GET', url: '/.well-known/did.json' });
+      expect(rootDid.status).toBe(200);
+      expect(JSON.parse(rootDid.text).id).toBe(HOST_DID);
 
       const selfDesc = await invokeExpress(app, { method: 'GET', url: `${HOST_WELL_KNOWN_PREFIX}/self-description.json` });
       expect(selfDesc.status).toBe(200);

@@ -5,6 +5,9 @@ host:
   publicUrl: https://host-st.example.invalid
   legalName: Example Host staging
   idValue: host-st.example.invalid
+  adminEmail: controller@host-st.example.invalid
+  adminUid: host-st-controller-001
+  adminRole: ISCO-08|1120
   storageScope: host-st
   allowedSectors: [onehealth-research]
   identityChannel: identity-global
