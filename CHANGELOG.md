@@ -17,6 +17,12 @@
   animal fixtures, and the unreferenced root JWKS sample from GW CORE. Public
   closeout documents and audit scripts now resolve only maintained public
   references, while local internal-note paths remain ignored.
+- Fail closed when host organization registration returns an entry-level
+  `OperationOutcome`, while retaining the existing persisted Offer and Order
+  readiness checks.
+- Add the repository-owned secure local SDK E2E runner. It requires Node 24,
+  enables every live GW journey and transport profile, preserves audit logs,
+  and rejects any reported `SKIP` before the service can be released.
 
 ## [1.23.12] - 2026-09-01
 

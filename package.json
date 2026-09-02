@@ -64,6 +64,7 @@
     "test:e2e": "NODE_OPTIONS=--experimental-vm-modules TEST_ENV=e2e jest --no-coverage src/__tests__/e2e",
     "test:e2e:test-network-unid": "NODE_OPTIONS=--experimental-vm-modules TEST_ENV=e2e jest --no-coverage src/__tests__/e2e/consentaccess.test-network-unid.e2e.spec.ts",
     "test:e2e:real": "bash ./scripts/test-e2e-real-precheck.sh",
+    "test:e2e:secure-local": "bash ./scripts/run-secure-e2e-google-user.sh",
     "ica:a4:fullcycle": "node ./scripts/run-ica-a4-fullcycle.mjs",
     "ica:antifraud:fullcycle": "PDF_PATH=${HOME}/GITS/gdc-workspace/examples/TEST-A4-Antifraud.pdf SECTOR=health-care node ./scripts/run-ica-a4-fullcycle.mjs",
     "seed:dev": "ts-node --esm scripts/seed-dev-cas.ts",

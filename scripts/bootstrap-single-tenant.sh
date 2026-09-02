@@ -145,7 +145,7 @@ org_payload="$(render_example_payload ORGANIZATION_REGISTRATION_REQUEST "$org_pa
 echo "[bootstrap] organization registration (taxId=$TAX_ID)"
 org_create="$(post_json "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch" "$org_payload")"
 echo "$org_create" | jq '.'
-org_err="$(echo "$org_create" | jq -r '.body.issues.issue[0].diagnostics // .issues.issue[0].diagnostics // empty')"
+org_err="$(echo "$org_create" | jq -r '.body.data[0].response.outcome.issue[0].diagnostics // .data[0].response.outcome.issue[0].diagnostics // .body.issues.issue[0].diagnostics // .issues.issue[0].diagnostics // empty')"
 if [[ -n "$org_err" && "$org_err" != *"already exists"* ]]; then
   echo "ERROR: organization registration failed: $org_err"
   exit 1
