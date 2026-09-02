@@ -11,6 +11,8 @@
 - Decrypt DCR-protected device-license documents inside the trusted tenant
   boundary before `License/_search` filtering and public projection, without
   exposing ciphertext or activation material.
+- Pin `gdc-common-utils-ts@2.7.2` for the canonical FHIR consent status
+  vocabulary consumed by draft permission-request ingestion.
 - Remove tracked internal planning notes, use-case-specific municipality and
   animal fixtures, and the unreferenced root JWKS sample from GW CORE. Public
   closeout documents and audit scripts now resolve only maintained public
