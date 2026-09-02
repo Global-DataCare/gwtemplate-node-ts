@@ -10,7 +10,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PACKAGE_PAGE="https://github.com/orgs/Global-DataCare/packages/container/package/gw-core"
-PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e09bc2bc86d50cccdec57e9b5fa9862cd6404e10305b6b9c33073f2cc5c8b632"
+PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:724ba328915d9907d7254c7eeded845d70dc1ae05881bccff630e871fbc7389f"
 CCAAS_PACKAGE_PAGE="https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime"
 CCAAS_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
 
@@ -55,12 +55,17 @@ fi
 grep -Fq 'CCAAS' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 grep -Fq 'GW CORE y CCAAS son artefactos OCI distintos' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
-  | grep -Fq 'e09bc2bc86d50cccdec57e9b5fa9862cd6404e10305b6b9c33073f2cc5c8b632'
+  | grep -Fq '724ba328915d9907d7254c7eeded845d70dc1ae05881bccff630e871fbc7389f'
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
   | grep -Fq '67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac'
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
   | grep -Fq "$PACKAGE_PAGE"
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
   | grep -Fq "$CCAAS_PACKAGE_PAGE"
+
+grep -Fq 'https://github.com/orgs/Global-DataCare/packages/container/package/dataspace-ica' \
+  "$ROOT_DIR/deliverables/MIGRACION_Y_DESPLIEGUE_ICA_ES.md"
+grep -Fq 'ghcr.io/global-datacare/dataspace-ica@sha256:2e0faee426f7e1c438409a99ae2ab61f4aa21fc1ef615de3928ee1c020092053' \
+  "$ROOT_DIR/deliverables/MIGRACION_Y_DESPLIEGUE_ICA_ES.md"
 
 echo "Public GW CORE image documentation contract: ok"

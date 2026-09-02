@@ -70,15 +70,17 @@ La salida obligatoria es:
 
 ## 5. Desplegar la nueva ICA sin cambiar DNS
 
-El proveedor construye una imagen inmutable desde el commit probado y la
-publica en su registro:
+La imagen OCI verificada de la ICA del espacio de datos está publicada en:
+
+- [paquete `dataspace-ica`](https://github.com/orgs/Global-DataCare/packages/container/package/dataspace-ica);
+- `ghcr.io/global-datacare/dataspace-ica@sha256:2e0faee426f7e1c438409a99ae2ab61f4aa21fc1ef615de3928ee1c020092053`.
+
+El proveedor comprueba y utiliza ese digest inmutable:
 
 ```bash
-export ICA_COMMIT="$(git rev-parse HEAD)"
-export ICA_IMAGE='<registro>/<repositorio>/dataspace-ica'
-docker build --pull -t "${ICA_IMAGE}:${ICA_COMMIT}" .
-docker push "${ICA_IMAGE}:${ICA_COMMIT}"
-docker buildx imagetools inspect "${ICA_IMAGE}:${ICA_COMMIT}"
+export ICA_IMAGE='ghcr.io/global-datacare/dataspace-ica@sha256:2e0faee426f7e1c438409a99ae2ab61f4aa21fc1ef615de3928ee1c020092053'
+docker pull "${ICA_IMAGE}"
+docker buildx imagetools inspect "${ICA_IMAGE}"
 ```
 
 Las plantillas Kubernetes públicas de la ICA están en

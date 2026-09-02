@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Pin every public GW CORE deployment and deliverable example to the verified
+  `1.23.15` OCI manifest, and document the independently published immutable
+  data-space ICA runtime used by the migration procedure.
+
 ## [1.23.15] - 2026-09-02
 
 - Clarify the public host-onboarding guide with explicit governance,
