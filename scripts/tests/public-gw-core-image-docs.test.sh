@@ -35,11 +35,23 @@ if grep -Eiq 'docs-internal|roadmap|pending compatibility TODO' "$ROOT_DIR/READM
   echo 'Public package README must not expose obsolete planning documents.' >&2
   exit 1
 fi
-if [[ -e "$ROOT_DIR/docs-internal/ROADMAP.md" ]]; then
-  echo 'The obsolete dated roadmap must not remain in the repository.' >&2
+for obsolete_path in \
+  docs-internal \
+  data/animal-index-collaboration \
+  jwks.json; do
+  if [[ -e "$ROOT_DIR/$obsolete_path" ]]; then
+    echo "Obsolete or use-case-specific residue must not remain in GW CORE: $obsolete_path" >&2
+    exit 1
+  fi
+done
+
+if rg -n 'docs-internal/' \
+  "$ROOT_DIR/docs-end" \
+  "$ROOT_DIR/scripts" \
+  --glob '!public-gw-core-image-docs.test.sh'; then
+  echo 'Public documentation and scripts must not point to removed internal files.' >&2
   exit 1
 fi
-grep -Fq 'CBOR' "$ROOT_DIR/docs-internal/BACKLOG.md"
 grep -Fq 'CCAAS' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 grep -Fq 'GW CORE y CCAAS son artefactos OCI distintos' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \

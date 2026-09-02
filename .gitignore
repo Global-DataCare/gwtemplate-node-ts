@@ -136,3 +136,5 @@ infra/fabric/local-network/external-chaincodes/*/
 # Internal planning notes (keep local)
 _TODO-TASKS.md
 docs/_TODO-TASKS.md
+/docs-internal/
+/data/animal-index-collaboration/

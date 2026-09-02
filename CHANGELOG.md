@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.23.13] - 2026-09-02
+
 - Keep permission requests as auditable `Communication` attachments containing
   canonical FHIR `Consent.status = draft` Bundles. Draft entries remain in the
   individual inbox and cannot be projected as active authorization rules; no
@@ -9,6 +11,10 @@
 - Decrypt DCR-protected device-license documents inside the trusted tenant
   boundary before `License/_search` filtering and public projection, without
   exposing ciphertext or activation material.
+- Remove tracked internal planning notes, use-case-specific municipality and
+  animal fixtures, and the unreferenced root JWKS sample from GW CORE. Public
+  closeout documents and audit scripts now resolve only maintained public
+  references, while local internal-note paths remain ignored.
 
 ## [1.23.12] - 2026-09-01
 

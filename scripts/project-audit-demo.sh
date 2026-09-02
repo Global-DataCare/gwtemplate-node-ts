@@ -139,7 +139,7 @@ mkdir -p "${RUN_LOG_DIR}"
 
 if [[ "${MODE}" != "demo" ]]; then
   echo "ERROR: mode '${MODE}' is not yet packaged in gwtemplate-node-ts." >&2
-  echo "See docs-internal/00-project-closeout-todo.md for compat/legacy and strict status." >&2
+  echo "See docs/TESTING.md for the supported public validation profiles." >&2
   exit 3
 fi
 

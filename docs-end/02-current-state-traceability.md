@@ -91,10 +91,6 @@ Residual query gap:
   `urn:gdc:...` tenant ids and should be treated as a follow-up query/index bug,
   not as missing onboarding writes
 
-The missing identity part is now specified in:
-
-- `docs-internal/03-identity-ledger-contract-plan.md`
-
 ## Cross-Repo Evidence That Already Exists But Is Separate
 
 The wider lifecycle story is distributed:

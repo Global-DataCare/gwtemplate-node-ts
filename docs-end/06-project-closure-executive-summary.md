@@ -463,7 +463,7 @@ de integradores, auditores y clientes.
 Se recomienda como documenatación complementaria:
 
 1. el anexo técnico detallado:
-   [05-project-closure-use-cases-and-lifecycles-summary.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs-internal/05-project-closure-use-cases-and-lifecycles-summary.md)
+   [05-project-closure-use-cases-and-lifecycles-summary.md](05-project-closure-use-cases-and-lifecycles-summary.md)
 2. la tabla funcional BFF `v1.5`
 3. los runbooks de trust bundle y local Fabric
 4. los scripts y referencias de pruebas live
