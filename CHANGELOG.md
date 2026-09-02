@@ -23,6 +23,12 @@
   service, sector, domain or network, submits the public JWK and signed proof,
   and keeps `thid` limited to asynchronous correlation.
 
+## [1.23.14] - 2026-09-02
+
+- Require lockfile-authoritative npm ci, effective internal dependency
+  verification with npm ls, and immediate E2E/Playwright termination after
+  the first failed project before expanding to sibling browsers or journeys.
+
 ## [1.23.13] - 2026-09-02
 
 - Keep permission requests as auditable `Communication` attachments containing
