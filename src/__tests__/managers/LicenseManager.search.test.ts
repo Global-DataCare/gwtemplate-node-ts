@@ -3,6 +3,7 @@
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import type { IVaultRepository } from '../../database/repositories/vault/vault.repository';
+import type { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import { LicenseManager } from '../../managers/LicenseManager';
 import { getEnvSectionId } from '../../utils/section-env';
 
@@ -223,6 +224,37 @@ describe('LicenseManager (_search)', () => {
       TEST_VAULT_ID,
       getEnvSectionId('device-licenses'),
     );
+  });
+
+  it('decrypts an active DCR-bound seat before projecting the authorized inventory', async () => {
+    // High-level flow:
+    // 1. DCR has encrypted an activated professional seat at rest.
+    // 2. The organization controller lists the complete seat inventory.
+    // 3. GW decrypts inside the trusted tenant boundary and returns only the
+    //    normalized public row; ciphertext and activation material stay out.
+    const activeDocument = newDocumentsLicenseSearchFixture()[0]!;
+    const protectedDocument = {
+      id: activeDocument.id,
+      status: activeDocument.status,
+      sequence: 1,
+      content: { protected: 'compact-jwe-at-rest' },
+    } as unknown as ConfidentialStorageDoc;
+    const kmsService = mock<IKmsService>();
+    kmsService.unprotectConfidentialData.mockResolvedValue(activeDocument.content as never);
+    mockVaultRepository.getContainersInSection.mockResolvedValue([protectedDocument] as any);
+    manager = new LicenseManager(mockVaultRepository, kmsService);
+
+    const response = await manager.process(newJobSearchLicense(
+      new LicenseListSearchEditor().setUserClass(DeviceUserClasses.Employee).buildSearchEntry() as unknown as Record<string, unknown>,
+    ));
+
+    expect((response.body as any).total).toBe(1);
+    expect((response.body as any).data[0]?.resource).toMatchObject({
+      id: EXAMPLE_LICENSE_SEAT_UUID_ACTIVE,
+      meta: { status: LicenseStatuses.Active },
+    });
+    expect(kmsService.unprotectConfidentialData).toHaveBeenCalledWith(protectedDocument, TEST_VAULT_ID);
+    expect(JSON.stringify(response.body)).not.toContain('compact-jwe-at-rest');
   });
 
   it('searches device licenses from one FHIR Parameters wrapper', async () => {

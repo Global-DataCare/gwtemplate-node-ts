@@ -57,7 +57,16 @@ E2E gates before `npm publish` or any container image build.
 
 - FHIR SearchParameter names are canonical FHIR names only: lowercase and `-` where applicable.
 - No invented camelCase for FHIR claims/search keys (example: use `Communication.part-of`, never `Communication.partOf`).
-- Custom parameter names are allowed only when FHIR has no defined parameter.
+- Resource names, properties, lifecycle values and search parameters must be
+  taken from the declared official HL7 FHIR version. Do not create pseudo-FHIR
+  namespaces such as `AccessRequest.*` or lifecycle values such as `proposed`
+  where the selected Consent contract requires `draft`.
+- R4/R5 differences must be explicit. A project extension is allowed only
+  after proving that the selected FHIR version has no suitable element or
+  SearchParameter, and must use a governed canonical extension URL.
+- A permission request is a FHIR `Communication` carrying a Bundle of
+  `Consent.status = draft`; draft Consent is inbox data and never an
+  authorization rule. Only `active` Consent may authorize.
 - `resource.meta.claims` is the canonical project-specific claims carrier in a Bundle document (or JSON:API Primary document embedded in a DIDComm message) and must always be persisted/propagated.
 - `resource.meta.claims` is not part of base FHIR. It is a claims-first extension used by GW/SDK contracts on top of FHIR-like resources.
 - Those claims are often contextualized with `@context` such as `org.schema` or `org.hl7.fhir.api`, but may also use less-contextualized keys when the active `@context` already disambiguates them.

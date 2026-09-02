@@ -25,7 +25,12 @@ import {
   buildCommunicationParticipantSearchParameters,
   buildExampleCommunicationParticipantProjection,
   buildExampleCommunicationParticipantSearchInput,
+  BundleEditableResourceTypes,
+  BundleEditor,
+  BundleOperations,
   CommunicationParticipantPrefixes,
+  ConsentDecisions,
+  ConsentStatuses,
   HealthcareBasicSections,
   ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts';
@@ -38,6 +43,8 @@ import {
   EXAMPLE_ALLERGY_IDENTIFIER,
   EXAMPLE_ALLERGY_ONSET_DATE_TIME,
   EXAMPLE_CLINICAL_SECTION_ALLERGIES,
+  EXAMPLE_COMMUNICATION_IDENTIFIER,
+  EXAMPLE_CONSENT_IDENTIFIER,
   EXAMPLE_CONTENT_TYPE_FHIR_JSON,
   EXAMPLE_CONTROLLER_DID,
   EXAMPLE_HEALTHCARE_JURISDICTION,
@@ -2095,6 +2102,74 @@ describe('CommunicationManager Unit Tests', () => {
       expect(channelRecord.meta?.documentReferenceCount).toBe(1);
       expect(channelRecord['Communication.content-reference']).toContain('DocumentReference/documentreference-from-communication-');
       expect(channelRecord.resource?.body?.data?.some((item: DataEntry) => item.type === 'Attachment')).toBe(true);
+    });
+
+    it('keeps a draft Consent Bundle in the Communication inbox without creating an active rule', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+
+      const permissionBundleEditor = new BundleEditor()
+        .setBundleOperation(BundleOperations.create)
+        .setBundleType(BundleTypes.batch)
+        .setAllowedResourceType(BundleEditableResourceTypes.consent);
+      permissionBundleEditor.newEntryAs(BundleEditableResourceTypes.consent)
+        .setIdentifier(EXAMPLE_CONSENT_IDENTIFIER)
+        .setStatus(ConsentStatuses.Draft)
+        .setSubject(EXAMPLE_SUBJECT_DID)
+        .setDecision(ConsentDecisions.Permit)
+        .doneEntry();
+      const permissionBundle = permissionBundleEditor.buildJsonApi();
+
+      const communicationClaims = {
+        '@context': Format.FHIR_API,
+        [CommunicationClaim.Identifier]: EXAMPLE_COMMUNICATION_IDENTIFIER,
+        [CommunicationClaim.Subject]: EXAMPLE_SUBJECT_DID,
+        [CommunicationClaim.Sender]: EXAMPLE_PROFESSIONAL_DID,
+        [CommunicationClaim.Recipient]: EXAMPLE_SUBJECT_DID,
+        [CommunicationClaim.ContentAttachmentType]: EXAMPLE_CONTENT_TYPE_FHIR_JSON,
+        [CommunicationClaim.ContentAttachmentData]: Buffer.from(
+          JSON.stringify(permissionBundle),
+          'utf8',
+        ).toString('base64'),
+      };
+      const job: JobRequest = {
+        id: randomUUID(),
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        tenantId: 'acme',
+        jurisdiction: EXAMPLE_HEALTHCARE_JURISDICTION,
+        sector: Sector.HEALTH_CARE,
+        section: 'individual',
+        format: Format.FHIR_API as any,
+        resourceType: ResourceTypesFhirR4.Communication,
+        action: '_batch',
+        content: {
+          jti: randomUUID(),
+          thid: EXAMPLE_COMMUNICATION_IDENTIFIER,
+          iss: EXAMPLE_PROFESSIONAL_DID,
+          aud: testServerDid,
+          exp: Math.floor(Date.now() / 1000) + 300,
+          type: 'api+json',
+          body: {
+            data: [{
+              type: ResourceTypesFhirR4.Communication,
+              resource: {
+                resourceType: ResourceTypesFhirR4.Communication,
+                meta: { claims: communicationClaims },
+              },
+            }],
+          },
+        } as any,
+      };
+
+      const response = await communicationManager.process(job);
+
+      expect((response.body as any).data[0]?.response?.status).toBe('200');
+      const writtenSectionIds = mockVaultRepository.put.mock.calls.map((call) => String(call[2] || ''));
+      expect(writtenSectionIds.some((sectionId) => sectionId.endsWith('_rules'))).toBe(false);
+      expect(writtenSectionIds.some((sectionId) => sectionId.endsWith('_consents'))).toBe(false);
+      expect(writtenSectionIds.some((sectionId) => sectionId.includes('communications'))).toBe(true);
     });
   });
 
