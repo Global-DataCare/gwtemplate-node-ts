@@ -3,7 +3,7 @@
 Distribución pública OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.1
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
 ```
 
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:
@@ -89,6 +89,23 @@ operativas mediante el adaptador KMS y publica su DID canónico en
 `https://<host>/.well-known/did.json`. El registro del operador no constituye
 un tenant de negocio; los tenants se incorporan después por su flujo normal en
 uno de los `host.allowedSectors` autorizados.
+
+`peer.channels` declara el conjunto completo de canales aprobado para el peer.
+En producción es obligatorio y debe incluir los tres canales predeterminados
+del GW, además de cualquier otro canal gobernado que vaya a utilizar el host:
+
+```yaml
+peer:
+  channels:
+    - identity-global
+    - identity-eu
+    - health-care-eu
+    - animal-pet-eu
+```
+
+Helm inyecta esa lista como `HLF_BOOTSTRAP_CHANNELS`, pero no incorpora el peer
+por sí mismo: el administrador de Fabric verifica la configuración efectiva de
+cada canal y ejecuta la unión mediante el reconciliador gobernado.
 
 Antes de instalar, deben existir los Secrets referenciados:
 

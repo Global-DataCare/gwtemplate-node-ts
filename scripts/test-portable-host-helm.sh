@@ -24,6 +24,11 @@ helm lint "${CHART}" -f "${CHART}/ci/local-evidence-values.yaml"
   echo 'production example must enumerate all nine CCAAS runtimes' >&2
   exit 1
 }
+[[ "$(yq -o=json -I=0 '.peer.channels' "${CHART}/ci/production-values.yaml")" == \
+  '["identity-global","identity-eu","health-care-eu","animal-pet-eu"]' ]] || {
+  echo 'production host example must declare every channel joined by its peer' >&2
+  exit 1
+}
 bash "${ROOT}/scripts/validate-host-helm-values.sh" \
   "${CHART}/ci/production-values.yaml" host-production host
 
@@ -55,6 +60,8 @@ grep -q 'NETWORK_MODE: "network"' "${TMP_DIR}/production.yaml"
 grep -q 'HOST_ADMIN_EMAIL: "controller@host.example.invalid"' "${TMP_DIR}/production.yaml"
 grep -q 'HOST_ADMIN_UID: "host-controller-001"' "${TMP_DIR}/production.yaml"
 grep -q 'HOST_ADMIN_ROLE: "ISCO-08|1120"' "${TMP_DIR}/production.yaml"
+grep -q 'HLF_BOOTSTRAP_CHANNELS: "identity-global,identity-eu,health-care-eu,animal-pet-eu"' \
+  "${TMP_DIR}/production.yaml"
 grep -q 'secretName: host-authorization' "${TMP_DIR}/production.yaml"
 grep -q 'mountPath: /var/run/gdc-host-authorization' "${TMP_DIR}/production.yaml"
 grep -q 'test -s /var/run/gdc-host-authorization/authorization.json' "${TMP_DIR}/production.yaml"
@@ -78,6 +85,13 @@ grep -q 'PORT: "3000"' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'SECURITY_MODE: "demo"' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'LEDGER_PROVIDER_MAP: "test=mem,local-network=fabric,test-network=fabric,network=fabric"' \
   "${TMP_DIR}/local-evidence.yaml"
+
+cp "${CHART}/ci/production-values.yaml" "${TMP_DIR}/missing-default-channel.yaml"
+yq -i 'del(.peer.channels[] | select(. == "health-care-eu"))' "${TMP_DIR}/missing-default-channel.yaml"
+if helm template invalid "${CHART}" -f "${TMP_DIR}/missing-default-channel.yaml" >/dev/null 2>&1; then
+  echo 'production must reject a peer channel list that omits a configured GW channel' >&2
+  exit 1
+fi
 grep -q 'app.kubernetes.io/component: postgresql' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'app.kubernetes.io/component: ipfs' "${TMP_DIR}/local-evidence.yaml"
 if grep -q '^kind: Ingress$' "${TMP_DIR}/local-host1.yaml" \
