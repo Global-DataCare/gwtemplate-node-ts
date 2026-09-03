@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-09-03
+
+- Normalize a canonical organization authorization URN stored in
+  `License.ownerOrganizationId` back to its bare official identifier before
+  deriving the deterministic employee role-licence id for DCR and revocation.
+- Cover the Fabric subject-key binding with a shared canonical organization
+  fixture so the role-licence preimage cannot regress to hashing the full URN.
+
 - Resolve protected clinical-creator bindings across verified phone/email,
   operational DID and DCR client/key aliases while keeping only the original
   operational actor DID on locally stored clinical records for edit/delete

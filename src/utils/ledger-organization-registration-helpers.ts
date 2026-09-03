@@ -36,6 +36,13 @@ export function buildLedgerOrganizationId(identifierType: string, identifierValu
   });
 }
 
+/** Returns the bare legal identifier required by the role-licence preimage. */
+export function resolveRoleLicenseOrganizationOfficialId(identifier: string): string {
+  const candidate = String(identifier || '').trim();
+  if (!candidate.toLowerCase().startsWith('urn:org:')) return candidate;
+  return normalizeOrganizationAuthorizationUrn(candidate).split(':').slice(3).join(':');
+}
+
 /**
  * Resolves the organization ledger identifier from the canonical legal-id
  * claims used across GW onboarding.

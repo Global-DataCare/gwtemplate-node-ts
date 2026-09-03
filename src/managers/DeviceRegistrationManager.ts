@@ -56,6 +56,7 @@ import { buildOrganizationRoleLicenseId } from 'gdc-common-utils-ts/utils/organi
 import { hasRoleCode } from 'gdc-common-utils-ts/utils/activation-policy';
 import type { ClinicalCreatorBinding } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
+import { resolveRoleLicenseOrganizationOfficialId } from '../utils/ledger-organization-registration-helpers';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -592,7 +593,9 @@ export class DeviceRegistrationManager implements IJobProcessor {
     const jurisdiction = String(params.job.jurisdiction || employeeTenantUrn?.jurisdiction || '').trim();
     const organizationId = String(employeeTenantUrn?.idValue || params.job.tenantId || params.vaultId).trim();
     const roleLicenseId = buildOrganizationRoleLicenseId({
-      organizationOfficialId: String(license.ownerOrganizationId || organizationId).trim(),
+      organizationOfficialId: resolveRoleLicenseOrganizationOfficialId(
+        String(license.ownerOrganizationId || organizationId),
+      ),
       jurisdiction: jurisdiction.toLowerCase(),
       stableContactIdentifier: actorIdentifier,
       licensedRole,
@@ -1005,7 +1008,9 @@ export class DeviceRegistrationManager implements IJobProcessor {
           const jurisdiction = String(job.jurisdiction || employeeTenantUrn?.jurisdiction || '').trim();
           const organizationId = String(employeeTenantUrn?.idValue || tenantId).trim();
           const roleLicenseId = buildOrganizationRoleLicenseId({
-            organizationOfficialId: String(license.ownerOrganizationId || organizationId).trim(),
+            organizationOfficialId: resolveRoleLicenseOrganizationOfficialId(
+              String(license.ownerOrganizationId || organizationId),
+            ),
             jurisdiction: jurisdiction.toLowerCase(),
             stableContactIdentifier: String(license.activatedBy || '').trim(),
             licensedRole,

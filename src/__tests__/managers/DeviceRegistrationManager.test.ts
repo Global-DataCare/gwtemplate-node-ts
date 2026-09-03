@@ -37,6 +37,10 @@ import {
   ExampleHttpStatusText,
 } from 'gdc-common-utils-ts/examples/shared';
 import {
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
+  EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
+} from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import {
   EXAMPLE_EMPLOYEE_ACTIVE_DEVICE_BINDINGS,
   EXAMPLE_LICENSE_ACTIVE_RECORD,
 } from 'gdc-common-utils-ts/examples/license';
@@ -48,6 +52,7 @@ import { DeviceAppTypes, DeviceUserClasses } from 'gdc-common-utils-ts/constants
 import { LicenseStatuses } from 'gdc-common-utils-ts/utils/license';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { buildOrganizationRoleLicenseId } from 'gdc-common-utils-ts/utils/organization-role-license';
 import { getClinicalCreatorBindingsSectionId } from '../../utils/clinical-creator-binding';
 
 const TEST_API_BASE_URL = 'http://localhost:3001';
@@ -335,7 +340,7 @@ describe('DeviceRegistrationManager', () => {
       ]));
     });
 
-    it('should keep two devices and both key sets active for the same employee seat', async () => {
+    it('should normalize the canonical organization owner when binding two devices to one employee seat', async () => {
       Object.assign(process.env, FABRIC_LEDGER_TEST_ENV);
 
       const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
@@ -466,7 +471,7 @@ describe('DeviceRegistrationManager', () => {
         exp: Math.floor(Date.now() / 1000) + 3600,
         subjectId: employeeId,
         activatedBy: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
-        ownerOrganizationId: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+        ownerOrganizationId: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
         issuedToRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
         deviceId: previousDeviceId,
       } as any;
@@ -533,7 +538,12 @@ describe('DeviceRegistrationManager', () => {
         expect.objectContaining({
           subjectId: employeeUrn,
           licensedRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
-          roleLicenseId: expect.stringMatching(/^urn:multibase:/),
+          roleLicenseId: buildOrganizationRoleLicenseId({
+            organizationOfficialId: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerTenantId,
+            jurisdiction: EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction.toLowerCase(),
+            stableContactIdentifier: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
+            licensedRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
+          }),
           meta: expect.objectContaining({
             attributes: expect.objectContaining({ did: employeeDid }),
           }),
