@@ -1,4 +1,5 @@
 import type {
+  ActorSession,
   ClinicalSectionUpdateInput,
   IndividualControllerSdk,
   IpsOrFhirImportInput,
@@ -6,6 +7,9 @@ import type {
   SubmitAndPollResult,
 } from 'gdc-sdk-node-ts';
 import { cloneImportedClinicalDocumentForDemo } from 'gdc-sdk-node-ts';
+
+/** Implemented by the individual-controller, individual-member and professional facades. */
+type ClinicalSummaryWriter = Pick<IndividualControllerSdk, 'updateClinicalSummary'>;
 
 /** Import one IPS while preserving its declared external author provenance. */
 export function importIps(
@@ -27,24 +31,27 @@ export function updateClinicalData(
 
 /** Create and write a separately authored, editable demo copy of an imported IPS. */
 export function updateEditableImportedIpsForDemo(
-  sdk: IndividualControllerSdk,
+  sdk: ClinicalSummaryWriter,
   route: RouteContext,
   input: Readonly<{
     importedIps: Record<string, unknown>;
     individualDid: string;
-    actorDid: string;
+    actorSession: Pick<ActorSession, 'actorDid'>;
     providerDid: string;
   }>,
 ): Promise<SubmitAndPollResult> {
+  const actorDid = String(input.actorSession.actorDid || '').trim();
+  if (!actorDid) throw new Error('The loaded actor session has no operational DID.');
+
   const editableCopy = cloneImportedClinicalDocumentForDemo({
     bundle: input.importedIps,
-    authenticatedActorDid: input.actorDid,
+    authenticatedActorDid: actorDid,
   });
 
   return sdk.updateClinicalSummary(route, {
     subject: input.individualDid,
-    // Operational DID returned by the authenticated profile.
-    sender: input.actorDid,
+    // Operational DID returned by the authenticated role-specific profile session.
+    sender: actorDid,
     // Real tenant DID inside the host that accommodates the tenant.
     recipient: input.providerDid,
     bundle: editableCopy,

@@ -143,15 +143,17 @@ Verify current branches, versions and published npm state before release claims.
 ## Preserve authored clinical deletion
 
 - For the current direct `updateClinicalSummary(...)` call, set `sender` to
-  the operational `profile.actorDid`, never a stable multibase URN or a
-  DID/alias owned by the portal. Set `recipient` to the real provider-tenant
-  DID inside the host that accommodates that tenant, never the host DID or a
-  portal alias. The subject remains the individual DID.
+  the operational `ActorSession.actorDid` returned with the authenticated
+  role-specific profile, never a stable multibase URN or a DID/alias owned by
+  the portal. This applies equally to controller, member/caregiver and
+  professional sessions. Set `recipient` to the real provider-tenant DID inside
+  the host that accommodates that tenant, never the host DID or a portal alias.
+  The subject remains the individual DID.
 - To edit an imported IPS in a demo, first call
-  `cloneImportedClinicalDocumentForDemo(...)` with that same `profile.actorDid`.
-  The helper gives the copy new resource ids and sets
-  `Composition.author = profile.actorDid`; it never rewrites the imported
-  source document.
+  `cloneImportedClinicalDocumentForDemo(...)` with that same session
+  `actorDid`. The helper gives the copy new resource ids and sets
+  `Composition.author` to that `actorDid`; it never rewrites the imported source
+  document.
 - Require a locally declared `Composition.author` to equal the authenticated
   actor DID before first persistence. An anonymous bearer or body claim never
   becomes author evidence.
