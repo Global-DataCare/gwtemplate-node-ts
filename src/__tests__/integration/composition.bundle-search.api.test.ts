@@ -46,7 +46,14 @@ import {
   EXAMPLE_JURISDICTION,
   EXAMPLE_ROUTE_VERSION,
   EXAMPLE_SUBJECT_DID,
+  EXAMPLE_PROFESSIONAL_DID,
+  EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
+  EXAMPLE_KYC_CONTROLLER_USER_UUID,
+  EXAMPLE_KYC_CONTROLLER_UUID,
+  EXAMPLE_TENANT_SERVICE_DID,
 } from 'gdc-common-utils-ts/examples/shared';
+import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { getClinicalCreatorBindingsSectionId } from '../../utils/ips-bundle';
 import { ExampleEmployeeEmails, ExampleEmployeeRoles } from 'gdc-common-utils-ts/examples/employee';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
@@ -304,6 +311,18 @@ describe('Composition Bundle _search API (integration)', () => {
       const subjectDid = 'did:web:api.acme.org:individual:ips-excluded-sections-001';
       const ipsType = `${HealthcareBasicSections.PatientSummaryDocument.system}|${HealthcareBasicSections.PatientSummaryDocument.code}`;
       const compositionSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'composition');
+      const practitionerIdentifier = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`;
+      const practitionerRoleIdentifier = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`;
+
+      await vaultRepository.put(tenantVaultId, [{
+        id: practitionerRoleIdentifier,
+        kind: FhirIpsCreatorKinds.Professional,
+        actorIdentifier: practitionerIdentifier,
+        authorIdentifier: practitionerRoleIdentifier,
+        ownerIdentifier: EXAMPLE_TENANT_SERVICE_DID,
+        role: EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
+        actorDids: [EXAMPLE_PROFESSIONAL_DID],
+      } as any], getClinicalCreatorBindingsSectionId());
 
       await vaultRepository.put(
         tenantVaultId,
@@ -314,7 +333,7 @@ describe('Composition Bundle _search API (integration)', () => {
             'Composition.identifier': 'urn:uuid:composition-medications-001',
             'Composition.subject': subjectDid,
             'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-            'Composition.author': 'did:web:api.acme.org:employee:doctor1',
+            'Composition.author': EXAMPLE_PROFESSIONAL_DID,
             'Composition.date': '2026-05-16T10:00:00Z',
             'Composition.type': ipsType,
           } as any,
@@ -324,7 +343,7 @@ describe('Composition Bundle _search API (integration)', () => {
             'Composition.identifier': 'urn:uuid:composition-allergies-001',
             'Composition.subject': subjectDid,
             'Composition.section': HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
-            'Composition.author': 'did:web:api.acme.org:employee:doctor1',
+            'Composition.author': EXAMPLE_PROFESSIONAL_DID,
             'Composition.date': '2026-05-16T11:00:00Z',
             'Composition.type': ipsType,
           } as any,
@@ -382,6 +401,18 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(
         searchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.section?.[0]?.code?.coding?.[0]?.code,
       ).toBe(HealthcareBasicSections.HistoryOfMedicationUse.code);
+      expect(searchPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.author)
+        .toEqual([{ reference: practitionerRoleIdentifier }]);
+      expect(searchPayload?.data?.[0]?.resource?.entry).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          fullUrl: practitionerIdentifier,
+          resource: expect.objectContaining({ resourceType: ResourceTypesFhirR4.Practitioner }),
+        }),
+        expect.objectContaining({
+          fullUrl: practitionerRoleIdentifier,
+          resource: expect.objectContaining({ resourceType: ResourceTypesFhirR4.PractitionerRole }),
+        }),
+      ]));
     } finally {
       queueAdapter.stop();
     }
@@ -1189,7 +1220,7 @@ describe('Composition Bundle _search API (integration)', () => {
         expect(searchPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.ResearchSubjectSearch);
         const matches = extractBundleSearchResources(searchPayload);
         expect(matches.length).toBeGreaterThanOrEqual(1);
-        const firstMatch = matches[0];
+        const firstMatch = matches[0] as any;
         expect(firstMatch?.composition?.resourceType).toBe('Composition');
         expect(
           firstMatch?.['Composition.subject']
@@ -1545,7 +1576,7 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(searchPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.ResearchSubjectSearch);
       const matches = extractBundleSearchResources(searchPayload);
       expect(matches).toHaveLength(1);
-      const savedResearchSubject = matches[0];
+      const savedResearchSubject = matches[0] as any;
       expect(savedResearchSubject?.resourceType).toBe(ResourceTypesFhirR4.ResearchSubject);
       expect(savedResearchSubject?.[ResearchSubjectClaim.Identifier]).toBe(subjectDid);
       expect(savedResearchSubject?.composition?.id).toBe(selectionCompositionId);

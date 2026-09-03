@@ -165,6 +165,18 @@ Verify current branches, versions and published npm state before release claims.
 - A typed delete addresses exactly `ResourceType/id`, has no resource body and may carry `.ifMatch(versionId)`.
 - Store only the creator DID in the clinical resource as `Composition.author`. Never store email, phone or their stable hashes in that resource.
 - At delete time, authorize the exact subject and creator. Resolve linked verified email/phone login channels from private identity metadata outside the resource, so phone-created and email-created data remain manageable after account linking.
+- In that protected metadata, store the actor/member UUID, a distinct
+  relationship or professional-assignment UUID, its owner and governed role.
+  Operational DIDs, verified contacts, DCR clients and `kid` values are aliases
+  only. Consent targets the assignment UUID plus its separate role.
+- Require an employee/member import or authorized onboarding record before DCR
+  may link a stable creator binding. DCR can add its verified client, actor DID
+  and public `kid` aliases to the exact existing binding; it cannot create or
+  alter the actor UUID, assignment UUID, owner or role.
+- At IPS export time, replace a locally stored operational author DID with the
+  bound FHIR author reference and include RelatedPerson or
+  PractitionerRole/Practitioner resources. Preserve unbound external source
+  authors exactly; never rewrite author identity during direct ingestion.
 - Remove the exact fact from later operational summaries and the synchronized research projection when enabled. This is neither secondary-use `deny` nor provider-offboarding link purge.
 - Keep 101 documentation at application level: actor, subject, hosted
   provider-tenant recipient, typed batch entry, authorization result and

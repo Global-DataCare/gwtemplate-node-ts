@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+- Resolve protected clinical-creator bindings across verified phone/email,
+  operational DID and DCR client/key aliases while keeping only the original
+  operational actor DID on locally stored clinical records for edit/delete
+  authorization.
+- Export bound local authors from `$summary` as stable FHIR RelatedPerson or
+  PractitionerRole/Practitioner resources using the actor UUID, distinct
+  assignment UUID, owner and governed role. Preserve unbound imported author
+  provenance unchanged.
+- Consume `gdc-common-utils-ts@2.8.1` for the shared creator, permission and
+  FHIR IPS projection contract.
+- Accept the canonical creator binding during DCR only when the exact stable
+  assignment was already imported or authorized, then attach the registered
+  client, actor DID and public key aliases in the protected tenant section.
+
 ## [1.23.22] - 2026-09-03
 
 - Accept the SMART post-DCR `smart/token`, canonical
