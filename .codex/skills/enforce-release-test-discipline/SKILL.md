@@ -126,6 +126,13 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
 6. Pin deployable consumers to the exact registry version and update their
    lockfiles. Never substitute GitHub, `file:`, workspace or vendored tarball
    dependencies for a released package.
+   When a product gateway is a long-lived fork of GW CORE or another gateway,
+   never merge or cherry-pick the upstream release commit into the product
+   branch. Start from a clean, current product `main`, inspect the exact
+   upstream diff, and reproduce only the applicable semantic changes in the
+   corresponding destination files. Preserve product-specific behavior,
+   fixtures, documentation and deployment profiles; prove the port with the
+   product's own tests and review its resulting diff before commit.
 7. Verify the actual deployment/revision and live boundary before reporting
    completion.
 
