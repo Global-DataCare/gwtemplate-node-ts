@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.23.18] - 2026-09-03
+
+- Reuse canonical shared lifecycle and gateway entry types in the Family
+  manager flow tests, and synchronize the integrator guide's signed-terms URL
+  with its executable canonical example fixture.
+
 ## [1.23.17] - 2026-09-03
 
 - Align the Family manager contract tests with canonical Bundle response

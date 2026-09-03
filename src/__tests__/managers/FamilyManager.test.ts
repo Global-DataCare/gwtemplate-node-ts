@@ -2,7 +2,11 @@
 // src/__tests__/managers/FamilyManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
-import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import {
+  GatewayRequestEntryTypes,
+  GatewayResponseEntryTypes,
+} from 'gdc-common-utils-ts/constants/gateway-response';
+import { LifecycleRequestType } from 'gdc-common-utils-ts/constants/lifecycle';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { randomUUID } from 'crypto';
@@ -200,7 +204,7 @@ function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest
       type: 'application/api+json',
       body: {
         data: [{
-          type: 'Family-search-v1.0',
+          type: GatewayResponseEntryTypes.FamilySearch,
           meta: {
             claims: {
               [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
@@ -350,7 +354,7 @@ function makeDisableJob(overrideClaims: Record<string, unknown> = {}): JobReques
       type: 'application/api+json',
       body: {
         data: [{
-          type: 'Family-disable-request-v1.0',
+          type: LifecycleRequestType.IndividualOrganizationDisable,
           meta: {
             claims: {
               [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
